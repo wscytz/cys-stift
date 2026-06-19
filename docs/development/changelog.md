@@ -47,4 +47,27 @@
 
 详见 [`docs/superpowers/plans/2026-06-19-phase-1-design-system.md`](../superpowers/plans/2026-06-19-phase-1-design-system.md) + [`docs/design/screenshots/phase-1/README.md`](../design/screenshots/phase-1/README.md)。
 
+## 2026-06-19 · phase 2 · data layer
+
+**交付**：`packages/domain` 从占位升级（types + codec + Card/Canvas/Workspace services + 6 个 vitest 通过）；`packages/db` 从占位升级（Drizzle schema 四表 + 7 个 SQLite 集成测试通过）；`/dev/db` 烟测页 + 客户端 db-client（in-memory + localStorage 后端）；puppeteer 持久化证据脚本。
+
+**核心承诺验证**：
+
+- UI 写 3 张卡 → 跨刷新 → 3 张卡完整保留 ✅（puppeteer 自动化断言）
+- 6 色 token / 字体 / 网格在数据层 UI 仍对 ✅
+- 4 张截图归档：`docs/design/screenshots/phase-2/`
+
+**关键工程决策**：
+
+- `packages/db` 用 **better-sqlite3** 跑通 SQL + drizzle schema，集成测试完整。浏览器侧 `db-client.ts` 走 in-memory + localStorage 占位后端，Repository 抽象保留 — Phase 2.5 替换 in-memory 为 wa-sqlite，business code 不动
+- `useDb()` hook 修了一个 SSR/客户端 hydration 引用稳定性问题（snapshot object 必须在数据变化时才重新分配）
+
+**已知 / 后续**：
+
+- Web 端 wa-sqlite + OPFS 替换 localStorage（Phase 2.5）
+- Tauri 端 Tauri fs 落盘验证（Phase 6/8）
+- MediaAsset 真实落盘（业务用，Phase 3+）
+
+详见 [`docs/superpowers/plans/2026-06-19-phase-2-data-layer.md`](../superpowers/plans/2026-06-19-phase-2-data-layer.md) + [`docs/design/screenshots/phase-2/README.md`](../design/screenshots/phase-2/README.md)。
+
 ---
