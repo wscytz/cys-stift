@@ -2,6 +2,7 @@
 
 > 每条一行，按日期倒序。详细见对应文件。
 
+- [2026-06-19 · Phase 6.5c Inbox→Canvas Send](decisions/2026-06-19-phase-6.5c.md) — 详情 Modal "Send to canvas" 按钮 + moveToCanvas 复用 + tldraw 自动渲染 + 6 断言 + 5 截图
 - [2026-06-19 · Phase 6.5b Inbox 多媒介编辑](decisions/2026-06-19-phase-6.5b.md) — 详情 Modal edit 模式暴露 links/code/quotes editor + editors 抽 features/card 共享 + domain/db 零改动 + 7 断言 + 6 截图
 - [2026-06-19 · Phase 6.5a 草稿自动保存](decisions/2026-06-19-phase-6.5a.md) — web-local localStorage 草稿 + 500ms 防抖 + Mini Input/CreateCardForm 接草稿 + domain/db 零改动 + 7 断言 + 6 截图
 - [2026-06-19 · Phase 7 Archive](decisions/2026-06-19-phase-7.md) — /archive 路由 + 网格/时间轴双视图 + 多选批量 + 蓝条 region + domain/db 零改动 + 8 截图 + 8 断言

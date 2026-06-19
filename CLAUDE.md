@@ -9,9 +9,9 @@
 
 ## 当前状态
 
-- Phase 0 ✅ 脚手架 · Phase 1 ✅ 设计系统 · Phase 2 ✅ 数据层 · Phase 3 ✅ Inbox 业务 · Phase 4 ✅ Canvas 基础 · Phase 5 ✅ Canvas 完整 · Phase 6 ✅ 捕获入口 · Phase 7 ✅ Archive · P6.5a ✅ 草稿自动保存 · **P6.5b ✅ Inbox 多媒介编辑**（详情 Modal edit 模式暴露 links/codeSnippets/quotes editor；editors 抽 `features/card/` 共享切片；Phase 3 hint 移除；domain/db 零改动 / 0 新依赖）
+- Phase 0 ✅ 脚手架 · Phase 1 ✅ 设计系统 · Phase 2 ✅ 数据层 · Phase 3 ✅ Inbox 业务 · Phase 4 ✅ Canvas 基础 · Phase 5 ✅ Canvas 完整 · Phase 6 ✅ 捕获入口 · Phase 7 ✅ Archive · P6.5a ✅ 草稿自动保存 · P6.5b ✅ Inbox 多媒介编辑 · **P6.5c ✅ Inbox→Canvas Send**（详情 Modal "Send to canvas" 按钮 + `moveToCanvas` 复用 + tldraw 自动渲染 + domain/db 零改动 / 0 新依赖）
 - **执行模式**：主模型（Claude）按 `docs/development/roadmap.md` 30 轮路线图顺序执行 + 自审；完成一个就开下一个（用户已授权一直做下去）。Ralph 自动循环不再使用（见下方"Ralph 状态"）
-- **下一个**：P6.5c inbox→canvas send（路线图 §1 下一行）→ 然后 P6.5d 画布视图持久化 → P6.5e-h → Phase 8 Tauri → Phase 9 导出
+- **下一个**：P6.5d 画布视图持久化（路线图 §1 下一行）→ 然后 P6.5e-h → Phase 8 Tauri → Phase 9 导出
 - 完整进度：`docs/development/changelog.md` + `docs/development/roadmap.md`（30 轮路线图）
 - 任务流程参考：`docs/ralph/README.md`（已归档，见下）
 

@@ -24,6 +24,7 @@ import {
   draftLinksToPayload,
   draftQuotesToPayload,
 } from '@/features/card/editors'
+import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 
 type View = 'inbox' | 'archived'
 
@@ -128,6 +129,22 @@ export default function InboxPage() {
             service.unarchive(detail.card.id)
             setDetail(null)
           }}
+          onSendToCanvas={() => {
+            const existing = service.listOnCanvas(DEFAULT_CANVAS_ID)
+            const nextZ = existing.length === 0
+              ? 0
+              : Math.max(...existing.map((c) => c.canvasPosition?.z ?? 0)) + 1
+            service.moveToCanvas(detail.card.id, {
+              canvasId: DEFAULT_CANVAS_ID,
+              x: 100 + (nextZ % 5) * 40,
+              y: 100 + (nextZ % 5) * 40,
+              w: 200,
+              h: 80,
+              z: nextZ,
+            })
+            const updated = service.get(detail.card.id)
+            if (updated) setDetail({ card: updated, mode: 'view' })
+          }}
           onRequestDelete={() => setConfirmDelete(detail.card.id)}
         />
       )}
@@ -222,6 +239,7 @@ interface CardDetailProps {
   onSwitchMode: (mode: 'view' | 'edit') => void
   onArchive: () => void
   onUnarchive: () => void
+  onSendToCanvas: () => void
   onRequestDelete: () => void
 }
 
@@ -232,6 +250,7 @@ function CardDetail({
   onSwitchMode,
   onArchive,
   onUnarchive,
+  onSendToCanvas,
   onRequestDelete,
 }: CardDetailProps) {
   const { card, mode } = state
@@ -385,6 +404,15 @@ function CardDetail({
               ) : (
                 <Button variant="secondary" onClick={onArchive}>
                   Archive
+                </Button>
+              )}
+              {card.canvasPosition ? (
+                <Button variant="secondary" disabled>
+                  <Tag color="blue">on canvas</Tag>
+                </Button>
+              ) : (
+                <Button variant="primary" onClick={onSendToCanvas}>
+                  Send to canvas
                 </Button>
               )}
               <span className="detail__spacer" />

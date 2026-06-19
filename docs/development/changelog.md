@@ -324,3 +324,43 @@
 详见 [`docs/superpowers/plans/2026-06-19-phase-6.5b-multi-media-edit.md`](../superpowers/plans/2026-06-19-phase-6.5b-multi-media-edit.md) + [`docs/design/screenshots/phase-6.5b/README.md`](../design/screenshots/phase-6.5b/README.md)。
 
 ---
+
+## 2026-06-19 · phase 6.5c · inbox to canvas send
+
+**交付**:`apps/web/src/app/inbox/page.tsx` 详情 Modal 加 "Send to canvas" 按钮(无 `canvasPosition` 时 primary)→ `CardService.moveToCanvas` 设 `CanvasPosition { canvasId: DEFAULT, x, y, w, h, z }` → 卡出现在 `/canvas`(Phase 4 tldraw binding 自动渲染 Card shape)→ 跨刷新保留 → 已发送按钮变 "on canvas" disabled 蓝 tag。`DEFAULT_CANVAS_ID` 从 `@/features/canvas/default-canvas` 复用。puppeteer 6/6 断言;5 张截图。
+
+**核心承诺验证(spec §6.3 / Phase 4 §6.11)**:
+
+- 详情 view mode 显示 "Send to canvas" 按钮 ✓
+- 点击后 `card.canvasPosition = {canvasId: "default-canvas", x:100, y:100, w:200, h:80, z:0}` 写入 ✓
+- 按钮变 "on canvas" disabled badge ✓
+- `/canvas` 渲染 1 个 Card shape(`[class*="tl-shape"][data-shape-type="card"]`)✓
+- 跨刷新保留 ✓
+- `/inbox` 列表隐藏该卡(spec §6.11 行为,`listInbox` 排除 canvasPosition 卡)✓
+- 零 page error
+- 5 张截图归档:`docs/design/screenshots/phase-6.5c/`
+
+**关键工程决策**:
+
+- **复用 `CardService.moveToCanvas`**(Phase 2 实现)+ **`CanvasPosition`**(已有类型);不重写,不扩 domain。
+- **`DEFAULT_CANVAS_ID` 从 `features/canvas/default-canvas` 引用**:避免 magic string。
+- **z 计算**:`Math.max(...existing.map(c => c.canvasPosition?.z ?? 0)) + 1`;并发竞态 MVP 可接受。
+- **位置 x/y 用阶梯式排布**:`100 + (z % 5) * 40`;避免多张卡重叠,后续 P6.5+ 可做智能定位。
+- **详情状态用 `service.get(id)` 更新**:不 stale state,触发 CardDetail re-render 显示 "on canvas" badge。
+- **inbox 列表隐藏 on-canvas 卡**:Phase 2 `listInbox` 真相(spec §6.11 行为);**已知 UX 限制**,后续 P9 导出可补。
+- **Canvas dblclick 路径不动**:Phase 4 实现的另一入口,与新路径并存不冲突。
+- **domain / db 零改动**:`moves a card to canvas` vitest 已覆盖。
+- **0 新依赖**。
+
+**已知 / 后续**:
+
+- UX 限制:inbox→canvas 后卡从 inbox 隐藏,只能去 `/canvas` 找回 → 后续 P9 导出可补
+- 多画布 UI(spec §4.9 schema 已支持)→ P6.5+
+- "Send to canvas" 撤销动作 → 留后
+- 智能定位到画布空白区 → 留后
+- "Open on canvas" link → 留 P6.5+
+- 并发 z 计算竞态 → 留后
+
+详见 [`docs/superpowers/plans/2026-06-19-phase-6.5c-inbox-to-canvas.md`](../superpowers/plans/2026-06-19-phase-6.5c-inbox-to-canvas.md) + [`docs/design/screenshots/phase-6.5c/README.md`](../design/screenshots/phase-6.5c/README.md)。
+
+---
