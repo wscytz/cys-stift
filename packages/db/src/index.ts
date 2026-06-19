@@ -1,3 +1,13 @@
-// @cys-stift/db — Drizzle ORM + SQLite schema + migrations
-// Phase 0: placeholder. Real schema lands in Phase 2.
-export {}
+// @cys-stift/db — SQLite + Drizzle + domain codecs
+export * from './schema'
+export * from './codec'
+export {
+  createMemoryDb,
+  createFileDb,
+  type DbHandle,
+} from './drizzle-client'
+export {
+  SqliteCardRepository,
+  SqliteCanvasRepository,
+  SqliteWorkspaceRepository,
+} from './repositories'

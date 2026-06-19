@@ -1,3 +1,16 @@
-// @cys-stift/domain — pure TS business rules (Card / Inbox / Canvas / Capture)
-// Phase 0: placeholder. Real models + services land in Phase 2.
-export {}
+// @cys-stift/domain — pure TS business rules (spec §4)
+export * from './types'
+export * from './codec'
+export {
+  CardService,
+  type CardRepository,
+  type CreateCardInput,
+} from './services/card-service'
+export {
+  CanvasService,
+  type CanvasRepository,
+} from './services/canvas-service'
+export {
+  WorkspaceService,
+  type WorkspaceRepository,
+} from './services/workspace-service'
