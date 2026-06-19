@@ -1,4 +1,4 @@
-# 当前会话交接(P6.5a → P6.5b inbox 多媒介编辑)
+# 当前会话交接(P6.5b → P6.5c inbox→canvas send)
 
 > 用途:spec §9.1 指定的跨会话/跨模型延续档。compact、切模型都不丢。
 > 写入时机:每完成一个 phase closeout 时回写。
@@ -8,15 +8,15 @@
 
 ## 阶段定位
 
-- **当前**:P6.5a ✅ 草稿自动保存(防抖 500ms 写 web-local localStorage + 关闭重开恢复 + 提交清除;tag `v0.8.1-phase-6.5a`;git 干净)
-- **下一个**:**P6.5b inbox 多媒介编辑**(路线图 `docs/development/roadmap.md` §1 下一行)—— 详情 Modal 编辑模式暴露 links/codeSnippets/quotes 编辑器
+- **当前**:P6.5b ✅ Inbox 多媒介编辑(详情 Modal edit 暴露 links/code/quotes editor + editors 抽 features/card 共享 + Phase 3 hint 移除;tag `v0.8.2-phase-6.5b`;git 干净)
+- **下一个**:**P6.5c inbox → canvas send**(路线图 `docs/development/roadmap.md` §1 下一行)—— 详情 Modal 加 "Send to canvas" 按钮,卡片发送后出现在 `/canvas`
 - **状态锚点**:`/Users/jinxunuo/projects/cys-stift/CLAUDE.md`(根项目锚点)+ `docs/development/roadmap.md`(30 轮路线图)
 
 ---
 
 ## 执行模式(2026-06-19 起生效)
 
-**用户授权:跑 30 轮(主 agent,不开 subagent),按 `docs/development/roadmap.md` §1 顺序一直做下去,完成一个就开下一个,合适时自动 compact。**
+**用户授权:跑 30 轮(主 agent,不开 subagent),按 `docs/development/roadmap.md` §1 顺序一直做下去,完成一个就开下一个,合适时自动 compact。Ralph 自动循环已装但 max=0=无限,本会话不依赖其自动行为,按 plan 推进。**
 
 - 路线图 §1 表是权威执行顺序
 - 每轮 = 一个 phase(写 plan → 实现 → 验收 → commit + tag + 六件套 closeout)
@@ -25,46 +25,57 @@
 
 ---
 
-## P6.5a 关键交付速览
+## P6.5b 关键交付速览
 
-- `apps/web/src/lib/draft-store.ts`(新):`DraftStore` 单例 + `useDraft` hook + localStorage 持久化;`Draft.payload: unknown` 各自 cast
-- `apps/web/src/lib/use-debounced-callback.ts`(新):通用防抖 hook,unmount cleanup
-- `apps/web/src/features/capture/mini-input.tsx`(改):`useDraft('capture')` 恢复 + 防抖 upsert + 提交/clear 时 `draftStore.clear`
-- `apps/web/src/app/inbox/create-card-form.tsx`(改):`useDraft('manual')` 恢复 + 防抖 upsert 完整表单状态 + reset 时 `draftStore.clear`
-- `scripts/p6.5a-shots.cjs`(新):7 项交互断言 + 6 截图
-- `docs/design/screenshots/phase-6.5a/`(6 PNG + README)
-- **domain / db 零改动** + **0 新依赖**
+- `apps/web/src/features/card/editors.tsx`(新):`ListEditor` / `CodeEditor` / `QuoteEditor` + `editorStyles` + `draftLinksToPayload` / `draftCodesToPayload` / `draftQuotesToPayload` 转换函数
+- `apps/web/src/app/inbox/page.tsx`(改):详情 Modal `CardDetail` 编辑模式暴露 3 editor + `onSave` 扩 5 字段 patch + Phase 3 hint 移除
+- `apps/web/src/app/inbox/create-card-form.tsx`(改):从本地编辑器实现改为 import 自 features/card/editors
+- `scripts/p6.5b-shots.cjs`(新):7 项交互断言 + 6 截图
+- `docs/design/screenshots/phase-6.5b/`(6 PNG + README)
+- **domain / db 零改动** + **0 新依赖**(`update can swap multi-media arrays` vitest 已覆盖)
 
 puppeteer 7/7 断言全过。
 
 ---
 
-## P6.5a 关键工程决策(接 P6.5b 别再踩)
+## P6.5b 关键工程决策(接 P6.5c 别再踩)
 
-1. **草稿独立 localStorage key**(`cys-stift.drafts.v1`,与 `cys-stift.cards.v1` 分离)→ P6.5b 任何"草稿式"持久化都遵循此模式(独立 key + 不污染 domain)。
-2. **草稿不进 domain**(web-local UI 状态)→ P6.5b 任何 UI 草稿/临时状态同理。
-3. **`unknown` payload + 消费方 cast**→ P6.5b 多媒介草稿也用此模式(避免类型耦合)。
-4. **防抖 500ms + useDebouncedCallback hook**→ P6.5b 任何字段级持久化复用。
-5. **Escape 保留 / 提交清除 / 空草稿自动 clear**→ P6.5b 多媒介编辑器的草稿逻辑同理。
-6. **snapshot 引用稳定** + **restore 用 `[ready]` deps** → P6.5b 任何 useSyncExternalStore 同模式。
-7. **CreateCardForm 改造不破坏 Phase 3 多媒介**:只加 useEffect 草稿读写 + 防抖 upsert,不动表单结构 → P6.5b 详情 Modal 编辑模式同理(扩 patch 白名单 + 暴露 editor,不破坏 view)。
+1. **editors 抽到 `features/card/editors.tsx`** 是 P6.5b 重构成果 → P6.5c 任何"在详情 Modal 加新功能"直接复用,不重写 editor。
+2. **`CardService.update` 白名单已含 links/codeSnippets/quotes** → P6.5c 加 `sendToCanvas` 新业务方法时,优先复用已有,不重复扩 patch。
+3. **`editorStyles` 导出共享 CSS** + 每个 consumer `<style>{editorStyles}</style>` → P6.5c 加新组件用同一 .le* 时复用。
+4. **state 同步 useEffect deps 多字段模式** → P6.5c 如果加 "on canvas" badge / 派生 state,沿用同样模式。
+5. **Canvas `CardDetailModal` 仍独立**(Phase 4 实现,只 title + body)→ P6.5c 之后考虑统一(避免现在触碰 tagged Phase 4)。
+6. **Archive tile onClick 不接通**(Lean)→ 后续 P6.5+ 或独立 phase;不引入 query string 处理。
 
 ---
 
-## P6.5b 范围种子(下一个 phase)
+## P6.5c 范围种子(下一个 phase)
 
-Inbox 多媒介编辑(详情 Modal 改 links/codeSnippets/quotes):
-- 抽 `ListEditor` / `CodeEditor` / `QuoteEditor` 从 `inbox/page.tsx` 到 `apps/web/src/features/card/`
-- 详情 Modal 编辑模式暴露 3 个 editor(已抽的 editor 复用)
-- 提交走 `CardService.update(id, {links, codeSnippets, quotes})`(需扩 `update` 白名单,domain 零改动只增字段白名单)
-- 草稿复用 P6.5a:`useDraft('edit-card')` 存正在编辑的 cardId + 草稿状态
+Inbox → canvas send:
+- 新建 `CanvasService.sendToCanvas(cardId, canvasId = DEFAULT_CANVAS_ID)`:复制 card 到 canvases(同 cardId 还是新 id? — spec §4.2 倾向同 cardId,canvas 通过 listOnCanvas 拉)
+- **决策**:用 `canvasId` nullable 外键(spec §4.9 canvases 表留好);`CardService.create` 默认 null,inbox→canvas 时设 `canvasId`
+- inbox 详情 Modal 加 "Send to canvas" 按钮 → `CanvasService.sendToCanvas(cardId)`
+- inbox 卡片详情 Modal 区分 "已送画布" 状态:badge "On canvas" + 跳画布按钮
+- 画布已有同一 cardId 则跳过(service 校验)
 
-需要 P6.5b plan 时再读:
-- spec §4.2 `Card.links / codeSnippets / quotes` + §4.8 `CaptureInput` 字段
-- Phase 3 closeout `docs/memory/decisions/2026-06-19-phase-3.md` 已知/后续段
-- Phase 3 plan `docs/superpowers/plans/2026-06-20-phase-3-inbox.md` "❌ 没做"段
-- 现有 inbox 代码:`apps/web/src/app/inbox/page.tsx` (详情 Modal)
-- 现有 CreateCardForm editor:`apps/web/src/app/inbox/create-card-form.tsx` (ListEditor/CodeEditor/QuoteEditor)
+需要 P6.5c plan 时再读:
+- spec §4.2 `Card.canvasId` + §4.9 `canvases` 表
+- Phase 4 closeout `docs/memory/decisions/2026-06-19-phase-4.md`
+- Phase 4 plan `docs/superpowers/plans/2026-06-19-phase-4-canvas.md`
+- 现有 canvas 代码:`apps/web/src/features/canvas/`
+- 现有 db schema:`packages/db/src/schema.ts`
+
+---
+
+## 现有 Card 编辑器(Phase 6.5b 新增)
+
+`/Users/jinxunuo/projects/cys-stift/apps/web/src/features/card/`:
+
+| 文件 | 做什么 |
+|---|---|
+| `editors.tsx` | ListEditor + CodeEditor + QuoteEditor + editorStyles + draft→payload 转换 |
+
+`apps/web/src/app/inbox/page.tsx` 的 `CardDetail` 用 editors 实现 edit mode;`apps/web/src/app/inbox/create-card-form.tsx` 也用。
 
 ---
 
@@ -105,7 +116,7 @@ Inbox 多媒介编辑(详情 Modal 改 links/codeSnippets/quotes):
 | `canvas-editor.tsx` | `<Tldraw shapeUtils hideUi onMount>` + snap/gridSize + dblclick |
 | `card-shape-util.tsx` | `CardShapeUtil` 白底黑边 8px 圆角 |
 | `canvas-binding.ts` | §6.11 数据流;防抖 300ms |
-| `card-detail-modal.tsx` | 复用 Phase 3 `MarkdownBody`;view/edit + archive/soft-delete |
+| `card-detail-modal.tsx` | 复用 Phase 3 `MarkdownBody`;view/edit + archive/soft-delete(只 title+body)|
 | `canvas-overrides.css` | snap 指示线黑色 1px |
 | `default-canvas.ts` | `DEFAULT_CANVAS_ID` |
 
@@ -113,7 +124,7 @@ Inbox 多媒介编辑(详情 Modal 改 links/codeSnippets/quotes):
 
 ---
 
-## 纪律提示(接 P6.5b 必须遵守)
+## 纪律提示(接 P6.5c 必须遵守)
 
 - ❌ 不要修改 `docs/superpowers/specs/2026-06-19-cys-stift-design.md`(五轮定稿)
 - ❌ 不要重新选型 / 不要加未要求依赖(YAGNI)
@@ -132,7 +143,7 @@ Inbox 多媒介编辑(详情 Modal 改 links/codeSnippets/quotes):
 
 ## 已通过事项(不要重新怀疑)
 
-### Phase 0-7 + P6.5a 全部通过
+### Phase 0-7 + P6.5a/b 全部通过
 - **Phase 0** — monorepo + Next.js 静态导出 + Tauri 壳 + 包豪斯占位首屏
 - **Phase 1** — packages/ui 组件库(7 组件)+ /design 视觉契约页
 - **Phase 2** — domain + db (drizzle/SQLite) + /dev/db 烟测页 + 持久化证据
@@ -142,6 +153,7 @@ Inbox 多媒介编辑(详情 Modal 改 links/codeSnippets/quotes):
 - **Phase 6** — 全局快捷键 + Mini Input + WebCaptureSink
 - **Phase 7** — /archive 网格/时间轴 + 多选批量 + 蓝条 region
 - **P6.5a** — 草稿自动保存(防抖 500ms + 关闭重开恢复 + 提交清除)
+- **P6.5b** — Inbox 多媒介编辑(editors 抽 features/card + 详情 Modal 暴露 3 类)
 
 ### 不变量
 - 6 色 token + Space Grotesk/Inter/JetBrains Mono + 8px 网格 在所有路由都对
@@ -151,11 +163,11 @@ Inbox 多媒介编辑(详情 Modal 改 links/codeSnippets/quotes):
 
 ---
 
-## 下一步(接 P6.5b 第 1 步)
+## 下一步(接 P6.5c 第 1 步)
 
-1. **读**:spec §4.2 + §4.8 + Phase 3 closeout 已知/后续 + 现有 inbox 详情 Modal + CreateCardForm editors
-2. **写**:`docs/superpowers/plans/2026-06-19-phase-6.5b-multi-media-edit.md`
-3. **实现** + 验收(抽 features/card/ editors + 详情 Modal 暴露 + CardService.update 白名单扩)
+1. **读**:spec §4.2 + §4.9 + Phase 4 closeout 已知/后续 + 现有 canvas + db schema
+2. **写**:`docs/superpowers/plans/2026-06-19-phase-6.5c-inbox-to-canvas.md`
+3. **实现** + 验收(CanvasService.sendToCanvas + 详情 Modal "Send to canvas" 按钮 + Card.canvasId 字段)
 4. **四件套 closeout**
 
-**第 4 轮起**(roadmap 0.5 + P7 1.5 + P6.5a 1.0 = 3 轮;P6.5b = 第 4 轮)。30 轮预算剩余 ~26 轮。
+**第 5 轮起**(roadmap 0.5 + P7 1.5 + P6.5a 1.0 + P6.5b 1.0 = 4 轮;P6.5c = 第 5 轮)。30 轮预算剩余 ~25 轮。

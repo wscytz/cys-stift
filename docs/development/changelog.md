@@ -287,3 +287,40 @@
 详见 [`docs/superpowers/plans/2026-06-19-phase-6.5a-drafts.md`](../superpowers/plans/2026-06-19-phase-6.5a-drafts.md) + [`docs/design/screenshots/phase-6.5a/README.md`](../design/screenshots/phase-6.5a/README.md)。
 
 ---
+
+## 2026-06-19 · phase 6.5b · inbox multi-media edit
+
+**交付**:`apps/web/src/features/card/editors.tsx`(新)抽 `ListEditor` / `CodeEditor` / `QuoteEditor` + `editorStyles` + 3 个 draft→payload 转换函数;`apps/web/src/app/inbox/page.tsx` 详情 Modal `CardDetail` 编辑模式**完整暴露** 3 个 editor(原 Phase 3 MVP 只暴露 title + body,违反 spec §4.2);`apps/web/src/app/inbox/create-card-form.tsx` 改用共享 editors;Phase 3 "intentionally not exposed (Phase 3 MVP)" hint 移除。puppeteer 7/7 断言;6 张截图。
+
+**核心承诺验证(spec §4.2 + Phase 3 closeout 已知/后续)**:
+
+- View 渲染原始 links/code/quotes ✓(view 模式 link-list / code-block / detail__quote 渲染)
+- Edit mode 暴露 **3 个 editor**(.le 块各一,Link + Code + Quote)✓
+- Phase 3 hint `.detail__hint` 移除 ✓
+- Save 走 `service.update(id, {title, body, links, codeSnippets, quotes})` —— title 改 "Edited title" + link 替换 + code 加到 2 + quote attribution 改 ✓
+- 跨刷新保留 ✓
+- 零 page error
+- 6 张截图归档:`docs/design/screenshots/phase-6.5b/`
+
+**关键工程决策**:
+
+- **editors 抽到 `features/card/editors.tsx`**:CreateCardForm + CardDetail 双消费,避免重复(原 Phase 3 在 CreateCardForm 重复定义)。
+- **`editorStyles` 导出共享 CSS**:每个 consumer `<style>{editorStyles}</style>`,不堆 .le*。
+- **draft→payload 转换集中到 editors 模块**(`draftLinksToPayload` 等):CreateCardForm + CardDetail 共用。
+- **`CardService.update` 白名单已含 3 字段**(Phase 3 实现,无需扩 domain);`update can swap multi-media arrays` vitest 已覆盖全 3 字段。
+- **`onSave` 扩 5 字段 patch**:title + body + links + codeSnippets + quotes(原 Phase 3 只传 title + body,3 类媒介走 card.* 不变)。
+- **state 同步 useEffect deps 加 3 字段**:打开不同卡 / 外部 update 时 5 state 全重置。
+- **Canvas `CardDetailModal` 不动**:Phase 4 自己的简化版,避免触碰 tagged Phase 4。
+- **Archive tile onClick 不接通**(Lean):不引入 query string 处理。
+- **0 新依赖** + **domain / db 零改动**。
+
+**已知 / 后续**:
+
+- Canvas `CardDetailModal` 多媒介编辑 → 后续 P6.5+ 统一
+- Archive tile onClick 接通 → 后续 P6.5+ 或独立 phase
+- Edit-mode 草稿 → 后续 P6.5+
+- Edit 实时预览 → 留后
+
+详见 [`docs/superpowers/plans/2026-06-19-phase-6.5b-multi-media-edit.md`](../superpowers/plans/2026-06-19-phase-6.5b-multi-media-edit.md) + [`docs/design/screenshots/phase-6.5b/README.md`](../design/screenshots/phase-6.5b/README.md)。
+
+---

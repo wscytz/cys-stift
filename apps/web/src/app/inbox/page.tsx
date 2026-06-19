@@ -12,6 +12,18 @@ import type {
 } from '@cys-stift/domain'
 import { CreateCardForm } from './create-card-form'
 import { MarkdownBody } from './markdown'
+import {
+  CodeEditor,
+  ListEditor,
+  QuoteEditor,
+  editorStyles,
+  type DraftCode,
+  type DraftLink,
+  type DraftQuote,
+  draftCodesToPayload,
+  draftLinksToPayload,
+  draftQuotesToPayload,
+} from '@/features/card/editors'
 
 type View = 'inbox' | 'archived'
 
@@ -225,13 +237,25 @@ function CardDetail({
   const { card, mode } = state
   const [title, setTitle] = useState(card.title)
   const [body, setBody] = useState(card.body)
+  const [links, setLinks] = useState<DraftLink[]>(() =>
+    card.links.map((l) => ({ url: l.url })),
+  )
+  const [codes, setCodes] = useState<DraftCode[]>(() =>
+    card.codeSnippets.map((c) => ({ language: c.language, code: c.code })),
+  )
+  const [quotes, setQuotes] = useState<DraftQuote[]>(() =>
+    card.quotes.map((q) => ({ text: q.text, attribution: q.attribution ?? '' })),
+  )
   const [pending, startTransition] = useTransition()
   const dialogRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setTitle(card.title)
     setBody(card.body)
-  }, [card.id, card.title, card.body])
+    setLinks(card.links.map((l) => ({ url: l.url })))
+    setCodes(card.codeSnippets.map((c) => ({ language: c.language, code: c.code })))
+    setQuotes(card.quotes.map((q) => ({ text: q.text, attribution: q.attribution ?? '' })))
+  }, [card.id, card.title, card.body, card.links, card.codeSnippets, card.quotes])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -258,9 +282,9 @@ function CardDetail({
       onSave({
         title: title.trim(),
         body,
-        links: card.links,
-        codeSnippets: card.codeSnippets,
-        quotes: card.quotes,
+        links: draftLinksToPayload(links),
+        codeSnippets: draftCodesToPayload(codes),
+        quotes: draftQuotesToPayload(quotes),
       })
     })
   }
@@ -334,13 +358,19 @@ function CardDetail({
                 className="detail__textarea"
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
-                rows={8}
+                rows={6}
               />
             </label>
-            <p className="detail__hint">
-              Editing links / code / quotes is intentionally not exposed here
-              (Phase 3 MVP). The detail view shows the persisted media.
-            </p>
+            <ListEditor
+              items={links}
+              onChange={setLinks}
+              make={() => ({ url: '' })}
+              label="Link"
+              placeholder="https://…"
+              fieldKey="url"
+            />
+            <CodeEditor items={codes} onChange={setCodes} />
+            <QuoteEditor items={quotes} onChange={setQuotes} />
           </>
         )}
 
@@ -374,6 +404,7 @@ function CardDetail({
           )}
         </div>
       </div>
+      <style>{editorStyles}</style>
     </Modal>
   )
 }
