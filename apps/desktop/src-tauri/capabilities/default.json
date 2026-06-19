@@ -1,0 +1,9 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default capabilities — Phase 0 has no commands exposed; window only.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default"
+  ]
+}

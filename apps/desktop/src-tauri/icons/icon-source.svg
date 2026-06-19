@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Bauhaus-inspired app icon: red field, white circle, black bar -->
+  <rect width="1024" height="1024" fill="#d40000"/>
+  <circle cx="512" cy="432" r="200" fill="#fafafa"/>
+  <rect x="232" y="680" width="560" height="56" fill="#0a0a0a"/>
+  <rect x="232" y="760" width="560" height="32" fill="#0a0a0a" opacity="0.6"/>
+</svg>

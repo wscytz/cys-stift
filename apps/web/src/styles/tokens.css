@@ -1,0 +1,62 @@
+/**
+ * Bauhaus tokens — see spec §5.1.
+ * Six primary tokens (red / yellow / blue / black / white / gray). Components
+ * consume CSS variables; Tailwind picks them up via @theme (see tokens.css).
+ * Region → token mapping lives in defaultRegionColor (spec §5.2).
+ */
+
+:root {
+  /* Color tokens — each has a DEFAULT and a soft tint. */
+  --color-red: #d40000;
+  --color-red-soft: #ffe5e5;
+  --color-yellow: #ffce00;
+  --color-yellow-soft: #fff8dc;
+  --color-blue: #003f7f;
+  --color-blue-soft: #e0ebf5;
+  --color-black: #0a0a0a;
+  --color-black-soft: #2b2b2b;
+  --color-white: #fafafa;
+  --color-white-soft: #ffffff;
+  --color-gray: #8c8c8c;
+  --color-gray-soft: #d9d9d9;
+
+  /* Typography */
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+
+  /* Font scale */
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-base: 16px;
+  --font-size-lg: 20px;
+  --font-size-xl: 24px;
+  --font-size-2xl: 32px;
+  --font-size-3xl: 48px;
+  --font-size-4xl: 64px;
+
+  /* 8px grid */
+  --space-0: 0;
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 40px;
+  --space-6: 48px;
+  --space-8: 64px;
+  --space-10: 80px;
+  --space-12: 96px;
+  --space-16: 128px;
+
+  /* Borders — Bauhaus favours single hairline strokes. */
+  --border-hairline: 1px solid var(--color-black);
+  --border-thick: 2px solid var(--color-black);
+
+  /* Radius — keep things geometric. */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+
+  /* Shadows — hard offset, no blur (Bauhaus signature). */
+  --shadow-sm: 0 1px 0 0 currentColor;
+  --shadow-md: 2px 2px 0 0 currentColor;
+}

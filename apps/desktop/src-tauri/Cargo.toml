@@ -1,0 +1,19 @@
+[package]
+name = "cys-stift"
+version = "0.1.0"
+description = "cy's Stift — local-first inspiration canvas"
+authors = ["cy"]
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "cys_stift_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0.3", features = [] }
+
+[dependencies]
+tauri = { version = "2.1.1", features = [] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

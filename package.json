@@ -1,0 +1,23 @@
+{
+  "name": "cys-stift",
+  "version": "0.1.0",
+  "private": true,
+  "description": "cy's Stift — 本地优先的灵感画布",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "tauri": "pnpm --filter desktop tauri",
+    "clean": "pnpm -r exec rm -rf .next out dist node_modules/.cache"
+  },
+  "devDependencies": {
+    "prettier": "3.3.3",
+    "typescript": "5.6.3"
+  }
+}

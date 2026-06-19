@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Tauri
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+
+# Turbo / cache
+.turbo/
+.cache/
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+
+# Test / coverage
+coverage/
+*.log
+
+# Media (user data, never in git — see §11 data dir)
+**/media/
+
+# Tauri signing
+*.key
+*.pem
