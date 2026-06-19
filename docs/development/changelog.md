@@ -364,3 +364,38 @@
 详见 [`docs/superpowers/plans/2026-06-19-phase-6.5c-inbox-to-canvas.md`](../superpowers/plans/2026-06-19-phase-6.5c-inbox-to-canvas.md) + [`docs/design/screenshots/phase-6.5c/README.md`](../design/screenshots/phase-6.5c/README.md)。
 
 ---
+
+## 2026-06-19 · phase 6.5d · canvas view persistence
+
+**交付**:`apps/web/src/lib/canvas-view-store.ts`(新):web-local localStorage key `cys-stift.canvas-view.v1` + `CanvasView {zoom, panX, panY, gridMode, gridSize}` 类型 + `canvasViewStore.get/update/reset` + `useCanvasView` hook;`apps/web/src/features/canvas/canvas-editor.tsx` onMount 加载视图 + `editor.store.listen` 监听 camera + gridMode 变化防抖 500ms 写回 store;删除硬编码默认值(改读 store);`hydrateOnce()` 在 `get/update` 同步调用,避免首次 mount 把默认值覆盖持久值。puppeteer 6/6 断言;4 张截图。
+
+**核心承诺验证(spec §4.3 gridMode + Phase 5 closeout 已知/后续)**:
+
+- 默认:{zoom:1, panX:0, panY:0, isGridMode:true} ✓
+- Zoom in ×2 → 400%(Phase 5 倍进 100→200→400)✓
+- `g` 切 free → isGridMode false ✓
+- Pan drag 触发 camera 变化 → 防抖 500ms 写入 ✓
+- localStorage 持久化:{zoom:4, panX:-540, panY:-319.5, gridMode:'free', gridSize:8} ✓
+- Reload 后状态全保留 ✓
+- 零 page error
+- 4 张截图归档:`docs/design/screenshots/phase-6.5d/`
+
+**关键工程决策**:
+
+- **web-local localStorage key**(`cys-stift.canvas-view.v1`,独立于 cards / drafts):view 是 UI 状态,非业务实体,Phase 8 Tauri 替换时再走 domain `CanvasService.updateView` + `canvases.viewJson`。
+- **单 canvas 视图**(MVP),不分 canvasId:spec §4.9 schema 留位,UI 留后。
+- **`hydrateOnce()` 在 get/update 同步调用**:避免首次 mount 把默认值写回覆盖持久值(原 bug 修复)。
+- **`editor.user.updateUserPreferences({isSnapMode})`**:Phase 5 closeout 决策,不是 `updateInstanceState({user})`(后者类型不接受)。
+- **`editor.store.listen()` 无 scope**(默认全监听):`scope: 'document'` 不触发,与 Phase 4 canvas-binding 同款用法。
+- **防抖 500ms** + **cleanup 注入 `editor.dispose`**:tldraw 卸载时清 timer + unsub。
+- **0 新依赖** + **domain / db 零改动**。
+
+**已知 / 后续**:
+
+- Phase 8 Tauri fs 替换 localStorage,view 进 `canvases.viewJson`
+- 多画布 view 分 canvasId → spec §4.9 schema 留位,UI 留后
+- 视图 history → 留后
+
+详见 [`docs/superpowers/plans/2026-06-19-phase-6.5d-canvas-view-persist.md`](../superpowers/plans/2026-06-19-phase-6.5d-canvas-view-persist.md) + [`docs/design/screenshots/phase-6.5d/README.md`](../design/screenshots/phase-6.5d/README.md)。
+
+---

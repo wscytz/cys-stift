@@ -22,11 +22,13 @@ import {
   cardIdFromShapeId,
   loadCardsIntoEditor,
 } from './canvas-binding'
+import { canvasViewStore } from '@/lib/canvas-view-store'
 
 const shapeUtils = [CardShapeUtil]
 const DEVICE_ID = 'web'
 const DEFAULT_CARD_W = 240
 const DEFAULT_CARD_H = 120
+const VIEW_PERSIST_DEBOUNCE_MS = 500
 
 export interface CanvasEditorProps {
   service: CardService
@@ -49,12 +51,18 @@ export function CanvasEditor({
         shapeUtils={shapeUtils}
         hideUi
         onMount={(editor: Editor) => {
-          // spec §4.3 — gridMode defaults to 'snap' with gridSize 8. tldraw's
-          // own defaults are isGridMode: false and gridSize: 10, so we set
-          // both at mount. The toolbar toggle then flips isGridMode (and the
-          // user.isSnapMode preference, which only inverts ctrl-key behaviour).
-          editor.updateInstanceState({ isGridMode: true })
-          editor.updateDocumentSettings({ gridSize: 8 })
+          // ── View persistence (Phase 6.5d) ──────────────────────────
+          // Load zoom/pan/gridMode from web-local store and apply before
+          // any shapes render. Default fallback inside canvasViewStore.
+          const view = canvasViewStore.get()
+          editor.setCamera({ x: view.panX, y: view.panY, z: view.zoom })
+          // spec §4.3 — gridMode + gridSize. isGridMode is the master
+          // snap toggle; user.isSnapMode inverts ctrl-key behaviour. Both
+          // must agree so toolbar state matches drag behaviour (Phase 5).
+          const snap = view.gridMode === 'snap'
+          editor.updateInstanceState({ isGridMode: snap })
+          editor.user.updateUserPreferences({ isSnapMode: snap })
+          editor.updateDocumentSettings({ gridSize: view.gridSize })
           // Diagnostic hook — lets the puppeteer scripts inspect live
           // editor state (isGridMode, gridSize, camera, etc.) without
           // monkey-patching internals. Cheap and only runs once at mount.
@@ -63,6 +71,34 @@ export function CanvasEditor({
           }
           loadCardsIntoEditor(editor, service, canvasId)
           bindCardWriteback(editor, service, canvasId)
+          // ── Persist view changes (zoom/pan/gridMode) ────────────────
+          // Debounce: 500ms of silence → write to store. Cleanup on
+          // editor dispose (tldraw calls dispose when unmounted).
+          let timer: ReturnType<typeof setTimeout> | null = null
+          const unsub = editor.store.listen(
+            () => {
+              if (timer !== null) clearTimeout(timer)
+              timer = setTimeout(() => {
+                timer = null
+                const cam = editor.getCamera()
+                const inst = editor.getInstanceState()
+                const isSnap = Boolean(inst.isGridMode)
+                canvasViewStore.update({
+                  zoom: cam.z,
+                  panX: cam.x,
+                  panY: cam.y,
+                  gridMode: isSnap ? 'snap' : 'free',
+                })
+              }, VIEW_PERSIST_DEBOUNCE_MS)
+            },
+          )
+          // tldraw exposes editor.dispose; call our cleanup alongside.
+          const prevDispose = editor.dispose.bind(editor)
+          editor.dispose = () => {
+            if (timer !== null) clearTimeout(timer)
+            unsub()
+            prevDispose()
+          }
           onEditorReady?.(editor)
           wireDoubleClick(editor, service, canvasId, onOpenCard)
         }}
