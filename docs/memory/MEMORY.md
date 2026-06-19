@@ -2,6 +2,7 @@
 
 > 每条一行，按日期倒序。详细见对应文件。
 
+- [2026-06-19 · Phase 4 Canvas 基础](decisions/2026-06-19-phase-4.md) — /canvas + tldraw v3 + Card ShapeUtil + §6.11 DB 真相源绑定（位置跨刷新持久化）+ 6 张截图
 - [2026-06-19 · 设计定稿](decisions/2026-06-19-design-finalized.md) — spec 经五轮复查定稿，`docs/superpowers/specs/2026-06-19-cys-stift-design.md`
 - [2026-06-19 · Phase 0 脚手架](decisions/2026-06-19-phase-0.md) — monorepo + Next.js 静态导出 + Tauri 壳 + 包豪斯占位首屏
 - [2026-06-19 · Phase 1 设计系统](decisions/2026-06-19-phase-1.md) — packages/ui 组件库 + /design 视觉契约页

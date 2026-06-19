@@ -35,10 +35,15 @@ export default function HomePage() {
             <span className="home__nav-label">Inbox</span>
             <span className="home__nav-note">收件箱 · 创建 / 编辑 / 归档卡片</span>
           </Link>
+          <Link href="/canvas" className="home__nav-link home__nav-link--canvas">
+            <span className="home__nav-arrow" aria-hidden="true">→</span>
+            <span className="home__nav-label">Canvas</span>
+            <span className="home__nav-note">画布 · 把卡片摆开慢慢养</span>
+          </Link>
         </nav>
         <footer className="home__foot">
-          <span>phase 3 · v0.4.0</span>
-          <span>phase 4 canvas coming</span>
+          <span>phase 4 · canvas</span>
+          <span>v0.5.0</span>
         </footer>
       </section>
       <style>{`
@@ -112,7 +117,9 @@ export default function HomePage() {
           color: var(--color-gray);
           border-top: var(--border-hairline);
         }
-        .home__nav { margin: 0; padding: 0; }
+        .home__nav { margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+        .home__nav-link--canvas .home__nav-arrow { background: var(--color-black); }
+        .home__nav-link--canvas:hover { box-shadow: 4px 4px 0 0 var(--color-black); }
         .home__nav-link {
           display: grid;
           grid-template-columns: 48px auto 1fr;
