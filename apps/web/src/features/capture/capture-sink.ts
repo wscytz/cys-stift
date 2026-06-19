@@ -41,9 +41,19 @@ export class WebCaptureSink implements CaptureSink {
 // (Phase 6) and the AppMenu "Capture" button (Phase 6.5g) both go through
 // `captureSinkRegistry.submit` so adding a new entry-point (Tauri global
 // shortcut, webhook, …) just means registering a new sink.
+//
+// Race safety: sinks are registered async (dynamic import in CaptureHost /
+// inbox mount). If a submit arrives before the matching sink is registered,
+// we fall back to `fallbackService.fromCapture` so the card is never lost.
+// The registered sink (when present) wins.
 const _sinks = new Map<string, CaptureSink>()
+let _fallbackService: CardService | null = null
 
 export const captureSinkRegistry = {
+  /** Register a fallback CardService used when no sink matches yet. */
+  setFallbackService(service: CardService) {
+    _fallbackService = service
+  },
   register(kind: string, sink: CaptureSink) {
     _sinks.set(kind, sink)
   },
@@ -53,14 +63,16 @@ export const captureSinkRegistry = {
   submit(input: CaptureInput): Promise<{ cardId: CardId }> {
     const kind = input.source.kind
     const sink = _sinks.get(kind)
-    if (!sink) {
-      return Promise.reject(
-        new Error(
-          `[captureSinkRegistry] no sink registered for source.kind="${kind}"`,
-        ),
-      )
+    if (sink) return sink.submit(input)
+    if (_fallbackService) {
+      const card = _fallbackService.fromCapture(input)
+      return Promise.resolve({ cardId: card.id })
     }
-    return sink.submit(input)
+    return Promise.reject(
+      new Error(
+        `[captureSinkRegistry] no sink registered for source.kind="${kind}" and no fallback service`,
+      ),
+    )
   },
   has(kind: string): boolean {
     return _sinks.has(kind)

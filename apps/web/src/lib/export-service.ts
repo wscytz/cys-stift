@@ -84,3 +84,86 @@ export function downloadExport(): number {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
   return blob.size
 }
+
+// ── Import (Phase 9.1) ─────────────────────────────────────────────────────
+// Reverse of export: validate a JSON string and write it back to the
+// browser stores. Merge strategy is OVERWRITE (the exported snapshot
+// becomes the source of truth). Callers should prompt the user to
+// export first as a backup.
+
+export interface ImportResult {
+  ok: boolean
+  cards: number
+  mediaAssets: number
+  error?: string
+}
+
+export function importFromJson(jsonText: string): ImportResult {
+  if (typeof window === 'undefined') {
+    return { ok: false, cards: 0, mediaAssets: 0, error: 'not in browser' }
+  }
+  let payload: ExportPayload
+  try {
+    payload = JSON.parse(jsonText) as ExportPayload
+  } catch (e) {
+    return {
+      ok: false,
+      cards: 0,
+      mediaAssets: 0,
+      error: `invalid JSON: ${(e as Error).message}`,
+    }
+  }
+  if (payload.version !== EXPORT_FORMAT_VERSION) {
+    return {
+      ok: false,
+      cards: 0,
+      mediaAssets: 0,
+      error: `unsupported version ${payload.version} (expected ${EXPORT_FORMAT_VERSION})`,
+    }
+  }
+  if (!Array.isArray(payload.cards)) {
+    return {
+      ok: false,
+      cards: 0,
+      mediaAssets: 0,
+      error: 'payload.cards is not an array',
+    }
+  }
+  // Overwrite the four stores. Missing optional keys are skipped.
+  try {
+    window.localStorage.setItem(
+      'cys-stift.cards.v1',
+      JSON.stringify({ cards: payload.cards }),
+    )
+    if (payload.mediaAssets && typeof payload.mediaAssets === 'object') {
+      window.localStorage.setItem(
+        'cys-stift.media.v1',
+        JSON.stringify({ assets: payload.mediaAssets }),
+      )
+    }
+    if (payload.drafts) {
+      window.localStorage.setItem(
+        'cys-stift.drafts.v1',
+        JSON.stringify({ drafts: payload.drafts }),
+      )
+    }
+    if (payload.settings) {
+      window.localStorage.setItem(
+        'cys-stift.settings.v1',
+        JSON.stringify({ settings: payload.settings }),
+      )
+    }
+  } catch (e) {
+    return {
+      ok: false,
+      cards: 0,
+      mediaAssets: 0,
+      error: `write failed: ${(e as Error).message}`,
+    }
+  }
+  return {
+    ok: true,
+    cards: payload.cards.length,
+    mediaAssets: Object.keys(payload.mediaAssets ?? {}).length,
+  }
+}

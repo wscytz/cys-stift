@@ -1,9 +1,15 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { Toolbar } from '@cys-stift/ui'
 import { settingsStore, useSettings } from '@/lib/settings-store'
-import { buildExportPayload, downloadExport } from '@/lib/export-service'
+import {
+  buildExportPayload,
+  downloadExport,
+  importFromJson,
+  type ImportResult,
+} from '@/lib/export-service'
 
 /**
  * /settings — spec §5.5 "可在设置改". MVP exposes only the capture
@@ -14,6 +20,26 @@ import { buildExportPayload, downloadExport } from '@/lib/export-service'
 export default function SettingsPage() {
   const { settings, ready } = useSettings()
   const sc = settings.captureShortcut
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
+
+  const handleImportFile = (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const file = files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = importFromJson(String(reader.result))
+      setImportResult(result)
+      if (result.ok) {
+        // Give the state a tick to render, then reload so all stores
+        // re-hydrate from the freshly written localStorage.
+        setTimeout(() => window.location.reload(), 800)
+      }
+    }
+    reader.onerror = () =>
+      setImportResult({ ok: false, cards: 0, mediaAssets: 0, error: 'read failed' })
+    reader.readAsText(file)
+  }
 
   const labelFor = (code: string) => {
     if (code === 'Space') return 'Space'
@@ -120,6 +146,36 @@ export default function SettingsPage() {
           >
             Export JSON
           </button>
+
+          <div className="set__import">
+            <label className="set__import-label">
+              Import JSON
+              <input
+                type="file"
+                accept="application/json,.json"
+                onChange={(e) => {
+                  handleImportFile(e.target.files)
+                  e.target.value = ''
+                }}
+                className="set__file"
+              />
+            </label>
+            <p className="set__import-hint">
+              Overwrites current data — export a backup first. Reloads on
+              success.
+            </p>
+            {importResult && (
+              <p
+                className={`set__import-result ${
+                  importResult.ok ? '' : 'set__import-result--error'
+                }`}
+              >
+                {importResult.ok
+                  ? `Imported ${importResult.cards} cards · ${importResult.mediaAssets} media. Reloading…`
+                  : `Import failed: ${importResult.error}`}
+              </p>
+            )}
+          </div>
         </section>
 
         <p className="footnote">
@@ -164,6 +220,12 @@ const styles = `
 }
 .set__export:hover { box-shadow: 2px 2px 0 0 var(--color-red); }
 .set__export:active { transform: translate(1px, 1px); box-shadow: none; }
+.set__import { margin-top: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); }
+.set__import-label { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-gray); cursor: pointer; }
+.set__file { margin-top: var(--space-1); font-family: var(--font-body); font-size: var(--font-size-sm); }
+.set__import-hint { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
+.set__import-result { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black-soft); }
+.set__import-result--error { color: var(--color-red); }
 .footnote { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); margin: 0; padding-top: var(--space-2); border-top: var(--border-hairline); }
 .footnote__link { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; }
 `

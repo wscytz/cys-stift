@@ -87,6 +87,9 @@ export function CaptureHost() {
   // Register the web sink on mount. Other sinks (Phase 6.5g MenuCaptureSink,
   // Phase 8 TauriCaptureSink) can also register against the same registry.
   useEffect(() => {
+    // Fallback first: if a submit arrives before the dynamic-import
+    // registration resolves, we still persist via service.fromCapture.
+    captureSinkRegistry.setFallbackService(service)
     void import('./capture-sink').then(({ WebCaptureSink }) => {
       captureSinkRegistry.register('shortcut', new WebCaptureSink(service))
     })

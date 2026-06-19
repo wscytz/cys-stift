@@ -559,3 +559,32 @@
 详见 [`docs/superpowers/plans/2026-06-19-phase-9-export.md`](../superpowers/plans/2026-06-19-phase-9-export.md) + [`docs/design/screenshots/phase-9/README.md`](../design/screenshots/phase-9/README.md) + [`docs/user/README.md`](../user/README.md)。
 
 ---
+
+## 2026-06-19 · phase 9.1 · JSON reverse import + capture race fix
+
+**交付**:`apps/web/src/lib/export-service.ts` 加 `importFromJson(jsonText)` + `ImportResult` 类型(校验 version/shape,覆盖式写 4 个 localStorage key);`apps/web/src/app/settings/page.tsx` 加 Import 按钮 + `<input type=file>` + 结果提示 + 成功后 reload;`apps/web/src/features/capture/capture-sink.ts` 加 `setFallbackService`(race 安全:submit 在 sink register 前到达也走 `service.fromCapture` 不丢卡);CaptureHost 注册 fallback。puppeteer 全过(export → clear → import → 2 cards 恢复);2 张截图。
+
+**核心承诺验证**:
+
+- Export 1 file → clear (0 cards) → Import → 2 cards 恢复(Import test A + B)✓
+- version !== 1 报错不写 ✓(校验)
+- 零 page error
+
+**关键工程决策**:
+
+- **覆盖式合并**(MVP):建议先 Export 备份。
+- **校验 version + shape**:`version !== 1` 或 cards 非数组 → 报错。
+- **可选 key 跳过**:drafts/settings 缺失不报错。
+- **reload 恢复**:写完 800ms reload,store 重新 hydrate。
+- **capture race fix**:registry 加 fallback CardService,sink 异步 register 前 submit 不丢卡。
+- **0 新依赖** + **domain/db 零改动**。
+
+**已知 / 后续**:
+
+- 合并策略(merge)→ 留后
+- 冲突解决 → 覆盖
+- 导入预览 / 撤销 → 留后
+
+详见 [`docs/superpowers/plans/2026-06-19-phase-9.1-import.md`](../superpowers/plans/2026-06-19-phase-9.1-import.md) + [`docs/design/screenshots/phase-9.1/README.md`](../design/screenshots/phase-9.1/README.md)。
+
+---
