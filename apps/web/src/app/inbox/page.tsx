@@ -26,7 +26,7 @@ import {
   draftQuotesToPayload,
 } from '@/features/card/editors'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
-import { WebCaptureSink } from '@/features/capture/capture-sink'
+import { captureSinkRegistry } from '@/features/capture/capture-sink'
 import { mediaStore } from '@/lib/media-store'
 
 type View = 'inbox' | 'archived'
@@ -44,6 +44,17 @@ export default function InboxPage() {
   const [view, setView] = useState<View>('inbox')
   const [detail, setDetail] = useState<DetailState | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<CardId | null>(null)
+
+  // Register the manual sink so CreateCardForm onCreate goes through
+  // captureSinkRegistry → consistent with shortcut + menubar paths.
+  useEffect(() => {
+    void import('@/features/capture/capture-sink').then(({ WebCaptureSink }) => {
+      captureSinkRegistry.register('manual', new WebCaptureSink(service))
+    })
+    return () => {
+      captureSinkRegistry.unregister('manual')
+    }
+  }, [service])
 
   // Inbox = no canvasPosition, not archived, not soft-deleted
   const inbox = service.listInbox()
@@ -82,12 +93,13 @@ export default function InboxPage() {
         {view === 'inbox' && (
           <CreateCardForm
             onCreate={(input) => {
-              // Unified capture entry (Phase 6.5e): both keyboard shortcut
-              // and manual form route through WebCaptureSink → service.fromCapture.
-              // One source of truth; one way to define `source.kind`.
-              // CaptureInput.links is `string[]`; ConvertCardForm gives us
-              // LinkPreview[]; extract URL string array for the sink.
-              new WebCaptureSink(service).submit({
+              // Unified capture entry (Phase 6.5e + 6.5g): all capture
+              // entry-points route through captureSinkRegistry →
+              // WebCaptureSink → service.fromCapture. Same onSubmit
+              // shape regardless of source.kind.
+              // CaptureInput.links is `string[]`; ConvertCardForm gives
+              // us LinkPreview[]; extract URL string array for the sink.
+              void captureSinkRegistry.submit({
                 source: { kind: 'manual', deviceId: DEVICE_ID },
                 title: input.title,
                 body: input.body,

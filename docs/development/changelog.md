@@ -457,3 +457,33 @@
 详见 [`docs/superpowers/plans/2026-06-19-phase-6.5f-media-upload.md`](../superpowers/plans/2026-06-19-phase-6.5f-media-upload.md) + [`docs/design/screenshots/phase-6.5f/README.md`](../design/screenshots/phase-6.5f/README.md)。
 
 ---
+
+## 2026-06-19 · phase 6.5g · menubar + CaptureSinkRegistry
+
+**交付**:`apps/web/src/components/app-menu.tsx`(新):全局菜单栏 4 入口(Inbox / Canvas / Archive / Capture)+ 当前路由高亮(`usePathname`)+ Capture dispatch CustomEvent;`apps/web/src/features/capture/capture-sink.ts` 加 `captureSinkRegistry`(register/unregister/submit/has);`apps/web/src/features/capture/menu-capture-sink.ts`(新):`MenuCaptureSink implements CaptureSink`(`source.kind='menubar'`);`apps/web/src/features/capture/capture-host.tsx` 加 `openKind` 状态 + 监听 CustomEvent + 动态 register sinks(shortcut/menubar);root layout 挂 `<AppMenu />`。puppeteer 6/6 断言;5 张截图。
+
+**核心承诺验证(spec §5.5 + §7 CaptureSink 接口多 sink)**:
+
+- AppMenu 在 home 可见 ✓
+- /inbox 高亮 Inbox / /canvas 高亮 Canvas / /archive 高亮 Archive ✓
+- 点 Capture → Mini Input 开 ✓
+- save → `card.source.kind === 'menubar'` ✓
+- 零 page error
+
+**关键工程决策**:
+
+- **CustomEvent `cys-stift:open-capture`**:不引入 Zustand/event-bus,单实例 CaptureHost 是 open 状态唯一持有者。
+- **CaptureSinkRegistry**:模块单例 `Map<string, CaptureSink>`;Phase 8 TauriCaptureSink `register('tauri', ...)`。
+- **`openKind` 状态**:CaptureHost 追踪谁打开,save 时用对应 source.kind。
+- **MenuCaptureSink 与 WebCaptureSink 对称**:都走 `service.fromCapture`。
+- **动态 import + register**:service 注入,unmount 时 unregister。
+
+**已知 / 后续**:
+
+- TauriCaptureSink(global-shortcut + OS 级)→ Phase 8
+- Webhook / mobile / alfred sink → 留后
+- 菜单栏用户自定义 → P6.5h
+
+详见 [`docs/superpowers/plans/2026-06-19-phase-6.5g-menubar.md`](../superpowers/plans/2026-06-19-phase-6.5g-menubar.md) + [`docs/design/screenshots/phase-6.5g/README.md`](../design/screenshots/phase-6.5g/README.md)。
+
+---

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Space_Grotesk, Inter } from 'next/font/google'
 import '../styles/globals.css'
 import { CaptureHost } from '@/features/capture/capture-host'
+import { AppMenu } from '@/components/app-menu'
 
 const display = Space_Grotesk({
   subsets: ['latin'],
@@ -26,6 +27,7 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" className={`${display.variable} ${body.variable}`}>
       <body>
+        <AppMenu />
         {children}
         <CaptureHost />
       </body>

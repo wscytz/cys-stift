@@ -35,3 +35,34 @@ export class WebCaptureSink implements CaptureSink {
     return Promise.resolve({ cardId: card.id })
   }
 }
+
+// ── Registry (Phase 6.5g) ──────────────────────────────────────────────────
+// Routes CaptureInput to the right sink by `source.kind`. The Mini Input
+// (Phase 6) and the AppMenu "Capture" button (Phase 6.5g) both go through
+// `captureSinkRegistry.submit` so adding a new entry-point (Tauri global
+// shortcut, webhook, …) just means registering a new sink.
+const _sinks = new Map<string, CaptureSink>()
+
+export const captureSinkRegistry = {
+  register(kind: string, sink: CaptureSink) {
+    _sinks.set(kind, sink)
+  },
+  unregister(kind: string) {
+    _sinks.delete(kind)
+  },
+  submit(input: CaptureInput): Promise<{ cardId: CardId }> {
+    const kind = input.source.kind
+    const sink = _sinks.get(kind)
+    if (!sink) {
+      return Promise.reject(
+        new Error(
+          `[captureSinkRegistry] no sink registered for source.kind="${kind}"`,
+        ),
+      )
+    }
+    return sink.submit(input)
+  },
+  has(kind: string): boolean {
+    return _sinks.has(kind)
+  },
+}
