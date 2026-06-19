@@ -22,6 +22,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useDb } from '@/lib/db-client'
+import { useSettings } from '@/lib/settings-store'
 import { MiniInput } from './mini-input'
 import { captureSinkRegistry } from './capture-sink'
 
@@ -29,6 +30,8 @@ export const CAPTURE_OPEN_EVENT = 'cys-stift:open-capture'
 
 export function CaptureHost() {
   const { service } = useDb()
+  const { settings } = useSettings()
+  const sc = settings.captureShortcut
   const [open, setOpen] = useState(false)
   // Tracks which entry-point opened the Mini Input so the saved card's
   // source.kind reflects it (shortcut vs menubar). Reset on submit/close.
@@ -53,9 +56,13 @@ export function CaptureHost() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (open) return
+      // Match against the user-configured shortcut (spec §5.5). We accept
+      // either meta or ctrl as the mod key for cross-platform forgiveness
+      // — the stored modKey is just the user's preferred label.
       const mod = e.metaKey || e.ctrlKey
-      if (!mod || !e.shiftKey) return
-      if (e.code !== 'Space') return
+      if (!mod) return
+      if (sc.shift && !e.shiftKey) return
+      if (e.code !== sc.code) return
       const t = e.target as HTMLElement | null
       if (t) {
         const tag = t.tagName
@@ -75,7 +82,7 @@ export function CaptureHost() {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener(CAPTURE_OPEN_EVENT, onMenuOpen as EventListener)
     }
-  }, [open])
+  }, [open, sc.shift, sc.code])
 
   // Register the web sink on mount. Other sinks (Phase 6.5g MenuCaptureSink,
   // Phase 8 TauriCaptureSink) can also register against the same registry.

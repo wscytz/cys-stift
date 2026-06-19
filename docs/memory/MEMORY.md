@@ -2,6 +2,7 @@
 
 > 每条一行，按日期倒序。详细见对应文件。
 
+- [2026-06-19 · Phase 6.5h 快捷键自定义](decisions/2026-06-19-phase-6.5h.md) — /settings + web-local settings-store + CaptureHost 读 settings + 5 断言 + 3 截图
 - [2026-06-19 · Phase 6.5g 菜单栏 + CaptureSinkRegistry](decisions/2026-06-19-phase-6.5g.md) — AppMenu 4 入口 + usePathname 高亮 + Capture CustomEvent + MenuCaptureSink + registry 抽象 + domain/db 零改动 + 6 断言 + 5 截图
 - [2026-06-19 · Phase 6.5f 图片上传](decisions/2026-06-19-phase-6.5f.md) — base64 inline localStorage + 详情 Modal 渲染 + UpdateCardPatch.media 扩 + 4 断言 + 3 截图
 - [2026-06-19 · Phase 6.5e 统一手动 capture](decisions/2026-06-19-phase-6.5e.md) — inbox CreateCardForm 走 WebCaptureSink(source.kind=manual)统一接口 + domain/db 零改动 + 5 断言 + 1 截图

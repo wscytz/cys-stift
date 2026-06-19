@@ -487,3 +487,34 @@
 详见 [`docs/superpowers/plans/2026-06-19-phase-6.5g-menubar.md`](../superpowers/plans/2026-06-19-phase-6.5g-menubar.md) + [`docs/design/screenshots/phase-6.5g/README.md`](../design/screenshots/phase-6.5g/README.md)。
 
 ---
+
+## 2026-06-19 · phase 6.5h · keymap customisation
+
+**交付**:`apps/web/src/lib/settings-store.ts`(新):web-local localStorage key `cys-stift.settings.v1` + `Settings { captureShortcut: {modKey, shift, code} }` + `settingsStore.get/update/updateCaptureShortcut` + `useSettings` hook;`apps/web/src/app/settings/page.tsx`(新):`/settings` 路由(system region)+ modifier/shift/key 下拉 + 实时显示当前组合;`apps/web/src/features/capture/capture-host.tsx`(改):keydown 监听改读 `settings.captureShortcut`(deps 含 sc.code,re-bind);AppMenu 加 Settings 入口。puppeteer 5/5 断言;3 张截图。
+
+**核心承诺验证(spec §5.5 "可在设置改")**:
+
+- /settings 默认显示 `⌘+⇧+Space` ✓
+- 改成 `⌘+⇧+C` ✓
+- localStorage 持久化(`captureShortcut.code === 'KeyC'`)✓
+- 按新组合(Ctrl+Shift+C)打开 Mini Input ✓
+- 零 page error
+
+**关键工程决策**:
+
+- **web-local settings store**(同 draft/canvas-view 模式):Phase 8 Tauri 读相同 shape。
+- **CaptureHost 接受 meta OR ctrl**(跨平台):`sc.modKey` 只是用户偏好 label。
+- **`useSettings` + keydown deps 含 sc.code**:改 code → listener re-bind,无需刷新。
+- **下拉式 UI**(不是录制式):MVP 简单。
+- **0 新依赖** + **domain / db 零改动**。
+
+**已知 / 后续**:
+
+- 冲突检测(快捷键被浏览器/系统占用)→ 留后
+- 录制式捕获 → 留后
+- canvas 快捷键自定义 → 留后
+- Tauri 端读 settings → Phase 8
+
+详见 [`docs/superpowers/plans/2026-06-19-phase-6.5h-keymap-custom.md`](../superpowers/plans/2026-06-19-phase-6.5h-keymap-custom.md) + [`docs/design/screenshots/phase-6.5h/README.md`](../design/screenshots/phase-6.5h/README.md)。
+
+---

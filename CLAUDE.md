@@ -9,9 +9,9 @@
 
 ## 当前状态
 
-- Phase 0 ✅ 脚手架 · Phase 1 ✅ 设计系统 · Phase 2 ✅ 数据层 · Phase 3 ✅ Inbox 业务 · Phase 4 ✅ Canvas 基础 · Phase 5 ✅ Canvas 完整 · Phase 6 ✅ 捕获入口 · Phase 7 ✅ Archive · P6.5a ✅ 草稿自动保存 · P6.5b ✅ Inbox 多媒介编辑 · P6.5c ✅ Inbox→Canvas Send · P6.5d ✅ 画布视图持久化 · P6.5e ✅ 统一手动 capture · P6.5f ✅ 图片上传 · **P6.5g ✅ 菜单栏 + CaptureSinkRegistry**（全局 AppMenu 4 入口 + usePathname 高亮 + Capture CustomEvent + MenuCaptureSink + registry 抽象；domain/db 零改动 / 0 新依赖）
+- Phase 0 ✅ 脚手架 · Phase 1 ✅ 设计系统 · Phase 2 ✅ 数据层 · Phase 3 ✅ Inbox 业务 · Phase 4 ✅ Canvas 基础 · Phase 5 ✅ Canvas 完整 · Phase 6 ✅ 捕获入口 · Phase 7 ✅ Archive · P6.5a ✅ 草稿自动保存 · P6.5b ✅ Inbox 多媒介编辑 · P6.5c ✅ Inbox→Canvas Send · P6.5d ✅ 画布视图持久化 · P6.5e ✅ 统一手动 capture · P6.5f ✅ 图片上传 · P6.5g ✅ 菜单栏 + CaptureSinkRegistry · **P6.5h ✅ 快捷键自定义**（/settings + settings-store + CaptureHost 读配置；domain/db 零改动 / 0 新依赖）
 - **执行模式**：主模型（Claude）按 `docs/development/roadmap.md` 30 轮路线图顺序执行 + 自审；完成一个就开下一个（用户已授权一直做下去）。Ralph 自动循环不再使用（见下方"Ralph 状态"）
-- **下一个**：P6.5h 快捷键自定义（路线图 §1 下一行）→ 然后 Phase 8 Tauri 打包 → Phase 9 导出。**注意：本机无 Rust 工具链（`rustc`/`cargo` 未装），Phase 8 只能做骨架 + 交接档，不能实际构建。**
+- **下一个**：**Phase 8 Tauri 打包**（路线图 §1）。⚠️ 本机无 Rust 工具链（`rustc`/`cargo` 未装），Phase 8 只能做骨架 + 交接档，不能实际构建。装 Rust 后跑 `pnpm tauri build`。
 - 完整进度：`docs/development/changelog.md` + `docs/development/roadmap.md`（30 轮路线图）
 - 任务流程参考：`docs/ralph/README.md`（已归档，见下）
 
