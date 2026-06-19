@@ -399,3 +399,30 @@
 详见 [`docs/superpowers/plans/2026-06-19-phase-6.5d-canvas-view-persist.md`](../superpowers/plans/2026-06-19-phase-6.5d-canvas-view-persist.md) + [`docs/design/screenshots/phase-6.5d/README.md`](../design/screenshots/phase-6.5d/README.md)。
 
 ---
+
+## 2026-06-19 · phase 6.5e · unify manual capture
+
+**交付**:`apps/web/src/app/inbox/page.tsx` CreateCardForm 的 onCreate 改走 `new WebCaptureSink(service).submit({source:{kind:'manual', deviceId}})`(从 `service.create` 直接调用切换);`CaptureInput.links` 是 `string[]`,转换 `input.links.map(l => l.url)`。puppeteer 5/5 断言;1 张截图。
+
+**核心承诺验证(spec §7 CaptureSink 接口统一)**:
+
+- Inbox 创建卡 → `card.source.kind === 'manual'` ✓
+- `card.source.deviceId === 'web'` ✓
+- 跨刷新保留 ✓
+- 零 page error
+
+**关键工程决策**:
+
+- **两路 capture 入口同一接口**:inbox 表单 + Mini Input 快捷键都走 `WebCaptureSink.submit → service.fromCapture`(spec §7 依赖倒置)。
+- **`CaptureInput.links` 是 `string[]`**,转换 `input.links.map(l => l.url)`。
+- **`service.create` 仍保留**(canvas dblclick 路径用),inbox 不再用。
+- **0 新依赖** + **domain / db 零改动**。
+
+**已知 / 后续**:
+
+- CaptureSinkRegistry(多 sink 注册)→ P6.5g
+- TauriCaptureSink / MenubarCaptureSink → P6.5g
+
+详见 [`docs/superpowers/plans/2026-06-19-phase-6.5e-unify-manual-capture.md`](../superpowers/plans/2026-06-19-phase-6.5e-unify-manual-capture.md) + [`docs/design/screenshots/phase-6.5e/README.md`](../design/screenshots/phase-6.5e/README.md)。
+
+---

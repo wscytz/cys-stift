@@ -320,7 +320,8 @@
 | **P6.5b** | **inbox 多媒介编辑** | ✅ | v0.8.2-phase-6.5b | 2026-06-19 |
 | **P6.5c** | **inbox → canvas send** | ✅ | v0.8.3-phase-6.5c | 2026-06-19 |
 | **P6.5d** | **画布视图持久化** | ✅ | v0.8.4-phase-6.5d | 2026-06-19 |
-| **P6.5e** | **手动 capture 改用 WebCaptureSink** | 🟡 下一个 | — | — |
+| **P6.5e** | **手动 capture 改用 WebCaptureSink** | ✅ | v0.8.5-phase-6.5e | 2026-06-19 |
+| **P6.5f** | **图片上传 / MediaAsset 落盘** | 🟡 下一个 | — | — |
 
 ---
 

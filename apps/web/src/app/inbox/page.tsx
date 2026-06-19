@@ -25,6 +25,7 @@ import {
   draftQuotesToPayload,
 } from '@/features/card/editors'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
+import { WebCaptureSink } from '@/features/capture/capture-sink'
 
 type View = 'inbox' | 'archived'
 
@@ -79,11 +80,16 @@ export default function InboxPage() {
         {view === 'inbox' && (
           <CreateCardForm
             onCreate={(input) => {
-              service.create({
+              // Unified capture entry (Phase 6.5e): both keyboard shortcut
+              // and manual form route through WebCaptureSink → service.fromCapture.
+              // One source of truth; one way to define `source.kind`.
+              // CaptureInput.links is `string[]`; ConvertCardForm gives us
+              // LinkPreview[]; extract URL string array for the sink.
+              new WebCaptureSink(service).submit({
+                source: { kind: 'manual', deviceId: DEVICE_ID },
                 title: input.title,
                 body: input.body,
-                source: { kind: 'manual', deviceId: DEVICE_ID },
-                links: input.links,
+                links: input.links.map((l) => l.url),
                 codeSnippets: input.codeSnippets,
                 quotes: input.quotes,
               })
