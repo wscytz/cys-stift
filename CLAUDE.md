@@ -9,8 +9,8 @@
 
 ## 当前状态
 
-- Phase 0 ✅ 脚手架 · Phase 1 ✅ 设计系统 · Phase 2 ✅ 数据层 · **Phase 3 ✅ Inbox 业务**（commit `284be2a`，tag `v0.4.0-phase-3`，GLM audit pass）
-- **下一个**：Phase 4 — Canvas 基础（tldraw 集成）
+- Phase 0 ✅ 脚手架 · Phase 1 ✅ 设计系统 · Phase 2 ✅ 数据层 · Phase 3 ✅ Inbox 业务 · **Phase 4 ✅ Canvas 基础**（commit `57d7b16`，tag `v0.5.0-phase-4`；tldraw v3 集成 + Card ShapeUtil + §6.11 位置持久化）
+- **下一个**：Phase 5 — Canvas 完整（网格 / 自由模式、缩放、对齐）
 - 完整进度：`docs/development/changelog.md`
 - **执行模式**：主模型（Claude）按 phase plan 手动执行 + 自审；不再跑 Ralph 自动循环（见下方"Ralph 状态"）
 - 任务流程参考：`docs/ralph/README.md`（已归档，见下）
