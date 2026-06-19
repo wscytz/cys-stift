@@ -2,7 +2,9 @@
 
 > 每条一行，按日期倒序。详细见对应文件。
 
-- [2026-06-19 · Phase 9 JSON 导出 + 用户文档](decisions/2026-06-19-phase-9.md) — /settings Export 按钮 + 开放格式 JSON + 用户文档 + 8 断言 + 2 截图
+- [2026-06-19 · Review 发现(3 真 bug + 2 风险,未修)](decisions/2026-06-19-review-findings.md) — Import 部分失败不一致 / soft-delete 无恢复入口 / sink 注册竞态 / editor.dispose 猴补丁 / listen 无 filter。**接手前先读**
+- [2026-06-19 · Phase 9.1 JSON 反向 import](decisions/2026-06-19-phase-9.1.md) — /settings Import 按钮 + 覆盖式写回 + capture race fallback
+- [2026-06-19 · Phase 9 JSON 导出 + 用户文档](decisions/2026-06-19-phase-9.md) — /settings Export 按钮 + 开放格式 JSON + 用户文档
 - [2026-06-19 · Phase 8 Tauri 打包 STUCK](decisions/2026-06-19-phase-8-stuck.md) — 本机无 Rust,骨架已就位(Phase 0),实际构建阻塞;写 stuck 决策档
 - [2026-06-19 · Phase 6.5h 快捷键自定义](decisions/2026-06-19-phase-6.5h.md) — /settings + web-local settings-store + CaptureHost 读 settings + 5 断言 + 3 截图
 - [2026-06-19 · Phase 6.5g 菜单栏 + CaptureSinkRegistry](decisions/2026-06-19-phase-6.5g.md) — AppMenu 4 入口 + usePathname 高亮 + Capture CustomEvent + MenuCaptureSink + registry 抽象 + domain/db 零改动 + 6 断言 + 5 截图
