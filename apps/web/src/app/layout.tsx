@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Space_Grotesk, Inter } from 'next/font/google'
 import '../styles/globals.css'
+import { CaptureHost } from '@/features/capture/capture-host'
 
 const display = Space_Grotesk({
   subsets: ['latin'],
@@ -24,7 +25,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN" className={`${display.variable} ${body.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <CaptureHost />
+      </body>
     </html>
   )
 }

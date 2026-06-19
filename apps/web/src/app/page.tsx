@@ -1,7 +1,8 @@
 /**
- * cy's Stift — Phase 0 placeholder.
- * A Bauhaus-styled hello page so we can verify tokens, fonts and the 8px grid
- * are wired before any real features land. See spec §5.
+ * cy's Stift — Phase 0 + Phase 4 + Phase 6. A Bauhaus-styled home page so
+ * we can verify tokens, fonts and the 8px grid are wired. Phase 6 adds
+ * the capture entry hint (Cmd/Ctrl+Shift+Space) — the button itself is
+ * decorative; the actual Mini Input is global and launched from anywhere.
  */
 import Link from 'next/link'
 
@@ -30,6 +31,11 @@ export default function HomePage() {
           </div>
         </dl>
         <nav className="home__nav" aria-label="Primary">
+          <div className="home__capture" aria-label="Quick capture">
+            <div className="home__capture-arrow" aria-hidden="true">⌘</div>
+            <div className="home__capture-label">Capture</div>
+            <div className="home__capture-note">Quick capture · ⌘⇧Space anywhere</div>
+          </div>
           <Link href="/inbox" className="home__nav-link">
             <span className="home__nav-arrow" aria-hidden="true">→</span>
             <span className="home__nav-label">Inbox</span>
@@ -42,8 +48,8 @@ export default function HomePage() {
           </Link>
         </nav>
         <footer className="home__foot">
-          <span>phase 4 · canvas</span>
-          <span>v0.5.0</span>
+          <span>phase 6 · capture entry</span>
+          <span>v0.7.0</span>
         </footer>
       </section>
       <style>{`
@@ -120,6 +126,50 @@ export default function HomePage() {
         .home__nav { margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
         .home__nav-link--canvas .home__nav-arrow { background: var(--color-black); }
         .home__nav-link--canvas:hover { box-shadow: 4px 4px 0 0 var(--color-black); }
+        /* Capture hint card — decorative. The actual Mini Input is global
+           and launches from anywhere via Cmd/Ctrl+Shift+Space. We don't
+           wire a click handler to this card to keep the capture flow
+           single-source (the keyboard shortcut). */
+        .home__capture {
+          display: grid;
+          grid-template-columns: 48px auto 1fr;
+          align-items: center;
+          gap: var(--space-3);
+          padding: var(--space-3) var(--space-3);
+          background: var(--color-red);
+          color: var(--color-white);
+          border: var(--border-thick);
+          border-color: var(--color-black);
+          border-radius: var(--radius-sm);
+          box-shadow: var(--shadow-md);
+        }
+        .home__capture-arrow {
+          display: inline-flex; align-items: center; justify-content: center;
+          width: 48px; height: 48px;
+          background: var(--color-white);
+          color: var(--color-red);
+          font-family: var(--font-mono);
+          font-size: var(--font-size-2xl);
+          font-weight: 700;
+        }
+        .home__capture-label {
+          font-family: var(--font-display);
+          font-size: var(--font-size-2xl);
+          font-weight: 500;
+          letter-spacing: -0.01em;
+          color: var(--color-white);
+        }
+        .home__capture-note {
+          font-family: var(--font-mono);
+          font-size: var(--font-size-xs);
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          text-align: right;
+        }
+        @media (max-width: 720px) {
+          .home__capture-note { display: none; }
+          .home__capture { grid-template-columns: 48px 1fr; }
+        }
         .home__nav-link {
           display: grid;
           grid-template-columns: 48px auto 1fr;

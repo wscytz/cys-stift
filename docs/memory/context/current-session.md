@@ -8,34 +8,92 @@
 
 ## 阶段定位
 
-- **当前**：Phase 5 ✅（commit 待打，tag `v0.6.0-phase-5`；snap/free + 缩放 + snap 指示线 + 键盘快捷键；git 干净）
-- **下一个**：**Phase 6 — Inbox 完整**（spec §8 路线图：多媒介编辑 / 全局快捷键 / mini input）
+- **当前**：Phase 6 ✅（commit 待打，tag `v0.7.0-phase-6`；`Cmd/Ctrl+Shift+Space` 全局快捷键 + Mini Input + WebCaptureSink 走 `service.fromCapture`；git 干净）
+- **下一个**：**Phase 7+ 候选**（Tauri 全局快捷键 / 菜单栏 / 编辑多媒介 / inbox→canvas send / 图片上传 / 草稿自动保存 / 快捷键自定义 / 多 CaptureSink 实现 / 手动 capture 改用 WebCaptureSink）
 - **状态锚点**：`/Users/jinxunuo/projects/cys-stift/CLAUDE.md`（根项目锚点，任何会话都先读）
 
 ---
 
-## Phase 5 关键交付速览
+## Phase 6 关键交付速览
 
-- `apps/web/src/app/canvas/page.tsx`：工具条右侧 SNAP/FREE 切换 + 缩放 4 按钮（−/%/+/FIT）+ 键盘快捷键（`+ - 0 1 g`）+ mobile media query
-- `apps/web/src/features/canvas/canvas-overrides.css`（新）：snap 指示线覆盖为 `var(--color-black)` 1px（tldraw 默认饱和红冲突）
-- `apps/web/src/features/canvas/tldraw-canvas.tsx`：导入 canvas-overrides.css
-- `apps/web/src/features/canvas/canvas-editor.tsx`：`isGridMode: true` + `gridSize: 8` + `window.__canvasEditor` 诊断 hook
-- `scripts/p5-shots.cjs` + `docs/design/screenshots/phase-5/`（10 截图）+ `README.md` 视觉笔记
-- **0 新依赖** + **domain/db 零改动**（视图持久化 Lean 排除）
+- `apps/web/src/features/capture/capture-sink.ts`（新）：`interface CaptureSink` + `class WebCaptureSink implements CaptureSink`（走 `service.fromCapture`，零运行时依赖，全部 `import type`）
+- `apps/web/src/features/capture/mini-input.tsx`（新）：spec §5.5 视觉（居中浮层 + 2px 红边 + 顶部 8px 红条 + z-index 200 + Escape/Enter/Cmd+Enter 键盘）
+- `apps/web/src/features/capture/capture-host.tsx`（新）：挂载 `keydown` 监听 + `useDb()` 注入 service + 单实例 Mini Input（root layout 挂载）
+- `apps/web/src/app/layout.tsx`（改）：挂 `<CaptureHost />`（所有路由生效）
+- `apps/web/src/app/page.tsx`（改）：首页新增 Capture 红条入口（decorative，无 onClick）
+- `scripts/p6-shots.cjs` + `docs/design/screenshots/phase-6/`（9 截图）+ `README.md` 视觉笔记
+- **0 新依赖** + **domain/db 零改动**（`service.fromCapture` 已有 + 1 个 vitest 覆盖）
 
-puppeteer 6/6 断言全过：snap 488%8==0 / free 747%8!=0 / zoom 100→800% / fit all-in / 键盘 g / 零 error。
+puppeteer 8/8 断言全过：shortcut open / enter expands body / cmd+enter saves / source.kind=shortcut / persisted across reload / shortcut on /canvas / input guard / zero page errors。
 
 ---
 
-## Phase 5 关键工程决策（接 Phase 6 别再踩）
+## Phase 6 关键工程决策（接 Phase 7 别再踩）
 
-1. **`useState<Editor>` 替代 `useRef<Editor>`** — Phase 4 用 ref 留坑（ref 不触发 re-render，toolbar 永远 disabled）。Phase 6 若再加依赖 editor handle 的 UI，**必须用 state**。
-2. **tldraw v3 snap 真开关是 `editor.updateInstanceState({ isGridMode })`**，**不是** `editor.user.updateUserPreferences({ isSnapMode })`（后者只翻 Ctrl 反转）。两者要同步。
-3. **tldraw v3 默认 `gridSize: 10`**（不是 8）。spec §4.3 要 8，**必须** onMount 显式 `editor.updateDocumentSettings({ gridSize: 8 })`。
-4. **`useValue` hook 从 `@tldraw/tldraw` 顶层可用**（通过 `@tldraw/editor` re-export `@tldraw/state-react`）。
-5. **缩放步进是 tldraw v3 默认 2x**（不是 context7 文档说的 1.5x）。验收断言用 `> previous` 不要 hardcode 1.5 倍数。
-6. **`window.__canvasEditor` 诊断 hook**：puppeteer 读 live editor state 用，后续 phase 调试时也方便。生产无副作用。
-7. **缩放按钮用本地 `<button>` 而非 `@cys-stift/ui` Button**——Button 40px 高 + padding 大不适合 47px 黑条内紧凑布局。本地按钮 32px，颜色/边框全走 token。
+1. **`CaptureSink` 接口放 `features/capture/` 而非 domain**：依赖倒置，web-local 接口 + 实现，domain 不感知。`CardService.fromCapture` 作为底层统一入口。**接 Phase 7 加新 sink（Tauri / menubar / webhook）时也放 `features/capture/`。**
+2. **Mini Input 不复用 `<Modal>`**：z-index 200 vs 100，边框 2px 红 vs 1px 黑，**自建 `.mi-*` CSS**。Phase 7 若加同款弹层（如 inbox→canvas 的 "send to canvas" 确认）也是同样策略。
+3. **`Input` 不 forwardRef**（Phase 1 组件未支持）：用 `autoFocus` 兜底——Mini Input 早返 `null` 后再渲染那一拍浏览器触发。**Phase 7 若需 focus 别的 Input 也用 autoFocus。**
+4. **首页 Capture 入口纯展示**（无 onClick）：避免 event bus；按快捷键即可。
+5. **Enter 展开 body 用 `placeholder` 字符串判别 active element**：Mini Input 内只有一个 Input；ref 更鲁棒但 Input 不支持。**Phase 7 别的地方要判别 input 类型也用 placeholder / data 属性。**
+6. **puppeteer 用 `Control+Shift+Space`**：macOS Chrome headless 模式 `Meta+Shift+Space` 被 Spotlight 系统级拦截；浏览器内 `Control` 跨平台一致，**真实用户 `Cmd+Shift+Space` 浏览器内仍工作**（CaptureHost 接受 `metaKey || ctrlKey`）。
+7. **不重构 inbox CreateCardForm**（tagged Phase 3）：手动 capture 入口仍走 `service.create`（不绕道 WebCaptureSink）。**Phase 7+ 统一时**再改 CreateCardForm 走 WebCaptureSink.submit。
+8. **0 新依赖**：沿用 react + domain + Phase 1 组件库。
+
+---
+
+## Phase 7+ 候选范围种子
+
+按 spec + Phase 6 closeout 已知/后续：
+
+### Tauri 端（apps/desktop 实施后）
+- **Tauri 全局快捷键**：`@tauri-apps/plugin-global-shortcut` 注册 `Cmd+Shift+Space`（OS 级，不需浏览器 focus）
+- **Tauri 菜单栏 capture**：Tauri menu API 添 capture 入口
+- 新增 `TauriCaptureSink implements CaptureSink` 放 `features/capture-tauri/`
+
+### Inbox 完整
+- **编辑多媒介**（详情 Modal 改 links/codeSnippets/quotes）：复用 Phase 3 CreateCardForm 的 `ListEditor` / `CodeEditor` / `QuoteEditor` 拆出来共享
+- **inbox → canvas send 动作**：inbox 卡片右键或 detail Modal 加 "Send to canvas" 按钮，service.create 副本到画布
+
+### 数据层扩展
+- **图片上传 / MediaAsset 落盘**：spec §4.5 已声明需落盘基础设施
+- **草稿自动保存**：spec §5.5 "输入即保存草稿到 SQLite"
+- **快捷键自定义**：spec §5.5 "可在设置改"
+
+### Capture 扩展
+- **多 CaptureSink 实现**：webhook / mobile / alfred 5 个待实现
+- **手动 capture 入口改用 WebCaptureSink**：unify inbox CreateCardForm
+
+---
+
+## 现有 Canvas 代码（接 Phase 7 也别忘了）
+
+`/Users/jinxunuo/projects/cys-stift/apps/web/src/features/canvas/`：
+
+| 文件 | 做什么 |
+|---|---|
+| `tldraw-canvas.tsx` | 客户端挂载守卫 + 动态 `import('./canvas-editor')` |
+| `canvas-editor.tsx` | `<Tldraw shapeUtils hideUi onMount>` + onMount 设 isGridMode/gridSize + 诊断 hook + dblclick 监听 |
+| `card-shape-util.tsx` | `CardShapeUtil extends BaseBoxShapeUtil`，白底黑边 8px 圆角 |
+| `canvas-binding.ts` | §6.11 数据流；防抖 300ms |
+| `card-detail-modal.tsx` | 复用 Phase 3 `MarkdownBody`；view/edit + archive/soft-delete |
+| `canvas-overrides.css` | Phase 5 新增：snap 指示线黑色 1px |
+| `default-canvas.ts` | `DEFAULT_CANVAS_ID` |
+
+`apps/web/src/app/canvas/page.tsx` 持有 `[editor, setEditor] = useState<Editor|null>`（注意：state 不是 ref）。
+
+---
+
+## 现有 Capture 代码（Phase 6 新增）
+
+`/Users/jinxunuo/projects/cys-stift/apps/web/src/features/capture/`：
+
+| 文件 | 做什么 |
+|---|---|
+| `capture-sink.ts` | `interface CaptureSink` + `class WebCaptureSink`（依赖倒置；接 Phase 7 加 TauriCaptureSink 等同结构）|
+| `mini-input.tsx` | Mini Input 组件（spec §5.5 视觉 + z-index 200 + Escape/Enter/Cmd+Enter）|
+| `capture-host.tsx` | 挂 `keydown` 监听 + `useDb()` + 单实例 Mini Input |
+
+`apps/web/src/app/layout.tsx` 挂 `<CaptureHost />`（root layout，所有路由生效）。
 
 ---
 
