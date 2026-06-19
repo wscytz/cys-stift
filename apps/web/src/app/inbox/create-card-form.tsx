@@ -3,6 +3,8 @@
 import { useState, useTransition, useEffect, useId } from 'react'
 import { Button, Input, Tag } from '@cys-stift/ui'
 import type { CodeBlock, LinkPreview, Quote } from '@cys-stift/domain'
+import { draftStore, useDraft } from '@/lib/draft-store'
+import { useDebouncedCallback } from '@/lib/use-debounced-callback'
 
 export interface CreateCardFormProps {
   onCreate: (input: {
@@ -28,13 +30,28 @@ interface DraftQuote {
   attribution: string
 }
 
+/** Persisted manual draft (spec §5.5 "输入即保存草稿" applied to the form). */
+interface ManualDraftPayload {
+  title: string
+  body: string
+  links: DraftLink[]
+  codes: DraftCode[]
+  quotes: DraftQuote[]
+}
+
 /**
  * Multi-media card creation form (spec §4.8 CaptureInput fields). Title is
  * the only required field; everything else is optional and submitted as the
  * matching typed array. We keep a small set of in-progress drafts so the
  * caller can review before persisting.
+ *
+ * Draft autosave (spec §5.5): any field change is debounced 500ms and
+ * persisted to draftStore; the latest draft is restored on mount. A
+ * successful submit (or Clear) clears the draft.
  */
 export function CreateCardForm({ onCreate }: CreateCardFormProps) {
+  const { draft, ready } = useDraft<ManualDraftPayload>('manual')
+  const restored = ready && draft ? draft.payload : null
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [openSection, setOpenSection] = useState<Section>(null)
@@ -44,6 +61,57 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
   const [pending, startTransition] = useTransition()
 
   const formId = useId()
+
+  // Restore the latest persisted manual draft once (after hydration).
+  useEffect(() => {
+    if (ready && restored) {
+      setTitle(restored.title ?? '')
+      setBody(restored.body ?? '')
+      setLinks(restored.links ?? [])
+      setCodes(restored.codes ?? [])
+      setQuotes(restored.quotes ?? [])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready])
+
+  // Debounced autosave of the full form state.
+  const persistDraft = useDebouncedCallback(
+    (p: ManualDraftPayload) => {
+      const hasContent =
+        p.title.trim().length > 0 ||
+        p.body.trim().length > 0 ||
+        p.links.some((l) => l.url.trim().length > 0) ||
+        p.codes.some((c) => c.code.trim().length > 0) ||
+        p.quotes.some((q) => q.text.trim().length > 0)
+      if (!hasContent) {
+        draftStore.clear('manual')
+        return
+      }
+      draftStore.upsert('manual', p)
+    },
+    500,
+  )
+
+  const setTitleAndPersist = (t: string) => {
+    setTitle(t)
+    persistDraft({ title: t, body, links, codes, quotes })
+  }
+  const setBodyAndPersist = (b: string) => {
+    setBody(b)
+    persistDraft({ title, body: b, links, codes, quotes })
+  }
+  const setLinksAndPersist = (next: DraftLink[]) => {
+    setLinks(next)
+    persistDraft({ title, body, links: next, codes, quotes })
+  }
+  const setCodesAndPersist = (next: DraftCode[]) => {
+    setCodes(next)
+    persistDraft({ title, body, links, codes: next, quotes })
+  }
+  const setQuotesAndPersist = (next: DraftQuote[]) => {
+    setQuotes(next)
+    persistDraft({ title, body, links, codes, quotes: next })
+  }
 
   useEffect(() => {
     // No-op: focus management is opt-in via document.activeElement;
@@ -59,6 +127,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
     setCodes([])
     setQuotes([])
     setOpenSection(null)
+    draftStore.clear('manual')
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -105,7 +174,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
         name={`${formId}-title`}
         placeholder="灵感标题…"
         value={title}
-        onChange={(e) => setTitle(e.target.value)}
+        onChange={(e) => setTitleAndPersist(e.target.value)}
         maxLength={200}
         required
       />
@@ -117,7 +186,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
           name={`${formId}-body`}
           placeholder={'用 Markdown 写…\n# heading\n- list\n**bold** `code`'}
           value={body}
-          onChange={(e) => setBody(e.target.value)}
+          onChange={(e) => setBodyAndPersist(e.target.value)}
           rows={4}
         />
       </label>
@@ -158,7 +227,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
       {openSection === 'links' && (
         <ListEditor
           items={links}
-          onChange={setLinks}
+          onChange={setLinksAndPersist}
           make={() => ({ url: '' })}
           label="URL"
           placeholder="https://…"
@@ -166,10 +235,10 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
         />
       )}
       {openSection === 'code' && (
-        <CodeEditor items={codes} onChange={setCodes} />
+        <CodeEditor items={codes} onChange={setCodesAndPersist} />
       )}
       {openSection === 'quotes' && (
-        <QuoteEditor items={quotes} onChange={setQuotes} />
+        <QuoteEditor items={quotes} onChange={setQuotesAndPersist} />
       )}
 
       <div className="ccf__actions">

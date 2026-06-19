@@ -20,6 +20,13 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { Button, Input } from '@cys-stift/ui'
+import { draftStore, useDraft } from '@/lib/draft-store'
+import { useDebouncedCallback } from '@/lib/use-debounced-callback'
+
+interface CaptureDraftPayload {
+  title: string
+  body: string
+}
 
 export interface MiniInputProps {
   open: boolean
@@ -28,24 +35,53 @@ export interface MiniInputProps {
 }
 
 export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
+  const { draft, ready } = useDraft<CaptureDraftPayload>('capture')
+  const restored = ready && draft ? draft.payload : null
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [bodyOpen, setBodyOpen] = useState(false)
   const bodyRef = useRef<HTMLTextAreaElement | null>(null)
 
-  // Reset on open transition (false → true) so the title input is empty.
-  useEffect(() => {
-    if (open) {
-      setTitle('')
-      setBody('')
-      setBodyOpen(false)
+  // Debounced autosave (spec §5.5). 500ms of silence → persist. The store
+  // write is best-effort; failure (quota) is swallowed inside draft-store.
+  const persistDraft = useDebouncedCallback((t: string, b: string) => {
+    // Only persist if there's something worth saving — an empty draft is
+    // treated as "no draft" so we don't leave stale empty records behind.
+    if (t.trim().length === 0 && b.trim().length === 0) {
+      draftStore.clear('capture')
+      return
     }
-  }, [open])
+    draftStore.upsert('capture', { title: t, body: b } satisfies CaptureDraftPayload)
+  }, 500)
+
+  // On open transition (false → true): restore the latest persisted draft.
+  // Escape-close deliberately keeps the draft (spec §5.5 "输入即保存").
+  // Only the `ready` flag gates this — once hydrated, the restored values
+  // are applied exactly once per open.
+  useEffect(() => {
+    if (open && ready) {
+      setTitle(restored?.title ?? '')
+      setBody(restored?.body ?? '')
+      setBodyOpen(Boolean(restored?.body && restored.body.trim().length > 0))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, ready])
+
+  const setTitleAndPersist = (t: string) => {
+    setTitle(t)
+    persistDraft(t, body)
+  }
+  const setBodyAndPersist = (b: string) => {
+    setBody(b)
+    persistDraft(title, b)
+  }
 
   const submit = () => {
     const t = title.trim()
     if (t.length === 0) return
     onSubmit({ title: t, body: body.trim() || undefined })
+    // Successful submit clears the draft (a saved card is no longer a draft).
+    draftStore.clear('capture')
   }
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -95,7 +131,7 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
             type="text"
             placeholder="灵感标题…"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => setTitleAndPersist(e.target.value)}
             className="mi-title"
             autoFocus
           />
@@ -117,7 +153,7 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
               className="mi-textarea"
               placeholder="Markdown 笔记（可选）"
               value={body}
-              onChange={(e) => setBody(e.target.value)}
+              onChange={(e) => setBodyAndPersist(e.target.value)}
               rows={5}
             />
           )}

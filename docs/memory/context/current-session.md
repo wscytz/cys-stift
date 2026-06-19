@@ -1,4 +1,4 @@
-# 当前会话交接(Phase 7 → P6.5a 草稿自动保存)
+# 当前会话交接(P6.5a → P6.5b inbox 多媒介编辑)
 
 > 用途:spec §9.1 指定的跨会话/跨模型延续档。compact、切模型都不丢。
 > 写入时机:每完成一个 phase closeout 时回写。
@@ -8,8 +8,8 @@
 
 ## 阶段定位
 
-- **当前**:Phase 7 ✅(`/archive` 路由 + 网格/时间轴双视图 + 多选批量 + tag `v0.8.0-phase-7`;git 干净)
-- **下一个**:**P6.5a 草稿自动保存**(路线图 `docs/development/roadmap.md` §1 下一行)—— Mini Input + CreateCardForm 草稿 → SQLite(关闭重开恢复)
+- **当前**:P6.5a ✅ 草稿自动保存(防抖 500ms 写 web-local localStorage + 关闭重开恢复 + 提交清除;tag `v0.8.1-phase-6.5a`;git 干净)
+- **下一个**:**P6.5b inbox 多媒介编辑**(路线图 `docs/development/roadmap.md` §1 下一行)—— 详情 Modal 编辑模式暴露 links/codeSnippets/quotes 编辑器
 - **状态锚点**:`/Users/jinxunuo/projects/cys-stift/CLAUDE.md`(根项目锚点)+ `docs/development/roadmap.md`(30 轮路线图)
 
 ---
@@ -25,61 +25,46 @@
 
 ---
 
-## Phase 7 关键交付速览
+## P6.5a 关键交付速览
 
-- `apps/web/src/app/archive/page.tsx`(新):`/archive` 路由 + 蓝条 Toolbar + grid/timeline tab + 多选 + 浮动工具条 + 空态
-- `apps/web/src/features/archive/archive-card-tile.tsx`(新):`ArchiveCardTile` tile+row 双 variant 共用
-- `apps/web/src/features/archive/timeline.tsx`(新):日分组(UTC)+ 行式卡片
-- `apps/web/src/app/page.tsx`(改):首页加 Archive 蓝箭头入口 + footer 推进 phase 7 / v0.8.0
-- `scripts/p7-shots.cjs`(新):8 截图 + 8 断言
-- `docs/design/screenshots/phase-7/`(8 PNG + README)
-- **domain / db 零改动**(复用 Phase 2/3 archive/unarchive/softDelete)+ **0 新依赖**
+- `apps/web/src/lib/draft-store.ts`(新):`DraftStore` 单例 + `useDraft` hook + localStorage 持久化;`Draft.payload: unknown` 各自 cast
+- `apps/web/src/lib/use-debounced-callback.ts`(新):通用防抖 hook,unmount cleanup
+- `apps/web/src/features/capture/mini-input.tsx`(改):`useDraft('capture')` 恢复 + 防抖 upsert + 提交/clear 时 `draftStore.clear`
+- `apps/web/src/app/inbox/create-card-form.tsx`(改):`useDraft('manual')` 恢复 + 防抖 upsert 完整表单状态 + reset 时 `draftStore.clear`
+- `scripts/p6.5a-shots.cjs`(新):7 项交互断言 + 6 截图
+- `docs/design/screenshots/phase-6.5a/`(6 PNG + README)
+- **domain / db 零改动** + **0 新依赖**
 
-puppeteer 8/8 断言全过。
-
----
-
-## Phase 7 关键工程决策(接 P6.5 别再踩)
-
-1. **复用 `CardService` 已有方法**(archive/unarchive/softDelete)→ P6.5 加新业务方法时优先复用,domain/db 尽量零改动。
-2. **Tile + Row 双 variant 共用一个组件**:P6.5 任何"网格 + 列表"双视图复用此模式(`variant` prop 切换)。
-3. **多选 Set 状态不可变更新**:切换 selectMode / 批量操作后 `clearSelected()` 防泄漏。P6.5 多选场景同理。
-4. **浮动工具条 z-index 50** < CaptureHost 200 < Modal 100;互斥显示无冲突。
-5. **Archive 不开 detail modal**(避免触碰 tagged Phase 3 `CardDetail`)→ P6.5b 抽 `features/card/` 共享 detail modal 后,archive tile onClick 接通。
-6. **时间轴日分组用 UTC ISO date** → P9 暴露本地时区。
-7. **批量 soft-delete 不二次确认**(Lean,软删不真删)→ P9 JSON 导出前补二次确认。
-8. **首页入口三色分明**:inbox 红 / canvas 黑 / archive 蓝 —— P6.5 加新入口(如 settings)选剩余 token(gray / yellow / white)保持包豪斯原色集。
+puppeteer 7/7 断言全过。
 
 ---
 
-## P6.5a 范围种子(下一个 phase)
+## P6.5a 关键工程决策(接 P6.5b 别再踩)
 
-草稿自动保存(spec §5.5 "输入即保存草稿到 SQLite"):
-- `DraftService` 新增到 `packages/domain`(零依赖)
-- `drafts` SQLite 表:`id / kind: 'capture' | 'manual' / payload: text(json) / updatedAt`
-- Mini Input + inbox CreateCardForm 改动 → 防抖 500ms 写 DraftService.upsert
-- 打开时先查 DraftService.get 填回
-- 提交成功后清除
-- **注意**:当前浏览器端 db-client 是 in-memory + localStorage(Phase 2),草稿表也要走同样的客户端存储;Phase 2.5(wa-sqlite + OPFS)统一替换
-
-需要 P6.5a plan 时再读:
-- spec §5.5(Mini Input "输入即保存草稿")
-- Phase 6 closeout `docs/memory/decisions/2026-06-19-phase-6.md` 已知/后续段
-- 现有 capture 代码:`apps/web/src/features/capture/`
-- 现有 db-client:`apps/web/src/lib/db-client.ts`
+1. **草稿独立 localStorage key**(`cys-stift.drafts.v1`,与 `cys-stift.cards.v1` 分离)→ P6.5b 任何"草稿式"持久化都遵循此模式(独立 key + 不污染 domain)。
+2. **草稿不进 domain**(web-local UI 状态)→ P6.5b 任何 UI 草稿/临时状态同理。
+3. **`unknown` payload + 消费方 cast**→ P6.5b 多媒介草稿也用此模式(避免类型耦合)。
+4. **防抖 500ms + useDebouncedCallback hook**→ P6.5b 任何字段级持久化复用。
+5. **Escape 保留 / 提交清除 / 空草稿自动 clear**→ P6.5b 多媒介编辑器的草稿逻辑同理。
+6. **snapshot 引用稳定** + **restore 用 `[ready]` deps** → P6.5b 任何 useSyncExternalStore 同模式。
+7. **CreateCardForm 改造不破坏 Phase 3 多媒介**:只加 useEffect 草稿读写 + 防抖 upsert,不动表单结构 → P6.5b 详情 Modal 编辑模式同理(扩 patch 白名单 + 暴露 editor,不破坏 view)。
 
 ---
 
-## 现有 Archive 代码(Phase 7 新增)
+## P6.5b 范围种子(下一个 phase)
 
-`/Users/jinxunuo/projects/cys-stift/apps/web/src/features/archive/`:
+Inbox 多媒介编辑(详情 Modal 改 links/codeSnippets/quotes):
+- 抽 `ListEditor` / `CodeEditor` / `QuoteEditor` 从 `inbox/page.tsx` 到 `apps/web/src/features/card/`
+- 详情 Modal 编辑模式暴露 3 个 editor(已抽的 editor 复用)
+- 提交走 `CardService.update(id, {links, codeSnippets, quotes})`(需扩 `update` 白名单,domain 零改动只增字段白名单)
+- 草稿复用 P6.5a:`useDraft('edit-card')` 存正在编辑的 cardId + 草稿状态
 
-| 文件 | 做什么 |
-|---|---|
-| `archive-card-tile.tsx` | `ArchiveCardTile` tile+row 双 variant(蓝条 + meta + 选中态 checkbox)|
-| `timeline.tsx` | 日分组(UTC)+ 行式卡片堆叠 |
-
-`apps/web/src/app/archive/page.tsx` 持有 `view: 'grid' | 'timeline'` + `selectMode: boolean` + `selected: Set<CardId>` 状态。
+需要 P6.5b plan 时再读:
+- spec §4.2 `Card.links / codeSnippets / quotes` + §4.8 `CaptureInput` 字段
+- Phase 3 closeout `docs/memory/decisions/2026-06-19-phase-3.md` 已知/后续段
+- Phase 3 plan `docs/superpowers/plans/2026-06-20-phase-3-inbox.md` "❌ 没做"段
+- 现有 inbox 代码:`apps/web/src/app/inbox/page.tsx` (详情 Modal)
+- 现有 CreateCardForm editor:`apps/web/src/app/inbox/create-card-form.tsx` (ListEditor/CodeEditor/QuoteEditor)
 
 ---
 
@@ -90,10 +75,23 @@ puppeteer 8/8 断言全过。
 | 文件 | 做什么 |
 |---|---|
 | `capture-sink.ts` | `interface CaptureSink` + `class WebCaptureSink` |
-| `mini-input.tsx` | Mini Input 组件(spec §5.5 视觉)|
+| `mini-input.tsx` | Mini Input 组件(spec §5.5 视觉 + P6.5a 草稿)|
 | `capture-host.tsx` | 挂 `keydown` 监听 + `useDb()` + 单实例 Mini Input |
 
 `apps/web/src/app/layout.tsx` 挂 `<CaptureHost />`(root layout)。
+
+---
+
+## 现有 Archive 代码(Phase 7)
+
+`/Users/jinxunuo/projects/cys-stift/apps/web/src/features/archive/`:
+
+| 文件 | 做什么 |
+|---|---|
+| `archive-card-tile.tsx` | `ArchiveCardTile` tile+row 双 variant(蓝条 + meta + 选中态 checkbox)|
+| `timeline.tsx` | 日分组(UTC)+ 行式卡片堆叠 |
+
+`apps/web/src/app/archive/page.tsx` 持有 `view: 'grid' \| 'timeline'` + `selectMode: boolean` + `selected: Set<CardId>` 状态。
 
 ---
 
@@ -115,7 +113,7 @@ puppeteer 8/8 断言全过。
 
 ---
 
-## 纪律提示(接 P6.5 必须遵守)
+## 纪律提示(接 P6.5b 必须遵守)
 
 - ❌ 不要修改 `docs/superpowers/specs/2026-06-19-cys-stift-design.md`(五轮定稿)
 - ❌ 不要重新选型 / 不要加未要求依赖(YAGNI)
@@ -134,7 +132,7 @@ puppeteer 8/8 断言全过。
 
 ## 已通过事项(不要重新怀疑)
 
-### Phase 0-7 全部通过
+### Phase 0-7 + P6.5a 全部通过
 - **Phase 0** — monorepo + Next.js 静态导出 + Tauri 壳 + 包豪斯占位首屏
 - **Phase 1** — packages/ui 组件库(7 组件)+ /design 视觉契约页
 - **Phase 2** — domain + db (drizzle/SQLite) + /dev/db 烟测页 + 持久化证据
@@ -143,20 +141,21 @@ puppeteer 8/8 断言全过。
 - **Phase 5** — snap/free + 缩放控件 + snap 指示线 + 键盘快捷键
 - **Phase 6** — 全局快捷键 + Mini Input + WebCaptureSink
 - **Phase 7** — /archive 网格/时间轴 + 多选批量 + 蓝条 region
+- **P6.5a** — 草稿自动保存(防抖 500ms + 关闭重开恢复 + 提交清除)
 
 ### 不变量
 - 6 色 token + Space Grotesk/Inter/JetBrains Mono + 8px 网格 在所有路由都对
-- `features/` + `app/` 各 phase hex grep 零命中
+- `features/` + `app/` + `lib/` 各 phase hex grep 零命中
 - domain 10 tests + db 7 tests 全绿
 - `pnpm --filter web build` exit 0,12 个静态页(含 /archive)
 
 ---
 
-## 下一步(接 P6.5a 第 1 步)
+## 下一步(接 P6.5b 第 1 步)
 
-1. **读**:spec §5.5 + Phase 6 closeout 已知/后续 + 现有 capture 代码 + db-client
-2. **写**:`docs/superpowers/plans/2026-06-19-phase-6.5a-drafts.md`
-3. **实现** + 验收(domain DraftService + drafts 表 + Mini Input/CreateCardForm 改造)
+1. **读**:spec §4.2 + §4.8 + Phase 3 closeout 已知/后续 + 现有 inbox 详情 Modal + CreateCardForm editors
+2. **写**:`docs/superpowers/plans/2026-06-19-phase-6.5b-multi-media-edit.md`
+3. **实现** + 验收(抽 features/card/ editors + 详情 Modal 暴露 + CardService.update 白名单扩)
 4. **四件套 closeout**
 
-**第 3 轮起**(Phase 7 = 第 2 轮;roadmap = 第 1 轮 / 0.5)。30 轮预算剩余 ~27 轮。
+**第 4 轮起**(roadmap 0.5 + P7 1.5 + P6.5a 1.0 = 3 轮;P6.5b = 第 4 轮)。30 轮预算剩余 ~26 轮。
