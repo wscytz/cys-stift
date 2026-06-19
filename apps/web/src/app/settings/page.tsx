@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Toolbar } from '@cys-stift/ui'
 import { settingsStore, useSettings } from '@/lib/settings-store'
+import { buildExportPayload, downloadExport } from '@/lib/export-service'
 
 /**
  * /settings — spec §5.5 "可在设置改". MVP exposes only the capture
@@ -99,6 +100,28 @@ export default function SettingsPage() {
           </p>
         </section>
 
+        <section className="set">
+          <h2 className="set__h">Data</h2>
+          <p className="set__lede">
+            Your data lives only on this machine. Export an open-format
+            JSON backup any time — cards, media, drafts, and settings.
+            (spec §1.2 — data is portable, no lock-in.)
+          </p>
+          <button
+            type="button"
+            className="set__export"
+            onClick={() => {
+              const bytes = downloadExport()
+              console.info(
+                `[export] ${bytes} bytes · ` +
+                  `${buildExportPayload().cards.length} cards`,
+              )
+            }}
+          >
+            Export JSON
+          </button>
+        </section>
+
         <p className="footnote">
           <Link href="/" className="footnote__link">← home</Link>
           {' · '}
@@ -126,6 +149,21 @@ const styles = `
 .set__current { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-sm); color: var(--color-black-soft); }
 .set__current code { background: var(--color-gray-soft); padding: 2px var(--space-1); border-radius: 2px; }
 .set__hint { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); line-height: 1.6; }
+.set__export {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: var(--color-black);
+  color: var(--color-white);
+  border: var(--border-hairline);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.set__export:hover { box-shadow: 2px 2px 0 0 var(--color-red); }
+.set__export:active { transform: translate(1px, 1px); box-shadow: none; }
 .footnote { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); margin: 0; padding-top: var(--space-2); border-top: var(--border-hairline); }
 .footnote__link { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; }
 `

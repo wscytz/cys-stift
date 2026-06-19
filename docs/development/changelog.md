@@ -518,3 +518,44 @@
 详见 [`docs/superpowers/plans/2026-06-19-phase-6.5h-keymap-custom.md`](../superpowers/plans/2026-06-19-phase-6.5h-keymap-custom.md) + [`docs/design/screenshots/phase-6.5h/README.md`](../design/screenshots/phase-6.5h/README.md)。
 
 ---
+
+## 2026-06-19 · phase 8 · tauri packaging — STUCK
+
+**状态**:🟡 STUCK — 本机无 `rustc`/`cargo`,Phase 0 已搭好完整 `apps/desktop/src-tauri/` 骨架,实际构建 + global-shortcut plugin + 签名 + CI 需 Rust。按 roadmap §3.5 失败模式,写 stuck 决策档而非未经验证 Rust 代码。
+
+详见 [`docs/memory/decisions/2026-06-19-phase-8-stuck.md`](../memory/decisions/2026-06-19-phase-8-stuck.md)。
+
+---
+
+## 2026-06-19 · phase 9 · JSON export + user docs
+
+**交付**:`apps/web/src/lib/export-service.ts`(新):`EXPORT_FORMAT_VERSION = 1` + `ExportPayload` 类型 + `buildExportPayload()`(纯函数,读 cards/media/drafts/settings)+ `downloadExport()`(Blob + `<a download>`);`apps/web/src/app/settings/page.tsx` 加 Data section + Export JSON 按钮;`docs/user/README.md`(新):用户指南(捕获/inbox/canvas/archive/settings + 数据隐私 + 快捷键速查 + 已知限制)。puppeteer 8/8 断言;2 张截图。
+
+**核心承诺验证(spec §1.2 信念4 "数据可迁移" + §8 Phase 9)**:
+
+- 下载 1 个 `cys-stift-export-*.json` ✓
+- `version === 1` ✓
+- `cards.length === 2` ✓
+- `mediaAssets` 1 key ✓
+- `settings.captureShortcut.code === 'KeyC'` ✓
+- `exportedAt` ISO string ✓
+- 零 page error
+
+**关键工程决策**:
+
+- **开放格式 JSON,版本化**(`version: 1`):任何工具可读;未来迁移路径。
+- **导出范围**:cards + mediaAssets(必)+ drafts + settings(可选)。
+- **浏览器原生下载**(`<a download>` + Blob URL):0 新依赖。
+- **纯函数 `buildExportPayload`** + `downloadExport` 分离副作用。
+- **用户文档 `docs/user/README.md`**:核心流程 + 数据隐私 + 快捷键速查。
+- **0 新依赖** + **domain/db 零改动**。
+
+**已知 / 后续**:
+
+- 反向 import → 留后
+- 录屏 → 留后
+- `/changelog` 路由 → 留后
+
+详见 [`docs/superpowers/plans/2026-06-19-phase-9-export.md`](../superpowers/plans/2026-06-19-phase-9-export.md) + [`docs/design/screenshots/phase-9/README.md`](../design/screenshots/phase-9/README.md) + [`docs/user/README.md`](../user/README.md)。
+
+---

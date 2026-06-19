@@ -9,10 +9,11 @@
 
 ## 当前状态
 
-- Phase 0 ✅ 脚手架 · Phase 1 ✅ 设计系统 · Phase 2 ✅ 数据层 · Phase 3 ✅ Inbox 业务 · Phase 4 ✅ Canvas 基础 · Phase 5 ✅ Canvas 完整 · Phase 6 ✅ 捕获入口 · Phase 7 ✅ Archive · P6.5a ✅ 草稿自动保存 · P6.5b ✅ Inbox 多媒介编辑 · P6.5c ✅ Inbox→Canvas Send · P6.5d ✅ 画布视图持久化 · P6.5e ✅ 统一手动 capture · P6.5f ✅ 图片上传 · P6.5g ✅ 菜单栏 + CaptureSinkRegistry · **P6.5h ✅ 快捷键自定义**（/settings + settings-store + CaptureHost 读配置；domain/db 零改动 / 0 新依赖）
+- Phase 0 ✅ 脚手架 · Phase 1 ✅ 设计系统 · Phase 2 ✅ 数据层 · Phase 3 ✅ Inbox 业务 · Phase 4 ✅ Canvas 基础 · Phase 5 ✅ Canvas 完整 · Phase 6 ✅ 捕获入口 · Phase 7 ✅ Archive · P6.5a ✅ 草稿自动保存 · P6.5b ✅ Inbox 多媒介编辑 · P6.5c ✅ Inbox→Canvas Send · P6.5d ✅ 画布视图持久化 · P6.5e ✅ 统一手动 capture · P6.5f ✅ 图片上传 · P6.5g ✅ 菜单栏 + CaptureSinkRegistry · P6.5h ✅ 快捷键自定义 · Phase 8 🟡 STUCK(需 Rust) · **Phase 9 ✅ JSON 导出 + 用户文档**
+- **30 轮路线图核心 spec §8 全部完成**(Phase 0-9,除 Phase 8 Tauri 打包因无 Rust 骨架就位待构建)。产品已是**完整可用的 web 应用**:捕获 / inbox(多媒介编辑)/ canvas(视图持久化)/ archive(网格+时间轴+多选)/ settings(快捷键自定义+导出)/ 用户文档。
 - **执行模式**：主模型（Claude）按 `docs/development/roadmap.md` 30 轮路线图顺序执行 + 自审；完成一个就开下一个（用户已授权一直做下去）。Ralph 自动循环不再使用（见下方"Ralph 状态"）
-- **下一个**：**Phase 8 Tauri 打包**（路线图 §1）。⚠️ 本机无 Rust 工具链（`rustc`/`cargo` 未装），Phase 8 只能做骨架 + 交接档，不能实际构建。装 Rust 后跑 `pnpm tauri build`。
-- 完整进度：`docs/development/changelog.md` + `docs/development/roadmap.md`（30 轮路线图）
+- **下一个候选**（路线图外,后续打磨）:反向 import / 录屏 / `/changelog` 路由 / OPFS 真实落盘(Phase 2.5)/ Phase 8 Tauri(用户装 Rust 后)/ 暗色模式 / 标签搜索 / 多画布 UI / 云同步
+- 完整进度：`docs/development/changelog.md` + `docs/development/roadmap.md`（30 轮路线图）+ `docs/user/README.md`（用户指南）
 - 任务流程参考：`docs/ralph/README.md`（已归档，见下）
 
 ## 技术栈（不可重新选型）
