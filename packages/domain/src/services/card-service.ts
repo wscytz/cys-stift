@@ -43,6 +43,17 @@ export interface CreateCardInput {
   color?: Card['color']
 }
 
+export interface UpdateCardPatch {
+  title?: string
+  body?: string
+  type?: CardType
+  color?: Card['color']
+  pinned?: boolean
+  links?: LinkPreview[]
+  codeSnippets?: CodeBlock[]
+  quotes?: Quote[]
+}
+
 export class CardService {
   constructor(private repo: CardRepository) {}
 
@@ -88,6 +99,34 @@ export class CardService {
 
   get(id: CardId): Card | null {
     return this.repo.getById(id)
+  }
+
+  /**
+   * Update mutable card fields. Returns the updated card, or null if the card
+   * does not exist. Only fields present in `patch` are touched — lifecycle
+   * fields (archived / deletedAt / canvasPosition) are intentionally not
+   * patchable here; use archive / unarchive / moveToCanvas / softDelete for
+   * those. updatedAt is bumped automatically.
+   */
+  update(id: CardId, patch: UpdateCardPatch): Card | null {
+    const card = this.repo.getById(id)
+    if (!card) return null
+    const next: Card = {
+      ...card,
+      ...(patch.title !== undefined ? { title: patch.title } : {}),
+      ...(patch.body !== undefined ? { body: patch.body } : {}),
+      ...(patch.type !== undefined ? { type: patch.type } : {}),
+      ...(patch.color !== undefined ? { color: patch.color } : {}),
+      ...(patch.pinned !== undefined ? { pinned: patch.pinned } : {}),
+      ...(patch.links !== undefined ? { links: patch.links } : {}),
+      ...(patch.codeSnippets !== undefined
+        ? { codeSnippets: patch.codeSnippets }
+        : {}),
+      ...(patch.quotes !== undefined ? { quotes: patch.quotes } : {}),
+      updatedAt: new Date(),
+    }
+    this.repo.update(next)
+    return next
   }
 
   listInbox(): Card[] {

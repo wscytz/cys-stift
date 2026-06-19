@@ -16,6 +16,8 @@
     "next": "15.0.3",
     "react": "19.0.0",
     "react-dom": "19.0.0",
+    "react-markdown": "9",
+    "rehype-sanitize": "6",
     "tailwindcss": "4.0.0-beta.3"
   },
   "devDependencies": {

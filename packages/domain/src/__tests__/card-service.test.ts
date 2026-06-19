@@ -111,4 +111,43 @@ describe('CardService', () => {
       expect(card.source.shortcutId).toBe('cmd-shift-space')
     }
   })
+
+  it('update mutates whitelisted fields and bumps updatedAt', async () => {
+    const c = service.create({ title: 'old', body: 'b', source: dummySource })
+    const before = c.updatedAt.getTime()
+    // small delay so the timestamps differ deterministically
+    await new Promise((r) => setTimeout(r, 5))
+    const next = service.update(c.id, { title: 'new', body: 'B' })
+    expect(next).not.toBeNull()
+    expect(next?.title).toBe('new')
+    expect(next?.body).toBe('B')
+    expect(next?.updatedAt.getTime()).toBeGreaterThan(before)
+  })
+
+  it('update only touches provided fields', () => {
+    const c = service.create({ title: 'keep', source: dummySource })
+    service.update(c.id, { title: 'changed' })
+    const fetched = service.get(c.id)
+    expect(fetched?.title).toBe('changed')
+    expect(fetched?.type).toBe('note')
+    expect(fetched?.archived).toBe(false)
+  })
+
+  it('update can swap multi-media arrays', () => {
+    const c = service.create({ title: 'media', source: dummySource })
+    service.update(c.id, {
+      links: [{ url: 'https://a.example', fetchedAt: new Date() }],
+      codeSnippets: [{ language: 'ts', code: 'const x = 1' }],
+      quotes: [{ text: 'q', attribution: 'a' }],
+    })
+    const fetched = service.get(c.id)
+    expect(fetched?.links).toHaveLength(1)
+    expect(fetched?.codeSnippets).toHaveLength(1)
+    expect(fetched?.quotes).toHaveLength(1)
+  })
+
+  it('update returns null for unknown id', () => {
+    const result = service.update('nope' as CardId, { title: 'x' })
+    expect(result).toBeNull()
+  })
 })

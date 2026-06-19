@@ -5,6 +5,7 @@ export {
   CardService,
   type CardRepository,
   type CreateCardInput,
+  type UpdateCardPatch,
 } from './services/card-service'
 export {
   CanvasService,
