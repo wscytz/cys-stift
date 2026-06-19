@@ -1,0 +1,36 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 10, 0.5);
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  z-index: 100;
+}
+
+.frame {
+  background: var(--color-white);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+  min-width: 320px;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  box-shadow: var(--shadow-md);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: 500;
+  color: var(--color-black);
+}
+
+.body {
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  color: var(--color-black-soft);
+}

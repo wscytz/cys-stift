@@ -1,0 +1,21 @@
+.toolbar {
+  display: grid;
+  grid-template-columns: 8px 1fr;
+  height: 48px;
+  border-bottom: var(--border-hairline);
+  background: var(--color-white);
+}
+
+.stripe {
+  width: 8px;
+  height: 100%;
+}
+
+.content {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  gap: var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--font-size-base);
+}

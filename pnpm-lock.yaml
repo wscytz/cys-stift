@@ -27,6 +27,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@cys-stift/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       next:
         specifier: 15.0.3
         version: 15.0.3(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -36,6 +39,9 @@ importers:
       react-dom:
         specifier: 19.0.0
         version: 19.0.0(react@19.0.0)
+      tailwindcss:
+        specifier: 4.0.0-beta.3
+        version: 4.0.0-beta.3
     devDependencies:
       '@types/node':
         specifier: 22.9.0
@@ -836,6 +842,9 @@ packages:
       babel-plugin-macros:
         optional: true
 
+  tailwindcss@4.0.0-beta.3:
+    resolution: {integrity: sha512-Cem7SF6OYcijYA1ZOGmuZHxk704iOxsRboFCXIpSJSR0XFft/NNz93Yoo0kHZIGNlqZmnQItI7JUSdR++Y9hZQ==}
+
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
 
@@ -1531,6 +1540,8 @@ snapshots:
     dependencies:
       client-only: 0.0.1
       react: 19.0.0
+
+  tailwindcss@4.0.0-beta.3: {}
 
   tinybench@2.9.0: {}
 

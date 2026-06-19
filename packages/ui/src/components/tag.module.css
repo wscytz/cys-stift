@@ -1,0 +1,14 @@
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-0, 0) var(--space-1);
+  height: 24px;
+  background: var(--tag-color-soft);
+  color: var(--tag-color);
+  border: 1px solid var(--tag-color);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}

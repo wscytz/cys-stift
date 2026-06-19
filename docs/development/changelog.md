@@ -26,3 +26,25 @@
 ---
 
 <!-- 未来 phase 在此追加 -->
+
+## 2026-06-19 · phase 1 · design system
+
+**交付**：`packages/ui` 从占位升级为真组件库；7 个核心组件（Button / Input / Card / Tag / Toolbar / Modal / Tooltip）；`/design` 视觉契约页面；Tailwind v4 接入。
+
+**关键点**：
+
+- tokens 拆成双源：`tokens.css`（CSS variables）+ `tokens.ts`（TS 对象 + 类型），Tailwind preset 注入 `@theme`
+- 6 原色 / 8px 网格 / 字体 / 边框阴影全部锁在 token 集里，组件层只引用
+- `/design` 是视觉契约：每个 token、每种字体、每个组件变体都看得见
+- 视觉对照笔记（带逐项打勾）+ 三张截图归档到 `docs/design/screenshots/phase-1/`
+
+**验证**：
+
+- `pnpm --filter web build` → 静态产物 101 kB First Load JS
+- 6 色 hex 全对（spec §5 vs 截图）
+- 7 个组件每个在 `/design` 有可见展示
+- Modal / Tooltip 静态截图受限（hover/click 触发），交互验证留后续 phase
+
+详见 [`docs/superpowers/plans/2026-06-19-phase-1-design-system.md`](../superpowers/plans/2026-06-19-phase-1-design-system.md) + [`docs/design/screenshots/phase-1/README.md`](../design/screenshots/phase-1/README.md)。
+
+---

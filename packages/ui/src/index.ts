@@ -1,3 +1,18 @@
-// @cys-stift/ui — Bauhaus design system + React components
-// Phase 0: placeholder barrel. Real implementation lands in Phase 1.
-export {}
+// @cys-stift/ui — Bauhaus design system for cy's Stift
+// Phase 1: tokens + 7 core components. More land with each phase.
+
+export * from './tokens'
+export { Button } from './components/button'
+export type { ButtonProps, ButtonVariant } from './components/button'
+export { Input } from './components/input'
+export type { InputProps } from './components/input'
+export { Card } from './components/card'
+export type { CardProps } from './components/card'
+export { Tag } from './components/tag'
+export type { TagProps } from './components/tag'
+export { Toolbar } from './components/toolbar'
+export type { ToolbarProps } from './components/toolbar'
+export { Modal } from './components/modal'
+export type { ModalProps } from './components/modal'
+export { Tooltip } from './components/tooltip'
+export type { TooltipProps } from './components/tooltip'

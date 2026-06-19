@@ -1,7 +1,7 @@
-@import './tokens.css';
+@import '@cys-stift/ui/tokens.css';
+@import 'tailwindcss';
 
-/* Reset + base. Intentionally minimal — the design system (Phase 1) will
- * refine this. */
+/* Base reset — kept minimal so the design system stays the source of truth. */
 *,
 *::before,
 *::after {

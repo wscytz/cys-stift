@@ -7,7 +7,16 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./tokens": "./src/tokens.ts"
+    "./tokens": "./src/tokens.ts",
+    "./tokens.css": "./src/tokens.css",
+    "./tailwind.css": "./src/tailwind-preset.css",
+    "./button": "./src/components/button.tsx",
+    "./input": "./src/components/input.tsx",
+    "./card": "./src/components/card.tsx",
+    "./tag": "./src/components/tag.tsx",
+    "./toolbar": "./src/components/toolbar.tsx",
+    "./modal": "./src/components/modal.tsx",
+    "./tooltip": "./src/components/tooltip.tsx"
   },
   "scripts": {
     "build": "tsc -b",

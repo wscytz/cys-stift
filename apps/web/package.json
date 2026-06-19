@@ -9,9 +9,11 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@cys-stift/ui": "workspace:*",
     "next": "15.0.3",
     "react": "19.0.0",
-    "react-dom": "19.0.0"
+    "react-dom": "19.0.0",
+    "tailwindcss": "4.0.0-beta.3"
   },
   "devDependencies": {
     "@types/node": "22.9.0",
