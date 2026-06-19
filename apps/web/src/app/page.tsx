@@ -1,8 +1,10 @@
 /**
- * cy's Stift — Phase 0 + Phase 4 + Phase 6. A Bauhaus-styled home page so
- * we can verify tokens, fonts and the 8px grid are wired. Phase 6 adds
- * the capture entry hint (Cmd/Ctrl+Shift+Space) — the button itself is
- * decorative; the actual Mini Input is global and launched from anywhere.
+ * cy's Stift — Phase 0 + Phase 4 + Phase 6 + Phase 7. A Bauhaus-styled
+ * home page so we can verify tokens, fonts and the 8px grid are wired.
+ * Phase 6 adds the capture entry hint (Cmd/Ctrl+Shift+Space) — the
+ * button itself is decorative; the actual Mini Input is global and
+ * launched from anywhere.
+ * Phase 7 adds the Archive entry (blue region stripe).
  */
 import Link from 'next/link'
 
@@ -46,10 +48,15 @@ export default function HomePage() {
             <span className="home__nav-label">Canvas</span>
             <span className="home__nav-note">画布 · 把卡片摆开慢慢养</span>
           </Link>
+          <Link href="/archive" className="home__nav-link home__nav-link--archive">
+            <span className="home__nav-arrow" aria-hidden="true">→</span>
+            <span className="home__nav-label">Archive</span>
+            <span className="home__nav-note">归档 · 已沉淀的卡片</span>
+          </Link>
         </nav>
         <footer className="home__foot">
-          <span>phase 6 · capture entry</span>
-          <span>v0.7.0</span>
+          <span>phase 7 · archive</span>
+          <span>v0.8.0</span>
         </footer>
       </section>
       <style>{`
@@ -126,6 +133,8 @@ export default function HomePage() {
         .home__nav { margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
         .home__nav-link--canvas .home__nav-arrow { background: var(--color-black); }
         .home__nav-link--canvas:hover { box-shadow: 4px 4px 0 0 var(--color-black); }
+        .home__nav-link--archive .home__nav-arrow { background: var(--color-blue); }
+        .home__nav-link--archive:hover { box-shadow: 4px 4px 0 0 var(--color-blue); }
         /* Capture hint card — decorative. The actual Mini Input is global
            and launches from anywhere via Cmd/Ctrl+Shift+Space. We don't
            wire a click handler to this card to keep the capture flow

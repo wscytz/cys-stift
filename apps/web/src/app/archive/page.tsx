@@ -1,0 +1,241 @@
+'use client'
+
+import { useState, useMemo } from 'react'
+import Link from 'next/link'
+import { Button, Card as UICard, Tag, Toolbar } from '@cys-stift/ui'
+import type { CardId } from '@cys-stift/domain'
+import { useDb } from '@/lib/db-client'
+import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
+import { Timeline } from '@/features/archive/timeline'
+
+type View = 'grid' | 'timeline'
+
+export default function ArchivePage() {
+  const { snap, service, ready } = useDb()
+  void snap // subscribe
+  const [view, setView] = useState<View>('grid')
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState<Set<CardId>>(() => new Set())
+
+  // Archived & not soft-deleted, sorted by updatedAt desc.
+  const cards = useMemo(
+    () =>
+      service
+        .listAll()
+        .filter((c) => c.archived && !c.deletedAt)
+        .sort((a, b) => +b.updatedAt - +a.updatedAt),
+    [service, ready, snap],
+  )
+
+  const toggleSelect = (id: CardId) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const clearSelected = () => {
+    setSelected(new Set())
+  }
+
+  const handleUnarchiveSelected = () => {
+    for (const id of selected) {
+      service.unarchive(id)
+    }
+    clearSelected()
+  }
+
+  const handleSoftDeleteSelected = () => {
+    for (const id of selected) {
+      service.softDelete(id)
+    }
+    clearSelected()
+  }
+
+  const exitSelectMode = () => {
+    setSelectMode(false)
+    clearSelected()
+  }
+
+  return (
+    <main className="page">
+      <Toolbar region="archive">
+        <span className="crumb">cy&rsquo;s stift</span>
+        <span className="crumb-sep">/</span>
+        <span className="crumb crumb--here">archive</span>
+        <span className="crumb-spacer" />
+        <button
+          type="button"
+          className={`tab ${view === 'grid' ? 'tab--active' : ''}`}
+          onClick={() => setView('grid')}
+        >
+          grid
+        </button>
+        <button
+          type="button"
+          className={`tab ${view === 'timeline' ? 'tab--active' : ''}`}
+          onClick={() => setView('timeline')}
+        >
+          timeline
+        </button>
+        <Tag color="blue">{cards.length}</Tag>
+        <span className="tab-sep" />
+        {selectMode ? (
+          <Button variant="ghost" onClick={exitSelectMode}>
+            Done
+          </Button>
+        ) : (
+          <Button variant="ghost" onClick={() => setSelectMode(true)} disabled={cards.length === 0}>
+            Select
+          </Button>
+        )}
+      </Toolbar>
+
+      <div className="content">
+        {cards.length === 0 ? (
+          <EmptyState />
+        ) : view === 'grid' ? (
+          <ul className="grid">
+            {cards.map((card) => (
+              <li key={card.id}>
+                <ArchiveCardTile
+                  card={card}
+                  variant="tile"
+                  selected={selected.has(card.id)}
+                  selectMode={selectMode}
+                  onClick={() => {
+                    // Phase 7 Lean: no detail modal in archive; opening
+                    // is intentionally not wired (avoid touching Phase 3).
+                    // Users can unarchive then edit in /inbox.
+                  }}
+                  onToggleSelect={() => toggleSelect(card.id)}
+                />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Timeline
+            cards={cards}
+            selected={selected}
+            selectMode={selectMode}
+            onOpen={() => {}}
+            onToggleSelect={toggleSelect}
+          />
+        )}
+
+        <p className="footnote">
+          <Link href="/" className="footnote__link">← home</Link>
+          {' · '}
+          <Link href="/inbox" className="footnote__link">inbox</Link>
+          {' · '}
+          <Link href="/dev/db" className="footnote__link">dev/db</Link>
+        </p>
+      </div>
+
+      {selectMode && selected.size > 0 && (
+        <div className="floater" role="region" aria-label="Bulk actions">
+          <span className="floater__label">{selected.size} selected</span>
+          <span className="floater__sep" aria-hidden="true" />
+          <Button variant="primary" onClick={handleUnarchiveSelected}>
+            Unarchive
+          </Button>
+          <Button variant="danger" onClick={handleSoftDeleteSelected}>
+            Soft-delete
+          </Button>
+          <Button variant="ghost" onClick={clearSelected}>
+            Clear
+          </Button>
+        </div>
+      )}
+
+      <style>{styles}</style>
+    </main>
+  )
+}
+
+function EmptyState() {
+  return (
+    <UICard>
+      <div className="empty">
+        <div className="empty__bar" aria-hidden="true" />
+        <p className="empty__eyebrow">archive</p>
+        <h2 className="empty__h">No archived cards.</h2>
+        <p className="empty__lede">
+          Cards you archive from the inbox will show up here. Unarchive to
+          bring them back, or use multi-select to soft-delete in batch.
+        </p>
+      </div>
+    </UICard>
+  )
+}
+
+const styles = `
+.page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
+.crumb {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-gray);
+}
+.crumb--here { color: var(--color-black); }
+.crumb-sep { color: var(--color-gray); }
+.crumb-spacer { flex: 1; }
+.tab {
+  height: 32px;
+  padding: 0 var(--space-2);
+  background: transparent;
+  border: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-gray);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.tab--active { color: var(--color-black); border-bottom-color: var(--color-blue); }
+.tab-sep { width: 1px; height: 24px; background: var(--color-gray-soft); margin: 0 var(--space-1); }
+
+.content { max-width: 1120px; margin: 0 auto; padding: var(--space-5) var(--space-4); display: flex; flex-direction: column; gap: var(--space-4); }
+
+.grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-3);
+}
+
+.empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) 0; }
+.empty__bar { width: 64px; height: 8px; background: var(--color-blue); }
+.empty__eyebrow { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.16em; color: var(--color-gray); }
+.empty__h { margin: 0; font-family: var(--font-display); font-size: var(--font-size-2xl); font-weight: 500; letter-spacing: -0.01em; }
+.empty__lede { margin: 0; color: var(--color-black-soft); font-size: var(--font-size-base); line-height: 1.6; max-width: 60ch; }
+
+.footnote { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); margin: 0; padding-top: var(--space-2); border-top: var(--border-hairline); }
+.footnote__link { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; }
+
+.floater {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--color-black);
+  color: var(--color-white);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+}
+.floater__label { text-transform: uppercase; letter-spacing: 0.12em; }
+.floater__sep { width: 1px; height: 24px; background: var(--color-gray-soft); margin: 0 var(--space-1); }
+`

@@ -9,10 +9,10 @@
 
 ## 当前状态
 
-- Phase 0 ✅ 脚手架 · Phase 1 ✅ 设计系统 · Phase 2 ✅ 数据层 · Phase 3 ✅ Inbox 业务 · Phase 4 ✅ Canvas 基础 · Phase 5 ✅ Canvas 完整 · **Phase 6 ✅ 捕获入口**（`Cmd/Ctrl+Shift+Space` 全局快捷键 + Mini Input 居中浮层 + WebCaptureSink 走 `service.fromCapture`；0 新依赖 / domain+db 零改动）
-- **下一个**：Phase 7+ 候选（Tauri 全局快捷键 / 菜单栏 / 编辑多媒介 / inbox→canvas send / 图片上传 / 草稿自动保存 / 快捷键自定义 / 多 CaptureSink 实现）
-- 完整进度：`docs/development/changelog.md`
-- **执行模式**：主模型（Claude）按 phase plan 手动执行 + 自审；不再跑 Ralph 自动循环（见下方"Ralph 状态"）
+- Phase 0 ✅ 脚手架 · Phase 1 ✅ 设计系统 · Phase 2 ✅ 数据层 · Phase 3 ✅ Inbox 业务 · Phase 4 ✅ Canvas 基础 · Phase 5 ✅ Canvas 完整 · Phase 6 ✅ 捕获入口 · **Phase 7 ✅ Archive**（`/archive` 路由 + 网格/时间轴双视图 + 多选批量 unarchive/soft-delete + 蓝条 region；domain/db 零改动 / 0 新依赖）
+- **执行模式**：主模型（Claude）按 `docs/development/roadmap.md` 30 轮路线图顺序执行 + 自审；完成一个就开下一个（用户已授权一直做下去）。Ralph 自动循环不再使用（见下方"Ralph 状态"）
+- **下一个**：P6.5a 草稿自动保存（路线图 §1 下一行）→ 然后 P6.5b 多媒介编辑 → P6.5c inbox→canvas → P6.5d 画布视图持久化 → P6.5e-h → Phase 8 Tauri → Phase 9 导出
+- 完整进度：`docs/development/changelog.md` + `docs/development/roadmap.md`（30 轮路线图）
 - 任务流程参考：`docs/ralph/README.md`（已归档，见下）
 
 ## 技术栈（不可重新选型）

@@ -2,6 +2,7 @@
 
 > 每条一行，按日期倒序。详细见对应文件。
 
+- [2026-06-19 · Phase 7 Archive](decisions/2026-06-19-phase-7.md) — /archive 路由 + 网格/时间轴双视图 + 多选批量 + 蓝条 region + domain/db 零改动 + 8 截图 + 8 断言
 - [2026-06-19 · Phase 6 捕获入口](decisions/2026-06-19-phase-6.md) — 全局快捷键 Cmd/Ctrl+Shift+Space + Mini Input 浮层（红边 + 顶部红条）+ WebCaptureSink 走 service.fromCapture + 8 项交互断言 + 9 张截图
 - [2026-06-19 · Phase 5 Canvas 完整](decisions/2026-06-19-phase-5.md) — /canvas 工具条加 snap/free + zoom 4 按钮 + 快捷键（g + - 0 1）+ §4.3 gridSize=8 + §8 四件 + 10 张截图
 - [2026-06-19 · Phase 4 Canvas 基础](decisions/2026-06-19-phase-4.md) — /canvas + tldraw v3 + Card ShapeUtil + §6.11 DB 真相源绑定（位置跨刷新持久化）+ 6 张截图

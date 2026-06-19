@@ -1,0 +1,182 @@
+'use client'
+
+import { Tag } from '@cys-stift/ui'
+import type { Card } from '@cys-stift/domain'
+
+interface ArchiveCardTileProps {
+  card: Card
+  variant?: 'tile' | 'row'
+  selected: boolean
+  selectMode: boolean
+  onClick: () => void
+  onToggleSelect: () => void
+}
+
+/**
+ * Archive card visual: 白底黑边 1px + 8px 圆角 + 左侧 8px 蓝条
+ * (与 inbox 红条区分,spec §5.2 archive→blue / §5.4 Archive 视觉骨架).
+ *
+ * - variant="tile" 网格视图
+ * - variant="row"  时间轴行式
+ */
+export function ArchiveCardTile({
+  card,
+  variant = 'tile',
+  selected,
+  selectMode,
+  onClick,
+  onToggleSelect,
+}: ArchiveCardTileProps) {
+  const preview = card.body.slice(0, 120)
+  const totalMedia = card.links.length + card.codeSnippets.length + card.quotes.length
+  const cls = [
+    variant === 'tile' ? 'tile' : 'row',
+    selected ? 'tile--selected' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  return (
+    <div className={cls}>
+      {selectMode && (
+        <label className="tile__check" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onToggleSelect}
+            aria-label={`Select card ${card.title || '(untitled)'}`}
+          />
+        </label>
+      )}
+      <button
+        type="button"
+        className="tile__main"
+        onClick={onClick}
+        aria-label={`Open card ${card.title || '(untitled)'}`}
+      >
+        <div className="tile__bar" aria-hidden="true" />
+        <div className="tile__body">
+          <h3 className={variant === 'tile' ? 'tile__title' : 'row__title'}>
+            {card.title || '(untitled)'}
+          </h3>
+          {variant === 'tile' && preview && (
+            <p className="tile__preview">{preview}</p>
+          )}
+          <div className="tile__meta">
+            <Tag color="blue">{card.type}</Tag>
+            {totalMedia > 0 && <Tag color="red">{totalMedia} media</Tag>}
+            <span className="tile__time">
+              {card.updatedAt.toISOString().slice(0, 10)}
+            </span>
+          </div>
+        </div>
+      </button>
+      <style>{styles}</style>
+    </div>
+  )
+}
+
+const styles = `
+.tile, .row {
+  position: relative;
+  display: flex;
+  text-align: left;
+  background: var(--color-white);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  overflow: hidden;
+  color: var(--color-black);
+  font-family: var(--font-body);
+  transition: transform 80ms ease-out, box-shadow 80ms ease-out, border-color 80ms ease-out;
+  box-shadow: var(--shadow-sm);
+}
+.tile { min-height: 160px; }
+.tile--selected { border-color: var(--color-blue); border-width: 2px; }
+.tile:hover, .row:hover { box-shadow: var(--shadow-md); }
+.tile:active, .row:active { transform: translate(2px, 2px); box-shadow: none; }
+
+.tile__check {
+  position: absolute;
+  top: var(--space-1);
+  left: var(--space-1);
+  z-index: 2;
+  background: var(--color-white);
+  padding: 2px 4px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.tile__check input { cursor: pointer; }
+
+.tile__main {
+  flex: 1;
+  display: flex;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.tile__bar {
+  width: 8px;
+  flex-shrink: 0;
+  background: var(--color-blue);
+}
+.tile__body {
+  flex: 1;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.tile__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.tile__preview {
+  margin: 0;
+  color: var(--color-black-soft);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tile__meta {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+  margin-top: auto;
+  flex-wrap: wrap;
+}
+.tile__time {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-gray);
+  margin-left: auto;
+}
+
+/* Row variant (timeline) */
+.row { min-height: 56px; }
+.row__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: -0.005em;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+`
