@@ -49,6 +49,7 @@ export interface UpdateCardPatch {
   type?: CardType
   color?: Card['color']
   pinned?: boolean
+  media?: MediaRef[]
   links?: LinkPreview[]
   codeSnippets?: CodeBlock[]
   quotes?: Quote[]
@@ -118,6 +119,7 @@ export class CardService {
       ...(patch.type !== undefined ? { type: patch.type } : {}),
       ...(patch.color !== undefined ? { color: patch.color } : {}),
       ...(patch.pinned !== undefined ? { pinned: patch.pinned } : {}),
+      ...(patch.media !== undefined ? { media: patch.media } : {}),
       ...(patch.links !== undefined ? { links: patch.links } : {}),
       ...(patch.codeSnippets !== undefined
         ? { codeSnippets: patch.codeSnippets }

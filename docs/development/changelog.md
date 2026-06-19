@@ -426,3 +426,34 @@
 详见 [`docs/superpowers/plans/2026-06-19-phase-6.5e-unify-manual-capture.md`](../superpowers/plans/2026-06-19-phase-6.5e-unify-manual-capture.md) + [`docs/design/screenshots/phase-6.5e/README.md`](../design/screenshots/phase-6.5e/README.md)。
 
 ---
+
+## 2026-06-19 · phase 6.5f · media upload (inline base64 MVP)
+
+**交付**:`apps/web/src/lib/media-store.ts`(新):web-local localStorage key `cys-stift.media.v1` + `attach` / `getAsset` / `remove` + base64 data URL(soft 500KB 警告);`packages/domain/src/services/card-service.ts` 扩 `UpdateCardPatch.media` + `update` 函数体(零依赖 + 新加 1 vitest);`apps/web/src/app/inbox/page.tsx` 详情 Modal view + edit mode 渲染 `card.media`(view 渲染 `<img>`;edit 加 file input + 缩略图列表 + × 删除)。puppeteer 4/4 断言;3 张截图。
+
+**核心承诺验证(spec §4.5 MediaAsset 最小 MVP)**:
+
+- 上传 1 张图 → save → `card.media.length === 1` ✓
+- `cys-stift.media.v1` 1 asset ✓
+- 详情 Modal 渲染 1 个 `<img class="media-list__img">` ✓
+- 跨刷新保留 ✓
+- 零 page error
+
+**关键工程决策**:
+
+- **base64 inline localStorage 占位**:Phase 2.5 OPFS / Phase 8 Tauri fs 替换时,`mediaStore` 公共 API 不变。
+- **domain 扩 `UpdateCardPatch.media`**:补白名单,不破坏零依赖,新加 1 个 vitest。
+- **软限制 500KB**:console.warn 提示,仍接受。
+- **0 新依赖**:FileReader / data URL 原生。
+
+**已知 / 后续**:
+
+- OPFS 真实落盘 → Phase 2.5(独立 phase)
+- Tauri fs 落盘 → Phase 8
+- 图片编辑(裁剪/旋转)→ 留后
+- 拖放上传 → 留后
+- OG 图片抓取 → 留后
+
+详见 [`docs/superpowers/plans/2026-06-19-phase-6.5f-media-upload.md`](../superpowers/plans/2026-06-19-phase-6.5f-media-upload.md) + [`docs/design/screenshots/phase-6.5f/README.md`](../design/screenshots/phase-6.5f/README.md)。
+
+---

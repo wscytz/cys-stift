@@ -8,6 +8,7 @@ import type {
   CardId,
   CodeBlock,
   LinkPreview,
+  MediaRef,
   Quote,
 } from '@cys-stift/domain'
 import { CreateCardForm } from './create-card-form'
@@ -26,6 +27,7 @@ import {
 } from '@/features/card/editors'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import { WebCaptureSink } from '@/features/capture/capture-sink'
+import { mediaStore } from '@/lib/media-store'
 
 type View = 'inbox' | 'archived'
 
@@ -238,6 +240,7 @@ interface CardDetailProps {
   onSave: (patch: {
     title: string
     body: string
+    media: MediaRef[]
     links: LinkPreview[]
     codeSnippets: CodeBlock[]
     quotes: Quote[]
@@ -262,6 +265,7 @@ function CardDetail({
   const { card, mode } = state
   const [title, setTitle] = useState(card.title)
   const [body, setBody] = useState(card.body)
+  const [media, setMedia] = useState<MediaRef[]>(card.media)
   const [links, setLinks] = useState<DraftLink[]>(() =>
     card.links.map((l) => ({ url: l.url })),
   )
@@ -277,10 +281,11 @@ function CardDetail({
   useEffect(() => {
     setTitle(card.title)
     setBody(card.body)
+    setMedia(card.media)
     setLinks(card.links.map((l) => ({ url: l.url })))
     setCodes(card.codeSnippets.map((c) => ({ language: c.language, code: c.code })))
     setQuotes(card.quotes.map((q) => ({ text: q.text, attribution: q.attribution ?? '' })))
-  }, [card.id, card.title, card.body, card.links, card.codeSnippets, card.quotes])
+  }, [card.id, card.title, card.body, card.media, card.links, card.codeSnippets, card.quotes])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -307,11 +312,24 @@ function CardDetail({
       onSave({
         title: title.trim(),
         body,
+        media: media,
         links: draftLinksToPayload(links),
         codeSnippets: draftCodesToPayload(codes),
         quotes: draftQuotesToPayload(quotes),
       })
     })
+  }
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files) return
+    for (const file of Array.from(files)) {
+      try {
+        const ref = await mediaStore.attach(file)
+        setMedia((prev) => [...prev, ref])
+      } catch (err) {
+        console.error('[CardDetail] attach failed', err)
+      }
+    }
   }
 
   return (
@@ -326,6 +344,38 @@ function CardDetail({
               </span>
             </div>
             <MarkdownBody source={card.body} />
+            {card.media.length > 0 && (
+              <DetailSection label="Media">
+                <ul className="media-list">
+                  {card.media.map((m, i) => {
+                    const asset = mediaStore.getAsset(m.assetId)
+                    if (!asset) return null
+                    if (asset.kind === 'image') {
+                      return (
+                        <li key={String(m.assetId)} className="media-list__item">
+                          <img
+                            src={asset.dataUrl}
+                            alt={asset.id}
+                            className="media-list__img"
+                          />
+                        </li>
+                      )
+                    }
+                    return (
+                      <li key={String(m.assetId)} className="media-list__item">
+                        <a
+                          href={asset.dataUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {asset.mimeType} ({(asset.byteSize / 1024).toFixed(1)} KB)
+                        </a>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </DetailSection>
+            )}
             {card.links.length > 0 && (
               <DetailSection label="Links">
                 <ul className="link-list">
@@ -386,6 +436,54 @@ function CardDetail({
                 rows={6}
               />
             </label>
+            <div className="detail__field">
+              <span className="detail__label">Media (images / files)</span>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  void handleFiles(e.target.files)
+                  e.target.value = ''
+                }}
+                className="detail__file"
+              />
+              {media.length > 0 && (
+                <ul className="media-list media-list--edit">
+                  {media.map((m) => {
+                    const asset = mediaStore.getAsset(m.assetId)
+                    if (!asset) return null
+                    return (
+                      <li
+                        key={String(m.assetId)}
+                        className="media-list__item media-list__item--edit"
+                      >
+                        {asset.kind === 'image' && (
+                          <img
+                            src={asset.dataUrl}
+                            alt={asset.id}
+                            className="media-list__img media-list__img--thumb"
+                          />
+                        )}
+                        <button
+                          type="button"
+                          className="le__remove"
+                          onClick={() => {
+                            mediaStore.remove(m.assetId)
+                            setMedia((prev) =>
+                              prev.filter((x) => x.assetId !== m.assetId),
+                            )
+                          }}
+                          aria-label="Remove media"
+                        >
+                          ×
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
             <ListEditor
               items={links}
               onChange={setLinks}
@@ -558,6 +656,14 @@ const styles = `
 }
 .detail__textarea:focus { border-bottom-color: var(--color-red); }
 .detail__hint { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
+.detail__file { font-family: var(--font-mono); font-size: var(--font-size-sm); margin-top: var(--space-1); }
+.media-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.media-list__item { display: inline-flex; }
+.media-list__img { max-width: 100%; border: var(--border-hairline); display: block; }
+.media-list--edit { margin-top: var(--space-2); }
+.media-list__item--edit { position: relative; }
+.media-list__img--thumb { width: 96px; height: 96px; object-fit: cover; }
+.media-list__item--edit .le__remove { position: absolute; top: 0; right: 0; background: var(--color-white); }
 .detail__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
 .detail__spacer { flex: 1; }
 .detail__quote { margin: 0; padding: var(--space-2) var(--space-3); border-left: 4px solid var(--color-red); background: var(--color-red-soft); }

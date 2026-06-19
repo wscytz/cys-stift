@@ -2,6 +2,7 @@
 
 > 每条一行，按日期倒序。详细见对应文件。
 
+- [2026-06-19 · Phase 6.5f 图片上传](decisions/2026-06-19-phase-6.5f.md) — base64 inline localStorage + 详情 Modal 渲染 + UpdateCardPatch.media 扩 + 4 断言 + 3 截图
 - [2026-06-19 · Phase 6.5e 统一手动 capture](decisions/2026-06-19-phase-6.5e.md) — inbox CreateCardForm 走 WebCaptureSink(source.kind=manual)统一接口 + domain/db 零改动 + 5 断言 + 1 截图
 - [2026-06-19 · Phase 6.5d 画布视图持久化](decisions/2026-06-19-phase-6.5d.md) — web-local canvas-view-store + tldraw camera/gridMode 监听 + 防抖 500ms 写回 + 6 断言 + 4 截图
 - [2026-06-19 · Phase 6.5c Inbox→Canvas Send](decisions/2026-06-19-phase-6.5c.md) — 详情 Modal "Send to canvas" 按钮 + moveToCanvas 复用 + tldraw 自动渲染 + 6 断言 + 5 截图

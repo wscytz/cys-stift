@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { CardService, type CardRepository } from '../services/card-service'
-import type { Card, CardId, CanvasId, WorkspaceId } from '../types'
+import type { Card, CardId, CanvasId, MediaAssetId, MediaRef, WorkspaceId } from '../types'
 
 class InMemoryCardRepository implements CardRepository {
   private store = new Map<CardId, Card>()
@@ -144,6 +144,16 @@ describe('CardService', () => {
     expect(fetched?.links).toHaveLength(1)
     expect(fetched?.codeSnippets).toHaveLength(1)
     expect(fetched?.quotes).toHaveLength(1)
+  })
+
+  it('update can swap media array', () => {
+    const c = service.create({ title: 'media-assets', source: dummySource })
+    const a1: MediaRef = { assetId: 'a1' as MediaAssetId, order: 0 }
+    const a2: MediaRef = { assetId: 'a2' as MediaAssetId, order: 1 }
+    service.update(c.id, { media: [a1, a2] })
+    const fetched = service.get(c.id)
+    expect(fetched?.media).toHaveLength(2)
+    expect(fetched?.media[0].assetId).toBe('a1')
   })
 
   it('update returns null for unknown id', () => {
