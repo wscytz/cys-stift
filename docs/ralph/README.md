@@ -1,5 +1,19 @@
 # Ralph Loop — cy's Stift 任务总指南
 
+> ⚠️ **2026-06-19 起已停用（归档保留）**
+>
+> Ralph 自动循环不再运行。当前执行模式是**主模型（Claude）按 phase plan 手动执行 + 自审**。
+> 本文档内容（任务流程、审核标准 §6、compact/clear 规则 §4.7）**仍有参考价值**，但其中：
+> - "Ralph 是执行者 / `/ralph-loop` 命令 / stop hook 自动循环" → **不再适用**
+> - "智谱 GLM 独立审核" → 仍可用（`scripts/audit-glm.sh`），但改为**按需手动触发**，不再绑定循环
+> - 审核标准 §6 → **仍然适用**，主模型自审时照此逐项检查
+>
+> 详见根 `CLAUDE.md` 的 "Ralph 状态" 章节。如要重启 Ralph，本文档 + 各 plan 仍在，接回 stop hook 即可。
+>
+> ---
+>
+> **下方为原文档（归档，未删改内容）：**
+>
 > **给 Ralph 看的任务描述。** Ralph 在 MiniMax 下循环跑（操作员 ccswitch 配置）；**每个 phase 的产物会被智谱 GLM 在独立对话里审核**。本文档跟"用什么模型跑 ralph"无关——它只描述任务。
 >
 > **关键** 因为 Ralph 会被审核，prompt 必须把**审核标准**说清楚，让 Ralph 第一轮就交出能过审的产物，避免循环浪费。
@@ -182,9 +196,9 @@ Ralph 是多轮连续迭代，**反复压缩的信息衰减风险远大于收益
 - ✅ **Phase 0** — 脚手架（`v0.1.0-phase-0`，commit `ae2d5dc`）
 - ✅ **Phase 1** — 设计系统（`v0.2.0-phase-1`，commit `fc10050`）
 - ✅ **Phase 2** — 数据层（`v0.3.0-phase-2`，commit `bb81af5`）
-- ⏳ **Phase 3** — Inbox 业务（**下一个**）
-  - Plan 还没写 → 写完再启动 ralph
-- 🔒 Phase 4–9 锁着
+- ✅ **Phase 3** — Inbox 业务（`v0.4.0-phase-3`，commit `284be2a`，GLM audit pass）— **Ralph 停用前最后一个 phase；此 phase 及之后改主模型手动执行**
+- ⏳ **Phase 4** — Canvas 基础（tldraw 集成）（**下一个**）
+- 🔒 Phase 5–9 锁着
 
 ---
 

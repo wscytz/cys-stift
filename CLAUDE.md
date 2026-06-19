@@ -9,9 +9,11 @@
 
 ## 当前状态
 
-- Phase 0 ✅ 脚手架 · Phase 1 ✅ 设计系统 · Phase 2 ✅ 数据层 · **Phase 3 ⏳ Inbox 业务（下一个）**
+- Phase 0 ✅ 脚手架 · Phase 1 ✅ 设计系统 · Phase 2 ✅ 数据层 · **Phase 3 ✅ Inbox 业务**（commit `284be2a`，tag `v0.4.0-phase-3`，GLM audit pass）
+- **下一个**：Phase 4 — Canvas 基础（tldraw 集成）
 - 完整进度：`docs/development/changelog.md`
-- 详细任务指南（给 Ralph）：`docs/ralph/README.md`
+- **执行模式**：主模型（Claude）按 phase plan 手动执行 + 自审；不再跑 Ralph 自动循环（见下方"Ralph 状态"）
+- 任务流程参考：`docs/ralph/README.md`（已归档，见下）
 
 ## 技术栈（不可重新选型）
 
@@ -32,7 +34,7 @@
 - ❌ 不要破坏 `packages/domain` 的零依赖特性（它不 import 任何框架）
 - ❌ 不要假装 build / test 通过 —— 必须实际跑命令看 exit code
 - ❌ 不要添加用户没要求的依赖或"附赠功能"（YAGNI）
-- ❌ Ralph 循环中**不要输出假 `<promise>`** 来逃出循环
+- ❌ 不要输出假 `<promise>` 来逃出循环 / 跳过验收
 
 ## 关键文件位置
 
@@ -40,7 +42,7 @@
 |---|---|
 | 整体设计 / 数据模型 / 路线图 | `docs/superpowers/specs/2026-06-19-cys-stift-design.md` |
 | 当前 phase 的实现计划 | `docs/superpowers/plans/` |
-| Ralph 任务指南 + compact/clear 规则 | `docs/ralph/README.md` |
+| Ralph 任务指南 + compact/clear 规则 | `docs/ralph/README.md`（已归档） |
 | 架构决策记录 | `docs/adr/` |
 | 设计 token 规则 | `docs/design/tokens.md` |
 | 跨模型记忆 | `docs/memory/MEMORY.md` |
@@ -54,6 +56,18 @@ pnpm --filter domain test     # domain 单元测试（必须全绿）
 pnpm --filter db test         # db 集成测试（必须全绿）
 pnpm --filter web build       # Next.js 静态导出（必须 exit 0）
 ```
+
+## Ralph 状态（已停用）
+
+> **2026-06-19 起，不再跑 Ralph 自动循环。** 改为主模型（Claude）按 phase plan 手动执行 + 自审。
+>
+> - `docs/ralph/README.md` **保留为归档**，内容（任务流程、审核标准、compact/clear 规则）仍可参考，但其中的"Ralph 是执行者 / 自动循环 / stop hook"描述**不再适用**。
+> - Phase 3（Inbox）就是手动执行的第一个 phase，已完成并通过 GLM audit。
+> - `scripts/audit-glm.sh` 保留：跨模型审核（GLM-5.2，Anthropic 兼容 endpoint）仍有用，需要时手动跑。
+>
+> **如果以后想重启 Ralph**：`docs/ralph/` + 各 plan 文件都在，重新接 stop hook 即可。
+
+---
 
 ## Compact Instructions
 
@@ -70,5 +84,5 @@ pnpm --filter web build       # Next.js 静态导出（必须 exit 0）
 
 ---
 
-> 详细规则见 `docs/ralph/README.md` 的"上下文管理"章节。
 > 各包的局部纪律见对应目录的 `CLAUDE.md`。
+> Ralph 已停用，但其任务流程/审核标准仍可在 `docs/ralph/README.md` 查到（归档状态）。

@@ -1,5 +1,8 @@
 # Phase 3 实现计划 · Inbox 业务
 
+> ✅ **已完成**（commit `284be2a`，tag `v0.4.0-phase-3`，GLM audit pass，2026-06-19）。
+> 下方为原始计划，保留作为历史记录。本 phase 是 Ralph 模式下手动执行的产物（Ralph 在此 phase 期间停用，改主模型执行；见根 `CLAUDE.md` "Ralph 状态"）。
+
 | 字段 | 值 |
 |---|---|
 | 计划 | Phase 3：Inbox 业务 |
