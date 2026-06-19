@@ -2,6 +2,7 @@
 
 > 每条一行，按日期倒序。详细见对应文件。
 
+- [2026-06-19 · Phase 5 Canvas 完整](decisions/2026-06-19-phase-5.md) — /canvas 工具条加 snap/free + zoom 4 按钮 + 快捷键（g + - 0 1）+ §4.3 gridSize=8 + §8 四件 + 10 张截图
 - [2026-06-19 · Phase 4 Canvas 基础](decisions/2026-06-19-phase-4.md) — /canvas + tldraw v3 + Card ShapeUtil + §6.11 DB 真相源绑定（位置跨刷新持久化）+ 6 张截图
 - [2026-06-19 · 设计定稿](decisions/2026-06-19-design-finalized.md) — spec 经五轮复查定稿，`docs/superpowers/specs/2026-06-19-cys-stift-design.md`
 - [2026-06-19 · Phase 0 脚手架](decisions/2026-06-19-phase-0.md) — monorepo + Next.js 静态导出 + Tauri 壳 + 包豪斯占位首屏

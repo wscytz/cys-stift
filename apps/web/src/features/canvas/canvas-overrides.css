@@ -1,0 +1,21 @@
+/* Phase 5 — Canvas overrides for tldraw's default visuals.
+ *
+ * Keep this file intentionally small: tldraw v3.15.x defaults mostly fit
+ * Bauhaus (dot grid background, mono caps on chrome, hairline borders).
+ * Only override what truly conflicts with our 6-color / 8px-grid / mono
+ * typography token system.
+ *
+ * Spec §5.4 + §6.3: snap lines should look like print registration marks —
+ * hairline, mono-tone (black), not tldraw's default saturated red.
+ */
+
+/* Snap indicator / point / gap — tldraw default uses --color-snap (red,
+   hsl(0, 76%, 60%)). We override to black 1px so it reads as a Bauhaus
+   alignment guide, not a warning color. (Red is reserved for inbox / capture
+   regions per the design system.) */
+.tl-snap-indicator,
+.tl-snap-point,
+.tl-snap-gap {
+	stroke: var(--color-black) !important;
+	stroke-width: calc(1px * var(--tl-scale)) !important;
+}

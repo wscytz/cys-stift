@@ -1,84 +1,73 @@
-# 当前会话交接（Phase 4 → Phase 5）
+# 当前会话交接（Phase 5 → Phase 6）
 
 > 用途：spec §9.1 指定的跨会话/跨模型延续档。compact、切模型都不丢。
-> 写入时机：Phase 4 closeout 后，下次启动时由新会话/新模型先读此档。
-> 每次有重要进展（plan 写完、closeout 完成等）必须回写更新本档。
+> 写入时机：每完成一个 phase closeout 时回写。
+> 启动时由新会话/新模型先读此档。
 
 ---
 
-## 阶段定位（接 Phase 5 用）
+## 阶段定位
 
-- **当前**：Phase 4 ✅（commit `57d7b16`，tag `v0.5.0-phase-4`，git clean）
-- **下一个**：**Phase 5 — Canvas 完整**（spec §8 行 648–661：网格 / 自由模式、缩放、对齐）
+- **当前**：Phase 5 ✅（commit 待打，tag `v0.6.0-phase-5`；snap/free + 缩放 + snap 指示线 + 键盘快捷键；git 干净）
+- **下一个**：**Phase 6 — Inbox 完整**（spec §8 路线图：多媒介编辑 / 全局快捷键 / mini input）
 - **状态锚点**：`/Users/jinxunuo/projects/cys-stift/CLAUDE.md`（根项目锚点，任何会话都先读）
 
 ---
 
-## Phase 5 范围种子（按事实清单，不是我建议）
+## Phase 5 关键交付速览
 
-来自三处明确的"给 Phase 5"清单，整理为**必做**和**可选**两类：
+- `apps/web/src/app/canvas/page.tsx`：工具条右侧 SNAP/FREE 切换 + 缩放 4 按钮（−/%/+/FIT）+ 键盘快捷键（`+ - 0 1 g`）+ mobile media query
+- `apps/web/src/features/canvas/canvas-overrides.css`（新）：snap 指示线覆盖为 `var(--color-black)` 1px（tldraw 默认饱和红冲突）
+- `apps/web/src/features/canvas/tldraw-canvas.tsx`：导入 canvas-overrides.css
+- `apps/web/src/features/canvas/canvas-editor.tsx`：`isGridMode: true` + `gridSize: 8` + `window.__canvasEditor` 诊断 hook
+- `scripts/p5-shots.cjs` + `docs/design/screenshots/phase-5/`（10 截图）+ `README.md` 视觉笔记
+- **0 新依赖** + **domain/db 零改动**（视图持久化 Lean 排除）
 
-### ✅ Phase 5 必做（spec §8 + Phase 4 closeout 共识）
-1. **网格 snap** — 8px 步进；位置/尺寸吸附（spec §4.3 gridSize=8，§5.4 点阵背景已有）
-2. **自由模式切换** — `CanvasView.gridMode: 'snap' | 'free'` 切换 UI
-3. **缩放控件 UI** — zoom in / zoom out / zoom to fit 显式按钮（Phase 4 隐藏了 tldraw chrome）
-4. **对齐辅助线** — snap 模式自动出（tldraw v3 内置 snapping）
-
-### ❓ Phase 5 选做（closeout 标 Phase 5+，需用户决定是否纳入本阶段）
-5. **视图持久化** — `canvases.viewJson` 的 `zoom/pan/gridMode` 防抖回写
-   - 前提：domain 需补 `CanvasService.updateView` + `CanvasRepository.update`（目前都不存在）
-   - schema 列已就位（spec §4.9），无任何读写代码
-6. **Delete 键同步打磨** — tldraw Delete 只删 shape（刷新从 DB 回来）；需桥接到 `CardService.softDelete`
+puppeteer 6/6 断言全过：snap 488%8==0 / free 747%8!=0 / zoom 100→800% / fit all-in / 键盘 g / 零 error。
 
 ---
 
-## 现有 tldraw 集成的关键代码位置
+## Phase 5 关键工程决策（接 Phase 6 别再踩）
+
+1. **`useState<Editor>` 替代 `useRef<Editor>`** — Phase 4 用 ref 留坑（ref 不触发 re-render，toolbar 永远 disabled）。Phase 6 若再加依赖 editor handle 的 UI，**必须用 state**。
+2. **tldraw v3 snap 真开关是 `editor.updateInstanceState({ isGridMode })`**，**不是** `editor.user.updateUserPreferences({ isSnapMode })`（后者只翻 Ctrl 反转）。两者要同步。
+3. **tldraw v3 默认 `gridSize: 10`**（不是 8）。spec §4.3 要 8，**必须** onMount 显式 `editor.updateDocumentSettings({ gridSize: 8 })`。
+4. **`useValue` hook 从 `@tldraw/tldraw` 顶层可用**（通过 `@tldraw/editor` re-export `@tldraw/state-react`）。
+5. **缩放步进是 tldraw v3 默认 2x**（不是 context7 文档说的 1.5x）。验收断言用 `> previous` 不要 hardcode 1.5 倍数。
+6. **`window.__canvasEditor` 诊断 hook**：puppeteer 读 live editor state 用，后续 phase 调试时也方便。生产无副作用。
+7. **缩放按钮用本地 `<button>` 而非 `@cys-stift/ui` Button**——Button 40px 高 + padding 大不适合 47px 黑条内紧凑布局。本地按钮 32px，颜色/边框全走 token。
+
+---
+
+## Phase 6 范围种子
+
+按 spec §8 路线图，Phase 6 = "Inbox 完整"：多媒介编辑 / 全局快捷键 / mini input。需要 Phase 6 plan 时再读：
+- spec §6.3（Inbox / capture）+ §1.3 + §2 数据模型
+- Phase 3 closeout（`docs/development/changelog.md` phase 3 段）已知/后续
+- Phase 3 plan（`docs/superpowers/plans/2026-06-20-phase-3-inbox.md`）"❌ 没做"段
+- 现有 inbox 代码：`apps/web/src/app/inbox/page.tsx`
+
+---
+
+## 现有 Canvas 代码（接 Phase 6 也别忘了）
 
 `/Users/jinxunuo/projects/cys-stift/apps/web/src/features/canvas/`：
 
 | 文件 | 做什么 |
 |---|---|
-| `tldraw-canvas.tsx` | 客户端挂载守卫 + `useEffect` 内 `import('./canvas-editor')`（动态 import 边界） |
-| `canvas-editor.tsx` | `<Tldraw shapeUtils hideUi onMount>` + §6.11 load/writeback 接线 + DOM dblclick 监听 |
-| `card-shape-util.tsx` | `CardShapeUtil extends BaseBoxShapeUtil`，白底黑边 8px 圆角，CSS variable token |
-| `canvas-binding.ts` | §6.11 数据流；含 `cardShapeIdOf` / `cardIdFromShapeId` / `loadCardsIntoEditor` / `bindCardWriteback`（300ms 防抖）/ `addCardShape` / `updateCardShape` / `removeCardShape` |
+| `tldraw-canvas.tsx` | 客户端挂载守卫 + 动态 `import('./canvas-editor')` |
+| `canvas-editor.tsx` | `<Tldraw shapeUtils hideUi onMount>` + onMount 设 isGridMode/gridSize + 诊断 hook + dblclick 监听 |
+| `card-shape-util.tsx` | `CardShapeUtil extends BaseBoxShapeUtil`，白底黑边 8px 圆角 |
+| `canvas-binding.ts` | §6.11 数据流；防抖 300ms |
 | `card-detail-modal.tsx` | 复用 Phase 3 `MarkdownBody`；view/edit + archive/soft-delete |
-| `default-canvas.ts` | `DEFAULT_CANVAS_ID = toCanvasId('default-canvas')`（spec §1.4 单画布） |
+| `canvas-overrides.css` | Phase 5 新增：snap 指示线黑色 1px |
+| `default-canvas.ts` | `DEFAULT_CANVAS_ID` |
 
-`apps/web/src/app/canvas/page.tsx` — `/canvas` production 路由，editor handle 经 `onEditorReady` 提到 page 层。
-
----
-
-## tldraw v3 踩坑清单（接 Phase 5 的人不要重新踩）
-
-> 锁版本：**tldraw v3.15.6**（不是 v5）。npm latest 已 v5.1.x，但 v5 peer 要 React ≥19.2.1。我们 React 19.0.0 pinned。升 React 必须先确认 tldraw 兼容矩阵。
-
-1. **shape id 必须 `shape:` 前缀** — tldraw 强校验；`cardShapeIdOf` 加前缀，`cardIdFromShapeId` 剥前缀。
-2. **动态 import 边界在 `tldraw-canvas.tsx`** — tldraw 模块加载时访问 `window`，静态导出预渲染期会炸。`useEffect` 内 `import('./canvas-editor')`。tldraw ~2.1MB 独立 chunk，懒载不污染其他路由首屏。
-3. **`mergeRemoteChanges` 避自激** — 加载用 `editor.store.mergeRemoteChanges(() => createShape)` 标 remote 源；写回监听 `store.listen({source:'user'})` 只听用户拖动。
-4. **`pointerEvents: none` on HTMLContainer** — 否则 HTML 覆盖层吞 pointer、tldraw 拖不动卡片。Phase 5 卡内仍无交互需求，保持 `none`。
-5. **`changes.updated` value 是 `[from, to]` 元组** — 不是 `{before, after}`。用 `change?.[1]` 取 after。
-6. **`TLRecord.type` 访问需窄化** — `TLPage` 没有 type；先 `after?.typeName === 'shape' && after.type === 'card'`。
-7. **`BaseBoxShapeUtil.indicator(shape)`** 是抽象方法，必须实现（返回 `<rect>`）。
-8. **`verbatimModuleSyntax`** — `TLBaseShape` 必须 type-only import（`import { ..., type TLBaseShape }`）。
-9. **`@tldraw/tldraw/tldraw.css`** — 顶层静态 `import`，动态 `import()` CSS TS 会报（CSS 无 JS export）。
-10. **tldraw "Made with tldraw" 徽章** — 免费版 license 必需署名，**保留**（上 license 后才可去）。
+`apps/web/src/app/canvas/page.tsx` 持有 `[editor, setEditor] = useState<Editor|null>`（注意：state 不是 ref）。
 
 ---
 
-## 验证命令（Phase 5 验收同 Phase 4）
-
-```bash
-pnpm --filter domain test           # domain vitest（必须全绿；Phase 5 若扩 CanvasService 会加测试）
-pnpm --filter db test               # db 集成测试（必须全绿；Phase 5 视图持久化会触 schema）
-pnpm --filter web build             # Next.js 静态导出（必须 exit 0；/canvas 路由不能炸）
-python3 -m http.server 3016 --directory apps/web/out    # 模拟 Tauri 静态托管
-node scripts/pN-shots.cjs           # puppeteer 截图 + 交互断言（参考 p4-shots.cjs 模式）
-```
-
----
-
-## 纪律提示（接 Phase 5 必须遵守）
+## 纪律提示（接 Phase 6 必须遵守）
 
 - ❌ 不要修改 `docs/superpowers/specs/2026-06-19-cys-stift-design.md`（五轮定稿）
 - ❌ 不要重新选型 / 不要加未要求依赖（YAGNI）
@@ -94,20 +83,27 @@ node scripts/pN-shots.cjs           # puppeteer 截图 + 交互断言（参考 p
 
 ---
 
-## Phase 4 已通过的事项（不要重新怀疑）
+## 已通过事项（不要重新怀疑）
 
-- tldraw v3 + React 19.0.0 + Next 15 静态导出可挂载渲染（puppeteer 零 page error）
-- §6.11 数据绑定：DB `cards.canvasPosition` 单一真相源；拖动 → 300ms 防抖 → `moveToCanvas` 回写
-- 位置持久化跨刷新：puppeteer 断言 100 → 320 → 320 ✅
-- 双击空白建卡 / 双击卡开详情 / 编辑标题实时反映 / 归档即时移除 全部断言通过
-- 6 色 token + Space Grotesk/Inter/JetBrains Mono + 8px 网格 + 黑 region 条 在 /canvas 仍对
-- `features/canvas/` 内 hex grep 零命中
+### Phase 0-5 全部通过
+- **Phase 0** — monorepo + Next.js 静态导出 + Tauri 壳 + 包豪斯占位首屏
+- **Phase 1** — packages/ui 组件库（7 组件）+ /design 视觉契约页
+- **Phase 2** — domain + db (drizzle/SQLite) + /dev/db 烟测页 + 持久化证据
+- **Phase 3** — /inbox production 路由 + 多媒介表单 + 详情/编辑/归档 + Markdown 渲染
+- **Phase 4** — /canvas + tldraw v3 + Card ShapeUtil + §6.11 DB 真相源（位置跨刷新持久化）
+- **Phase 5** — snap/free + 缩放控件 + snap 指示线 + 键盘快捷键（spec §8 4 件）
+
+### 不变量
+- 6 色 token + Space Grotesk/Inter/JetBrains Mono + 8px 网格 + 黑 region 条 在所有路由都对
+- `features/canvas/` + `app/canvas/` hex grep 零命中
+- domain 10 tests + db 7 tests 全绿
+- `pnpm --filter web build` exit 0，10 个静态页（含 /canvas）
 
 ---
 
-## 下一步（接 Phase 5 第 1 步）
+## 下一步（接 Phase 6 第 1 步）
 
-1. **读**：`docs/superpowers/specs/2026-06-19-cys-stift-design.md` §4.3 / §5.4 / §6.11 / §8 / §12 风险（再核一遍）
-2. **问用户**：Lean（仅 spec §8 4 件）vs Full（再加视图持久化 + Delete 键打磨）
-3. **写**：`docs/superpowers/plans/2026-06-19-phase-5-<slug>.md`
+1. **读**：spec §6.3 / §1.3 / §2 + Phase 3 plan "❌ 没做"段 + 现有 inbox 代码
+2. **问用户**：范围确认（Lean / Full）
+3. **写**：`docs/superpowers/plans/YYYY-MM-DD-phase-6-<slug>.md`
 4. **review**：self-review → 用户 review → 批准后实施

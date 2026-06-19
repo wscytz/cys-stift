@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import '@tldraw/tldraw/tldraw.css'
+import './canvas-overrides.css'
 import type { CanvasEditorProps } from './canvas-editor'
 
 type EditorComponent = React.ComponentType<CanvasEditorProps>

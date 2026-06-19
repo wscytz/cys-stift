@@ -49,6 +49,18 @@ export function CanvasEditor({
         shapeUtils={shapeUtils}
         hideUi
         onMount={(editor: Editor) => {
+          // spec §4.3 — gridMode defaults to 'snap' with gridSize 8. tldraw's
+          // own defaults are isGridMode: false and gridSize: 10, so we set
+          // both at mount. The toolbar toggle then flips isGridMode (and the
+          // user.isSnapMode preference, which only inverts ctrl-key behaviour).
+          editor.updateInstanceState({ isGridMode: true })
+          editor.updateDocumentSettings({ gridSize: 8 })
+          // Diagnostic hook — lets the puppeteer scripts inspect live
+          // editor state (isGridMode, gridSize, camera, etc.) without
+          // monkey-patching internals. Cheap and only runs once at mount.
+          if (typeof window !== 'undefined') {
+            ;(window as unknown as { __canvasEditor?: Editor }).__canvasEditor = editor
+          }
           loadCardsIntoEditor(editor, service, canvasId)
           bindCardWriteback(editor, service, canvasId)
           onEditorReady?.(editor)
