@@ -161,7 +161,7 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
           )}
         </div>
         <div className="mi-actions">
-          <span className="mi-hint">⌘↩ {t('card.detail.save')} · esc {t('card.detail.cancel')}</span>
+          <span className="mi-hint">{navigator.platform?.includes('Mac') ? '⌘↩' : 'Ctrl+Enter'} {t('card.detail.save')} · esc {t('card.detail.cancel')}</span>
           <Button variant="ghost" onClick={onClose}>
             {t('card.detail.cancel')}
           </Button>

@@ -10,9 +10,12 @@
  */
 import Link from 'next/link'
 import { useI18n } from '@/lib/i18n'
+import { useEffect, useState } from 'react'
 
 export default function HomePage() {
   const { t } = useI18n()
+  const [isMac, setIsMac] = useState(true)
+  useEffect(() => { setIsMac(navigator.platform?.includes('Mac') ?? true) }, [])
   return (
     <main className="home">
       <header className="home__bar" aria-hidden="true" />
@@ -42,9 +45,9 @@ export default function HomePage() {
         </dl>
         <nav className="home__nav" aria-label="Primary">
           <div className="home__capture" aria-label="Quick capture">
-            <div className="home__capture-arrow" aria-hidden="true">⌘</div>
+            <div className="home__capture-arrow" aria-hidden="true">{isMac ? '⌘' : '^'}</div>
             <div className="home__capture-label">{t('home.feature.capture.title')}</div>
-            <div className="home__capture-note">{t('home.hint')}</div>
+            <div className="home__capture-note">{isMac ? t('home.hint.mac') : t('home.hint.win')}</div>
           </div>
           <Link href="/inbox" className="home__nav-link">
             <span className="home__nav-arrow" aria-hidden="true">→</span>
