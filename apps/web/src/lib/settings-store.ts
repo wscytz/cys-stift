@@ -29,11 +29,13 @@ export type ThemePreference = 'light' | 'dark' | 'system'
 export interface Settings {
   captureShortcut: CaptureShortcut
   theme: ThemePreference
+  locale: 'zh' | 'en'
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   captureShortcut: { modKey: 'meta', shift: true, code: 'Space' },
   theme: 'system',
+  locale: 'zh',
 }
 
 function isValid(v: unknown): v is Settings {
@@ -53,6 +55,9 @@ function isValid(v: unknown): v is Settings {
     return false
   }
   if (o.theme !== 'light' && o.theme !== 'dark' && o.theme !== 'system') {
+    return false
+  }
+  if (o.locale !== 'zh' && o.locale !== 'en') {
     return false
   }
   return true
@@ -132,6 +137,13 @@ export const settingsStore = {
       ..._settings,
       captureShortcut: { ..._settings.captureShortcut, ...patch },
     }
+    saveSettings(_settings)
+    notify()
+  },
+  updateLocale(l: 'zh' | 'en'): void {
+    hydrateOnce()
+    if (_settings.locale === l) return
+    _settings = { ..._settings, locale: l }
     saveSettings(_settings)
     notify()
   },

@@ -1,0 +1,171 @@
+/**
+ * i18n messages for cy's Stift (v0.22.3-i18n-restore).
+ *
+ * Flat key dictionary, `as const` so TypeScript infers the literal union
+ * `MessageKey`. Two languages strictly aligned — every key has zh + en.
+ *
+ * Brands / proper nouns (cy's stift, Markdown, JSON, URL, Cmd) kept in
+ * original form per spec decision. Design taglines EN retains original
+ * English, ZH translates.
+ */
+export const messages = {
+  /* ── Brand ── */
+  'brand.name': { zh: "cy's stift", en: "cy's stift" },
+
+  /* ── Navigation ── */
+  'nav.inbox': { zh: '收件箱', en: 'Inbox' },
+  'nav.canvas': { zh: '画布', en: 'Canvas' },
+  'nav.archive': { zh: '归档', en: 'Archive' },
+  'nav.search': { zh: '搜索', en: 'Search' },
+  'nav.trash': { zh: '回收站', en: 'Trash' },
+  'nav.settings': { zh: '设置', en: 'Settings' },
+  'nav.capture': { zh: '捕获', en: 'Capture' },
+
+  /* ── Home page ── */
+  'home.eyebrow': { zh: 'phase 0 · scaffold', en: 'phase 0 · scaffold' },
+  'home.title': { zh: 'cy\'s Stift', en: "cy's Stift" },
+  'home.tagline': { zh: '灵感 3 秒记，画布上慢慢养。', en: 'Capture inspiration in 3 seconds, cultivate it on canvas.' },
+  'home.hint': { zh: '⌘⇧SPACE anywhere', en: '⌘⇧SPACE anywhere' },
+  'home.feature.capture.title': { zh: 'Capture', en: 'Capture' },
+  'home.feature.capture.desc': { zh: '快捷键全局唤起 mini-input，灵感 3 秒记，随时归位。', en: 'Global shortcut invokes the mini input. Capture in 3 seconds.' },
+  'home.feature.inbox.title': { zh: 'Inbox', en: 'Inbox' },
+  'home.feature.inbox.desc': { zh: '马克笔思想、代码片段、链接、引用。就地编辑，养出完整笔记。', en: 'Ideas, code, links, quotes. Edit in place, grow into full notes.' },
+  'home.feature.canvas.title': { zh: 'Canvas', en: 'Canvas' },
+  'home.feature.canvas.desc': { zh: '卡片自由摆放的无限画布。双击创建，拖拽搭建，视觉整理。', en: 'Cards on an infinite canvas. Double-click, drag, arrange visually.' },
+  'home.feature.archive.title': { zh: 'Archive', en: 'Archive' },
+  'home.feature.archive.desc': { zh: '归档即分类。网格或时间轴查看，多选删除，回收站可恢复。', en: 'Archive as taxonomy. Grid or timeline, batch actions, recoverable.' },
+
+  /* ── Inbox ── */
+  'inbox.crumb': { zh: '收件箱', en: 'inbox' },
+  'inbox.tab.inbox': { zh: '活跃', en: 'Active' },
+  'inbox.tab.archived': { zh: '归档', en: 'Archived' },
+  'inbox.empty.title': { zh: '暂无卡片。', en: 'No cards yet.' },
+  'inbox.empty.titleArchived': { zh: '暂无归档。', en: 'Nothing archived yet.' },
+  'inbox.empty.lede': { zh: '在上方创建第一张卡片。可添加链接、代码块和引用，它们会保持在同一条笔记上。', en: 'Create the first card above. Add links, code blocks, and quotes — they all stay attached to the same note.' },
+  'inbox.empty.ledeArchived': { zh: '从活跃标签页归档卡片到此处。归档的卡片会保留，直到你取消归档或软删除。', en: 'Archive from the active tab to move cards here. They stay archived until you unarchive them or soft-delete from here.' },
+  'inbox.create.placeholder': { zh: '灵感标题…', en: 'Idea title…' },
+  'inbox.create.bodyPlaceholder': { zh: 'Markdown 笔记（可选）', en: 'Markdown body (optional)' },
+  'inbox.create.submit': { zh: '加入收件箱', en: 'Add to inbox' },
+
+  /* ── Card detail ── */
+  'card.detail.title': { zh: '编辑卡片', en: 'Edit card' },
+  'card.detail.dateFormat': { zh: '显示日期', en: 'show date' },
+  'card.detail.bodyLabel': { zh: '正文（Markdown）', en: 'Body (Markdown)' },
+  'card.detail.links': { zh: '链接', en: 'Links' },
+  'card.detail.code': { zh: '代码', en: 'Code' },
+  'card.detail.quotes': { zh: '引用', en: 'Quotes' },
+  'card.detail.edit': { zh: '编辑', en: 'Edit' },
+  'card.detail.save': { zh: '保存', en: 'Save' },
+  'card.detail.saving': { zh: '保存中…', en: 'Saving…' },
+  'card.detail.cancel': { zh: '取消', en: 'Cancel' },
+  'card.detail.archive': { zh: '归档', en: 'Archive' },
+  'card.detail.unarchive': { zh: '取消归档', en: 'Unarchive' },
+  'card.detail.sendBack': { zh: '退回收件箱', en: 'Send back to inbox' },
+  'card.detail.delete': { zh: '软删除', en: 'Soft-delete' },
+  'card.detail.deleteConfirmTitle': { zh: '软删除这张卡片？', en: 'Soft-delete this card?' },
+  'card.detail.deleteConfirmBody': { zh: '卡片将从画布上隐藏并标记为已删除。记录保留在存储中，你可以稍后从数据库恢复。', en: 'The card will be hidden and marked as deleted. The record stays in storage so you can recover it later.' },
+  'card.detail.editHint': { zh: '这里有意不暴露链接/代码/引用的编辑（Phase 4 MVP），详情视图会显示已持久化的内容。', en: 'Editing links / code / quotes is intentionally not exposed here (Phase 4 MVP). The detail view shows persisted media.' },
+
+  /* ── Canvas ── */
+  'canvas.crumb': { zh: '画布', en: 'canvas' },
+  'canvas.new': { zh: '+ 新建', en: '+ New' },
+  'canvas.newTitle': { zh: '新建画布', en: 'New canvas' },
+  'canvas.newModalTitle': { zh: '新建画布', en: 'New canvas' },
+  'canvas.newModalBody': { zh: '给新画布起个名字。创建后会立即切换过去。', en: 'Name your new canvas. You\'ll switch to it immediately.' },
+  'canvas.rename': { zh: '重命名', en: 'Rename' },
+  'canvas.renameTitle': { zh: '重命名当前画布', en: 'Rename current canvas' },
+  'canvas.delete': { zh: '删除', en: 'Delete' },
+  'canvas.deleteTitle': { zh: '删除这个画布（默认画布不可删除）', en: 'Delete this canvas (default cannot be deleted)' },
+  'canvas.deleteModalTitle': { zh: '删除画布', en: 'Delete canvas' },
+  'canvas.deleteModalBodyCards': { zh: '画布「{name}」上有 {n} 张卡片。删除后它们将被退回收件箱。', en: 'Canvas "{name}" has {n} cards. They will be sent back to the inbox.' },
+  'canvas.deleteModalBodyNoCards': { zh: '确定删除画布「{name}」吗？此操作不可撤销。', en: 'Delete canvas "{name}"? This cannot be undone.' },
+  'canvas.deleteCanvas': { zh: '删除画布', en: 'Delete canvas' },
+  'canvas.namePlaceholder': { zh: '画布名称…', en: 'Canvas name…' },
+  'canvas.switchTitle': { zh: '切换画布', en: 'Switch canvas' },
+  'canvas.snap': { zh: '吸附', en: 'Snap' },
+  'canvas.free': { zh: '自由', en: 'Free' },
+  'canvas.toggleSnap': { zh: '切换吸附模式', en: 'Toggle snap mode' },
+  'canvas.zoomOut': { zh: '缩小', en: 'Zoom out' },
+  'canvas.zoomIn': { zh: '放大', en: 'Zoom in' },
+  'canvas.zoomFit': { zh: '适配', en: 'Fit' },
+  'canvas.emptyTitle': { zh: '空白画布', en: 'Empty canvas' },
+  'canvas.emptyHint': { zh: '双击创建 · 拖动摆放', en: 'double-click to create · drag to place' },
+
+  /* ── Archive ── */
+  'archive.crumb': { zh: '归档', en: 'archive' },
+  'archive.viewGrid': { zh: '网格', en: 'Grid' },
+  'archive.viewTimeline': { zh: '时间轴', en: 'Timeline' },
+  'archive.selectNone': { zh: '取消选择', en: 'Select none' },
+  'archive.batchDelete': { zh: '批量软删除', en: 'Batch soft-delete' },
+  'archive.batchDeleteConfirmTitle': { zh: '确认批量软删除', en: 'Confirm batch soft-delete' },
+  'archive.batchDeleteConfirmBody': { zh: '确定要软删除选中的 {n} 张卡片吗？可以在回收站恢复。', en: 'Soft-delete {n} selected cards? They can be recovered from Trash.' },
+  'archive.confirmDelete': { zh: '删除', en: 'Delete' },
+  'archive.empty': { zh: '没有归档卡片。已归档的卡片会在这里出现。', en: 'No archived cards. Archived cards show up here.' },
+
+  /* ── Trash ── */
+  'trash.crumb': { zh: '回收站', en: 'trash' },
+  'trash.empty': { zh: '回收站为空。软删除的卡片会在这里出现，你可以恢复或永久删除。', en: 'Trash is empty. Soft-deleted cards show up here for recovery or permanent deletion.' },
+  'trash.restore': { zh: '恢复', en: 'Restore' },
+  'trash.deleteForever': { zh: '永久删除', en: 'Delete forever' },
+  'trash.deleteForeverTitle': { zh: '永久删除？', en: 'Delete forever?' },
+  'trash.deleteForeverBody': { zh: '卡片「{title}」将从存储中永久删除，此操作不可撤销。', en: 'Card "{title}" will be permanently removed from storage. This cannot be undone.' },
+  'trash.deleteForeverBtn': { zh: '永久删除', en: 'Delete forever' },
+
+  /* ── Settings ── */
+  'settings.crumb': { zh: '设置', en: 'settings' },
+  'settings.appearance': { zh: '外观', en: 'Appearance' },
+  'settings.appearanceLede': { zh: '在亮色与暗色模式之间切换。「跟随系统」实时追踪 OS 设置。（Bauhaus 六原色保留）', en: 'Switch between light and dark. "Follow system" tracks your OS setting live. (Six Bauhaus colours preserved.)' },
+  'settings.theme': { zh: '主题', en: 'Theme' },
+  'settings.themeSystem': { zh: '跟随系统', en: 'Follow system' },
+  'settings.themeLight': { zh: '亮色', en: 'Light' },
+  'settings.themeDark': { zh: '暗色', en: 'Dark' },
+  'settings.language': { zh: '语言', en: 'Language' },
+  'settings.languageLede': { zh: '选择界面语言。', en: 'Choose the interface language.' },
+  'settings.languageZh': { zh: '中文', en: 'Chinese' },
+  'settings.languageEn': { zh: 'English', en: 'English' },
+  'settings.captureShortcut': { zh: '捕获快捷键', en: 'Capture shortcut' },
+  'settings.captureShortcutLede': { zh: '在应用任何位置按下此组合键（输入框外）即可弹出快速捕获。更改即时生效。', en: 'Press this combo anywhere (outside an input) to open the Mini Input. Changes apply immediately.' },
+  'settings.modifier': { zh: '修饰键', en: 'Modifier' },
+  'settings.modifierMeta': { zh: '⌘ Cmd (Mac)', en: '⌘ Cmd (mac)' },
+  'settings.modifierCtrl': { zh: 'Ctrl (Win)', en: 'Ctrl (win)' },
+  'settings.shift': { zh: 'Shift', en: 'Shift' },
+  'settings.key': { zh: '按键', en: 'Key' },
+  'settings.current': { zh: '当前', en: 'Current' },
+  'settings.currentSuffix': { zh: '（加载中…）', en: '(loading…)' },
+  'settings.captureHint': { zh: '注意：macOS 上 ⌘+⇧+Space 可能被 Spotlight 拦截，但浏览器内仍可工作。录制 UI 和冲突检测尚未实现。', en: 'Note: on macOS, ⌘+⇧+Space may be captured by Spotlight at the OS level. The shortcut still works inside the browser. Recording UI and conflict detection are post-MVP.' },
+  'settings.data': { zh: '数据', en: 'Data' },
+  'settings.dataLede': { zh: '你的数据仅保存于本机。随时导出开放的 JSON 备份——卡片、媒体、草稿和设置都在。（数据可移植，无锁定。）', en: 'Your data lives only on this machine. Export an open-format JSON backup any time — cards, media, drafts, and settings.' },
+  'settings.exportJson': { zh: '导出 JSON', en: 'Export JSON' },
+  'settings.importJson': { zh: '导入 JSON', en: 'Import JSON' },
+  'settings.importHint': { zh: '会覆盖当前数据——请先导出备份。成功后会重新加载。', en: 'Overwrites current data — export a backup first. Reloads on success.' },
+  'settings.importOk': { zh: '已导入 {cards} 张卡片 · {mediaAssets} 个媒体。正在重新加载…', en: 'Imported {cards} cards · {mediaAssets} media. Reloading…' },
+  'settings.importFail': { zh: '导入失败：{error}', en: 'Import failed: {error}' },
+
+  /* ── Search ── */
+  'search.crumb': { zh: '搜索', en: 'search' },
+  'search.placeholder': { zh: '搜索标题、正文、链接…', en: 'Search title, body, links…' },
+  'search.empty': { zh: '输入关键词开始搜索。', en: 'Type to search.' },
+  'search.noMatch': { zh: '未找到匹配 "{q}" 的卡片。', en: 'No cards match "{q}".' },
+  'search.resultsCount': { zh: '找到 {n} 个结果', en: '{n} results' },
+
+  /* ── Design page ── */
+  'design.toolbar.canvas': { zh: '画布 · 灵感墙', en: 'Canvas · inspiration wall' },
+  'design.toolbar.archive': { zh: '归档 · 2026', en: 'Archive · 2026' },
+
+  /* ── Common ── */
+  'common.home': { zh: '首页', en: 'home' },
+  'common.cancel': { zh: '取消', en: 'Cancel' },
+  'common.ok': { zh: '确定', en: 'OK' },
+
+  /* ── tldraw ── */
+  'tldraw.loading': { zh: '画布加载中…', en: 'Loading canvas…' },
+  'tldraw.loadError': { zh: '画布加载失败：{err}', en: 'Canvas load error: {err}' },
+
+  /* ── Capture ── */
+  'capture.miniTitle': { zh: '灵感标题…', en: 'Idea title…' },
+  'capture.miniBody': { zh: 'Markdown 笔记（可选）', en: 'Markdown body (optional)' },
+  'capture.addNote': { zh: '加入收件箱', en: 'Add to inbox' },
+} as const
+
+export type MessageKey = keyof typeof messages
+export type Locale = 'zh' | 'en'

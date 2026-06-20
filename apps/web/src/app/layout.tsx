@@ -4,6 +4,7 @@ import '../styles/globals.css'
 import { CaptureHost } from '@/features/capture/capture-host'
 import { AppMenu } from '@/components/app-menu'
 import { ThemeBoot } from '@/components/theme-boot'
+import { I18nProvider } from '@/lib/i18n'
 
 const display = Space_Grotesk({
   subsets: ['latin'],
@@ -47,9 +48,11 @@ export default function RootLayout({
       </head>
       <body>
         <ThemeBoot />
-        <AppMenu />
-        {children}
-        <CaptureHost />
+        <I18nProvider>
+          <AppMenu />
+          {children}
+          <CaptureHost />
+        </I18nProvider>
       </body>
     </html>
   )

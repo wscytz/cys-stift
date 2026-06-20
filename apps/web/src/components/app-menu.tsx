@@ -3,30 +3,28 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { CAPTURE_OPEN_EVENT } from '@/features/capture/capture-host'
+import { useI18n } from '@/lib/i18n'
+import type { MessageKey } from '@/lib/i18n/messages'
 
 /**
- * AppMenu — global top menu bar (Phase 6.5g). Four entries across every
- * route: Inbox / Canvas / Archive / Capture. The Capture entry dispatches
- * a CustomEvent so CaptureHost opens the Mini Input (one source of truth
- * for the global open state — no shared store, no event bus library).
- *
- * Visual: compact horizontal bar under a neutral 4px gray stripe. Does
- * not compete with region toolbars (inbox/canvas/archive keep their own
- * coloured 8px stripe inside the page).
+ * AppMenu — global top menu bar (v0.22.3-i18n-restore).
+ * i18n bilingual + ZH/EN switcher + 4px grey stripe restored
+ * (Part B1/B2 of i18n-bugfixes decision).
  */
 export function AppMenu() {
   const pathname = usePathname() ?? '/'
+  const { locale, t, setLocale } = useI18n()
 
   const onCaptureClick = () => {
     window.dispatchEvent(new CustomEvent(CAPTURE_OPEN_EVENT))
   }
 
-  const entries: { href: string; label: string; key: string }[] = [
-    { href: '/inbox', label: 'Inbox', key: 'inbox' },
-    { href: '/canvas', label: 'Canvas', key: 'canvas' },
-    { href: '/archive', label: 'Archive', key: 'archive' },
-    { href: '/trash', label: 'Trash', key: 'trash' },
-    { href: '/settings', label: 'Settings', key: 'settings' },
+  const entries: { href: string; key: MessageKey }[] = [
+    { href: '/inbox', key: 'nav.inbox' },
+    { href: '/canvas', key: 'nav.canvas' },
+    { href: '/archive', key: 'nav.archive' },
+    { href: '/trash', key: 'nav.trash' },
+    { href: '/settings', key: 'nav.settings' },
   ]
 
   const activeKey = entries.find((e) => pathname.startsWith(e.href))?.key
@@ -35,7 +33,7 @@ export function AppMenu() {
     <nav className="app-menu" aria-label="Primary">
       <span className="app-menu__bar" aria-hidden="true" />
       <Link href="/" className="app-menu__brand">
-        cy&rsquo;s stift
+        {t('brand.name')}
       </Link>
       <span className="app-menu__sep" aria-hidden="true">/</span>
       <div className="app-menu__entries">
@@ -45,13 +43,31 @@ export function AppMenu() {
             href={e.href}
             className={`app-menu__link ${activeKey === e.key ? 'app-menu__link--active' : ''}`}
           >
-            {e.label}
+            {t(e.key)}
           </Link>
         ))}
       </div>
       <span className="app-menu__spacer" />
+      <div className="app-menu__locale" role="group" aria-label="Language">
+        <button
+          type="button"
+          className={`app-menu__locale-btn ${locale === 'zh' ? 'app-menu__locale-btn--active' : ''}`}
+          onClick={() => setLocale('zh')}
+          aria-pressed={locale === 'zh'}
+        >
+          中
+        </button>
+        <button
+          type="button"
+          className={`app-menu__locale-btn ${locale === 'en' ? 'app-menu__locale-btn--active' : ''}`}
+          onClick={() => setLocale('en')}
+          aria-pressed={locale === 'en'}
+        >
+          EN
+        </button>
+      </div>
       <button type="button" className="app-menu__capture" onClick={onCaptureClick}>
-        Capture
+        {t('nav.capture')}
       </button>
       <style>{styles}</style>
     </nav>
@@ -73,7 +89,12 @@ const styles = `
   font-size: var(--font-size-xs);
 }
 .app-menu__bar {
-  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--color-gray);
 }
 .app-menu__brand {
   font-family: var(--font-display);
@@ -96,6 +117,21 @@ const styles = `
 .app-menu__link:hover { color: var(--color-black); background: var(--color-gray-soft); }
 .app-menu__link--active { color: var(--color-black); border-bottom: 2px solid var(--color-black); }
 .app-menu__spacer { flex: 1; }
+.app-menu__locale { display: inline-flex; gap: 2px; }
+.app-menu__locale-btn {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: transparent;
+  color: var(--color-gray);
+  border: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.app-menu__locale-btn:hover { color: var(--color-black); background: var(--color-gray-soft); }
+.app-menu__locale-btn--active { color: var(--color-black); border-bottom: 2px solid var(--color-black); }
 .app-menu__capture {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
