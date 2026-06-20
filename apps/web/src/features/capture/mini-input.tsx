@@ -189,7 +189,10 @@ const styles = `
 .mi-frame {
   width: min(480px, calc(100vw - var(--space-6)));
   background: var(--color-white);
-  border: 2px solid var(--color-red);
+  /* v0.23.0 polish: thinner border keeps the red accent recognisable
+     without overpowering on dark theme where the bright --color-red
+     (#ff4d4d) on near-black gives strong contrast. */
+  border: 1px solid var(--color-red);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-md);
   overflow: hidden;
