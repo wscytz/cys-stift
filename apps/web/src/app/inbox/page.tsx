@@ -114,9 +114,7 @@ export default function InboxPage() {
 
         {view === 'inbox' && (
           <p className="footnote">
-            <Link href="/" className="footnote__link">← home</Link>
-            {' · '}
-            <Link href="/dev/db" className="footnote__link">dev/db</Link>
+            <Link href="/" className="footnote__link">← {t('common.home')}</Link>
           </p>
         )}
       </div>
