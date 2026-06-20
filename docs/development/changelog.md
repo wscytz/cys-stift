@@ -973,3 +973,19 @@ UX walkthrough 修复 5 个真 bug(plan 完成后 puppeteer-driven deep walkthro
 详见 [`docs/memory/decisions/2026-06-20-ux-polish-2.md`](../memory/decisions/2026-06-20-ux-polish-2.md)。
 
 ---
+
+## 2026-06-20 · v0.23.0-modal-mini-input-polish
+
+闭合 BUG 12(共享 card-detail Modal 标题与首字段间距)+ mini-input 暗色红边框视觉冲击,纯 CSS,不动 data/接口/依赖。
+
+- **fix(card-detail)**: `.cd > :first-child { margin-top: calc(-1 * var(--space-2)) }` 加到共享 `features/card/card-detail.tsx`,与 v0.22.0 修过的 `features/canvas/card-detail-modal.tsx:221` 对齐(canvas-modal 已修,共享 detail 漏了)。消除两个 Modal 视觉分裂 → `6c94a3a`
+- **polish(mini-input)**: `.mi-frame` 边框 `2px → 1px`,亮暗都更克制。暗色 `--color-red: #ff4d4d` 在 `#0a0a0a` 深底上 2px 过粗,1px 仍识别为 Capture 入口但不冲击。8px 顶部红条(capture region)+ textarea focus 红下划线均不动 → `1cf45ec`
+
+**验收**:
+
+- domain 26/26 + db 7/7 + web build 14 页 exit 0
+- puppeteer mini-audit 6/6 页 passed, 0 console error, 0 overflow
+
+详见 [`docs/memory/decisions/2026-06-23-modal-mini-input-polish.md`](../memory/decisions/2026-06-23-modal-mini-input-polish.md)。
+
+---
