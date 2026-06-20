@@ -33,3 +33,22 @@ a {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* v0.22.0-ui-polish #3 · CJK + 西文混排断字规则(spec §4.3 C6).
+ * Applies to inbox / archive / trash cards (all share .tile__title
+ * and .tile__preview). Scoped to tile classes only — does NOT touch
+ * markdown code blocks, URLs, or other global text wrap behaviour. */
+.tile__title {
+  word-break: normal;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+  line-break: strict;
+  -webkit-line-break: strict;
+  font-weight: 600;
+}
+.tile__preview {
+  word-break: normal;
+  overflow-wrap: anywhere;
+  line-break: strict;
+  line-height: 1.55;
+}
