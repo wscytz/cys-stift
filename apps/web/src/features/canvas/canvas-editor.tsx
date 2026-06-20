@@ -12,8 +12,33 @@
  * T3 wires the spec §6.11 binding (load DB cards → shapes; debounce-write shape
  * moves back to DB). T4 adds double-click: blank → create a card at the point;
  * card → open it. Single-click stays tldraw's selection/drag.
+ *
+ * ## Review #4 + #5 fix (Phase canvas-refactor, 2026-06-20)
+ *
+ * The previous implementation ran all side-effects inside `Tldraw.onMount`:
+ *
+ *   - view persistence (`editor.store.listen(...)` with NO filter → review #5:
+ *     every store change, including card moves, triggered a debounced camera
+ *     read; functional but wasteful)
+ *   - monkey-patched `editor.dispose = () => { ... }` to ensure cleanup ran
+ *     → review #4: assumed tldraw calls `editor.dispose` on unmount; if that
+ *     path changes, the listener + pending timer leak.
+ *
+ * The refactor splits side-effects by lifetime:
+ *
+ *   - `Tldraw.onMount` → only one-shot setup: apply persisted view, load cards,
+ *     bind card writeback, expose `window.__canvasEditor`, call `onEditorReady`.
+ *   - `<ViewPersistenceBridge>` → React `useValue` + `useEffect`. Reads
+ *     camera and `isGridMode` via tldraw's reactive system (same pattern as
+ *     `ZoomGroup`); debounce-writes to `canvasViewStore`. Cleanup is React's
+ *     own `clearTimeout` — no editor.dispose patching, no listen with no
+ *     filter.
+ *   - `<DoubleClickBridge>` → React `useEffect` on `editor.getContainer()`.
+ *     `addEventListener` + cleanup `removeEventListener`. Replaces the
+ *     previous `wireDoubleClick()` which had no cleanup hook.
  */
-import { Tldraw, type Editor } from '@tldraw/tldraw'
+import { useEffect, useRef } from 'react'
+import { Tldraw, useValue, type Editor } from '@tldraw/tldraw'
 import type { CanvasId, Card, CardService } from '@cys-stift/domain'
 import { CardShapeUtil } from './card-shape-util'
 import {
@@ -33,6 +58,13 @@ const VIEW_PERSIST_DEBOUNCE_MS = 500
 export interface CanvasEditorProps {
   service: CardService
   canvasId: CanvasId
+  /**
+   * Editor handle lifted to page state. Page calls `onEditorReady(editor)` from
+   * `Tldraw.onMount`; the same handle is then passed back here as `editor` so
+   * the bridge components can subscribe via React `useEffect` instead of
+   * monkey-patching `editor.dispose`. Null until first mount.
+   */
+  editor: Editor | null
   /** Open a card in the detail modal (freshly created or existing). */
   onOpenCard: (card: Card) => void
   /** Page lifts the editor handle so it can sync shapes after modal edits. */
@@ -42,6 +74,7 @@ export interface CanvasEditorProps {
 export function CanvasEditor({
   service,
   canvasId,
+  editor,
   onOpenCard,
   onEditorReady,
 }: CanvasEditorProps) {
@@ -50,96 +83,142 @@ export function CanvasEditor({
       <Tldraw
         shapeUtils={shapeUtils}
         hideUi
-        onMount={(editor: Editor) => {
-          // ── View persistence (Phase 6.5d) ──────────────────────────
-          // Load zoom/pan/gridMode from web-local store and apply before
-          // any shapes render. Default fallback inside canvasViewStore.
+        onMount={(ed: Editor) => {
+          // ── One-shot setup (Phase 6.5d view + Phase 4 binding) ───
+          // View persistence: apply zoom/pan/gridMode BEFORE first paint so
+          // users never see the default view flash.
           const view = canvasViewStore.get()
-          editor.setCamera({ x: view.panX, y: view.panY, z: view.zoom })
+          ed.setCamera({ x: view.panX, y: view.panY, z: view.zoom })
           // spec §4.3 — gridMode + gridSize. isGridMode is the master
           // snap toggle; user.isSnapMode inverts ctrl-key behaviour. Both
           // must agree so toolbar state matches drag behaviour (Phase 5).
           const snap = view.gridMode === 'snap'
-          editor.updateInstanceState({ isGridMode: snap })
-          editor.user.updateUserPreferences({ isSnapMode: snap })
-          editor.updateDocumentSettings({ gridSize: view.gridSize })
+          ed.updateInstanceState({ isGridMode: snap })
+          ed.user.updateUserPreferences({ isSnapMode: snap })
+          ed.updateDocumentSettings({ gridSize: view.gridSize })
           // Diagnostic hook — lets the puppeteer scripts inspect live
           // editor state (isGridMode, gridSize, camera, etc.) without
           // monkey-patching internals. Cheap and only runs once at mount.
           if (typeof window !== 'undefined') {
-            ;(window as unknown as { __canvasEditor?: Editor }).__canvasEditor = editor
+            ;(window as unknown as { __canvasEditor?: Editor }).__canvasEditor = ed
           }
-          loadCardsIntoEditor(editor, service, canvasId)
-          bindCardWriteback(editor, service, canvasId)
-          // ── Persist view changes (zoom/pan/gridMode) ────────────────
-          // Debounce: 500ms of silence → write to store. Cleanup on
-          // editor dispose (tldraw calls dispose when unmounted).
-          let timer: ReturnType<typeof setTimeout> | null = null
-          const unsub = editor.store.listen(
-            () => {
-              if (timer !== null) clearTimeout(timer)
-              timer = setTimeout(() => {
-                timer = null
-                const cam = editor.getCamera()
-                const inst = editor.getInstanceState()
-                const isSnap = Boolean(inst.isGridMode)
-                canvasViewStore.update({
-                  zoom: cam.z,
-                  panX: cam.x,
-                  panY: cam.y,
-                  gridMode: isSnap ? 'snap' : 'free',
-                })
-              }, VIEW_PERSIST_DEBOUNCE_MS)
-            },
-          )
-          // tldraw exposes editor.dispose; call our cleanup alongside.
-          const prevDispose = editor.dispose.bind(editor)
-          editor.dispose = () => {
-            if (timer !== null) clearTimeout(timer)
-            unsub()
-            prevDispose()
-          }
-          onEditorReady?.(editor)
-          wireDoubleClick(editor, service, canvasId, onOpenCard)
+          loadCardsIntoEditor(ed, service, canvasId)
+          bindCardWriteback(ed, service, canvasId)
+          onEditorReady?.(ed)
+          // No listen() / no editor.dispose monkey-patch from here on;
+          // reactive side-effects live in the bridge components below.
         }}
+      />
+      <ViewPersistenceBridge editor={editor} />
+      <DoubleClickBridge
+        editor={editor}
+        canvasId={canvasId}
+        service={service}
+        onOpenCard={onOpenCard}
       />
     </div>
   )
 }
 
 /**
- * Double-click → create-on-canvas (spec §1.4) or open. Hit-testing tells blank
- * (create) from card (open). Listener lives on the editor container; tldraw
- * tears it down with the editor.
+ * ViewPersistenceBridge — closes review #5 + #4 for view persistence.
+ *
+ * Subscribes to `editor.getCamera()` and `editor.getInstanceState().isGridMode`
+ * via tldraw's reactive `useValue` (same primitive `ZoomGroup` uses for its
+ * zoom-percentage readout). When either changes, a 500ms debounce timer
+ * writes to `canvasViewStore`. The timer is cancelled on cleanup via plain
+ * React — no `editor.dispose` patch, no `editor.store.listen(callback)`
+ * without a filter (review #5 root cause was that listen fires on EVERY
+ * store change including card drags; here we only run when camera or
+ * isGridMode actually change).
  */
-function wireDoubleClick(
-  editor: Editor,
-  service: CardService,
-  canvasId: CanvasId,
-  onOpenCard: (card: Card) => void,
-): void {
-  const onDbl = (e: MouseEvent) => {
-    const pagePoint = editor.screenToPage({ x: e.clientX, y: e.clientY })
-    const hit = editor.getShapeAtPoint(pagePoint)
-    if (hit && hit.type === 'card') {
-      const card = service.get(cardIdFromShapeId(String(hit.id)))
-      if (card) onOpenCard(card)
-      return
+function ViewPersistenceBridge({ editor }: { editor: Editor | null }) {
+  const cam = useValue('cvp camera', () => editor?.getCamera(), [editor])
+  const isGrid = useValue(
+    'cvp isGridMode',
+    () => editor?.getInstanceState().isGridMode,
+    [editor],
+  )
+  useEffect(() => {
+    if (!editor || !cam) return
+    const id = setTimeout(() => {
+      canvasViewStore.update({
+        zoom: cam.z,
+        panX: cam.x,
+        panY: cam.y,
+        gridMode: isGrid ? 'snap' : 'free',
+      })
+    }, VIEW_PERSIST_DEBOUNCE_MS)
+    return () => clearTimeout(id)
+    // deps: editor + the three camera scalars + isGrid flag. useValue
+    // returns a fresh reference on each tick; using scalar fields keeps the
+    // effect from re-running on unrelated reactivity churn.
+  }, [editor, cam?.z, cam?.x, cam?.y, isGrid])
+  return null
+}
+
+/**
+ * DoubleClickBridge — closes review #4 for double-click handling.
+ *
+ * Previously `wireDoubleClick()` was called from inside `onMount` and
+ * `addEventListener`'d on `editor.getContainer()` with no matching
+ * `removeEventListener`. It worked in practice because tldraw tears down the
+ * container with the editor, but it relied on that implicit lifetime — a
+ * brittle assumption.
+ *
+ * Now `useEffect([editor, ...])` adds the listener and the cleanup function
+ * removes it. When the page unmounts (or the editor handle changes) the
+ * listener is gone before the editor is dropped, so no phantom dblclick on
+ * a stale container.
+ *
+ * The callback is stored in a ref so the effect doesn't depend on a fresh
+ * `onOpenCard` identity every render — page-side `onOpenCard={(card) =>
+ * setDetail({card})}` would otherwise re-subscribe on every render.
+ */
+function DoubleClickBridge({
+  editor,
+  canvasId,
+  service,
+  onOpenCard,
+}: {
+  editor: Editor | null
+  canvasId: CanvasId
+  service: CardService
+  onOpenCard: (card: Card) => void
+}) {
+  const cbRef = useRef(onOpenCard)
+  cbRef.current = onOpenCard
+  const serviceRef = useRef(service)
+  serviceRef.current = service
+
+  useEffect(() => {
+    if (!editor) return
+    const container = editor.getContainer()
+    const onDbl = (e: MouseEvent) => {
+      const pagePoint = editor.screenToPage({ x: e.clientX, y: e.clientY })
+      const hit = editor.getShapeAtPoint(pagePoint)
+      if (hit && hit.type === 'card') {
+        const card = serviceRef.current.get(cardIdFromShapeId(String(hit.id)))
+        if (card) cbRef.current(card)
+        return
+      }
+      const card = serviceRef.current.create({
+        title: '',
+        source: { kind: 'manual', deviceId: DEVICE_ID },
+        canvasPosition: {
+          canvasId,
+          x: Math.round(pagePoint.x),
+          y: Math.round(pagePoint.y),
+          w: DEFAULT_CARD_W,
+          h: DEFAULT_CARD_H,
+          z: Date.now(),
+        },
+      })
+      addCardShape(editor, card)
+      cbRef.current(card)
     }
-    const card = service.create({
-      title: '',
-      source: { kind: 'manual', deviceId: DEVICE_ID },
-      canvasPosition: {
-        canvasId,
-        x: Math.round(pagePoint.x),
-        y: Math.round(pagePoint.y),
-        w: DEFAULT_CARD_W,
-        h: DEFAULT_CARD_H,
-        z: Date.now(),
-      },
-    })
-    addCardShape(editor, card)
-    onOpenCard(card)
-  }
-  editor.getContainer().addEventListener('dblclick', onDbl)
+    container.addEventListener('dblclick', onDbl)
+    return () => container.removeEventListener('dblclick', onDbl)
+  }, [editor, canvasId])
+  return null
 }

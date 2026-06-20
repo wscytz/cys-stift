@@ -657,3 +657,41 @@
 详见 [`docs/superpowers/plans/2026-06-20-trash-recovery.md`](../superpowers/plans/2026-06-20-trash-recovery.md) + [`docs/memory/decisions/2026-06-20-trash.md`](../memory/decisions/2026-06-20-trash.md) + [`docs/design/screenshots/phase-trash/`](../design/screenshots/phase-trash/)。
 
 ---
+
+## 2026-06-20 · phase canvas-refactor · useEffect 驱动 canvas-editor(关闭 review #4 #5)
+
+**交付**:承接 review findings #4 + #5(原计划:动 canvas 时一起修)。① `apps/web/src/features/canvas/canvas-editor.tsx` 重构:onMount 只剩一次性副作用(view apply + loadCardsIntoEditor + bindCardWriteback + `__canvasEditor` 句柄 + onEditorReady);新增 `<ViewPersistenceBridge>`(`useValue` 订阅 camera + isGridMode + 500ms 防抖 `useEffect` 写回 canvasViewStore,React cleanup `clearTimeout`)+ `<DoubleClickBridge>`(`useEffect` 在 editor container 上 add/remove dblclick,回调走 ref 避免 effect 重订);**全删 `editor.store.listen(callback)` 无 filter + `editor.dispose` 猴补丁**。② `apps/web/src/app/canvas/page.tsx` 把 editor 作为 prop 传给 TldrawCanvas(1 行);TldrawCanvas.tsx 无需改(已 `{...props}` 透传)。③ `scripts/canvas-refactor-shots.cjs`(新):反复切 /canvas↔/inbox ×4 + reload + 拖卡 + 双击建卡 + view 持久化回归。④ p6.5d-shots.cjs 全过(view 持久化行为不变)。Tag **v0.11.0-canvas-refactor**。
+
+**核心承诺验证**:
+
+- #4 反复切 /canvas 4 次后相机稳定(zoom 1 / snap)+ 0 page error ✓
+- #4 reload 后 view 全保留(zoom 2 / free / pan -120,-60)✓
+- #5 拖卡后 view-store 持久化**0 写入**(before === after 深相等)— useValue 替代全量 listen ✓
+- #4 dblclick 双击空白处建新卡 ✓
+- p6.5d view 持久化回归全过 ✓
+- 零 page error;canvas chunk 体积不变(484 kB);14 静态页不变
+- domain 15 / db 7 全绿;web build exit 0
+
+**关键工程决策**:
+
+- **view 持久化用 `useValue` 订阅,不用 `editor.store.listen(callback)`**:`useValue('cvp camera', () => editor.getCamera())` + `useValue('cvp isGridMode', () => editor.getInstanceState().isGridMode)`(复用 ZoomGroup 已用的 tldraw 响应原语)。`useValue` 只在订阅的标量变化时回调,**完全跳过 listen 的"所有 store changes"问题**(#5 根因)。
+- **副作用按 lifetime 分**:onMount = tldraw 触发的一次性动作;bridge useEffects = editor 准备好后的响应式副作用。语义清晰,生命周期各归其主。
+- **回调走 ref 避免 effect 重订**:`DoubleClickBridge` 内 `const cbRef = useRef(onOpenCard); cbRef.current = onOpenCard`。page 端 `onOpenCard={(card) => setDetail({card})}` 每次 render 都是新函数 — 不走 ref 会让 dblclick effect 每次 render 都 add/remove 监听,既浪费又有 setDetail 期间短暂未挂载窗口。
+- **`editor` 下传 page→canvas-editor**:page 已有 `editor` state(`onEditorReady` 拿到后 setEditor),复用同一 handle 作为 prop 给 canvas-editor。无新 state、无新 ref、无新 IPC。
+- **保留 `onEditorReady` callback**:page 仍需 `setEditor` 给 CardDetailModal 用 onSave/onArchive/onDelete 同步 shape,这个回调不能丢。
+- **保留 `__canvasEditor` 诊断句柄**:puppeteer 用 `window.__canvasEditor` 读 live state;本次 e2e 仍用它。
+- **`bindCardWriteback` / `loadCardsIntoEditor` 内部不动**:本次 scope 是副作用组装方式,不是卡片绑定逻辑。
+- **0 新依赖** + **没碰 spec** + **domain/db/ui 零改动** + **canvas chunk 体积不变(484 kB)**。
+
+**已知 / 后续**(review 已全部关闭):
+
+- ~~#4 canvas-editor dispose 猴补丁~~ ✅
+- ~~#5 listen 无 filter~~ ✅
+- canvas dblclick 走 capture registry(plan 决定走 captureSinkRegistry,但当前实现是直接 `service.create`;未要求,YAGNI)
+- 多画布 UI(spec §4.9 schema 已支持)
+- view 持久化迁到 domain `CanvasService.updateView`(Phase 8 Tauri 时统一)
+- "重置 view" 按钮(已知 UX 缺口)
+
+详见 [`docs/superpowers/plans/2026-06-20-canvas-editor-refactor.md`](../superpowers/plans/2026-06-20-canvas-editor-refactor.md) + [`docs/memory/decisions/2026-06-20-canvas-refactor.md`](../memory/decisions/2026-06-20-canvas-refactor.md) + [`docs/design/screenshots/phase-canvas-refactor/`](../design/screenshots/phase-canvas-refactor/)。
+
+---

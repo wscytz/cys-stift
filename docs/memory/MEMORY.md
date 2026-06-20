@@ -2,9 +2,10 @@
 
 > 每条一行，按日期倒序。详细见对应文件。
 
+- [2026-06-20 · Phase canvas-refactor useEffect 驱动 canvas-editor(已交付)](decisions/2026-06-20-canvas-refactor.md) — 关闭 review #4 #5(useValue + useEffect bridge,无 dispose 猴补丁,无 listen 无 filter);tag v0.11.0-canvas-refactor
 - [2026-06-20 · Phase trash soft-delete 回收/恢复视图(已交付)](decisions/2026-06-20-trash.md) — 新 /trash 路由 + domain restore/hardDelete + AppMenu Trash 入口 + inbox 文案兑现;tag v0.10.0-trash
 - [2026-06-20 · Review bugfix #1 + #3(已修)](decisions/2026-06-20-review-bugfixes.md) — import 原子性(snapshot+回滚)+ sink 注册竞态(cancelled flag);#2/#4/#5 仍 open
-- [2026-06-19 · Review 发现(3 真 bug + 2 风险)](decisions/2026-06-19-review-findings.md) — #1 #3 已于 06-20 修(见上);**#2 也已于 06-20 修(trash 视图,见上);剩 #4 #5 canvas-editor,未修**
+- [2026-06-19 · Review 发现(3 真 bug + 2 风险)](decisions/2026-06-19-review-findings.md) — #1 #3 已于 06-20 修;#2 也已于 06-20 修(trash 视图);#4 #5 canvas-editor 也已于 06-20 修(canvas-refactor);**全部 review findings 已关闭**
 - [2026-06-19 · Phase 9.1 JSON 反向 import](decisions/2026-06-19-phase-9.1.md) — /settings Import 按钮 + 覆盖式写回 + capture race fallback
 - [2026-06-19 · Phase 9 JSON 导出 + 用户文档](decisions/2026-06-19-phase-9.md) — /settings Export 按钮 + 开放格式 JSON + 用户文档
 - [2026-06-19 · Phase 8 Tauri 打包 STUCK](decisions/2026-06-19-phase-8-stuck.md) — 本机无 Rust,骨架已就位(Phase 0),实际构建阻塞;写 stuck 决策档

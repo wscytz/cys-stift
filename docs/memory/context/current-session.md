@@ -3,27 +3,27 @@
 > **新会话/新模型先读此档**,再读根 `CLAUDE.md` + `docs/development/roadmap.md`。
 > clear 后上下文全丢,这里是不丢的全部。
 >
-> **▶ 下一步:等用户诉求。** review findings #1 #2 #3 已全部修完(`v0.9.2` 修 #1+#3,`v0.10.0-trash` 修 #2);剩 #4 #5 canvas-editor 脆弱点(动 canvas 时修)。Phase 8 Tauri build(Rust 就绪)按需触发。候选:暗色模式 / 多画布 UI / 标签搜索 / OPFS(Phase 2.5)/ Phase 8 tauri build + 签名公证。
+> **▶ 下一步:等用户诉求。** review findings **全部 5 项关闭**(`v0.9.2` 修 #1+#3,`v0.10.0-trash` 修 #2,`v0.11.0-canvas-refactor` 修 #4+#5)。Phase 8 Tauri build(Rust 就绪)按需触发。候选:暗色模式 / 多画布 UI / 标签搜索 / OPFS(Phase 2.5)/ Phase 8 tauri build + 签名公证。
 
 ---
 
 ## 一句话现状
 
-**spec §8 路线图 13 个 phase 已全部完成**(Phase 0-7 + P6.5a-h + P8 + P9 + P9.1) + **review bugfix #1 #3(v0.9.2)** + **Phase trash(v0.10.0-trash,关闭 findings #2)**。Phase 8 Tauri:Rust 本就已装(cargo 1.96),`cargo check` 通过,待 `pnpm tauri build` + 签名。**review findings 仅剩 #4 #5 canvas-editor 脆弱点(动 canvas 时修)**。等用户下一步诉求。
+**spec §8 路线图 13 个 phase 全部完成 + review 全部 5 项关闭**(Phase 0-7 + P6.5a-h + P8 + P9 + P9.1 + bugfix #1+#3 v0.9.2 + trash v0.10.0-trash + canvas-refactor v0.11.0-canvas-refactor)。Phase 8 Tauri:Rust 本就已装(cargo 1.96),`cargo check` 通过,待 `pnpm tauri build` + 签名。等用户下一步诉求。
 
 ---
 
-## 🔴 剩余 open(findings 里 #1 #2 #3 已修,2026-06-20)
+## 🔴 review findings(全部 5 项关闭,2026-06-20)
 
-**完整原始清单见 [`docs/memory/decisions/2026-06-19-review-findings.md`](../decisions/2026-06-19-review-findings.md),已修记录见 [`docs/memory/decisions/2026-06-20-review-bugfixes.md`](../decisions/2026-06-20-review-bugfixes.md) + [`docs/memory/decisions/2026-06-20-trash.md`](../decisions/2026-06-20-trash.md)**。摘要:
+**完整原始清单见 [`docs/memory/decisions/2026-06-19-review-findings.md`](../decisions/2026-06-19-review-findings.md);已修记录见 06-20 三档**。
 
-- ✅ **#1 Import 部分失败** — 已修(v0.9.2):`export-service.ts` `importFromJson` 改 snapshot + 全量回滚(序列化前置 + 写入失败逐条回滚)。
+- ✅ **#1 Import 部分失败** — 已修(v0.9.2):`export-service.ts` `importFromJson` 改 snapshot + 全量回滚。
 - ✅ **#3 sink 注册竞态** — 已修(v0.9.2):`inbox/page.tsx` + `capture-host.tsx` effect 加 `cancelled` flag。
 - ✅ **#2 soft-delete 无恢复入口** — 已修(v0.10.0-trash):新 `/trash` 路由 + domain `restore`/`hardDelete` + AppMenu Trash + inbox 文案兑现。
-- ⬜ **#4 `editor.dispose` 猴补丁脆弱** — `canvas-editor.tsx:96-101`(留到动 canvas 时重构成 useEffect)。
-- ⬜ **#5 `editor.store.listen` 无 filter** — `canvas-editor.tsx:78`(同上)。
+- ✅ **#4 `editor.dispose` 猴补丁脆弱** — 已修(v0.11.0-canvas-refactor):全删猴补丁,改 useEffect cleanup + add/removeEventListener。
+- ✅ **#5 `editor.store.listen` 无 filter** — 已修(v0.11.0-canvas-refactor):全删 listen,改 `useValue` 订阅 camera + isGridMode 标量。
 
-**建议**:等用户明确诉求;#4 #5 留到下次动 canvas 一起。
+**结论**:review **0 项 open**,产品可继续推 UX 改进 / Phase 8 Tauri。
 
 ---
 
@@ -46,6 +46,7 @@
 | P9.1 | JSON 反向 import | v0.9.1 | importFromJson + capture race fallback |
 | Review | bugfix #1+#3 | v0.9.2 | import 原子性(snapshot+回滚)+ sink 注册竞态(cancelled flag) |
 | trash | soft-delete 回收/恢复 | v0.10.0-trash | /trash 路由 + domain restore/hardDelete + AppMenu Trash + inbox 文案兑现 |
+| canvas-refactor | useEffect 驱动 canvas-editor | v0.11.0-canvas-refactor | useValue 替代 listen 无 filter + useEffect bridge 替代 dispose 猴补丁,关闭 #4 #5 |
 
 **全部 0 新依赖;domain 11 tests + db 7 tests 全绿;web build exit 0(13 静态页);git 干净。**
 
@@ -112,7 +113,6 @@ Rust **本就已装**(cargo/rustc 1.96,6/19 装),根因是 PATH 未 source `~/.c
 
 ## 下一步候选(等用户诉求)
 
-- **canvas-editor 脆弱点**(findings #4 #5,下次动 canvas 一起重构成 useEffect)
 - 暗色模式 / 多画布 UI / 标签全文搜索 / OPFS 真实落盘(P2.5)/ canvas dblclick 走 registry / archive tile 接 detail / 录屏
 - Phase 8 Tauri build(本地未签名可直接出;Rust 就绪)+ 签名公证(需 Apple 证书)
 - 云同步 / CRDT(spec §4.10 前瞻,需 server)

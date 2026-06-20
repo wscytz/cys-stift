@@ -116,6 +116,7 @@ export default function CanvasPage() {
         <TldrawCanvas
           service={service}
           canvasId={DEFAULT_CANVAS_ID}
+          editor={editor}
           onOpenCard={(card) => setDetail({ card })}
           onEditorReady={(ed) => setEditor(ed)}
         />
