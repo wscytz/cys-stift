@@ -7,7 +7,7 @@
 
 ## 一句话现状
 
-**spec §8 路线图 13 个 phase 已完成**(Phase 0-7 + P6.5a-h + P9 + P9.1),Phase 8 Tauri 因本机无 Rust STUCK。self-review 发现的 **#1 import 原子性 + #3 sink 注册竞态已于 2026-06-20 修(v0.9.2)**;**剩 #2 soft-delete 无恢复入口(产品决策)+ #4 #5 canvas-editor 脆弱点(动 canvas 时修),仍 open**。等用户下一步诉求。
+**spec §8 路线图 13 个 phase 已完成**(Phase 0-7 + P6.5a-h + P9 + P9.1)。**Phase 8 Tauri:Rust 本就已装(2026-06-20 纠正——根因是 PATH 未配不是未安装,`cargo check` 已通过),待 `pnpm tauri build` + 签名**。self-review 发现的 **#1 import 原子性 + #3 sink 注册竞态已于 2026-06-20 修(v0.9.2)**;**剩 #2 soft-delete 无恢复入口(产品决策)+ #4 #5 canvas-editor 脆弱点(动 canvas 时修),仍 open**。等用户下一步诉求。
 
 ---
 
@@ -39,7 +39,7 @@
 | 6.5f | 图片上传 | v0.8.6 | media-store(base64 占位)+ 详情 Modal |
 | 6.5g | 菜单栏 + registry | v0.8.7 | AppMenu + CaptureSinkRegistry + MenuCaptureSink |
 | 6.5h | 快捷键自定义 | v0.8.8 | /settings + settings-store |
-| P8 | Tauri 打包 | 🟡 STUCK | 无 Rust(`rustc`/`cargo` 未装);骨架在 `apps/desktop/src-tauri/` |
+| P8 | Tauri 打包 | 🟢 Rust 就绪 | Rust 本已装(cargo 1.96),根因 PATH 已修,`cargo check` 通过;待 `pnpm tauri build`/签名 |
 | P9 | JSON 导出 + 文档 | v0.9.0 | export-service + `docs/user/README.md` |
 | P9.1 | JSON 反向 import | v0.9.1 | importFromJson + capture race fallback |
 | Review | bugfix #1+#3 | v0.9.2 | import 原子性(snapshot+回滚)+ sink 注册竞态(cancelled flag) |
@@ -94,15 +94,16 @@ node scripts/p<N>-shots.cjs   # N = 6.5a/b/c/d/e/f/g/h, 7, 9, 9.1
 
 ---
 
-## Phase 8 Tauri STUCK(需用户介入)
+## Phase 8 Tauri — Rust 就绪(2026-06-20 纠正,原"STUCK 需 Rust"是误判)
 
-本机无 `rustc`/`cargo`。骨架已在 `apps/desktop/src-tauri/`(Phase 0 搭)。装 Rust 后:
-1. `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-2. `cd apps/desktop/src-tauri && cargo check`
-3. 加 `tauri-plugin-global-shortcut` + JS 侧 `TauriCaptureSink` → `registry.register('tauri', ...)`
-4. `pnpm tauri build`(mac .dmg / win .msi)+ 签名公证
+Rust **本就已装**(cargo/rustc 1.96,6/19 装),根因是 PATH 未 source `~/.cargo/env` → 交互 shell `command not found` 被误判。已修:`~/.zshrc` 加 `source "$HOME/.cargo/env"`。**`cargo check` exit 0,0 warning/error**,Phase 0 骨架完整,`tauri.conf.json` 正确指向 `../web/out`。接下来:
 
-详见 `docs/memory/decisions/2026-06-19-phase-8-stuck.md`。**不阻断**:Phase 9 导出不依赖 Tauri。
+1. `cd apps/desktop/src-tauri && cargo check` ✅(已验证)
+2. `pnpm tauri build` → mac 出本地未签名 `.app`/`.dmg`(Gatekeeper 提示右键打开即可)
+3. 按需加 `tauri-plugin-global-shortcut` + JS 侧 `TauriCaptureSink` → `registry.register('tauri', ...)`
+4. 签名 + 公证(需 Apple Developer 证书 $99/年;不签本地也能用)
+
+详见 `docs/memory/decisions/2026-06-19-phase-8-stuck.md`(顶部有 2026-06-20 纠正块)。
 
 ---
 
@@ -111,7 +112,7 @@ node scripts/p<N>-shots.cjs   # N = 6.5a/b/c/d/e/f/g/h, 7, 9, 9.1
 - **soft-delete 恢复视图**(findings #2,产品决策,工作量中等:domain 加 `restore`/`hardDelete` + 新 tab/route)
 - **canvas-editor 脆弱点**(findings #4 #5,下次动 canvas 一起重构成 useEffect)
 - 暗色模式 / 多画布 UI / 标签全文搜索 / OPFS 真实落盘(P2.5)/ canvas dblclick 走 registry / archive tile 接 detail / 录屏
-- Phase 8 Tauri(需 Rust)
+- Phase 8 Tauri build(本地未签名可直接出;Rust 就绪)+ 签名公证(需 Apple 证书)
 - 云同步 / CRDT(spec §4.10 前瞻,需 server)
 
 ---

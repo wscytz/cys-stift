@@ -1,8 +1,23 @@
-# Phase 8 · Tauri 打包 — STUCK(需 Rust 工具链)
+# Phase 8 · Tauri 打包 — Rust 就绪(2026-06-20 纠正;原记 STUCK 是误判)
 
-**日期**:2026-06-19
-**状态**:🟡 STUCK — 骨架已就位(Phase 0),实际构建阻塞于 Rust 工具链
+**日期**:2026-06-19(初记)· 2026-06-20(纠正)
+**状态**:✅ Rust 就绪(2026-06-20 纠正)—— 工具链**本就已装**,根因是 PATH 未 source `~/.cargo/env`,**不是**"未安装"。`cargo check` 已通过。下方原"STUCK"记录保留为历史。
 **执行模式**:主模型(Claude)按 plan 手动执行 + 自审(30 轮路线图第 11 轮)
+
+---
+
+## ⚡ 2026-06-20 状态纠正 — Rust 其实早就装好了
+
+> **原记录(下方)说"本机无 rustc/cargo"是误判。** 真相:
+
+- **工具链本就已装**:`cargo 1.96.0` + `rustc 1.96.0`,`stable-aarch64-apple-darwin`(2026-06-19 装,跟项目同期)。`~/.cargo/bin` + `~/.rustup/toolchains/` 都在。
+- **根因是 PATH**:rustup 把代理二进制放 `~/.cargo/bin`,需 source `~/.cargo/env` 才进 PATH。当时没有任何 shell rc source 它 → 交互 shell `command not found` → 误判"未安装"。
+- **已修(2026-06-20)**:`~/.zshrc` 追加 `source "$HOME/.cargo/env"`,新 shell `cargo --version` 正常。
+- **骨架编译验证**:`cd apps/desktop/src-tauri && cargo check` → **exit 0,0 warning,0 error**。Phase 0 骨架完整可用,`tauri.conf.json` 正确指向 `../web/out` 静态导出,Xcode CLT 26.5 / arm64 满足编译前提。
+
+**结论**:Phase 8 **不再"需用户装 Rust"**。可直接进 `pnpm tauri build`(本地未签名 `.app`/`.dmg`)+ 按需加 `global-shortcut`/`updater` plugin + 签名公证(需 Apple 证书)。
+
+下方原"STUCK"内容保留为历史记录。
 
 ---
 
