@@ -63,8 +63,18 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   const t = useCallback(
     (key: MessageKey, params?: Record<string, string | number | null | undefined>) => {
-      const msg = messages[key]?.[locale]
-      if (!msg) return String(key)
+      const entry = messages[key]
+      const msg = entry?.[locale]
+      if (!entry || !msg) {
+        // v0.23.1 dev-mode warning: silent fallback (returning the raw
+        // key) hid typos from review. Warn once per missing key so the
+        // dev console highlights the issue without spamming prod.
+        if (process.env.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          console.warn(`[i18n] missing key: ${String(key)} (locale: ${locale})`)
+        }
+        return String(key)
+      }
       if (!params) return msg
       let result: string = msg
       for (const [k, v] of Object.entries(params)) {

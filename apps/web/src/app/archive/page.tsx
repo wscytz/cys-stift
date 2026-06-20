@@ -123,7 +123,7 @@ export default function ArchivePage() {
           </Button>
         ) : (
           <Button variant="ghost" onClick={() => setSelectMode(true)} disabled={cards.length === 0}>
-            {t('archive.viewGrid')}
+            {t('archive.select')}
           </Button>
         )}
       </Toolbar>
@@ -162,17 +162,17 @@ export default function ArchivePage() {
       </div>
 
       {selectMode && selected.size > 0 && (
-        <div className="floater" role="region" aria-label="Bulk actions">
-          <span className="floater__label">{selected.size} selected</span>
+        <div className="floater" role="region" aria-label={t('archive.batchDelete')}>
+          <span className="floater__label">{t('archive.floater.selected', { n: selected.size })}</span>
           <span className="floater__sep" aria-hidden="true" />
           <Button variant="primary" onClick={handleUnarchiveSelected}>
-            Unarchive
+            {t('archive.floater.unarchive')}
           </Button>
           <Button variant="danger" onClick={handleSoftDeleteSelected}>
-            Soft-delete
+            {t('archive.floater.softDelete')}
           </Button>
           <Button variant="ghost" onClick={clearSelected}>
-            Clear
+            {t('archive.floater.clear')}
           </Button>
         </div>
       )}
@@ -181,41 +181,32 @@ export default function ArchivePage() {
         <Modal
           open
           onClose={handleCancelBatchSoftDelete}
-          title={`Soft-delete ${confirmBatchDelete.length} card${
-            confirmBatchDelete.length === 1 ? '' : 's'
-          }?`}
+          title={t('archive.batchDeleteConfirmTitleN', { n: confirmBatchDelete.length })}
         >
           <p className="confirm__body">
             <strong>
-              {confirmBatchDelete.length} card
-              {confirmBatchDelete.length === 1 ? '' : 's'}:
+              {t('archive.batchDeleteConfirmCardsHeader', { n: confirmBatchDelete.length })}
             </strong>{' '}
             {(() => {
               const titles = confirmBatchDelete
-                .map((id) => cards.find((c) => c.id === id)?.title || '(untitled)')
+                .map((id) => cards.find((c) => c.id === id)?.title || t('card.untitled'))
                 .slice(0, 5)
               const overflow = confirmBatchDelete.length - titles.length
               return (
                 <>
                   {titles.join(', ')}
-                  {overflow > 0 && `, and ${overflow} more`}.
+                  {overflow > 0 && t('archive.batchDeleteConfirmAndMore', { n: overflow })}.
                 </>
               )
             })()}
           </p>
-          <p className="confirm__body">
-            These cards will be hidden from the archive. You can{' '}
-            <Link href="/trash" className="confirm__link">
-              restore them from Trash
-            </Link>{' '}
-            later.
-          </p>
+          <p className="confirm__body">{t('archive.batchDeleteConfirmRecovery')}</p>
           <div className="confirm__actions">
             <Button variant="ghost" onClick={handleCancelBatchSoftDelete}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button variant="danger" onClick={handleConfirmBatchSoftDelete}>
-              Soft-delete {confirmBatchDelete.length}
+              {t('archive.batchDeleteConfirmAction', { n: confirmBatchDelete.length })}
             </Button>
           </div>
         </Modal>

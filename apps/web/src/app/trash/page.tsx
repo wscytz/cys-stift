@@ -80,7 +80,7 @@ export default function TrashPage() {
         {confirmingCard && (
           <>
             <p className="confirm__body">
-              {t('trash.deleteForeverBody', { title: confirmingCard.title || '(untitled)' })}
+              {t('trash.deleteForeverBody', { title: confirmingCard.title || t('card.untitled') })}
             </p>
             <div className="confirm__actions">
               <Button variant="ghost" onClick={() => setConfirmHardDelete(null)}>

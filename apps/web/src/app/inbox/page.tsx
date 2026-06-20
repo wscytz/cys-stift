@@ -181,7 +181,7 @@ function CardTile({ card, onOpen }: { card: Card; onOpen: () => void }) {
     <button type="button" className="tile" onClick={onOpen}>
       <div className="tile__bar" aria-hidden="true" />
       <div className="tile__body">
-        <h3 className="tile__title">{card.title || '(untitled)'}</h3>
+        <h3 className="tile__title">{card.title || t('card.untitled')}</h3>
         {preview && <p className="tile__preview">{preview}</p>}
         <div className="tile__meta">
           <Tag color="red">{t(typeKeyOf(card.type))}</Tag>

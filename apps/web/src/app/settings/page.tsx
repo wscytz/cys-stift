@@ -44,7 +44,9 @@ export default function SettingsPage() {
   }
 
   const labelFor = (code: string) => {
-    if (code === 'Space') return 'Space'
+    if (code === 'Space') return t('settings.key.space')
+    if (code === 'Comma') return t('settings.key.comma')
+    if (code === 'Period') return t('settings.key.period')
     if (code.startsWith('Key')) return code.slice(3)
     if (code.startsWith('Digit')) return code.slice(5)
     return code

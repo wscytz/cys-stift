@@ -390,11 +390,11 @@ export function CardDetailModal({
                 )}
                 {card.canvasPosition && has('sendToCanvas') ? (
                   <Button variant="secondary" disabled>
-                    <Tag color="blue">on canvas</Tag>
+                    <Tag color="blue">{t('card.detail.onCanvas')}</Tag>
                   </Button>
                 ) : showSendToCanvas ? (
                   <Button variant="primary" onClick={onSendToCanvas}>
-                    Send to canvas
+                    {t('card.detail.sendToCanvas')}
                   </Button>
                 ) : null}
                 <span className="cd__spacer" />
