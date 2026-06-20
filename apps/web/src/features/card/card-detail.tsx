@@ -53,6 +53,7 @@ import {
 } from './editors'
 import { MarkdownBody } from '@/app/inbox/markdown'
 import { mediaStore } from '@/lib/media-store'
+import { useI18n } from '@/lib/i18n'
 
 export type CardDetailAction = 'archive' | 'unarchive' | 'sendToCanvas' | 'softDelete'
 
@@ -96,6 +97,7 @@ export function CardDetailModal({
   onSendToCanvas,
   onConfirmDelete,
 }: CardDetailModalProps) {
+  const { t } = useI18n()
   const [mode, setMode] = useState<'view' | 'edit'>(initialMode)
   const [title, setTitle] = useState(card.title)
   const [body, setBody] = useState(card.body)
@@ -200,7 +202,7 @@ export function CardDetailModal({
       <Modal
         open
         onClose={onClose}
-        title={mode === 'edit' ? 'Edit card' : card.title || '(untitled)'}
+        title={mode === 'edit' ? t('card.detail.title') : card.title || '(untitled)'}
       >
         <div className="cd" ref={dialogRef}>
           {mode === 'view' ? (
@@ -251,7 +253,7 @@ export function CardDetailModal({
                 </Section>
               )}
               {card.links.length > 0 && (
-                <Section label="Links">
+                <Section label={t('card.detail.links')}>
                   <ul className="cd__links">
                     {card.links.map((l, i) => (
                       <li key={i}>
@@ -268,7 +270,7 @@ export function CardDetailModal({
                 </Section>
               )}
               {card.codeSnippets.length > 0 && (
-                <Section label="Code">
+                <Section label={t('card.detail.code')}>
                   {card.codeSnippets.map((c, i) => (
                     <div key={i} className="cd__code">
                       <div className="cd__code-lang">{c.language}</div>
@@ -280,7 +282,7 @@ export function CardDetailModal({
                 </Section>
               )}
               {card.quotes.length > 0 && (
-                <Section label="Quotes">
+                <Section label={t('card.detail.quotes')}>
                   {card.quotes.map((q, i) => (
                     <blockquote key={i} className="cd__quote">
                       <p>{q.text}</p>
@@ -302,7 +304,7 @@ export function CardDetailModal({
                 maxLength={200}
               />
               <label className="cd__field">
-                <span className="cd__label">Body (Markdown)</span>
+                <span className="cd__label">{t('card.detail.bodyLabel')}</span>
                 <textarea
                   className="cd__textarea"
                   value={body}
@@ -374,15 +376,15 @@ export function CardDetailModal({
           <div className="cd__actions">
             {mode === 'view' ? (
               <>
-                <Button onClick={() => setMode('edit')}>Edit</Button>
+                <Button onClick={() => setMode('edit')}>{t('card.detail.edit')}</Button>
                 {showArchive && (
                   <Button variant="secondary" onClick={onArchive}>
-                    Archive
+                    {t('card.detail.archive')}
                   </Button>
                 )}
                 {showUnarchive && (
                   <Button variant="secondary" onClick={onUnarchive}>
-                    Unarchive
+                    {t('card.detail.unarchive')}
                   </Button>
                 )}
                 {card.canvasPosition && has('sendToCanvas') ? (
@@ -400,17 +402,17 @@ export function CardDetailModal({
                     variant="danger"
                     onClick={() => setConfirmDelete(true)}
                   >
-                    Soft-delete
+                    {t('card.detail.delete')}
                   </Button>
                 )}
               </>
             ) : (
               <>
                 <Button onClick={handleSave} disabled={pending || !title.trim()}>
-                  {pending ? 'Saving…' : 'Save'}
+                  {pending ? t('card.detail.saving') : t('card.detail.save')}
                 </Button>
                 <Button variant="ghost" onClick={() => setMode('view')}>
-                  Cancel
+                  {t('card.detail.cancel')}
                 </Button>
               </>
             )}
@@ -423,18 +425,14 @@ export function CardDetailModal({
       <Modal
         open={confirmDelete}
         onClose={() => setConfirmDelete(false)}
-        title="Soft-delete this card?"
+        title={t('card.detail.deleteConfirmTitle')}
       >
         <p className="cd__confirm">
-          The card is hidden and marked as deleted. You can{' '}
-          <a href="/trash" className="cd__confirm-link">
-            restore it from Trash
-          </a>{' '}
-          later.
+          {t('card.detail.deleteConfirmBody')}
         </p>
         <div className="cd__confirm-actions">
           <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
-            Cancel
+            {t('card.detail.cancel')}
           </Button>
           <Button
             variant="danger"
@@ -443,7 +441,7 @@ export function CardDetailModal({
               onConfirmDelete()
             }}
           >
-            Soft-delete
+            {t('card.detail.delete')}
           </Button>
         </div>
       </Modal>
