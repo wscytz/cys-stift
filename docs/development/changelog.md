@@ -989,3 +989,26 @@ UX walkthrough 修复 5 个真 bug(plan 完成后 puppeteer-driven deep walkthro
 详见 [`docs/memory/decisions/2026-06-23-modal-mini-input-polish.md`](../memory/decisions/2026-06-23-modal-mini-input-polish.md)。
 
 ---
+
+## 2026-06-20 · v0.23.1-i18n-hardening
+
+Review 驱动的 i18n hardening。修了 6 处硬编码英文 + 1 个调试辅助(原本静默吞错)+ 1 个潜在 UX bug(archive select 按钮复用 viewGrid 标签)。
+
+- **fix(archive)**: floater + 批量删除 confirm modal 全 i18n(原硬编码 "Unarchive" / "Soft-delete" / "Clear" / "selected" / "Cancel" / "(untitled)")→ `9c6e771`
+- **fix(archive)**: select 按钮原本误用 `t('archive.viewGrid')` 显示 "Grid",新建 `archive.select` → `9c6e771`
+- **fix(card-detail)**: "Send to canvas" 按钮 + "on canvas" Tag 硬编码 → `t('card.detail.sendToCanvas'|'onCanvas')` → `9c6e771`
+- **fix(inbox)**: 卡片无标题 fallback `(untitled)` → `t('card.untitled')` → `9c6e771`
+- **fix(trash)**: 软删除 confirm body `(untitled)` → `t('card.untitled')` → `9c6e771`
+- **fix(settings)**: `labelFor()` 键名 "Space" / "Comma" / "Period" → `t('settings.key.*')` → `9c6e771`
+- **feat(i18n)**: `t()` 缺失 key 时 dev-mode `console.warn` 一次,生产仍静默返回原 key(避免 console 污染)→ `9c6e771`
+
+**新增 i18n keys**(15 个):`card.untitled` / `card.detail.sendToCanvas` / `card.detail.onCanvas` / `archive.select` / `archive.floater.{selected,unarchive,softDelete,clear}` / `archive.batchDeleteConfirm{TitleN,CardsHeader,AndMore,Recovery,Action}` / `settings.key.{space,comma,period}`
+
+**验收**:
+
+- domain 26/26 + db 7/7 + web build 14 页 exit 0
+- 7 个文件 / +48 -29 行 / 1 个 commit
+
+详见 [`docs/memory/decisions/2026-06-23-i18n-hardening.md`](../memory/decisions/2026-06-23-i18n-hardening.md)。
+
+---
