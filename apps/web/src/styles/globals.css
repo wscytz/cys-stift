@@ -1,6 +1,14 @@
 @import '@cys-stift/ui/tokens.css';
 @import 'tailwindcss';
 
+/* AppMenu (position:sticky) occupies normal flow space at the top of
+ * <body>. Canvas page subtracts this so it doesn't overflow by
+ * AppMenu's height. Measured once — keep in sync if .app-menu
+ * padding/font changes. (App-level layout var, not a design token.) */
+:root {
+  --app-menu-height: 56px;
+}
+
 /* Base reset — kept minimal so the design system stays the source of truth. */
 *,
 *::before,

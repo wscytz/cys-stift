@@ -84,6 +84,17 @@ export function CanvasEditor({
       <Tldraw
         shapeUtils={shapeUtils}
         hideUi
+        components={{
+          // v0.22.0-ui-polish: hide tldraw's built-in chrome so the canvas
+          // page renders as a single two-layer UI (AppMenu + page toolbar).
+          // Our own SnapToggle / ZoomGroup cover snap + zoom; SharePanel and
+          // the menu/nav panels are page-level concerns that live elsewhere.
+          TopPanel: () => null,
+          SharePanel: () => null,
+          MenuPanel: () => null,
+          NavigationPanel: () => null,
+          PageMenu: () => null,
+        }}
         onMount={(ed: Editor) => {
           // ── One-shot setup (Phase 6.5d view + Phase 4 binding) ───
           // View persistence: apply zoom/pan/gridMode BEFORE first paint so

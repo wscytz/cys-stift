@@ -196,9 +196,6 @@ export default function CanvasPage() {
           Delete
         </Button>
         <span className="crumb-spacer" />
-        <span className="hint">double-click to create · drag to place</span>
-        <Tag color="black">{onCanvas}</Tag>
-        <Link href="/" className="crumb-link">← home</Link>
         <span className="tb-divider" aria-hidden="true" />
         <SnapToggle mode={snapMode} onToggle={toggleSnap} disabled={!editor} />
         <span className="tb-divider" aria-hidden="true" />
@@ -466,7 +463,7 @@ function ZoomGroup({
 }
 
 const styles = `
-.page { height: 100vh; display: flex; flex-direction: column; background: var(--color-white); color: var(--color-black); }
+.page { height: calc(100vh - var(--app-menu-height)); display: flex; flex-direction: column; background: var(--color-white); color: var(--color-black); }
 .crumb { font-family: var(--font-mono); font-size: var(--font-size-sm); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-gray); }
 .crumb--here { color: var(--color-black); }
 .crumb-sep { color: var(--color-gray); }
@@ -478,14 +475,12 @@ const styles = `
    editor itself on wide screens anyway) and via the dblclick affordance
    on long-press. */
 @media (max-width: 720px) {
-  .hint { display: none; }
   /* Tighten the toolbar: drop dividers and the percentage readout so the
      snap tag + − % + FIT fit in 390px without wrapping. */
   .tb-divider { display: none; }
   .tb-zoom-pct { display: none; }
   .crumb { white-space: nowrap; }
 }
-.crumb-link { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; }
 .cv-host { position: relative; flex: 1; min-height: 0; }
 .cv-editor { position: absolute; inset: 0; }
 .cv-state { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--font-mono); font-size: var(--font-size-sm); color: var(--color-gray); }
