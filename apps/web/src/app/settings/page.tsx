@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Toolbar } from '@cys-stift/ui'
 import { settingsStore, useSettings } from '@/lib/settings-store'
+import { useI18n } from '@/lib/i18n'
 import {
   buildExportPayload,
   downloadExport,
@@ -18,6 +19,7 @@ import {
  * UI are post-MVP.
  */
 export default function SettingsPage() {
+  const { t } = useI18n()
   const { settings, ready } = useSettings()
   const sc = settings.captureShortcut
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
@@ -53,19 +55,33 @@ export default function SettingsPage() {
       <Toolbar region="system">
         <span className="crumb">cy&rsquo;s stift</span>
         <span className="crumb-sep">/</span>
-        <span className="crumb crumb--here">settings</span>
+        <span className="crumb crumb--here">{t('settings.crumb')}</span>
       </Toolbar>
 
       <div className="content">
         <section className="set">
-          <h2 className="set__h">Appearance</h2>
-          <p className="set__lede">
-            Switch the app between light and dark. &ldquo;Follow system&rdquo; tracks your OS
-            setting live. (spec §5.6 — six Bauhaus colours preserved.)
-          </p>
-
+          <h2 className="set__h">{t('settings.language')}</h2>
+          <p className="set__lede">{t('settings.languageLede')}</p>
           <div className="set__row">
-            <label className="set__label">Theme</label>
+            <label className="set__label">{t('settings.language')}</label>
+            <select
+              className="set__select"
+              value={settings.locale}
+              onChange={(e) =>
+                settingsStore.updateLocale(e.target.value as 'zh' | 'en')
+              }
+            >
+              <option value="zh">{t('settings.languageZh')}</option>
+              <option value="en">{t('settings.languageEn')}</option>
+            </select>
+          </div>
+        </section>
+
+        <section className="set">
+          <h2 className="set__h">{t('settings.appearance')}</h2>
+          <p className="set__lede">{t('settings.appearanceLede')}</p>
+          <div className="set__row">
+            <label className="set__label">{t('settings.theme')}</label>
             <select
               className="set__select"
               value={settings.theme}
@@ -75,22 +91,18 @@ export default function SettingsPage() {
                 )
               }
             >
-              <option value="system">Follow system</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
+              <option value="system">{t('settings.themeSystem')}</option>
+              <option value="light">{t('settings.themeLight')}</option>
+              <option value="dark">{t('settings.themeDark')}</option>
             </select>
           </div>
         </section>
 
         <section className="set">
-          <h2 className="set__h">Capture shortcut</h2>
-          <p className="set__lede">
-            Press this combo anywhere (outside an input) to open the Mini
-            Input. Changes apply immediately.
-          </p>
-
+          <h2 className="set__h">{t('settings.captureShortcut')}</h2>
+          <p className="set__lede">{t('settings.captureShortcutLede')}</p>
           <div className="set__row">
-            <label className="set__label">Modifier</label>
+            <label className="set__label">{t('settings.modifier')}</label>
             <select
               className="set__select"
               value={sc.modKey}
@@ -100,13 +112,12 @@ export default function SettingsPage() {
                 })
               }
             >
-              <option value="meta">⌘ Cmd (mac)</option>
-              <option value="ctrl">Ctrl (win)</option>
+              <option value="meta">{t('settings.modifierMeta')}</option>
+              <option value="ctrl">{t('settings.modifierCtrl')}</option>
             </select>
           </div>
-
           <div className="set__row">
-            <label className="set__label">Shift</label>
+            <label className="set__label">{t('settings.shift')}</label>
             <input
               type="checkbox"
               checked={sc.shift}
@@ -115,9 +126,8 @@ export default function SettingsPage() {
               }
             />
           </div>
-
           <div className="set__row">
-            <label className="set__label">Key</label>
+            <label className="set__label">{t('settings.key')}</label>
             <select
               className="set__select"
               value={sc.code}
@@ -132,32 +142,22 @@ export default function SettingsPage() {
               ))}
             </select>
           </div>
-
           <p className="set__current">
-            Current:{' '}
+            {t('settings.current')}:{' '}
             <code>
               {(sc.modKey === 'meta' ? '⌘' : 'Ctrl') +
                 (sc.shift ? '+⇧' : '') +
                 '+' +
                 labelFor(sc.code)}
             </code>{' '}
-            {ready ? '' : '(loading…)'}
+            {ready ? '' : t('settings.currentSuffix')}
           </p>
-
-          <p className="set__hint">
-            Note: on macOS, ⌘+⇧+Space may be captured by Spotlight at the OS
-            level. The shortcut still works inside the browser. Recording UI
-            and conflict detection are post-MVP.
-          </p>
+          <p className="set__hint">{t('settings.captureHint')}</p>
         </section>
 
         <section className="set">
-          <h2 className="set__h">Data</h2>
-          <p className="set__lede">
-            Your data lives only on this machine. Export an open-format
-            JSON backup any time — cards, media, drafts, and settings.
-            (spec §1.2 — data is portable, no lock-in.)
-          </p>
+          <h2 className="set__h">{t('settings.data')}</h2>
+          <p className="set__lede">{t('settings.dataLede')}</p>
           <button
             type="button"
             className="set__export"
@@ -169,12 +169,11 @@ export default function SettingsPage() {
               )
             }}
           >
-            Export JSON
+            {t('settings.exportJson')}
           </button>
-
           <div className="set__import">
             <label className="set__import-label">
-              Import JSON
+              {t('settings.importJson')}
               <input
                 type="file"
                 accept="application/json,.json"
@@ -185,10 +184,7 @@ export default function SettingsPage() {
                 className="set__file"
               />
             </label>
-            <p className="set__import-hint">
-              Overwrites current data — export a backup first. Reloads on
-              success.
-            </p>
+            <p className="set__import-hint">{t('settings.importHint')}</p>
             {importResult && (
               <p
                 className={`set__import-result ${
@@ -196,8 +192,8 @@ export default function SettingsPage() {
                 }`}
               >
                 {importResult.ok
-                  ? `Imported ${importResult.cards} cards · ${importResult.mediaAssets} media. Reloading…`
-                  : `Import failed: ${importResult.error}`}
+                  ? t('settings.importOk', { cards: importResult.cards, mediaAssets: importResult.mediaAssets })
+                  : t('settings.importFail', { error: importResult.error ?? '' })}
               </p>
             )}
           </div>
