@@ -467,6 +467,12 @@ function Section({
 
 const styles = `
 .cd { display: flex; flex-direction: column; gap: var(--space-3); }
+/* v0.22.0-ux-bugfix parity with canvas modal: tighten the gap between
+   modal title and first body field. The .cd flex container's gap of
+   space-3 (24px) plus the Modal component's body padding makes the
+   first child feel detached; pulling it up by space-2 (16px) hugs
+   the title. */
+.cd > :first-child { margin-top: calc(-1 * var(--space-2)); }
 .cd__meta { display: flex; align-items: center; gap: var(--space-2); }
 .cd__time { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
 .cd__field { display: flex; flex-direction: column; gap: var(--space-1); }
