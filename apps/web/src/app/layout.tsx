@@ -26,7 +26,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN" className={`${display.variable} ${body.variable}`}>
+    <html lang="zh-CN" data-theme="light" suppressHydrationWarning className={`${display.variable} ${body.variable}`}>
       <head>
         {/*
          * Early-apply theme (spec §5.6, 2026-06-20). The inline script
