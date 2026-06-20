@@ -11,6 +11,7 @@ import { useCanvases } from '@/lib/canvas-store'
 import { captureSinkRegistry } from '@/features/capture/capture-sink'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
+import { typeKeyOf } from '@/lib/type-label'
 
 type View = 'inbox' | 'archived'
 
@@ -183,7 +184,7 @@ function CardTile({ card, onOpen }: { card: Card; onOpen: () => void }) {
         <h3 className="tile__title">{card.title || '(untitled)'}</h3>
         {preview && <p className="tile__preview">{preview}</p>}
         <div className="tile__meta">
-          <Tag color="red">{card.type}</Tag>
+          <Tag color="red">{t(typeKeyOf(card.type))}</Tag>
           {totalMedia > 0 && <Tag color="blue">{totalMedia} media</Tag>}
           <span className="tile__time">
             {card.capturedAt.toISOString().slice(0, 10)}

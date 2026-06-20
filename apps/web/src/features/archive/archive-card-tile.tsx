@@ -2,6 +2,8 @@
 
 import { Tag } from '@cys-stift/ui'
 import type { Card } from '@cys-stift/domain'
+import { useI18n } from '@/lib/i18n'
+import { typeKeyOf } from '@/lib/type-label'
 
 interface ArchiveCardTileProps {
   card: Card
@@ -27,6 +29,7 @@ export function ArchiveCardTile({
   onClick,
   onToggleSelect,
 }: ArchiveCardTileProps) {
+  const { t } = useI18n()
   const preview = card.body.slice(0, 120)
   const totalMedia = card.links.length + card.codeSnippets.length + card.quotes.length
   const cls = [
@@ -63,7 +66,7 @@ export function ArchiveCardTile({
             <p className="tile__preview">{preview}</p>
           )}
           <div className="tile__meta">
-            <Tag color="blue">{card.type}</Tag>
+            <Tag color="blue">{t(typeKeyOf(card.type))}</Tag>
             {totalMedia > 0 && <Tag color="red">{totalMedia} media</Tag>}
             <span className="tile__time">
               {card.updatedAt.toISOString().slice(0, 10)}

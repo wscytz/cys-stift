@@ -165,6 +165,13 @@ export const messages = {
   'capture.miniTitle': { zh: '灵感标题…', en: 'Idea title…' },
   'capture.miniBody': { zh: 'Markdown 笔记（可选）', en: 'Markdown body (optional)' },
   'capture.addNote': { zh: '加入收件箱', en: 'Add to inbox' },
+
+  /* ── Card types ── */
+  'card.typeNote': { zh: '笔记', en: 'Note' },
+  'card.typeImage': { zh: '图片', en: 'Image' },
+  'card.typeLink': { zh: '链接', en: 'Link' },
+  'card.typeCode': { zh: '代码', en: 'Code' },
+  'card.typeQuote': { zh: '引用', en: 'Quote' },
 } as const
 
 export type MessageKey = keyof typeof messages

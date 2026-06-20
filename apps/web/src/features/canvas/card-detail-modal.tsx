@@ -14,6 +14,7 @@ import { Button, Input, Modal, Tag } from '@cys-stift/ui'
 import type { Card } from '@cys-stift/domain'
 import { MarkdownBody } from '@/app/inbox/markdown'
 import { useI18n } from '@/lib/i18n'
+import { typeKeyOf } from '@/lib/type-label'
 
 interface Props {
   card: Card
@@ -88,7 +89,7 @@ export function CardDetailModal({
           {mode === 'view' ? (
             <>
               <div className="cd__meta">
-                <Tag color="black">{card.type}</Tag>
+                <Tag color="black">{t(typeKeyOf(card.type))}</Tag>
                 <span className="cd__time">
                   {card.capturedAt.toISOString().slice(0, 19).replace('T', ' ')}
                 </span>

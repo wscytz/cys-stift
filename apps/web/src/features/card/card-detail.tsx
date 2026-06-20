@@ -54,6 +54,7 @@ import {
 import { MarkdownBody } from '@/app/inbox/markdown'
 import { mediaStore } from '@/lib/media-store'
 import { useI18n } from '@/lib/i18n'
+import { typeKeyOf } from '@/lib/type-label'
 
 export type CardDetailAction = 'archive' | 'unarchive' | 'sendToCanvas' | 'softDelete'
 
@@ -208,7 +209,7 @@ export function CardDetailModal({
           {mode === 'view' ? (
             <>
               <div className="cd__meta">
-                <Tag color="red">{card.type}</Tag>
+                <Tag color="red">{t(typeKeyOf(card.type))}</Tag>
                 <span className="cd__time">
                   {card.capturedAt.toISOString().slice(0, 19).replace('T', ' ')}
                 </span>
