@@ -76,7 +76,7 @@ export default function TrashPage() {
         </p>
       </div>
 
-        <Modal
+      <Modal
         open={confirmingCard != null}
         onClose={() => setConfirmHardDelete(null)}
         title={t('trash.deleteForeverTitle')}
@@ -90,21 +90,8 @@ export default function TrashPage() {
               <Button variant="ghost" onClick={() => setConfirmHardDelete(null)}>
                 {t('common.cancel')}
               </Button>
-              <Button variant="danger" onClick={() => service.hardDelete(confirmingCard.id).then(() => setConfirmHardDelete(null))}>
+              <Button variant="danger" onClick={() => { service.hardDelete(confirmingCard.id); setConfirmHardDelete(null) }}>
                 {t('trash.deleteForeverBtn')}
-              </Button>
-            </div>
-          </>
-        )}
-      </Modal>
-              <Button
-                variant="danger"
-                onClick={() => {
-                  if (confirmingCard) service.hardDelete(confirmingCard.id)
-                  setConfirmHardDelete(null)
-                }}
-              >
-                Delete forever
               </Button>
             </div>
           </>

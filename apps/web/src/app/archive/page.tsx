@@ -123,7 +123,7 @@ export default function ArchivePage() {
           </Button>
         ) : (
           <Button variant="ghost" onClick={() => setSelectMode(true)} disabled={cards.length === 0}>
-            Select
+            {t('archive.viewGrid')}
           </Button>
         )}
       </Toolbar>
