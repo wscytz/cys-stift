@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import '@tldraw/tldraw/tldraw.css'
 import './canvas-overrides.css'
+import { useI18n } from '@/lib/i18n'
 import type { CanvasEditorProps } from './canvas-editor'
 
 type EditorComponent = React.ComponentType<CanvasEditorProps>
@@ -14,6 +15,7 @@ type EditorComponent = React.ComponentType<CanvasEditorProps>
  * code-splits tldraw into its own lazy chunk (~2 MB, spec §12 / ADR-0005).
  */
 export function TldrawCanvas(props: CanvasEditorProps) {
+  const { t } = useI18n()
   const [Editor, setEditor] = useState<EditorComponent | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
@@ -31,7 +33,7 @@ export function TldrawCanvas(props: CanvasEditorProps) {
     }
   }, [])
 
-  if (err) return <div className="cv-state cv-state--err">canvas load error: {err}</div>
-  if (!Editor) return <div className="cv-state">loading canvas…</div>
+  if (err) return <div className="cv-state cv-state--err">{t('tldraw.loadError', { err })}</div>
+  if (!Editor) return <div className="cv-state">{t('tldraw.loading')}</div>
   return <Editor {...props} />
 }
