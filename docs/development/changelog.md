@@ -737,3 +737,41 @@
 详见 [`docs/superpowers/plans/2026-06-20-archive-detail.md`](../superpowers/plans/2026-06-20-archive-detail.md) + [`docs/memory/decisions/2026-06-20-archive-detail.md`](../memory/decisions/2026-06-20-archive-detail.md) + [`docs/design/screenshots/phase-archive-detail/`](../design/screenshots/phase-archive-detail/)。
 
 ---
+
+## 2026-06-20 · phase batch-confirm · archive 批量软删二次确认(关闭 review §🟠 UX #3)
+
+**交付**:承接 review §🟠 UX 洞 #3:"archive 批量 soft-delete 无二次确认"。`apps/web/src/app/archive/page.tsx` import 加 `Modal`,新 state `confirmBatchDelete: CardId[] \| null`(null 隐藏 / 数组显示),改 `handleSoftDeleteSelected` 改弹 Modal 不直接软删,新 `handleConfirmBatchSoftDelete` / `handleCancelBatchSoftDelete`,新增 floater 后的 `<Modal>` 块(title 显示 "Soft-delete N card(s)?",body 列出前 5 个 title + "...and N more" + "restore them from Trash" Link,actions Cancel + "Soft-delete N"),styles 字符串加 `.confirm__body` / `.confirm__link` / `.confirm__actions`(沿用 trash page 的 `confirm__*` 命名空间)。`scripts/batch-soft-delete-confirm-shots.cjs`(新):seed 3 卡 → 选 3 → 弹 Modal → Cancel 保留 → 再触发 → 确认 → /archive 空 + /trash 3。Tag **v0.13.0-batch-confirm**。
+
+**核心承诺验证**:
+
+- floater "Soft-delete" 一次点击不再直接软删,改弹 Modal ✓
+- Modal title = "Soft-delete 3 cards?"(单复数处理)✓
+- Modal body 列出 3 个 title + Link 指向 `/trash` ✓
+- Cancel 关闭 Modal,3 卡仍在 archive,selected 保留 ✓
+- 再次点 floater "Soft-delete" → Modal 重新打开 ✓
+- 点 danger "Soft-delete 3" → /archive 空 + /trash 3 ✓
+- 回归:`p7` ✓ / `p6.5b` ✓ / `trash` ✓ / `archive-detail` ✓ 全过
+- domain 15 / db 7 全绿;web build exit 0,**14 静态页**
+- /archive 3.27 → 3.63 kB(+360 Modal 引入)
+- 零 page error
+
+**关键工程决策**:
+
+- **复用 trash page 的 `confirm__*` class 命名空间**(而非新建 `bcf__*` 或引入 `cd__*`):archive 与 trash 同为"删除/恢复"流程,UI 模式一致;shared CardDetailModal 用 `cd__*`(因为它有自己的多页路由/状态),archive 这里是 page-level confirm,延续 trash 的轻量命名最简。
+- **复用 inbox/trash 已有的 trash 链接文案**:与单卡软删确认(`CardDetailModal.cd__confirm`)及 trash hardDelete(`trash/page.tsx.confirm__body`)文案风格一致 —— 用户对"可以从 Trash 恢复"的承诺已在 3 个确认对话框里看到,跨页面一致。
+- **Cancel 保留 selected**:用户误触 Modal 后可以重新决定,不必重新 tick N 个 checkbox。`clearSelected()` 只在确认软删后才调。
+- **列出前 5 个 title + "+N more"**:N=3 时显示全部;N=50 时 modal 不会被撑爆,用户知道删的是哪些 + 总数。
+- **Danger 按钮 label 带数量**:`Soft-delete 3` 而不是单 `Soft-delete`,最后再给用户一次明确的"我删几卡"视觉。
+- **0 新依赖** + **没碰 spec** + **domain/db/ui 零改动** + **`Modal` 复用 `@cys-stift/ui`**。
+
+**已知 / 后续**(review UX 洞剩 #2):
+
+- ✅ ~~批量 soft-delete 二次确认~~ (本次)
+- ⬜ UX #2 send-to-canvas 反向动作(卡上画布后无"拿回 inbox"按钮)
+- 批量 Unarchive 加确认(非破坏性,review 没要求,YAGNI)
+- 输入卡名 "delete" 才确认的高强度确认(信任 Modal 拦截,匹配现有 confirm 风格)
+- 把 batch confirm 抽到 features/card 共享组件(archive 是唯一批量场景,YAGNI)
+
+详见 [`docs/superpowers/plans/2026-06-20-batch-soft-delete-confirm.md`](../superpowers/plans/2026-06-20-batch-soft-delete-confirm.md) + [`docs/memory/decisions/2026-06-20-batch-confirm.md`](../memory/decisions/2026-06-20-batch-confirm.md) + [`docs/design/screenshots/phase-batch-confirm/`](../design/screenshots/phase-batch-confirm/)。
+
+---

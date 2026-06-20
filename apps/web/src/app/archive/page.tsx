@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Button, Card as UICard, Tag, Toolbar } from '@cys-stift/ui'
+import { Button, Card as UICard, Modal, Tag, Toolbar } from '@cys-stift/ui'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
 import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
@@ -21,6 +21,15 @@ export default function ArchivePage() {
   // click was no-op). Single source of truth lives in `cards` below; we
   // keep a local `detail` ref so editing reflects immediately.
   const [detail, setDetail] = useState<{ card: Card } | null>(null)
+  // Phase batch-confirm (review §🟠 UX #3): batch soft-delete via the
+  // floater previously fired without any confirmation — one click
+  // soft-deleted N cards. The confirm modal mirrors the trash /
+  // shared-CardDetailModal pattern: shows what will be affected, the
+  // recovery path (Trash), and a danger button labelled with the count.
+  // null = hidden; an array = "show confirm for these ids".
+  const [confirmBatchDelete, setConfirmBatchDelete] = useState<
+    CardId[] | null
+  >(null)
 
   // Archived & not soft-deleted, sorted by updatedAt desc.
   const cards = useMemo(
@@ -53,10 +62,24 @@ export default function ArchivePage() {
   }
 
   const handleSoftDeleteSelected = () => {
-    for (const id of selected) {
+    // Phase batch-confirm: don't soft-delete yet — open the confirm
+    // modal. The user still has the selection set so they can re-trigger
+    // after Cancel without re-ticking every tile.
+    setConfirmBatchDelete([...selected])
+  }
+
+  const handleConfirmBatchSoftDelete = () => {
+    if (!confirmBatchDelete) return
+    for (const id of confirmBatchDelete) {
       service.softDelete(id)
     }
+    setConfirmBatchDelete(null)
     clearSelected()
+  }
+
+  const handleCancelBatchSoftDelete = () => {
+    setConfirmBatchDelete(null)
+    // Keep `selected` so the user can rethink without re-ticking.
   }
 
   const exitSelectMode = () => {
@@ -154,6 +177,50 @@ export default function ArchivePage() {
             Clear
           </Button>
         </div>
+      )}
+
+      {confirmBatchDelete && (
+        <Modal
+          open
+          onClose={handleCancelBatchSoftDelete}
+          title={`Soft-delete ${confirmBatchDelete.length} card${
+            confirmBatchDelete.length === 1 ? '' : 's'
+          }?`}
+        >
+          <p className="confirm__body">
+            <strong>
+              {confirmBatchDelete.length} card
+              {confirmBatchDelete.length === 1 ? '' : 's'}:
+            </strong>{' '}
+            {(() => {
+              const titles = confirmBatchDelete
+                .map((id) => cards.find((c) => c.id === id)?.title || '(untitled)')
+                .slice(0, 5)
+              const overflow = confirmBatchDelete.length - titles.length
+              return (
+                <>
+                  {titles.join(', ')}
+                  {overflow > 0 && `, and ${overflow} more`}.
+                </>
+              )
+            })()}
+          </p>
+          <p className="confirm__body">
+            These cards will be hidden from the archive. You can{' '}
+            <Link href="/trash" className="confirm__link">
+              restore them from Trash
+            </Link>{' '}
+            later.
+          </p>
+          <div className="confirm__actions">
+            <Button variant="ghost" onClick={handleCancelBatchSoftDelete}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleConfirmBatchSoftDelete}>
+              Soft-delete {confirmBatchDelete.length}
+            </Button>
+          </div>
+        </Modal>
       )}
 
       {detail && (
@@ -264,4 +331,8 @@ const styles = `
 }
 .floater__label { text-transform: uppercase; letter-spacing: 0.12em; }
 .floater__sep { width: 1px; height: 24px; background: var(--color-gray-soft); margin: 0 var(--space-1); }
+
+.confirm__body { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
+.confirm__link { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; }
+.confirm__actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-2); }
 `

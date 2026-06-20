@@ -3,32 +3,32 @@
 > **新会话/新模型先读此档**,再读根 `CLAUDE.md` + `docs/development/roadmap.md`。
 > clear 后上下文全丢,这里是不丢的全部。
 >
-> **▶ 下一步:等用户诉求。** review findings **全部 5 项关闭** + UX 洞 #4(archive tile 接 Modal)**已修**;剩 UX 洞 #2 #3(批量 soft-delete 二次确认 / send-to-canvas 反向)。Phase 8 Tauri build(Rust 就绪)按需触发。候选:暗色模式 / 多画布 UI / 标签搜索 / OPFS(Phase 2.5)/ 剩余 UX 洞 / Phase 8 tauri build + 签名公证。
+> **▶ 下一步:等用户诉求。** review findings **全部 5 项关闭** + UX 洞 #3 #4(archive tile 接 Modal + 批量软删二次确认)**已修**;剩 UX 洞 #2(send-to-canvas 反向)。Phase 8 Tauri build(Rust 就绪)按需触发。候选:暗色模式 / 多画布 UI / 标签搜索 / OPFS(Phase 2.5)/ 剩余 UX 洞 / Phase 8 tauri build + 签名公证。
 
 ---
 
 ## 一句话现状
 
-**spec §8 路线图 13 个 phase 全部完成 + review 全部 5 项关闭 + UX 洞 #4 关闭**(Phase 0-7 + P6.5a-h + P8 + P9 + P9.1 + bugfix v0.9.2 + trash v0.10.0 + canvas-refactor v0.11.0 + **archive-detail v0.12.0**)。Phase 8 Tauri:Rust 本就已装(cargo 1.96),`cargo check` 通过,待 `pnpm tauri build` + 签名。等用户下一步诉求。
+**spec §8 路线图 13 个 phase 全部完成 + review 全部 5 项关闭 + UX 洞 #3 #4 关闭**(Phase 0-7 + P6.5a-h + P8 + P9 + P9.1 + bugfix v0.9.2 + trash v0.10.0 + canvas-refactor v0.11.0 + archive-detail v0.12.0 + **batch-confirm v0.13.0**)。Phase 8 Tauri:Rust 本就已装(cargo 1.96),`cargo check` 通过,待 `pnpm tauri build` + 签名。等用户下一步诉求。
 
 ---
 
-## 🔴 review findings(全部 5 项关闭,2026-06-20)+ UX 洞 #4 关闭
+## 🔴 review findings(全部 5 项关闭,2026-06-20)+ UX 洞 #3 #4 关闭
 
-**完整原始清单见 [`docs/memory/decisions/2026-06-19-review-findings.md`](../decisions/2026-06-19-review-findings.md);已修记录见 06-20 五档**。
+**完整原始清单见 [`docs/memory/decisions/2026-06-19-review-findings.md`](../decisions/2026-06-19-review-findings.md);已修记录见 06-20 六档**。
 
-- ✅ **#1 Import 部分失败** — 已修(v0.9.2):`export-service.ts` `importFromJson` 改 snapshot + 全量回滚。
-- ✅ **#3 sink 注册竞态** — 已修(v0.9.2):`inbox/page.tsx` + `capture-host.tsx` effect 加 `cancelled` flag。
-- ✅ **#2 soft-delete 无恢复入口** — 已修(v0.10.0-trash):新 `/trash` 路由 + domain `restore`/`hardDelete`。
-- ✅ **#4 `editor.dispose` 猴补丁脆弱** — 已修(v0.11.0-canvas-refactor):改 useEffect cleanup + add/removeEventListener。
-- ✅ **#5 `editor.store.listen` 无 filter** — 已修(v0.11.0-canvas-refactor):改 `useValue` 订阅 camera + isGridMode 标量。
-- ✅ **UX #4 archive tile no-op** — 已修(v0.12.0-archive-detail):抽共享 `CardDetailModal` + archive 接入(关闭)。
+- ✅ **#1 Import 部分失败** — 已修(v0.9.2)
+- ✅ **#3 sink 注册竞态** — 已修(v0.9.2)
+- ✅ **#2 soft-delete 无恢复入口** — 已修(v0.10.0-trash)
+- ✅ **#4 `editor.dispose` 猴补丁脆弱** — 已修(v0.11.0-canvas-refactor)
+- ✅ **#5 `editor.store.listen` 无 filter** — 已修(v0.11.0-canvas-refactor)
+- ✅ **UX #4 archive tile no-op** — 已修(v0.12.0-archive-detail):共享 CardDetailModal
+- ✅ **UX #3 批量 soft-delete 无二次确认** — 已修(v0.13.0-batch-confirm):floater 弹 Modal + Cancel 保留 selected
 
-**剩余 UX 洞(可补)**:
-- ⬜ UX #3 批量 soft-delete 二次确认(archive floater 软删多卡无确认;误删可 trash 恢复,二确仍是 UX 改进)
-- ⬜ UX #2 send-to-canvas 反向动作(卡上画布后无"拿回 inbox")
+**剩余 UX 洞**:
+- ⬜ **UX #2 send-to-canvas 反向动作**(卡上画布后无"拿回 inbox"按钮)
 
-**结论**:review + UX 洞 #4 **全关**;剩 #2 #3 是 nice-to-have。
+**结论**:review + UX 洞 #3 #4 全关;剩 #2 唯一。
 
 ---
 
@@ -53,6 +53,7 @@
 | trash | soft-delete 回收/恢复 | v0.10.0-trash | /trash 路由 + domain restore/hardDelete + AppMenu Trash + inbox 文案兑现 |
 | canvas-refactor | useEffect 驱动 canvas-editor | v0.11.0-canvas-refactor | useValue 替代 listen 无 filter + useEffect bridge 替代 dispose 猴补丁,关闭 #4 #5 |
 | archive-detail | archive tile 接 Modal + 共享组件 | v0.12.0-archive-detail | 抽 features/card/card-detail.tsx,inbox+archive 双消费;关闭 UX #4 |
+| batch-confirm | archive 批量软删二次确认 | v0.13.0-batch-confirm | floater Soft-delete 弹 Modal + Cancel 保留 selected;关闭 UX #3 |
 
 **全部 0 新依赖;domain 11 tests + db 7 tests 全绿;web build exit 0(13 静态页);git 干净。**
 
@@ -119,8 +120,7 @@ Rust **本就已装**(cargo/rustc 1.96,6/19 装),根因是 PATH 未 source `~/.c
 
 ## 下一步候选(等用户诉求)
 
-- **UX #3 批量 soft-delete 二次确认**(archive floater 软删多卡时无确认;误删可 trash 恢复,二确仍是 UX 改进)
-- **UX #2 send-to-canvas 反向动作**(卡上画布后无"拿回 inbox"按钮)
+- **UX #2 send-to-canvas 反向动作**(卡上画布后无"拿回 inbox"按钮) — review 唯一剩余 UX 洞
 - 暗色模式 / 多画布 UI / 标签全文搜索 / OPFS 真实落盘(P2.5)/ canvas dblclick 走 registry / 录屏
 - Phase 8 Tauri build(本地未签名可直接出;Rust 就绪)+ 签名公证(需 Apple 证书)
 - 云同步 / CRDT(spec §4.10 前瞻,需 server)
