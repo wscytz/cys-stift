@@ -1,7 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <!-- Bauhaus-inspired app icon: red field, white circle, black bar -->
-  <rect width="1024" height="1024" fill="#d40000"/>
-  <circle cx="512" cy="432" r="200" fill="#fafafa"/>
-  <rect x="232" y="680" width="560" height="56" fill="#0a0a0a"/>
-  <rect x="232" y="760" width="560" height="32" fill="#0a0a0a" opacity="0.6"/>
+  <!-- v0.22.1-ux-polish-2: cy's Stift app icon (matches web favicon).
+       6-colour Bauhaus mark — black square (background, brand
+       emphasis on dark surfaces) with a centred red square
+       (spec §5.4 — the same red used by Inbox tiles, Capture
+       button, and the design system in general).
+       Keep this file at 1024×1024 so `cargo tauri icon` can downscale
+       to all required PNG / .icns sizes. -->
+  <rect width="1024" height="1024" fill="#0a0a0a"/>
+  <rect x="204.8" y="204.8" width="614.4" height="614.4" fill="#d40000"/>
 </svg>
