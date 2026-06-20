@@ -7,6 +7,7 @@ import type {
   CaptureSource,
 } from '@cys-stift/domain'
 import type { CaptureSink } from './capture-sink'
+import { getDeviceId } from '@/lib/device-id'
 
 /**
  * MenuCaptureSink — opens the global Mini Input from a menu bar / nav
@@ -23,7 +24,7 @@ export class MenuCaptureSink implements CaptureSink {
   submit(input: Omit<CaptureInput, 'source'>): Promise<{ cardId: CardId }> {
     const card = this.service.fromCapture({
       ...input,
-      source: { kind: 'menubar', deviceId: 'web' } satisfies Extract<
+      source: { kind: 'menubar', deviceId: getDeviceId() } satisfies Extract<
         CaptureSource,
         { kind: 'menubar' }
       >,

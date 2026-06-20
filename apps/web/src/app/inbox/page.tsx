@@ -12,10 +12,11 @@ import { captureSinkRegistry } from '@/features/capture/capture-sink'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
 import { typeKeyOf } from '@/lib/type-label'
+import { getDeviceId } from '@/lib/device-id'
 
 type View = 'inbox' | 'archived'
 
-const DEVICE_ID = 'web'
+const DEVICE_ID = getDeviceId()
 
 export default function InboxPage() {
   const { t } = useI18n()

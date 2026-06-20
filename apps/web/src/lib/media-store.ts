@@ -20,6 +20,10 @@ export interface MediaAssetData {
   dataUrl: string
   byteSize: number
   createdAt: string // ISO
+  /** SHA-1 content hash (v0.22.6-refactor C), computed on attach.
+   * Available after the asset is fully loaded — may be empty for
+   * assets attached before this field was added. */
+  checksum: string
 }
 
 type AssetMap = Record<string, MediaAssetData>
@@ -65,6 +69,9 @@ export const mediaStore = {
    * the caller can put into `card.media`. The actual blob lives only here
    * (web-local) — domain never sees the binary (Phase 2.5 will swap in
    * OPFS / Tauri fs and the public surface stays the same).
+   *
+   * SHA-1 checksum computed via crypto.subtle.digest during attach
+   * (v0.22.6-refactor C) so sync can deduplicate assets later.
    */
   async attach(file: File): Promise<MediaRef> {
     if (file.size > SOFT_LIMIT_BYTES) {
@@ -77,6 +84,7 @@ export const mediaStore = {
     }
     const dataUrl = await readAsDataURL(file)
     const id = makeId()
+    const checksum = await contentHash(dataUrl)
     const asset: MediaAssetData = {
       id,
       kind: file.type.startsWith('image/') ? 'image' : 'file',
@@ -84,6 +92,7 @@ export const mediaStore = {
       dataUrl,
       byteSize: file.size,
       createdAt: new Date().toISOString(),
+      checksum,
     }
     const all = loadAssets()
     all[id] = asset
@@ -102,4 +111,18 @@ export const mediaStore = {
     delete all[id]
     saveAssets(all)
   },
+}
+
+/** SHA-1 content hash of a string (v0.22.6-refactor C).
+ * Uses the Web Crypto API; returns hex string. Falls back to
+ * empty string if crypto.subtle is unavailable or fails. */
+async function contentHash(data: string): Promise<string> {
+  try {
+    const buf = new TextEncoder().encode(data)
+    const hashBuf = await crypto.subtle.digest('SHA-1', buf)
+    const hashArr = Array.from(new Uint8Array(hashBuf))
+    return hashArr.map((b) => b.toString(16).padStart(2, '0')).join('')
+  } catch {
+    return ''
+  }
 }

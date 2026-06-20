@@ -49,9 +49,10 @@ import {
 } from './canvas-binding'
 import { canvasViewStore } from '@/lib/canvas-view-store'
 import { captureSinkRegistry } from '@/features/capture/capture-sink'
+import { getDeviceId } from '@/lib/device-id'
 
 const shapeUtils = [CardShapeUtil]
-const DEVICE_ID = 'web'
+const DEVICE_ID = getDeviceId()
 const DEFAULT_CARD_W = 240
 const DEFAULT_CARD_H = 120
 const VIEW_PERSIST_DEBOUNCE_MS = 500

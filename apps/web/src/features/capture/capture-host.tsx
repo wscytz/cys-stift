@@ -25,6 +25,7 @@ import { useDb } from '@/lib/db-client'
 import { useSettings } from '@/lib/settings-store'
 import { MiniInput } from './mini-input'
 import { captureSinkRegistry } from './capture-sink'
+import { getDeviceId } from '@/lib/device-id'
 
 export const CAPTURE_OPEN_EVENT = 'cys-stift:open-capture'
 
@@ -39,13 +40,14 @@ export function CaptureHost() {
 
   const onSubmit = useCallback(
     ({ title, body }: { title: string; body?: string }) => {
+      const did = getDeviceId()
       const source =
         openKind === 'menubar'
-          ? { kind: 'menubar' as const, deviceId: 'web' }
+          ? { kind: 'menubar' as const, deviceId: did }
           : {
               kind: 'shortcut' as const,
               shortcutId: 'cmd-shift-space',
-              deviceId: 'web',
+              deviceId: did,
             }
       void captureSinkRegistry.submit({ title, body, source })
       setOpen(false)
