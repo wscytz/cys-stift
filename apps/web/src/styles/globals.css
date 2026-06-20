@@ -6,7 +6,7 @@
  * AppMenu's height. Measured once — keep in sync if .app-menu
  * padding/font changes. (App-level layout var, not a design token.) */
 :root {
-  --app-menu-height: 56px;
+  --app-menu-height: 69px;
 }
 
 /* Base reset — kept minimal so the design system stays the source of truth. */
