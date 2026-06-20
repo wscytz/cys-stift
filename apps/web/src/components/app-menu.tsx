@@ -23,6 +23,7 @@ export function AppMenu() {
     { href: '/inbox', key: 'nav.inbox' },
     { href: '/canvas', key: 'nav.canvas' },
     { href: '/archive', key: 'nav.archive' },
+    { href: '/search', key: 'nav.search' },
     { href: '/trash', key: 'nav.trash' },
     { href: '/settings', key: 'nav.settings' },
   ]
