@@ -199,12 +199,12 @@ function EmptyState({ view }: { view: View }) {
         <div className="empty__bar" aria-hidden="true" />
         <p className="empty__eyebrow">inbox</p>
         <h2 className="empty__h">
-          {view === 'inbox' ? 'No cards yet.' : 'No archived cards.'}
+          {view === 'inbox' ? 'No cards yet.' : 'Nothing archived yet.'}
         </h2>
         <p className="empty__lede">
           {view === 'inbox'
             ? 'Create the first card above. Add links, code blocks, and quotes — they all stay attached to the same note.'
-            : 'Archived cards show up here. Unarchive to bring them back to the inbox.'}
+            : 'Archive from the active tab to move cards here. They stay archived until you unarchive them or soft-delete from here.'}
         </p>
       </div>
     </UICard>
