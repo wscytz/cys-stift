@@ -17,6 +17,7 @@ import {
   draftLinksToPayload,
   draftQuotesToPayload,
 } from '@/features/card/editors'
+import { useI18n } from '@/lib/i18n'
 
 export interface CreateCardFormProps {
   onCreate: (input: {
@@ -50,6 +51,7 @@ interface ManualDraftPayload {
  * successful submit (or Clear) clears the draft.
  */
 export function CreateCardForm({ onCreate }: CreateCardFormProps) {
+  const { t } = useI18n()
   const { draft, ready } = useDraft<ManualDraftPayload>('manual')
   const restored = ready && draft ? draft.payload : null
   const [title, setTitle] = useState('')
@@ -154,9 +156,9 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
       </h2>
 
       <Input
-        label="Title"
+        label={t('card.detail.bodyLabel')}
         name={`${formId}-title`}
-        placeholder="灵感标题…"
+        placeholder={t('inbox.create.placeholder')}
         value={title}
         onChange={(e) => setTitleAndPersist(e.target.value)}
         maxLength={200}
@@ -164,11 +166,11 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
       />
 
       <label className="ccf__field">
-        <span className="ccf__label">Body (Markdown, optional)</span>
+        <span className="ccf__label">{t('inbox.create.bodyPlaceholder')}</span>
         <textarea
           className="ccf__textarea"
           name={`${formId}-body`}
-          placeholder={'用 Markdown 写…\n# heading\n- list\n**bold** `code`'}
+          placeholder={t('inbox.create.bodyPlaceholder')}
           value={body}
           onChange={(e) => setBodyAndPersist(e.target.value)}
           rows={4}
@@ -227,7 +229,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
 
       <div className="ccf__actions">
         <Button type="submit" disabled={!canSubmit}>
-          {pending ? 'Saving…' : 'Add to inbox'}
+          {pending ? t('card.detail.saving') : t('inbox.create.submit')}
         </Button>
         <Button type="button" variant="ghost" onClick={reset}>
           Clear
