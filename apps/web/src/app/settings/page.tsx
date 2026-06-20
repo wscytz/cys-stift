@@ -200,7 +200,7 @@ export default function SettingsPage() {
         </section>
 
         <p className="footnote">
-          <Link href="/" className="footnote__link">← home</Link>
+          <Link href="/" className="footnote__link">← {t('common.home')}</Link>
           {' · '}
           <Link href="/inbox" className="footnote__link">inbox</Link>
         </p>

@@ -68,11 +68,7 @@ export default function TrashPage() {
         )}
 
         <p className="footnote">
-          <Link href="/" className="footnote__link">← home</Link>
-          {' · '}
-          <Link href="/inbox" className="footnote__link">inbox</Link>
-          {' · '}
-          <Link href="/archive" className="footnote__link">archive</Link>
+          <Link href="/" className="footnote__link">← {t('common.home')}</Link>
         </p>
       </div>
 

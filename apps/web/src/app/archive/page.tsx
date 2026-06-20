@@ -157,11 +157,7 @@ export default function ArchivePage() {
         )}
 
         <p className="footnote">
-          <Link href="/" className="footnote__link">← home</Link>
-          {' · '}
-          <Link href="/inbox" className="footnote__link">inbox</Link>
-          {' · '}
-          <Link href="/dev/db" className="footnote__link">dev/db</Link>
+          <Link href="/" className="footnote__link">← {t('common.home')}</Link>
         </p>
       </div>
 
