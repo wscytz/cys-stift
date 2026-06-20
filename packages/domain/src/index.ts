@@ -15,3 +15,4 @@ export {
   WorkspaceService,
   type WorkspaceRepository,
 } from './services/workspace-service'
+export { searchCards } from './services/search'
