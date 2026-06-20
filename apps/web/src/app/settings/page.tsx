@@ -58,6 +58,31 @@ export default function SettingsPage() {
 
       <div className="content">
         <section className="set">
+          <h2 className="set__h">Appearance</h2>
+          <p className="set__lede">
+            Switch the app between light and dark. &ldquo;Follow system&rdquo; tracks your OS
+            setting live. (spec §5.6 — six Bauhaus colours preserved.)
+          </p>
+
+          <div className="set__row">
+            <label className="set__label">Theme</label>
+            <select
+              className="set__select"
+              value={settings.theme}
+              onChange={(e) =>
+                settingsStore.updateTheme(
+                  e.target.value as 'light' | 'dark' | 'system',
+                )
+              }
+            >
+              <option value="system">Follow system</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </div>
+        </section>
+
+        <section className="set">
           <h2 className="set__h">Capture shortcut</h2>
           <p className="set__lede">
             Press this combo anywhere (outside an input) to open the Mini

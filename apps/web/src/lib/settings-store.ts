@@ -18,12 +18,22 @@ export interface CaptureShortcut {
   code: string
 }
 
+/**
+ * Theme preference (spec §5.6, 2026-06-20). 'system' follows the OS
+ * `prefers-color-scheme` media query; 'light' / 'dark' are explicit
+ * user overrides. Root layout reads this and sets `data-theme` on
+ * <html> so the CSS variable variant in tokens.css kicks in.
+ */
+export type ThemePreference = 'light' | 'dark' | 'system'
+
 export interface Settings {
   captureShortcut: CaptureShortcut
+  theme: ThemePreference
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   captureShortcut: { modKey: 'meta', shift: true, code: 'Space' },
+  theme: 'system',
 }
 
 function isValid(v: unknown): v is Settings {
@@ -32,12 +42,20 @@ function isValid(v: unknown): v is Settings {
   const sc = o.captureShortcut
   if (!sc || typeof sc !== 'object') return false
   const s = sc as Record<string, unknown>
-  return (
-    (s.modKey === 'meta' || s.modKey === 'ctrl') &&
-    typeof s.shift === 'boolean' &&
-    typeof s.code === 'string' &&
-    s.code.length > 0
-  )
+  if (
+    !(
+      (s.modKey === 'meta' || s.modKey === 'ctrl') &&
+      typeof s.shift === 'boolean' &&
+      typeof s.code === 'string' &&
+      s.code.length > 0
+    )
+  ) {
+    return false
+  }
+  if (o.theme !== 'light' && o.theme !== 'dark' && o.theme !== 'system') {
+    return false
+  }
+  return true
 }
 
 function loadSettings(): Settings {
@@ -96,6 +114,12 @@ export const settingsStore = {
     hydrateOnce()
     return _settings
   },
+  /** Subscribe to settings changes. Returns an unsubscribe function.
+   * Exposed for consumers (e.g. theme.ts) that need to react to
+   * user settings updates outside the React tree. */
+  subscribe(cb: () => void): () => void {
+    return subscribe(cb)
+  },
   update(patch: Partial<Settings>): void {
     hydrateOnce()
     _settings = { ..._settings, ...patch }
@@ -108,6 +132,13 @@ export const settingsStore = {
       ..._settings,
       captureShortcut: { ..._settings.captureShortcut, ...patch },
     }
+    saveSettings(_settings)
+    notify()
+  },
+  updateTheme(theme: ThemePreference): void {
+    hydrateOnce()
+    if (_settings.theme === theme) return
+    _settings = { ..._settings, theme }
     saveSettings(_settings)
     notify()
   },

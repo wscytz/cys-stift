@@ -3,6 +3,7 @@ import { Space_Grotesk, Inter } from 'next/font/google'
 import '../styles/globals.css'
 import { CaptureHost } from '@/features/capture/capture-host'
 import { AppMenu } from '@/components/app-menu'
+import { ThemeBoot } from '@/components/theme-boot'
 
 const display = Space_Grotesk({
   subsets: ['latin'],
@@ -26,7 +27,26 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN" className={`${display.variable} ${body.variable}`}>
+      <head>
+        {/*
+         * Early-apply theme (spec §5.6, 2026-06-20). The inline script
+         * runs synchronously before any page paints, so users with
+         * dark-mode preference don't see a light-mode flash. Reads the
+         * stored preference and resolves 'system' against the OS
+         * media query, then writes data-theme on <html>.
+         *
+         * After hydration the <ThemeBoot> component takes over for
+         * live OS-theme-change tracking (this script only runs once).
+         */}
+        <script
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var raw=localStorage.getItem('cys-stift.settings.v1');var pref='system';if(raw){var p=JSON.parse(raw);if(p&&p.settings&&(p.settings.theme==='light'||p.settings.theme==='dark'||p.settings.theme==='system'))pref=p.settings.theme;}var resolved=pref==='dark'?'dark':pref==='light'?'light':(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',resolved);}catch(e){document.documentElement.setAttribute('data-theme','light');}})();`,
+          }}
+        />
+      </head>
       <body>
+        <ThemeBoot />
         <AppMenu />
         {children}
         <CaptureHost />
