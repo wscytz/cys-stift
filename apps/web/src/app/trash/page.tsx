@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Button, Card as UICard, Modal, Tag, Toolbar } from '@cys-stift/ui'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
+import { useI18n } from '@/lib/i18n'
 import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
 
 /**
@@ -21,6 +22,7 @@ import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
  * No select mode (MVP): every action is per-card.
  */
 export default function TrashPage() {
+  const { t } = useI18n()
   const { snap, service, ready } = useDb()
   void snap // subscribe
   const [confirmHardDelete, setConfirmHardDelete] = useState<CardId | null>(null)
@@ -43,7 +45,7 @@ export default function TrashPage() {
       <Toolbar region="trash">
         <span className="crumb">cy&rsquo;s stift</span>
         <span className="crumb-sep">/</span>
-        <span className="crumb crumb--here">trash</span>
+        <span className="crumb crumb--here">{t('trash.crumb')}</span>
         <span className="crumb-spacer" />
         <Tag color="gray">{trashed.length}</Tag>
       </Toolbar>
@@ -74,21 +76,27 @@ export default function TrashPage() {
         </p>
       </div>
 
-      <Modal
+        <Modal
         open={confirmingCard != null}
         onClose={() => setConfirmHardDelete(null)}
-        title="Delete forever?"
+        title={t('trash.deleteForeverTitle')}
       >
         {confirmingCard && (
           <>
             <p className="confirm__body">
-              <strong>{confirmingCard.title || '(untitled)'}</strong> will be
-              removed permanently. This cannot be undone.
+              {t('trash.deleteForeverBody', { title: confirmingCard.title || '(untitled)' })}
             </p>
             <div className="confirm__actions">
               <Button variant="ghost" onClick={() => setConfirmHardDelete(null)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
+              <Button variant="danger" onClick={() => service.hardDelete(confirmingCard.id).then(() => setConfirmHardDelete(null))}>
+                {t('trash.deleteForeverBtn')}
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
               <Button
                 variant="danger"
                 onClick={() => {
@@ -120,6 +128,7 @@ interface TrashItemProps {
  * stripe). Per-card Restore + Delete forever actions below the tile.
  */
 function TrashItem({ card, onRestore, onRequestHardDelete }: TrashItemProps) {
+  const { t } = useI18n()
   return (
     <div className="trash-item">
       <ArchiveCardTile
@@ -127,17 +136,15 @@ function TrashItem({ card, onRestore, onRequestHardDelete }: TrashItemProps) {
         variant="tile"
         selected={false}
         selectMode={false}
-        onClick={() => {
-          // Trash items are not editable from /trash — restore first.
-        }}
+        onClick={() => {}} // Trash items are not editable from /trash — restore first.
         onToggleSelect={() => {}}
       />
       <div className="trash-item__actions">
         <Button variant="secondary" onClick={onRestore}>
-          Restore
+          {t('trash.restore')}
         </Button>
         <Button variant="danger" onClick={onRequestHardDelete}>
-          Delete forever
+          {t('trash.deleteForever')}
         </Button>
       </div>
     </div>
@@ -145,16 +152,13 @@ function TrashItem({ card, onRestore, onRequestHardDelete }: TrashItemProps) {
 }
 
 function EmptyState() {
+  const { t } = useI18n()
   return (
     <UICard>
       <div className="empty">
         <div className="empty__bar" aria-hidden="true" />
-        <p className="empty__eyebrow">trash</p>
-        <h2 className="empty__h">Trash is empty.</h2>
-        <p className="empty__lede">
-          Soft-deleted cards land here. You can restore them to their
-          original view, or delete them permanently.
-        </p>
+        <p className="empty__eyebrow">{t('trash.crumb')}</p>
+        <h2 className="empty__h">{t('trash.empty')}</h2>
       </div>
     </UICard>
   )
