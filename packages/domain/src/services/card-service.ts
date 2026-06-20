@@ -165,6 +165,25 @@ export class CardService {
     })
   }
 
+  /**
+   * Remove a card from the canvas (clears `canvasPosition` so it
+   * reappears in the inbox via `listInbox`). Does NOT delete the card;
+   * use `softDelete` / `hardDelete` for that. Idempotent: calling on
+   * a card that isn't on a canvas is a no-op. Returns true if the card
+   * was actually moved off the canvas.
+   */
+  removeFromCanvas(id: CardId): boolean {
+    const card = this.repo.getById(id)
+    if (!card) return false
+    if (!card.canvasPosition) return false
+    this.repo.update({
+      ...card,
+      canvasPosition: undefined,
+      updatedAt: new Date(),
+    })
+    return true
+  }
+
   softDelete(id: CardId): void {
     const card = this.repo.getById(id)
     if (!card) return

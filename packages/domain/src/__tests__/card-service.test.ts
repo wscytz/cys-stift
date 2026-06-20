@@ -206,4 +206,28 @@ describe('CardService', () => {
     const ok = service.hardDelete('nope' as CardId)
     expect(ok).toBe(false)
   })
+
+  it('removeFromCanvas clears canvasPosition so card returns to inbox', () => {
+    const c = service.create({ title: 'on canvas', source: dummySource })
+    const canvasId = 'c1' as CanvasId
+    service.moveToCanvas(c.id, { canvasId, x: 0, y: 0, w: 200, h: 100, z: 0 })
+    expect(service.listInbox()).toHaveLength(0)
+    expect(service.listOnCanvas(canvasId)).toHaveLength(1)
+
+    const ok = service.removeFromCanvas(c.id)
+    expect(ok).toBe(true)
+
+    const after = service.get(c.id)
+    expect(after?.canvasPosition).toBeUndefined()
+    expect(service.listInbox()).toHaveLength(1)
+    expect(service.listOnCanvas(canvasId)).toHaveLength(0)
+  })
+
+  it('removeFromCanvas is idempotent (no-op when not on canvas)', () => {
+    const c = service.create({ title: 'inbox', source: dummySource })
+    expect(c.canvasPosition).toBeUndefined()
+    const ok = service.removeFromCanvas(c.id)
+    expect(ok).toBe(false)
+    expect(service.get(c.id)?.canvasPosition).toBeUndefined()
+  })
 })

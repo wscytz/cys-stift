@@ -21,6 +21,12 @@ interface Props {
   onArchive: () => void
   onUnarchive: () => void
   onDelete: () => void
+  /**
+   * Move the card off the canvas and back to the inbox. Only available
+   * when the card currently has a `canvasPosition` (otherwise there's
+   * nothing to send back from). UX #2 closure (review §🟠).
+   */
+  onSendToInbox?: () => void
 }
 
 export function CardDetailModal({
@@ -30,6 +36,7 @@ export function CardDetailModal({
   onArchive,
   onUnarchive,
   onDelete,
+  onSendToInbox,
 }: Props) {
   // A card opened with no title (freshly created via double-click) opens in edit.
   const [mode, setMode] = useState<'view' | 'edit'>(card.title ? 'view' : 'edit')
@@ -160,6 +167,11 @@ export function CardDetailModal({
                 ) : (
                   <Button variant="secondary" onClick={onArchive}>
                     Archive
+                  </Button>
+                )}
+                {card.canvasPosition && onSendToInbox && (
+                  <Button variant="secondary" onClick={onSendToInbox}>
+                    Send back to inbox
                   </Button>
                 )}
                 <span className="cd__spacer" />

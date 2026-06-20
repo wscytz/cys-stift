@@ -150,6 +150,14 @@ export default function CanvasPage() {
             if (editor) removeCardShape(editor, detail.card.id)
             setDetail(null)
           }}
+          onSendToInbox={() => {
+            // Phase UX #2: clear canvasPosition, shape disappears, card
+            // reappears in /inbox via listInbox (which excludes cards
+            // with canvasPosition per spec §6.11).
+            service.removeFromCanvas(detail.card.id)
+            if (editor) removeCardShape(editor, detail.card.id)
+            setDetail(null)
+          }}
         />
       )}
 
