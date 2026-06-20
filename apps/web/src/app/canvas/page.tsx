@@ -7,6 +7,7 @@ import type { Editor } from '@tldraw/tldraw'
 import type { CanvasId, Card } from '@cys-stift/domain'
 import { Button, Modal, Toolbar, Tag } from '@cys-stift/ui'
 import { useDb } from '@/lib/db-client'
+import { useI18n } from '@/lib/i18n'
 import { TldrawCanvas } from '@/features/canvas/tldraw-canvas'
 import { CardDetailModal } from '@/features/canvas/card-detail-modal'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
@@ -33,6 +34,7 @@ import { canvasStore, useCanvases } from '@/lib/canvas-store'
  * (send-to-active-canvas) is a follow-up.
  */
 export default function CanvasPage() {
+  const { t } = useI18n()
   const { snap, service } = useDb()
   void snap // subscribe so the toolbar count re-renders on card changes
   // Phase 5: editor is now held in state (not a ref) so consumers re-render
@@ -161,7 +163,7 @@ export default function CanvasPage() {
       <Toolbar region="canvas">
         <span className="crumb">cy&rsquo;s stift</span>
         <span className="crumb-sep">/</span>
-        <span className="crumb crumb--here">canvas</span>
+        <span className="crumb crumb--here">{t('canvas.crumb')}</span>
         <span className="crumb-sep">/</span>
         <CanvasSwitcher
           canvases={canvases}
@@ -175,25 +177,25 @@ export default function CanvasPage() {
         <Button
           variant="ghost"
           onClick={() => setCreatingName('')}
-          title="New canvas"
+          title={t('canvas.newTitle')}
         >
-          + New
+          {t('canvas.new')}
         </Button>
         <Button
           variant="ghost"
           onClick={startRename}
-          title="Rename current canvas"
+          title={t('canvas.renameTitle')}
           disabled={!activeCanvas}
         >
-          Rename
+          {t('canvas.rename')}
         </Button>
         <Button
           variant="ghost"
           onClick={requestDelete}
-          title="Delete this canvas (default canvas cannot be deleted)"
+          title={t('canvas.deleteTitle')}
           disabled={activeCanvasId === DEFAULT_CANVAS_ID}
         >
-          Delete
+          {t('canvas.delete')}
         </Button>
         <span className="crumb-spacer" />
         <span className="tb-divider" aria-hidden="true" />
@@ -213,8 +215,8 @@ export default function CanvasPage() {
         />
         {onCanvas === 0 && (
           <div className="cv-empty" aria-hidden="true">
-            <span className="cv-empty__eyebrow">Empty canvas</span>
-            <span className="cv-empty__hint">double-click to create · drag to place</span>
+            <span className="cv-empty__eyebrow">{t('canvas.emptyTitle')}</span>
+            <span className="cv-empty__hint">{t('canvas.emptyHint')}</span>
           </div>
         )}
       </div>
@@ -222,11 +224,9 @@ export default function CanvasPage() {
       <Modal
         open={creatingName !== null}
         onClose={() => setCreatingName(null)}
-        title="New canvas"
+        title={t('canvas.newModalTitle')}
       >
-        <p className="confirm__body">
-          Name your new canvas. You'll switch to it immediately.
-        </p>
+        <p className="confirm__body">{t('canvas.newModalBody')}</p>
         <input
           autoFocus
           className="cinput"
@@ -236,19 +236,19 @@ export default function CanvasPage() {
             if (e.key === 'Enter') handleCreateCanvas((e.target as HTMLInputElement).value)
             else if (e.key === 'Escape') setCreatingName(null)
           }}
-          placeholder="e.g. Project B"
+          placeholder={t('canvas.namePlaceholder')}
           maxLength={60}
         />
         <div className="confirm__actions">
           <Button variant="ghost" onClick={() => setCreatingName(null)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             variant="primary"
             onClick={() => handleCreateCanvas(creatingName ?? '')}
             disabled={!creatingName?.trim()}
           >
-            Create
+            {t('canvas.new')}
           </Button>
         </div>
       </Modal>
@@ -256,20 +256,19 @@ export default function CanvasPage() {
       <Modal
         open={confirmDeleteId !== null}
         onClose={() => setConfirmDeleteId(null)}
-        title="Delete this canvas?"
+        title={t('canvas.deleteModalTitle')}
       >
         <p className="confirm__body">
-          <strong>{canvases.find((c) => c.id === confirmDeleteId)?.name}</strong> will
-          be removed. {cardCountOnTarget > 0
-            ? `${cardCountOnTarget} card${cardCountOnTarget === 1 ? '' : 's'} on this canvas will move back to the inbox.`
-            : 'It has no cards.'}
+          {cardCountOnTarget > 0
+            ? t('canvas.deleteModalBodyCards', { name: canvases.find((c) => c.id === confirmDeleteId)?.name ?? '', n: cardCountOnTarget })
+            : t('canvas.deleteModalBodyNoCards', { name: canvases.find((c) => c.id === confirmDeleteId)?.name ?? '' })}
         </p>
         <div className="confirm__actions">
           <Button variant="ghost" onClick={() => setConfirmDeleteId(null)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button variant="danger" onClick={confirmDelete}>
-            Delete canvas
+            {t('canvas.deleteCanvas')}
           </Button>
         </div>
       </Modal>
@@ -344,6 +343,7 @@ function CanvasSwitcher({
   onCancelRename: () => void
   onSwitch: (id: CanvasId) => void
 }) {
+  const { t } = useI18n()
   if (renamingId !== null) {
     return (
       <input
@@ -367,7 +367,7 @@ function CanvasSwitcher({
         className="cselect"
         value={activeId}
         onChange={(e) => onSwitch(e.target.value as CanvasId)}
-        title="Switch canvas"
+        title={t('canvas.switchTitle')}
       >
         {canvases.map((c) => (
           <option key={c.id} value={c.id}>
@@ -379,8 +379,8 @@ function CanvasSwitcher({
         type="button"
         className="cselect-edit"
         onClick={onStartRename}
-        title="Rename this canvas"
-        aria-label="Rename current canvas"
+        title={t('canvas.renameTitle')}
+        aria-label={t('canvas.renameTitle')}
       >
         ✎
       </button>
@@ -402,6 +402,7 @@ function SnapToggle({
   onToggle: () => void
   disabled: boolean
 }) {
+  const { t } = useI18n()
   return (
     <button
       type="button"
@@ -409,9 +410,9 @@ function SnapToggle({
       onClick={onToggle}
       disabled={disabled}
       aria-pressed={mode === 'snap'}
-      title="Toggle snap / free (G)"
+      title={t('canvas.toggleSnap')}
     >
-      {mode === 'snap' ? 'SNAP 8' : 'FREE'}
+      {mode === 'snap' ? t('canvas.snap') : t('canvas.free')}
     </button>
   )
 }
@@ -429,6 +430,7 @@ function ZoomGroup({
   editor: Editor | null
   onZoom: (op: 'in' | 'out' | 'fit') => void
 }) {
+  const { t } = useI18n()
   const z = useValue('canvas zoom', () => editor?.getCamera().z ?? 1, [editor])
   const pct = Math.round((z ?? 1) * 100)
   return (
@@ -438,8 +440,8 @@ function ZoomGroup({
         className="tb-icon-btn"
         onClick={() => onZoom('out')}
         disabled={!editor}
-        aria-label="Zoom out"
-        title="Zoom out (−)"
+        aria-label={t('canvas.zoomOut')}
+        title={`${t('canvas.zoomOut')} (-)`}
       >
         −
       </button>
@@ -449,8 +451,8 @@ function ZoomGroup({
         className="tb-icon-btn"
         onClick={() => onZoom('in')}
         disabled={!editor}
-        aria-label="Zoom in"
-        title="Zoom in (+)"
+        aria-label={t('canvas.zoomIn')}
+        title={`${t('canvas.zoomIn')} (+)`}
       >
         +
       </button>
@@ -459,10 +461,10 @@ function ZoomGroup({
         className="tb-icon-btn tb-icon-btn--fit"
         onClick={() => onZoom('fit')}
         disabled={!editor}
-        aria-label="Zoom to fit"
-        title="Fit content (0)"
+        aria-label={t('canvas.zoomFit')}
+        title={`${t('canvas.zoomFit')} (0)`}
       >
-        FIT
+        {t('canvas.zoomFit')}
       </button>
     </span>
   )
