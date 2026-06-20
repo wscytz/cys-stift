@@ -211,6 +211,12 @@ export default function CanvasPage() {
           onOpenCard={(card) => setDetail({ card })}
           onEditorReady={(ed) => setEditor(ed)}
         />
+        {onCanvas === 0 && (
+          <div className="cv-empty" aria-hidden="true">
+            <span className="cv-empty__eyebrow">Empty canvas</span>
+            <span className="cv-empty__hint">double-click to create · drag to place</span>
+          </div>
+        )}
       </div>
 
       <Modal
@@ -485,6 +491,33 @@ const styles = `
 .cv-editor { position: absolute; inset: 0; }
 .cv-state { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--font-mono); font-size: var(--font-size-sm); color: var(--color-gray); }
 .cv-state--err { color: var(--color-red); }
+/* v0.22.0-ux-bugfix: empty-state hint overlay. Shown only when the
+ * active canvas has zero cards. Hidden once the first card is created
+ * or restored (when onCanvas > 0). Pointer-events: none so dblclick
+ * passes through to the tldraw surface (which creates a card). */
+.cv-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-2);
+  pointer-events: none;
+  user-select: none;
+  padding-bottom: 80px; /* lift above tldraw bottom watermark */
+}
+.cv-empty__eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--color-gray);
+}
+.cv-empty__hint {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-black-soft);
+}
 /* Bauhaus 8px dot grid on tldraw's background layer (spec §5.4). Page-space
    grid lines arrive with tldraw's snap mode (SnapManager). */
 .tl-background {

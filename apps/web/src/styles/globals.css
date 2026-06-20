@@ -34,21 +34,29 @@ a {
   text-underline-offset: 2px;
 }
 
-/* v0.22.0-ui-polish #3 · CJK + 西文混排断字规则(spec §4.3 C6).
+/* v0.22.0-ui-polish #3 + ux-bugfix · CJK + 西文混排断字规则.
  * Applies to inbox / archive / trash cards (all share .tile__title
  * and .tile__preview). Scoped to tile classes only — does NOT touch
- * markdown code blocks, URLs, or other global text wrap behaviour. */
+ * markdown code blocks, URLs, or other global text wrap behaviour.
+ *
+ * Strategy:
+ *   - `word-break: keep-all` keeps CJK sequences as unbreakable units
+ *     (so "中文" no longer splits into "中" / "文").
+ *   - `overflow-wrap: anywhere` lets Latin words break at any character
+ *     if a CJK sequence on the same line is too wide.
+ *   - `text-wrap: balance` balances multi-line title widths.
+ *   - `line-height: 1.55` (preview) increases density slightly.
+ *
+ * Note: do NOT add `line-break: strict` / `-webkit-line-break: strict`
+ * — they make Chrome break inside CJK words in some flows. */
 .tile__title {
-  word-break: normal;
+  word-break: keep-all;
   overflow-wrap: anywhere;
   text-wrap: balance;
-  line-break: strict;
-  -webkit-line-break: strict;
   font-weight: 600;
 }
 .tile__preview {
-  word-break: normal;
+  word-break: keep-all;
   overflow-wrap: anywhere;
-  line-break: strict;
   line-height: 1.55;
 }

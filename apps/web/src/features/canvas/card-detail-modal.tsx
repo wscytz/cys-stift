@@ -219,8 +219,15 @@ export function CardDetailModal({
 
 const styles = `
 .cd { display: flex; flex-direction: column; gap: var(--space-3); }
+/* v0.22.0-ux-bugfix: Modal body adds padding above the first child;
+   tighten it so the first field hugs the modal title. */
+.cd > :first-child { margin-top: calc(-1 * var(--space-2)); }
 .cd__meta { display: flex; align-items: center; gap: var(--space-2); }
 .cd__time { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
+/* v0.22.0-ux-bugfix: tighten the gap between the body label and
+   its textarea — the inherited .cd gap of space-3 (12px) plus the
+   Input component's own padding made the label feel disconnected
+   from its control. 4px keeps them as a tight pair. */
 .cd__field { display: flex; flex-direction: column; gap: var(--space-1); }
 .cd__label { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-gray); }
 .cd__textarea {

@@ -75,7 +75,7 @@ export default function TrashPage() {
       </div>
 
       <Modal
-        open={confirmingCard !== undefined}
+        open={confirmingCard != null}
         onClose={() => setConfirmHardDelete(null)}
         title="Delete forever?"
       >

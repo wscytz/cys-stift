@@ -236,7 +236,7 @@ const styles = `
   cursor: pointer;
   border-bottom: 2px solid transparent;
 }
-.tab--active { color: var(--color-black); border-bottom-color: var(--color-red); }
+.tab--active { color: var(--color-black); border-bottom-color: var(--color-red); font-weight: 600; }
 
 .content { max-width: 1120px; margin: 0 auto; padding: var(--space-5) var(--space-4); display: flex; flex-direction: column; gap: var(--space-4); }
 

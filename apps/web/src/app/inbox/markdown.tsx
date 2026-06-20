@@ -16,9 +16,7 @@ import rehypeSanitize from 'rehype-sanitize'
  *   - Headings use display font, code uses mono, lists use square bullets.
  */
 export function MarkdownBody({ source }: { source: string }) {
-  if (!source.trim()) {
-    return <p className="md md--empty">(no body)</p>
-  }
+  if (!source.trim()) return null
   return (
     <div className="md">
       <ReactMarkdown
