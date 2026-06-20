@@ -22,6 +22,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Button, Input } from '@cys-stift/ui'
 import { draftStore, useDraft } from '@/lib/draft-store'
 import { useDebouncedCallback } from '@/lib/use-debounced-callback'
+import { useI18n } from '@/lib/i18n'
 
 interface CaptureDraftPayload {
   title: string
@@ -35,6 +36,7 @@ export interface MiniInputProps {
 }
 
 export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
+  const { t } = useI18n()
   const { draft, ready } = useDraft<CaptureDraftPayload>('capture')
   const restored = ready && draft ? draft.payload : null
   const [title, setTitle] = useState('')
@@ -105,7 +107,7 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
       !e.shiftKey &&
       !bodyOpen &&
       document.activeElement instanceof HTMLInputElement &&
-      document.activeElement.placeholder === '灵感标题…'
+      document.activeElement.placeholder === t('capture.miniTitle')
     ) {
       e.preventDefault()
       setBodyOpen(true)
@@ -120,7 +122,7 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
       className="mi-backdrop"
       role="dialog"
       aria-modal="true"
-      aria-label="Quick capture"
+      aria-label={t('nav.capture')}
       onClick={onClose}
       onKeyDown={onKeyDown}
     >
@@ -129,7 +131,7 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
         <div className="mi-body">
           <Input
             type="text"
-            placeholder="灵感标题…"
+            placeholder={t('capture.miniTitle')}
             value={title}
             onChange={(e) => setTitleAndPersist(e.target.value)}
             className="mi-title"
@@ -144,14 +146,14 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
                 queueMicrotask(() => bodyRef.current?.focus())
               }}
             >
-              + Add note
+              + {t('inbox.create.bodyPlaceholder')}
             </button>
           )}
           {bodyOpen && (
             <textarea
               ref={bodyRef}
               className="mi-textarea"
-              placeholder="Markdown 笔记（可选）"
+              placeholder={t('capture.miniBody')}
               value={body}
               onChange={(e) => setBodyAndPersist(e.target.value)}
               rows={5}
@@ -159,16 +161,16 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
           )}
         </div>
         <div className="mi-actions">
-          <span className="mi-hint">⌘↩ save · esc cancel</span>
+          <span className="mi-hint">⌘↩ {t('card.detail.save')} · esc {t('card.detail.cancel')}</span>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {t('card.detail.cancel')}
           </Button>
           <Button
             variant="danger"
             disabled={title.trim().length === 0}
             onClick={submit}
           >
-            Save
+            {t('card.detail.save')}
           </Button>
         </div>
       </div>
