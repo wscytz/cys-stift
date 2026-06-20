@@ -1,4 +1,4 @@
-# 当前会话交接(2026-06-19 末 · 待用户给诉求)
+# 当前会话交接(2026-06-20 · #1+#3 已修,待用户给下一步诉求)
 
 > **新会话/新模型先读此档**,再读根 `CLAUDE.md` + `docs/development/roadmap.md`。
 > clear 后上下文全丢,这里是不丢的全部。
@@ -7,21 +7,21 @@
 
 ## 一句话现状
 
-**spec §8 路线图 13 个 phase 已完成**(Phase 0-7 + P6.5a-h + P9 + P9.1),Phase 8 Tauri 因本机无 Rust STUCK。刚做完一轮 self-review,**发现 3 个真 bug + 2 个风险,尚未修**。用户 review 完,正要给下一步诉求。
+**spec §8 路线图 13 个 phase 已完成**(Phase 0-7 + P6.5a-h + P9 + P9.1),Phase 8 Tauri 因本机无 Rust STUCK。self-review 发现的 **#1 import 原子性 + #3 sink 注册竞态已于 2026-06-20 修(v0.9.2)**;**剩 #2 soft-delete 无恢复入口(产品决策)+ #4 #5 canvas-editor 脆弱点(动 canvas 时修),仍 open**。等用户下一步诉求。
 
 ---
 
-## 🔴 必读:刚发现的 open bug(未修)
+## 🔴 剩余 open(findings 里 #1 #3 已修,2026-06-20)
 
-**完整清单见 [`docs/memory/decisions/2026-06-19-review-findings.md`](../decisions/2026-06-19-review-findings.md)**。摘要:
+**完整原始清单见 [`docs/memory/decisions/2026-06-19-review-findings.md`](../decisions/2026-06-19-review-findings.md),已修记录见 [`docs/memory/decisions/2026-06-20-review-bugfixes.md`](../decisions/2026-06-20-review-bugfixes.md)**。摘要:
 
-1. **Import 部分失败不一致** — `export-service.ts:133-163`(cards 写成功 media 抛错 → 状态半旧半新,无回滚)
-2. **soft-delete 无恢复入口** — 全局 gap(软删后 UI 无处看/恢复,文案承诺了恢复但没实现)
-3. **sink 注册竞态** — `inbox/page.tsx:50-57` + `capture-host.tsx:89-103`(unmount 后 import 才 resolve → phantom sink)
-4. `editor.dispose` 猴补丁脆弱 — `canvas-editor.tsx:96-101`
-5. `editor.store.listen` 无 filter — `canvas-editor.tsx:78`
+- ✅ **#1 Import 部分失败** — 已修:`export-service.ts` `importFromJson` 改 snapshot + 全量回滚(序列化前置 + 写入失败逐条回滚)。
+- ✅ **#3 sink 注册竞态** — 已修:`inbox/page.tsx` + `capture-host.tsx` effect 加 `cancelled` flag。
+- ⬜ **#2 soft-delete 无恢复入口** — 全局 gap(软删后 UI 无处看/恢复)。**产品决策**:要做"已删除/回收站"视图(domain 需新增 `restore`/`hardDelete`,现状只有 `softDelete`)+ archive/inbox 多处文案承诺了恢复。
+- ⬜ **#4 `editor.dispose` 猴补丁脆弱** — `canvas-editor.tsx:96-101`(留到动 canvas 时重构成 useEffect)。
+- ⬜ **#5 `editor.store.listen` 无 filter** — `canvas-editor.tsx:78`(同上)。
 
-**建议**:#1 #3 先修(几行,低风险);#2 是产品决策(要做"已删除"视图);#4 #5 留到动 canvas 时一起。
+**建议**:#2 等用户明确要做(工作量中等:domain 加方法 + 新 tab/route + restore/hardDelete);#4 #5 留到下次动 canvas 一起。
 
 ---
 
@@ -42,6 +42,7 @@
 | P8 | Tauri 打包 | 🟡 STUCK | 无 Rust(`rustc`/`cargo` 未装);骨架在 `apps/desktop/src-tauri/` |
 | P9 | JSON 导出 + 文档 | v0.9.0 | export-service + `docs/user/README.md` |
 | P9.1 | JSON 反向 import | v0.9.1 | importFromJson + capture race fallback |
+| Review | bugfix #1+#3 | v0.9.2 | import 原子性(snapshot+回滚)+ sink 注册竞态(cancelled flag) |
 
 **全部 0 新依赖;domain 11 tests + db 7 tests 全绿;web build exit 0(13 静态页);git 干净。**
 
@@ -107,8 +108,8 @@ node scripts/p<N>-shots.cjs   # N = 6.5a/b/c/d/e/f/g/h, 7, 9, 9.1
 
 ## 下一步候选(等用户诉求决定优先级)
 
-- **修 review 发现的 bug**(见上方 🔴,#1 #3 优先)
-- **soft-delete 恢复视图**(产品决策,工作量中等)
+- **soft-delete 恢复视图**(findings #2,产品决策,工作量中等:domain 加 `restore`/`hardDelete` + 新 tab/route)
+- **canvas-editor 脆弱点**(findings #4 #5,下次动 canvas 一起重构成 useEffect)
 - 暗色模式 / 多画布 UI / 标签全文搜索 / OPFS 真实落盘(P2.5)/ canvas dblclick 走 registry / archive tile 接 detail / 录屏
 - Phase 8 Tauri(需 Rust)
 - 云同步 / CRDT(spec §4.10 前瞻,需 server)

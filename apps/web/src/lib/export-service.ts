@@ -129,31 +129,65 @@ export function importFromJson(jsonText: string): ImportResult {
       error: 'payload.cards is not an array',
     }
   }
-  // Overwrite the four stores. Missing optional keys are skipped.
+  // Overwrite the four stores atomically. Missing optional keys are
+  // skipped. We (1) serialise everything first — a serialise error must
+  // abort before any store is touched; (2) snapshot each key's old raw
+  // value; (3) write them; (4) on any write error (e.g. quota on a big
+  // base64 media blob), roll back every touched key to its pre-import
+  // value so the user never ends up in a half-overwritten state.
+  const writes: { key: string; value: string }[] = []
   try {
-    window.localStorage.setItem(
-      'cys-stift.cards.v1',
-      JSON.stringify({ cards: payload.cards }),
-    )
+    writes.push({
+      key: 'cys-stift.cards.v1',
+      value: JSON.stringify({ cards: payload.cards }),
+    })
     if (payload.mediaAssets && typeof payload.mediaAssets === 'object') {
-      window.localStorage.setItem(
-        'cys-stift.media.v1',
-        JSON.stringify({ assets: payload.mediaAssets }),
-      )
+      writes.push({
+        key: 'cys-stift.media.v1',
+        value: JSON.stringify({ assets: payload.mediaAssets }),
+      })
     }
     if (payload.drafts) {
-      window.localStorage.setItem(
-        'cys-stift.drafts.v1',
-        JSON.stringify({ drafts: payload.drafts }),
-      )
+      writes.push({
+        key: 'cys-stift.drafts.v1',
+        value: JSON.stringify({ drafts: payload.drafts }),
+      })
     }
     if (payload.settings) {
-      window.localStorage.setItem(
-        'cys-stift.settings.v1',
-        JSON.stringify({ settings: payload.settings }),
-      )
+      writes.push({
+        key: 'cys-stift.settings.v1',
+        value: JSON.stringify({ settings: payload.settings }),
+      })
     }
   } catch (e) {
+    return {
+      ok: false,
+      cards: 0,
+      mediaAssets: 0,
+      error: `serialise failed: ${(e as Error).message}`,
+    }
+  }
+
+  // Snapshot old values now, before any write mutates storage.
+  const snapshot = writes.map((w) => ({
+    key: w.key,
+    prev: window.localStorage.getItem(w.key),
+  }))
+
+  try {
+    for (const w of writes) window.localStorage.setItem(w.key, w.value)
+  } catch (e) {
+    // Roll back every key we touched to its pre-import value. A null
+    // prev means the key didn't exist before — remove it.
+    for (const s of snapshot) {
+      try {
+        if (s.prev === null) window.localStorage.removeItem(s.key)
+        else window.localStorage.setItem(s.key, s.prev)
+      } catch {
+        // Best-effort rollback; the original write error is what we
+        // report. Restoring smaller previous values rarely throws.
+      }
+    }
     return {
       ok: false,
       cards: 0,
@@ -161,6 +195,7 @@ export function importFromJson(jsonText: string): ImportResult {
       error: `write failed: ${(e as Error).message}`,
     }
   }
+
   return {
     ok: true,
     cards: payload.cards.length,

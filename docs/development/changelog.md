@@ -588,3 +588,32 @@
 详见 [`docs/superpowers/plans/2026-06-19-phase-9.1-import.md`](../superpowers/plans/2026-06-19-phase-9.1-import.md) + [`docs/design/screenshots/phase-9.1/README.md`](../design/screenshots/phase-9.1/README.md)。
 
 ---
+
+## 2026-06-20 · review bugfix · #1 import 不一致 + #3 sink 注册竞态
+
+**交付**:承接 self-review([`decisions/2026-06-19-review-findings.md`](../memory/decisions/2026-06-19-review-findings.md))的建议优先级 #1 + #3。① `apps/web/src/lib/export-service.ts`(`importFromJson`)写入段重写:先序列化全部待写项 → 快照旧值 → 写入 → 任一抛错逐条回滚(序列化/写入抛错都返回 `ok:false` 且任何 key 不被半覆盖);② `apps/web/src/app/inbox/page.tsx`(manual sink)+ `apps/web/src/features/capture/capture-host.tsx`(shortcut + menubar)effect 加 `cancelled` flag,杜绝 unmount 后 dynamic import resolve 注册 phantom sink。`scripts/import-rollback-shots.cjs`(新)e2e + 截图。
+
+**核心承诺验证**:
+
+- #1 monkeypatch media key setItem 抛 QuotaExceeded → cards 回滚到原值 + UI 报 `Import failed: write failed: quota exceeded (simulated)` ✓
+- #1 happy path 仍写 NEW 卡 ✓
+- #3 三入口回归:`p6`(快捷键)/ `p6.5e`(手动)/ `p6.5g`(menubar)全过 ✓
+- domain 11 / db 7 全绿;web build exit 0;零 page error
+
+**关键工程决策**:
+
+- **#1 瞬态内存快照 + 回滚,不用持久 `cys-stift.backup.v1`**:避免陈旧副本 footgun + YAGNI(用户已被提示先 Export)。"导入后可撤销"是独立 feature。
+- **#1 序列化前置**:序列化抛错(循环引用等)时任何 key 没被碰。
+- **#1 回滚容错**:回滚的 setItem/removeItem 各自 try/catch(best-effort)。
+- **#3 标准 React `cancelled` 模式**:一个 flag 守 effect 内全部 import(capture-host 2 个);`setFallbackService` 同步不受影响。
+- **0 新依赖** + **domain/db 零改动** + **没碰 spec**。
+
+**已知 / 后续**(findings 剩余):
+
+- #2 soft-delete 回收/恢复视图(产品决策 + domain `restore`/`hardDelete`)
+- #4 / #5 canvas-editor 脆弱点(下次动 canvas)
+- UX 洞(批量 soft-delete 二次确认 / send-to-canvas 反向 / archive tile no-op / OPFS 真实落盘)
+
+详见 [`docs/superpowers/plans/2026-06-20-review-bugfixes.md`](../superpowers/plans/2026-06-20-review-bugfixes.md) + [`docs/memory/decisions/2026-06-20-review-bugfixes.md`](../memory/decisions/2026-06-20-review-bugfixes.md) + [`docs/design/screenshots/review-import-rollback/`](../design/screenshots/review-import-rollback/)。
+
+---

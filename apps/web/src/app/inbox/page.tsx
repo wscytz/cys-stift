@@ -47,11 +47,16 @@ export default function InboxPage() {
 
   // Register the manual sink so CreateCardForm onCreate goes through
   // captureSinkRegistry → consistent with shortcut + menubar paths.
+  // Guard against the dynamic import resolving after unmount, which
+  // would otherwise register a phantom sink nobody ever unregisters.
   useEffect(() => {
+    let cancelled = false
     void import('@/features/capture/capture-sink').then(({ WebCaptureSink }) => {
+      if (cancelled) return
       captureSinkRegistry.register('manual', new WebCaptureSink(service))
     })
     return () => {
+      cancelled = true
       captureSinkRegistry.unregister('manual')
     }
   }, [service])

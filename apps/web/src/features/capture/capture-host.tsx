@@ -86,17 +86,24 @@ export function CaptureHost() {
 
   // Register the web sink on mount. Other sinks (Phase 6.5g MenuCaptureSink,
   // Phase 8 TauriCaptureSink) can also register against the same registry.
+  // The `cancelled` flag guards both dynamic imports: if the host unmounts
+  // before an import resolves, we skip registering instead of leaking a
+  // phantom sink that the cleanup (already run) can't remove.
   useEffect(() => {
+    let cancelled = false
     // Fallback first: if a submit arrives before the dynamic-import
     // registration resolves, we still persist via service.fromCapture.
     captureSinkRegistry.setFallbackService(service)
     void import('./capture-sink').then(({ WebCaptureSink }) => {
+      if (cancelled) return
       captureSinkRegistry.register('shortcut', new WebCaptureSink(service))
     })
     void import('./menu-capture-sink').then(({ MenuCaptureSink }) => {
+      if (cancelled) return
       captureSinkRegistry.register('menubar', new MenuCaptureSink(service))
     })
     return () => {
+      cancelled = true
       captureSinkRegistry.unregister('shortcut')
       captureSinkRegistry.unregister('menubar')
     }
