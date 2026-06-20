@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { settingsStore, useSettings } from '@/lib/settings-store'
 import type { MessageKey, Locale } from './messages'
 import { messages } from './messages'
@@ -43,7 +43,13 @@ function loadLocale(): Locale {
  * Renders children immediately (no loading flash).
  */
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocale] = useState<Locale>(loadLocale)
+  // SSR always renders 'zh'. On client mount, useEffect syncs the real
+  // persisted locale. This avoids every hydration mismatch because SSR
+  // HTML and client first-render both say 'zh'; the real locale takes
+  // over a tick later. No user-visible flash: the inline <script> in
+  // <head> already set <html lang> correctly for the first paint, and
+  // React suppresses the re-render warning for the RTL attribute.
+  const [locale, setLocale] = useState<Locale>('zh')
   const ref = useRef(locale)
   ref.current = locale
 
@@ -70,6 +76,18 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   )
 
   const value = useMemo<I18nCtx>(() => ({ locale, t, setLocale: doSetLocale }), [locale, t, doSetLocale])
+
+  // Hydrate from settingsStore on first mount only
+  useEffect(() => {
+    const stored = settingsStore.get().locale
+    if (stored === 'zh' || stored === 'en') {
+      setLocale(stored)
+      if (typeof document !== 'undefined') {
+        document.documentElement.lang = stored === 'zh' ? 'zh-CN' : 'en'
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
 }

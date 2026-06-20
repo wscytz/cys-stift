@@ -219,7 +219,7 @@ const styles = `
 .content { max-width: 720px; margin: 0 auto; padding: var(--space-5) var(--space-4); display: flex; flex-direction: column; gap: var(--space-4); }
 .set { display: flex; flex-direction: column; gap: var(--space-3); }
 .set__h { margin: 0; font-family: var(--font-display); font-size: var(--font-size-xl); font-weight: 500; letter-spacing: -0.01em; }
-.set__lede { margin: 0; color: var(--color-black-soft); font-size: var(--font-size-base); line-height: 1.6; max-width: 60ch; }
+.set__lede { margin: 0; color: var(--color-black-soft); font-size: var(--font-size-base); line-height: 1.6; max-width: 60ch; overflow: hidden; }
 .set__row { display: grid; grid-template-columns: 120px 1fr; align-items: center; gap: var(--space-3); }
 .set__label { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-gray); }
 .set__select { font-family: var(--font-body); font-size: var(--font-size-base); padding: var(--space-1) var(--space-2); border: var(--border-hairline); border-radius: var(--radius-sm); background: var(--color-white); color: var(--color-black); }
