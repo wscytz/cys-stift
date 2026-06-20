@@ -944,3 +944,20 @@ UI polish 三合一,不动数据/接口/依赖,基于 v0.15 干净基线重启(v
 详见 [`docs/memory/decisions/2026-06-20-ui-polish.md`](../memory/decisions/2026-06-20-ui-polish.md)。
 
 ---
+
+## 2026-06-20 · v0.22.0-ux-polish
+
+UX walkthrough 修复 5 个真 bug(plan 完成后 puppeteer-driven deep walkthrough 发现),集中 commit `e8a8da4`。
+
+- **fix(canvas)**: 空状态加 "EMPTY CANVAS" + 双击提示 overlay(`onCanvas === 0` 时显示)
+- **fix(trash)**: Modal 关不掉 bug(`!== undefined` → `!= null`)
+- **fix(markdown)**: 移除空 body 的 "(no body)" 占位文案(直接 return null)
+- **fix(card-detail-modal)**: Edit card 标签间距收紧(`.cd__field gap` 12→4px,first-child margin-top: -8px)
+- **fix(inbox)**: active tab 字重 500→600
+- **fix(tile)**: CJK 断字规则再修正(`word-break: keep-all` 真正解决 "中文" 被拆的问题)
+
+**已知遗留**(out of scope,需更大改动): Soft-delete 按钮红色 variant 与 Capture 红色冲突、Archive tab 空文案不准确、Capture placeholder 红色对比度差、favicon.ico 404。
+
+详见 [`docs/memory/decisions/2026-06-20-ui-polish.md`](../memory/decisions/2026-06-20-ui-polish.md) 后续 §v0.22.0-ux-polish。
+
+---
