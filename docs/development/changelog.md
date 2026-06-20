@@ -1106,3 +1106,25 @@ Phase B(a11y)。ui 包 Modal 加 focus trap,所有 Modal(card-detail / archive b
 详见 [`docs/memory/decisions/2026-06-23-modal-focus-trap.md`](../memory/decisions/2026-06-23-modal-focus-trap.md)。
 
 ---
+
+## 2026-06-21 · v0.25.0-tauri-global-shortcut
+
+Phase C(战略级)。桌面端全局快捷键:app 后台/失焦时 ⌘⇧Space(mac)/ Ctrl+Shift+Space(win)也能唤起 capture。**桌面端相对 web 的核心差异落地**。
+
+- **feat(src-tauri)**: `tauri-plugin-global-shortcut v2.3.2` 注册 `CmdOrCtrl+Shift+Space`,handler show+focus 主窗口 + emit `global-capture-open` event。plugin load/register 失败 eprintln 不 panic → `c83eedf`
+- **feat(config)**: `tauri.conf.json` `app.withGlobalTauri=true` 注入 `window.__TAURI__`;capabilities `+global-shortcut:default` → `c83eedf`
+- **feat(capture-host)**: 新 useEffect 监听 `window.__TAURI__.event.listen('global-capture-open')` → 打开 Mini Input(source 'shortcut')。浏览器环境(`__TAURI__` undefined)自动 no-op → `c83eedf`
+
+**关键决策**:
+- 用 `withGlobalTauri` 而非装 `@tauri-apps/api` → web 包零新依赖,浏览器仍可跑
+- 硬编码 `CmdOrCtrl+Shift+Space`(Tauri 自动 mac=Cmd/win=Ctrl,与 web 默认一致);动态配置(前端 settings → Rust 重注册)defer
+- handler show+focus+emit 三步;plugin/register 容错(eprintln,不 fatal)
+
+**验收**:
+- cargo check exit 0 + pnpm web build exit 0 + **cargo tauri build exit 0**(release 13.89s,产 .app + .dmg)
+- ⚠️ **全局唤起效果未经 GUI 实测**(无 GUI 环境),交付代码 + .app,用户手动测:最小化/切后台后按 ⌘⇧Space 应唤起窗口 + Mini Input
+- 7 个文件 / +262 -9 行 / 1 个 commit
+
+详见 [`docs/memory/decisions/2026-06-21-tauri-global-shortcut.md`](../memory/decisions/2026-06-21-tauri-global-shortcut.md)。
+
+---
