@@ -822,3 +822,49 @@
 详见 commit `9d7aa24`。
 
 ---
+
+## 2026-06-20 · phase multi-canvas · 多画布 UI(关闭 spec §4.9 长期留后)
+
+**交付**:承接 spec §4.9 多画布 UI 留后(schema 早支持,web 端缺最后一块)。① `apps/web/src/lib/canvas-store.ts`(新,~200 行):web-local 多画布 state(模式同 cards/drafts/media/canvas-view/settings),`cys-stift.canvases.v1` 存储 `CanvasesSnapshot { canvases, activeCanvasId }`,永远 seed `DEFAULT_CANVAS_ID`,setActive / create(dedup 命名)/ rename / delete(idempotent,删 default 拒绝,删 active 自动 fallback default);② `apps/web/src/app/canvas/page.tsx`:`useCanvases()` + `activeCanvasId` 取代硬编码 `DEFAULT_CANVAS_ID`,工具栏加 native `<select>` Canvas 切换器 + pencil 笔 inline rename input + `+New` / `Rename` / `Delete` ghost 按钮,删除 Modal 列出画布名 + 卡数,确认前先 `removeFromCanvas` 把所有卡回 inbox(防静默丢失),`<TldrawCanvas key={activeCanvasId}>` 切画布 remount 避免 stale editor;③ 新 `CanvasSwitcher` 子组件(select + pencil 模式);④ `scripts/multi-canvas-shots.cjs`(新,15 断言 + 6 截图)。Tag **v0.15.0-multi-canvas**。
+
+**核心承诺验证**:
+
+- /canvas 显示 default 画布,switcher active + 1 卡 visible ✓
+- default 画布 Delete 按钮 disabled(防删 seed)✓
+- +New "Project B" → 切到 Project B(active 切换),tldraw 0 shapes ✓
+- 切回 default → 卡重新 visible(1 shape)✓
+- Project B → rename "Project C" ✓
+- Delete Project C → confirm Modal 出现(显示 0 cards)→ 确认 → 列表回 ["default canvas"] + active 回到 default-canvas ✓
+- seed 卡仍 canvasPosition.canvasId = 'default-canvas'(无静默丢失)✓
+- 9 个回归 e2e 全过
+- domain 17 / db 7 全绿;web build exit 0,**14 静态页**
+- /canvas 484 → 486 kB(+2 kB 切换器 / 2 Modals)
+- 0 page error
+
+**关键工程决策**:
+
+- **新 web-local store,非迁 domain**:`CanvasService` 已存在(Phase 2),但其接口接收 repository(db 包,Phase 8 Tauri 才用);MVP 阶段用 `canvasStore` web-local 持久化 canvas 列表 + active 选择,与 cards/drafts/media 等 5 个 web-local store 模式一致 —— Phase 8 Tauri 时公共 API 不变,迁不迁后端看需
+- **native `<select>` 而非自造 popover**:a11y 0 成本 + 工具栏 32px 高度合适,自造 dropdown 增加 50+ 行代码没收益
+- **`<TldrawCanvas key={canvasId}>` remount**:`loadCardsIntoEditor` 只在 onMount 跑一次,切画布若不 remount 会有 stale shapes
+- **删除前 `removeFromCanvas`**:用户删画布时,卡在那个画布上静默消失?先 move 回 inbox,user 在 inbox 看到所有"被画布吞掉"的卡
+- **default 画布不能删**:它是 seed,删了 store 会再次 seed,但 UI 闪烁不友好;`if (id === DEFAULT_CANVAS_ID) return false` + Delete 按钮 disabled
+- **删除 active 画布自动 fallback default**:`delete` 方法检测 wasActive 后 activeCanvasId 改 DEFAULT,无需 UI 提示"先切再删"
+- **create dedup 命名**:`Project B` 已存在则自动 `Project B (2)`,避免 store 出现重复名
+- **inbox "Send to canvas" 仍用 `DEFAULT_CANVAS_ID`(MVP 不动)**:扩到 activeCanvasId 需 inbox 接 canvasStore,扩大 scope;记入 plan 留后
+- **view 持久化不分 canvasId(MVP 不动)**:`cys-stift.canvas-view.v1` 仍是单值,切画布 view 不隔离;spec §4.9 支持,plan 留后
+- **0 新依赖** + **没碰 spec** + **domain 零改动**(`CanvasService` / `Canvas` 已存在)
+
+**已知 / 后续**(全 review + UX 洞都已关闭,产品 0 open review):
+
+- inbox "Send to canvas" 用 activeCanvasId(目前 hardcode DEFAULT)
+- canvas view 持久化按 canvasId 拆分
+- workspace 多 workspace 切换
+- 拖卡跨画布(drag to canvas)
+- 画布排序 / 收藏
+- "switch to canvas X" URL hash 直链
+- 暗色模式 / 标签搜索 / OPFS / 录屏
+- Phase 8 Tauri build + 签名公证
+
+详见 [`docs/superpowers/plans/2026-06-20-multi-canvas.md`](../superpowers/plans/2026-06-20-multi-canvas.md) + [`docs/memory/decisions/2026-06-20-multi-canvas.md`](../memory/decisions/2026-06-20-multi-canvas.md) + [`docs/design/screenshots/phase-multi-canvas/`](../design/screenshots/phase-multi-canvas/)。
+
+---

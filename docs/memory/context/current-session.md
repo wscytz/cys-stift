@@ -3,7 +3,7 @@
 > **新会话/新模型先读此档**,再读根 `CLAUDE.md` + `docs/development/roadmap.md`。
 > clear 后上下文全丢,这里是不丢的全部。
 >
-> **▶ 下一步:等用户诉求。** review findings **全部 5 项关闭** + UX 洞 #2 #3 #4(archive tile 接 Modal + 批量软删二次确认 + send-back 反向)**全部已修**;**产品 0 个 open review 项**。Phase 8 Tauri build(Rust 就绪)按需触发。候选:多画布 UI(spec §4.9) / 暗色模式 / 标签搜索 / OPFS(Phase 2.5) / inbox dead styles 清理 / 录屏 / Phase 8 tauri build + 签名公证。
+> **▶ 下一步:等用户诉求。** review findings **全部 5 项关闭** + UX 洞 #2 #3 #4 全部已修 + spec §4.9 多画布已交付。**产品 0 个 open review 项**。Phase 8 Tauri build(Rust 就绪)按需触发。候选:暗色模式 / 标签搜索 / OPFS(Phase 2.5) / 录屏 / inbox "Send to canvas" 用 activeCanvasId / canvas view 持久化按 canvasId 拆分 / Phase 8 tauri build + 签名公证。
 
 ---
 
@@ -54,6 +54,7 @@
 | batch-confirm | archive 批量软删二次确认 | v0.13.0-batch-confirm | floater Soft-delete 弹 Modal + Cancel 保留 selected;关闭 UX #3 |
 | send-back | canvas 卡反向回 inbox | v0.14.0-send-back | domain removeFromCanvas + canvas Modal 按钮;关闭 UX #2 |
 | refactor 9d7aa24 | canvas dblclick 走 capture registry | (no tag) | 统一所有 capture 入口(inbox/menubar/shortcut/canvas) |
+| multi-canvas | 多画布 UI | v0.15.0-multi-canvas | canvas-store + 切换器 + +New/Rename/Delete + delete 预 removeFromCanvas;spec §4.9 长期留后已补 |
 
 **全部 0 新依赖;domain 11 tests + db 7 tests 全绿;web build exit 0(13 静态页);git 干净。**
 
@@ -120,8 +121,10 @@ Rust **本就已装**(cargo/rustc 1.96,6/19 装),根因是 PATH 未 source `~/.c
 
 ## 下一步候选(等用户诉求)
 
-- **多画布 UI**(spec §4.9 schema 已支持 — 留后很久)
-- 暗色模式 / 标签全文搜索 / OPFS 真实落盘(P2.5)/ 录屏 / inbox page dead styles 清理
+- 暗色模式 / 标签全文搜索 / OPFS 真实落盘(P2.5)/ 录屏
+- inbox "Send to canvas" 用 activeCanvasId(MVP 仍 hardcode DEFAULT)
+- canvas view 持久化按 canvasId 拆分(MVP 仍单值)
+- workspace 多 workspace 切换
 - Phase 8 Tauri build(本地未签名可直接出;Rust 就绪)+ 签名公证(需 Apple 证书)
 - 云同步 / CRDT(spec §4.10 前瞻,需 server)
 
