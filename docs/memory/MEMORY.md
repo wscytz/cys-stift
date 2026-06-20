@@ -2,6 +2,7 @@
 
 > 每条一行，按日期倒序。详细见对应文件。
 
+- [2026-06-20 · Phase send-back canvas 卡反向回 inbox(已交付)](decisions/2026-06-20-send-back.md) — 关闭 review §🟠 UX #2(domain removeFromCanvas + canvas Modal 按钮);tag v0.14.0-send-back
 - [2026-06-20 · Phase batch-confirm archive 批量软删二次确认(已交付)](decisions/2026-06-20-batch-confirm.md) — 关闭 review §🟠 UX #3(floater Soft-delete 弹 Modal + Cancel 保留 selected);tag v0.13.0-batch-confirm
 - [2026-06-20 · Phase archive-detail archive tile 接 detail Modal(已交付)](decisions/2026-06-20-archive-detail.md) — 抽共享 CardDetailModal(inbox+archive 双消费)/actions prop/confirm 内置;关闭 review §🟠 UX #4;tag v0.12.0-archive-detail
 - [2026-06-20 · Phase canvas-refactor useEffect 驱动 canvas-editor(已交付)](decisions/2026-06-20-canvas-refactor.md) — 关闭 review #4 #5(useValue + useEffect bridge,无 dispose 猴补丁,无 listen 无 filter);tag v0.11.0-canvas-refactor

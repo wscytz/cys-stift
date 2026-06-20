@@ -775,3 +775,50 @@
 详见 [`docs/superpowers/plans/2026-06-20-batch-soft-delete-confirm.md`](../superpowers/plans/2026-06-20-batch-soft-delete-confirm.md) + [`docs/memory/decisions/2026-06-20-batch-confirm.md`](../memory/decisions/2026-06-20-batch-confirm.md) + [`docs/design/screenshots/phase-batch-confirm/`](../design/screenshots/phase-batch-confirm/)。
 
 ---
+
+## 2026-06-20 · phase send-back · canvas 卡反向回 inbox(关闭 review §🟠 UX #2)
+
+**交付**:承接 review §🟠 UX 洞 #2(最后剩余 UX 洞):"卡上画布后无'拿回 inbox'反向动作"。① `packages/domain/src/services/card-service.ts` 加 `removeFromCanvas(id)`(清 `canvasPosition`,spec §6.11 的 `listInbox` 自然显示)+ 2 vitest(17 passed);② `apps/web/src/features/canvas/card-detail-modal.tsx` 加 `onSendToInbox?` prop + "Send back to inbox" 按钮(仅当 `card.canvasPosition` 存在);③ `apps/web/src/app/canvas/page.tsx` 调 `service.removeFromCanvas` + `removeCardShape`;④ `scripts/send-back-shots.cjs`(新,7 断言 + 4 截图)。Tag **v0.14.0-send-back**。
+
+**核心承诺验证**:
+
+- canvas 双击已有卡 → Modal 打开,view 模式显示 "Send back to inbox" 按钮 ✓
+- 点击 → Modal 关闭,shape 消失,`canvasPosition` 清空 ✓
+- /inbox 显示该卡(`listInbox` 排除 canvasPosition 卡)✓
+- 7/7 断言 + 0 page error
+- 回归:`canvas-refactor` ✓ / `p4` / `p5` / `p6.5d` 全过
+- domain 17 / db 7 / web build 14 静态页 exit 0
+
+**关键工程决策**:
+
+- **新方法 `removeFromCanvas` 而非复用 `update`**:卡片字段是 lifecycle 字段(archived / deletedAt / canvasPosition),不通过通用 `update` 改,与 `moveToCanvas` / `softDelete` 等对称。
+- **idempotent + boolean return**:`!card.canvasPosition` 时返 false,无副作用;`hardDelete`/`restore` 也是 boolean 一致风格。
+- **不动 inbox 显示逻辑**:`listInbox` 已排除 `canvasPosition` 卡(原 spec §6.11 行为),`removeFromCanvas` 自动让卡重现在 inbox,无需 inbox 端任何代码。
+- **canvas 按钮 conditional render**:`card.canvasPosition && onSendToInbox` — 已是 inbox 卡的画布上不应显示此按钮(虽然 inbox 卡不会到画布,但兜底)。
+- **0 新依赖** + **没碰 spec** + **ui 零改动**(只 canvas 局部组件加 prop)
+
+详见 [`docs/memory/decisions/2026-06-20-send-back.md`](../memory/decisions/2026-06-20-send-back.md) + [`docs/design/screenshots/phase-send-back/`](../design/screenshots/phase-send-back/)。
+
+---
+
+## 2026-06-20 · refactor · canvas dblclick 走 capture registry
+
+**交付**:统一所有 capture 入口。`apps/web/src/features/canvas/canvas-editor.tsx` 的 `DoubleClickBridge` 把直接 `service.create` 改为 `captureSinkRegistry.submit({source: {kind: 'manual', deviceId: 'web'}, title: '', canvasPosition})`,复用 inbox form / menubar / shortcut 同一条路径。复用 'manual' kind(不是新 kind),因为行为上等价(都是 WebCaptureSink → fromCapture → service.create),`canvasPosition` 字段足以区分画布上创建的卡与 inbox-only 手动创建。registry 找不到 manual sink 时 fallback 到 `fallbackService`(CaptureHost 在所有路由都 setFallbackService)—— 卡永不丢。
+
+**核心承诺验证**:
+
+- 双击画布空白 → registry submit → 调 WebCaptureSink(from inbox mount 注册)或 fallback service(直接 /canvas)→ `service.fromCapture` → 卡片创建
+- 已有 `canvas-refactor-shots.cjs` 间接覆盖(7/7 PASS,创建第 2 张卡的断言通过新路径)
+- 回归:`canvas-refactor` ✓ / `send-back` ✓ / `p4` / `p5` / `p6.5d` 全过
+- domain 17 / db 7 / web build 14 静态页 exit 0
+
+**关键工程决策**:
+
+- **复用 'manual' kind**:行为等价(同一 WebCaptureSink 实现),canvasPosition 区分来源;不引入新 kind 增加 registry 复杂度。
+- **fallback 兜底**:CaptureHost 永远在所有路由 setFallbackService,直接 /canvas 不经 /inbox 时也能创建卡。
+- **不动 capture-sink.ts**:registry 接口已设计好 race-safe,canvas 这边只是 consumer。
+- **0 新依赖** + **没碰 spec** + **domain 零改动**
+
+详见 commit `9d7aa24`。
+
+---
