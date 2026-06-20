@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Button, Card as UICard, Modal, Tag, Toolbar } from '@cys-stift/ui'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
+import { useI18n } from '@/lib/i18n'
 import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
 import { Timeline } from '@/features/archive/timeline'
 import { CardDetailModal } from '@/features/card/card-detail'
@@ -12,6 +13,7 @@ import { CardDetailModal } from '@/features/card/card-detail'
 type View = 'grid' | 'timeline'
 
 export default function ArchivePage() {
+  const { t } = useI18n()
   const { snap, service, ready } = useDb()
   void snap // subscribe
   const [view, setView] = useState<View>('grid')
@@ -97,27 +99,27 @@ export default function ArchivePage() {
       <Toolbar region="archive">
         <span className="crumb">cy&rsquo;s stift</span>
         <span className="crumb-sep">/</span>
-        <span className="crumb crumb--here">archive</span>
+        <span className="crumb crumb--here">{t('archive.crumb')}</span>
         <span className="crumb-spacer" />
         <button
           type="button"
           className={`tab ${view === 'grid' ? 'tab--active' : ''}`}
           onClick={() => setView('grid')}
         >
-          grid
+          {t('archive.viewGrid')}
         </button>
         <button
           type="button"
           className={`tab ${view === 'timeline' ? 'tab--active' : ''}`}
           onClick={() => setView('timeline')}
         >
-          timeline
+          {t('archive.viewTimeline')}
         </button>
         <Tag color="blue">{cards.length}</Tag>
         <span className="tab-sep" />
         {selectMode ? (
           <Button variant="ghost" onClick={exitSelectMode}>
-            Done
+            {t('archive.selectNone')}
           </Button>
         ) : (
           <Button variant="ghost" onClick={() => setSelectMode(true)} disabled={cards.length === 0}>
@@ -249,16 +251,13 @@ export default function ArchivePage() {
 }
 
 function EmptyState() {
+  const { t } = useI18n()
   return (
     <UICard>
       <div className="empty">
         <div className="empty__bar" aria-hidden="true" />
-        <p className="empty__eyebrow">archive</p>
-        <h2 className="empty__h">No archived cards.</h2>
-        <p className="empty__lede">
-          Cards you archive from the inbox will show up here. Unarchive to
-          bring them back, or use multi-select to soft-delete in batch.
-        </p>
+        <p className="empty__eyebrow">{t('archive.crumb')}</p>
+        <h2 className="empty__h">{t('archive.empty')}</h2>
       </div>
     </UICard>
   )
