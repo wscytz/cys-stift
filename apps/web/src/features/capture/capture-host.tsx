@@ -86,6 +86,38 @@ export function CaptureHost() {
     }
   }, [open, sc.shift, sc.code])
 
+  // Phase C (v0.25.0): listen for the Tauri global-shortcut event so the
+  // Mini Input opens even when the window is unfocused/minimised. No-op in
+  // a plain browser (window.__TAURI__ is undefined). We use the global API
+  // (withGlobalTauri) instead of importing @tauri-apps/api so the web
+  // bundle stays free of a Tauri runtime dependency.
+  useEffect(() => {
+    type TauriEventAPI = {
+      listen: (
+        event: string,
+        handler: (e: unknown) => void,
+      ) => Promise<() => void>
+    }
+    type TauriGlobal = { event?: TauriEventAPI }
+    const tauri = (window as unknown as { __TAURI__?: TauriGlobal }).__TAURI__
+    if (!tauri?.event?.listen) return
+    let unlisten: (() => void) | undefined
+    tauri.event
+      .listen('global-capture-open', () => {
+        setOpenKind('shortcut')
+        setOpen(true)
+      })
+      .then((fn) => {
+        unlisten = fn
+      })
+      .catch(() => {
+        /* Tauri event listen failed — ignore outside the desktop shell */
+      })
+    return () => {
+      unlisten?.()
+    }
+  }, [])
+
   // Register the web sink on mount. Other sinks (Phase 6.5g MenuCaptureSink,
   // Phase 8 TauriCaptureSink) can also register against the same registry.
   // The `cancelled` flag guards both dynamic imports: if the host unmounts

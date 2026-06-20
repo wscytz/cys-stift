@@ -1,9 +1,10 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capabilities — Phase 0 has no commands exposed; window only.",
+  "description": "Default capabilities. Phase C (v0.25.0) adds global-shortcut for the capture hotkey.",
   "windows": ["main"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "global-shortcut:default"
   ]
 }
