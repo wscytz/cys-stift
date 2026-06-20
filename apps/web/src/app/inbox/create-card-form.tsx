@@ -231,6 +231,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
         <Button type="submit" disabled={!canSubmit}>
           {pending ? t('card.detail.saving') : t('inbox.create.submit')}
         </Button>
+        <span className="ccf__actions-spacer" />
         <Button type="button" variant="ghost" onClick={reset}>
           Clear
         </Button>
@@ -301,5 +302,6 @@ const styles = `
   cursor: pointer;
 }
 .ccf__toggle:hover { background: var(--color-red-soft); }
-.ccf__actions { display: flex; gap: var(--space-2); }
+.ccf__actions { display: flex; gap: var(--space-2); align-items: center; }
+.ccf__actions-spacer { flex: 1; }
 `

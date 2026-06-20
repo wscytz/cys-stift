@@ -524,8 +524,8 @@ const styles = `
    grid lines arrive with tldraw's snap mode (SnapManager). */
 .tl-background {
   background-color: var(--color-white) !important;
-  background-image: radial-gradient(var(--color-gray) 0.8px, transparent 0.8px) !important;
-  background-size: 8px 8px !important;
+  background-image: radial-gradient(var(--color-gray-soft) 0.8px, transparent 0.8px) !important;
+  background-size: 32px 32px !important;
   background-position: 0 0 !important;
 }
 
