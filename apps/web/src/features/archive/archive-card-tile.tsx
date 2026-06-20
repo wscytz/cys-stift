@@ -4,6 +4,7 @@ import { Tag } from '@cys-stift/ui'
 import type { Card } from '@cys-stift/domain'
 import { useI18n } from '@/lib/i18n'
 import { typeKeyOf } from '@/lib/type-label'
+import type { MessageKey } from '@/lib/i18n/messages'
 
 interface ArchiveCardTileProps {
   card: Card
@@ -12,6 +13,14 @@ interface ArchiveCardTileProps {
   selectMode: boolean
   onClick: () => void
   onToggleSelect: () => void
+  /**
+   * L3 (v0.23.3): when true the tile renders as a non-interactive
+   * container instead of a <button>. Used by /trash where tiles are
+   * display-only (restore/delete happen via sibling actions). Before
+   * this, the tile was a <button> with an empty onClick — keyboard
+   * users could Tab to it and press Enter with nothing happening.
+   */
+  disabled?: boolean
 }
 
 /**
@@ -28,16 +37,40 @@ export function ArchiveCardTile({
   selectMode,
   onClick,
   onToggleSelect,
+  disabled = false,
 }: ArchiveCardTileProps) {
   const { t } = useI18n()
   const preview = card.body.slice(0, 120)
   const totalMedia = card.links.length + card.codeSnippets.length + card.quotes.length
+  const titleText = card.title || t('card.untitled')
   const cls = [
     variant === 'tile' ? 'tile' : 'row',
     selected ? 'tile--selected' : '',
+    disabled ? 'tile--disabled' : '',
   ]
     .filter(Boolean)
     .join(' ')
+
+  const inner = (
+    <>
+      <div className="tile__bar" aria-hidden="true" />
+      <div className="tile__body">
+        <h3 className={variant === 'tile' ? 'tile__title' : 'row__title'}>
+          {titleText}
+        </h3>
+        {variant === 'tile' && preview && (
+          <p className="tile__preview">{preview}</p>
+        )}
+        <div className="tile__meta">
+          <Tag color="blue">{t(typeKeyOf(card.type) as MessageKey)}</Tag>
+          {totalMedia > 0 && <Tag color="red">{totalMedia} media</Tag>}
+          <span className="tile__time">
+            {card.updatedAt.toISOString().slice(0, 10)}
+          </span>
+        </div>
+      </div>
+    </>
+  )
 
   return (
     <div className={cls}>
@@ -47,33 +80,24 @@ export function ArchiveCardTile({
             type="checkbox"
             checked={selected}
             onChange={onToggleSelect}
-            aria-label={`Select card ${card.title || '(untitled)'}`}
+            aria-label={titleText}
           />
         </label>
       )}
-      <button
-        type="button"
-        className="tile__main"
-        onClick={onClick}
-        aria-label={`Open card ${card.title || '(untitled)'}`}
-      >
-        <div className="tile__bar" aria-hidden="true" />
-        <div className="tile__body">
-          <h3 className={variant === 'tile' ? 'tile__title' : 'row__title'}>
-            {card.title || '(untitled)'}
-          </h3>
-          {variant === 'tile' && preview && (
-            <p className="tile__preview">{preview}</p>
-          )}
-          <div className="tile__meta">
-            <Tag color="blue">{t(typeKeyOf(card.type))}</Tag>
-            {totalMedia > 0 && <Tag color="red">{totalMedia} media</Tag>}
-            <span className="tile__time">
-              {card.updatedAt.toISOString().slice(0, 10)}
-            </span>
-          </div>
+      {disabled ? (
+        <div className="tile__main" aria-disabled="true" role="img" aria-label={titleText}>
+          {inner}
         </div>
-      </button>
+      ) : (
+        <button
+          type="button"
+          className="tile__main"
+          onClick={onClick}
+          aria-label={titleText}
+        >
+          {inner}
+        </button>
+      )}
       <style>{styles}</style>
     </div>
   )
@@ -96,6 +120,8 @@ const styles = `
 }
 .tile { min-height: 160px; }
 .tile--selected { border-color: var(--color-blue); border-width: 2px; }
+.tile--disabled { cursor: default; }
+.tile--disabled:hover { box-shadow: var(--shadow-sm); }
 .tile:hover, .row:hover { box-shadow: var(--shadow-md); }
 .tile:active, .row:active { transform: translate(2px, 2px); box-shadow: none; }
 

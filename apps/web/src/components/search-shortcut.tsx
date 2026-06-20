@@ -17,11 +17,19 @@ export function SearchShortcut() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
-        e.preventDefault()
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        router.push('/search')
+      if (!(e.metaKey || e.ctrlKey) || e.key !== '/') return
+      // L2 (v0.23.3): don't hijack the shortcut when the user is typing
+      // '/' inside an input/textarea/contenteditable (e.g. a search
+      // query, a card body, the mini-input title). Tag-name check is
+      // locale-stable and cheap.
+      const target = e.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) {
+        return
       }
+      e.preventDefault()
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      router.push('/search')
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

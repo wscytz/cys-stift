@@ -149,7 +149,8 @@ function TrashItem({ card, onRestore, onRequestHardDelete }: TrashItemProps) {
         variant="tile"
         selected={false}
         selectMode={false}
-        onClick={() => {}} // Trash items are not editable from /trash — restore first.
+        disabled // L3: trash tiles are display-only; restore/delete via sibling buttons
+        onClick={() => {}}
         onToggleSelect={() => {}}
       />
       <div className="trash-item__actions">

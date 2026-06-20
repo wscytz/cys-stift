@@ -82,12 +82,20 @@ export const mediaStore = {
    */
   async attach(file: File): Promise<MediaRef> {
     if (file.size > SOFT_LIMIT_BYTES) {
-      // Soft warning — MVP allows it but user should know it's a placeholder.
-      console.warn(
-        `[mediaStore] ${file.name} is ${(file.size / 1024).toFixed(0)} KB; ` +
-          `> ${SOFT_LIMIT_BYTES / 1024} KB recommended. ` +
-          `OPFS / Tauri fs lands in Phase 2.5 / 8.`,
-      )
+      // L5 (v0.23.3): dedupe the soft-size warning per file identity so
+      // re-attaching the same large file (or attaching many copies of it)
+      // doesn't flood the console. Keyed on name+size+mtime which uniquely
+      // identifies a File within a session.
+      const dedupeKey = `${file.name}:${file.size}:${file.lastModified}`
+      if (!_warnedOversized.has(dedupeKey)) {
+        _warnedOversized.add(dedupeKey)
+        // Soft warning — MVP allows it but user should know it's a placeholder.
+        console.warn(
+          `[mediaStore] ${file.name} is ${(file.size / 1024).toFixed(0)} KB; ` +
+            `> ${SOFT_LIMIT_BYTES / 1024} KB recommended. ` +
+            `OPFS / Tauri fs lands in Phase 2.5 / 8.`,
+        )
+      }
     }
     const dataUrl = await readAsDataURL(file)
     const id = makeId()
@@ -115,10 +123,16 @@ export const mediaStore = {
   },
 
   remove(id: MediaAssetId): void {
-    const all = loadAssets()
-    if (!all[id]) return
-    delete all[id]
-    saveAssets(all)
+    // L1 (v0.23.3): route through the same enqueueWrite queue as attach()
+    // so a concurrent attach + remove can't interleave (remove loading
+    // the old map before attach's write lands → attach's asset vanishes).
+    // API stays synchronous void for callers; the write itself is queued.
+    void enqueueWrite(() => {
+      const all = loadAssets()
+      if (!all[id]) return
+      delete all[id]
+      saveAssets(all)
+    })
   },
   /** v0.23.2-hardening: enqueued variant of remove() — same atomic
    * guarantee as attach() so a concurrent attach + remove can't lose
@@ -149,6 +163,9 @@ function enqueueWrite<T>(fn: () => T): Promise<T> {
   _writeQueue = next.catch(() => undefined)
   return next
 }
+
+// L5 (v0.23.3): dedupe soft-size warnings per file identity.
+const _warnedOversized = new Set<string>()
 
 /** SHA-1 content hash of a string (v0.22.6-refactor C).
  * Uses the Web Crypto API; returns hex string. Falls back to

@@ -5,6 +5,12 @@ import { settingsStore, useSettings } from '@/lib/settings-store'
 import type { MessageKey, Locale } from './messages'
 import { messages } from './messages'
 
+// L4 (v0.23.3): dedupe dev-mode missing-key warnings. Without this, a
+// single typo'd t() call warns on every re-render (a page with the bug
+// re-renders dozens of times in dev). We record each `${locale}:${key}`
+// pair once and stay silent after.
+const _warnedKeys = new Set<string>()
+
 interface I18nCtx {
   locale: Locale
   t: (key: MessageKey, params?: Record<string, string | number | null | undefined>) => string
@@ -70,8 +76,12 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
         // key) hid typos from review. Warn once per missing key so the
         // dev console highlights the issue without spamming prod.
         if (process.env.NODE_ENV !== 'production') {
-          // eslint-disable-next-line no-console
-          console.warn(`[i18n] missing key: ${String(key)} (locale: ${locale})`)
+          const dedupeKey = `${locale}:${String(key)}`
+          if (!_warnedKeys.has(dedupeKey)) {
+            _warnedKeys.add(dedupeKey)
+            // eslint-disable-next-line no-console
+            console.warn(`[i18n] missing key: ${String(key)} (locale: ${locale})`)
+          }
         }
         return String(key)
       }
