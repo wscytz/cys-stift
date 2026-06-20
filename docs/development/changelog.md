@@ -961,3 +961,15 @@ UX walkthrough 修复 5 个真 bug(plan 完成后 puppeteer-driven deep walkthro
 详见 [`docs/memory/decisions/2026-06-20-ui-polish.md`](../memory/decisions/2026-06-20-ui-polish.md) 后续 §v0.22.0-ux-polish。
 
 ---
+
+## 2026-06-20 · v0.22.1-ux-polish-2
+
+闭合 v0.22.0 deep walkthrough 留的 3 个 deferred UX bug(原 BUG 14/15 经勘察确认不成立,跳过)。
+
+- **fix(ui)**: `Button variant="danger"` 改为 red-outline(白底 + 红字 + 2px 红边框 + red-soft hover)→ 7 处同步生效,与 Capture 红填充视觉权重区分
+- **fix(inbox)**: archived tab 空文案改为"Nothing archived yet." + 完整操作引导(指明入口 + 解释归档 vs 软删除)
+- **feat(web)**: SVG favicon(`apps/web/src/app/icon.svg`),Next.js App Router 自动发现 + 注入 `<link rel="icon">` → 消掉 favicon.ico 404
+
+详见 [`docs/memory/decisions/2026-06-20-ux-polish-2.md`](../memory/decisions/2026-06-20-ux-polish-2.md)。
+
+---
