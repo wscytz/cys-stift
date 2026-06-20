@@ -1,40 +1,16 @@
 'use client'
 
-import { useState, useEffect, useTransition, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Button, Card as UICard, Input, Modal, Tag, Toolbar } from '@cys-stift/ui'
-import type {
-  Card,
-  CardId,
-  CodeBlock,
-  LinkPreview,
-  MediaRef,
-  Quote,
-} from '@cys-stift/domain'
+import { Button, Card as UICard, Tag, Toolbar } from '@cys-stift/ui'
+import type { Card } from '@cys-stift/domain'
 import { CreateCardForm } from './create-card-form'
-import { MarkdownBody } from './markdown'
-import {
-  CodeEditor,
-  ListEditor,
-  QuoteEditor,
-  editorStyles,
-  type DraftCode,
-  type DraftLink,
-  type DraftQuote,
-  draftCodesToPayload,
-  draftLinksToPayload,
-  draftQuotesToPayload,
-} from '@/features/card/editors'
+import { CardDetailModal } from '@/features/card/card-detail'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import { captureSinkRegistry } from '@/features/capture/capture-sink'
-import { mediaStore } from '@/lib/media-store'
+import { useDb } from '@/lib/db-client'
 
 type View = 'inbox' | 'archived'
-
-interface DetailState {
-  card: Card
-  mode: 'view' | 'edit'
-}
 
 const DEVICE_ID = 'web'
 
@@ -42,8 +18,9 @@ export default function InboxPage() {
   const { snap, service, ready } = useDb()
   void snap // subscribe to the snapshot so the component re-renders on changes
   const [view, setView] = useState<View>('inbox')
-  const [detail, setDetail] = useState<DetailState | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState<CardId | null>(null)
+  // Phase archive-detail: detail state simplified — modal owns view/edit
+  // toggle now (was DetailState { card, mode } + page-level confirm).
+  const [detail, setDetail] = useState<Card | null>(null)
 
   // Register the manual sink so CreateCardForm onCreate goes through
   // captureSinkRegistry → consistent with shortcut + menubar paths.
@@ -122,7 +99,7 @@ export default function InboxPage() {
           <ul className="grid">
             {visible.map((card) => (
               <li key={card.id}>
-                <CardTile card={card} onOpen={() => setDetail({ card, mode: 'view' })} />
+                <CardTile card={card} onOpen={() => setDetail(card)} />
               </li>
             ))}
           </ul>
@@ -138,20 +115,20 @@ export default function InboxPage() {
       </div>
 
       {detail && (
-        <CardDetail
-          state={detail}
+        <CardDetailModal
+          card={detail}
+          actions={['archive', 'unarchive', 'sendToCanvas', 'softDelete']}
           onClose={() => setDetail(null)}
           onSave={(patch) => {
-            const updated = service.update(detail.card.id, patch)
-            if (updated) setDetail({ card: updated, mode: 'view' })
+            const updated = service.update(detail.id, patch)
+            if (updated) setDetail(updated)
           }}
-          onSwitchMode={(mode) => setDetail({ ...detail, mode })}
           onArchive={() => {
-            service.archive(detail.card.id)
+            service.archive(detail.id)
             setDetail(null)
           }}
           onUnarchive={() => {
-            service.unarchive(detail.card.id)
+            service.unarchive(detail.id)
             setDetail(null)
           }}
           onSendToCanvas={() => {
@@ -159,7 +136,7 @@ export default function InboxPage() {
             const nextZ = existing.length === 0
               ? 0
               : Math.max(...existing.map((c) => c.canvasPosition?.z ?? 0)) + 1
-            service.moveToCanvas(detail.card.id, {
+            service.moveToCanvas(detail.id, {
               canvasId: DEFAULT_CANVAS_ID,
               x: 100 + (nextZ % 5) * 40,
               y: 100 + (nextZ % 5) * 40,
@@ -167,49 +144,20 @@ export default function InboxPage() {
               h: 80,
               z: nextZ,
             })
-            const updated = service.get(detail.card.id)
-            if (updated) setDetail({ card: updated, mode: 'view' })
+            const updated = service.get(detail.id)
+            if (updated) setDetail(updated)
           }}
-          onRequestDelete={() => setConfirmDelete(detail.card.id)}
+          onConfirmDelete={() => {
+            service.softDelete(detail.id)
+            setDetail(null)
+          }}
         />
       )}
-
-      <Modal
-        open={confirmDelete !== null}
-        onClose={() => setConfirmDelete(null)}
-        title="Soft-delete this card?"
-      >
-        <p className="confirm__body">
-          The card is hidden and marked as deleted. You can{' '}
-          <Link href="/trash" className="confirm__link">
-            restore it from Trash
-          </Link>{' '}
-          later.
-        </p>
-        <div className="confirm__actions">
-          <Button variant="ghost" onClick={() => setConfirmDelete(null)}>
-            Cancel
-          </Button>
-          <Button
-            variant="danger"
-            onClick={() => {
-              if (confirmDelete) service.softDelete(confirmDelete)
-              setConfirmDelete(null)
-              setDetail(null)
-            }}
-          >
-            Soft-delete
-          </Button>
-        </div>
-      </Modal>
 
       <style>{styles}</style>
     </main>
   )
 }
-
-// ── Hook (kept local to avoid coupling) ────────────────────────────────────
-import { useDb } from '@/lib/db-client'
 
 // ── Subcomponents ──────────────────────────────────────────────────────────
 
@@ -251,328 +199,6 @@ function EmptyState({ view }: { view: View }) {
         </p>
       </div>
     </UICard>
-  )
-}
-
-interface CardDetailProps {
-  state: DetailState
-  onClose: () => void
-  onSave: (patch: {
-    title: string
-    body: string
-    media: MediaRef[]
-    links: LinkPreview[]
-    codeSnippets: CodeBlock[]
-    quotes: Quote[]
-  }) => void
-  onSwitchMode: (mode: 'view' | 'edit') => void
-  onArchive: () => void
-  onUnarchive: () => void
-  onSendToCanvas: () => void
-  onRequestDelete: () => void
-}
-
-function CardDetail({
-  state,
-  onClose,
-  onSave,
-  onSwitchMode,
-  onArchive,
-  onUnarchive,
-  onSendToCanvas,
-  onRequestDelete,
-}: CardDetailProps) {
-  const { card, mode } = state
-  const [title, setTitle] = useState(card.title)
-  const [body, setBody] = useState(card.body)
-  const [media, setMedia] = useState<MediaRef[]>(card.media)
-  const [links, setLinks] = useState<DraftLink[]>(() =>
-    card.links.map((l) => ({ url: l.url })),
-  )
-  const [codes, setCodes] = useState<DraftCode[]>(() =>
-    card.codeSnippets.map((c) => ({ language: c.language, code: c.code })),
-  )
-  const [quotes, setQuotes] = useState<DraftQuote[]>(() =>
-    card.quotes.map((q) => ({ text: q.text, attribution: q.attribution ?? '' })),
-  )
-  const [pending, startTransition] = useTransition()
-  const dialogRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    setTitle(card.title)
-    setBody(card.body)
-    setMedia(card.media)
-    setLinks(card.links.map((l) => ({ url: l.url })))
-    setCodes(card.codeSnippets.map((c) => ({ language: c.language, code: c.code })))
-    setQuotes(card.quotes.map((q) => ({ text: q.text, attribution: q.attribution ?? '' })))
-  }, [card.id, card.title, card.body, card.media, card.links, card.codeSnippets, card.quotes])
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  // Focus the title input on entering edit mode
-  useEffect(() => {
-    if (mode === 'edit') {
-      const el = dialogRef.current?.querySelector<HTMLInputElement>(
-        'input[name="edit-title"]',
-      )
-      el?.focus()
-      el?.select()
-    }
-  }, [mode])
-
-  const handleSave = () => {
-    if (!title.trim()) return
-    startTransition(() => {
-      onSave({
-        title: title.trim(),
-        body,
-        media: media,
-        links: draftLinksToPayload(links),
-        codeSnippets: draftCodesToPayload(codes),
-        quotes: draftQuotesToPayload(quotes),
-      })
-    })
-  }
-
-  const handleFiles = async (files: FileList | null) => {
-    if (!files) return
-    for (const file of Array.from(files)) {
-      try {
-        const ref = await mediaStore.attach(file)
-        setMedia((prev) => [...prev, ref])
-      } catch (err) {
-        console.error('[CardDetail] attach failed', err)
-      }
-    }
-  }
-
-  return (
-    <Modal open onClose={onClose} title={mode === 'edit' ? 'Edit card' : card.title || '(untitled)'}>
-      <div className="detail" ref={dialogRef}>
-        {mode === 'view' ? (
-          <>
-            <div className="detail__meta">
-              <Tag color="red">{card.type}</Tag>
-              <span className="detail__time">
-                {card.capturedAt.toISOString().slice(0, 19).replace('T', ' ')}
-              </span>
-            </div>
-            <MarkdownBody source={card.body} />
-            {card.media.length > 0 && (
-              <DetailSection label="Media">
-                <ul className="media-list">
-                  {card.media.map((m, i) => {
-                    const asset = mediaStore.getAsset(m.assetId)
-                    if (!asset) return null
-                    if (asset.kind === 'image') {
-                      return (
-                        <li key={String(m.assetId)} className="media-list__item">
-                          <img
-                            src={asset.dataUrl}
-                            alt={asset.id}
-                            className="media-list__img"
-                          />
-                        </li>
-                      )
-                    }
-                    return (
-                      <li key={String(m.assetId)} className="media-list__item">
-                        <a
-                          href={asset.dataUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {asset.mimeType} ({(asset.byteSize / 1024).toFixed(1)} KB)
-                        </a>
-                      </li>
-                    )
-                  })}
-                </ul>
-              </DetailSection>
-            )}
-            {card.links.length > 0 && (
-              <DetailSection label="Links">
-                <ul className="link-list">
-                  {card.links.map((l, i) => (
-                    <li key={i}>
-                      <a
-                        href={l.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {l.url}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </DetailSection>
-            )}
-            {card.codeSnippets.length > 0 && (
-              <DetailSection label="Code">
-                {card.codeSnippets.map((c, i) => (
-                  <div key={i} className="code-block">
-                    <div className="code-block__lang">{c.language}</div>
-                    <pre className="code-block__pre">
-                      <code>{c.code}</code>
-                    </pre>
-                  </div>
-                ))}
-              </DetailSection>
-            )}
-            {card.quotes.length > 0 && (
-              <DetailSection label="Quotes">
-                {card.quotes.map((q, i) => (
-                  <blockquote key={i} className="detail__quote">
-                    <p>{q.text}</p>
-                    {q.attribution && (
-                      <cite className="detail__cite">— {q.attribution}</cite>
-                    )}
-                  </blockquote>
-                ))}
-              </DetailSection>
-            )}
-          </>
-        ) : (
-          <>
-            <Input
-              name="edit-title"
-              label="Title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              maxLength={200}
-            />
-            <label className="detail__field">
-              <span className="detail__label">Body (Markdown)</span>
-              <textarea
-                className="detail__textarea"
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                rows={6}
-              />
-            </label>
-            <div className="detail__field">
-              <span className="detail__label">Media (images / files)</span>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => {
-                  void handleFiles(e.target.files)
-                  e.target.value = ''
-                }}
-                className="detail__file"
-              />
-              {media.length > 0 && (
-                <ul className="media-list media-list--edit">
-                  {media.map((m) => {
-                    const asset = mediaStore.getAsset(m.assetId)
-                    if (!asset) return null
-                    return (
-                      <li
-                        key={String(m.assetId)}
-                        className="media-list__item media-list__item--edit"
-                      >
-                        {asset.kind === 'image' && (
-                          <img
-                            src={asset.dataUrl}
-                            alt={asset.id}
-                            className="media-list__img media-list__img--thumb"
-                          />
-                        )}
-                        <button
-                          type="button"
-                          className="le__remove"
-                          onClick={() => {
-                            mediaStore.remove(m.assetId)
-                            setMedia((prev) =>
-                              prev.filter((x) => x.assetId !== m.assetId),
-                            )
-                          }}
-                          aria-label="Remove media"
-                        >
-                          ×
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </div>
-            <ListEditor
-              items={links}
-              onChange={setLinks}
-              make={() => ({ url: '' })}
-              label="Link"
-              placeholder="https://…"
-              fieldKey="url"
-            />
-            <CodeEditor items={codes} onChange={setCodes} />
-            <QuoteEditor items={quotes} onChange={setQuotes} />
-          </>
-        )}
-
-        <div className="detail__actions">
-          {mode === 'view' ? (
-            <>
-              <Button onClick={() => onSwitchMode('edit')}>Edit</Button>
-              {card.archived ? (
-                <Button variant="secondary" onClick={onUnarchive}>
-                  Unarchive
-                </Button>
-              ) : (
-                <Button variant="secondary" onClick={onArchive}>
-                  Archive
-                </Button>
-              )}
-              {card.canvasPosition ? (
-                <Button variant="secondary" disabled>
-                  <Tag color="blue">on canvas</Tag>
-                </Button>
-              ) : (
-                <Button variant="primary" onClick={onSendToCanvas}>
-                  Send to canvas
-                </Button>
-              )}
-              <span className="detail__spacer" />
-              <Button variant="danger" onClick={onRequestDelete}>
-                Soft-delete
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button onClick={handleSave} disabled={pending || !title.trim()}>
-                {pending ? 'Saving…' : 'Save'}
-              </Button>
-              <Button variant="ghost" onClick={() => onSwitchMode('view')}>
-                Cancel
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-      <style>{editorStyles}</style>
-    </Modal>
-  )
-}
-
-function DetailSection({
-  label,
-  children,
-}: {
-  label: string
-  children: React.ReactNode
-}) {
-  return (
-    <section className="dsec">
-      <h3 className="dsec__h">{label}</h3>
-      <div className="dsec__body">{children}</div>
-    </section>
   )
 }
 
@@ -719,8 +345,4 @@ const styles = `
   overflow-x: auto;
   line-height: 1.5;
 }
-
-.confirm__body { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
-.confirm__link { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; }
-.confirm__actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-2); }
 `

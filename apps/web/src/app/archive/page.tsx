@@ -3,10 +3,11 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Button, Card as UICard, Tag, Toolbar } from '@cys-stift/ui'
-import type { CardId } from '@cys-stift/domain'
+import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
 import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
 import { Timeline } from '@/features/archive/timeline'
+import { CardDetailModal } from '@/features/card/card-detail'
 
 type View = 'grid' | 'timeline'
 
@@ -16,6 +17,10 @@ export default function ArchivePage() {
   const [view, setView] = useState<View>('grid')
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Set<CardId>>(() => new Set())
+  // Detail modal — Phase archive-detail closes review §🟠 UX #4 (tile
+  // click was no-op). Single source of truth lives in `cards` below; we
+  // keep a local `detail` ref so editing reflects immediately.
+  const [detail, setDetail] = useState<{ card: Card } | null>(null)
 
   // Archived & not soft-deleted, sorted by updatedAt desc.
   const cards = useMemo(
@@ -57,6 +62,11 @@ export default function ArchivePage() {
   const exitSelectMode = () => {
     setSelectMode(false)
     clearSelected()
+  }
+
+  const openDetail = (id: CardId) => {
+    const c = cards.find((x) => x.id === id)
+    if (c) setDetail({ card: c })
   }
 
   return (
@@ -105,11 +115,7 @@ export default function ArchivePage() {
                   variant="tile"
                   selected={selected.has(card.id)}
                   selectMode={selectMode}
-                  onClick={() => {
-                    // Phase 7 Lean: no detail modal in archive; opening
-                    // is intentionally not wired (avoid touching Phase 3).
-                    // Users can unarchive then edit in /inbox.
-                  }}
+                  onClick={() => openDetail(card.id)}
                   onToggleSelect={() => toggleSelect(card.id)}
                 />
               </li>
@@ -120,7 +126,7 @@ export default function ArchivePage() {
             cards={cards}
             selected={selected}
             selectMode={selectMode}
-            onOpen={() => {}}
+            onOpen={openDetail}
             onToggleSelect={toggleSelect}
           />
         )}
@@ -148,6 +154,26 @@ export default function ArchivePage() {
             Clear
           </Button>
         </div>
+      )}
+
+      {detail && (
+        <CardDetailModal
+          card={detail.card}
+          actions={['unarchive', 'softDelete']}
+          onClose={() => setDetail(null)}
+          onSave={(patch) => {
+            const updated = service.update(detail.card.id, patch)
+            if (updated) setDetail({ card: updated })
+          }}
+          onUnarchive={() => {
+            service.unarchive(detail.card.id)
+            setDetail(null)
+          }}
+          onConfirmDelete={() => {
+            service.softDelete(detail.card.id)
+            setDetail(null)
+          }}
+        />
       )}
 
       <style>{styles}</style>

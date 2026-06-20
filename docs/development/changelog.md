@@ -695,3 +695,45 @@
 详见 [`docs/superpowers/plans/2026-06-20-canvas-editor-refactor.md`](../superpowers/plans/2026-06-20-canvas-editor-refactor.md) + [`docs/memory/decisions/2026-06-20-canvas-refactor.md`](../memory/decisions/2026-06-20-canvas-refactor.md) + [`docs/design/screenshots/phase-canvas-refactor/`](../design/screenshots/phase-canvas-refactor/)。
 
 ---
+
+## 2026-06-20 · phase archive-detail · archive tile 接 detail Modal(关闭 review §🟠 UX #4)
+
+**交付**:承接 review §🟠 UX 洞 #4:"archive tile 点击 no-op"。① `apps/web/src/features/card/card-detail.tsx`(新,~360 行共享组件,基于 inbox 完整版,内置 soft-delete confirm modal);② `apps/web/src/app/archive/page.tsx` 接 Modal(grid + Timeline 两路 `openDetail(id)` → Modal),actions `['unarchive','softDelete']`;③ `apps/web/src/app/inbox/page.tsx` 删本地 CardDetail(~320 行)+ DetailState + page-level confirm Modal,改用共享 `CardDetailModal`(actions `['archive','unarchive','sendToCanvas','softDelete']`,共享组件按 `card.archived` 字段决定渲染哪个切换按钮);④ `scripts/archive-detail-shots.cjs`(新)+ `p6.5b`/`trash` 脚本更新 selector(`cd__*` 新 class)。Tag **v0.12.0-archive-detail**。
+
+**核心承诺验证**:
+
+- archive grid 点 tile → CardDetailModal view 打开(cd__meta / cd__actions / Links + Code + Quotes sections 全在)✓
+- Edit 模式 3 个 editor 面板(links / code / quotes)✓
+- 改 title → Save → localStorage 持久化 `Renamed archive card` ✓
+- Save 后自动回 view 模式;Escape 关 Modal ✓
+- Timeline 视图点行 → Modal 打开,标题显示新值 ✓
+- Modal 内 Soft-delete → 内置 confirm Modal(`cd__confirm` + `cd__confirm-actions`)→ 确认 → deletedAt 设置 ✓
+- /archive 空 + /trash 有 1 ✓
+- 回归:`p7` ✓(archive 多选批量)/ `p6.5b` ✓(inbox 详情编辑)/ `trash` ✓(trash 视图软删恢复)全过
+- domain 15 / db 7 全绿;web build exit 0,**14 静态页**
+- **/inbox 体积 8.44 → 5.08 kB(-3.4 kB 共享组件提取收益)**;/archive 3.15 → 3.27 kB(共享 Modal 引入)
+- 零 page error
+
+**关键工程决策**:
+
+- **共享组件放 `features/card/`**(与 P6.5b 抽的 `editors.tsx` 同层),不放 `inbox/`(那是 inbox 私有)
+- **共享组件内置 soft-delete confirm Modal**(取代 inbox 原本 page-level confirm + inbox 的 `confirmDelete` state 全删):consumer 传 `onConfirmDelete` 即可,内聚更好;inbox page 净减 ~50 行
+- **`actions` prop 控制可执行动作集合**:archive 上下文 `['unarchive','softDelete']`(归档卡不能再 archive);inbox 上下文全 4 个 + 共享组件按 `card.archived` 自路由 Archive/Unarchive 按钮
+- **`sendToCanvas` 仅当卡无 `canvasPosition` 才显示**:匹配 inbox 原 P6.5c 行为;archive 不传 `onSendToCanvas`(actions 不含)所以 archive 不显示
+- **`cd__*` class 命名空间**(从 inbox 原 `detail__*` / `media-list` / `link-list` / `code-block` 收敛):组件独立,被多 consumer 共用不污染 inbox page 的样式
+- **canvas 的 `CardDetailModal` 不动**:Phase 4 的简化版(title + body only),已能用;触碰 tagged Phase 4 风险
+- **0 新依赖** + **没碰 spec** + **domain/db 零改动** + **archive/onclick no-op 注释删除**
+
+**已知 / 后续**:
+
+- 批量 soft-delete 二次确认(review §🟠 UX #3 — YAGNI,误删可 trash 恢复)
+- send-to-canvas 反向动作(卡上画布后无"拿回 inbox"按钮)
+- archive 内筛选 / 搜索(YAGNI)
+- archive tile 长按多选(touch UX,YAGNI)
+- canvas `CardDetailModal` 升级到共享组件(留后,功能等价但需要回归测)
+- inbox page 内的 dead styles 清理(`.link-list` / `.code-block` / `.media-list` 等现在无 JSX 引用 — 留后,YAGNI)
+- Phase 8 Tauri build + 签名公证(需 Apple 证书)
+
+详见 [`docs/superpowers/plans/2026-06-20-archive-detail.md`](../superpowers/plans/2026-06-20-archive-detail.md) + [`docs/memory/decisions/2026-06-20-archive-detail.md`](../memory/decisions/2026-06-20-archive-detail.md) + [`docs/design/screenshots/phase-archive-detail/`](../design/screenshots/phase-archive-detail/)。
+
+---

@@ -87,11 +87,14 @@ async function seedCards(page, cards) {
   await page.click('.tile')
   await wait(400)
   // 验证 Phase 3 view 已渲染 links / code / quotes(草稿级断言)
-  const detailLinks = await page.$$eval('.link-list a', (els) => els.map((a) => a.href))
-  const codeBlocks = await page.$$eval('.code-block__lang', (els) =>
+  // Phase archive-detail: shared CardDetailModal uses `cd__*` class
+  // namespace (was `link-list` / `code-block` / `detail__quote` in the
+  // pre-extraction inbox local CardDetail).
+  const detailLinks = await page.$$eval('.cd__links a', (els) => els.map((a) => a.href))
+  const codeBlocks = await page.$$eval('.cd__code-lang', (els) =>
     els.map((e) => e.textContent),
   )
-  const quoteTexts = await page.$$eval('.detail__quote p', (els) =>
+  const quoteTexts = await page.$$eval('.cd__quote p', (els) =>
     els.map((e) => e.textContent),
   )
   console.log(`  [view] links = ${JSON.stringify(detailLinks)}`)
@@ -110,7 +113,7 @@ async function seedCards(page, cards) {
   const editPanels = await page.$$('.le')
   console.log(`  [edit-mode] editor panels = ${editPanels.length}  (expect 3)`)
   // Phase 3 hint 已移除
-  const hint = await page.$('.detail__hint')
+  const hint = await page.$('.cd__hint')
   console.log(`  [edit-mode] phase-3 hint present = ${hint !== null}  (expect false)`)
   await shotFull(page, '03-detail-edit-mode-with-editors.png')
 

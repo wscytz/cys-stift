@@ -2,6 +2,7 @@
 
 > 每条一行，按日期倒序。详细见对应文件。
 
+- [2026-06-20 · Phase archive-detail archive tile 接 detail Modal(已交付)](decisions/2026-06-20-archive-detail.md) — 抽共享 CardDetailModal(inbox+archive 双消费)/actions prop/confirm 内置;关闭 review §🟠 UX #4;tag v0.12.0-archive-detail
 - [2026-06-20 · Phase canvas-refactor useEffect 驱动 canvas-editor(已交付)](decisions/2026-06-20-canvas-refactor.md) — 关闭 review #4 #5(useValue + useEffect bridge,无 dispose 猴补丁,无 listen 无 filter);tag v0.11.0-canvas-refactor
 - [2026-06-20 · Phase trash soft-delete 回收/恢复视图(已交付)](decisions/2026-06-20-trash.md) — 新 /trash 路由 + domain restore/hardDelete + AppMenu Trash 入口 + inbox 文案兑现;tag v0.10.0-trash
 - [2026-06-20 · Review bugfix #1 + #3(已修)](decisions/2026-06-20-review-bugfixes.md) — import 原子性(snapshot+回滚)+ sink 注册竞态(cancelled flag);#2/#4/#5 仍 open

@@ -47,25 +47,25 @@ async function clickButtonWithText(page, text) {
 
 /**
  * Click the "Soft-delete" button in the OPEN confirm dialog (not the one
- * in the detail modal that just opened it). We wait for `.confirm__body`
+ * in the detail modal that just opened it). We wait for `.cd__confirm`
  * to be visible, which is only present in the confirm modal — so the
  * next "Soft-delete" we find belongs to the confirm action.
  */
 async function clickConfirmSoftDelete(page) {
-  await page.waitForSelector('.confirm__body', { timeout: 5000 })
+  await page.waitForSelector('.cd__confirm', { timeout: 5000 })
   await wait(150)
   return page.evaluate(() => {
-    // The confirm modal is the outer Modal that contains .confirm__body.
-    // The danger button is inside .confirm__actions; pick the one whose
-    // closest ancestor has .confirm__body.
-    const body = document.querySelector('.confirm__body')
+    // The confirm modal is the outer Modal that contains .cd__confirm.
+    // The danger button is inside .cd__confirm-actions; pick the one whose
+    // closest ancestor has .cd__confirm.
+    const body = document.querySelector('.cd__confirm')
     if (!body) return false
     // Walk up to the Modal root, then down to its danger button.
     let root = body
-    while (root.parentElement && !root.querySelector('.confirm__actions')) {
+    while (root.parentElement && !root.querySelector('.cd__confirm-actions')) {
       root = root.parentElement
     }
-    const actions = root.querySelector('.confirm__actions')
+    const actions = root.querySelector('.cd__confirm-actions')
     if (!actions) return false
     const danger = [...actions.querySelectorAll('button')].find((b) =>
       b.className.toLowerCase().includes('danger') ||
@@ -202,7 +202,8 @@ async function clickConfirmSoftDelete(page) {
   console.log(`  [/trash second] items = ${trashItems2.length}  (expect 1)`)
   await shotFull(page, '04-trash-before-hard-delete.png')
 
-  // Click Delete forever → Modal
+  // Click Delete forever → trash page's own confirm Modal (Phase trash
+  // — predates the shared CardDetailModal, still uses .confirm__body).
   await clickButtonWithText(page, 'Delete forever')
   await wait(500)
   const modalOpen = await page.evaluate(
@@ -210,8 +211,6 @@ async function clickConfirmSoftDelete(page) {
   )
   console.log(`  [hard-delete modal] open = ${modalOpen}  (expect true)`)
   await shotFull(page, '05-trash-hard-delete-modal.png')
-  // Confirm (the confirm modal has a danger button labelled "Delete forever"
-  // inside .confirm__actions).
   const confirmedHard = await page.evaluate(() => {
     const body = document.querySelector('.confirm__body')
     if (!body) return false
@@ -273,7 +272,7 @@ async function clickConfirmSoftDelete(page) {
   })
   await wait(400)
   const modalBody = await page.evaluate(() => {
-    const body = document.querySelector('.confirm__body')
+    const body = document.querySelector('.cd__confirm')
     return body ? body.textContent : ''
   })
   const mentionsTrash = /restore it from Trash/i.test(modalBody)
