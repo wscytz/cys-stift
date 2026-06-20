@@ -13,6 +13,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { Button, Input, Modal, Tag } from '@cys-stift/ui'
 import type { Card } from '@cys-stift/domain'
 import { MarkdownBody } from '@/app/inbox/markdown'
+import { useI18n } from '@/lib/i18n'
 
 interface Props {
   card: Card
@@ -38,6 +39,7 @@ export function CardDetailModal({
   onDelete,
   onSendToInbox,
 }: Props) {
+  const { t } = useI18n()
   // A card opened with no title (freshly created via double-click) opens in edit.
   const [mode, setMode] = useState<'view' | 'edit'>(card.title ? 'view' : 'edit')
   const [title, setTitle] = useState(card.title)
@@ -80,7 +82,7 @@ export function CardDetailModal({
       <Modal
         open
         onClose={onClose}
-        title={mode === 'edit' ? 'Edit card' : card.title || '(untitled)'}
+        title={mode === 'edit' ? t('card.detail.title') : card.title || '(untitled)'}
       >
         <div className="cd" ref={bodyRef}>
           {mode === 'view' ? (
@@ -141,7 +143,7 @@ export function CardDetailModal({
                 maxLength={200}
               />
               <label className="cd__field">
-                <span className="cd__label">Body (Markdown)</span>
+                <span className="cd__label">{t('card.detail.bodyLabel')}</span>
                 <textarea
                   className="cd__textarea"
                   value={body}
@@ -149,43 +151,40 @@ export function CardDetailModal({
                   rows={8}
                 />
               </label>
-              <p className="cd__hint">
-                Editing links / code / quotes is intentionally not exposed here
-                (Phase 4 MVP). The detail view shows the persisted media.
-              </p>
+              <p className="cd__hint">{t('card.detail.editHint')}</p>
             </>
           )}
 
           <div className="cd__actions">
             {mode === 'view' ? (
               <>
-                <Button onClick={() => setMode('edit')}>Edit</Button>
+                <Button onClick={() => setMode('edit')}>{t('card.detail.edit')}</Button>
                 {card.archived ? (
                   <Button variant="secondary" onClick={onUnarchive}>
-                    Unarchive
+                    {t('card.detail.unarchive')}
                   </Button>
                 ) : (
                   <Button variant="secondary" onClick={onArchive}>
-                    Archive
+                    {t('card.detail.archive')}
                   </Button>
                 )}
                 {card.canvasPosition && onSendToInbox && (
                   <Button variant="secondary" onClick={onSendToInbox}>
-                    Send back to inbox
+                    {t('card.detail.sendBack')}
                   </Button>
                 )}
                 <span className="cd__spacer" />
                 <Button variant="danger" onClick={() => setConfirmDelete(true)}>
-                  Soft-delete
+                  {t('card.detail.delete')}
                 </Button>
               </>
             ) : (
               <>
                 <Button onClick={save} disabled={pending || !title.trim()}>
-                  {pending ? 'Saving…' : 'Save'}
+                  {pending ? t('card.detail.saving') : t('card.detail.save')}
                 </Button>
                 <Button variant="ghost" onClick={() => setMode('view')}>
-                  Cancel
+                  {t('card.detail.cancel')}
                 </Button>
               </>
             )}
@@ -196,18 +195,15 @@ export function CardDetailModal({
       <Modal
         open={confirmDelete}
         onClose={() => setConfirmDelete(false)}
-        title="Soft-delete this card?"
+        title={t('card.detail.deleteConfirmTitle')}
       >
-        <p className="cd__confirm">
-          The card will be hidden from the canvas and marked as deleted. The
-          record is kept in storage so you can recover it later from the database.
-        </p>
+        <p className="cd__confirm">{t('card.detail.deleteConfirmBody')}</p>
         <div className="cd__actions cd__actions--end">
           <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
-            Cancel
+            {t('card.detail.cancel')}
           </Button>
           <Button variant="danger" onClick={onDelete}>
-            Soft-delete
+            {t('card.detail.delete')}
           </Button>
         </div>
       </Modal>
