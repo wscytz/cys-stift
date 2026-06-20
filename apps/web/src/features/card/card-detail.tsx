@@ -56,7 +56,7 @@ import { mediaStore } from '@/lib/media-store'
 import { useI18n } from '@/lib/i18n'
 import { typeKeyOf } from '@/lib/type-label'
 
-export type CardDetailAction = 'archive' | 'unarchive' | 'sendToCanvas' | 'softDelete'
+export type CardDetailAction = 'archive' | 'unarchive' | 'sendToCanvas' | 'softDelete' | 'pin'
 
 export interface CardDetailSavePatch {
   title: string
@@ -83,6 +83,9 @@ export interface CardDetailModalProps {
   onArchive?: () => void
   onUnarchive?: () => void
   onSendToCanvas?: () => void
+  /** Phase A (v0.24.0): toggle pinned state. Rendered as a Pin/Unpin
+   *  button in the view toolbar when 'pin' is in `actions`. */
+  onTogglePin?: () => void
   /** Confirmed soft-delete (modal already asked). */
   onConfirmDelete: () => void
 }
@@ -96,6 +99,7 @@ export function CardDetailModal({
   onArchive,
   onUnarchive,
   onSendToCanvas,
+  onTogglePin,
   onConfirmDelete,
 }: CardDetailModalProps) {
   const { t } = useI18n()
@@ -197,6 +201,7 @@ export function CardDetailModal({
   const showUnarchive = has('unarchive') && card.archived
   const showSendToCanvas =
     has('sendToCanvas') && !card.canvasPosition && Boolean(onSendToCanvas)
+  const showPin = has('pin') && Boolean(onTogglePin)
 
   return (
     <>
@@ -378,6 +383,11 @@ export function CardDetailModal({
             {mode === 'view' ? (
               <>
                 <Button onClick={() => setMode('edit')}>{t('card.detail.edit')}</Button>
+                {showPin && (
+                  <Button variant="secondary" onClick={onTogglePin}>
+                    {card.pinned ? t('card.detail.unpin') : t('card.detail.pin')}
+                  </Button>
+                )}
                 {showArchive && (
                   <Button variant="secondary" onClick={onArchive}>
                     {t('card.detail.archive')}

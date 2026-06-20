@@ -61,6 +61,8 @@ export const messages = {
   'card.detail.cancel': { zh: '取消', en: 'Cancel' },
   'card.detail.archive': { zh: '归档', en: 'Archive' },
   'card.detail.unarchive': { zh: '取消归档', en: 'Unarchive' },
+  'card.detail.pin': { zh: '固定', en: 'Pin' },
+  'card.detail.unpin': { zh: '取消固定', en: 'Unpin' },
   'card.detail.sendBack': { zh: '退回收件箱', en: 'Send back to inbox' },
   'card.detail.delete': { zh: '软删除', en: 'Soft-delete' },
   'card.detail.sendToCanvas': { zh: '发送到画布', en: 'Send to canvas' },

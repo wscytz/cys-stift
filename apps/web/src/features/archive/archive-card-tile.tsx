@@ -21,6 +21,9 @@ interface ArchiveCardTileProps {
    * users could Tab to it and press Enter with nothing happening.
    */
   disabled?: boolean
+  /** Phase A (v0.24.0): pin toggle. When provided, a ★ button renders
+   * in the tile corner. Omit (e.g. on /trash) to hide pinning. */
+  onTogglePin?: () => void
 }
 
 /**
@@ -38,6 +41,7 @@ export function ArchiveCardTile({
   onClick,
   onToggleSelect,
   disabled = false,
+  onTogglePin,
 }: ArchiveCardTileProps) {
   const { t } = useI18n()
   const preview = card.body.slice(0, 120)
@@ -47,6 +51,7 @@ export function ArchiveCardTile({
     variant === 'tile' ? 'tile' : 'row',
     selected ? 'tile--selected' : '',
     disabled ? 'tile--disabled' : '',
+    card.pinned ? 'tile--pinned' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -84,6 +89,20 @@ export function ArchiveCardTile({
           />
         </label>
       )}
+      {onTogglePin && !disabled && (
+        <button
+          type="button"
+          className="tile__pin"
+          onClick={(e) => {
+            e.stopPropagation()
+            onTogglePin()
+          }}
+          aria-label={card.pinned ? t('card.detail.unpin') : t('card.detail.pin')}
+          aria-pressed={card.pinned}
+        >
+          {card.pinned ? '★' : '☆'}
+        </button>
+      )}
       {disabled ? (
         <div className="tile__main" aria-disabled="true" role="img" aria-label={titleText}>
           {inner}
@@ -120,8 +139,19 @@ const styles = `
 }
 .tile { min-height: 160px; }
 .tile--selected { border-color: var(--color-blue); border-width: 2px; }
+.tile--pinned { border-color: var(--color-yellow); border-width: 2px; }
+.tile--pinned .tile__bar { background: var(--color-yellow); }
 .tile--disabled { cursor: default; }
 .tile--disabled:hover { box-shadow: var(--shadow-sm); }
+.tile__pin {
+  position: absolute; top: var(--space-1); right: var(--space-1); z-index: 2;
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--color-white); border: var(--border-hairline); border-radius: var(--radius-sm);
+  font-size: var(--font-size-base); line-height: 1; color: var(--color-gray);
+  cursor: pointer; padding: 0;
+}
+.tile__pin:hover { color: var(--color-yellow); }
 .tile:hover, .row:hover { box-shadow: var(--shadow-md); }
 .tile:active, .row:active { transform: translate(2px, 2px); box-shadow: none; }
 

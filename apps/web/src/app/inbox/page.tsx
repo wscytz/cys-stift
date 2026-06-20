@@ -47,10 +47,12 @@ export default function InboxPage() {
   }, [service])
 
   // Inbox = no canvasPosition, not archived, not soft-deleted
-  const inbox = service.listInbox()
-  const archived = service
-    .listAll()
-    .filter((c) => c.archived && !c.deletedAt)
+  const inbox = pinFirst(service.listInbox())
+  const archived = pinFirst(
+    service
+      .listAll()
+      .filter((c) => c.archived && !c.deletedAt),
+  )
   const visible = view === 'inbox' ? inbox : archived
 
   return (
@@ -107,7 +109,13 @@ export default function InboxPage() {
           <ul className="grid">
             {visible.map((card) => (
               <li key={card.id}>
-                <CardTile card={card} onOpen={() => setDetail(card)} />
+                <CardTile
+                  card={card}
+                  onOpen={() => setDetail(card)}
+                  onTogglePin={() =>
+                    service.update(card.id, { pinned: !card.pinned })
+                  }
+                />
               </li>
             ))}
           </ul>
@@ -123,10 +131,14 @@ export default function InboxPage() {
       {detail && (
         <CardDetailModal
           card={detail}
-          actions={['archive', 'unarchive', 'sendToCanvas', 'softDelete']}
+          actions={['archive', 'unarchive', 'sendToCanvas', 'softDelete', 'pin']}
           onClose={() => setDetail(null)}
           onSave={(patch) => {
             const updated = service.update(detail.id, patch)
+            if (updated) setDetail(updated)
+          }}
+          onTogglePin={() => {
+            const updated = service.update(detail.id, { pinned: !detail.pinned })
             if (updated) setDetail(updated)
           }}
           onArchive={() => {
@@ -172,26 +184,58 @@ export default function InboxPage() {
 
 // ── Subcomponents ──────────────────────────────────────────────────────────
 
-function CardTile({ card, onOpen }: { card: Card; onOpen: () => void }) {
+/** Phase A (v0.24.0): stable partition that lifts pinned cards to the
+ * front without reordering the rest. sort() isn't stable across engines,
+ * so we partition instead — preserves the underlying list order within
+ * each group. */
+function pinFirst<T extends { pinned: boolean }>(cards: T[]): T[] {
+  const pinned = cards.filter((c) => c.pinned)
+  const rest = cards.filter((c) => !c.pinned)
+  return [...pinned, ...rest]
+}
+
+function CardTile({
+  card,
+  onOpen,
+  onTogglePin,
+}: {
+  card: Card
+  onOpen: () => void
+  onTogglePin: () => void
+}) {
   const { t } = useI18n()
   const preview = card.body.slice(0, 120)
   const totalMedia =
     card.links.length + card.codeSnippets.length + card.quotes.length
   return (
-    <button type="button" className="tile" onClick={onOpen}>
-      <div className="tile__bar" aria-hidden="true" />
-      <div className="tile__body">
-        <h3 className="tile__title">{card.title || t('card.untitled')}</h3>
-        {preview && <p className="tile__preview">{preview}</p>}
-        <div className="tile__meta">
-          <Tag color="red">{t(typeKeyOf(card.type))}</Tag>
-          {totalMedia > 0 && <Tag color="blue">{totalMedia} media</Tag>}
-          <span className="tile__time">
-            {card.capturedAt.toISOString().slice(0, 10)}
-          </span>
+    <div className={`tile ${card.pinned ? 'tile--pinned' : ''}`}>
+      <button
+        type="button"
+        className="tile__pin"
+        onClick={(e) => {
+          e.stopPropagation()
+          onTogglePin()
+        }}
+        aria-label={card.pinned ? t('card.detail.unpin') : t('card.detail.pin')}
+        aria-pressed={card.pinned}
+      >
+        {card.pinned ? '★' : '☆'}
+      </button>
+      <button type="button" className="tile__main" onClick={onOpen}>
+        <div className="tile__bar" aria-hidden="true" />
+        <div className="tile__body">
+          <h3 className="tile__title">{card.title || t('card.untitled')}</h3>
+          {preview && <p className="tile__preview">{preview}</p>}
+          <div className="tile__meta">
+            <Tag color="red">{t(typeKeyOf(card.type))}</Tag>
+            {totalMedia > 0 && <Tag color="blue">{totalMedia} media</Tag>}
+            <span className="tile__time">
+              {card.capturedAt.toISOString().slice(0, 10)}
+            </span>
+          </div>
         </div>
-      </div>
-    </button>
+      </button>
+    </div>
   )
 }
 
@@ -258,17 +302,31 @@ const styles = `
   background: var(--color-white);
   border: var(--border-hairline);
   border-radius: var(--radius-sm);
-  cursor: pointer;
   overflow: hidden;
   min-height: 160px;
-  transition: transform 80ms ease-out, box-shadow 80ms ease-out;
+  transition: transform 80ms ease-out, box-shadow 80ms ease-out, border-color 80ms ease-out;
   box-shadow: var(--shadow-sm);
   font-family: var(--font-body);
   color: var(--color-black);
-  padding: 0;
 }
 .tile:hover { box-shadow: var(--shadow-md); }
-.tile:active { transform: translate(2px, 2px); box-shadow: none; }
+.tile--pinned { border-color: var(--color-yellow); border-width: 2px; }
+.tile--pinned .tile__bar { background: var(--color-yellow); }
+.tile__pin {
+  position: absolute; top: var(--space-1); right: var(--space-1); z-index: 2;
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--color-white); border: var(--border-hairline); border-radius: var(--radius-sm);
+  font-size: var(--font-size-base); line-height: 1; color: var(--color-gray);
+  cursor: pointer; padding: 0;
+}
+.tile__pin:hover { color: var(--color-yellow); }
+.tile__main {
+  flex: 1; display: flex; width: 100%;
+  background: transparent; border: 0; padding: 0; text-align: left;
+  cursor: pointer; color: inherit; font: inherit;
+}
+.tile__main:active { transform: translate(2px, 2px); box-shadow: none; }
 .tile__bar { width: 8px; flex-shrink: 0; background: var(--color-red); }
 .tile__body { flex: 1; padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
 .tile__title {

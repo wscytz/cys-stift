@@ -75,12 +75,18 @@ export default function SearchPage() {
       {detail && (
         <CardDetailModal
           card={detail.card}
-          actions={['archive', 'softDelete', 'sendToCanvas']}
+          actions={['archive', 'softDelete', 'sendToCanvas', 'pin']}
           onClose={() => setDetail(null)}
           onSave={(patch) => {
             // C1 (v0.23.3): persist to the store, not just local state.
             // Before this fix, closing the modal dropped the edits.
             const updated = service.update(detail.card.id, patch)
+            if (updated) setDetail({ card: updated })
+          }}
+          onTogglePin={() => {
+            const updated = service.update(detail.card.id, {
+              pinned: !detail.card.pinned,
+            })
             if (updated) setDetail({ card: updated })
           }}
           onConfirmDelete={() => {

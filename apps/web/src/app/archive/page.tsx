@@ -33,13 +33,18 @@ export default function ArchivePage() {
     CardId[] | null
   >(null)
 
-  // Archived & not soft-deleted, sorted by updatedAt desc.
+  // Archived & not soft-deleted, sorted by updatedAt desc. Pinned cards
+  // lift to the front (stable partition, Phase A v0.24.0).
   const cards = useMemo(
-    () =>
-      service
+    () => {
+      const all = service
         .listAll()
         .filter((c) => c.archived && !c.deletedAt)
-        .sort((a, b) => +b.updatedAt - +a.updatedAt),
+        .sort((a, b) => +b.updatedAt - +a.updatedAt)
+      const pinned = all.filter((c) => c.pinned)
+      const rest = all.filter((c) => !c.pinned)
+      return [...pinned, ...rest]
+    },
     [service, ready, snap],
   )
 
@@ -142,6 +147,9 @@ export default function ArchivePage() {
                   selectMode={selectMode}
                   onClick={() => openDetail(card.id)}
                   onToggleSelect={() => toggleSelect(card.id)}
+                  onTogglePin={() =>
+                    service.update(card.id, { pinned: !card.pinned })
+                  }
                 />
               </li>
             ))}
@@ -215,10 +223,16 @@ export default function ArchivePage() {
       {detail && (
         <CardDetailModal
           card={detail.card}
-          actions={['unarchive', 'softDelete']}
+          actions={['unarchive', 'softDelete', 'pin']}
           onClose={() => setDetail(null)}
           onSave={(patch) => {
             const updated = service.update(detail.card.id, patch)
+            if (updated) setDetail({ card: updated })
+          }}
+          onTogglePin={() => {
+            const updated = service.update(detail.card.id, {
+              pinned: !detail.card.pinned,
+            })
             if (updated) setDetail({ card: updated })
           }}
           onUnarchive={() => {
