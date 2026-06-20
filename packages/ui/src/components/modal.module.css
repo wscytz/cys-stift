@@ -20,6 +20,12 @@
   gap: var(--space-3);
   box-shadow: var(--shadow-md);
 }
+/* The frame is a focus container (tabIndex=-1 fallback when no focusable
+   child exists). It carries no visible outline — focus indication is the
+   job of the inner controls. */
+.frame:focus {
+  outline: none;
+}
 
 .title {
   margin: 0;

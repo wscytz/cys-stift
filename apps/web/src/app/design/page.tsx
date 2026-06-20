@@ -4,7 +4,6 @@ import { Input } from '@cys-stift/ui/input'
 import { Card } from '@cys-stift/ui/card'
 import { Tag } from '@cys-stift/ui/tag'
 import { Toolbar } from '@cys-stift/ui/toolbar'
-import { Modal } from '@cys-stift/ui/modal'
 import { Tooltip } from '@cys-stift/ui/tooltip'
 import { tokens, defaultRegionColor } from '@cys-stift/ui/tokens'
 
@@ -265,14 +264,13 @@ export default function DesignPage() {
 }
 
 function ModalExample() {
-  // 'use client' would be needed for true interactivity under App Router;
-  // Phase 1 ships a static showcase; full interactivity verified in T4.
+  // Phase 1 static showcase. The real <Modal> is a client component
+  // (focus trap needs useEffect); a server showcase page can't pass a
+  // function onClose into it, so we render a visual mockup instead.
+  // Interactivity is verified on /inbox, /archive, etc.
   return (
     <div className="stack">
-      <p className="hint">Modal uses React state. See source — the showcase is rendered statically here for visual reference.</p>
-      <Modal open={false} onClose={() => {}} title="Example modal">
-        <p>This is what a modal looks like. The backdrop is 50% black, the frame is hairline-bordered white.</p>
-      </Modal>
+      <p className="hint">Modal: 50% black backdrop, hairline white frame, offset shadow. Focus trap + Tab cycling land in Phase B.</p>
       <div style={{ position: 'relative', height: '180px', border: '1px dashed var(--color-gray-soft)' }}>
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(10,10,10,0.5)', display: 'grid', placeItems: 'center', padding: 'var(--space-4)' }}>
           <div style={{ background: 'var(--color-white)', border: 'var(--border-hairline)', padding: 'var(--space-4)', boxShadow: 'var(--shadow-md)', width: '320px' }}>
