@@ -42,10 +42,25 @@
   color: var(--color-white);
 }
 
+/* v0.22.1-ux-polish-2: danger now reads as "warning / recoverable"
+ * via red outline (vs Capture button which is a red-fill "primary
+ * action"). The semantic separation keeps the user from mistaking a
+ * soft-delete (recoverable from trash) for the product's main action.
+ * 2px border (vs default 1px) bumps the visual weight so it still
+ * reads as "important", just differently important from "primary". */
 .danger {
-  background: var(--color-red);
-  color: var(--color-white);
-  border-color: var(--color-black);
+  background: var(--color-white);
+  color: var(--color-red);
+  border-color: var(--color-red);
+  border-width: 2px;
+  padding: 0 calc(var(--space-3) - 1px);
+}
+.danger:hover {
+  background: var(--color-red-soft);
+  color: var(--color-red);
+}
+.danger:focus-visible {
+  outline-color: var(--color-red);
 }
 
 .ghost {
