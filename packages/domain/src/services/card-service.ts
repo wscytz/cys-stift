@@ -171,6 +171,37 @@ export class CardService {
     this.repo.update({ ...card, deletedAt: new Date(), updatedAt: new Date() })
   }
 
+  /**
+   * Restore a soft-deleted card. Clears `deletedAt` and bumps `updatedAt`,
+   * but leaves `archived` and `canvasPosition` untouched — so the card
+   * naturally returns to whatever view it belonged to (inbox / archive /
+   * canvas). Idempotent: if the card is not soft-deleted, this still
+   * succeeds (no-op). Returns true if the card existed and was modified.
+   */
+  restore(id: CardId): boolean {
+    const card = this.repo.getById(id)
+    if (!card) return false
+    this.repo.update({
+      ...card,
+      deletedAt: undefined,
+      updatedAt: new Date(),
+    })
+    return true
+  }
+
+  /**
+   * Permanently delete a card. Storage semantics belong to the repository
+   * implementation (SQLite DELETEs the row; in-memory forgets the key).
+   * Idempotent: if the card is gone, this is a no-op. Returns true if a
+   * card was actually removed.
+   */
+  hardDelete(id: CardId): boolean {
+    const card = this.repo.getById(id)
+    if (!card) return false
+    this.repo.delete(id)
+    return true
+  }
+
   count(): number {
     return this.repo.listAll().length
   }

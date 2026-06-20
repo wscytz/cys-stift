@@ -3,7 +3,7 @@ import styles from './toolbar.module.css'
 
 export interface ToolbarProps {
   /** Region identifier — controls the 8px colour stripe on the left. */
-  region?: 'capture' | 'inbox' | 'canvas' | 'archive' | 'system'
+  region?: 'capture' | 'inbox' | 'canvas' | 'archive' | 'trash' | 'system'
   children: ReactNode
 }
 

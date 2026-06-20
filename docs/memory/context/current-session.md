@@ -1,29 +1,29 @@
-# 当前会话交接(2026-06-20 · ▶ 下一步 = 执行 trash 回收/恢复视图 plan)
+# 当前会话交接(2026-06-20 · ▶ 下一步 = 等用户诉求)
 
 > **新会话/新模型先读此档**,再读根 `CLAUDE.md` + `docs/development/roadmap.md`。
 > clear 后上下文全丢,这里是不丢的全部。
 >
-> **▶ 下一步(compact 后立即执行):soft-delete 回收/恢复视图(findings #2)。** 入口已定 = **新 `/trash` 路由**(活跃 inbox / 归档 archive / 删除 trash 三分离)。完整 plan 见 [`docs/superpowers/plans/2026-06-20-trash-recovery.md`](../../superpowers/plans/2026-06-20-trash-recovery.md) —— domain 加 `restore`/`hardDelete`(repo.delete 已就绪)+ `/trash` 页 + AppMenu Trash 入口 + inbox 软删文案指向 Trash + e2e + closeout 四件套,tag `v0.10.0-trash`。**先读 plan 再动手。**
+> **▶ 下一步:等用户诉求。** review findings #1 #2 #3 已全部修完(`v0.9.2` 修 #1+#3,`v0.10.0-trash` 修 #2);剩 #4 #5 canvas-editor 脆弱点(动 canvas 时修)。Phase 8 Tauri build(Rust 就绪)按需触发。候选:暗色模式 / 多画布 UI / 标签搜索 / OPFS(Phase 2.5)/ Phase 8 tauri build + 签名公证。
 
 ---
 
 ## 一句话现状
 
-**spec §8 路线图 13 个 phase 已完成**(Phase 0-7 + P6.5a-h + P9 + P9.1)。**Phase 8 Tauri:Rust 本就已装(2026-06-20 纠正——根因是 PATH 未配不是未安装,`cargo check` 已通过),待 `pnpm tauri build` + 签名**。self-review 发现的 **#1 import 原子性 + #3 sink 注册竞态已于 2026-06-20 修(v0.9.2)**;**剩 #2 soft-delete 无恢复入口(产品决策)+ #4 #5 canvas-editor 脆弱点(动 canvas 时修),仍 open**。等用户下一步诉求。
+**spec §8 路线图 13 个 phase 已全部完成**(Phase 0-7 + P6.5a-h + P8 + P9 + P9.1) + **review bugfix #1 #3(v0.9.2)** + **Phase trash(v0.10.0-trash,关闭 findings #2)**。Phase 8 Tauri:Rust 本就已装(cargo 1.96),`cargo check` 通过,待 `pnpm tauri build` + 签名。**review findings 仅剩 #4 #5 canvas-editor 脆弱点(动 canvas 时修)**。等用户下一步诉求。
 
 ---
 
-## 🔴 剩余 open(findings 里 #1 #3 已修,2026-06-20)
+## 🔴 剩余 open(findings 里 #1 #2 #3 已修,2026-06-20)
 
-**完整原始清单见 [`docs/memory/decisions/2026-06-19-review-findings.md`](../decisions/2026-06-19-review-findings.md),已修记录见 [`docs/memory/decisions/2026-06-20-review-bugfixes.md`](../decisions/2026-06-20-review-bugfixes.md)**。摘要:
+**完整原始清单见 [`docs/memory/decisions/2026-06-19-review-findings.md`](../decisions/2026-06-19-review-findings.md),已修记录见 [`docs/memory/decisions/2026-06-20-review-bugfixes.md`](../decisions/2026-06-20-review-bugfixes.md) + [`docs/memory/decisions/2026-06-20-trash.md`](../decisions/2026-06-20-trash.md)**。摘要:
 
-- ✅ **#1 Import 部分失败** — 已修:`export-service.ts` `importFromJson` 改 snapshot + 全量回滚(序列化前置 + 写入失败逐条回滚)。
-- ✅ **#3 sink 注册竞态** — 已修:`inbox/page.tsx` + `capture-host.tsx` effect 加 `cancelled` flag。
-- ⬜ **#2 soft-delete 无恢复入口** — 全局 gap(软删后 UI 无处看/恢复)。**产品决策**:要做"已删除/回收站"视图(domain 需新增 `restore`/`hardDelete`,现状只有 `softDelete`)+ archive/inbox 多处文案承诺了恢复。
+- ✅ **#1 Import 部分失败** — 已修(v0.9.2):`export-service.ts` `importFromJson` 改 snapshot + 全量回滚(序列化前置 + 写入失败逐条回滚)。
+- ✅ **#3 sink 注册竞态** — 已修(v0.9.2):`inbox/page.tsx` + `capture-host.tsx` effect 加 `cancelled` flag。
+- ✅ **#2 soft-delete 无恢复入口** — 已修(v0.10.0-trash):新 `/trash` 路由 + domain `restore`/`hardDelete` + AppMenu Trash + inbox 文案兑现。
 - ⬜ **#4 `editor.dispose` 猴补丁脆弱** — `canvas-editor.tsx:96-101`(留到动 canvas 时重构成 useEffect)。
 - ⬜ **#5 `editor.store.listen` 无 filter** — `canvas-editor.tsx:78`(同上)。
 
-**建议**:#2 等用户明确要做(工作量中等:domain 加方法 + 新 tab/route + restore/hardDelete);#4 #5 留到下次动 canvas 一起。
+**建议**:等用户明确诉求;#4 #5 留到下次动 canvas 一起。
 
 ---
 
@@ -45,6 +45,7 @@
 | P9 | JSON 导出 + 文档 | v0.9.0 | export-service + `docs/user/README.md` |
 | P9.1 | JSON 反向 import | v0.9.1 | importFromJson + capture race fallback |
 | Review | bugfix #1+#3 | v0.9.2 | import 原子性(snapshot+回滚)+ sink 注册竞态(cancelled flag) |
+| trash | soft-delete 回收/恢复 | v0.10.0-trash | /trash 路由 + domain restore/hardDelete + AppMenu Trash + inbox 文案兑现 |
 
 **全部 0 新依赖;domain 11 tests + db 7 tests 全绿;web build exit 0(13 静态页);git 干净。**
 
@@ -109,7 +110,7 @@ Rust **本就已装**(cargo/rustc 1.96,6/19 装),根因是 PATH 未 source `~/.c
 
 ---
 
-## 下一步候选(trash 执行完后排)
+## 下一步候选(等用户诉求)
 
 - **canvas-editor 脆弱点**(findings #4 #5,下次动 canvas 一起重构成 useEffect)
 - 暗色模式 / 多画布 UI / 标签全文搜索 / OPFS 真实落盘(P2.5)/ canvas dblclick 走 registry / archive tile 接 detail / 录屏

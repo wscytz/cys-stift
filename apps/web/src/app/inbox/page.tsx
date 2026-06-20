@@ -180,8 +180,11 @@ export default function InboxPage() {
         title="Soft-delete this card?"
       >
         <p className="confirm__body">
-          The card will be hidden and marked as deleted. The record is kept in
-          storage so you can recover it later from the database.
+          The card is hidden and marked as deleted. You can{' '}
+          <Link href="/trash" className="confirm__link">
+            restore it from Trash
+          </Link>{' '}
+          later.
         </p>
         <div className="confirm__actions">
           <Button variant="ghost" onClick={() => setConfirmDelete(null)}>
@@ -718,5 +721,6 @@ const styles = `
 }
 
 .confirm__body { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
+.confirm__link { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; }
 .confirm__actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-2); }
 `

@@ -617,3 +617,43 @@
 详见 [`docs/superpowers/plans/2026-06-20-review-bugfixes.md`](../superpowers/plans/2026-06-20-review-bugfixes.md) + [`docs/memory/decisions/2026-06-20-review-bugfixes.md`](../memory/decisions/2026-06-20-review-bugfixes.md) + [`docs/design/screenshots/review-import-rollback/`](../design/screenshots/review-import-rollback/)。
 
 ---
+
+## 2026-06-20 · phase trash · soft-delete 回收/恢复视图
+
+**交付**:承接 review findings #2(产品决策)。① `packages/domain/src/services/card-service.ts` 加 `restore(id)`(清 `deletedAt` + bump `updatedAt`)+ `hardDelete(id)`(调 `repo.delete`,4 个 vitest);② `packages/ui/src/components/toolbar.tsx` `region` 联合加 `'trash'`(颜色自动 gray,`regionColorForStripe` default 已返 gray);③ `apps/web/src/app/trash/page.tsx`(新,14 静态路由):列 `deletedAt` 卡按 `deletedAt` desc,复用 `ArchiveCardTile` 视觉 + 每卡 Restore(清 `deletedAt`,自然回 inbox/archive/canvas) + Delete forever(`Modal` 二次确认,`hardDelete` 真删不可逆);④ `apps/web/src/components/app-menu.tsx` entries 加 Trash;⑤ `apps/web/src/app/inbox/page.tsx` 软删 Modal body 文案 `"...recover it later from the database"` → `"...restore it from Trash"`(链 `<Link href="/trash">`);⑥ `scripts/trash-shots.cjs`(新)e2e + 7 截图。Tag **v0.10.0-trash**。
+
+**核心承诺验证**:
+
+- inbox 软删 tr-1 → `deletedAt` 设上 + `/trash` 列 1 项 ✓
+- Restore → `deletedAt === undefined` + 卡回原视图(inbox/archive/canvas 之一)✓
+- 再软删 → Delete forever → Modal → 确认 → `listAll()` 不含该 id + `/trash` 空 ✓
+- AppMenu `/trash` 高亮 active ✓
+- inbox 软删 Modal body 含 `"restore it from Trash"` ✓
+- 零 page error
+- domain 15(11→15)/ db 7 全绿;web build exit 0,14 静态页;7 截图归档
+
+**关键工程决策**:
+
+- **新 `/trash` 路由**(非 archive 三 tab):三分离(inbox 活跃 / archive 归档 / trash 已删)更清晰;spec 没限定 UI 形态,选最简单。
+- **`restore` 只清 `deletedAt`,不动 `archived` / `canvasPosition`**:卡自然回原视图,不需要 domain 知道"它原来在哪"——单一真相源是卡自身字段。
+- **`hardDelete` 调 `repo.delete`(db 层已就绪)**:不引入新存储语义,`sqlite DELETE` 由 db 包保证。
+- **`restore` / `hardDelete` 返回 boolean**(而非 void):让调用方知道是否真改了一张卡;其他 service 方法维持原签名(零破坏)。
+- **单卡操作**(无 selectMode):MVP,先验证核心闭环;批量 restore/hardDelete 留后(archive 批量模式可复用)。
+- **Delete forever 只 Modal 二次确认**,不要求打字 "delete":MVP,信任 Modal 拦截。
+- **`TrashItem` 复用 `ArchiveCardTile`**:视觉已存在的"白底黑边 + 蓝条"通用卡,archive 只是恰好蓝条;不重做。
+- **inbox 软删 Modal 链 `<Link href="/trash">`**:文案承诺即兑现,点链接直接跳 /trash。
+- **`region: 'trash'` 自动 gray**:`regionColorForStripe` default 返 gray,无 if 分支。
+- **0 新依赖** + **没碰 spec** + **ui 仅扩联合类型** + **domain 只加方法**。
+
+**已知 / 后续**(findings 剩余):
+
+- #4 / #5 canvas-editor 脆弱点(下次动 canvas 一起重构成 useEffect)
+- 批量 restore / hardDelete(archive 批量模式可复用)
+- media gc:hardDelete 只删 card 记录,关联 media assets 留孤儿,Phase 2.5 OPFS 时统一 gc
+- 定期自动清空 trash(保留期)—— 未要求,YAGNI
+- UX 洞(批量 soft-delete 二次确认 / send-to-canvas 反向 / archive tile no-op / OPFS 真实落盘)
+- Phase 8 Tauri build(Rust 就绪)+ 签名公证(需 Apple 证书)
+
+详见 [`docs/superpowers/plans/2026-06-20-trash-recovery.md`](../superpowers/plans/2026-06-20-trash-recovery.md) + [`docs/memory/decisions/2026-06-20-trash.md`](../memory/decisions/2026-06-20-trash.md) + [`docs/design/screenshots/phase-trash/`](../design/screenshots/phase-trash/)。
+
+---

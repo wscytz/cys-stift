@@ -25,6 +25,7 @@ export function AppMenu() {
     { href: '/inbox', label: 'Inbox', key: 'inbox' },
     { href: '/canvas', label: 'Canvas', key: 'canvas' },
     { href: '/archive', label: 'Archive', key: 'archive' },
+    { href: '/trash', label: 'Trash', key: 'trash' },
     { href: '/settings', label: 'Settings', key: 'settings' },
   ]
 

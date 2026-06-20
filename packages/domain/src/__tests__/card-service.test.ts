@@ -160,4 +160,50 @@ describe('CardService', () => {
     const result = service.update('nope' as CardId, { title: 'x' })
     expect(result).toBeNull()
   })
+
+  it('restore clears deletedAt and preserves archived/canvasPosition', async () => {
+    // archive + move to canvas, then soft-delete, then restore
+    const c = service.create({ title: 'round trip', source: dummySource })
+    const canvasId = 'c1' as CanvasId
+    const position = { canvasId, x: 0, y: 0, w: 200, h: 100, z: 0 }
+    service.moveToCanvas(c.id, position)
+    service.archive(c.id)
+    const before = service.get(c.id)
+    expect(before?.deletedAt).toBeUndefined()
+    const beforeUpdate = before!.updatedAt.getTime()
+    await new Promise((r) => setTimeout(r, 5))
+    service.softDelete(c.id)
+    expect(service.get(c.id)?.deletedAt).toBeInstanceOf(Date)
+
+    const ok = service.restore(c.id)
+    expect(ok).toBe(true)
+    const restored = service.get(c.id)
+    expect(restored).not.toBeNull()
+    expect(restored?.deletedAt).toBeUndefined()
+    // archived + canvasPosition untouched (so card returns to its previous
+    // view naturally — archive or canvas, not inbox)
+    expect(restored?.archived).toBe(true)
+    expect(restored?.canvasPosition).toEqual(position)
+    // updatedAt bumped
+    expect(restored!.updatedAt.getTime()).toBeGreaterThan(beforeUpdate)
+  })
+
+  it('restore on unknown id returns false (idempotent no-op)', () => {
+    const ok = service.restore('nope' as CardId)
+    expect(ok).toBe(false)
+  })
+
+  it('hardDelete removes the card entirely', () => {
+    const c = service.create({ title: 'gone', source: dummySource })
+    expect(service.get(c.id)).not.toBeNull()
+    const ok = service.hardDelete(c.id)
+    expect(ok).toBe(true)
+    expect(service.get(c.id)).toBeNull()
+    expect(service.listAll().some((x) => x.id === c.id)).toBe(false)
+  })
+
+  it('hardDelete on unknown id returns false (idempotent no-op)', () => {
+    const ok = service.hardDelete('nope' as CardId)
+    expect(ok).toBe(false)
+  })
 })
