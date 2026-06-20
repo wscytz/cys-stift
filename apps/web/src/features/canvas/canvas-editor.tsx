@@ -48,6 +48,7 @@ import {
   loadCardsIntoEditor,
 } from './canvas-binding'
 import { canvasViewStore } from '@/lib/canvas-view-store'
+import { captureSinkRegistry } from '@/features/capture/capture-sink'
 
 const shapeUtils = [CardShapeUtil]
 const DEVICE_ID = 'web'
@@ -202,20 +203,40 @@ function DoubleClickBridge({
         if (card) cbRef.current(card)
         return
       }
-      const card = serviceRef.current.create({
-        title: '',
-        source: { kind: 'manual', deviceId: DEVICE_ID },
-        canvasPosition: {
-          canvasId,
-          x: Math.round(pagePoint.x),
-          y: Math.round(pagePoint.y),
-          w: DEFAULT_CARD_W,
-          h: DEFAULT_CARD_H,
-          z: Date.now(),
-        },
-      })
-      addCardShape(editor, card)
-      cbRef.current(card)
+      // Blank dblclick → create via captureSinkRegistry (Phase plan:
+      // unify all entry-points through the registry — manual sink
+      // registered on inbox mount, registry falls back to
+      // fallbackService when the sink isn't ready yet, so card is
+      // never lost). We reuse `manual` source kind (same path as
+      // the inbox form); the canvasPosition disambiguates the
+      // resulting card from inbox-only manual creates.
+      void captureSinkRegistry
+        .submit({
+          title: '',
+          source: { kind: 'manual', deviceId: DEVICE_ID },
+          canvasPosition: {
+            canvasId,
+            x: Math.round(pagePoint.x),
+            y: Math.round(pagePoint.y),
+            w: DEFAULT_CARD_W,
+            h: DEFAULT_CARD_H,
+            z: Date.now(),
+          },
+        })
+        .then(({ cardId }) => {
+          const card = serviceRef.current.get(cardId)
+          if (card) {
+            addCardShape(editor, card)
+            cbRef.current(card)
+          }
+        })
+        .catch((err: unknown) => {
+          // surface in dev console; the registry itself only rejects
+          // when neither a matching sink nor a fallback service is set,
+          // which would be a wiring bug (CaptureHost / inbox mount
+          // both set fallback).
+          console.error('[canvas-editor] dblclick create failed', err)
+        })
     }
     container.addEventListener('dblclick', onDbl)
     return () => container.removeEventListener('dblclick', onDbl)
