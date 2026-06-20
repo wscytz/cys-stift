@@ -1,6 +1,7 @@
 # 开发环境搭建
 
 > macOS 与 Windows 双平台。命令一致（pnpm），前置工具链略有不同。
+> **精确版本清单见 [`dependencies.md`](dependencies.md)** —— 本档讲「怎么装」,dependencies.md 讲「装了什么 + 精确版本」。
 
 ---
 
