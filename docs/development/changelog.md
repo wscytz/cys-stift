@@ -1061,3 +1061,27 @@ Review 驱动第二轮。3 个并行 Explore agent 全代码 + UX walkthrough + 
 详见 [`docs/memory/decisions/2026-06-23-critical-and-latent.md`](../memory/decisions/2026-06-23-critical-and-latent.md)。
 
 ---
+
+## 2026-06-20 · v0.24.0-card-pinning
+
+Phase A(快速完善)。给 `Card.pinned`(domain Phase 2 就有但无 UI)接上完整交互。
+
+- **feat(inbox)**: CardTile 重构为 `div > pin-btn > main-btn`(button 不能嵌套 button)。★ 按钮 toggle pinned,pinned 卡左边条 + 边框转 `--color-yellow`。列表用稳定分区(filter 而非 sort)pinned 前置 → `5117cce`
+- **feat(archive)**: ArchiveCardTile 加可选 `onTogglePin` prop(传了才渲染 ★,/trash disabled / /search 不传 → 无按钮)。/archive 列表 pinned 前置 → `5117cce`
+- **feat(card-detail)**: `CardDetailAction` 加 `'pin'` + `onTogglePin` prop → view toolbar Pin/Unpin toggle 按钮。inbox/archive/search 三个 caller 接上 → `5117cce`
+- **i18n**: `card.detail.pin`(固定)/ `card.detail.unpin`(取消固定)→ `5117cce`
+
+**关键决策**:
+- toggle 走 `service.update(id, { pinned })`,**不加新 domain 方法**(YAGNI,domain 已支持)
+- 排序用 `filter` 分区而非 `sort()` — sort 跨引擎不稳定,分区保序
+- canvas 卡片**不加** pin — canvas 用位置/z 表达重要性,canvas modal 是独立 Phase 4 组件保持 MVP
+- domain **零改动**(pinned 字段 + UpdateCardPatch + update() 第 121 行 Phase 2 就绪)
+
+**验收**:
+- domain 26/26 + db 7/7 + web build 14 页 exit 0
+- 7 个文件 / +235 -31 行 / 1 个 commit
+- pinned 状态持久(reload 后仍在),i18n 中英切换正确
+
+详见 [`docs/memory/decisions/2026-06-23-card-pinning.md`](../memory/decisions/2026-06-23-card-pinning.md)。
+
+---
