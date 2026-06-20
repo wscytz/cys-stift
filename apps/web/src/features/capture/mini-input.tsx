@@ -98,16 +98,19 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
       return
     }
     // Enter inside the title input → expand the body textarea and focus it.
-    // We detect "title input is active" by checking the active element's
-    // placeholder (brittle but fine here — there's only one Input in the
-    // dialog). When bodyOpen is already true Enter is just a newline inside
-    // the textarea, so we let that pass through.
-    if (
+// We detect "title input is active" via e.target (v0.23.2-hardening).
+// The previous approach compared the active element's placeholder to
+// t('capture.miniTitle'), which broke after a locale switch because the
+// active element retained the old placeholder value while t() returned
+// the new one. The event target IS the currently-keyed element so it's
+// always in sync with the user's current focus.
+// When bodyOpen is already true Enter is just a newline inside the
+// textarea, so we let that pass through.
+if (
       e.key === 'Enter' &&
       !e.shiftKey &&
       !bodyOpen &&
-      document.activeElement instanceof HTMLInputElement &&
-      document.activeElement.placeholder === t('capture.miniTitle')
+      (e.target as HTMLElement).tagName === 'INPUT'
     ) {
       e.preventDefault()
       setBodyOpen(true)

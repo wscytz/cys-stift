@@ -129,6 +129,70 @@ export function importFromJson(jsonText: string): ImportResult {
       error: 'payload.cards is not an array',
     }
   }
+  // v0.23.2-hardening: per-card structural validation. A malformed card
+  // (missing id, missing createdAt, non-string title) would corrupt the
+  // DB schema on the next read. Reject the whole import — better than
+  // silently importing half-good data the user can't tell is broken.
+  for (let i = 0; i < payload.cards.length; i++) {
+    const c = payload.cards[i]
+    if (!c || typeof c !== 'object') {
+      return {
+        ok: false,
+        cards: 0,
+        mediaAssets: 0,
+        error: `cards[${i}] is not an object`,
+      }
+    }
+    const card = c as unknown as Record<string, unknown>
+    if (typeof card.id !== 'string' || card.id.length === 0) {
+      return {
+        ok: false,
+        cards: 0,
+        mediaAssets: 0,
+        error: `cards[${i}].id missing or not a string`,
+      }
+    }
+    if (typeof card.title !== 'string') {
+      return {
+        ok: false,
+        cards: 0,
+        mediaAssets: 0,
+        error: `cards[${i}].title must be a string`,
+      }
+    }
+    if (typeof card.body !== 'string') {
+      return {
+        ok: false,
+        cards: 0,
+        mediaAssets: 0,
+        error: `cards[${i}].body must be a string`,
+      }
+    }
+    if (
+      card.createdAt !== undefined &&
+      typeof card.createdAt !== 'string' &&
+      !(card.createdAt instanceof Date)
+    ) {
+      return {
+        ok: false,
+        cards: 0,
+        mediaAssets: 0,
+        error: `cards[${i}].createdAt must be a string ISO date`,
+      }
+    }
+    if (
+      card.updatedAt !== undefined &&
+      typeof card.updatedAt !== 'string' &&
+      !(card.updatedAt instanceof Date)
+    ) {
+      return {
+        ok: false,
+        cards: 0,
+        mediaAssets: 0,
+        error: `cards[${i}].updatedAt must be a string ISO date`,
+      }
+    }
+  }
   // Overwrite the four stores atomically. Missing optional keys are
   // skipped. We (1) serialise everything first — a serialise error must
   // abort before any store is touched; (2) snapshot each key's old raw

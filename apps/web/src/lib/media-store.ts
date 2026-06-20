@@ -72,6 +72,13 @@ export const mediaStore = {
    *
    * SHA-1 checksum computed via crypto.subtle.digest during attach
    * (v0.22.6-refactor C) so sync can deduplicate assets later.
+   *
+   * Concurrency (v0.23.2-hardening): the body has 2 awaits
+   * (readAsDataURL + crypto.subtle.digest). Naive loadAssets/saveAssets
+   * bracketing lets two concurrent attach() calls both load the same
+   * initial map and lose one of the writes — assets silently disappear.
+   * We serialise all writes through a module-level promise chain so each
+   * attach completes its load → save atomically.
    */
   async attach(file: File): Promise<MediaRef> {
     if (file.size > SOFT_LIMIT_BYTES) {
@@ -94,11 +101,13 @@ export const mediaStore = {
       createdAt: new Date().toISOString(),
       checksum,
     }
-    const all = loadAssets()
-    all[id] = asset
-    saveAssets(all)
-    const ref: MediaRef = { assetId: id, order: 0 }
-    return ref
+    return enqueueWrite(() => {
+      const all = loadAssets()
+      all[id] = asset
+      saveAssets(all)
+      const ref: MediaRef = { assetId: id, order: 0 }
+      return ref
+    })
   },
 
   getAsset(id: MediaAssetId): MediaAssetData | null {
@@ -111,6 +120,34 @@ export const mediaStore = {
     delete all[id]
     saveAssets(all)
   },
+  /** v0.23.2-hardening: enqueued variant of remove() — same atomic
+   * guarantee as attach() so a concurrent attach + remove can't lose
+   * data. Returns a promise for symmetry; today callers don't await. */
+  removeAsync(id: MediaAssetId): Promise<void> {
+    return enqueueWrite(() => {
+      const all = loadAssets()
+      if (!all[id]) return
+      delete all[id]
+      saveAssets(all)
+    })
+  },
+}
+
+/**
+ * v0.23.2-hardening: serialise writes through a promise chain so the
+ * `loadAssets → mutate → saveAssets` block in attach() / remove() runs
+ * atomically with respect to itself. Without this, two concurrent
+ * attach() calls both load the same initial map and the second save
+ * overwrites the first asset (silent data loss).
+ */
+let _writeQueue: Promise<unknown> = Promise.resolve()
+function enqueueWrite<T>(fn: () => T): Promise<T> {
+  const next = _writeQueue.then(fn, fn)
+  // Swallow the queue's own rejections so a failed write doesn't break
+  // the chain for every subsequent caller. The caller still sees their
+  // own error via the promise they receive.
+  _writeQueue = next.catch(() => undefined)
+  return next
 }
 
 /** SHA-1 content hash of a string (v0.22.6-refactor C).
