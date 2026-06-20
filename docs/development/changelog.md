@@ -1030,3 +1030,34 @@ Review 驱动的 robustness 改动,4 个非 i18n 类 bug(并发 / 校验 / local
 详见 [`docs/memory/decisions/2026-06-23-hardening.md`](../memory/decisions/2026-06-23-hardening.md)。
 
 ---
+
+## 2026-06-20 · v0.23.3-critical-and-latent
+
+Review 驱动第二轮。3 个并行 Explore agent 全代码 + UX walkthrough + 未完成功能 audit。5 个 Critical(数据/safety/重复创建)+ 5 个 Latent(队列/快捷键/a11y/警告刷屏)。**全 10 项现场独立核对,0 误报**。
+
+### Critical(数据丢失 / safety / 重复创建)
+
+- **fix(search)**: `onSave` 只更新本地 state,关闭 Modal 后修改丢失。改调 `service.update()` 与 archive/inbox 一致 → `2638687`
+- **fix(trash)**: "永久删除"原仅 Cancel/Confirm 一次性删(文件头注释说"type delete to confirm"是 stale)。加必填 `type delete` 输入框,红按钮在 match 前禁用。新增 2 个 i18n key → `2638687`
+- **fix(canvas)**: 空白处快速 dblclick 重复创建卡 — `captureSinkRegistry.submit()` 微任务 resolve,第二击进入时第一张 shape 还没入库。加 `creating` latch 在 `.finally()` 清 → `2638687`
+- **fix(mini-input)**: rapid ⌘↩(或双击按钮)可能重复提交 — `submit()` 重新进入。加 `submitting` latch + Save 按钮 disabled → `2638687`
+- **fix(card-detail)**: view 模式 Modal 标题 `card.title \|\| '(untitled)'` 硬编码英文(zh 用户看英文 fallback)。改用 `t('card.untitled')` → `2638687`
+
+### Latent(队列 / 快捷键 / a11y / 警告刷屏)
+
+- **harden(media-store)**: `remove()` 同步版 bypass v0.23.2 enqueueWrite 队列,与并发 attach race。内部改走队列,API 保持 `void` → `3d9bb6c`
+- **harden(search-shortcut)**: ⌘/ 在 input/textarea/contentEditable 内也触发,抢焦点跳走。加 e.target tag 检测排除 → `3d9bb6c`
+- **a11y(archive-card-tile)**: /trash 的 tile 是空 button,Tab+Enter 无反应。ArchiveCardTile 加 `disabled` prop,disabled 时渲染非交互容器(`aria-disabled` + `role=img`)。顺手修了同文件 3 处硬编码 `(untitled)` → `3d9bb6c`
+- **harden(i18n)**: `t()` 缺 key 的 dev warn 每次 render 都打,1 个 typo 刷屏。用模块级 Set 按 `locale:key` 去重 → `3d9bb6c`
+- **harden(media-store)**: quota 警告每次 attach 都打,重拖同一文件刷屏。用 Set 按 `name:size:mtime` 去重 → `3d9bb6c`
+
+**新增 i18n keys**(2 个):`trash.deleteForeverConfirm` / `trash.deleteForeverTypePlaceholder`
+
+**验收**:
+
+- domain 26/26 + db 7/7 + web build 14 页 exit 0
+- 10 个文件 / +172 -46 行 / 2 个 commit
+
+详见 [`docs/memory/decisions/2026-06-23-critical-and-latent.md`](../memory/decisions/2026-06-23-critical-and-latent.md)。
+
+---
