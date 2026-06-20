@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useValue } from '@tldraw/tldraw'
 import type { Editor } from '@tldraw/tldraw'
-import type { Card } from '@cys-stift/domain'
-import { Button, Toolbar, Tag } from '@cys-stift/ui'
+import type { CanvasId, Card } from '@cys-stift/domain'
+import { Button, Modal, Toolbar, Tag } from '@cys-stift/ui'
 import { useDb } from '@/lib/db-client'
 import { TldrawCanvas } from '@/features/canvas/tldraw-canvas'
 import { CardDetailModal } from '@/features/canvas/card-detail-modal'
@@ -15,19 +15,22 @@ import {
   removeCardShape,
   updateCardShape,
 } from '@/features/canvas/canvas-binding'
+import { canvasStore, useCanvases } from '@/lib/canvas-store'
 
 /**
- * /canvas — Phase 4 + Phase 5. A statically-exported route (no [id] segment,
- * spec §6.12) hosting the tldraw surface. Cards on the default canvas render
- * as custom tldraw shapes; the DB is the source of truth for positions
- * (spec §6.11).
+ * /canvas — Phase 4 + Phase 5 + Phase multi-canvas (2026-06-20).
+ * A statically-exported route (no [id] segment, spec §6.12) hosting the
+ * tldraw surface. Cards on the selected canvas render as custom tldraw
+ * shapes; the DB is the source of truth for positions (spec §6.11).
  *
- * The editor handle is lifted here (via onEditorReady) so the detail modal can
- * sync shapes back into tldraw after a save / archive / delete.
+ * The editor handle is lifted here (via onEditorReady) so the detail modal
+ * can sync shapes back into tldraw after a save / archive / delete.
  *
- * Phase 5 adds the snap/free toggle + zoom controls to the right side of the
- * toolbar (spec §8 line "网格 / 自由模式、缩放、对齐"). All UI is local state
- * (no DB persistence — view persistence is Phase 5+).
+ * Phase multi-canvas adds a Canvas switcher + create/rename/delete in the
+ * toolbar. Active canvasId lives in `canvas-store` (web-local
+ * localStorage). Inbox "Send to canvas" still targets DEFAULT_CANVAS_ID —
+ * MVP scope keeps that path stable; cross-canvas routing of new cards
+ * (send-to-active-canvas) is a follow-up.
  */
 export default function CanvasPage() {
   const { snap, service } = useDb()
@@ -39,8 +42,17 @@ export default function CanvasPage() {
   const [detail, setDetail] = useState<{ card: Card } | null>(null)
   const [snapMode, setSnapMode] = useState<'snap' | 'free'>('snap')
 
-  const onCanvas = service.listOnCanvas(DEFAULT_CANVAS_ID).filter((c) => !c.archived && !c.deletedAt)
-    .length
+  const { snapshot: canvasesSnap } = useCanvases()
+  const activeCanvasId = canvasesSnap.activeCanvasId
+  const canvases = canvasesSnap.canvases
+
+  const [creatingName, setCreatingName] = useState<string | null>(null)
+  const [renamingId, setRenamingId] = useState<CanvasId | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<CanvasId | null>(null)
+
+  const onCanvas = service
+    .listOnCanvas(activeCanvasId)
+    .filter((c) => !c.archived && !c.deletedAt).length
 
   const toggleSnap = useCallback(() => {
     if (!editor) return
@@ -96,12 +108,93 @@ export default function CanvasPage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [zoomBy, toggleSnap])
 
+  const switchCanvas = (id: CanvasId) => {
+    if (id === activeCanvasId) return
+    // Close any open card detail (it belongs to the previous canvas).
+    setDetail(null)
+    canvasStore.setActive(id)
+  }
+
+  const handleCreateCanvas = (raw: string) => {
+    const name = raw.trim()
+    setCreatingName(null)
+    if (!name) return
+    canvasStore.create(name)
+  }
+
+  const startRename = () => {
+    setRenamingId(activeCanvasId)
+  }
+
+  const handleRename = (raw: string) => {
+    const name = raw.trim()
+    setRenamingId(null)
+    if (!name) return
+    canvasStore.rename(activeCanvasId, name)
+  }
+
+  const requestDelete = () => {
+    // Already gated by the disabled state on the button (active
+    // canvas + default canvas are not deletable).
+    if (activeCanvasId === DEFAULT_CANVAS_ID) return
+    setConfirmDeleteId(activeCanvasId)
+  }
+
+  const confirmDelete = () => {
+    if (!confirmDeleteId) return
+    // Move any cards on this canvas back to the inbox before deleting
+    // so the user never silently loses their cards.
+    for (const c of service.listOnCanvas(confirmDeleteId)) {
+      service.removeFromCanvas(c.id)
+    }
+    canvasStore.delete(confirmDeleteId)
+    setConfirmDeleteId(null)
+  }
+
+  const activeCanvas = canvases.find((c) => c.id === activeCanvasId)
+  const cardCountOnTarget = confirmDeleteId
+    ? service.listOnCanvas(confirmDeleteId).filter((c) => !c.deletedAt).length
+    : 0
+
   return (
     <main className="page">
       <Toolbar region="canvas">
         <span className="crumb">cy&rsquo;s stift</span>
         <span className="crumb-sep">/</span>
         <span className="crumb crumb--here">canvas</span>
+        <span className="crumb-sep">/</span>
+        <CanvasSwitcher
+          canvases={canvases}
+          activeId={activeCanvasId}
+          renamingId={renamingId}
+          onStartRename={startRename}
+          onCommitRename={handleRename}
+          onCancelRename={() => setRenamingId(null)}
+          onSwitch={switchCanvas}
+        />
+        <Button
+          variant="ghost"
+          onClick={() => setCreatingName('')}
+          title="New canvas"
+        >
+          + New
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={startRename}
+          title="Rename current canvas"
+          disabled={!activeCanvas}
+        >
+          Rename
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={requestDelete}
+          title="Delete this canvas (default canvas cannot be deleted)"
+          disabled={activeCanvasId === DEFAULT_CANVAS_ID}
+        >
+          Delete
+        </Button>
         <span className="crumb-spacer" />
         <span className="hint">double-click to create · drag to place</span>
         <Tag color="black">{onCanvas}</Tag>
@@ -114,13 +207,69 @@ export default function CanvasPage() {
 
       <div className="cv-host">
         <TldrawCanvas
+          key={activeCanvasId}
           service={service}
-          canvasId={DEFAULT_CANVAS_ID}
+          canvasId={activeCanvasId}
           editor={editor}
           onOpenCard={(card) => setDetail({ card })}
           onEditorReady={(ed) => setEditor(ed)}
         />
       </div>
+
+      <Modal
+        open={creatingName !== null}
+        onClose={() => setCreatingName(null)}
+        title="New canvas"
+      >
+        <p className="confirm__body">
+          Name your new canvas. You'll switch to it immediately.
+        </p>
+        <input
+          autoFocus
+          className="cinput"
+          value={creatingName ?? ''}
+          onChange={(e) => setCreatingName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleCreateCanvas((e.target as HTMLInputElement).value)
+            else if (e.key === 'Escape') setCreatingName(null)
+          }}
+          placeholder="e.g. Project B"
+          maxLength={60}
+        />
+        <div className="confirm__actions">
+          <Button variant="ghost" onClick={() => setCreatingName(null)}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => handleCreateCanvas(creatingName ?? '')}
+            disabled={!creatingName?.trim()}
+          >
+            Create
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={confirmDeleteId !== null}
+        onClose={() => setConfirmDeleteId(null)}
+        title="Delete this canvas?"
+      >
+        <p className="confirm__body">
+          <strong>{canvases.find((c) => c.id === confirmDeleteId)?.name}</strong> will
+          be removed. {cardCountOnTarget > 0
+            ? `${cardCountOnTarget} card${cardCountOnTarget === 1 ? '' : 's'} on this canvas will move back to the inbox.`
+            : 'It has no cards.'}
+        </p>
+        <div className="confirm__actions">
+          <Button variant="ghost" onClick={() => setConfirmDeleteId(null)}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={confirmDelete}>
+            Delete canvas
+          </Button>
+        </div>
+      </Modal>
 
       {detail && (
         <CardDetailModal
@@ -163,6 +312,76 @@ export default function CanvasPage() {
 
       <style>{styles}</style>
     </main>
+  )
+}
+
+/**
+ * CanvasSwitcher — native select-style dropdown. Native <select> is the
+ * cheapest accessible pattern (keyboard / mobile / screen reader all work
+ * out of the box); the editor's tldraw surface is already JS-heavy and
+ * adding a custom popover would be more code than it's worth.
+ *
+ * When `renamingId === activeId` we render an inline <input> in place of
+ * the active option so rename is a single keystroke away.
+ */
+function CanvasSwitcher({
+  canvases,
+  activeId,
+  renamingId,
+  onStartRename,
+  onCommitRename,
+  onCancelRename,
+  onSwitch,
+}: {
+  canvases: { id: CanvasId; name: string }[]
+  activeId: CanvasId
+  renamingId: CanvasId | null
+  onStartRename: () => void
+  onCommitRename: (name: string) => void
+  onCancelRename: () => void
+  onSwitch: (id: CanvasId) => void
+}) {
+  if (renamingId !== null) {
+    return (
+      <input
+        autoFocus
+        className="crename"
+        defaultValue={canvases.find((c) => c.id === renamingId)?.name ?? ''}
+        onBlur={(e) => onCommitRename(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter')
+            onCommitRename((e.target as HTMLInputElement).value)
+          else if (e.key === 'Escape') onCancelRename()
+        }}
+        maxLength={60}
+        onClick={(e) => e.stopPropagation()}
+      />
+    )
+  }
+  return (
+    <>
+      <select
+        className="cselect"
+        value={activeId}
+        onChange={(e) => onSwitch(e.target.value as CanvasId)}
+        title="Switch canvas"
+      >
+        {canvases.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        className="cselect-edit"
+        onClick={onStartRename}
+        title="Rename this canvas"
+        aria-label="Rename current canvas"
+      >
+        ✎
+      </button>
+    </>
   )
 }
 
@@ -316,4 +535,47 @@ const styles = `
 .tb-icon-btn:hover { background: var(--color-black); color: var(--color-white); }
 .tb-icon-btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tb-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Phase multi-canvas — canvas switcher dropdown + inline rename input. */
+.cselect {
+  height: 32px;
+  padding: 0 var(--space-2);
+  background: var(--color-white);
+  color: var(--color-black);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.cselect:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.cselect-edit {
+  height: 32px; width: 32px;
+  background: transparent; color: var(--color-gray);
+  border: 0; cursor: pointer; font-size: var(--font-size-base);
+}
+.cselect-edit:hover { color: var(--color-black); }
+.crename {
+  height: 32px; padding: 0 var(--space-2);
+  background: var(--color-white); color: var(--color-black);
+  font-family: var(--font-mono); font-size: var(--font-size-sm);
+  border: var(--border-hairline); border-radius: var(--radius-sm);
+  outline: none;
+  min-width: 200px;
+}
+.crename:focus { border-color: var(--color-red); }
+.cinput {
+  display: block;
+  width: 100%;
+  height: 32px;
+  margin-top: var(--space-2);
+  padding: 0 var(--space-2);
+  background: var(--color-white); color: var(--color-black);
+  font-family: var(--font-mono); font-size: var(--font-size-base);
+  border: var(--border-hairline); border-radius: var(--radius-sm);
+  outline: none;
+}
+.cinput:focus { border-color: var(--color-red); }
+.confirm__body { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
+.confirm__actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-2); }
 `
