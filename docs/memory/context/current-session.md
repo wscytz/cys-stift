@@ -1,7 +1,9 @@
-# 当前会话交接(2026-06-20 · #1+#3 已修,待用户给下一步诉求)
+# 当前会话交接(2026-06-20 · ▶ 下一步 = 执行 trash 回收/恢复视图 plan)
 
 > **新会话/新模型先读此档**,再读根 `CLAUDE.md` + `docs/development/roadmap.md`。
 > clear 后上下文全丢,这里是不丢的全部。
+>
+> **▶ 下一步(compact 后立即执行):soft-delete 回收/恢复视图(findings #2)。** 入口已定 = **新 `/trash` 路由**(活跃 inbox / 归档 archive / 删除 trash 三分离)。完整 plan 见 [`docs/superpowers/plans/2026-06-20-trash-recovery.md`](../../superpowers/plans/2026-06-20-trash-recovery.md) —— domain 加 `restore`/`hardDelete`(repo.delete 已就绪)+ `/trash` 页 + AppMenu Trash 入口 + inbox 软删文案指向 Trash + e2e + closeout 四件套,tag `v0.10.0-trash`。**先读 plan 再动手。**
 
 ---
 
@@ -107,9 +109,8 @@ Rust **本就已装**(cargo/rustc 1.96,6/19 装),根因是 PATH 未 source `~/.c
 
 ---
 
-## 下一步候选(等用户诉求决定优先级)
+## 下一步候选(trash 执行完后排)
 
-- **soft-delete 恢复视图**(findings #2,产品决策,工作量中等:domain 加 `restore`/`hardDelete` + 新 tab/route)
 - **canvas-editor 脆弱点**(findings #4 #5,下次动 canvas 一起重构成 useEffect)
 - 暗色模式 / 多画布 UI / 标签全文搜索 / OPFS 真实落盘(P2.5)/ canvas dblclick 走 registry / archive tile 接 detail / 录屏
 - Phase 8 Tauri build(本地未签名可直接出;Rust 就绪)+ 签名公证(需 Apple 证书)
