@@ -927,3 +927,20 @@ Tag **v0.17.0-dark-mode**。
 详见 [`docs/memory/decisions/2026-06-20-dark-mode.md`](../memory/decisions/2026-06-20-dark-mode.md) + [`docs/design/screenshots/phase-dark-mode/`](../design/screenshots/phase-dark-mode/)。
 
 ---
+
+## 2026-06-20 · v0.22.0-ui-polish
+
+UI polish 三合一,不动数据/接口/依赖,基于 v0.15 干净基线重启(v0.18/19/20/21 决策档保留,代码未落地)。
+
+- **fix(canvas)**: 折叠三层 UI 为两层(canvas/page.tsx 删 3 个冗余节点 + tldraw 自带 chrome `components` prop 屏蔽 + canvas `.page` 用 `var(--app-menu-height)` 避免底部裁剪) → `cc914a5`
+- **fix(layout)**: 修 hydration mismatch("1 error" 红标真根因),`<html>` 加 `data-theme="light"` + `suppressHydrationWarning` → `9325cca`
+- **polish(tiles)**: 卡片 CJK 断字规则 + grid 列宽 280→320 + 字重 500→600 + 行间距 < 列间距 → `a1186fa`
+
+**验收**:
+- domain 26/26 + db 7/7 + web build 14 页 exit 0
+- puppeteer mini-audit 6/6 页 passed, 0 console error, 0 overflow
+- 6 张截图 commit 到 `docs/design/screenshots/phase-canvas-polish/`
+
+详见 [`docs/memory/decisions/2026-06-20-ui-polish.md`](../memory/decisions/2026-06-20-ui-polish.md)。
+
+---
