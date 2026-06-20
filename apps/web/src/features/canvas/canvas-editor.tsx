@@ -87,8 +87,10 @@ export function CanvasEditor({
         onMount={(ed: Editor) => {
           // ── One-shot setup (Phase 6.5d view + Phase 4 binding) ───
           // View persistence: apply zoom/pan/gridMode BEFORE first paint so
-          // users never see the default view flash.
-          const view = canvasViewStore.get()
+          // users never see the default view flash. Phase multi-canvas
+          // follow-up: view is per-canvas (v0.15+), so we look up the
+          // view for THIS canvas, not the global default.
+          const view = canvasViewStore.get(canvasId)
           ed.setCamera({ x: view.panX, y: view.panY, z: view.zoom })
           // spec §4.3 — gridMode + gridSize. isGridMode is the master
           // snap toggle; user.isSnapMode inverts ctrl-key behaviour. Both
@@ -110,7 +112,7 @@ export function CanvasEditor({
           // reactive side-effects live in the bridge components below.
         }}
       />
-      <ViewPersistenceBridge editor={editor} />
+      <ViewPersistenceBridge editor={editor} canvasId={canvasId} />
       <DoubleClickBridge
         editor={editor}
         canvasId={canvasId}
@@ -133,7 +135,7 @@ export function CanvasEditor({
  * store change including card drags; here we only run when camera or
  * isGridMode actually change).
  */
-function ViewPersistenceBridge({ editor }: { editor: Editor | null }) {
+function ViewPersistenceBridge({ editor, canvasId }: { editor: Editor | null; canvasId: CanvasId }) {
   const cam = useValue('cvp camera', () => editor?.getCamera(), [editor])
   const isGrid = useValue(
     'cvp isGridMode',
@@ -143,7 +145,7 @@ function ViewPersistenceBridge({ editor }: { editor: Editor | null }) {
   useEffect(() => {
     if (!editor || !cam) return
     const id = setTimeout(() => {
-      canvasViewStore.update({
+      canvasViewStore.update(canvasId, {
         zoom: cam.z,
         panX: cam.x,
         panY: cam.y,
@@ -151,10 +153,11 @@ function ViewPersistenceBridge({ editor }: { editor: Editor | null }) {
       })
     }, VIEW_PERSIST_DEBOUNCE_MS)
     return () => clearTimeout(id)
-    // deps: editor + the three camera scalars + isGrid flag. useValue
-    // returns a fresh reference on each tick; using scalar fields keeps the
-    // effect from re-running on unrelated reactivity churn.
-  }, [editor, cam?.z, cam?.x, cam?.y, isGrid])
+    // deps: editor + canvasId + the three camera scalars + isGrid flag.
+    // useValue returns a fresh reference on each tick; using scalar fields
+    // keeps the effect from re-running on unrelated reactivity churn.
+    // canvasId is in deps so switching canvases writes to the new id.
+  }, [editor, canvasId, cam?.z, cam?.x, cam?.y, isGrid])
   return null
 }
 

@@ -7,6 +7,7 @@ import type { Card } from '@cys-stift/domain'
 import { CreateCardForm } from './create-card-form'
 import { CardDetailModal } from '@/features/card/card-detail'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
+import { useCanvases } from '@/lib/canvas-store'
 import { captureSinkRegistry } from '@/features/capture/capture-sink'
 import { useDb } from '@/lib/db-client'
 
@@ -21,6 +22,9 @@ export default function InboxPage() {
   // Phase archive-detail: detail state simplified — modal owns view/edit
   // toggle now (was DetailState { card, mode } + page-level confirm).
   const [detail, setDetail] = useState<Card | null>(null)
+  // v0.15 follow-up: "Send to canvas" routes to the user's currently
+  // active canvas (read from canvasStore), not the hardcoded default.
+  const { snapshot: canvasesSnap } = useCanvases()
 
   // Register the manual sink so CreateCardForm onCreate goes through
   // captureSinkRegistry → consistent with shortcut + menubar paths.
@@ -132,12 +136,17 @@ export default function InboxPage() {
             setDetail(null)
           }}
           onSendToCanvas={() => {
-            const existing = service.listOnCanvas(DEFAULT_CANVAS_ID)
+            // Phase v0.15 follow-up: send to whichever canvas is
+            // currently active in canvasStore (multi-canvas). Falls
+            // back to DEFAULT_CANVAS_ID if the store hasn't hydrated
+            // yet (first render / SSR).
+            const targetCanvasId = canvasesSnap.activeCanvasId ?? DEFAULT_CANVAS_ID
+            const existing = service.listOnCanvas(targetCanvasId)
             const nextZ = existing.length === 0
               ? 0
               : Math.max(...existing.map((c) => c.canvasPosition?.z ?? 0)) + 1
             service.moveToCanvas(detail.id, {
-              canvasId: DEFAULT_CANVAS_ID,
+              canvasId: targetCanvasId,
               x: 100 + (nextZ % 5) * 40,
               y: 100 + (nextZ % 5) * 40,
               w: 200,

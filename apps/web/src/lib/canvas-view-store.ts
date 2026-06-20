@@ -1,12 +1,15 @@
 'use client'
 
-import { useEffect, useMemo, useSyncExternalStore, useState } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import type { CanvasId } from '@cys-stift/domain'
 
-// ── Canvas view persistence (spec §4.3 gridMode / Phase 5 closeout) ────────
-// Web-local view state backed by localStorage. Single canvas in MVP
-// (DEFAULT_CANVAS_ID), so we don't key by canvas id. When Phase 8
-// introduces Tauri fs, this moves to Tauri fs + canvases.viewJson
-// (schema already has the column, spec §4.9).
+// ── Canvas view persistence per-canvas (spec §4.3 + §4.9, v0.15 follow-up) ─
+// Up to v0.15 the view was a single value (no per-canvas split). With
+// multi-canvas UI shipped, each canvas now keeps its own zoom / pan /
+// gridMode so switching canvases preserves how you left it. The store
+// shape is now `Record<CanvasId, CanvasView>` keyed by canvas id. Public
+// API is the same set / get / update / reset shape, scoped to a canvas
+// id; useCanvasView(canvasId) replaces the canvasId-less hook.
 
 const STORAGE_KEY = 'cys-stift.canvas-view.v1'
 
@@ -26,7 +29,7 @@ const DEFAULT_VIEW: CanvasView = {
   gridSize: 8,
 }
 
-function isValid(v: unknown): v is CanvasView {
+function isValidView(v: unknown): v is CanvasView {
   if (!v || typeof v !== 'object') return false
   const o = v as Record<string, unknown>
   return (
@@ -38,30 +41,50 @@ function isValid(v: unknown): v is CanvasView {
   )
 }
 
-function loadView(): CanvasView {
-  if (typeof window === 'undefined') return DEFAULT_VIEW
+type ViewMap = Record<string, CanvasView>
+
+function loadViewMap(): ViewMap {
+  if (typeof window === 'undefined') return {}
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return DEFAULT_VIEW
-    const parsed = JSON.parse(raw) as { view?: unknown }
-    return isValid(parsed.view) ? parsed.view : DEFAULT_VIEW
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as { views?: unknown; view?: unknown }
+    // Back-compat: previous shape was { view: CanvasView } (single value).
+    // If we see the old shape, treat it as the default canvas's view.
+    if (parsed.view && isValidView(parsed.view)) {
+      // The legacy store had no canvasId dimension — we still don't know
+      // which canvas it belonged to, so we drop it. The legacy single
+      // value was effectively unused after v0.15 (canvas page reads
+      // canvasViewStore.get(activeCanvasId) and DEFAULT returns the
+      // default). Users would have to re-pan/zoom once on upgrade.
+      // Worth the migration simplicity.
+      return {}
+    }
+    if (parsed.views && typeof parsed.views === 'object') {
+      const out: ViewMap = {}
+      for (const [id, v] of Object.entries(parsed.views)) {
+        if (isValidView(v)) out[id] = v
+      }
+      return out
+    }
+    return {}
   } catch {
-    return DEFAULT_VIEW
+    return {}
   }
 }
 
-function saveView(view: CanvasView) {
+function saveViewMap(views: ViewMap) {
   if (typeof window === 'undefined') return
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ view }))
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ views }))
   } catch {
-    // Quota / private mode — best-effort.
+    // quota / private mode — best-effort.
   }
 }
 
-// ── Module singleton ───────────────────────────────────────────────────────
+// ── Module singleton ────────────────────────────────────────────────────────
 
-let _view: CanvasView = DEFAULT_VIEW
+let _views: ViewMap = {}
 let _hydrated = false
 const _subscribers = new Set<() => void>()
 
@@ -72,20 +95,25 @@ function notify() {
 function hydrateOnce() {
   if (_hydrated) return
   _hydrated = true
-  _view = loadView()
+  _views = loadViewMap()
   notify()
 }
 
-// Stable snapshot cache — only reallocate when _view changes.
-let _cachedSnapshot: CanvasView = _view
-function getSnapshot(): CanvasView {
-  if (_cachedSnapshot !== _view) {
-    _cachedSnapshot = _view
+function persist() {
+  saveViewMap(_views)
+  notify()
+}
+
+// Stable snapshot cache — only reallocate when _views changes.
+let _cachedSnapshot: ViewMap = _views
+function getSnapshot(): ViewMap {
+  if (_cachedSnapshot !== _views) {
+    _cachedSnapshot = _views
   }
   return _cachedSnapshot
 }
 
-function getServerSnapshot(): CanvasView {
+function getServerSnapshot(): ViewMap {
   return _cachedSnapshot
 }
 
@@ -99,38 +127,59 @@ function subscribe(cb: () => void) {
 // ── Public API ─────────────────────────────────────────────────────────────
 
 export const canvasViewStore = {
-  /** Synchronous read — calls hydrateOnce() so the first read reflects
-   * localStorage. After that, repeated reads are cheap (just returns _view). */
-  get(): CanvasView {
+  /** Read a canvas's view (default view if the canvas has none yet). */
+  get(id: CanvasId): CanvasView {
     hydrateOnce()
-    return _view
+    return _views[id] ?? DEFAULT_VIEW
   },
-  update(patch: Partial<CanvasView>): void {
+  /** Patch a canvas's view. */
+  update(id: CanvasId, patch: Partial<CanvasView>): void {
     hydrateOnce()
-    const next: CanvasView = { ..._view, ...patch }
-    _view = next
-    saveView(_view)
-    notify()
+    const current = _views[id] ?? DEFAULT_VIEW
+    const next: CanvasView = { ...current, ...patch }
+    if (next.zoom === current.zoom &&
+        next.panX === current.panX &&
+        next.panY === current.panY &&
+        next.gridMode === current.gridMode &&
+        next.gridSize === current.gridSize) {
+      return
+    }
+    _views = { ..._views, [id]: next }
+    persist()
   },
-  reset(): void {
+  /** Reset a single canvas's view to defaults. */
+  reset(id: CanvasId): void {
     hydrateOnce()
-    _view = DEFAULT_VIEW
-    saveView(_view)
-    notify()
+    if (!(id in _views)) return
+    const next = { ..._views }
+    delete next[id]
+    _views = next
+    persist()
+  },
+  /** Reset every canvas's view (used by "Reset view" UI in the future). */
+  resetAll(): void {
+    hydrateOnce()
+    if (Object.keys(_views).length === 0) return
+    _views = {}
+    persist()
   },
 }
 
 /**
- * useCanvasView — read the persisted view. After hydration the snapshot
- * reflects localStorage; before that, the defaults are returned (safe
- * for SSR / first client paint).
+ * useCanvasView — read a canvas's persisted view. After hydration the
+ * snapshot reflects localStorage; before that, the defaults are returned
+ * (safe for SSR / first client paint).
  */
-export function useCanvasView(): { view: CanvasView; ready: boolean } {
+export function useCanvasView(canvasId: CanvasId): {
+  view: CanvasView
+  ready: boolean
+} {
   const [ready, setReady] = useState(false)
   useEffect(() => {
     hydrateOnce()
     setReady(true)
   }, [])
-  const view = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+  const views = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+  const view = useMemo(() => views[canvasId] ?? DEFAULT_VIEW, [views, canvasId])
   return useMemo(() => ({ view, ready }), [view, ready])
 }

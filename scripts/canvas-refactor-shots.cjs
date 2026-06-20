@@ -41,8 +41,13 @@ async function readView(page) {
 }
 
 async function setView(page, view) {
+  // v0.15+ writes per-canvas; default canvas key.
   await page.evaluate(
-    (k, v) => localStorage.setItem(k, JSON.stringify({ view: v })),
+    (k, v) =>
+      localStorage.setItem(
+        k,
+        JSON.stringify({ views: { 'default-canvas': v } }),
+      ),
     VIEW_KEY,
     view,
   )

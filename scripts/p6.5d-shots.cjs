@@ -26,10 +26,19 @@ async function shotFull(page, name) {
 }
 
 async function readView(page) {
+  // v0.15+ shape: { views: { [canvasId]: CanvasView } }. The default
+  // canvas ('default-canvas') is what p6.5d exercises. We read its
+  // view directly so this stays robust against future per-canvas
+  // migrations.
   return page.evaluate((k) => {
     const raw = localStorage.getItem(k)
     if (!raw) return null
-    return JSON.parse(raw).view
+    const parsed = JSON.parse(raw)
+    if (parsed.views && parsed.views['default-canvas']) {
+      return parsed.views['default-canvas']
+    }
+    // Legacy shape (single view).
+    return parsed.view ?? null
   }, VIEW_KEY)
 }
 
