@@ -26,6 +26,10 @@ export default function TrashPage() {
   const { snap, service, ready } = useDb()
   void snap // subscribe
   const [confirmHardDelete, setConfirmHardDelete] = useState<CardId | null>(null)
+  // C2 (v0.23.3): hard-delete is irreversible — require the user to type
+  // "delete" before the red button enables. The typed text resets when
+  // the modal closes so a later reopen starts clean.
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
   const trashed = useMemo(
     () =>
@@ -74,7 +78,10 @@ export default function TrashPage() {
 
       <Modal
         open={confirmingCard != null}
-        onClose={() => setConfirmHardDelete(null)}
+        onClose={() => {
+          setConfirmHardDelete(null)
+          setDeleteConfirmText('')
+        }}
         title={t('trash.deleteForeverTitle')}
       >
         {confirmingCard && (
@@ -82,11 +89,34 @@ export default function TrashPage() {
             <p className="confirm__body">
               {t('trash.deleteForeverBody', { title: confirmingCard.title || t('card.untitled') })}
             </p>
+            <p className="confirm__body">{t('trash.deleteForeverConfirm')}</p>
+            <input
+              className="confirm__type"
+              type="text"
+              autoFocus
+              placeholder={t('trash.deleteForeverTypePlaceholder')}
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+            />
             <div className="confirm__actions">
-              <Button variant="ghost" onClick={() => setConfirmHardDelete(null)}>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setConfirmHardDelete(null)
+                  setDeleteConfirmText('')
+                }}
+              >
                 {t('common.cancel')}
               </Button>
-              <Button variant="danger" onClick={() => { service.hardDelete(confirmingCard.id); setConfirmHardDelete(null) }}>
+              <Button
+                variant="danger"
+                disabled={deleteConfirmText !== 'delete'}
+                onClick={() => {
+                  service.hardDelete(confirmingCard.id)
+                  setConfirmHardDelete(null)
+                  setDeleteConfirmText('')
+                }}
+              >
                 {t('trash.deleteForeverBtn')}
               </Button>
             </div>
@@ -192,5 +222,14 @@ const styles = `
 .footnote__link { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; }
 
 .confirm__body { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
+.confirm__body + .confirm__body { margin-top: var(--space-1); }
+.confirm__type {
+  display: block; width: 100%; margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-mono); font-size: var(--font-size-sm);
+  border: var(--border-hairline); border-radius: var(--radius-sm);
+  background: var(--color-white); color: var(--color-black); outline: none;
+}
+.confirm__type:focus { border-color: var(--color-red); }
 .confirm__actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-2); }
 `

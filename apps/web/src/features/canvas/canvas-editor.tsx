@@ -210,6 +210,13 @@ function DoubleClickBridge({
   useEffect(() => {
     if (!editor) return
     const container = editor.getContainer()
+    // C3 (v0.23.3): captureSinkRegistry.submit() resolves on a microtask,
+    // so a rapid second dblclick on the same blank spot hits the handler
+    // again before the first card's shape is added to the editor. Without
+    // this guard the second dblclick sees no shape at the point and
+    // creates a duplicate card. We hold the flag from the create call
+    // until the shape lands (or the promise rejects).
+    let creating = false
     const onDbl = (e: MouseEvent) => {
       const pagePoint = editor.screenToPage({ x: e.clientX, y: e.clientY })
       const hit = editor.getShapeAtPoint(pagePoint)
@@ -218,6 +225,7 @@ function DoubleClickBridge({
         if (card) cbRef.current(card)
         return
       }
+      if (creating) return
       // Blank dblclick → create via captureSinkRegistry (Phase plan:
       // unify all entry-points through the registry — manual sink
       // registered on inbox mount, registry falls back to
@@ -225,6 +233,7 @@ function DoubleClickBridge({
       // never lost). We reuse `manual` source kind (same path as
       // the inbox form); the canvasPosition disambiguates the
       // resulting card from inbox-only manual creates.
+      creating = true
       void captureSinkRegistry
         .submit({
           title: '',
@@ -251,6 +260,9 @@ function DoubleClickBridge({
           // which would be a wiring bug (CaptureHost / inbox mount
           // both set fallback).
           console.error('[canvas-editor] dblclick create failed', err)
+        })
+        .finally(() => {
+          creating = false
         })
     }
     container.addEventListener('dblclick', onDbl)

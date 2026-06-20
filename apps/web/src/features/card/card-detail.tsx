@@ -203,7 +203,7 @@ export function CardDetailModal({
       <Modal
         open
         onClose={onClose}
-        title={mode === 'edit' ? t('card.detail.title') : card.title || '(untitled)'}
+        title={mode === 'edit' ? t('card.detail.title') : card.title || t('card.untitled')}
       >
         <div className="cd" ref={dialogRef}>
           {mode === 'view' ? (

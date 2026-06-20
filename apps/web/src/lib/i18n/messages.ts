@@ -123,6 +123,8 @@ export const messages = {
   'trash.deleteForeverTitle': { zh: '永久删除？', en: 'Delete forever?' },
   'trash.deleteForeverBody': { zh: '卡片「{title}」将从存储中永久删除，此操作不可撤销。', en: 'Card "{title}" will be permanently removed from storage. This cannot be undone.' },
   'trash.deleteForeverBtn': { zh: '永久删除', en: 'Delete forever' },
+  'trash.deleteForeverConfirm': { zh: '请输入 “delete” 以确认永久删除（不可撤销）。', en: 'Type "delete" to confirm permanent deletion (cannot be undone).' },
+  'trash.deleteForeverTypePlaceholder': { zh: 'delete', en: 'delete' },
 
   /* ── Settings ── */
   'settings.crumb': { zh: '设置', en: 'settings' },

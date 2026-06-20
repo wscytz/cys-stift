@@ -42,6 +42,12 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [bodyOpen, setBodyOpen] = useState(false)
+  // C4 (v0.23.3): block rapid double-submit. The submit handler is
+  // fire-and-forget (caller does `void captureSinkRegistry.submit()`),
+  // and React's async setState means a second ⌘↩ within the same tick
+  // re-enters submit() before setOpen(false) closes the modal — two
+  // cards get created. Latch until the parent unmounts/closes us.
+  const [submitting, setSubmitting] = useState(false)
   const bodyRef = useRef<HTMLTextAreaElement | null>(null)
 
   // Debounced autosave (spec §5.5). 500ms of silence → persist. The store
@@ -79,8 +85,10 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
   }
 
   const submit = () => {
+    if (submitting) return
     const t = title.trim()
     if (t.length === 0) return
+    setSubmitting(true)
     onSubmit({ title: t, body: body.trim() || undefined })
     // Successful submit clears the draft (a saved card is no longer a draft).
     draftStore.clear('capture')
@@ -170,7 +178,7 @@ if (
           </Button>
           <Button
             variant="danger"
-            disabled={title.trim().length === 0}
+            disabled={submitting || title.trim().length === 0}
             onClick={submit}
           >
             {t('card.detail.save')}

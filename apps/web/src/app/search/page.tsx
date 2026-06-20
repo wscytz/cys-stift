@@ -78,7 +78,10 @@ export default function SearchPage() {
           actions={['archive', 'softDelete', 'sendToCanvas']}
           onClose={() => setDetail(null)}
           onSave={(patch) => {
-            setDetail({ card: { ...detail.card, ...patch } })
+            // C1 (v0.23.3): persist to the store, not just local state.
+            // Before this fix, closing the modal dropped the edits.
+            const updated = service.update(detail.card.id, patch)
+            if (updated) setDetail({ card: updated })
           }}
           onConfirmDelete={() => {
             service.softDelete(detail.card.id)
