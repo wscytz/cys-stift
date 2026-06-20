@@ -868,3 +868,62 @@
 详见 [`docs/superpowers/plans/2026-06-20-multi-canvas.md`](../superpowers/plans/2026-06-20-multi-canvas.md) + [`docs/memory/decisions/2026-06-20-multi-canvas.md`](../memory/decisions/2026-06-20-multi-canvas.md) + [`docs/design/screenshots/phase-multi-canvas/`](../design/screenshots/phase-multi-canvas/)。
 
 ---
+
+## 2026-06-20 · phase multi-canvas-polish · view per canvas + active-canvas routing(v0.16)
+
+**交付**:v0.15 plan 留后的两项 polish(共 commit `778245d`):
+① `canvas-view-store.ts` 改为 `Record<CanvasId, CanvasView>`,API `get(id) / update(id, ...) / reset(id)`,`useCanvasView(canvasId)` 接受 canvasId 订阅,`CanvasEditor.onMount` 读 `canvasViewStore.get(canvasId)` + `ViewPersistenceBridge` deps 加 canvasId;
+② `inbox/page.tsx` 接 `useCanvases().activeCanvasId`,`moveToCanvas` 用 activeCanvasId(替代 hardcode DEFAULT)。两个 e2e 脚本(`p6.5d-shots.cjs` + `canvas-refactor-shots.cjs`)更新 selector(读 / 写新 view shape)。
+
+**核心承诺验证**:
+
+- 切画布时 view 独立恢复:zoom/pan/gridMode per canvasId ✓
+- /canvas → 切到 active, /inbox → "Send to canvas" 送到 active(不再是固定 default)✓
+- p6.5d view 持久化回归 ✓ / canvas-refactor 回归 ✓ / 全部 10 e2e ✓
+- domain 17 / db 7 / web build 14 静态页 exit 0
+
+**已知 / 后续**:无 — review + UX 洞 + spec §4.9 + canvas polish 全交付,产品**无遗留可补功能**(除 Phase 8 Tauri build / 签名公证)。
+
+详见 commit `778245d`。
+
+---
+
+## 2026-06-20 · phase dark-mode · 暗色模式(关闭 spec §5.6 长期留后)
+
+**交付**:spec §5.6 "MVP 不做,预留 token 抽象,未来加" —— 现在加。
+① `packages/ui/src/tokens.css` 加 `:root[data-theme='dark']` 变体(`--color-white` ↔ `--color-black` 互换,hue tokens 调亮保 AA,soft 变深 washes,borders 改灰);**用 `:root[data-theme='dark']` 而不是 `[data-theme='dark']`** 以更高特异性压过 Tailwind v4 `@theme` reset;
+② `apps/web/src/lib/settings-store.ts` 加 `theme: 'light' | 'dark' | 'system'` 字段(default 'system') + `updateTheme()` + public `subscribe()`;
+③ `apps/web/src/lib/theme.ts`(新):`resolveTheme(pref)` 优先级 explicit > system(`matchMedia`) > light;`applyTheme()` 写 `data-theme` on `<html>` + sync `--tl-bg` on `<body>` 让 tldraw surface 跟;
+④ `apps/web/src/components/theme-boot.tsx`(新):client-only mount,`useThemeApplication` 订阅 settings 变化 + OS dark-mode flips;
+⑤ `apps/web/src/app/layout.tsx` head 加 inline script 同步读 localStorage + apply theme 在 first paint,**避免 dark-mode flash**;
+⑥ `apps/web/src/app/settings/page.tsx` 加 Appearance section(Theme `<select>` Light/Dark/Follow system)。
+Tag **v0.17.0-dark-mode**。
+
+**核心承诺验证**:
+
+- 默认 `data-theme=light`,`--color-white=#fafafa`,`--color-black=#0a0a0a` ✓
+- /settings 选 Dark → `data-theme=dark`,`--color-white=#0a0a0a`(背景翻黑),`--color-black=#fafafa`(文本翻白)✓
+- reload → inline head script 重新 apply dark before paint(无 flash)✓
+- /inbox 切到 dark 立即生效 ✓
+- 切回 light 立即生效 ✓
+- 切到 system → headless 无 OS dark preference,resolve 为 light ✓
+- 11 断言全过 + 0 page error
+- 10 个回归 e2e 全过
+- domain 17 / db 7 / web build 14 静态页 exit 0
+- /settings 4.47 → 4.68 kB(+Appearance section)
+
+**关键工程决策**:
+
+- **`:root[data-theme='dark']` 而非 `[data-theme='dark']`**:0,1,1 specificity 压过 Tailwind v4 `@theme` reset 的 `:root`(0,0,1),确保 dark variant 真生效
+- **inline head script 防 flash**:read localStorage + apply data-theme 在 first paint 之前,client 启动后 ThemeBoot 接管 OS theme 变化监听
+- **6 原色不变**:包豪斯红/黄/蓝/灰保留,只调亮度(浅→深→浅,dark 调更亮)保 AA 对比度;不引入第七色(守 spec §5.2)
+- **theme = 'system' 默认**:尊重 OS 偏好;`matchMedia('(prefers-color-scheme: dark)')` 实时跟踪
+- **tldraw bg 跟随**:theme.ts applyTheme 时同步 `--tl-bg` on `<body>`,tldraw 的 canvas surface 跟随页面主题
+- **公共 `subscribe()` API**:settingsStore 暴露 subscribe 给 theme.ts,统一 hooks + imperative 消费
+- **0 新依赖** + **没碰 spec** + **domain 零改动**
+
+**已知 / 后续**:**无遗留可补功能**(除 Phase 8 Tauri build / 签名公证)。
+
+详见 [`docs/memory/decisions/2026-06-20-dark-mode.md`](../memory/decisions/2026-06-20-dark-mode.md) + [`docs/design/screenshots/phase-dark-mode/`](../design/screenshots/phase-dark-mode/)。
+
+---

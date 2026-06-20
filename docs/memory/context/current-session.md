@@ -1,9 +1,9 @@
-# 当前会话交接(2026-06-20 · ▶ 下一步 = 等用户诉求)
+# 当前会话交接(2026-06-20 · ▶ 下一步 = 软件开发基本完成 + 等用户诉求)
 
 > **新会话/新模型先读此档**,再读根 `CLAUDE.md` + `docs/development/roadmap.md`。
 > clear 后上下文全丢,这里是不丢的全部。
 >
-> **▶ 下一步:等用户诉求。** review findings **全部 5 项关闭** + UX 洞 #2 #3 #4 全部已修 + spec §4.9 多画布已交付。**产品 0 个 open review 项**。Phase 8 Tauri build(Rust 就绪)按需触发。候选:暗色模式 / 标签搜索 / OPFS(Phase 2.5) / 录屏 / inbox "Send to canvas" 用 activeCanvasId / canvas view 持久化按 canvasId 拆分 / Phase 8 tauri build + 签名公证。
+> **▶ 下一步:软件开发基本完成,等用户决定 Phase 8 Tauri build 或其他。** 所有非上架代办已清空:review findings 全部 5 项 + UX 洞 #2/#3/#4 + spec §4.9 多画布 + spec §5.6 暗色模式 + inbox dead styles + canvas view per canvas + canvas send-to-active + canvas dblclick registry 全部交付。**产品 0 open 项**。
 
 ---
 

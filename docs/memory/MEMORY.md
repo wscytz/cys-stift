@@ -2,6 +2,8 @@
 
 > 每条一行，按日期倒序。详细见对应文件。
 
+- [2026-06-20 · Phase dark-mode 暗色模式(已交付)](decisions/2026-06-20-dark-mode.md) — 关闭 spec §5.6 长期留后(:root[data-theme='dark'] + inline head script 防 flash + theme.ts + ThemeBoot);tag v0.17.0-dark-mode
+- [2026-06-20 · Phase multi-canvas-polish view per canvas + active-canvas routing(已交付)](commit 778245d) — v0.15 plan 留后(canvas-view-store Record<CanvasId> + inbox send-to-canvas 用 activeCanvasId);tag v0.16.0-multi-canvas-polish
 - [2026-06-20 · Phase multi-canvas 多画布 UI(已交付)](decisions/2026-06-20-multi-canvas.md) — spec §4.9 长期留后已补(canvas-store + canvas page 切换器 + +New/Rename/Delete + delete 预 removeFromCanvas);tag v0.15.0-multi-canvas
 - [2026-06-20 · Phase send-back canvas 卡反向回 inbox(已交付)](decisions/2026-06-20-send-back.md) — 关闭 review §🟠 UX #2(domain removeFromCanvas + canvas Modal 按钮);tag v0.14.0-send-back
 - [2026-06-20 · Phase batch-confirm archive 批量软删二次确认(已交付)](decisions/2026-06-20-batch-confirm.md) — 关闭 review §🟠 UX #3(floater Soft-delete 弹 Modal + Cancel 保留 selected);tag v0.13.0-batch-confirm
