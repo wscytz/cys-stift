@@ -10,12 +10,14 @@ import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import { useCanvases } from '@/lib/canvas-store'
 import { captureSinkRegistry } from '@/features/capture/capture-sink'
 import { useDb } from '@/lib/db-client'
+import { useI18n } from '@/lib/i18n'
 
 type View = 'inbox' | 'archived'
 
 const DEVICE_ID = 'web'
 
 export default function InboxPage() {
+  const { t } = useI18n()
   const { snap, service, ready } = useDb()
   void snap // subscribe to the snapshot so the component re-renders on changes
   const [view, setView] = useState<View>('inbox')
@@ -54,21 +56,21 @@ export default function InboxPage() {
       <Toolbar region="inbox">
         <span className="crumb">cy&rsquo;s stift</span>
         <span className="crumb-sep">/</span>
-        <span className="crumb crumb--here">inbox</span>
+        <span className="crumb crumb--here">{t('inbox.crumb')}</span>
         <span className="crumb-spacer" />
         <button
           type="button"
           className={`tab ${view === 'inbox' ? 'tab--active' : ''}`}
           onClick={() => setView('inbox')}
         >
-          active
+          {t('inbox.tab.inbox')}
         </button>
         <button
           type="button"
           className={`tab ${view === 'archived' ? 'tab--active' : ''}`}
           onClick={() => setView('archived')}
         >
-          archived
+          {t('inbox.tab.archived')}
         </button>
         <Tag color={view === 'inbox' ? 'red' : 'blue'}>
           {view === 'inbox' ? inbox.length : archived.length}
@@ -193,18 +195,17 @@ function CardTile({ card, onOpen }: { card: Card; onOpen: () => void }) {
 }
 
 function EmptyState({ view }: { view: View }) {
+  const { t } = useI18n()
   return (
     <UICard>
       <div className="empty">
         <div className="empty__bar" aria-hidden="true" />
-        <p className="empty__eyebrow">inbox</p>
+        <p className="empty__eyebrow">{t('inbox.crumb')}</p>
         <h2 className="empty__h">
-          {view === 'inbox' ? 'No cards yet.' : 'Nothing archived yet.'}
+          {view === 'inbox' ? t('inbox.empty.title') : t('inbox.empty.titleArchived')}
         </h2>
         <p className="empty__lede">
-          {view === 'inbox'
-            ? 'Create the first card above. Add links, code blocks, and quotes — they all stay attached to the same note.'
-            : 'Archive from the active tab to move cards here. They stay archived until you unarchive them or soft-delete from here.'}
+          {view === 'inbox' ? t('inbox.empty.lede') : t('inbox.empty.ledeArchived')}
         </p>
       </div>
     </UICard>
