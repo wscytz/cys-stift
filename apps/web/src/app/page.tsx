@@ -1,3 +1,5 @@
+'use client'
+
 /**
  * cy's Stift — Phase 0 + Phase 4 + Phase 6 + Phase 7. A Bauhaus-styled
  * home page so we can verify tokens, fonts and the 8px grid are wired.
@@ -7,56 +9,62 @@
  * Phase 7 adds the Archive entry (blue region stripe).
  */
 import Link from 'next/link'
+import { useI18n } from '@/lib/i18n'
 
 export default function HomePage() {
+  const { t } = useI18n()
   return (
     <main className="home">
       <header className="home__bar" aria-hidden="true" />
       <section className="home__content">
-        <p className="home__eyebrow">phase 0 · scaffold</p>
+        <p className="home__eyebrow">{t('home.eyebrow')}</p>
         <h1 className="home__title">
           cy&rsquo;s <span className="home__title-accent">Stift</span>
         </h1>
-        <p className="home__lede">灵感 3 秒记，画布上慢慢养。</p>
+        <p className="home__lede">{t('home.tagline')}</p>
         <dl className="home__meta">
           <div>
-            <dt>local-first</dt>
-            <dd>data lives on your machine</dd>
+            <dt>{t('home.feature.capture.title')}</dt>
+            <dd>{t('home.feature.capture.desc')}</dd>
           </div>
           <div>
-            <dt>form follows function</dt>
-            <dd>Bauhaus restraint, geometric grid</dd>
+            <dt>{t('home.feature.inbox.title')}</dt>
+            <dd>{t('home.feature.inbox.desc')}</dd>
           </div>
           <div>
-            <dt>feature-sliced</dt>
-            <dd>each capability is an interface</dd>
+            <dt>{t('home.feature.canvas.title')}</dt>
+            <dd>{t('home.feature.canvas.desc')}</dd>
+          </div>
+          <div>
+            <dt>{t('home.feature.archive.title')}</dt>
+            <dd>{t('home.feature.archive.desc')}</dd>
           </div>
         </dl>
         <nav className="home__nav" aria-label="Primary">
           <div className="home__capture" aria-label="Quick capture">
             <div className="home__capture-arrow" aria-hidden="true">⌘</div>
-            <div className="home__capture-label">Capture</div>
-            <div className="home__capture-note">Quick capture · ⌘⇧Space anywhere</div>
+            <div className="home__capture-label">{t('home.feature.capture.title')}</div>
+            <div className="home__capture-note">{t('home.hint')}</div>
           </div>
           <Link href="/inbox" className="home__nav-link">
             <span className="home__nav-arrow" aria-hidden="true">→</span>
-            <span className="home__nav-label">Inbox</span>
-            <span className="home__nav-note">收件箱 · 创建 / 编辑 / 归档卡片</span>
+            <span className="home__nav-label">{t('home.feature.inbox.title')}</span>
+            <span className="home__nav-note">{t('home.feature.inbox.desc')}</span>
           </Link>
           <Link href="/canvas" className="home__nav-link home__nav-link--canvas">
             <span className="home__nav-arrow" aria-hidden="true">→</span>
-            <span className="home__nav-label">Canvas</span>
-            <span className="home__nav-note">画布 · 把卡片摆开慢慢养</span>
+            <span className="home__nav-label">{t('home.feature.canvas.title')}</span>
+            <span className="home__nav-note">{t('home.feature.canvas.desc')}</span>
           </Link>
           <Link href="/archive" className="home__nav-link home__nav-link--archive">
             <span className="home__nav-arrow" aria-hidden="true">→</span>
-            <span className="home__nav-label">Archive</span>
-            <span className="home__nav-note">归档 · 已沉淀的卡片</span>
+            <span className="home__nav-label">{t('home.feature.archive.title')}</span>
+            <span className="home__nav-note">{t('home.feature.archive.desc')}</span>
           </Link>
         </nav>
         <footer className="home__foot">
-          <span>phase 7 · archive</span>
-          <span>v0.8.0</span>
+          <span>{t('home.eyebrow')}</span>
+          <span>v0.22.4</span>
         </footer>
       </section>
       <style>{`
