@@ -45,8 +45,6 @@ function writeCardToShape(editor: Editor, card: Card): void {
     props: {
       w: p?.w ?? DEFAULT_W,
       h: p?.h ?? DEFAULT_H,
-      title: card.title,
-      kind: card.type,
     },
   })
 }
@@ -64,8 +62,6 @@ export function cardToShape(card: Card): TLShapePartial {
     props: {
       w: p?.w ?? DEFAULT_W,
       h: p?.h ?? DEFAULT_H,
-      title: card.title,
-      kind: card.type,
     },
   }
 }

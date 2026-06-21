@@ -27,23 +27,22 @@ export type CardShape = TLBaseShape<
   {
     w: number
     h: number
-    title: string
-    kind: string // CardType, kept as plain string for tldraw props
   }
 >
 
 export class CardShapeUtil extends BaseBoxShapeUtil<CardShape> {
   static override type = CARD_TYPE
 
+  // F1.3 (v0.26.0): slimmed to geometry only. Content (title/body/type/
+  // pinned) is read from CardService at render time (F1.2), so it never
+  // lives in tldraw's store — no stale props, no sync conflicts.
   static override props = {
     w: T.positiveNumber,
     h: T.positiveNumber,
-    title: T.string,
-    kind: T.string,
   }
 
   override getDefaultProps(): CardShape['props'] {
-    return { w: 240, h: 120, title: '', kind: 'note' }
+    return { w: 240, h: 120 }
   }
 
   override component(shape: CardShape) {
