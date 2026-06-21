@@ -1154,3 +1154,24 @@ Review 驱动。3 个并行 Explore agent 复核 v0.24-v0.25,6 项全修(4 真 b
 详见 [`docs/memory/decisions/2026-06-21-review-bugfixes.md`](../memory/decisions/2026-06-21-review-bugfixes.md)。
 
 ---
+
+## 2026-06-21 · v0.26.0-high-freedom-canvas-f1
+
+高自由画布 Phase **F1(地基)**。参考苹果无边记(Freeform),以"整理笔记"为核心,画布从"只摆灵感卡"向"自由多元素笔记整理"演进。F1 = 持久化地基 + card 内容单一数据源 + body preview。**F2(包豪斯工具栏)下一档**。
+
+- **F1.1** `CardServiceContext` + Provider — 让 card shape component 能查 CardService → `b9d0e57`
+- **F1.2** card-shape-util component 渲染查 CardService — **body preview(3 行)** + pinned 黄星 + 类型标签 + inbox→画布实时同步 + 占位(card 删时)→ `af4fe61`
+- **F1.3** card props 瘦化 `{w,h}`(去 title/kind)+ binding 同步 — 单一数据源,无 stale → `b58d460`
+- **F1.4** `lib/canvas-snapshot-store.ts` — per-canvas snapshot(localStorage)+ quota 容错 → `ab7f4c2`
+- **F1.5** onMount `loadSnapshot` 恢复全画布(document only,camera 仍 canvasViewStore)+ `loadCardsIntoEditor` 幂等补漏 + 自由元素 `store.listen` 防抖写回 → `78777bc`
+
+**关键决策**:
+- **card 内容单一数据源**:shape 只存几何 + cardId 引用(在 shape.id),内容渲染查 CardService → inbox/archive 编辑实时反映画布,body preview 自然实现,无 sync 冲突
+- **持久化**:per-canvas snapshot(`getSnapshot`/`loadSnapshot`,localStorage),document only。不用 tldraw 原生 IndexedDB(避免卡脱离 CardService 体系)
+- **reset 重灾区谨慎**:F1 拆 5 步,每步独立 commit + build 验证
+
+**验收**:domain 26/26 + db 7/7 + web build exit 0。GUI 可见改进:card body preview + pinned 星 + inbox→画布实时同步。自由元素(便签/文本/形状/箭头/手绘)持久化**已就位但待 F2 工具栏才能创建测试**(F1 阶段 hideUi 未放工具)。
+
+详见 [`docs/memory/decisions/2026-06-21-high-freedom-canvas-f1.md`](../memory/decisions/2026-06-21-high-freedom-canvas-f1.md)。
+
+---
