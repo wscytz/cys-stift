@@ -72,4 +72,19 @@ describe('PROMPTS (privacy lock)', () => {
       expect(u).not.toMatch(/apiKey|api.key/i)
     },
   )
+
+  // ── Privacy rule #3: soft-deleted cards never reach the AI ──
+  // serializeCardForAI returns '' for deleted cards; the blank-card
+  // fallback must NOT then hand-concat the raw title/body. v0.37.0 fix.
+  it.each<AIAction>(['summarize', 'improveWriting', 'translate'])(
+    '%s prompt is empty for a soft-deleted card (rule #3)',
+    (action) => {
+      const deleted = fakeCard({ title: 'Leaked Title', body: 'Leaked body' })
+      deleted.deletedAt = new Date('2026-06-21')
+      const u = PROMPTS[action].buildUser(deleted as never)
+      expect(u).toBe('')
+      expect(u).not.toContain('Leaked Title')
+      expect(u).not.toContain('Leaked body')
+    },
+  )
 })

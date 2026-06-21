@@ -18,6 +18,7 @@ import { restoreFromFile } from '@/features/canvas/cystift-payload'
 import type { CardService } from '@cys-stift/domain'
 import { pushToast } from '@/lib/toast-store'
 import { useI18n } from '@/lib/i18n'
+import { useDb } from '@/lib/db-client'
 import type { MessageKey } from '@/lib/i18n/messages'
 
 function getDeviceId(): string {
@@ -46,16 +47,13 @@ interface DropOrPastePayload {
   kind: 'drag-drop' | 'paste'
 }
 
-/** The CardService exposed on the canvas page (set in canvas-editor onMount).
- *  Present only when the user is on /canvas — re-import needs it to create
- *  cards. Null off-canvas. */
-function getCardService(): CardService | null {
-  if (typeof window === 'undefined') return null
-  return (window as unknown as { __cardService?: CardService }).__cardService ?? null
-}
-
+/** The CardService is passed in from the component (via useDb()) so the
+ *  handler never depends on the flaky `window.__cardService` global that
+ *  is set/deleted across the async onMount gap — that race previously made
+ *  `.cystift` restore silently fall through to card creation. */
 function dispatchFiles(
   { files, kind }: DropOrPastePayload,
+  service: CardService,
   t: (key: MessageKey, params?: Record<string, string | number>) => string,
 ): void {
   if (files.length === 0) return
@@ -68,9 +66,8 @@ function dispatchFiles(
     const lower = file.name.toLowerCase()
     const maybeCystift =
       lower.endsWith('.png') || lower.endsWith('.svg')
-    const svc = getCardService()
-    if (maybeCystift && svc) {
-      void restoreFromFile(file, svc)
+    if (maybeCystift) {
+      void restoreFromFile(file, service)
         .then((canvasId) => {
           if (canvasId) {
             pushToast({
@@ -130,6 +127,7 @@ function captureAndToast(
 
 export function FileDropHandler() {
   const { t } = useI18n()
+  const { service } = useDb()
   useEffect(() => {
     const onDragOver = (e: DragEvent) => {
       if (!e.dataTransfer) return
@@ -143,7 +141,7 @@ export function FileDropHandler() {
       const files = e.dataTransfer?.files
       if (!files || files.length === 0) return
       e.preventDefault()
-      dispatchFiles({ files: Array.from(files), kind: 'drag-drop' }, t)
+      dispatchFiles({ files: Array.from(files), kind: 'drag-drop' }, service, t)
     }
     const onPaste = (e: ClipboardEvent) => {
       if (isEditableTarget(e.target)) return
@@ -161,7 +159,7 @@ export function FileDropHandler() {
       }
       if (files.length === 0) return
       e.preventDefault()
-      dispatchFiles({ files, kind: 'paste' }, t)
+      dispatchFiles({ files, kind: 'paste' }, service, t)
     }
     window.addEventListener('dragover', onDragOver)
     window.addEventListener('drop', onDrop)
@@ -171,7 +169,7 @@ export function FileDropHandler() {
       window.removeEventListener('drop', onDrop)
       window.removeEventListener('paste', onPaste)
     }
-  }, [])
+  }, [service, t])
 
   return null
 }

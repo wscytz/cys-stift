@@ -25,7 +25,7 @@
  * outside `<CardServiceContext.Provider>`, so the page wires the service
  * in directly — keeps the toolbar a pure (testable) component.
  */
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useValue, GeoShapeGeoStyle, type Editor } from '@tldraw/tldraw'
 import type { CardService } from '@cys-stift/domain'
 import { useI18n } from '@/lib/i18n'
@@ -101,6 +101,29 @@ export function CanvasToolbar({
   const aiEnabled = useAIEnabled()
   const showAutoRelate = aiEnabled && selectedCardsCount >= 2
 
+  // v0.31.x review fix: tldraw 3.x collapsed rectangle/ellipse/triangle/…
+  // into a single 'geo' tool whose geometry is a per-shape style. Both the
+  // click handler and the keyboard shortcut route through this so they can
+  // never disagree (the prior bug: click path was fixed, key path still
+  // called setCurrentTool('rectangle') → silent "no child state" failure).
+  const activate = useCallback(
+    (id: ToolId) => {
+      if (!editor) return
+      if (id === 'rectangle') {
+        editor.setStyleForNextShapes(GeoShapeGeoStyle, 'rectangle')
+        editor.setCurrentTool('geo')
+        return
+      }
+      if (id === 'ellipse') {
+        editor.setStyleForNextShapes(GeoShapeGeoStyle, 'ellipse')
+        editor.setCurrentTool('geo')
+        return
+      }
+      editor.setCurrentTool(id)
+    },
+    [editor],
+  )
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!editor) return
@@ -117,27 +140,12 @@ export function CanvasToolbar({
       const tool = TOOLS.find((x) => x.shortcut === e.key.toLowerCase())
       if (tool) {
         e.preventDefault()
-        editor.setCurrentTool(tool.id)
+        activate(tool.id)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [editor])
-
-  const activate = (id: ToolId) => {
-    if (!editor) return
-    if (id === 'rectangle') {
-      editor.setStyleForNextShapes(GeoShapeGeoStyle, 'rectangle')
-      editor.setCurrentTool('geo')
-      return
-    }
-    if (id === 'ellipse') {
-      editor.setStyleForNextShapes(GeoShapeGeoStyle, 'ellipse')
-      editor.setCurrentTool('geo')
-      return
-    }
-    editor.setCurrentTool(id)
-  }
+  }, [editor, activate])
 
   return (
     <div className="cv-toolbar" role="toolbar" aria-label={t('canvas.tools')}>

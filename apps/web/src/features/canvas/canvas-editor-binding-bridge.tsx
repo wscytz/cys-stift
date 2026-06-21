@@ -47,7 +47,14 @@ export function EditorBindingBridge({
       { source: 'user', scope: 'document' },
     )
     return () => {
-      if (persistTimer) clearTimeout(persistTimer)
+      // Review fix (v0.37.0): the 500ms snapshot debounce meant freeform
+      // strokes drawn then immediately followed by a canvas switch / route
+      // change / tab close were lost — the teardown only cleared the timer.
+      // If a save was pending, flush it once before tearing down listeners.
+      if (persistTimer) {
+        clearTimeout(persistTimer)
+        void canvasSnapshotStore.save(canvasId, getSnapshot(editor.store))
+      }
       unsubWriteback()
       unsubPersist()
       if (typeof window !== 'undefined') {

@@ -163,7 +163,7 @@ export function bindCardWriteback(
     timer = setTimeout(flush, WRITEBACK_DEBOUNCE_MS)
   }
 
-  return editor.store.listen(
+  const unsub = editor.store.listen(
     (entry) => {
       for (const change of Object.values(entry.changes.updated)) {
         // changes.updated values are [from, to] tuples; [1] is the new state.
@@ -176,6 +176,19 @@ export function bindCardWriteback(
     },
     { source: 'user', scope: 'document' },
   )
+
+  // Review fix (v0.37.0): the 300ms writeback debounce means a card dragged
+  // then immediately followed by a canvas switch / route change / tab close
+  // would lose the last position — the teardown only unsubscribed, never
+  // flushed. We now flush synchronously before unsubscribing so no pending
+  // drag is dropped on the floor.
+  return () => {
+    if (timer) {
+      clearTimeout(timer)
+      flush()
+    }
+    unsub()
+  }
 }
 
 /**

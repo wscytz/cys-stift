@@ -26,11 +26,23 @@ export interface PromptTemplate {
   buildUser: (card: Card) => string
 }
 
+/**
+ * Privacy rule #3: soft-deleted cards are NEVER in the AI's view. The guard
+ * must run BEFORE the `ctx || fallback` pattern in each buildUser —
+ * otherwise the empty string `serializeCardForAI` returns for a deleted
+ * card is falsy and the `||` falls through to hand-concatenating the raw
+ * title/body. Review fix (v0.37.0). (See prompts.test.ts "rule #3".)
+ */
+function hiddenFromAI(card: Card): boolean {
+  return Boolean(card.deletedAt)
+}
+
 export const PROMPTS: Record<AIAction, PromptTemplate> = {
   summarize: {
     system:
       'You are a concise summarizer. Produce a 1-3 sentence summary preserving key facts. Output plain text only — no markdown, no preamble.',
     buildUser: (card) => {
+      if (hiddenFromAI(card)) return ''
       const ctx = serializeCardForAI(card)
       return ctx || `Title: ${card.title}\n\nBody: ${card.body || '(empty)'}`
     },
@@ -39,6 +51,7 @@ export const PROMPTS: Record<AIAction, PromptTemplate> = {
     system:
       'You are a writing coach. Improve clarity, flow, and conciseness while preserving meaning. Output the improved body only — no preamble, no "Here is the improved version:".',
     buildUser: (card) => {
+      if (hiddenFromAI(card)) return ''
       const ctx = serializeCardForAI(card)
       return ctx || `Title: ${card.title}\n\nBody: ${card.body || '(empty)'}`
     },
@@ -48,6 +61,7 @@ export const PROMPTS: Record<AIAction, PromptTemplate> = {
       'You are a translator. Translate the body to the target language, preserving markdown formatting. Output only the translated body.',
     // The {{LANG}} placeholder is replaced at runtime by ai-actions.ts
     buildUser: (card) => {
+      if (hiddenFromAI(card)) return ''
       const ctx = serializeCardForAI(card)
       const body = ctx || `${card.body || '(empty)'}`
       return `Target: {{LANG}}\n\n---\n\n${body}`
