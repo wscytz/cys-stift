@@ -4,6 +4,8 @@
 
 - [2026-06-21 · Phase canvas-m2 智能化+多模态+传递(已交付)](decisions/2026-06-21-canvas-m2-smart.md) — edge connector drag + 文件拖拽(md/image/doc/ppt/epub) + 关键词关系推断 + 浮动面板 + 单卡导出 .md; tag v0.28.0-canvas-m2-smart; e2e 6/6; new deps: markitdownllm + pdfjs-dist
 - [2026-06-21 · Phase canvas-m3 AI(已交付)](decisions/2026-06-21-canvas-m3-ai.md) — 3 provider (OpenAI/Anthropic/Ollama) + /settings AI 面板 + 卡片 AI actions (summarize/rewrite/translate) + 画布 auto-relate; tag v0.29.0-canvas-m3-ai; e2e 7/7; new deps: eventsource-parser + vitest + jsdom
+- [2026-06-21 · AI 可访问性 & 隐私设计(纯文档,已交付)](decisions/2026-06-21-ai-accessibility-design.md) — 手动 AI context allowlist (ai-context.ts 设计) + 隐私文档双轨 (user/privacy + dev/privacy-design) + 多模态不做 + 手绘 = 几何描述 + media 二进制永不外发; tag v0.30.0-ai-accessibility; 无代码改动
+- [2026-06-21 · 用户反馈 F3 AI 数据访问 + 隐私](feedback/2026-06-21-ai-feedback.md) — 多模态不做 / 手绘 = 几何描述 / 手动而非自动 / 隐私文档双轨 / 每个 phase 必走 check-list
 - [2026-06-21 · 用户反馈 F2:画布智能化+文件拖拽+竞品对标](feedback/2026-06-21-f2-ux-feedback.md) — 箭头智能推断+edge drag+文件拖拽导入(md/docx/xlsx)+剪贴板粘贴+竞品功能对标(Freeform/Miro);域层 drag-drop 已定义但零接线 — 域层 TS 门禁+数据丢失修复(导入/跨 tab/几何 reconcile)+M1 label 修正+import XSS 加固+canvas listener 迁 useEffect cleanup(B8)+/dev 生产门禁+CI+token 纪律;domain 26/26+db 7/7+web build 0+e2e 8/8
 - [2026-06-21 · Phase canvas-m1 画布关系(已交付)](decisions/2026-06-21-canvas-m1-relations.md) — tldraw arrow 加语义关系类型(blocks/references/derived-from/related-to)+ 选中面板 + 卡片连接徽标 + snapshot 透明持久;e2e 8/8;tag v0.27.0-canvas-m1-relations
 - [2026-06-21 · Phase canvas-bugfixes 跨 tab+DB 与 shape reconcile+删画布清 snapshot+写回 race guard(已交付)](decisions/2026-06-21-canvas-bugfixes.md) — 关闭 review B1/B3/B4/B5(critical/high);tag v0.26.4-canvas-bugfixes

@@ -4,6 +4,31 @@
 
 ---
 
+## 2026-06-21 · v0.30.0-ai-accessibility
+
+AI 可访问性 & 隐私设计(**纯文档**,无代码改动):
+
+- **`docs/user/privacy.md`**:中英双语,UI 友好。AI 看到什么 / 看不到什么 / 怎么关 / 关了会怎样 / API key 怎么存 / 多 provider 行为差异 / 手绘 = 几何描述 / 多模态不做
+- **`docs/development/privacy-design.md`**:开发面向。三条原则(显式 allowlist / 手动 / 本地优先)、手动 AI context 流程、12 项 phase check-list、`ai-context.ts` API 设计、`canvas-snapshot.ts` schema、DSL 输出格式、测试要求、未来扩展
+- **决策档**:`docs/memory/decisions/2026-06-21-ai-accessibility-design.md`
+- **用户原话归档**:`docs/memory/feedback/2026-06-21-ai-feedback.md`
+- **关键决策**:
+  - 手动 `ai-context.ts` allowlist,不自动化 codegen
+  - 多模态(GPT-4V / Claude Vision)**永久不做**
+  - 手绘内容 = 客户端几何描述(启发式 line/rect/ellipse/note/draw 原笔触),不走 vision
+  - media 二进制永不外发,只发 metadata
+  - 软删除的卡不在 AI 视野
+  - 每个 phase 改 AI 必走 check-list(privacy-design.md §7)
+- **CLAUDE.md 更新**:加 v0.30.0 记录 + M3.1 实装候选清单
+- **`apps/web/CLAUDE.md` 更新**:加 AI 改动 check-list(简版)
+- **MEMORY.md 更新**:加索引
+
+**M3.1 实装任务不在本 phase**:ai-context.ts / canvas-snapshot.ts / dsl-parser.ts / toolbar "📐 AI 排版" 按钮(~ 400 行,基于本文档设计)
+
+详见 [`docs/memory/decisions/2026-06-21-ai-accessibility-design.md`](../memory/decisions/2026-06-21-ai-accessibility-design.md)。
+
+---
+
 ## 2026-06-21 · v0.29.0-canvas-m3-ai
 
 M3(AI 元素 — 完全可选 / 本地优先 / 密钥不外泄):

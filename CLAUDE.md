@@ -14,15 +14,23 @@
 - **✅ 所有非上架代办清空**:review #1-5 + UX #2/#3/#4 + spec §4.9 多画布 + spec §5.6 暗色模式 + canvas view per canvas + canvas send-to-active + inbox dead styles cleanup 全部交付。**核心流程完整可用**。已知 open:canvas snapshot 主线程阻塞(B6)/ `__canvasEditor` global 残留(B8 — 已于 v0.27.1 修);packages/db 为 Phase 8 Tauri 预留(web 未使用,走 localStorage adapter);无 CI(2026-06-21 添加 GitHub Actions)
 - **v0.27.1 大修**(2026-06-21):导入后内存状态同步(rehydrateCards)、跨 tab Date 串重建(parseCardsRaw)、syncCardsToEditor 几何 reconcile、M1 arrow label(text prop)、onMount listener 迁 useEffect cleanup(B8)、import XSS 加固(link 白名单+media dataUrl 校验)、/dev/* 生产门禁、domain tsc 门禁、CI workflow。详见 `docs/memory/decisions/2026-06-21-canvas-m1-relations.md`。
 - **v0.29.0 M3 AI**(2026-06-21):3 provider(OpenAI/Anthropic/Ollama)+ /settings AI 面板 + 卡片 3 action(summarize/rewrite/translate)+ 画布 auto-relate + 4 个 vitest 单测 + e2e 7/7。详见 `docs/memory/decisions/2026-06-21-canvas-m3-ai.md`。
+- **v0.30.0 AI 可访问性 & 隐私设计**(2026-06-21):**纯文档**,无代码改动。8 个文档:
+  - `docs/user/privacy.md`(用户面向 — AI 看到什么 / 怎么关 / 关了会怎样)
+  - `docs/development/privacy-design.md`(开发面向 — 手动 AI context 流程 + check-list + ai-context.ts API 设计 + 画布快照 schema + DSL 输出 + 测试要求)
+  - `docs/memory/decisions/2026-06-21-ai-accessibility-design.md`(决策档)
+  - `docs/memory/feedback/2026-06-21-ai-feedback.md`(用户原话归档)
+  - 关键决策:**手动而非自动** / **多模态不做** / **手绘 = 几何描述**(不走 vision) / **media 二进制永不外发** / **软删除的卡不在 AI 视野**
+  - 每个 phase 改 AI 必走 `privacy-design.md` 第 7 节 check-list(12 项 audit)
+  - 详见 `docs/memory/decisions/2026-06-21-ai-accessibility-design.md`
 - **执行模式**：主模型（Claude）按 plan 手动执行 + 自审;Ralph 自动循环已停用（见下方"Ralph 状态"）
-- **下一个**：等用户诉求。**M3 收尾**（canvas modal AI 接入 / OS keychain 加密 API key / 流式 cancel UI / Agent loop 探索）已记入决策档。当前活跃候选：
-  - **M3.1 文字 DSL 排版**：纯文本 AI 输入 cards 列表 + prompt,输出 markdown-link 风格的 DSL 描述布局(`[A] --rel--> [B]`、`@cluster(健康) @pos(300,400)`),客户端解析 + apply。**多模态不做**(外围支持不成熟)。手绘内容 = 视觉装饰,不进 AI 视野;用户用 card 注释(如 `// 区域:工作`)驱动 AI 语义理解。
-  - **标签系统**(`Card.tag: string[]`):支撑 M3.1 的 cluster + 染色,画布按 tag 上色。复杂度中。
-  - **Phase 8 Tauri build**:本地未签名可直接出;签名公证需 Apple 证书。
-  - **OPFS**(Phase 2.5 长期留后):5MB localStorage 限制解除,支持大 media。
-  - **录屏**:canvas 操作录制成 .webm 导出。
-  - **inbox 批量操作 / minimap / 暗色模式 polish / Card markdown 双向编辑**:UX 打磨。
-- 完整进度：`docs/development/changelog.md` + `docs/development/roadmap.md`（30 轮路线图）+ `docs/user/README.md`（用户指南）+ `docs/memory/context/current-session.md`（**clear 后第一份要读的交接档**）
+- **下一个**：等用户诉求。**M3.1 实装任务**(基于 v0.30.0 设计文档,~ 400 行):
+  - `ai-context.ts`(allowlist + serializer,~ 80 行)
+  - `canvas-snapshot.ts`(画布快照 + 几何描述,~ 80 行)
+  - `dsl-parser.ts`(DSL 解析,~ 100 行)
+  - `prompts.ts` 改用新 helper + 反向断言单测
+  - toolbar "📐 AI 排版" 按钮
+  - 其他活跃候选:标签系统 / Tauri 打包 / OPFS / 录屏 / UX 打磨
+- 完整进度：`docs/development/changelog.md` + `docs/development/roadmap.md`（30 轮路线图）+ `docs/user/README.md`（用户指南）+ `docs/user/privacy.md`（**AI 隐私必读**）+ `docs/memory/context/current-session.md`（**clear 后第一份要读的交接档**）
 - 任务流程参考：`docs/ralph/README.md`（已归档，见下）
 
 ## 技术栈（不可重新选型）
