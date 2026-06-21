@@ -26,7 +26,7 @@
  * in directly — keeps the toolbar a pure (testable) component.
  */
 import { useEffect } from 'react'
-import { useValue, type Editor } from '@tldraw/tldraw'
+import { useValue, GeoShapeGeoStyle, type Editor } from '@tldraw/tldraw'
 import type { CardService } from '@cys-stift/domain'
 import { useI18n } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n/messages'
@@ -35,6 +35,12 @@ import { useAIEnabled } from '@/features/ai/ai-settings-provider'
 import { autoRelate } from './auto-relate'
 import { pushToast } from '@/lib/toast-store'
 
+// v0.31.x review fix: tldraw 3.x collapsed the per-shape tools (rectangle /
+// ellipse / triangle / …) into a single 'geo' tool whose concrete geometry
+// is a *style* on the created shape. The toolbar's `rectangle` and `ellipse`
+// buttons previously called `editor.setCurrentTool('rectangle')` and hit
+// "no child state exists with the id rectangle" — silently dead. Now we set
+// the next-shape style to the chosen geo kind, then switch into the geo tool.
 type ToolId =
   | 'select'
   | 'draw'
@@ -71,6 +77,14 @@ export function CanvasToolbar({
   const current = useValue(
     'canvas tool',
     () => editor?.getCurrentToolId() ?? 'select',
+    [editor],
+  )
+  // Review fix: rectangle/ellipse both compile to the single 'geo' tool
+  // in tldraw 3.x, so the active highlight has to follow the next-shape
+  // style (`getStyleForNextShape(GeoShapeGeoStyle)`), not the tool id.
+  const nextGeoStyle = useValue(
+    'canvas next geo style',
+    () => (editor ? editor.getStyleForNextShape(GeoShapeGeoStyle) : null),
     [editor],
   )
   // M3.5 — selection-driven auto-relate button. Re-evaluates on every
@@ -110,24 +124,49 @@ export function CanvasToolbar({
     return () => window.removeEventListener('keydown', onKey)
   }, [editor])
 
+  const activate = (id: ToolId) => {
+    if (!editor) return
+    if (id === 'rectangle') {
+      editor.setStyleForNextShapes(GeoShapeGeoStyle, 'rectangle')
+      editor.setCurrentTool('geo')
+      return
+    }
+    if (id === 'ellipse') {
+      editor.setStyleForNextShapes(GeoShapeGeoStyle, 'ellipse')
+      editor.setCurrentTool('geo')
+      return
+    }
+    editor.setCurrentTool(id)
+  }
+
   return (
     <div className="cv-toolbar" role="toolbar" aria-label={t('canvas.tools')}>
-      {TOOLS.map((tool) => (
-        <button
-          key={tool.id}
-          type="button"
-          className={`cv-toolbar__btn ${
-            current === tool.id ? 'cv-toolbar__btn--active' : ''
-          }`}
-          onClick={() => editor?.setCurrentTool(tool.id)}
-          disabled={!editor}
-          aria-label={t(tool.key)}
-          aria-pressed={current === tool.id}
-          title={`${t(tool.key)} (${tool.shortcut})`}
-        >
-          <CanvasIcon id={tool.icon} />
-        </button>
-      ))}
+      {TOOLS.map((tool) => {
+        // Rectangle/ellipse share the 'geo' tool id — only one can be
+        // "active" at a time, decided by the next-shape style.
+        const isActive =
+          tool.id === 'rectangle'
+            ? current === 'geo' && nextGeoStyle === 'rectangle'
+            : tool.id === 'ellipse'
+              ? current === 'geo' && nextGeoStyle === 'ellipse'
+              : current === tool.id
+        return (
+          <button
+            key={tool.id}
+            type="button"
+            className={`cv-toolbar__btn ${
+              isActive ? 'cv-toolbar__btn--active' : ''
+            }`}
+            onClick={() => activate(tool.id)}
+            disabled={!editor}
+            aria-label={t(tool.key)}
+            aria-pressed={isActive}
+            title={`${t(tool.key)} (${tool.shortcut})`}
+          >
+            <CanvasIcon id={tool.icon} />
+          </button>
+        )
+      })}
       {showAutoRelate && (
         <button
           type="button"
