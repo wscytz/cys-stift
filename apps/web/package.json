@@ -9,12 +9,13 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@cys-stift/db": "workspace:*",
     "@cys-stift/domain": "workspace:*",
     "@cys-stift/ui": "workspace:*",
     "@tldraw/tldraw": "3.15.6",
-    "better-sqlite3": "11.5.0",
+    "eventsource-parser": "1.1.2",
+    "markitdownllm": "^0.1.5",
     "next": "15.0.3",
+    "pdfjs-dist": "^6.0.227",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-markdown": "9",
@@ -22,10 +23,12 @@
     "tailwindcss": "4.0.0-beta.3"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "7.6.11",
     "@types/node": "22.9.0",
     "@types/react": "19.0.0",
     "@types/react-dom": "19.0.0",
-    "typescript": "5.6.3"
+    "@vitest/ui": "2.1.5",
+    "jsdom": "^29.1.1",
+    "typescript": "5.6.3",
+    "vitest": "2.1.5"
   }
 }

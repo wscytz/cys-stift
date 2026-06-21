@@ -1,0 +1,89 @@
+'use client'
+
+/**
+ * Safe href allowlist — the single source of truth for which URL schemes may
+ * render as a clickable link. Anything else collapses to '#' so an attacker
+ * (or a malformed import) can't plant `javascript:` / `data:text/html` /
+ * `vbscript:` links that execute on click.
+ *
+ * Used by both the markdown renderer (inbox/markdown.tsx) and the typed-links
+ * section of card-detail (which bypasses markdown and previously rendered
+ * card.links[].url verbatim — an XSS hole for imported cards).
+ */
+const SAFE_HREF_PREFIXES = ['http://', 'https://', 'mailto:', 'tel:', '/']
+
+export function safeHref(href: string | undefined | null): string {
+  if (typeof href !== 'string') return '#'
+  const trimmed = href.trim()
+  if (trimmed === '') return '#'
+  return SAFE_HREF_PREFIXES.some((p) => trimmed.toLowerCase().startsWith(p))
+    ? trimmed
+    : '#'
+}
+
+/**
+ * Validate that a string looks like a safe inline image data URL. We only
+ * allow a small raster image MIME set — no SVG (an `<img src>` of an
+ * SVG data URL can execute script in some contexts) and certainly no
+ * text/html. Returns false for anything that isn't a base64 data: URL of an
+ * allowed image type. Used to harden imported media assets.
+ */
+const SAFE_DATA_IMAGE_RE =
+  /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$/
+
+export function isSafeImageDataUrl(value: unknown, maxBytes = 5_000_000): boolean {
+  if (typeof value !== 'string') return false
+  if (!SAFE_DATA_IMAGE_RE.test(value)) return false
+  // base64 length ≈ 4/3 of raw bytes; cap the data URL to stay within the
+  // localStorage quota budget.
+  return value.length <= Math.ceil(maxBytes * 1.4)
+}
+
+/**
+ * M2.2 — safe file data URL allowlist. Broader than isSafeImageDataUrl:
+ * covers text/* + common document MIMEs so FileCaptureSink can attach
+ * converted documents and raw .docx/.pdf/.xlsx files. SVG is still excluded
+ * (XSS vector). 5MB hard cap (same as image — single attachment shouldn't
+ * blow the localStorage budget on its own).
+ */
+const SAFE_DATA_FILE_RE =
+  /^data:(?:text\/(?:plain|markdown|csv|html)|application\/(?:pdf|msword|vnd\.openxmlformats-officedocument\.(?:wordprocessingml|spreadsheetml|presentationml))|application\/epub\+zip|image\/(?:png|jpeg|jpg|gif|webp));base64,[A-Za-z0-9+/=]+$/
+
+export function isSafeFileDataUrl(
+  value: unknown,
+  maxBytes = 5_000_000,
+): boolean {
+  if (typeof value !== 'string') return false
+  if (!SAFE_DATA_FILE_RE.test(value)) return false
+  return value.length <= Math.ceil(maxBytes * 1.4)
+}
+
+/**
+ * M3 — AI settings validators. Provider id must be one of the 3 supported
+ * names; model id must be a short, conservative token (preventing prompt
+ * injection via a user-imported settings file from spreading into the URL
+ * path or fetch body); baseUrl must be a parseable http(s) URL. All three
+ * return false on non-strings / null / undefined to keep them safe to call
+ * on parsed JSON without a separate type guard.
+ */
+export function isSafeProviderId(
+  value: unknown,
+): value is 'openai' | 'anthropic' | 'ollama' {
+  return value === 'openai' || value === 'anthropic' || value === 'ollama'
+}
+
+export function isSafeModelId(value: unknown): boolean {
+  return (
+    typeof value === 'string' && /^[a-zA-Z0-9._:-]{1,64}$/.test(value)
+  )
+}
+
+export function isSafeBaseUrl(value: unknown): boolean {
+  if (typeof value !== 'string') return false
+  try {
+    const u = new URL(value)
+    return u.protocol === 'https:' || u.protocol === 'http:'
+  } catch {
+    return false
+  }
+}
