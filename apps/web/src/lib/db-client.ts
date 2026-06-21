@@ -66,18 +66,28 @@ if (typeof window !== 'undefined') {
       // Re-hydrate from the new value (only if hydration already happened;
       // a fresh tab still relies on its own first-mount hydrate).
       if (_hydrated) {
-        try {
-          const parsed = JSON.parse(e.newValue) as { cards: Card[] }
-          if (Array.isArray(parsed.cards)) {
-            _cards = parsed.cards
-            notify()
-          }
-        } catch {
-          // ignore malformed payload from a concurrent import/save
-        }
+        rehydrateCards()
       }
     }
   })
+}
+
+/**
+ * Re-read cards from localStorage and replace the in-memory cache. Used
+ * after an import (settings/page.tsx) so the post-import localStorage
+ * state is reflected in subscribers BEFORE the page reloads. The page
+ * reloads 400ms after import anyway, so this is a belt-and-braces
+ * safeguard against a same-tab mutation during the reload window
+ * overwriting the import (the cross-tab 'storage' event doesn't fire
+ * in the tab that wrote the data).
+ */
+export function rehydrateCards(): void {
+  if (typeof window === 'undefined') return
+  const next = loadSnapshot()
+  if (next.cards !== _cards) {
+    _cards = next.cards
+    notify()
+  }
 }
 
 function hydrateOnce() {
