@@ -8,6 +8,7 @@
  */
 
 import type { AIProvider, AIRequest, AIResponse } from '../types'
+import { consumeStream } from './stream-reader'
 
 interface OpenAIConfig {
   apiKey: string
@@ -49,30 +50,36 @@ export function createOpenAIProvider(cfg: OpenAIConfig): AIProvider {
       const decoder = new TextDecoder()
       let content = ''
       let buffer = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        // Keep the trailing partial line in the buffer; emit full lines.
-        buffer = lines.pop() ?? ''
-        for (const line of lines) {
-          const trimmed = line.trim()
-          if (!trimmed.startsWith('data:')) continue
-          const data = trimmed.slice(5).trim()
-          if (data === '[DONE]') continue
-          try {
-            const json = JSON.parse(data)
-            const chunk = json.choices?.[0]?.delta?.content
-            if (chunk) {
-              content += chunk
-              onDelta(chunk)
+      await consumeStream(
+        reader,
+        decoder,
+        (chunk) => {
+          buffer += chunk
+          const lines = buffer.split('\n')
+          // Keep the trailing partial line in the buffer; emit full lines.
+          buffer = lines.pop() ?? ''
+          for (const line of lines) {
+            const trimmed = line.trim()
+            if (!trimmed.startsWith('data:')) continue
+            const data = trimmed.slice(5).trim()
+            if (data === '[DONE]') continue
+            try {
+              const json = JSON.parse(data)
+              const delta = json.choices?.[0]?.delta?.content
+              if (delta) {
+                content += delta
+                onDelta(delta)
+              }
+            } catch (e) {
+              // Partial JSON mid-stream is normal (a line split across
+              // chunks is held in buffer); a genuinely malformed line is
+              // rare — log at debug rather than swallow silently.
+              console.debug('[openai] skipping unparseable SSE line', e)
             }
-          } catch {
-            /* skip partial JSON */
           }
-        }
-      }
+        },
+        signal,
+      )
       return { content }
     },
     async testConnection(signal) {

@@ -105,28 +105,16 @@ export function CanvasEditor({
             PageMenu: () => null,
           }}
           onMount={(ed: Editor) => {
-            // ── F1.5: restore the full document (cards + freeform elements)
-            //    from the per-canvas snapshot BEFORE backfilling / view setup.
-            //    Document only — camera stays governed by canvasViewStore
-            //    below so pan/zoom persistence is unaffected.
-            //    P3: load is async (OPFS). We fire-and-forget the non-critical
-            //    bits (snapshot restore + card backfill) so onMount returns
-            //    synchronously; tldraw TypeScript typing doesn't accept an
-            //    async onMount handler.
-            void canvasSnapshotStore.load(canvasId).then((restored) => {
-            if (restored) {
-              try {
-                loadSnapshot(
-                  ed.store,
-                  restored as unknown as Parameters<typeof loadSnapshot>[1],
-                )
-              } catch (e) {
-                console.warn('[canvas] snapshot load failed', e)
-              }
-            }
+            // ── Sync setup (runs immediately, before tldraw's first paint
+            //    of the empty canvas). View + globals + onEditorReady must
+            //    land here so the page's `editor` state is non-null ASAP —
+            //    otherwise the bridges (DoubleClickBridge etc.) aren't
+            //    subscribed yet and a quick dblclick/drag in the first
+            //    ~100ms is accepted by tldraw but writeback isn't listening.
+            //    Review fix v0.37.0 (onMount race).
 
-            // ── View persistence (Phase 6.5d): apply zoom/pan/gridMode BEFORE
-            //    first paint. Per-canvas (v0.15+).
+            // View persistence (Phase 6.5d): apply zoom/pan/gridMode BEFORE
+            // first paint. Per-canvas (v0.15+).
             const view = canvasViewStore.get(canvasId)
             ed.setCamera({ x: view.panX, y: view.panY, z: view.zoom })
             const isSnap = view.gridMode === 'snap'
@@ -150,11 +138,28 @@ export function CanvasEditor({
               ;(window as unknown as { __cardService?: CardService }).__cardService = service
             }
 
-            // One-shot backfill: cards in CardService but not in the snapshot
-            // (new card since last visit, or first visit with no snapshot).
-            loadCardsIntoEditor(ed, service, canvasId)
-
+            // Lift the editor handle NOW (sync) so the page re-renders with
+            // editor !== null and the bridges subscribe before any user input.
             onEditorReady?.(ed)
+
+            // ── Async setup (fire-and-forget; tldraw rejects an async
+            //    onMount). Restore the full document (cards + freeform) from
+            //    the per-canvas snapshot BEFORE backfilling. Document only —
+            //    camera is governed by canvasViewStore above. P3: OPFS load.
+            void canvasSnapshotStore.load(canvasId).then((restored) => {
+              if (restored) {
+                try {
+                  loadSnapshot(
+                    ed.store,
+                    restored as unknown as Parameters<typeof loadSnapshot>[1],
+                  )
+                } catch (e) {
+                  console.warn('[canvas] snapshot load failed', e)
+                }
+              }
+              // One-shot backfill: cards in CardService but not in the snapshot
+              // (new card since last visit, or first visit with no snapshot).
+              loadCardsIntoEditor(ed, service, canvasId)
             })
           }}
         />

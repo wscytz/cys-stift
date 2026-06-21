@@ -50,6 +50,31 @@ describe('SQLite repository', () => {
     }
   })
 
+  it('preserves tags through SQLite round-trip (v0.37.0 — was silently dropped)', () => {
+    // P4 (v0.32.0) added Card.tags, but the db codec/schema had no tagsJson
+    // column until v0.37.0, so a tagged card round-tripped with tags: [].
+    // This test is the regression guard.
+    const card = service.create({
+      title: 'tagged card',
+      source,
+      tags: [
+        { value: 'urgent', color: 'var(--color-red)' },
+        { value: 'idea', color: 'var(--color-blue)' },
+      ],
+    })
+    const fetched = service.get(card.id)!
+    expect(fetched.tags).toHaveLength(2)
+    expect(fetched.tags[0]?.value).toBe('urgent')
+    expect(fetched.tags[0]?.color).toBe('var(--color-red)')
+    expect(fetched.tags[1]?.value).toBe('idea')
+
+    // update() must also preserve tags across a write.
+    service.update(card.id, { body: 'edited' })
+    const refetched = service.get(card.id)!
+    expect(refetched.tags).toHaveLength(2)
+    expect(refetched.tags[0]?.value).toBe('urgent')
+  })
+
   it('handles canvasPosition with optional rotation', () => {
     const card = service.create({
       title: 'placed',

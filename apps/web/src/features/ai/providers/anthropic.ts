@@ -12,6 +12,7 @@
  */
 
 import { createParser, type ParseEvent } from 'eventsource-parser'
+import { consumeStream } from './stream-reader'
 import type { AIProvider, AIRequest, AIResponse } from '../types'
 
 interface AnthropicConfig {
@@ -62,15 +63,16 @@ export function createAnthropicProvider(cfg: AnthropicConfig): AIProvider {
             content += chunk
             onDelta(chunk)
           }
-        } catch {
-          /* skip */
+        } catch (e) {
+          console.debug('[anthropic] skipping unparseable SSE event', e)
         }
       })
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        parser.feed(decoder.decode(value, { stream: true }))
-      }
+      await consumeStream(
+        reader,
+        decoder,
+        (chunk) => parser.feed(chunk),
+        signal,
+      )
       return { content }
     },
     async testConnection(signal) {

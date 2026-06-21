@@ -66,6 +66,7 @@ function applySchema(raw: Database.Database): void {
       links_json TEXT NOT NULL DEFAULT '[]',
       code_snippets_json TEXT NOT NULL DEFAULT '[]',
       quotes_json TEXT NOT NULL DEFAULT '[]',
+      tags_json TEXT NOT NULL DEFAULT '[]',
       source_json TEXT NOT NULL,
       captured_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
@@ -85,18 +86,5 @@ function applySchema(raw: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_cards_workspace_inbox ON cards (workspace_id, archived);
     CREATE INDEX IF NOT EXISTS idx_cards_canvas ON cards (canvas_id);
     CREATE INDEX IF NOT EXISTS idx_cards_captured_at ON cards (captured_at);
-    CREATE TABLE IF NOT EXISTS media_assets (
-      id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL,
-      kind TEXT NOT NULL,
-      mime_type TEXT NOT NULL,
-      byte_size INTEGER NOT NULL,
-      width INTEGER,
-      height INTEGER,
-      storage_backend TEXT NOT NULL,
-      storage_rel_path TEXT NOT NULL,
-      storage_checksum TEXT NOT NULL,
-      created_at INTEGER NOT NULL
-    );
   `)
 }

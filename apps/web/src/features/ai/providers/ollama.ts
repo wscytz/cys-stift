@@ -15,6 +15,7 @@
  */
 
 import type { AIProvider, AIRequest, AIResponse } from '../types'
+import { consumeStream } from './stream-reader'
 
 interface OllamaConfig {
   baseUrl: string
@@ -54,27 +55,31 @@ export function createOllamaProvider(cfg: OllamaConfig): AIProvider {
       const decoder = new TextDecoder()
       let content = ''
       let buffer = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
-        for (const line of lines) {
-          if (!line.trim()) continue
-          try {
-            const json = JSON.parse(line)
-            const chunk = json.message?.content
-            if (chunk) {
-              content += chunk
-              onDelta(chunk)
+      await consumeStream(
+        reader,
+        decoder,
+        (chunk) => {
+          buffer += chunk
+          const lines = buffer.split('\n')
+          buffer = lines.pop() ?? ''
+          for (const line of lines) {
+            if (!line.trim()) continue
+            try {
+              const json = JSON.parse(line)
+              const delta = json.message?.content
+              if (delta) {
+                content += delta
+                onDelta(delta)
+              }
+              // json.done is the terminal NDJSON line; the server closes
+              // the stream right after, so consumeStream finishes naturally.
+            } catch (e) {
+              console.debug('[ollama] skipping unparseable NDJSON line', e)
             }
-            if (json.done) return { content }
-          } catch {
-            /* skip */
           }
-        }
-      }
+        },
+        signal,
+      )
       return { content }
     },
     async testConnection(signal) {

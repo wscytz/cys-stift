@@ -19,6 +19,7 @@ import type {
   CodeBlock,
   Quote,
   MediaRef,
+  TagRef,
   CanvasView,
   RegionColorMap,
 } from '@cys-stift/domain'
@@ -56,6 +57,7 @@ export function cardFromRow(row: CardRow): Card {
   const codeSnippets = parseJson<CodeBlock[]>(row.codeSnippetsJson, [])
   const quotes = parseJson<Quote[]>(row.quotesJson, [])
   const media = parseJson<MediaRef[]>(row.mediaJson, [])
+  const tags = parseJson<TagRef[]>(row.tagsJson, [])
 
   let canvasPosition: CanvasPosition | undefined
   if (row.canvasId) {
@@ -79,6 +81,7 @@ export function cardFromRow(row: CardRow): Card {
     links,
     codeSnippets,
     quotes,
+    tags,
     source,
     capturedAt: row.capturedAt,
     createdAt: row.createdAt,
@@ -102,6 +105,7 @@ export function cardToRow(card: Card): CardRow {
     linksJson: stringifyJson(card.links),
     codeSnippetsJson: stringifyJson(card.codeSnippets),
     quotesJson: stringifyJson(card.quotes),
+    tagsJson: stringifyJson(card.tags),
     sourceJson: stringifyJson(card.source),
     capturedAt: card.capturedAt,
     createdAt: card.createdAt,

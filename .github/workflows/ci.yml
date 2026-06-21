@@ -22,15 +22,23 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: domain typecheck + test
-        run: pnpm --filter domain test
-        # test script = tsc --noEmit && vitest run (typecheck gate added v0.27.1)
+      # v0.37.0: a real typecheck gate. The package `test` scripts are just
+      # `vitest run` (no tsc), and vitest does not typecheck — so type errors
+      # in packages/domain, db, ui were silently passing. This step runs the
+      # `lint` script (tsc --noEmit) of the three typed packages. web is
+      # typechecked by `next build` below; its `next lint` is interactive and
+      # not used here.
+      - name: typecheck (domain / db / ui — tsc --noEmit)
+        run: |
+          pnpm --filter domain lint
+          pnpm --filter @cys-stift/db lint
+          pnpm --filter @cys-stift/ui lint
 
-      - name: db typecheck + test
+      - name: domain test
+        run: pnpm --filter domain test
+
+      - name: db test
         run: pnpm --filter db test
 
-      - name: web build
+      - name: web build (includes web typecheck)
         run: pnpm --filter web build
-
-      - name: config (tsc --noEmit)
-        run: pnpm --filter @cys-stift/config build 2>/dev/null || echo 'placeholder — skip'

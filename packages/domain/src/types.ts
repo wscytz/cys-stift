@@ -152,23 +152,12 @@ export interface Workspace {
   createdAt: Date
 }
 
-// ── MediaAsset (spec §4.5) ──────────────────────────────────────────────────
-
-export interface MediaAsset {
-  id: MediaAssetId
-  cardId: CardId
-  kind: 'image' | 'file'
-  mimeType: string
-  byteSize: number
-  width?: number
-  height?: number
-  storage: {
-    backend: 'local-fs'
-    relPath: string
-    checksum: string
-  }
-  createdAt: Date
-}
+// ── MediaAsset ───────────────────────────────────────────────────────────
+// The full MediaAsset entity (spec §4.5) is deferred — web stores media as
+// inline data URLs in MediaRef, and no SQLite repository/codec consumes a
+// MediaAsset row yet. The `MediaAssetId` brand above stays (MediaRef.assetId
+// uses it). Removed in v0.37.0 (YAGNI — the table + type existed with no
+// repository/service wiring).
 
 // ── CaptureInput (spec §4.8) — for CaptureSink.submit() ─────────────────────
 

@@ -1,6 +1,6 @@
 /**
  * Drizzle schema for cy's Stift (spec §4.7, §4.9, §4.6).
- * Four tables: workspaces, canvases, cards, media_assets.
+ * Three tables: workspaces, canvases, cards.
  *
  * Branded IDs are stored as plain text — the boundary codec in ./codec.ts
  * re-brands them on read. JSON columns are plain text with TS type assertions
@@ -45,6 +45,10 @@ export const cards = sqliteTable(
     linksJson: text('links_json').notNull().default('[]'),
     codeSnippetsJson: text('code_snippets_json').notNull().default('[]'),
     quotesJson: text('quotes_json').notNull().default('[]'),
+    // P4 (v0.32.0) tags — stored as JSON (value+color TagRef[]). Review fix
+    // v0.37.0: this column + the codec round-trip were missing, so P4 tags
+    // were silently dropped to [] whenever a card went through SQLite.
+    tagsJson: text('tags_json').notNull().default('[]'),
 
     sourceJson: text('source_json').notNull(),
 
@@ -72,21 +76,6 @@ export const cards = sqliteTable(
   }),
 )
 
-export const mediaAssets = sqliteTable('media_assets', {
-  id: text('id').primaryKey(),
-  cardId: text('card_id').notNull(),
-  kind: text('kind').notNull(),
-  mimeType: text('mime_type').notNull(),
-  byteSize: integer('byte_size').notNull(),
-  width: integer('width'),
-  height: integer('height'),
-  storageBackend: text('storage_backend').notNull(),
-  storageRelPath: text('storage_rel_path').notNull(),
-  storageChecksum: text('storage_checksum').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-})
-
 export type CardRow = typeof cards.$inferSelect
 export type CanvasRow = typeof canvases.$inferSelect
 export type WorkspaceRow = typeof workspaces.$inferSelect
-export type MediaAssetRow = typeof mediaAssets.$inferSelect
