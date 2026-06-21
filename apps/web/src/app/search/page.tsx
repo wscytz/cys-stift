@@ -3,36 +3,38 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Toolbar, Tag } from '@cys-stift/ui'
-import type { Card } from '@cys-stift/domain'
-import { searchCards } from '@cys-stift/domain'
+import type { Card, SearchResult } from '@cys-stift/domain'
+import { searchCards, bodySnippet } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
 import { CardDetailModal } from '@/features/card/card-detail'
 import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
 
 /**
- * /search — v0.22.5-search restore.
- * Full-text search with live results as you type. Reuses ArchiveCardTile
- * for results grid and CardDetailModal for card detail/edit.
+ * /search — v0.22.5-search restore / P11 v0.36.0 enhance.
+ * Full-text search with live results as you type: title-boosted scoring, tag
+ * search, body snippets. Reuses ArchiveCardTile for results grid and
+ * CardDetailModal for card detail/edit.
  */
 export default function SearchPage() {
-  const { t, locale } = useI18n()
-  const { snap, service, ready } = useDb()
+  const { t } = useI18n()
+  const { snap, service } = useDb()
   const [query, setQuery] = useState('')
   const [detail, setDetail] = useState<{ card: Card } | null>(null)
 
-  const allCards = service.listAll()
+  const allCards = useMemo(() => service.listAll(), [snap, service])
   const results = useMemo(() => {
-    // G1 (v0.25.1): lift pinned matches to the front, matching inbox/
-    // archive behaviour. Stable partition (not sort) so the search
-    // ranking inside each group is preserved.
     const matched = searchCards(allCards, query)
-    const pinned = matched.filter((c) => c.pinned)
-    const rest = matched.filter((c) => !c.pinned)
+    // G1 (v0.25.1): lift pinned matches to the front. We preserve the
+    // score ordering within each group (pinned first, then unpinned).
+    const pinned: typeof matched = []
+    const rest: typeof matched = []
+    for (const r of matched) {
+      if (r.card.pinned) pinned.push(r)
+      else rest.push(r)
+    }
     return [...pinned, ...rest]
   }, [allCards, query])
-
-  const resetQuery = () => setQuery('')
 
   return (
     <main className="page">
@@ -60,16 +62,19 @@ export default function SearchPage() {
           <>
             <p className="search-count">{t('search.resultsCount', { n: results.length })}</p>
             <ul className="grid">
-              {results.map((card) => (
-                <li key={card.id}>
+              {results.map((r) => (
+                <li key={r.card.id}>
                   <ArchiveCardTile
-                    card={card}
+                    card={r.card}
                     variant="tile"
                     selected={false}
                     selectMode={false}
-                    onClick={() => setDetail({ card })}
+                    onClick={() => setDetail({ card: r.card })}
                     onToggleSelect={() => {}}
                   />
+                  {query.trim() !== '' && r.score > 0 && (
+                    <SnippetLine result={r} query={query} />
+                  )}
                 </li>
               ))}
             </ul>
@@ -83,8 +88,6 @@ export default function SearchPage() {
           actions={['archive', 'softDelete', 'sendToCanvas', 'pin']}
           onClose={() => setDetail(null)}
           onSave={(patch) => {
-            // C1 (v0.23.3): persist to the store, not just local state.
-            // Before this fix, closing the modal dropped the edits.
             const updated = service.update(detail.card.id, patch)
             if (updated) setDetail({ card: updated })
           }}
@@ -106,6 +109,15 @@ export default function SearchPage() {
   )
 }
 
+/** Per-result snippet line: shows body excerpt centred on first match. */
+function SnippetLine({ result, query }: { result: SearchResult; query: string }) {
+  const snippet = bodySnippet(result.card, query)
+  if (!snippet) return null
+  return (
+    <p className="search-snippet">{snippet}</p>
+  )
+}
+
 const styles = `
 .page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
 .crumb { font-family: var(--font-mono); font-size: var(--font-size-sm); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-gray); }
@@ -122,6 +134,11 @@ const styles = `
 .search-input:focus { border-color: var(--color-black); border-width: 2px; padding: 0 calc(var(--space-3) - 1px); }
 .search-hint { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-sm); color: var(--color-gray); }
 .search-count { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); text-transform: uppercase; letter-spacing: 0.12em; }
+.search-snippet {
+  margin: var(--space-1) 0 0; font-family: var(--font-mono);
+  font-size: var(--font-size-xs); color: var(--color-gray);
+  line-height: 1.4; word-break: break-all;
+}
 .grid {
   list-style: none; margin: 0; padding: 0;
   display: grid;

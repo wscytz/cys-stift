@@ -2,6 +2,10 @@
 
 > 每条一行，按日期倒序。详细见对应文件。
 
+- [2026-06-21 · P7 AI 排版 v0.33.2(已交付)](decisions/2026-06-21-ai-layout.md) — applyLayout(editor, ops)引擎 + canvas-toolbar 📐 按钮 + handleAILayout 全流程(snapshot→AI→parseDsl→applyLayout)+10 单测; vitest 162/162; build 0
+- [2026-06-21 · P6 AI 数据上下文 v0.33.1(已交付)](decisions/2026-06-21-ai-context.md) — ai-context.ts(manual allowlist+serializeCardForAI)+ canvas-snapshot.ts(画布几何快照+手绘线启发式)+ dsl-parser.ts(AI DSL 解析→typed ops)+ prompts.ts 迁移走 serializeCardForAI; vitest 152/152; build 0
+- [2026-06-21 · P4 标签系统 v0.32.0(已交付)](decisions/2026-06-21-tags.md) — Card.tags: TagRef[] + 10 色固定调色板 + CardService addTag/removeTag/listTags/listByTags + card-detail tag chip 输入/展示; vitest 126/126, domain 38/38; build 0
+- [2026-06-21 · P3 快照异步 v0.31.2(已交付)](decisions/2026-06-21-snapshot-offload.md) — B6 canvas snapshot save offload 到 OPFS(异步)+localStorage fallback+首次 load 自动迁移; vitest 126/126; build 0
 - [2026-06-21 · Phase canvas-export P5(已交付)](decisions/2026-06-21-canvas-export.md) — 画布导出 SVG/PNG + **.cystift 往返**(图片内嵌完整画布,拖回恢复;PNG 自写 tEXt chunk + SVG data-cystift)+ 字体 base64 嵌入 + getSvgString 首调重试 + Bauhaus 对话框; tag v0.33.0-canvas-export; vitest 52/52 + e2e PASS; 参考分析 reference-patterns.md §P5
 - [2026-06-21 · 参考项目分析 drawio + AFFiNE](../../development/reference-patterns.md) — 挖两项目可移植技术/UX,按 phase 整理(P5 导出 / P11 搜索 / P4 标签 / 存储 / P12 打磨),每条标移植方式 + 源码位置 + 不可移植清单
 - [2026-06-21 · Phase canvas-m2 智能化+多模态+传递(已交付)](decisions/2026-06-21-canvas-m2-smart.md) — edge connector drag + 文件拖拽(md/image/doc/ppt/epub) + 关键词关系推断 + 浮动面板 + 单卡导出 .md; tag v0.28.0-canvas-m2-smart; e2e 6/6; new deps: markitdownllm + pdfjs-dist

@@ -15,5 +15,5 @@ export {
   WorkspaceService,
   type WorkspaceRepository,
 } from './services/workspace-service'
-export { searchCards } from './services/search'
+export { searchCards, normalise, tokenise, bodySnippet, type SearchResult } from './services/search'
 export { TAG_COLORS } from './types'
