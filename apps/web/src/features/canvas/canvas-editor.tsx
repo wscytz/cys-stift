@@ -38,7 +38,7 @@
  *     previous `wireDoubleClick()` which had no cleanup hook.
  */
 import { useEffect, useRef } from 'react'
-import { Tldraw, useValue, getSnapshot, loadSnapshot, type Editor } from '@tldraw/tldraw'
+import { Tldraw, useValue, getSnapshot, loadSnapshot, type Editor, defaultShapeUtils } from '@tldraw/tldraw'
 import type { CanvasId, Card, CardService } from '@cys-stift/domain'
 import { CardShapeUtil } from './card-shape-util'
 import { CardServiceContext } from './card-service-context'
@@ -53,7 +53,7 @@ import { canvasSnapshotStore } from '@/lib/canvas-snapshot-store'
 import { captureSinkRegistry } from '@/features/capture/capture-sink'
 import { getDeviceId } from '@/lib/device-id'
 
-const shapeUtils = [CardShapeUtil]
+const shapeUtils = [CardShapeUtil, ...defaultShapeUtils]
 const DEVICE_ID = getDeviceId()
 const DEFAULT_CARD_W = 240
 const DEFAULT_CARD_H = 120
