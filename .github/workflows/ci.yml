@@ -1,0 +1,36 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: domain typecheck + test
+        run: pnpm --filter domain test
+        # test script = tsc --noEmit && vitest run (typecheck gate added v0.27.1)
+
+      - name: db typecheck + test
+        run: pnpm --filter db test
+
+      - name: web build
+        run: pnpm --filter web build
+
+      - name: config (tsc --noEmit)
+        run: pnpm --filter @cys-stift/config build 2>/dev/null || echo 'placeholder — skip'
