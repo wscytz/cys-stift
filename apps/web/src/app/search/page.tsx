@@ -22,10 +22,15 @@ export default function SearchPage() {
   const [detail, setDetail] = useState<{ card: Card } | null>(null)
 
   const allCards = service.listAll()
-  const results = useMemo(
-    () => searchCards(allCards, query),
-    [allCards, query],
-  )
+  const results = useMemo(() => {
+    // G1 (v0.25.1): lift pinned matches to the front, matching inbox/
+    // archive behaviour. Stable partition (not sort) so the search
+    // ranking inside each group is preserved.
+    const matched = searchCards(allCards, query)
+    const pinned = matched.filter((c) => c.pinned)
+    const rest = matched.filter((c) => !c.pinned)
+    return [...pinned, ...rest]
+  }, [allCards, query])
 
   const resetQuery = () => setQuery('')
 

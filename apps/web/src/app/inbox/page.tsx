@@ -310,7 +310,9 @@ const styles = `
   color: var(--color-black);
 }
 .tile:hover { box-shadow: var(--shadow-md); }
-.tile--pinned { border-color: var(--color-yellow); border-width: 2px; }
+/* R4 (v0.25.1): outline (not border-width) so pinning doesn't reflow
+   the grid — the 2px outline overlays the default 1px hairline. */
+.tile--pinned { outline: 2px solid var(--color-yellow); outline-offset: -1px; }
 .tile--pinned .tile__bar { background: var(--color-yellow); }
 .tile__pin {
   position: absolute; top: var(--space-1); right: var(--space-1); z-index: 2;

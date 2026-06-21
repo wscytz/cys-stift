@@ -9,6 +9,8 @@ interface TimelineProps {
   selectMode: boolean
   onOpen: (id: CardId) => void
   onToggleSelect: (id: CardId) => void
+  /** G2 (v0.25.1): pin toggle passed through to each row tile. */
+  onTogglePin?: (id: CardId) => void
 }
 
 /**
@@ -21,6 +23,7 @@ export function Timeline({
   selectMode,
   onOpen,
   onToggleSelect,
+  onTogglePin,
 }: TimelineProps) {
   // Group by ISO date (UTC). Cards are already sorted by updatedAt desc,
   // so insertion order in the Map is the desired day-desc order.
@@ -42,7 +45,10 @@ export function Timeline({
         <section className="tl__day" key={day}>
           <h3 className="tl__day-label">{day}</h3>
           <ul className="tl__list">
-            {dayCards.map((c) => (
+            {/* G2 (v0.25.1): pinned rows lift to the top of each day
+                bucket (stable partition) so the star + front placement
+                matches the grid view within a day. */}
+            {[...dayCards.filter((c) => c.pinned), ...dayCards.filter((c) => !c.pinned)].map((c) => (
               <li key={c.id}>
                 <ArchiveCardTile
                   card={c}
@@ -51,6 +57,7 @@ export function Timeline({
                   selectMode={selectMode}
                   onClick={() => onOpen(c.id)}
                   onToggleSelect={() => onToggleSelect(c.id)}
+                  onTogglePin={onTogglePin ? () => onTogglePin(c.id) : undefined}
                 />
               </li>
             ))}

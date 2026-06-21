@@ -91,6 +91,12 @@ export function CaptureHost() {
   // a plain browser (window.__TAURI__ is undefined). We use the global API
   // (withGlobalTauri) instead of importing @tauri-apps/api so the web
   // bundle stays free of a Tauri runtime dependency.
+  //
+  // R1 (v0.25.1): listen() returns a Promise<unlisten>. If the component
+  // unmounts before that resolves, the naive cleanup (unlisten?.()) would
+  // no-op and the listener would leak forever. Guard with a cancelled flag
+  // and unregister inside .then if we've already torn down — same pattern
+  // as the capture-sink registration effect below.
   useEffect(() => {
     type TauriEventAPI = {
       listen: (
@@ -101,6 +107,7 @@ export function CaptureHost() {
     type TauriGlobal = { event?: TauriEventAPI }
     const tauri = (window as unknown as { __TAURI__?: TauriGlobal }).__TAURI__
     if (!tauri?.event?.listen) return
+    let cancelled = false
     let unlisten: (() => void) | undefined
     tauri.event
       .listen('global-capture-open', () => {
@@ -108,12 +115,19 @@ export function CaptureHost() {
         setOpen(true)
       })
       .then((fn) => {
+        // Unmounted before the promise resolved — unregister immediately
+        // so the listener doesn't outlive the component.
+        if (cancelled) {
+          fn()
+          return
+        }
         unlisten = fn
       })
       .catch(() => {
         /* Tauri event listen failed — ignore outside the desktop shell */
       })
     return () => {
+      cancelled = true
       unlisten?.()
     }
   }, [])

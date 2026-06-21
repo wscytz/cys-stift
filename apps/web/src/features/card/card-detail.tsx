@@ -201,7 +201,8 @@ export function CardDetailModal({
   const showUnarchive = has('unarchive') && card.archived
   const showSendToCanvas =
     has('sendToCanvas') && !card.canvasPosition && Boolean(onSendToCanvas)
-  const showPin = has('pin') && Boolean(onTogglePin)
+  const showPin =
+    has('pin') && Boolean(onTogglePin) && !card.canvasPosition
 
   return (
     <>

@@ -51,7 +51,10 @@ export function ArchiveCardTile({
     variant === 'tile' ? 'tile' : 'row',
     selected ? 'tile--selected' : '',
     disabled ? 'tile--disabled' : '',
-    card.pinned ? 'tile--pinned' : '',
+    // R2 (v0.25.1): don't show the pinned visual on disabled tiles (e.g.
+    // /trash) — the pin button is hidden there, so a lingering yellow
+    // border would be a visual leak with no way to toggle it off.
+    !disabled && card.pinned ? 'tile--pinned' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -138,8 +141,13 @@ const styles = `
   box-shadow: var(--shadow-sm);
 }
 .tile { min-height: 160px; }
-.tile--selected { border-color: var(--color-blue); border-width: 2px; }
-.tile--pinned { border-color: var(--color-yellow); border-width: 2px; }
+/* R4 (v0.25.1): state via outline (not border-width) so toggling
+   pinned/selected doesn't reflow the grid. Default keeps the 1px
+   hairline; the 2px outline overlays it (outline-offset -1px). Pinned
+   is declared last so it wins the shared outline property when both
+   states apply. */
+.tile--selected { outline: 2px solid var(--color-blue); outline-offset: -1px; }
+.tile--pinned { outline: 2px solid var(--color-yellow); outline-offset: -1px; }
 .tile--pinned .tile__bar { background: var(--color-yellow); }
 .tile--disabled { cursor: default; }
 .tile--disabled:hover { box-shadow: var(--shadow-sm); }

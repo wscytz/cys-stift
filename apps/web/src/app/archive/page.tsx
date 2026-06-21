@@ -161,6 +161,10 @@ export default function ArchivePage() {
             selectMode={selectMode}
             onOpen={openDetail}
             onToggleSelect={toggleSelect}
+            onTogglePin={(id) => {
+              const c = cards.find((x) => x.id === id)
+              if (c) service.update(id, { pinned: !c.pinned })
+            }}
           />
         )}
 
