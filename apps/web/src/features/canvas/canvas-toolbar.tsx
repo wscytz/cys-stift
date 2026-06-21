@@ -13,12 +13,21 @@
  *
  * Keyboard shortcuts (v/d/r/o/a/n/t/e) mirror tldraw's defaults — both may
  * fire under hideUi, both set the same tool, so there's no conflict.
+ *
+ * Phase M3.5 (2026-06-21): adds a context-sensitive `✨ AI auto-relate`
+ * button that surfaces only when (a) the user has enabled AI in /settings
+ * AND (b) at least 2 cards are selected. Clicking infers a relation type
+ * for every selected pair and creates an arrow (M2.1) with that type
+ * applied (M2.3). A toast reports how many arrows were created.
  */
 import { useEffect } from 'react'
 import { useValue, type Editor } from '@tldraw/tldraw'
 import { useI18n } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n/messages'
 import { CanvasIcon, type CanvasIconId } from './canvas-icon'
+import { useAIEnabled } from '@/features/ai/ai-settings-provider'
+import { autoRelate } from './auto-relate'
+import { pushToast } from '@/lib/toast-store'
 
 type ToolId =
   | 'select'
@@ -48,6 +57,19 @@ export function CanvasToolbar({ editor }: { editor: Editor | null }) {
     () => editor?.getCurrentToolId() ?? 'select',
     [editor],
   )
+  // M3.5 — selection-driven auto-relate button. Re-evaluates on every
+  // tldraw store change so a click that selects a second card shows the
+  // button immediately.
+  const selectedCardsCount = useValue(
+    'canvas selected cards',
+    () => {
+      if (!editor) return 0
+      return editor.getSelectedShapes().filter((s) => s.type === 'card').length
+    },
+    [editor],
+  )
+  const aiEnabled = useAIEnabled()
+  const showAutoRelate = aiEnabled && selectedCardsCount >= 2
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -90,6 +112,31 @@ export function CanvasToolbar({ editor }: { editor: Editor | null }) {
           <CanvasIcon id={tool.icon} />
         </button>
       ))}
+      {showAutoRelate && (
+        <button
+          type="button"
+          className="cv-toolbar__btn cv-toolbar__btn--ai"
+          onClick={() => {
+            if (!editor) return
+            const ids = editor
+              .getSelectedShapes()
+              .filter((s) => s.type === 'card')
+              .map((s) => String(s.id).replace(/^shape:/, ''))
+            const { arrowsCreated } = autoRelate(editor, ids)
+            pushToast({
+              kind: arrowsCreated > 0 ? 'success' : 'info',
+              message:
+                arrowsCreated > 0
+                  ? t('canvas.autoRelateDone', { n: String(arrowsCreated) })
+                  : t('canvas.autoRelateNone'),
+            })
+          }}
+          title={t('canvas.autoRelate')}
+          aria-label={t('canvas.autoRelate')}
+        >
+          ✨
+        </button>
+      )}
       <style>{styles}</style>
     </div>
   )
@@ -137,6 +184,16 @@ const styles = `
   color: var(--color-white);
   border-color: var(--color-black);
   box-shadow: inset 0 0 0 1px var(--color-white);
+}
+.cv-toolbar__btn--ai {
+  background: var(--color-yellow);
+  color: var(--color-black);
+  font-size: var(--font-size-base);
+}
+.cv-toolbar__btn--ai:hover:not(:disabled):not(.cv-toolbar__btn--active) {
+  background: var(--color-black);
+  color: var(--color-yellow);
+  border-color: var(--color-black);
 }
 .cv-toolbar__btn:focus-visible {
   outline: 2px solid var(--color-red);

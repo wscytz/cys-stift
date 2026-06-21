@@ -115,6 +115,9 @@ export const messages = {
   'relation.cardArrows': { zh: '× {n}', en: '× {n}' },
   'relation.inferred': { zh: '已推断: {type}', en: 'Inferred: {type}' },
   'relation.autoApplied': { zh: '已自动设为「{type}」', en: 'Auto-set to "{type}"' },
+  'canvas.autoRelate': { zh: 'AI 自动关联', en: 'AI auto-relate' },
+  'canvas.autoRelateDone': { zh: '已创建 {n} 条 AI 关系', en: 'Created {n} AI relations' },
+  'canvas.autoRelateNone': { zh: '未找到可推断的关系', en: 'No inferable relations' },
 
   /* ── Archive ── */
   'archive.crumb': { zh: '归档', en: 'archive' },
