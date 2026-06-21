@@ -4,6 +4,69 @@
 
 ---
 
+## 2026-06-21 · v0.29.0-canvas-m3-ai
+
+M3(AI 元素 — 完全可选 / 本地优先 / 密钥不外泄):
+
+- **3 个 AI provider**: OpenAI (Bearer + chat/completions + SSE) / Anthropic (x-api-key + messages + content_block_delta) / Ollama (NDJSON + 本地) — 不开 SDK,纯原生 HTTP + eventsource-parser
+- **/settings AI 面板**: provider 下拉 / baseUrl / model / API key password(show/hide toggle)/ 启用 toggle / 测试连接 / 明文警告 banner
+- **卡片 AI actions**: Summarize / Rewrite / Translate(zh↔en), inline popover 流式输出 + Replace / Append as new / Cancel 三选项
+- **画布 AI auto-relate**: 选中 ≥2 卡 → 对每对推断关系类型 → 创建箭头(复用 M2.1 `createArrowFromHandle`)
+- **Provider factory maker pattern**: apiKey 闭包进 instance,工厂存 maker 函数而非实例
+- **零 AI 配置时 UI 完全干净** — AI 按钮在 `ai === null || !enabled` 时不渲染(不是 disabled),符合本地优先不打扰原则
+- **vitest 引入** — web 包从 0 到 12 单测(纯函数 + provider factory + safe-href AI 校验)
+- **新 dep**: eventsource-parser (1 runtime) + vitest + @vitest/ui + jsdom (3 dev)
+- **e2e**: `scripts/m3-shots.cjs`(7/7 passed)
+
+详见 [`docs/memory/decisions/2026-06-21-canvas-m3-ai.md`](../memory/decisions/2026-06-21-canvas-m3-ai.md)。
+
+---
+
+## 2026-06-21 · v0.28.0-canvas-m2-smart
+
+M2(画布智能化 + 多模态入口 + 传递出口): P0/P1 四个能力 + 单卡导出最简形态。
+
+- **edge connector drag**: 卡片 4 边中点显示 vertex handle, 拖到目标卡松手即建绑定箭头 → `card-handles.ts` + `card-shape-util.tsx` (onHandleDragEnd 走 M1 验证的两步走)
+- **文件多模态拖拽粘贴**: 拖入 .md/.txt/.csv/.html → 文本卡; .docx/.xlsx/.pdf/.pptx/.epub → markitdownllm 转 md + 原文件 media ref; 图片 → mediaStore image 卡 → `file-capture-sink.ts` + `file-drop-handler.tsx` + Toast 提示
+- **智能关系类型推断**: 拖出箭头后读取源/目标卡内容做关键词匹配, auto-apply 默认 relation type → `relation-inference.ts` + `relation-panel.tsx` (`__cardService` 诊断 hook)
+- **浮动关系面板**: panel 位置改为浮在 arrow 旁 (用 `getShapePageBounds` 计算) → `relation-panel.tsx`
+- **单卡导出 Markdown**: card-detail 加 Export 按钮 → `serialize-card.ts` (frontmatter + body + 媒体 + links + code + quotes) → `export-card.ts`
+- **新 dep**: markitdownllm 0.1.5 + pdfjs-dist 6.0.227 (markitdownllm 的 pdf 转换依赖)
+- **e2e**: `scripts/m2-shots.cjs` 6/6 passed (edge connector + inference + floating panel + file drop + export)
+
+详见 [`docs/memory/decisions/2026-06-21-canvas-m2-smart.md`](../memory/decisions/2026-06-21-canvas-m2-smart.md)。
+
+---
+
+## 2026-06-21 · v0.27.1-review-hardening
+
+大规模代码复审修复(domain + web + canvas + import + CI,grep 4 agent → 18 findings 全修):
+
+- **domain**:修复 12 个 TS 类型错误(wspaceId/fetchedAt/pinned/index-access)、softDelete 幂等、ensureDefault 签名(不再悬空 canvas)、UpdateCardPatch.color → ColorToken 解耦、test 脚本加 `tsc --noEmit` 门禁(db 加同)
+- **数据丢失**:导入后 rehydrateCards() 防本 tab 覆盖、跨 tab storage 走 parseCardsRaw(Date 重建)、syncCardsToEditor 几何 reconcile(B3-bis)
+- **M1 label**:relation arrow 写 `text` prop(之前误用 richText 失败,注释错误,已修)
+- **import XSS**:links[].url http(s)/mailto/tel 白名单、media dataUrl image/\* base64 校验 + 大小上限、safe-href 共享工具
+- **canvas 生命周期**:writeback + snapshot listener 迁 EditorBindingBridge useEffect(清除 __canvasEditor = B8)
+- **web**:删除 unused deps(better-sqlite3/@cys-stift/db/@types)、/dev/\* prod 门禁(NODE_ENV)、scrim token("rgba leak"修)、search/settings/design 加 role="main"
+- **CI**:新增 `.github/workflows/ci.yml`(domain+db 带有 tsc 门禁的 test + web build)
+- **决策**:`docs/memory/decisions/2026-06-21-canvas-bugfixes.md` 更新(UI polish + label fix notes)
+
+---
+
+## 2026-06-21 · v0.27.0-canvas-m1-relations
+
+M1(画布关系):给 tldraw arrow 加语义关系类型。
+
+- **关系类型 registry**: 4 内置(blocks/references/derived-from/related-to),映射到 arrow 原生 color/dash/arrowhead/labelColor → `relation-types.ts`
+- **关系面板**: 选中单个 arrow 浮出 4 类型按钮,点击重写 arrow 原生 props + 数据属性 `data-relation-id` 供 e2e → `relation-panel.tsx`
+- **卡片连接徽标**: 卡片左下角显示 `× N`(N = 连接到该卡的 distinct arrow 数,`getBindingsToShape` 去重)→ `card-shape-util.tsx`
+- **持久化透明**: 关系全在 arrow record,snapshot 自动保存,无新持久化层
+- **e2e**: 建两卡+绑定箭头+选 Blocks+reload 持久 + 徽标 + infer 反查 → `scripts/m1-relations-shots.cjs` 8/8
+
+详见 [`docs/memory/decisions/2026-06-21-canvas-m1-relations.md`](../memory/decisions/2026-06-21-canvas-m1-relations.md)。
+
+---
+
 ## 2026-06-19 · phase 0 · scaffold
 
 **交付**：pnpm monorepo 骨架 + Next.js（静态导出）+ Tauri 桌面壳 + 包豪斯占位首屏 + 完整文档与工程化配置 + git init。
