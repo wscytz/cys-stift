@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useValue } from '@tldraw/tldraw'
 import type { Editor } from '@tldraw/tldraw'
@@ -13,6 +13,12 @@ import { CanvasToolbar } from '@/features/canvas/canvas-toolbar'
 import { RelationPanel } from '@/features/canvas/relation-panel'
 import { CardDetailModal } from '@/features/canvas/card-detail-modal'
 import { ExportDialog } from '@/features/canvas/export-dialog'
+import { applyLayout } from '@/features/canvas/apply-layout'
+import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
+import { parseDsl } from '@/features/ai/dsl-parser'
+import { streamText } from '@/features/ai/stream-text'
+import { useAIEnabled, getCurrentAI } from '@/features/ai/ai-settings-provider'
+import { pushToast } from '@/lib/toast-store'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import {
   addCardShape,
@@ -93,6 +99,51 @@ export default function CanvasPage() {
     },
     [editor],
   )
+
+  const aiEnabled = useAIEnabled()
+
+  // P7 — AI layout button handler. Snapshots the canvas, sends to AI with
+  // a layout prompt, parses the DSL response, and applies it.
+  const handleAILayout = useCallback(async () => {
+    if (!editor) return
+    const cfg = getCurrentAI()
+    if (!cfg) return
+
+    const canvasName = canvases.find((c) => c.id === activeCanvasId)?.name ?? 'canvas'
+    const snap = snapshotCanvas(editor, activeCanvasId)
+    const formatted = formatCanvasSnapshot(snap)
+
+    const systemPrompt =
+      'You are a canvas layout assistant. Given a list of cards and shapes with positions, suggest new positions to organize them better. Group related items together. Output DSL directives only — no explanations.'
+
+    const userPrompt = `Organize these items into a clean layout. Keep items within reasonable proximity. Do NOT move items that are already well-placed.
+
+${formatted}
+
+Output DSL like:
+[card #id] @pos(x, y)
+[free: rect at (x, y) size WxH]`
+
+    try {
+      const result = await streamText(cfg, { system: systemPrompt, user: userPrompt }, () => {})
+      if (!result?.content) {
+        pushToast({ kind: 'info', message: t('canvas.aiLayoutEmpty') })
+        return
+      }
+      const ops = parseDsl(result.content)
+      if (ops.length === 0) {
+        pushToast({ kind: 'info', message: t('canvas.aiLayoutEmpty') })
+        return
+      }
+      applyLayout(editor, ops)
+      pushToast({ kind: 'success', message: t('canvas.aiLayoutDone') })
+    } catch (e) {
+      pushToast({
+        kind: 'error',
+        message: t('ai.error', { error: (e as Error).message }),
+      })
+    }
+  }, [editor, activeCanvasId, canvases, t])
 
   // Keyboard shortcuts: + - 0 1 g. Phase 5: 4 zoom keys + snap toggle. Skip when
   // typing into an input / textarea / contenteditable so we don't break the
@@ -237,7 +288,11 @@ export default function CanvasPage() {
           onOpenCard={(card) => setDetail({ card })}
           onEditorReady={(ed) => setEditor(ed)}
         />
-        <CanvasToolbar editor={editor} service={service} />
+        <CanvasToolbar
+          editor={editor}
+          service={service}
+          onAILayout={handleAILayout}
+        />
         <RelationPanel editor={editor} />
         {onCanvas === 0 && (
           <div className="cv-empty" aria-hidden="true">

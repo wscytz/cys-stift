@@ -59,9 +59,13 @@ const TOOLS: { id: ToolId; key: MessageKey; icon: CanvasIconId; shortcut: string
 export function CanvasToolbar({
   editor,
   service,
+  onAILayout,
 }: {
   editor: Editor | null
   service: CardService
+  /** P7 — callback when user clicks "AI layout" button. Page wires the
+   *  full AI pipeline (snapshot → streamText → parseDsl → applyLayout). */
+  onAILayout?: () => void
 }) {
   const { t } = useI18n()
   const current = useValue(
@@ -147,6 +151,18 @@ export function CanvasToolbar({
           aria-label={t('canvas.autoRelate')}
         >
           ✨
+        </button>
+      )}
+      {aiEnabled && (
+        <button
+          type="button"
+          className="cv-toolbar__btn cv-toolbar__btn--ai"
+          onClick={() => { const fn = onAILayout; if (fn) fn() }}
+          disabled={!editor || !onAILayout}
+          title={t('canvas.aiLayout')}
+          aria-label={t('canvas.aiLayout')}
+        >
+          📐
         </button>
       )}
       <style>{styles}</style>

@@ -293,6 +293,10 @@ export const messages = {
   'tag.filter': { zh: '按标签筛选', en: 'Filter by tags' },
   'tag.all': { zh: '全部', en: 'All' },
   'tag.noTags': { zh: '暂无标签', en: 'No tags yet' },
+  /* ── AI Layout (P7) ── */
+  'canvas.aiLayout': { zh: 'AI 排版', en: 'AI layout' },
+  'canvas.aiLayoutDone': { zh: 'AI 排版已应用', en: 'AI layout applied' },
+  'canvas.aiLayoutEmpty': { zh: 'AI 未返回有效排版', en: 'AI returned no valid layout' },
 } as const
 
 export type MessageKey = keyof typeof messages
