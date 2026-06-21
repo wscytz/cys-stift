@@ -2,6 +2,7 @@
 
 > 每条一行，按日期倒序。详细见对应文件。
 
+- [2026-06-21 · P3-P7+P11 批量交付 + 视觉 review 2 修](decisions/2026-06-21-p4-p7-batch.md) — P3 OPFS / P4 标签 / P6 AI context / P7 AI 排版 / P11 搜索增强 + 用户报的 2 真 bug(ThemeBoot 未挂载 6f5902a、toolbar 矩形/椭圆死按钮 48dfaa7 — tldraw 3.x 用 'geo' + GeoShapeGeoStyle,不是 'rectangle'/'ellipse');vitest 162/162; build 0
 - [2026-06-21 · P7 AI 排版 v0.33.2(已交付)](decisions/2026-06-21-ai-layout.md) — applyLayout(editor, ops)引擎 + canvas-toolbar 📐 按钮 + handleAILayout 全流程(snapshot→AI→parseDsl→applyLayout)+10 单测; vitest 162/162; build 0
 - [2026-06-21 · P6 AI 数据上下文 v0.33.1(已交付)](decisions/2026-06-21-ai-context.md) — ai-context.ts(manual allowlist+serializeCardForAI)+ canvas-snapshot.ts(画布几何快照+手绘线启发式)+ dsl-parser.ts(AI DSL 解析→typed ops)+ prompts.ts 迁移走 serializeCardForAI; vitest 152/152; build 0
 - [2026-06-21 · P4 标签系统 v0.32.0(已交付)](decisions/2026-06-21-tags.md) — Card.tags: TagRef[] + 10 色固定调色板 + CardService addTag/removeTag/listTags/listByTags + card-detail tag chip 输入/展示; vitest 126/126, domain 38/38; build 0

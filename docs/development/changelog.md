@@ -1326,3 +1326,39 @@ Review 驱动。3 个并行 Explore agent 复核 v0.24-v0.25,6 项全修(4 真 b
 详见 [`docs/memory/decisions/2026-06-21-high-freedom-canvas-f2.md`](../memory/decisions/2026-06-21-high-freedom-canvas-f2.md)。
 
 ---
+
+## 2026-06-21 · v0.36.0-search
+
+P11(全文搜索增强 — 倒叙记录在 [`2026-06-21-p4-p7-batch.md`](../memory/decisions/2026-06-21-p4-p7-batch.md) P11 段):
+
+- **scoring**: title 命中 +1.5/token,body/tags/links/code/quotes 命中 +1.0/token。Sort by score desc, then capturedAt desc
+- **normalise/tokenise**: 剥控制字符 + lowercase + 塌空白 + 空白 split(基础安全网,防 XSS/markdown 注入到正则)
+- **`bodySnippet(card, query)`**: 200 字 body 摘要,围绕首个匹配 token 居中,头尾省略号
+- **`SearchResult` interface**: `{card, score, matchedField}` — matchedField 供 snippet 抽取决定
+- **`/search` UI**: 用 `ArchiveCardTile` 渲染 + 下方加 `SnippetLine` 显示 body 摘要;pinned 卡前置 partition(与 inbox/archive 一致)
+- **测试**: 9 个新增 search.test.ts(normalise / tokenise / searchCards 各场景 / bodySnippet 边界)
+- **vitest**: 162/162、domain 38/38、db 7/7、build 0
+- **commit**: `712350c`
+
+## 2026-06-21 · review-fix #1 · ThemeBoot 未挂载(用户报)
+
+用户报"日/夜间模式手动调没用"。
+
+- **根因**: `apps/web/src/app/layout.tsx` import 了 `ThemeBoot` 但 JSX body 里**没挂**。`useThemeApplication` hook 没运行 → settingsStore notify 没人听 → `data-theme` 永远停在 head inline script 初值
+- **修法**: JSX body 加 `<ThemeBoot />` 一行(在 `<AIProviderSync />` 后)
+- **验收**: build exit 0、vitest 162/162 不回归、GUI 实测 settings 切换 dark/light 实时生效
+- **commit**: `6f5902a`
+
+## 2026-06-21 · review-fix #2 · canvas toolbar 矩形/椭圆死按钮(用户报)
+
+用户报"画布下面 3、4 用不了,按压动画有但不会变红也不会按下去"。
+
+- **根因**: tldraw 3.x 把 `rectangle`/`ellipse`/`triangle`/... 合并成单个 `'geo'` 工具,具体几何形状通过 `editor.setStyleForNextShapes(GeoShapeGeoStyle, 'rectangle'|'ellipse')` 切换。原代码调 `setCurrentTool('rectangle')` 触发 `Error: root - no child state exists with the id rectangle.`,onClick handler 无 try/catch → **静默失败**。按钮按压动画是 CSS `:active`,与 handler 无关
+- **puppeteer 验证 bug**: `setCurrentTool('rectangle')` 抛 `no child state exists with the id rectangle`,`'geo'` 成功
+- **修法**:
+  1. import `GeoShapeGeoStyle` from `@tldraw/tldraw`
+  2. 抽 `activate(id)`:rectangle/ellipse 先 `setStyleForNextShapes(GeoShapeGeoStyle, X)` 再 `setCurrentTool('geo')`
+  3. active 高亮:rectangle/ellipse 改用 `getStyleForNextShape(GeoShapeGeoStyle)` + `current === 'geo'`
+- **puppeteer 验证修**: 拖鼠标创建 `{type:'geo', props:{geo:'rectangle'}}` shape ✓; 椭圆同理 ✓
+- **验收**: build exit 0、vitest 162/162 不回归、puppeteer 实测两形状都能创建
+- **commit**: `48dfaa7`
