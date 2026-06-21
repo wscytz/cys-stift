@@ -67,10 +67,10 @@ export function buildCystiftPayload(
  * the snapshot, and switches to the new canvas. Returns the new canvas id
  * (or null if the payload is bad).
  */
-export function restoreCystiftPayload(
+export async function restoreCystiftPayload(
   payload: CystiftPayload,
   service: CardService,
-): CanvasId | null {
+): Promise<CanvasId | null> {
   if (!payload || payload.app !== 'cys-stift' || !Array.isArray(payload.cards)) {
     return null
   }
@@ -113,7 +113,7 @@ export function restoreCystiftPayload(
   } catch {
     snapshot = {} as CanvasSnapshot
   }
-  canvasSnapshotStore.save(newCanvasId, snapshot)
+  await canvasSnapshotStore.save(newCanvasId, snapshot)
   // canvasStore.create already made the new canvas active; ensure it.
   canvasStore.setActive(newCanvasId)
   return newCanvasId
@@ -167,14 +167,14 @@ export async function restoreFromFile(
     const text = await file.text()
     const payload = extractCystiftFromSvg(text)
     if (!payload) return null
-    return restoreCystiftPayload(payload, service)
+    return await restoreCystiftPayload(payload, service)
   }
 
   // PNG — read bytes, look for the cystift tEXt chunk.
   const buf = new Uint8Array(await file.arrayBuffer())
   const payload = await extractCystiftFromPng(buf)
   if (!payload) return null
-  return restoreCystiftPayload(payload, service)
+  return await restoreCystiftPayload(payload, service)
 }
 
 /** Quick check whether a File MIGHT be a cystift file (cheap — name/mime

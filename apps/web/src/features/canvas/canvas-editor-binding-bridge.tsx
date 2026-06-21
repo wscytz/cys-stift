@@ -41,7 +41,7 @@ export function EditorBindingBridge({
       () => {
         if (persistTimer) clearTimeout(persistTimer)
         persistTimer = setTimeout(() => {
-          canvasSnapshotStore.save(canvasId, getSnapshot(editor.store))
+          void canvasSnapshotStore.save(canvasId, getSnapshot(editor.store))
         }, VIEW_PERSIST_DEBOUNCE_MS)
       },
       { source: 'user', scope: 'document' },

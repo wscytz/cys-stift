@@ -246,7 +246,7 @@ export const canvasStore = {
     // canvas deletion leaves its full document (shapes, hand-draw paths)
     // stranded forever. Callers should have already moved cards back to
     // inbox before delete, so the snapshot is safe to drop.
-    canvasSnapshotStore.remove(id)
+    canvasSnapshotStore.remove(id).catch(() => {})
     return true
   },
 }

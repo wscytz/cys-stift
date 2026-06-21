@@ -109,7 +109,11 @@ export function CanvasEditor({
             //    from the per-canvas snapshot BEFORE backfilling / view setup.
             //    Document only — camera stays governed by canvasViewStore
             //    below so pan/zoom persistence is unaffected.
-            const restored = canvasSnapshotStore.load(canvasId)
+            //    P3: load is async (OPFS). We fire-and-forget the non-critical
+            //    bits (snapshot restore + card backfill) so onMount returns
+            //    synchronously; tldraw TypeScript typing doesn't accept an
+            //    async onMount handler.
+            void canvasSnapshotStore.load(canvasId).then((restored) => {
             if (restored) {
               try {
                 loadSnapshot(
@@ -151,6 +155,7 @@ export function CanvasEditor({
             loadCardsIntoEditor(ed, service, canvasId)
 
             onEditorReady?.(ed)
+            })
           }}
         />
       </CardServiceContext.Provider>
