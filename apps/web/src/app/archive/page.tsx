@@ -9,8 +9,12 @@ import { useI18n } from '@/lib/i18n'
 import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
 import { Timeline } from '@/features/archive/timeline'
 import { CardDetailModal } from '@/features/card/card-detail'
+import { captureSinkRegistry } from '@/features/capture/capture-sink'
+import { getDeviceId } from '@/lib/device-id'
 
 type View = 'grid' | 'timeline'
+
+const DEVICE_ID = getDeviceId()
 
 export default function ArchivePage() {
   const { t } = useI18n()
@@ -227,7 +231,7 @@ export default function ArchivePage() {
       {detail && (
         <CardDetailModal
           card={detail.card}
-          actions={['unarchive', 'softDelete', 'pin']}
+          actions={['unarchive', 'softDelete', 'pin', 'export', 'rewrite', 'summarize', 'translate']}
           onClose={() => setDetail(null)}
           onSave={(patch) => {
             const updated = service.update(detail.card.id, patch)
@@ -246,6 +250,16 @@ export default function ArchivePage() {
           onConfirmDelete={() => {
             service.softDelete(detail.card.id)
             setDetail(null)
+          }}
+          onAIAppendNew={(c) => {
+            // M3 — AI append on archive page. The new card lands in
+            // inbox (captureSinkRegistry 'manual' sink target) so the
+            // user can find it alongside their other active notes.
+            void captureSinkRegistry.submit({
+              source: { kind: 'manual', deviceId: DEVICE_ID },
+              title: c.title,
+              body: c.body,
+            })
           }}
         />
       )}

@@ -24,6 +24,13 @@
  * one breaking change vs the original inbox CardDetail (which delegated
  * the confirm to the page). The page-level `confirmDelete` state + Modal
  * in inbox/page.tsx goes away as part of this phase.
+ *
+ * Phase M3 (2026-06-21): adds three AI action types ('rewrite' /
+ * 'summarize' / 'translate'). They render inline buttons next to the
+ * view-mode toolbar; their popover mounts inside the Modal so the streaming
+ * output stays on-screen. The popover is only mounted when an AI action
+ * is in flight — `useAIEnabled()` hides the buttons themselves if the
+ * user has no AI config.
  */
 import { useEffect, useRef, useState, useTransition } from 'react'
 import {
@@ -53,10 +60,24 @@ import {
 } from './editors'
 import { MarkdownBody } from '@/app/inbox/markdown'
 import { mediaStore } from '@/lib/media-store'
+import { safeHref, isSafeImageDataUrl } from '@/lib/safe-href'
 import { useI18n } from '@/lib/i18n'
 import { typeKeyOf } from '@/lib/type-label'
+import { downloadCardMarkdown } from '@/lib/export-card'
+import { pushToast } from '@/lib/toast-store'
+import { useAIEnabled } from '@/features/ai/ai-settings-provider'
+import { AIPopover } from '@/features/ai/ai-popover'
 
-export type CardDetailAction = 'archive' | 'unarchive' | 'sendToCanvas' | 'softDelete' | 'pin'
+export type CardDetailAction =
+  | 'archive'
+  | 'unarchive'
+  | 'sendToCanvas'
+  | 'softDelete'
+  | 'pin'
+  | 'export'
+  | 'rewrite'
+  | 'summarize'
+  | 'translate'
 
 export interface CardDetailSavePatch {
   title: string
@@ -88,6 +109,10 @@ export interface CardDetailModalProps {
   onTogglePin?: () => void
   /** Confirmed soft-delete (modal already asked). */
   onConfirmDelete: () => void
+  /** M3 — AI "Append as new card" handler. The popover doesn't know how
+   *  to create cards (that needs the active CardService), so the consumer
+   *  wires it. Optional — if omitted the button is disabled. */
+  onAIAppendNew?: (card: { title: string; body: string }) => void
 }
 
 export function CardDetailModal({
@@ -101,6 +126,7 @@ export function CardDetailModal({
   onSendToCanvas,
   onTogglePin,
   onConfirmDelete,
+  onAIAppendNew,
 }: CardDetailModalProps) {
   const { t } = useI18n()
   const [mode, setMode] = useState<'view' | 'edit'>(initialMode)
@@ -118,6 +144,11 @@ export function CardDetailModal({
   )
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [pending, startTransition] = useTransition()
+  // M3 — AI action state. We track which action (if any) is in flight
+  // along with the translate target lang. Closing sets it back to null.
+  const [aiAction, setAiAction] = useState<'rewrite' | 'summarize' | 'translate' | null>(null)
+  const [translateTo, setTranslateTo] = useState<'zh' | 'en'>('en')
+  const aiEnabled = useAIEnabled()
   const dialogRef = useRef<HTMLDivElement>(null)
 
   const has = (a: CardDetailAction) => actions.includes(a)
@@ -228,7 +259,11 @@ export function CardDetailModal({
                       const asset = mediaStore.getAsset(m.assetId)
                       if (!asset) return null
                       if (asset.kind === 'image') {
-                        return (
+                        // Only render data URLs that pass the image allowlist
+                        // (no SVG/script vectors, size-bounded). Imported
+                        // assets are untrusted; a non-image or oversized data
+                        // URL renders a fallback label instead of an <img>.
+                        return isSafeImageDataUrl(asset.dataUrl) ? (
                           <li
                             key={String(m.assetId)}
                             className="cd__media-item"
@@ -238,6 +273,19 @@ export function CardDetailModal({
                               alt={asset.id}
                               className="cd__media-img"
                             />
+                          </li>
+                        ) : (
+                          <li
+                            key={String(m.assetId)}
+                            className="cd__media-item"
+                          >
+                            <a
+                              href={safeHref(asset.dataUrl)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {asset.mimeType} ({(asset.byteSize / 1024).toFixed(1)} KB)
+                            </a>
                           </li>
                         )
                       }
@@ -265,7 +313,7 @@ export function CardDetailModal({
                     {card.links.map((l, i) => (
                       <li key={i}>
                         <a
-                          href={l.url}
+                          href={safeHref(l.url)}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
@@ -409,6 +457,67 @@ export function CardDetailModal({
                   </Button>
                 ) : null}
                 <span className="cd__spacer" />
+                {aiEnabled && has('summarize') && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => setAiAction('summarize')}
+                  >
+                    ✨ {t('card.summarize')}
+                  </Button>
+                )}
+                {aiEnabled && has('rewrite') && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => setAiAction('rewrite')}
+                  >
+                    ✨ {t('card.rewrite')}
+                  </Button>
+                )}
+                {aiEnabled && has('translate') && (
+                  <span className="cd__translate">
+                    <select
+                      className="cd__translate-select"
+                      value={translateTo}
+                      onChange={(e) =>
+                        setTranslateTo(e.target.value as 'zh' | 'en')
+                      }
+                      disabled={aiAction === 'translate'}
+                      aria-label={t('card.translate')}
+                    >
+                      <option value="en">→ EN</option>
+                      <option value="zh">→ ZH</option>
+                    </select>
+                    <Button
+                      variant="secondary"
+                      onClick={() => setAiAction('translate')}
+                    >
+                      ✨ {t('card.translate')}
+                    </Button>
+                  </span>
+                )}
+                {has('export') && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      try {
+                        const size = downloadCardMarkdown(card)
+                        pushToast({
+                          kind: 'success',
+                          message: t('card.exportSuccess', { n: size }),
+                        })
+                      } catch (e) {
+                        pushToast({
+                          kind: 'error',
+                          message: t('card.exportFailed', {
+                            error: (e as Error).message,
+                          }),
+                        })
+                      }
+                    }}
+                  >
+                    {t('card.export')}
+                  </Button>
+                )}
                 {has('softDelete') && (
                   <Button
                     variant="danger"
@@ -429,6 +538,33 @@ export function CardDetailModal({
               </>
             )}
           </div>
+
+          {aiAction && (
+            <AIPopover
+              card={card}
+              action={aiAction === 'rewrite' ? 'improveWriting' : aiAction}
+              targetLang={aiAction === 'translate' ? translateTo : undefined}
+              onClose={() => setAiAction(null)}
+              onReplace={(body) => {
+                onSave({
+                  title: card.title,
+                  body,
+                  media: card.media,
+                  links: card.links,
+                  codeSnippets: card.codeSnippets,
+                  quotes: card.quotes,
+                })
+                setAiAction(null)
+              }}
+              onAppendNew={(c) => {
+                if (onAIAppendNew) {
+                  onAIAppendNew(c)
+                  pushToast({ kind: 'success', message: t('ai.appendedAsNew') })
+                }
+                setAiAction(null)
+              }}
+            />
+          )}
         </div>
         <style>{editorStyles}</style>
         <style>{styles}</style>
@@ -497,6 +633,20 @@ const styles = `
 .cd__file { font-family: var(--font-mono); font-size: var(--font-size-sm); margin-top: var(--space-1); }
 .cd__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
 .cd__spacer { flex: 1; }
+.cd__translate { display: inline-flex; gap: var(--space-1); align-items: center; }
+.cd__translate-select {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-white);
+  color: var(--color-black);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.cd__translate-select:disabled { opacity: 0.5; cursor: not-allowed; }
 .cd__sec { display: flex; flex-direction: column; gap: var(--space-2); }
 .cd__sec-h { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.16em; color: var(--color-gray); }
 .cd__sec-body { display: flex; flex-direction: column; gap: var(--space-2); }

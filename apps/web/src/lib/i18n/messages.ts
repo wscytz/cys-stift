@@ -250,6 +250,14 @@ export const messages = {
   'card.export': { zh: '导出 Markdown', en: 'Export Markdown' },
   'card.exportSuccess': { zh: '已导出 {n} 字节', en: 'Exported {n} bytes' },
   'card.exportFailed': { zh: '导出失败: {error}', en: 'Export failed: {error}' },
+  'card.summarize': { zh: 'AI 总结', en: 'AI summarize' },
+  'card.rewrite': { zh: 'AI 改写', en: 'AI rewrite' },
+  'card.translate': { zh: 'AI 翻译', en: 'AI translate' },
+  'ai.appendNew': { zh: '存为新卡', en: 'Save as new card' },
+  'ai.replace': { zh: '替换正文', en: 'Replace body' },
+  'ai.appendedAsNew': { zh: '已存为新卡', en: 'Saved as new card' },
+  'ai.notConfigured': { zh: 'AI 未配置 — 在 /settings 启用', en: 'AI not configured — enable in /settings' },
+  'ai.error': { zh: 'AI 失败:{error}', en: 'AI failed: {error}' },
 } as const
 
 export type MessageKey = keyof typeof messages

@@ -13,6 +13,7 @@ import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
 import { typeKeyOf } from '@/lib/type-label'
 import { getDeviceId } from '@/lib/device-id'
+import { pushToast } from '@/lib/toast-store'
 
 type View = 'inbox' | 'archived'
 
@@ -131,7 +132,7 @@ export default function InboxPage() {
       {detail && (
         <CardDetailModal
           card={detail}
-          actions={['archive', 'unarchive', 'sendToCanvas', 'softDelete', 'pin']}
+          actions={['archive', 'unarchive', 'sendToCanvas', 'softDelete', 'pin', 'export', 'rewrite', 'summarize', 'translate']}
           onClose={() => setDetail(null)}
           onSave={(patch) => {
             const updated = service.update(detail.id, patch)
@@ -173,6 +174,24 @@ export default function InboxPage() {
           onConfirmDelete={() => {
             service.softDelete(detail.id)
             setDetail(null)
+          }}
+          onAIAppendNew={(c) => {
+            // M3 — AI "Append as new card". Goes through captureSinkRegistry
+            // for consistency with the inbox CreateCardForm path. Toast
+            // (success / fail) is surfaced by the consumer (we don't push
+            // here — the popover already showed an optimistic toast).
+            try {
+              captureSinkRegistry.submit({
+                source: { kind: 'manual', deviceId: DEVICE_ID },
+                title: c.title,
+                body: c.body,
+              })
+            } catch (e) {
+              pushToast({
+                kind: 'error',
+                message: 'AI append failed: ' + (e as Error).message,
+              })
+            }
           }}
         />
       )}

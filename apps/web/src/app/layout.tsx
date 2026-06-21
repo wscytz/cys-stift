@@ -2,10 +2,13 @@ import type { Metadata } from 'next'
 import { Space_Grotesk, Inter } from 'next/font/google'
 import '../styles/globals.css'
 import { CaptureHost } from '@/features/capture/capture-host'
+import { FileDropHandler } from '@/features/capture/file-drop-handler'
 import { AppMenu } from '@/components/app-menu'
 import { ThemeBoot } from '@/components/theme-boot'
+import { ToastHost } from '@/components/toast'
 import { I18nProvider } from '@/lib/i18n'
 import { SearchShortcut } from '@/components/search-shortcut'
+import { AIProviderSync } from '@/features/ai/ai-settings-provider'
 
 const display = Space_Grotesk({
   subsets: ['latin'],
@@ -51,7 +54,10 @@ export default function RootLayout({
         <I18nProvider>
           <AppMenu />
           {children}
+          <AIProviderSync />
           <CaptureHost />
+          <FileDropHandler />
+          <ToastHost />
           <SearchShortcut />
         </I18nProvider>
       </body>
