@@ -2,6 +2,8 @@
 
 > 每条一行，按日期倒序。详细见对应文件。
 
+- [2026-06-21 · Phase canvas-export P5(已交付)](decisions/2026-06-21-canvas-export.md) — 画布导出 SVG/PNG + **.cystift 往返**(图片内嵌完整画布,拖回恢复;PNG 自写 tEXt chunk + SVG data-cystift)+ 字体 base64 嵌入 + getSvgString 首调重试 + Bauhaus 对话框; tag v0.33.0-canvas-export; vitest 52/52 + e2e PASS; 参考分析 reference-patterns.md §P5
+- [2026-06-21 · 参考项目分析 drawio + AFFiNE](../../development/reference-patterns.md) — 挖两项目可移植技术/UX,按 phase 整理(P5 导出 / P11 搜索 / P4 标签 / 存储 / P12 打磨),每条标移植方式 + 源码位置 + 不可移植清单
 - [2026-06-21 · Phase canvas-m2 智能化+多模态+传递(已交付)](decisions/2026-06-21-canvas-m2-smart.md) — edge connector drag + 文件拖拽(md/image/doc/ppt/epub) + 关键词关系推断 + 浮动面板 + 单卡导出 .md; tag v0.28.0-canvas-m2-smart; e2e 6/6; new deps: markitdownllm + pdfjs-dist
 - [2026-06-21 · Phase canvas-m3 AI(已交付)](decisions/2026-06-21-canvas-m3-ai.md) — 3 provider (OpenAI/Anthropic/Ollama) + /settings AI 面板 + 卡片 AI actions (summarize/rewrite/translate) + 画布 auto-relate; tag v0.29.0-canvas-m3-ai; e2e 7/7; new deps: eventsource-parser + vitest + jsdom
 - [2026-06-21 · AI 可访问性 & 隐私设计(纯文档,已交付)](decisions/2026-06-21-ai-accessibility-design.md) — 手动 AI context allowlist (ai-context.ts 设计) + 隐私文档双轨 (user/privacy + dev/privacy-design) + 多模态不做 + 手绘 = 几何描述 + media 二进制永不外发; tag v0.30.0-ai-accessibility; 无代码改动

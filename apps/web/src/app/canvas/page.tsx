@@ -12,6 +12,7 @@ import { TldrawCanvas } from '@/features/canvas/tldraw-canvas'
 import { CanvasToolbar } from '@/features/canvas/canvas-toolbar'
 import { RelationPanel } from '@/features/canvas/relation-panel'
 import { CardDetailModal } from '@/features/canvas/card-detail-modal'
+import { ExportDialog } from '@/features/canvas/export-dialog'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import {
   addCardShape,
@@ -64,6 +65,7 @@ export default function CanvasPage() {
   const [creatingName, setCreatingName] = useState<string | null>(null)
   const [renamingId, setRenamingId] = useState<CanvasId | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<CanvasId | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
 
   const onCanvas = service
     .listOnCanvas(activeCanvasId)
@@ -212,6 +214,15 @@ export default function CanvasPage() {
         </Button>
         <span className="crumb-spacer" />
         <span className="tb-divider" aria-hidden="true" />
+        <Button
+          variant="ghost"
+          onClick={() => setExportOpen(true)}
+          disabled={!editor}
+          title={t('canvas.export')}
+        >
+          {t('canvas.export')}
+        </Button>
+        <span className="tb-divider" aria-hidden="true" />
         <SnapToggle mode={snapMode} onToggle={toggleSnap} disabled={!editor} />
         <span className="tb-divider" aria-hidden="true" />
         <ZoomGroup editor={editor} onZoom={zoomBy} />
@@ -287,6 +298,15 @@ export default function CanvasPage() {
           </Button>
         </div>
       </Modal>
+
+      <ExportDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        editor={editor}
+        service={service}
+        canvasId={activeCanvasId}
+        canvasName={activeCanvas?.name ?? ''}
+      />
 
       {detail && (
         <CardDetailModal

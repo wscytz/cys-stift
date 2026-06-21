@@ -4,6 +4,20 @@
 
 ---
 
+## 2026-06-21 · v0.33.0-canvas-export
+
+P5(画布导出 + `.cystift` 往返 — 做出特色):
+
+- **`.cystift` 往返(特色)**: 导出的 SVG/PNG 内嵌完整画布(卡片 + tldraw 快照 + 画布元数据)。拖回应用即在新画布恢复 — 单文件便携卡片(drawio P5-7 套路,移植到 tldraw 栈)。PNG 走自写 `tEXt` chunk(键 `cystift`,纯 TS 含 CRC32);SVG 走 `data-cystift` 属性。
+- **导出管线**: `editor.getSvgString` + 字体嵌入(`await document.fonts.ready` + base64 @font-face,**不走 Google Fonts `@import`**)+ 图片外链内联。PNG 走 `getSvgAsImage`。
+- **getSvgString 首调 undefined 重试**: tldraw 新会话首次导出可能返回 undefined;10×150ms 重试兜底(真实用户卡片刚建即导出也会撞上)。
+- **Bauhaus 导出对话框**: format(SVG/PNG/JPEG)/ scope(整张/选中)/ scale(1×2×3×)/ border / background(透明/白底) + `.cystift` 高亮卡(黑底红影,特色 callout)。`getSafeFileName` 抄 AFFiNE。
+- **零 domain/db 改动**(纯加法)。vitest 21→52(+31:export-bounds 18 + png-text-chunk 8 + cystift-payload 5)。e2e p5-export PASS(PNG tEXt + SVG data-cystift 都往返解出 app=cys-stift, cards=1)+ canvas-refactor 无回归。
+- **不做**: PDF/打印 / webp/dpi / JPEG 带 cystift。
+- 参考分析: `docs/development/reference-patterns.md` §P5(drawio + AFFiNE)。
+
+---
+
 ## 2026-06-21 · v0.31.0-debt-cleanup
 
 P1(技术债清扫 — 零行为变化):

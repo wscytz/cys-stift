@@ -14,6 +14,8 @@
 import { useEffect } from 'react'
 import { captureSinkRegistry } from './capture-sink'
 import { fileCaptureSource } from './file-capture-sink'
+import { restoreFromFile } from '@/features/canvas/cystift-payload'
+import type { CardService } from '@cys-stift/domain'
 import { pushToast } from '@/lib/toast-store'
 import { useI18n } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n/messages'
@@ -44,6 +46,14 @@ interface DropOrPastePayload {
   kind: 'drag-drop' | 'paste'
 }
 
+/** The CardService exposed on the canvas page (set in canvas-editor onMount).
+ *  Present only when the user is on /canvas — re-import needs it to create
+ *  cards. Null off-canvas. */
+function getCardService(): CardService | null {
+  if (typeof window === 'undefined') return null
+  return (window as unknown as { __cardService?: CardService }).__cardService ?? null
+}
+
 function dispatchFiles(
   { files, kind }: DropOrPastePayload,
   t: (key: MessageKey, params?: Record<string, string | number>) => string,
@@ -52,38 +62,70 @@ function dispatchFiles(
   const source = fileCaptureSource(kind, getDeviceId())
   files.forEach((file, i) => {
     const singleSource = i === 0 ? source : { ...source, fileCount: 1 }
-    void captureSinkRegistry
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .submit({ source: singleSource as any, file } as any)
-      .then(() => {
-        pushToast({
-          kind: 'success',
-          message: t('capture.success', { name: file.name }),
+    // P5.4 — a dropped `.cystift` PNG/SVG restores the canvas instead of
+    // becoming a card. Probe png/svg files first; only fall through to the
+    // normal capture path if it isn't a cystift export.
+    const lower = file.name.toLowerCase()
+    const maybeCystift =
+      lower.endsWith('.png') || lower.endsWith('.svg')
+    const svc = getCardService()
+    if (maybeCystift && svc) {
+      void restoreFromFile(file, svc)
+        .then((canvasId) => {
+          if (canvasId) {
+            pushToast({
+              kind: 'success',
+              message: t('canvas.cystiftRestored', { name: file.name }),
+            })
+          } else {
+            // Not a cystift file — create a card from it as usual.
+            captureAndToast(file, singleSource, t)
+          }
         })
-      })
-      .catch((e: Error) => {
-        const msg = e.message
-        if (msg.includes('too large')) {
-          pushToast({
-            kind: 'error',
-            message: t('capture.quotaExceeded', { name: file.name }),
-          })
-        } else if (msg.includes('unsupported')) {
-          pushToast({
-            kind: 'error',
-            message: t('capture.unsupported', {
-              name: file.name,
-              mime: file.type || 'unknown',
-            }),
-          })
-        } else {
-          pushToast({
-            kind: 'error',
-            message: t('capture.error', { name: file.name, error: msg }),
-          })
-        }
-      })
+        .catch(() => captureAndToast(file, singleSource, t))
+      return
+    }
+    captureAndToast(file, singleSource, t)
   })
+}
+
+function captureAndToast(
+  file: File,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  singleSource: any,
+  t: (key: MessageKey, params?: Record<string, string | number>) => string,
+): void {
+  void captureSinkRegistry
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .submit({ source: singleSource as any, file } as any)
+    .then(() => {
+      pushToast({
+        kind: 'success',
+        message: t('capture.success', { name: file.name }),
+      })
+    })
+    .catch((e: Error) => {
+      const msg = e.message
+      if (msg.includes('too large')) {
+        pushToast({
+          kind: 'error',
+          message: t('capture.quotaExceeded', { name: file.name }),
+        })
+      } else if (msg.includes('unsupported')) {
+        pushToast({
+          kind: 'error',
+          message: t('capture.unsupported', {
+            name: file.name,
+            mime: file.type || 'unknown',
+          }),
+        })
+      } else {
+        pushToast({
+          kind: 'error',
+          message: t('capture.error', { name: file.name, error: msg }),
+        })
+      }
+    })
 }
 
 export function FileDropHandler() {
