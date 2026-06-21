@@ -1175,3 +1175,22 @@ Review 驱动。3 个并行 Explore agent 复核 v0.24-v0.25,6 项全修(4 真 b
 详见 [`docs/memory/decisions/2026-06-21-high-freedom-canvas-f1.md`](../memory/decisions/2026-06-21-high-freedom-canvas-f1.md)。
 
 ---
+
+## 2026-06-21 · v0.26.1-high-freedom-canvas-f2
+
+高自由画布 Phase **F2(工具栏)**。F1 地基上,放开 tldraw 笔记工具,画布真正可"自由整理"。
+
+- **feat(canvas)**: `CanvasToolbar` 组件 — 底部浮动包豪斯工具栏,8 工具(select/draw/rectangle/ellipse/arrow/note/text/eraser),`editor.setCurrentTool` 切换,`useValue('canvas tool', ...)` 响应高亮,键盘快捷键 v/d/r/o/a/n/t/e → `6ad68cb`
+- **i18n**: `canvas.tools` + `canvas.tool.*`(9 key,zh/en)→ `6ad68cb`
+
+**关键决策**:
+- **保留 hideUi**:tldraw 默认彩色 chrome 与包豪斯冲突;自定义极简工具栏(mono 字符 + hairline + 硬阴影 + active 红)
+- **card 仍 dblclick**:card 是结构化数据(CardService),与自由 shape 不同源,保留独立入口(DoubleClickBridge)
+- **工具集**:select/draw/rectangle/ellipse/arrow/note/text/eraser — 无边记核心(手绘 + 形状 + 箭头 + 便签 + 文本),包豪斯约束(无彩色便利贴)
+- **快捷键不冲突**:避开现有 + - 0 1 g;输入框内不触发
+
+**验收**:domain 26/26 + db 7/7 + web build exit 0。GUI:工具栏切换工具,画布加便签/文本/形状/箭头/手绘,与灵感卡共存,刷新持久(F1 snapshot)。**需 GUI 实测**(无 headless canvas 测试)。
+
+详见 [`docs/memory/decisions/2026-06-21-high-freedom-canvas-f2.md`](../memory/decisions/2026-06-21-high-freedom-canvas-f2.md)。
+
+---
