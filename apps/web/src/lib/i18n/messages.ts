@@ -95,6 +95,15 @@ export const messages = {
   'canvas.zoomFit': { zh: '适配', en: 'Fit' },
   'canvas.emptyTitle': { zh: '空白画布', en: 'Empty canvas' },
   'canvas.emptyHint': { zh: '双击创建 · 拖动摆放', en: 'double-click to create · drag to place' },
+  'canvas.tools': { zh: '绘图工具', en: 'Drawing tools' },
+  'canvas.tool.select': { zh: '选择', en: 'Select' },
+  'canvas.tool.draw': { zh: '手绘', en: 'Draw' },
+  'canvas.tool.rectangle': { zh: '矩形', en: 'Rectangle' },
+  'canvas.tool.ellipse': { zh: '椭圆', en: 'Ellipse' },
+  'canvas.tool.arrow': { zh: '箭头', en: 'Arrow' },
+  'canvas.tool.note': { zh: '便签', en: 'Note' },
+  'canvas.tool.text': { zh: '文本', en: 'Text' },
+  'canvas.tool.eraser': { zh: '橡皮', en: 'Eraser' },
 
   /* ── Archive ── */
   'archive.crumb': { zh: '归档', en: 'archive' },
