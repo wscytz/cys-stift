@@ -99,10 +99,27 @@ export function loadCardsIntoEditor(
   if (cards.length === 0) return
   editor.store.mergeRemoteChanges(() => {
     for (const card of cards) {
-      // F1.5: skip cards already on the canvas (restored from the snapshot)
-      // so we don't double-create or trip the writeback listener.
-      if (editor.getShape(cardShapeIdOf(card.id))) continue
-      editor.createShape(cardToShape(card))
+      // B3 (v0.26.4): the DB is the source of truth. If the shape already
+      // exists (restored from the snapshot) but its position/z/rotation
+      // drifted from the DB (a concurrent tab moved it, B1 sync, or a
+      // tab-specific edit that wasn't snapshotted yet), reconcile to the
+      // DB position rather than skipping — otherwise the canvas silently
+      // shows a stale geometry. mergeRemoteChanges marks this as a
+      // 'remote' write so the writeback listener ignores it.
+      const shapeId = cardShapeIdOf(card.id)
+      const existing = editor.getShape(shapeId) as CardShape | undefined
+      const db = card.canvasPosition
+      if (existing) {
+        const drift =
+          existing.x !== db?.x ||
+          existing.y !== db?.y ||
+          existing.props.w !== (db?.w ?? DEFAULT_W) ||
+          existing.props.h !== (db?.h ?? DEFAULT_H) ||
+          existing.rotation !== (db?.rotation ?? 0)
+        if (drift) editor.updateShape(cardToShape(card))
+      } else {
+        editor.createShape(cardToShape(card))
+      }
     }
   })
 }
@@ -124,7 +141,17 @@ export function bindCardWriteback(
     for (const shape of pending.values()) {
       const cardId = cardIdFromShapeId(String(shape.id))
       const card = service.get(cardId)
-      if (!card) continue // card vanished (e.g. soft-deleted) — skip
+      // B5 (v0.26.4): guard against clobbering a concurrent restore / move.
+      // The 300ms writeback debounce means a pending shape can race with a
+      // service mutation: if the card was soft-deleted, archived, or
+      // moved to another canvas in the meantime, writing the old drag
+      // position would either resurrect it on this canvas or corrupt its
+      // current canvasId. Skip those cases — the shape stays as-is in
+      // memory; the next syncCardsToEditor pass reconciles.
+      if (!card) continue
+      if (card.deletedAt) continue
+      if (card.archived) continue
+      if (card.canvasPosition?.canvasId !== canvasId) continue
       const z = card.canvasPosition?.z ?? 0
       service.moveToCanvas(cardId, shapeToCardPosition(shape, canvasId, z))
     }

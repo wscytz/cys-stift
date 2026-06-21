@@ -54,6 +54,32 @@ function persist() {
   notify()
 }
 
+// B1 (v0.26.4): cross-tab sync. localStorage 'storage' events fire in OTHER
+// tabs/windows when a key changes — we notify our own subscribers so they
+// re-read the snapshot. Without this, two tabs editing the same data
+// silently overwrite each other until manual reload. The 'cards' key is the
+// only one we care about for now; canvas snapshots and other stores keep
+// their own sync (or not — out of scope here).
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === STORAGE_KEY && e.newValue && e.oldValue && e.newValue !== e.oldValue) {
+      // Re-hydrate from the new value (only if hydration already happened;
+      // a fresh tab still relies on its own first-mount hydrate).
+      if (_hydrated) {
+        try {
+          const parsed = JSON.parse(e.newValue) as { cards: Card[] }
+          if (Array.isArray(parsed.cards)) {
+            _cards = parsed.cards
+            notify()
+          }
+        } catch {
+          // ignore malformed payload from a concurrent import/save
+        }
+      }
+    }
+  })
+}
+
 function hydrateOnce() {
   if (_hydrated) return
   _hydrated = true
