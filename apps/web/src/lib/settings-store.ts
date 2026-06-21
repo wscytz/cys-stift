@@ -1,6 +1,11 @@
 'use client'
 
 import { useEffect, useMemo, useSyncExternalStore, useState } from 'react'
+import {
+  isSafeProviderId,
+  isSafeModelId,
+  isSafeBaseUrl,
+} from './safe-href'
 
 // ── Settings store (spec §5.5 "可在设置改") ───────────────────────────────
 // Web-local keymap + future settings. Backed by localStorage, same
@@ -26,16 +31,50 @@ export interface CaptureShortcut {
  */
 export type ThemePreference = 'light' | 'dark' | 'system'
 
+/**
+ * M3 — AI configuration. Stored as `ai: AIConfig | null` on Settings:
+ *   - `null`  → user has never configured AI (no buttons render)
+ *   - object  → user filled in the /settings panel, but the buttons still
+ *     gate on `enabled` so a saved-but-disabled state is honoured.
+ *
+ * The apiKey is plaintext — explicit decision (M3 ADR). A UI warning banner
+ * in /settings spells out the risk. M4 may add OS keychain.
+ */
+export interface AIConfig {
+  provider: 'openai' | 'anthropic' | 'ollama'
+  apiKey: string
+  baseUrl: string
+  model: string
+  enabled: boolean
+}
+
 export interface Settings {
   captureShortcut: CaptureShortcut
   theme: ThemePreference
   locale: 'zh' | 'en'
+  ai: AIConfig | null
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   captureShortcut: { modKey: 'meta', shift: true, code: 'Space' },
   theme: 'system',
   locale: 'zh',
+  ai: null,
+}
+
+/** Validate a parsed AI config. null is valid (no AI configured).
+ *  Object must satisfy all 5 validators. */
+function isValidAIConfig(v: unknown): v is AIConfig | null {
+  if (v === null) return true
+  if (typeof v !== 'object' || v === null) return false
+  const o = v as Record<string, unknown>
+  return (
+    isSafeProviderId(o.provider) &&
+    typeof o.apiKey === 'string' &&
+    isSafeBaseUrl(o.baseUrl) &&
+    isSafeModelId(o.model) &&
+    typeof o.enabled === 'boolean'
+  )
 }
 
 function isValid(v: unknown): v is Settings {
@@ -60,7 +99,9 @@ function isValid(v: unknown): v is Settings {
   if (o.locale !== 'zh' && o.locale !== 'en') {
     return false
   }
-  return true
+  // ai field is optional (backwards compat) — accept missing or null or valid
+  if (!('ai' in o) || o.ai === null) return true
+  return isValidAIConfig(o.ai)
 }
 
 function loadSettings(): Settings {
@@ -151,6 +192,29 @@ export const settingsStore = {
     hydrateOnce()
     if (_settings.theme === theme) return
     _settings = { ..._settings, theme }
+    saveSettings(_settings)
+    notify()
+  },
+  /**
+   * M3 — AI settings updater. Accepts a partial patch and merges onto the
+   * current config (or seeds a default-config-from-scratch if the user
+   * has never configured AI). The defaults are the OpenAI defaults —
+   * matches the dropdown's default selection so the panel works out of
+   * the box for first-time users.
+   */
+  updateAISettings(patch: Partial<AIConfig>): void {
+    hydrateOnce()
+    const defaults: AIConfig = {
+      provider: 'openai',
+      apiKey: '',
+      baseUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+      enabled: false,
+    }
+    const merged: AIConfig = _settings.ai
+      ? { ..._settings.ai, ...patch }
+      : { ...defaults, ...patch }
+    _settings = { ..._settings, ai: merged }
     saveSettings(_settings)
     notify()
   },

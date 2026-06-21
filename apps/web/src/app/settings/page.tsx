@@ -4,8 +4,10 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Toolbar } from '@cys-stift/ui'
 import { settingsStore, useSettings } from '@/lib/settings-store'
+import { rehydrateCards } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
 import { StorageMeter } from '@/components/storage-meter'
+import { AISettingsPanel } from '@/features/settings/ai-settings-panel'
 import {
   buildExportPayload,
   downloadExport,
@@ -34,9 +36,15 @@ export default function SettingsPage() {
       const result = importFromJson(String(reader.result))
       setImportResult(result)
       if (result.ok) {
-        // Give the state a tick to render, then reload so all stores
-        // re-hydrate from the freshly written localStorage.
-        setTimeout(() => window.location.reload(), 800)
+        // Re-sync the in-memory card store from the freshly written
+        // localStorage BEFORE the reload. Without this, any in-tab mutation
+        // during the reload window would call persist() and overwrite the
+        // imported cards with the stale pre-import list (silent data loss —
+        // the cross-tab 'storage' event doesn't fire in the same tab).
+        rehydrateCards()
+        // Reload so media/draft/settings stores (which keep their own
+        // in-memory cache) also re-hydrate from disk.
+        setTimeout(() => window.location.reload(), 400)
       }
     }
     reader.onerror = () =>
@@ -54,7 +62,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="page">
+    <main className="page" role="main">
       <Toolbar region="system">
         <span className="crumb">cy&rsquo;s stift</span>
         <span className="crumb-sep">/</span>
@@ -159,6 +167,8 @@ export default function SettingsPage() {
           <p className="set__hint">{t('settings.captureHint')}</p>
         </section>
 
+        <AISettingsPanel />
+
         <section className="set">
           <h2 className="set__h">{t('settings.data')}</h2>
           <p className="set__lede">{t('settings.dataLede')}</p>
@@ -251,6 +261,58 @@ const styles = `
 .set__import-hint { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
 .set__import-result { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black-soft); }
 .set__import-result--error { color: var(--color-red); }
+.set__warn {
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-yellow);
+  border: 2px solid var(--color-black);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+.set__input {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--color-white);
+  color: var(--color-black);
+  max-width: 360px;
+  width: 100%;
+}
+.set__input:disabled { background: var(--color-gray-soft); opacity: 0.6; }
+.set__keyWrap { display: flex; gap: var(--space-2); align-items: center; max-width: 480px; }
+.set__btnGhost {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: transparent;
+  border: var(--border-hairline);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.set__btnGhost:disabled { opacity: 0.4; cursor: not-allowed; }
+.set__actions { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
+.set__btn {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: var(--color-white);
+  color: var(--color-black);
+  border: var(--border-hairline);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.set__btn:hover:not(:disabled) { box-shadow: 2px 2px 0 0 var(--color-black); }
+.set__btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.set__btn--primary { background: var(--color-black); color: var(--color-white); }
+.set__btn--primary:hover:not(:disabled) { box-shadow: 2px 2px 0 0 var(--color-red); }
 .footnote { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); margin: 0; padding-top: var(--space-2); border-top: var(--border-hairline); }
 .footnote__link { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; }
 `

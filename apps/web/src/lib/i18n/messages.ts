@@ -105,6 +105,17 @@ export const messages = {
   'canvas.tool.text': { zh: '文本', en: 'Text' },
   'canvas.tool.eraser': { zh: '橡皮', en: 'Eraser' },
 
+  /* ── Canvas relations (M1) ── */
+  'relation.title': { zh: '关系类型', en: 'Relation type' },
+  'relation.blocks': { zh: '阻塞', en: 'Blocks' },
+  'relation.references': { zh: '引用', en: 'References' },
+  'relation.derivedFrom': { zh: '衍生自', en: 'Derived from' },
+  'relation.relatedTo': { zh: '相关', en: 'Related to' },
+  'relation.custom': { zh: '自定义', en: 'Custom' },
+  'relation.cardArrows': { zh: '× {n}', en: '× {n}' },
+  'relation.inferred': { zh: '已推断: {type}', en: 'Inferred: {type}' },
+  'relation.autoApplied': { zh: '已自动设为「{type}」', en: 'Auto-set to "{type}"' },
+
   /* ── Archive ── */
   'archive.crumb': { zh: '归档', en: 'archive' },
   'archive.viewGrid': { zh: '网格', en: 'Grid' },
@@ -170,6 +181,24 @@ export const messages = {
   'settings.importOk': { zh: '已导入 {cards} 张卡片 · {mediaAssets} 个媒体。正在重新加载…', en: 'Imported {cards} cards · {mediaAssets} media. Reloading…' },
   'settings.importFail': { zh: '导入失败：{error}', en: 'Import failed: {error}' },
 
+  /* ── AI (v0.29.0) ── */
+  'settings.ai': { zh: 'AI', en: 'AI' },
+  'settings.aiLede': { zh: '可选功能:启用后,卡片详情和画布将提供 AI 操作(总结 / 改写 / 翻译 / 自动关联)。需要远端 API key —— 完全可选,关闭后应用照常工作。', en: 'Optional. When enabled, card detail and canvas offer AI actions (summarize, rewrite, translate, auto-relate). Requires a remote API key — fully optional, app works without it.' },
+  'settings.aiPlaintextWarning': { zh: 'API key 以明文存储在本地(localStorage),仅保存在本机浏览器。不上传到任何服务器。请勿在公共设备上启用。', en: 'API key is stored in plaintext (localStorage) on this device only. Not uploaded anywhere. Do not enable on shared devices.' },
+  'settings.aiEnabled': { zh: '启用 AI', en: 'Enable AI' },
+  'settings.aiProvider': { zh: 'Provider', en: 'Provider' },
+  'settings.aiBaseUrl': { zh: 'API base URL', en: 'API base URL' },
+  'settings.aiModel': { zh: 'Model', en: 'Model' },
+  'settings.aiApiKey': { zh: 'API key', en: 'API key' },
+  'settings.aiShowKey': { zh: '显示', en: 'Show' },
+  'settings.aiHideKey': { zh: '隐藏', en: 'Hide' },
+  'settings.aiTest': { zh: '测试连接', en: 'Test connection' },
+  'settings.aiTesting': { zh: '测试中…', en: 'Testing…' },
+  'settings.aiTestOk': { zh: '连接成功 ({ms}ms)', en: 'Connected ({ms}ms)' },
+  'settings.aiTestFail': { zh: '连接失败:{error}', en: 'Connection failed: {error}' },
+  'settings.aiSave': { zh: '保存', en: 'Save' },
+  'settings.aiSaved': { zh: '已保存 AI 设置', en: 'AI settings saved' },
+
   /* ── Storage meter (v0.26.3) ── */
   'storage.title': { zh: '本地存储', en: 'Local storage' },
   'storage.usedOf': { zh: '已用 {used} / {total}', en: '{used} of {total} used' },
@@ -204,6 +233,12 @@ export const messages = {
   'capture.miniTitle': { zh: '灵感标题…', en: 'Idea title…' },
   'capture.miniBody': { zh: 'Markdown 笔记（可选）', en: 'Markdown body (optional)' },
   'capture.addNote': { zh: '加入收件箱', en: 'Add to inbox' },
+  'capture.drop': { zh: '拖入文件以创建卡片', en: 'Drop files to create cards' },
+  'capture.paste': { zh: '粘贴文件以创建卡片', en: 'Paste files to create cards' },
+  'capture.unsupported': { zh: '暂不支持 {name} ({mime})', en: 'Unsupported: {name} ({mime})' },
+  'capture.quotaExceeded': { zh: '{name} 超过 5MB,已跳过', en: '{name} exceeds 5MB, skipped' },
+  'capture.error': { zh: '{name}: {error}', en: '{name}: {error}' },
+  'capture.success': { zh: '已创建 {name}', en: 'Created {name}' },
 
   /* ── Card types ── */
   'card.typeNote': { zh: '笔记', en: 'Note' },
@@ -212,6 +247,9 @@ export const messages = {
   'card.typeCode': { zh: '代码', en: 'Code' },
   'card.typeQuote': { zh: '引用', en: 'Quote' },
   'card.untitled': { zh: '(无标题)', en: '(untitled)' },
+  'card.export': { zh: '导出 Markdown', en: 'Export Markdown' },
+  'card.exportSuccess': { zh: '已导出 {n} 字节', en: 'Exported {n} bytes' },
+  'card.exportFailed': { zh: '导出失败: {error}', en: 'Export failed: {error}' },
 } as const
 
 export type MessageKey = keyof typeof messages
