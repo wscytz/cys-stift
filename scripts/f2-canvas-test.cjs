@@ -164,6 +164,28 @@ const check = (name, ok, detail = '') => {
   check('no error elements on canvas', errors === 0, `errors=${errors}`)
   await page.screenshot({ path: path.join(out, '03-canvas-with-card.png'), fullPage: false })
 
+  // ── 5. storage meter on /settings (v0.26.3) ─────────────────────────
+  console.log('\n[5] storage meter renders on settings')
+  await page.goto(URL + '/settings', { waitUntil: 'networkidle0' })
+  await wait(1500)
+  const meter = await page.evaluate(() => {
+    const sm = document.querySelector('.sm')
+    if (!sm) return null
+    const line = sm.querySelector('.sm__line')?.textContent?.trim() ?? ''
+    const pct = sm.querySelector('.sm__pct')?.textContent?.trim() ?? ''
+    const fill = sm.querySelector('.sm__fill')
+    return {
+      present: true,
+      line,
+      pct,
+      fillWidth: fill ? fill.style.width : null,
+    }
+  })
+  check('storage meter rendered', !!meter)
+  check('storage meter shows a percent', !!meter?.pct && /\d+%/.test(meter.pct), `pct=${meter?.pct}`)
+  check('storage line shows used/total', /MB|KB|B/.test(meter?.line ?? ''), `line=${meter?.line}`)
+  await page.screenshot({ path: path.join(out, '04-settings-meter.png'), fullPage: false })
+
   await browser.close()
 
   console.log(`\n${fail === 0 ? '✓' : '✗'} ${pass} passed, ${fail} failed`)

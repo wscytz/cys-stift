@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Toolbar } from '@cys-stift/ui'
 import { settingsStore, useSettings } from '@/lib/settings-store'
 import { useI18n } from '@/lib/i18n'
+import { StorageMeter } from '@/components/storage-meter'
 import {
   buildExportPayload,
   downloadExport,
@@ -61,6 +62,7 @@ export default function SettingsPage() {
       </Toolbar>
 
       <div className="content">
+        <StorageMeter />
         <section className="set">
           <h2 className="set__h">{t('settings.language')}</h2>
           <p className="set__lede">{t('settings.languageLede')}</p>

@@ -170,6 +170,16 @@ export const messages = {
   'settings.importOk': { zh: '已导入 {cards} 张卡片 · {mediaAssets} 个媒体。正在重新加载…', en: 'Imported {cards} cards · {mediaAssets} media. Reloading…' },
   'settings.importFail': { zh: '导入失败：{error}', en: 'Import failed: {error}' },
 
+  /* ── Storage meter (v0.26.3) ── */
+  'storage.title': { zh: '本地存储', en: 'Local storage' },
+  'storage.usedOf': { zh: '已用 {used} / {total}', en: '{used} of {total} used' },
+  'storage.warning': { zh: '存储接近上限 — 建议导出 JSON 备份并清理', en: 'Storage near the limit — export a JSON backup and clean up' },
+  'storage.detailToggle': { zh: '查看详细', en: 'Show details' },
+  'storage.category.cards': { zh: '卡片', en: 'Cards' },
+  'storage.category.media': { zh: '媒体', en: 'Media' },
+  'storage.category.canvas': { zh: '画布快照', en: 'Canvas snapshots' },
+  'storage.category.other': { zh: '其他', en: 'Other' },
+
   /* ── Search ── */
   'search.crumb': { zh: '搜索', en: 'search' },
   'search.placeholder': { zh: '搜索标题、正文、链接…', en: 'Search title, body, links…' },
