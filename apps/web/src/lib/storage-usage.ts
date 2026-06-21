@@ -71,8 +71,11 @@ export async function scanStorageUsage(): Promise<StorageUsage> {
     const key = window.localStorage.key(i)
     if (!key || !key.startsWith(CYS_PREFIX)) continue
     const raw = window.localStorage.getItem(key) ?? ''
-    const bytes = raw.length // JS strings are UTF-16; length ≈ bytes for ASCII
-                            // most of our payload (cards, snapshots) is ASCII.
+    // Byte-accurate size (UTF-8). Review fix (v0.37.0): `raw.length` counts
+    // UTF-16 code units — a zh-default app with CJK card bodies + base64
+    // media data URLs undercounts by ~2x, so the 80% quota warning (the
+    // safety net against silent QuotaExceeded) fires too late.
+    const bytes = new Blob([raw]).size
     used += bytes
     byKey.push({ key, bytes, category: categorise(key) })
   }

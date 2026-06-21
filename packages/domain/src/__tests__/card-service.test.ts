@@ -154,7 +154,7 @@ describe('CardService', () => {
     service.update(c.id, { media: [a1, a2] })
     const fetched = service.get(c.id)
     expect(fetched?.media).toHaveLength(2)
-    expect(fetched?.media[0].assetId).toBe('a1')
+    expect(fetched?.media[0]?.assetId).toBe('a1')
   })
 
   it('update returns null for unknown id', () => {

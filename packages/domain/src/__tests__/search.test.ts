@@ -93,7 +93,7 @@ describe('searchCards', () => {
 
   it('matches links', () => {
     const r = searchCards(
-      [card('1', 'Link card', '', { links: [{ url: 'https://example.com/docs' }] })],
+      [card('1', 'Link card', '', { links: [{ url: 'https://example.com/docs', fetchedAt: new Date() }] })],
       'example.com',
     )
     expect(r).toHaveLength(1)
