@@ -4,6 +4,22 @@
 
 ---
 
+## 2026-06-21 · v0.31.0-debt-cleanup
+
+P1(技术债清扫 — 零行为变化):
+
+- **canvas-editor.tsx 拆分**: 347→166 行。3 个 bridge 抽到独立文件(`canvas-view-persistence-bridge.tsx` 53 行 / `canvas-editor-binding-bridge.tsx` 59 行 / `canvas-double-click-bridge.tsx` 111 行)。每个 bridge 是 null-returning 组件,独立 useEffect,可单测。
+- **B8 修正**: `__canvasEditor` global **保留**(e2e 17 处引用,grep 确认),加注释说明 diagnostic + e2e 友好 hook。`__cardService` 改走 React Context(`CardServiceContext` 已存在),relation-panel / auto-relate 不再读 global,`card-service-access.ts` 删除。
+- **顺带修预存 bug**: db-client.ts 新增 `rehydrateCards` 导出(M3.2 commit 引入 import 但函数丢失,build 阻塞)。用现有 `loadSnapshot()` 复用 Date 重建逻辑。
+- **canvas-snapshot-store 单测**: 9 个 it(save→load 往返 / corrupt JSON 容错 / SSR no-op / quota 异常不 throw / canvas 隔离 / remove no-op),为 P3 B6 offload 铺安全网。
+- **测试**: vitest 12 → 21(12 AI + 9 snapshot-store);domain 26/26;db 7/7;build exit 0
+- **e2e**: m3 7/7 + canvas-refactor PASS + m1 7/8(1 个预存 bug 与本次无关)
+- **新增 P1.5 决策档**: [`docs/memory/decisions/2026-06-21-debt-cleanup.md`](../memory/decisions/2026-06-21-debt-cleanup.md)
+
+详见决策档。
+
+---
+
 ## 2026-06-21 · v0.30.0-ai-accessibility
 
 AI 可访问性 & 隐私设计(**纯文档**,无代码改动):
