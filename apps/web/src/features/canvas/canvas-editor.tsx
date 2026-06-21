@@ -129,38 +129,33 @@ export function CanvasEditor({
           ed.user.updateUserPreferences({ isSnapMode: isSnap })
           ed.updateDocumentSettings({ gridSize: view.gridSize })
 
-          // Diagnostic hook (unchanged).
+          // Diagnostic hooks for devtools + e2e scripts. Always set —
+          // the production bundle keeps them so existing e2e suites
+          // (17 references across scripts/*.cjs) keep working. Cleared
+          // in EditorBindingBridge's cleanup (B8) so a canvas switch
+          // doesn't leave a stale editor reference on window. The
+          // references are Editor + CardService handles only — no card
+          // contents leak (use them via svc.get(id) for that).
+          // M2.3 — also expose `__cardService` so relation-inference can
+          // look up bound card titles/bodies when an arrow is selected.
           if (typeof window !== 'undefined') {
             ;(window as unknown as { __canvasEditor?: Editor }).__canvasEditor = ed
+            ;(window as unknown as { __cardService?: typeof service }).__cardService = service
           }
 
-          // Backfill cards in CardService but not in the snapshot (new card
-          // since last visit, or first visit with no snapshot), then bind
-          // card geometry writeback → CardService.canvasPosition.
+          // One-shot backfill: cards in CardService but not in the snapshot
+          // (new card since last visit, or first visit with no snapshot).
           loadCardsIntoEditor(ed, service, canvasId)
-          bindCardWriteback(ed, service, canvasId)
-
-          // F1.5: persist the whole document (cards + freeform) on user
-          // changes. Card geometry is also in CardService, but freeform
-          // elements live ONLY here — without this they'd vanish on reload.
-          let persistTimer: ReturnType<typeof setTimeout> | null = null
-          ed.store.listen(
-            () => {
-              if (persistTimer) clearTimeout(persistTimer)
-              persistTimer = setTimeout(() => {
-                canvasSnapshotStore.save(canvasId, getSnapshot(ed.store))
-              }, VIEW_PERSIST_DEBOUNCE_MS)
-            },
-            { source: 'user', scope: 'document' },
-          )
 
           onEditorReady?.(ed)
           // No listen() / no editor.dispose monkey-patch from here on;
-          // reactive side-effects live in the bridge components below.
+          // subscriptions (writeback + snapshot persist) live in
+          // EditorBindingBridge below so they get cleaned up on unmount.
         }}
       />
       </CardServiceContext.Provider>
       <ViewPersistenceBridge editor={editor} canvasId={canvasId} />
+      <EditorBindingBridge editor={editor} canvasId={canvasId} service={service} />
       <DoubleClickBridge
         editor={editor}
         canvasId={canvasId}
@@ -206,6 +201,56 @@ function ViewPersistenceBridge({ editor, canvasId }: { editor: Editor | null; ca
     // keeps the effect from re-running on unrelated reactivity churn.
     // canvasId is in deps so switching canvases writes to the new id.
   }, [editor, canvasId, cam?.z, cam?.x, cam?.y, isGrid])
+  return null
+}
+
+/**
+ * EditorBindingBridge — owns the two editor subscriptions that previously
+ * lived in onMount with no cleanup (writeback + snapshot persist), plus the
+ * `window.__canvasEditor` diagnostic hook.
+ *
+ * onMount can't return a cleanup (tldraw owns that callback), so these were
+ * betting entirely on tldraw tearing the listeners down with the editor. This
+ * bridge makes cleanup explicit: on unmount (or editor/canvas change) we
+ * unsubscribe both listeners, clear the pending snapshot timer, and delete
+ * the `__canvasEditor` global (B8 — a stale editor reference otherwise
+ * lingers on window after a canvas switch). Same pattern as the other two
+ * bridges; the onMount now only does one-shot setup.
+ *
+ * `service` is stable (memoised in useDb), so it's safe in the dep array.
+ */
+function EditorBindingBridge({
+  editor,
+  canvasId,
+  service,
+}: {
+  editor: Editor | null
+  canvasId: CanvasId
+  service: CardService
+}) {
+  useEffect(() => {
+    if (!editor) return
+    const unsubWriteback = bindCardWriteback(editor, service, canvasId)
+    let persistTimer: ReturnType<typeof setTimeout> | null = null
+    const unsubPersist = editor.store.listen(
+      () => {
+        if (persistTimer) clearTimeout(persistTimer)
+        persistTimer = setTimeout(() => {
+          canvasSnapshotStore.save(canvasId, getSnapshot(editor.store))
+        }, VIEW_PERSIST_DEBOUNCE_MS)
+      },
+      { source: 'user', scope: 'document' },
+    )
+    return () => {
+      if (persistTimer) clearTimeout(persistTimer)
+      unsubWriteback()
+      unsubPersist()
+      if (typeof window !== 'undefined') {
+        delete (window as unknown as { __canvasEditor?: Editor }).__canvasEditor
+        delete (window as unknown as { __cardService?: typeof service }).__cardService
+      }
+    }
+  }, [editor, canvasId, service])
   return null
 }
 

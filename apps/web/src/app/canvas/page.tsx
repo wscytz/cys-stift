@@ -10,6 +10,7 @@ import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
 import { TldrawCanvas } from '@/features/canvas/tldraw-canvas'
 import { CanvasToolbar } from '@/features/canvas/canvas-toolbar'
+import { RelationPanel } from '@/features/canvas/relation-panel'
 import { CardDetailModal } from '@/features/canvas/card-detail-modal'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import {
@@ -225,7 +226,8 @@ export default function CanvasPage() {
           onOpenCard={(card) => setDetail({ card })}
           onEditorReady={(ed) => setEditor(ed)}
         />
-        <CanvasToolbar editor={editor} />
+        <CanvasToolbar editor={editor} service={service} />
+        <RelationPanel editor={editor} />
         {onCanvas === 0 && (
           <div className="cv-empty" aria-hidden="true">
             <span className="cv-empty__eyebrow">{t('canvas.emptyTitle')}</span>

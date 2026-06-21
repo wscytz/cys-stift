@@ -19,9 +19,15 @@
  * AND (b) at least 2 cards are selected. Clicking infers a relation type
  * for every selected pair and creates an arrow (M2.1) with that type
  * applied (M2.3). A toast reports how many arrows were created.
+ *
+ * v0.31.0 (P1.2 debt cleanup): `service` is now passed as a prop rather
+ * than read from the `window.__cardService` global. The toolbar is mounted
+ * outside `<CardServiceContext.Provider>`, so the page wires the service
+ * in directly — keeps the toolbar a pure (testable) component.
  */
 import { useEffect } from 'react'
 import { useValue, type Editor } from '@tldraw/tldraw'
+import type { CardService } from '@cys-stift/domain'
 import { useI18n } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n/messages'
 import { CanvasIcon, type CanvasIconId } from './canvas-icon'
@@ -50,7 +56,13 @@ const TOOLS: { id: ToolId; key: MessageKey; icon: CanvasIconId; shortcut: string
   { id: 'eraser', key: 'canvas.tool.eraser', icon: 'eraser', shortcut: 'e' },
 ]
 
-export function CanvasToolbar({ editor }: { editor: Editor | null }) {
+export function CanvasToolbar({
+  editor,
+  service,
+}: {
+  editor: Editor | null
+  service: CardService
+}) {
   const { t } = useI18n()
   const current = useValue(
     'canvas tool',
@@ -122,7 +134,7 @@ export function CanvasToolbar({ editor }: { editor: Editor | null }) {
               .getSelectedShapes()
               .filter((s) => s.type === 'card')
               .map((s) => String(s.id).replace(/^shape:/, ''))
-            const { arrowsCreated } = autoRelate(editor, ids)
+            const { arrowsCreated } = autoRelate(editor, ids, service)
             pushToast({
               kind: arrowsCreated > 0 ? 'success' : 'info',
               message:
