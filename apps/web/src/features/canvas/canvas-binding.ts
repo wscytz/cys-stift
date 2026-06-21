@@ -152,6 +152,41 @@ export function bindCardWriteback(
 }
 
 /**
+ * Sync CardService → editor: add card shapes that are in CardService but
+ * missing from the editor (e.g. sent to canvas from inbox), remove shapes
+ * that are no longer on this canvas (sent back to inbox / archived /
+ * soft-deleted). Marks the writes remote so the writeback listener ignores
+ * them.
+ */
+export function syncCardsToEditor(
+  editor: Editor,
+  service: CardService,
+  canvasId: CanvasId,
+): void {
+  editor.store.mergeRemoteChanges(() => {
+    const wanted = service
+      .listOnCanvas(canvasId)
+      .filter((c) => !c.archived && !c.deletedAt)
+    const wantedIds = new Set(wanted.map((c) => c.id))
+    // Add missing.
+    for (const card of wanted) {
+      if (editor.getShape(cardShapeIdOf(card.id))) continue
+      editor.createShape(cardToShape(card))
+    }
+    // Remove orphaned (on canvas but no longer in CardService on this canvas).
+    const present = editor
+      .getCurrentPageShapes()
+      .filter((s) => s.type === 'card')
+    for (const shape of present) {
+      const cid = cardIdFromShapeId(String(shape.id))
+      if (!wantedIds.has(cid)) {
+        editor.deleteShape(shape.id)
+      }
+    }
+  })
+}
+
+/**
  * Add a card to the editor (e.g. just created via double-click). Marked remote
  * so it doesn't trip the writeback listener.
  */

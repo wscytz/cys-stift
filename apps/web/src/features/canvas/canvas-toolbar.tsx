@@ -18,6 +18,7 @@ import { useEffect } from 'react'
 import { useValue, type Editor } from '@tldraw/tldraw'
 import { useI18n } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n/messages'
+import { CanvasIcon, type CanvasIconId } from './canvas-icon'
 
 type ToolId =
   | 'select'
@@ -29,15 +30,15 @@ type ToolId =
   | 'text'
   | 'eraser'
 
-const TOOLS: { id: ToolId; key: MessageKey; glyph: string; shortcut: string }[] = [
-  { id: 'select', key: 'canvas.tool.select', glyph: '↖', shortcut: 'v' },
-  { id: 'draw', key: 'canvas.tool.draw', glyph: '✎', shortcut: 'd' },
-  { id: 'rectangle', key: 'canvas.tool.rectangle', glyph: '▭', shortcut: 'r' },
-  { id: 'ellipse', key: 'canvas.tool.ellipse', glyph: '◯', shortcut: 'o' },
-  { id: 'arrow', key: 'canvas.tool.arrow', glyph: '→', shortcut: 'a' },
-  { id: 'note', key: 'canvas.tool.note', glyph: '☰', shortcut: 'n' },
-  { id: 'text', key: 'canvas.tool.text', glyph: 'T', shortcut: 't' },
-  { id: 'eraser', key: 'canvas.tool.eraser', glyph: '⌫', shortcut: 'e' },
+const TOOLS: { id: ToolId; key: MessageKey; icon: CanvasIconId; shortcut: string }[] = [
+  { id: 'select', key: 'canvas.tool.select', icon: 'select', shortcut: 'v' },
+  { id: 'draw', key: 'canvas.tool.draw', icon: 'draw', shortcut: 'd' },
+  { id: 'rectangle', key: 'canvas.tool.rectangle', icon: 'rectangle', shortcut: 'r' },
+  { id: 'ellipse', key: 'canvas.tool.ellipse', icon: 'ellipse', shortcut: 'o' },
+  { id: 'arrow', key: 'canvas.tool.arrow', icon: 'arrow', shortcut: 'a' },
+  { id: 'note', key: 'canvas.tool.note', icon: 'note', shortcut: 'n' },
+  { id: 'text', key: 'canvas.tool.text', icon: 'text', shortcut: 't' },
+  { id: 'eraser', key: 'canvas.tool.eraser', icon: 'eraser', shortcut: 'e' },
 ]
 
 export function CanvasToolbar({ editor }: { editor: Editor | null }) {
@@ -86,7 +87,7 @@ export function CanvasToolbar({ editor }: { editor: Editor | null }) {
           aria-pressed={current === tool.id}
           title={`${t(tool.key)} (${tool.shortcut})`}
         >
-          {tool.glyph}
+          <CanvasIcon id={tool.icon} />
         </button>
       ))}
       <style>{styles}</style>
@@ -97,48 +98,56 @@ export function CanvasToolbar({ editor }: { editor: Editor | null }) {
 const styles = `
 .cv-toolbar {
   position: fixed;
-  bottom: var(--space-4);
+  bottom: var(--space-5);
   left: 50%;
   transform: translateX(-50%);
   z-index: 30;
   display: flex;
-  gap: 2px;
-  padding: var(--space-1);
+  gap: 4px;
+  padding: 6px;
   background: var(--color-white);
-  border: var(--border-hairline);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md);
+  border: 2px solid var(--color-black);
+  border-radius: 2px;
+  box-shadow: 4px 4px 0 0 var(--color-black);
   font-family: var(--font-mono);
 }
 .cv-toolbar__btn {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: transparent;
-  border: 0;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-base);
-  line-height: 1;
+  border: 1px solid transparent;
+  border-radius: 2px;
   color: var(--color-black);
   cursor: pointer;
   padding: 0;
+  transition: background 80ms ease-out, border-color 80ms ease-out, transform 80ms ease-out;
 }
-.cv-toolbar__btn:hover:not(:disabled) {
+.cv-toolbar__btn:hover:not(:disabled):not(.cv-toolbar__btn--active) {
   background: var(--color-gray-soft);
+  border-color: var(--color-black);
+}
+.cv-toolbar__btn:active:not(:disabled) {
+  transform: translate(1px, 1px);
 }
 .cv-toolbar__btn--active {
   background: var(--color-red);
   color: var(--color-white);
+  border-color: var(--color-black);
+  box-shadow: inset 0 0 0 1px var(--color-white);
+}
+.cv-toolbar__btn:focus-visible {
+  outline: 2px solid var(--color-red);
+  outline-offset: 2px;
 }
 .cv-toolbar__btn:disabled {
-  opacity: 0.4;
+  opacity: 0.3;
   cursor: default;
 }
 @media (max-width: 720px) {
-  .cv-toolbar { bottom: var(--space-2); }
-  .cv-toolbar__btn { width: 32px; height: 32px; font-size: var(--font-size-sm); }
+  .cv-toolbar { bottom: var(--space-3); gap: 2px; padding: 4px; }
+  .cv-toolbar__btn { width: 36px; height: 36px; }
 }
 `

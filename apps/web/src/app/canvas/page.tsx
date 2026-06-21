@@ -15,6 +15,7 @@ import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import {
   addCardShape,
   removeCardShape,
+  syncCardsToEditor,
   updateCardShape,
 } from '@/features/canvas/canvas-binding'
 import { canvasStore, useCanvases } from '@/lib/canvas-store'
@@ -48,6 +49,16 @@ export default function CanvasPage() {
   const { snapshot: canvasesSnap } = useCanvases()
   const activeCanvasId = canvasesSnap.activeCanvasId
   const canvases = canvasesSnap.canvases
+
+  // Sync CardService → editor on every DB change (e.g. user sends a card
+  // from /inbox via service.moveToCanvas, or unarchives from trash). Without
+  // this, inbox→canvas card creates shapes only via onMount's loadCardsIntoEditor
+  // backfill, so a send *after* mount silently fails to render. F1 promised
+  // "card is single source of truth"; this effect delivers it.
+  useEffect(() => {
+    if (!editor) return
+    syncCardsToEditor(editor, service, activeCanvasId)
+  }, [snap, editor, activeCanvasId, service])
 
   const [creatingName, setCreatingName] = useState<string | null>(null)
   const [renamingId, setRenamingId] = useState<CanvasId | null>(null)
