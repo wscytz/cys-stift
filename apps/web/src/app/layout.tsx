@@ -55,6 +55,7 @@ export default function RootLayout({
           <AppMenu />
           {children}
           <AIProviderSync />
+          <ThemeBoot />
           <CaptureHost />
           <FileDropHandler />
           <ToastHost />
