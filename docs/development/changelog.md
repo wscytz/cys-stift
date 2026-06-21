@@ -1128,3 +1128,29 @@ Phase C(战略级)。桌面端全局快捷键:app 后台/失焦时 ⌘⇧Space(m
 详见 [`docs/memory/decisions/2026-06-21-tauri-global-shortcut.md`](../memory/decisions/2026-06-21-tauri-global-shortcut.md)。
 
 ---
+
+## 2026-06-21 · v0.25.1-review-bugfixes
+
+Review 驱动。3 个并行 Explore agent 复核 v0.24-v0.25,6 项全修(4 真 bug + 2 一致性 gap)。
+
+### 🔴 真 bug
+
+- **fix(capture-host)**: Tauri listener 泄漏 race — `listen()` 返回 Promise,unmount 早于 resolve 时 cleanup no-op → listener 永久泄漏。加 cancelled flag,.then 内检查已取消则立即 unregister → `78b1bba`
+- **fix(archive-card-tile)**: `/trash` 软删除的 pinned 卡仍显示黄边(pin 按钮被 disabled 隐藏但 `tile--pinned` class 仍加)。cls 里 `disabled` 时不加 `tile--pinned` → `78b1bba`
+- **fix(card-detail)**: inbox detail 的 Pin 按钮在 send-to-canvas 后仍在(可 pin canvas 卡,违反决策)。`showPin` 加 `&& !card.canvasPosition` → `78b1bba`
+- **fix(css)**: `.tile--pinned`/`.tile--selected` 改 `border-width:2px` 导致 grid reflow;且 selected+pinned 同 specificity 冲突。改用 `outline:2px`(offset -1px)叠加在默认 1px hairline 上 → 无布局抖动,pinned(后声明)胜。inbox + archive-card-tile 同步 → `78b1bba`
+
+### 🟠 一致性 gap
+
+- **fix(search)**: 结果加 pinned 前置 partition(与 inbox/archive 一致)→ `78b1bba`
+- **fix(timeline)**: `/archive` Timeline 视图传 `onTogglePin`(行显示星)+ 每日组内 pinned 前置 → `78b1bba`
+
+**验收**:
+- domain 26/26 + db 7/7 + web build 14 页 exit 0
+- 7 个文件 / +51 -10 行 / 1 个 commit
+
+**defer 的 latent**(不修):pinFirst 未 memo(卡片量小 perf 可忽略)/ register 失败无 in-app 反馈 / emit 广播多 webview(单窗口无影响)/ auto-repeat 重复 emit(setOpen 幂等)/ window label 隐式 "main"(默认值稳定)
+
+详见 [`docs/memory/decisions/2026-06-21-review-bugfixes.md`](../memory/decisions/2026-06-21-review-bugfixes.md)。
+
+---
