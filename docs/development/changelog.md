@@ -1155,6 +1155,20 @@ Review 驱动。3 个并行 Explore agent 复核 v0.24-v0.25,6 项全修(4 真 b
 
 ---
 
+## 2026-06-21 · v0.26.4-canvas-bugfixes
+
+深度复审([`docs/reviews/2026-06-21-canvas-deep-review.md`](../reviews/2026-06-21-canvas-deep-review.md))找到 9 个问题,本档关闭其中 4 个 critical/high(B1/B3/B4/B5)。B2 由 B3 隐式覆盖。
+
+- **B1**: `db-client.ts` 加 `storage` event listener + 跨 tab re-hydrate,两 tab 编辑不再互相静默覆盖 → `cf2eba0`
+- **B3**: `loadCardsIntoEditor` 检测 DB 与 shape 位置不一致时 `updateShape` reconcile,DB 是权威 → `cf2eba0`
+- **B4**: `canvasStore.delete` 调 `canvasSnapshotStore.remove`,删画布释放 localStorage 配额 → `cf2eba0`
+- **B5**: `bindCardWriteback` flush guard: 卡被删/归档/移走时跳过写回,防 300ms 窗口覆盖 → `cf2eba0`
+- **e2e**: 17/17 通过(新增 5 断言覆盖 4 bug)
+
+详见 [`docs/memory/decisions/2026-06-21-canvas-bugfixes.md`](../memory/decisions/2026-06-21-canvas-bugfixes.md)。
+
+---
+
 ## 2026-06-21 · v0.26.0-high-freedom-canvas-f1
 
 高自由画布 Phase **F1(地基)**。参考苹果无边记(Freeform),以"整理笔记"为核心,画布从"只摆灵感卡"向"自由多元素笔记整理"演进。F1 = 持久化地基 + card 内容单一数据源 + body preview。**F2(包豪斯工具栏)下一档**。
