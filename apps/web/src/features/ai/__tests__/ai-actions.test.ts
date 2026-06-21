@@ -24,6 +24,7 @@ function fakeCard(title = 'Test', body = 'Some body'): Card {
     title,
     body,
     type: 'note',
+    tags: [],
     media: [],
     links: [],
     codeSnippets: [],

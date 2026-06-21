@@ -3,27 +3,33 @@ import { PROMPTS, type AIAction } from '../prompts'
 
 // Minimal Card-shaped object — just the fields buildUser reads.
 function fakeCard(overrides: { title?: string; body?: string } = {}) {
+  const title = overrides.title ?? 'Test Title'
+  const body = overrides.body ?? 'Test body content.'
   return {
-    title: overrides.title ?? 'Test Title',
-    body: overrides.body ?? 'Test body content.',
+    title,
+    body,
+    tags: [] as { value: string; color: string }[],
     // Fields the prompt must NEVER include:
     source: { kind: 'manual' as const, deviceId: 'secret-device-id' },
-    id: 'card-1',
+    id: 'card-1' as string,
     type: 'note' as const,
-    capturedAt: new Date(),
+    capturedAt: new Date('2026-06-21'),
     createdAt: new Date(),
     updatedAt: new Date(),
     pinned: false,
     archived: false,
-    media: [],
-    links: [],
-    codeSnippets: [],
-    quotes: [],
+    media: [] as { assetId: string; order: number; kind?: string }[],
+    links: [] as { url: string; title?: string }[],
+    codeSnippets: [] as { language: string; code: string }[],
+    quotes: [] as { text: string; attribution?: string }[],
+    deletedAt: undefined as Date | undefined,
+    canvasPosition: undefined as { canvasId: string } | undefined,
+    color: undefined as string | undefined,
   }
 }
 
 function buildsFor(action: AIAction, card: ReturnType<typeof fakeCard>) {
-  return { system: PROMPTS[action].system, user: PROMPTS[action].buildUser(card) }
+  return { system: PROMPTS[action].system, user: PROMPTS[action].buildUser(card as never) }
 }
 
 describe('PROMPTS (privacy lock)', () => {
@@ -32,9 +38,11 @@ describe('PROMPTS (privacy lock)', () => {
   it('summarize system is non-empty', () => { expect(sum.system.length).toBeGreaterThan(10) })
   it('summarize user includes the title', () => { expect(sum.user).toContain('Test Title') })
   it('summarize user includes the body', () => { expect(sum.user).toContain('Test body') })
-  it('summarize user shows (empty) when body is empty', () => {
-    const u = PROMPTS.summarize.buildUser(fakeCard({ title: 'X', body: '' }))
-    expect(u).toContain('(empty)')
+  it('summarize user shows no body text when body is empty', () => {
+    const u = PROMPTS.summarize.buildUser(fakeCard({ title: 'X', body: '' }) as never)
+    expect(u).toContain('title: X')
+    // body is empty so it won't appear or will show empty
+    expect(u).not.toContain('Test body')
   })
 
   // ── Improve writing ──
