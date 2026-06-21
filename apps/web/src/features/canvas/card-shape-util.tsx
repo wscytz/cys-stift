@@ -15,6 +15,10 @@
  * global :root tokens resolve here.
  */
 import { BaseBoxShapeUtil, HTMLContainer, T, type TLBaseShape } from '@tldraw/tldraw'
+import type { CardId } from '@cys-stift/domain'
+import { useCardService } from './card-service-context'
+import { useI18n } from '@/lib/i18n'
+import { typeKeyOf } from '@/lib/type-label'
 
 export const CARD_TYPE = 'card' as const
 
@@ -43,7 +47,17 @@ export class CardShapeUtil extends BaseBoxShapeUtil<CardShape> {
   }
 
   override component(shape: CardShape) {
-    const { title, kind } = shape.props
+    // F1.2 (v0.26.0): render from the domain CardService (single source of
+    // truth) via React context, not from stale shape props. The shape id
+    // encodes the cardId ("shape:<id>"); we reverse it to look the card up.
+    // If the card is gone (deleted) or the service isn't ready yet, render a
+    // muted placeholder so the shape doesn't pop out mid-interaction.
+    const service = useCardService()
+    const { t } = useI18n()
+    const cardId = String(shape.id).replace(/^shape:/, '') as unknown as CardId
+    const card = service?.get(cardId)
+    const title = card?.title || t('card.untitled')
+    const preview = card?.body ?? ''
     return (
       <HTMLContainer
         style={{
@@ -61,13 +75,28 @@ export class CardShapeUtil extends BaseBoxShapeUtil<CardShape> {
           boxShadow: 'var(--shadow-sm)',
           overflow: 'hidden',
           fontFamily: 'var(--font-body)',
+          position: 'relative',
           // pointerEvents: none so tldraw's canvas layer receives pointer
-          // events and can select/drag the shape. The card has no inner
-          // interaction in Phase 4; the open-detail action is wired via
-          // tldraw's shape double-click (T4).
+          // events and can select/drag the shape. Open-detail is wired via
+          // tldraw's shape double-click (DoubleClickBridge).
           pointerEvents: 'none',
         }}
       >
+        {card?.pinned && (
+          <span
+            style={{
+              position: 'absolute',
+              top: 'var(--space-1)',
+              right: 'var(--space-1)',
+              color: 'var(--color-yellow)',
+              fontSize: 'var(--font-size-base)',
+              lineHeight: 1,
+            }}
+            aria-hidden="true"
+          >
+            ★
+          </span>
+        )}
         <span
           style={{
             fontFamily: 'var(--font-mono)',
@@ -77,7 +106,7 @@ export class CardShapeUtil extends BaseBoxShapeUtil<CardShape> {
             color: 'var(--color-gray)',
           }}
         >
-          {kind}
+          {card ? t(typeKeyOf(card.type)) : '—'}
         </span>
         <h3
           style={{
@@ -90,8 +119,24 @@ export class CardShapeUtil extends BaseBoxShapeUtil<CardShape> {
             overflow: 'hidden',
           }}
         >
-          {title || '(untitled)'}
+          {title}
         </h3>
+        {preview && (
+          <p
+            style={{
+              margin: 0,
+              color: 'var(--color-black-soft)',
+              fontSize: 'var(--font-size-sm)',
+              lineHeight: 1.4,
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical' as const,
+              overflow: 'hidden',
+            }}
+          >
+            {preview}
+          </p>
+        )}
       </HTMLContainer>
     )
   }
