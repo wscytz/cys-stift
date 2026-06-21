@@ -38,7 +38,7 @@
  *     previous `wireDoubleClick()` which had no cleanup hook.
  */
 import { useEffect, useRef } from 'react'
-import { Tldraw, useValue, type Editor } from '@tldraw/tldraw'
+import { Tldraw, useValue, getSnapshot, loadSnapshot, type Editor } from '@tldraw/tldraw'
 import type { CanvasId, Card, CardService } from '@cys-stift/domain'
 import { CardShapeUtil } from './card-shape-util'
 import { CardServiceContext } from './card-service-context'
@@ -49,6 +49,7 @@ import {
   loadCardsIntoEditor,
 } from './canvas-binding'
 import { canvasViewStore } from '@/lib/canvas-view-store'
+import { canvasSnapshotStore } from '@/lib/canvas-snapshot-store'
 import { captureSinkRegistry } from '@/features/capture/capture-sink'
 import { getDeviceId } from '@/lib/device-id'
 
@@ -102,28 +103,57 @@ export function CanvasEditor({
           PageMenu: () => null,
         }}
         onMount={(ed: Editor) => {
-          // ── One-shot setup (Phase 6.5d view + Phase 4 binding) ───
-          // View persistence: apply zoom/pan/gridMode BEFORE first paint so
-          // users never see the default view flash. Phase multi-canvas
-          // follow-up: view is per-canvas (v0.15+), so we look up the
-          // view for THIS canvas, not the global default.
+          // ── F1.5: restore the full document (cards + freeform elements)
+          //    from the per-canvas snapshot BEFORE backfilling / view setup.
+          //    Document only — camera stays governed by canvasViewStore
+          //    below so pan/zoom persistence is unaffected.
+          const restored = canvasSnapshotStore.load(canvasId)
+          if (restored) {
+            try {
+              // round-tripped JSON → cast back to loadSnapshot's expected shape
+              loadSnapshot(
+                ed.store,
+                restored as unknown as Parameters<typeof loadSnapshot>[1],
+              )
+            } catch (e) {
+              console.warn('[canvas] snapshot load failed', e)
+            }
+          }
+
+          // ── View persistence (Phase 6.5d): apply zoom/pan/gridMode BEFORE
+          //    first paint. Per-canvas (v0.15+).
           const view = canvasViewStore.get(canvasId)
           ed.setCamera({ x: view.panX, y: view.panY, z: view.zoom })
-          // spec §4.3 — gridMode + gridSize. isGridMode is the master
-          // snap toggle; user.isSnapMode inverts ctrl-key behaviour. Both
-          // must agree so toolbar state matches drag behaviour (Phase 5).
-          const snap = view.gridMode === 'snap'
-          ed.updateInstanceState({ isGridMode: snap })
-          ed.user.updateUserPreferences({ isSnapMode: snap })
+          const isSnap = view.gridMode === 'snap'
+          ed.updateInstanceState({ isGridMode: isSnap })
+          ed.user.updateUserPreferences({ isSnapMode: isSnap })
           ed.updateDocumentSettings({ gridSize: view.gridSize })
-          // Diagnostic hook — lets the puppeteer scripts inspect live
-          // editor state (isGridMode, gridSize, camera, etc.) without
-          // monkey-patching internals. Cheap and only runs once at mount.
+
+          // Diagnostic hook (unchanged).
           if (typeof window !== 'undefined') {
             ;(window as unknown as { __canvasEditor?: Editor }).__canvasEditor = ed
           }
+
+          // Backfill cards in CardService but not in the snapshot (new card
+          // since last visit, or first visit with no snapshot), then bind
+          // card geometry writeback → CardService.canvasPosition.
           loadCardsIntoEditor(ed, service, canvasId)
           bindCardWriteback(ed, service, canvasId)
+
+          // F1.5: persist the whole document (cards + freeform) on user
+          // changes. Card geometry is also in CardService, but freeform
+          // elements live ONLY here — without this they'd vanish on reload.
+          let persistTimer: ReturnType<typeof setTimeout> | null = null
+          ed.store.listen(
+            () => {
+              if (persistTimer) clearTimeout(persistTimer)
+              persistTimer = setTimeout(() => {
+                canvasSnapshotStore.save(canvasId, getSnapshot(ed.store))
+              }, VIEW_PERSIST_DEBOUNCE_MS)
+            },
+            { source: 'user', scope: 'document' },
+          )
+
           onEditorReady?.(ed)
           // No listen() / no editor.dispose monkey-patch from here on;
           // reactive side-effects live in the bridge components below.

@@ -99,6 +99,9 @@ export function loadCardsIntoEditor(
   if (cards.length === 0) return
   editor.store.mergeRemoteChanges(() => {
     for (const card of cards) {
+      // F1.5: skip cards already on the canvas (restored from the snapshot)
+      // so we don't double-create or trip the writeback listener.
+      if (editor.getShape(cardShapeIdOf(card.id))) continue
       editor.createShape(cardToShape(card))
     }
   })
