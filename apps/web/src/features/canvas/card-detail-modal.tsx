@@ -11,25 +11,11 @@
  */
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { Button, Input, Modal, Tag } from '@cys-stift/ui'
-import type { Card } from '@cys-stift/domain'
+import type { Card, TagRef } from '@cys-stift/domain'
+import { TAG_COLORS } from '@cys-stift/domain'
 import { MarkdownBody } from '@/app/inbox/markdown'
 import { useI18n } from '@/lib/i18n'
 import { typeKeyOf } from '@/lib/type-label'
-
-interface Props {
-  card: Card
-  onClose: () => void
-  onSave: (patch: { title: string; body: string }) => void
-  onArchive: () => void
-  onUnarchive: () => void
-  onDelete: () => void
-  /**
-   * Move the card off the canvas and back to the inbox. Only available
-   * when the card currently has a `canvasPosition` (otherwise there's
-   * nothing to send back from). UX #2 closure (review §🟠).
-   */
-  onSendToInbox?: () => void
-}
 
 export function CardDetailModal({
   card,
@@ -39,12 +25,22 @@ export function CardDetailModal({
   onUnarchive,
   onDelete,
   onSendToInbox,
-}: Props) {
+}: {
+  card: Card
+  onClose: () => void
+  onSave: (patch: { title: string; body: string; tags: TagRef[] }) => void
+  onArchive: () => void
+  onUnarchive: () => void
+  onDelete: () => void
+  onSendToInbox?: () => void
+}) {
   const { t } = useI18n()
   // A card opened with no title (freshly created via double-click) opens in edit.
   const [mode, setMode] = useState<'view' | 'edit'>(card.title ? 'view' : 'edit')
   const [title, setTitle] = useState(card.title)
   const [body, setBody] = useState(card.body)
+  const [tags, setTags] = useState<TagRef[]>(card.tags)
+  const [tagInput, setTagInput] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [pending, startTransition] = useTransition()
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -52,7 +48,9 @@ export function CardDetailModal({
   useEffect(() => {
     setTitle(card.title)
     setBody(card.body)
-  }, [card.id, card.title, card.body])
+    setTags(card.tags)
+    setTagInput('')
+  }, [card.id, card.title, card.body, card.tags])
 
   useEffect(() => {
     if (mode === 'edit') {
@@ -73,7 +71,7 @@ export function CardDetailModal({
   const save = () => {
     if (!title.trim()) return
     startTransition(() => {
-      onSave({ title: title.trim(), body })
+      onSave({ title: title.trim(), body, tags })
       setMode('view')
     })
   }
@@ -90,6 +88,11 @@ export function CardDetailModal({
             <>
               <div className="cd__meta">
                 <Tag color="black">{t(typeKeyOf(card.type))}</Tag>
+                {card.tags.map((tag) => (
+                  <span key={tag.value} className="cd__tag-chip" style={{ background: tag.color }}>
+                    {tag.value}
+                  </span>
+                ))}
                 <span className="cd__time">
                   {card.capturedAt.toISOString().slice(0, 19).replace('T', ' ')}
                 </span>
@@ -152,6 +155,42 @@ export function CardDetailModal({
                   rows={8}
                 />
               </label>
+              <div className="cd__field">
+                <span className="cd__label">{t('tag.add')}</span>
+                <div className="cd__tags">
+                  {tags.map((tag) => (
+                    <span
+                      key={tag.value}
+                      className="cd__tag-chip"
+                      style={{ background: tag.color }}
+                      title={t('tag.remove')}
+                      onClick={() =>
+                        setTags((prev) => prev.filter((x) => x.value !== tag.value))
+                      }
+                    >
+                      {tag.value} ×
+                    </span>
+                  ))}
+                  <input
+                    className="cd__tag-input"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && tagInput.trim()) {
+                        e.preventDefault()
+                        const val = tagInput.trim()
+                        if (!tags.some((tag) => tag.value === val)) {
+                          const color =
+                            TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)]!
+                          setTags((prev) => [...prev, { value: val, color }])
+                        }
+                        setTagInput('')
+                      }
+                    }}
+                    placeholder={t('tag.placeholder')}
+                  />
+                </div>
+              </div>
               <p className="cd__hint">{t('card.detail.editHint')}</p>
             </>
           )}
@@ -249,4 +288,20 @@ const styles = `
 .cd__quote p { margin: 0 0 var(--space-1); }
 .cd__cite { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black-soft); font-style: normal; }
 .cd__confirm { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
+.cd__tags { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }
+.cd__tag-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px var(--space-1); border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  color: var(--color-black); border: 2px solid var(--color-black);
+  cursor: pointer; user-select: none; line-height: 1.3;
+}
+.cd__tag-chip:hover { opacity: 0.8; }
+.cd__tag-input {
+  appearance: none; border: var(--border-hairline); background: transparent;
+  padding: 2px var(--space-1); font-family: var(--font-mono);
+  font-size: var(--font-size-xs); color: var(--color-black);
+  min-width: 120px; line-height: 1.3;
+}
+.cd__tag-input:focus { outline: none; border-color: var(--color-red); }
 `

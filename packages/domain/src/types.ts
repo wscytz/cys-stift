@@ -22,6 +22,31 @@ export type MediaAssetId = string & { readonly __brand: 'MediaAssetId' }
 
 export type CardType = 'note' | 'image' | 'link' | 'code' | 'quote'
 
+// ── Tags (P4 v0.32.0) ───────────────────────────────────────────────────────
+
+/** 10-color fixed palette — chips never accept arbitrary hex. */
+export const TAG_COLORS = [
+  'var(--color-red)',
+  'var(--color-teal)',
+  'var(--color-blue)',
+  'var(--color-yellow)',
+  'var(--color-pink)',
+  'var(--color-white)',
+  'var(--color-gray)',
+  'var(--color-orange)',
+  'var(--color-purple)',
+  'var(--color-green)',
+] as const
+
+export type TagColor = (typeof TAG_COLORS)[number]
+
+export interface TagRef {
+  value: string
+  color: TagColor
+}
+
+// ── Card subtypes (spec §4.8) ───────────────────────────────────────────────
+
 export interface MediaRef {
   assetId: MediaAssetId
   caption?: string
@@ -79,6 +104,7 @@ export interface Card {
   canvasPosition?: CanvasPosition
 
   color?: ColorToken
+  tags: TagRef[]
   pinned: boolean
   archived: boolean
 

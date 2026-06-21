@@ -45,7 +45,9 @@ import type {
   LinkPreview,
   MediaRef,
   Quote,
+  TagRef,
 } from '@cys-stift/domain'
+import { TAG_COLORS } from '@cys-stift/domain'
 import {
   CodeEditor,
   ListEditor,
@@ -86,6 +88,7 @@ export interface CardDetailSavePatch {
   links: LinkPreview[]
   codeSnippets: CodeBlock[]
   quotes: Quote[]
+  tags: TagRef[]
 }
 
 export interface CardDetailModalProps {
@@ -142,6 +145,8 @@ export function CardDetailModal({
   const [quotes, setQuotes] = useState<DraftQuote[]>(() =>
     card.quotes.map((q) => ({ text: q.text, attribution: q.attribution ?? '' })),
   )
+  const [tags, setTags] = useState<TagRef[]>(card.tags)
+  const [tagInput, setTagInput] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [pending, startTransition] = useTransition()
   // M3 — AI action state. We track which action (if any) is in flight
@@ -162,6 +167,8 @@ export function CardDetailModal({
     setLinks(card.links.map((l) => ({ url: l.url })))
     setCodes(card.codeSnippets.map((c) => ({ language: c.language, code: c.code })))
     setQuotes(card.quotes.map((q) => ({ text: q.text, attribution: q.attribution ?? '' })))
+    setTags(card.tags)
+    setTagInput('')
     setMode(initialMode)
     setConfirmDelete(false)
   }, [
@@ -208,6 +215,7 @@ export function CardDetailModal({
         links: draftLinksToPayload(links),
         codeSnippets: draftCodesToPayload(codes),
         quotes: draftQuotesToPayload(quotes),
+        tags,
       })
       setMode('view')
     })
@@ -247,6 +255,11 @@ export function CardDetailModal({
             <>
               <div className="cd__meta">
                 <Tag color="red">{t(typeKeyOf(card.type))}</Tag>
+                {card.tags.map((tag) => (
+                  <span key={tag.value} className="cd__tag-chip" style={{ background: tag.color }}>
+                    {tag.value}
+                  </span>
+                ))}
                 <span className="cd__time">
                   {card.capturedAt.toISOString().slice(0, 19).replace('T', ' ')}
                 </span>
@@ -425,6 +438,42 @@ export function CardDetailModal({
               />
               <CodeEditor items={codes} onChange={setCodes} />
               <QuoteEditor items={quotes} onChange={setQuotes} />
+              <div className="cd__field">
+                <span className="cd__label">{t('tag.add')}</span>
+                <div className="cd__tags">
+                  {tags.map((tag) => (
+                    <span
+                      key={tag.value}
+                      className="cd__tag-chip"
+                      style={{ background: tag.color }}
+                      title={t('tag.remove')}
+                      onClick={() =>
+                        setTags((prev) => prev.filter((x) => x.value !== tag.value))
+                      }
+                    >
+                      {tag.value} ×
+                    </span>
+                  ))}
+                  <input
+                    className="cd__tag-input"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && tagInput.trim()) {
+                        e.preventDefault()
+                        const val = tagInput.trim()
+                        if (!tags.some((tag) => tag.value === val)) {
+                          const color =
+                            TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)]!
+                          setTags((prev) => [...prev, { value: val, color }])
+                        }
+                        setTagInput('')
+                      }
+                    }}
+                    placeholder={t('tag.placeholder')}
+                  />
+                </div>
+              </div>
             </>
           )}
 
@@ -553,6 +602,7 @@ export function CardDetailModal({
                   links: card.links,
                   codeSnippets: card.codeSnippets,
                   quotes: card.quotes,
+                  tags: card.tags,
                 })
                 setAiAction(null)
               }}
@@ -674,4 +724,21 @@ const styles = `
 .cd__confirm { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
 .cd__confirm-link { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; }
 .cd__confirm-actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-2); }
+
+.cd__tags { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }
+.cd__tag-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px var(--space-1); border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  color: var(--color-black); border: 2px solid var(--color-black);
+  cursor: pointer; user-select: none; line-height: 1.3;
+}
+.cd__tag-chip:hover { opacity: 0.8; }
+.cd__tag-input {
+  appearance: none; border: var(--border-hairline); background: transparent;
+  padding: 2px var(--space-1); font-family: var(--font-mono);
+  font-size: var(--font-size-xs); color: var(--color-black);
+  min-width: 120px; line-height: 1.3;
+}
+.cd__tag-input:focus { outline: none; border-color: var(--color-red); }
 `

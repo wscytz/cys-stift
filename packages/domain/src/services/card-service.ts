@@ -17,7 +17,10 @@ import type {
   LinkPreview,
   MediaRef,
   Quote,
+  TagRef,
+  TagColor,
 } from '../types'
+import { TAG_COLORS } from '../types'
 import { generateId } from '../codec'
 
 export interface CardRepository {
@@ -41,6 +44,7 @@ export interface CreateCardInput {
   codeSnippets?: CodeBlock[]
   quotes?: Quote[]
   color?: Card['color']
+  tags?: TagRef[]
 }
 
 export interface UpdateCardPatch {
@@ -53,6 +57,7 @@ export interface UpdateCardPatch {
   links?: LinkPreview[]
   codeSnippets?: CodeBlock[]
   quotes?: Quote[]
+  tags?: TagRef[]
 }
 
 export class CardService {
@@ -75,6 +80,7 @@ export class CardService {
       updatedAt: now,
       canvasPosition: input.canvasPosition,
       color: input.color,
+      tags: input.tags ?? [],
       pinned: false,
       archived: false,
     }
@@ -119,6 +125,7 @@ export class CardService {
       ...(patch.type !== undefined ? { type: patch.type } : {}),
       ...(patch.color !== undefined ? { color: patch.color } : {}),
       ...(patch.pinned !== undefined ? { pinned: patch.pinned } : {}),
+      ...(patch.tags !== undefined ? { tags: patch.tags } : {}),
       ...(patch.media !== undefined ? { media: patch.media } : {}),
       ...(patch.links !== undefined ? { links: patch.links } : {}),
       ...(patch.codeSnippets !== undefined
@@ -206,6 +213,75 @@ export class CardService {
       updatedAt: new Date(),
     })
     return true
+  }
+
+  /**
+   * Add a tag to a card. Idempotent: if the same tag value already
+   * exists, the existing color is preserved. Returns the updated card
+   * or null if the card doesn't exist.
+   */
+  addTag(id: CardId, value: string, color?: TagColor): Card | null {
+    const card = this.repo.getById(id)
+    if (!card) return null
+    const existing = card.tags.find((t) => t.value === value)
+    if (existing) return card
+    const chosen = color ?? TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)]!
+    const next: Card = {
+      ...card,
+      tags: [...card.tags, { value: value.trim(), color: chosen }],
+      updatedAt: new Date(),
+    }
+    this.repo.update(next)
+    return next
+  }
+
+  /**
+   * Remove a tag from a card by value. Idempotent: if the tag
+   * doesn't exist on the card, this is a no-op. Returns the updated
+   * card or null if the card doesn't exist.
+   */
+  removeTag(id: CardId, value: string): Card | null {
+    const card = this.repo.getById(id)
+    if (!card) return null
+    if (!card.tags.some((t) => t.value === value)) return card
+    const next: Card = {
+      ...card,
+      tags: card.tags.filter((t) => t.value !== value),
+      updatedAt: new Date(),
+    }
+    this.repo.update(next)
+    return next
+  }
+
+  /**
+
+  /** List all unique tag values across all cards. */
+  listTags(): { value: string; color: TagColor; count: number }[] {
+    const all = this.repo.listAll()
+    const map = new Map<string, { color: TagColor; count: number }>()
+    for (const c of all) {
+      for (const t of c.tags) {
+        const entry = map.get(t.value)
+        if (entry) {
+          entry.count++
+        } else {
+          map.set(t.value, { color: t.color, count: 1 })
+        }
+      }
+    }
+    return [...map.entries()].map(([value, { color, count }]) => ({
+      value,
+      color,
+      count,
+    }))
+  }
+
+  /** Find cards that have ANY of the given tag values. */
+  listByTags(tagValues: string[]): Card[] {
+    if (tagValues.length === 0) return []
+    return this.repo.listAll().filter((c) =>
+      c.tags.some((t) => tagValues.includes(t.value)),
+    )
   }
 
   /**

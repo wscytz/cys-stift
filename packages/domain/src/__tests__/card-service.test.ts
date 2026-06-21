@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { CardService, type CardRepository } from '../services/card-service'
-import type { Card, CardId, CanvasId, MediaAssetId, MediaRef, WorkspaceId } from '../types'
+import type { Card, CardId, CanvasId, MediaAssetId, MediaRef, WorkspaceId, TagRef } from '../types'
+import { TAG_COLORS } from '../types'
 
 class InMemoryCardRepository implements CardRepository {
   private store = new Map<CardId, Card>()
@@ -229,5 +230,130 @@ describe('CardService', () => {
     const ok = service.removeFromCanvas(c.id)
     expect(ok).toBe(false)
     expect(service.get(c.id)?.canvasPosition).toBeUndefined()
+  })
+
+  // ── Tags (P4) ─────────────────────────────────────────────────────────
+
+  it('creates a card with an empty tags array', () => {
+    const c = service.create({ title: 'no tags', source: dummySource })
+    expect(c.tags).toEqual([])
+  })
+
+  it('creates a card with initial tags', () => {
+    const c = service.create({
+      title: 'tagged',
+      source: dummySource,
+      tags: [{ value: 'idea', color: 'var(--color-red)' }],
+    })
+    expect(c.tags).toHaveLength(1)
+    expect(c.tags[0]?.value).toBe('idea')
+    expect(c.tags[0]?.color).toBe('var(--color-red)')
+  })
+
+  it('addTag adds a new tag with a random palette color', () => {
+    const c = service.create({ title: 'a', source: dummySource })
+    const updated = service.addTag(c.id, 'urgent')
+    expect(updated).not.toBeNull()
+    expect(updated?.tags).toHaveLength(1)
+    expect(updated?.tags[0]?.value).toBe('urgent')
+    // color must come from the palette
+    expect(TAG_COLORS).toContain(updated?.tags[0]?.color)
+  })
+
+  it('addTag trims the tag value', () => {
+    const c = service.create({ title: 'a', source: dummySource })
+    const updated = service.addTag(c.id, '  spaced  ')
+    expect(updated?.tags[0]?.value).toBe('spaced')
+  })
+
+  it('addTag is idempotent — same value returns unchanged card', () => {
+    const c = service.create({ title: 'a', source: dummySource })
+    const u1 = service.addTag(c.id, 'x')
+    const u2 = service.addTag(c.id, 'x')
+    expect(u2?.tags).toHaveLength(1)
+    // colors preserved on re-add
+    expect(u2?.tags[0]?.color).toBe(u1?.tags[0]?.color)
+  })
+
+  it('removeTag removes a tag by value', () => {
+    const c = service.create({
+      title: 'a',
+      source: dummySource,
+      tags: [
+        { value: 'a', color: 'var(--color-red)' },
+        { value: 'b', color: 'var(--color-blue)' },
+      ],
+    })
+    const updated = service.removeTag(c.id, 'a')
+    expect(updated?.tags).toHaveLength(1)
+    expect(updated?.tags[0]?.value).toBe('b')
+  })
+
+  it('removeTag is idempotent — missing value is no-op', () => {
+    const c = service.create({ title: 'a', source: dummySource })
+    const updated = service.removeTag(c.id, 'ghost')
+    expect(updated).not.toBeNull()
+    expect(updated?.tags).toEqual([])
+  })
+
+  it('addTag and removeTag return null for unknown card', () => {
+    expect(service.addTag('nope' as CardId, 'x')).toBeNull()
+    expect(service.removeTag('nope' as CardId, 'x')).toBeNull()
+  })
+
+  it('listTags aggregates unique tags with counts', () => {
+    service.create({
+      title: 'c1',
+      source: dummySource,
+      tags: [
+        { value: 'a', color: 'var(--color-red)' },
+        { value: 'b', color: 'var(--color-blue)' },
+      ],
+    })
+    service.create({
+      title: 'c2',
+      source: dummySource,
+      tags: [{ value: 'a', color: 'var(--color-red)' }],
+    })
+    const summary = service.listTags()
+    expect(summary).toHaveLength(2)
+    const a = summary.find((s) => s.value === 'a')
+    const b = summary.find((s) => s.value === 'b')
+    expect(a?.count).toBe(2)
+    expect(b?.count).toBe(1)
+    expect(a?.color).toBe('var(--color-red)')
+  })
+
+  it('listByTags returns cards matching any of the given tags', () => {
+    const c1 = service.create({
+      title: 'red tagged',
+      source: dummySource,
+      tags: [{ value: 'x', color: 'var(--color-red)' }],
+    })
+    const c2 = service.create({
+      title: 'blue tagged',
+      source: dummySource,
+      tags: [{ value: 'y', color: 'var(--color-blue)' }],
+    })
+    service.create({ title: 'untagged', source: dummySource })
+
+    const result = service.listByTags(['x', 'y'])
+    expect(result).toHaveLength(2)
+    expect(result.map((c) => c.id).sort()).toEqual([c1.id, c2.id].sort())
+  })
+
+  it('listByTags with empty array returns empty', () => {
+    service.create({ title: 'x', source: dummySource, tags: [{ value: 'a', color: 'var(--color-red)' }] })
+    expect(service.listByTags([])).toEqual([])
+  })
+
+  it('update can change tags', () => {
+    const c = service.create({ title: 'a', source: dummySource })
+    service.update(c.id, {
+      tags: [{ value: 'new', color: 'var(--color-purple)' }],
+    })
+    const fetched = service.get(c.id)
+    expect(fetched?.tags).toHaveLength(1)
+    expect(fetched?.tags[0]?.value).toBe('new')
   })
 })

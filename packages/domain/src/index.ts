@@ -16,3 +16,4 @@ export {
   type WorkspaceRepository,
 } from './services/workspace-service'
 export { searchCards } from './services/search'
+export { TAG_COLORS } from './types'

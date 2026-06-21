@@ -286,6 +286,13 @@ export const messages = {
   'ai.appendedAsNew': { zh: '已存为新卡', en: 'Saved as new card' },
   'ai.notConfigured': { zh: 'AI 未配置 — 在 /settings 启用', en: 'AI not configured — enable in /settings' },
   'ai.error': { zh: 'AI 失败:{error}', en: 'AI failed: {error}' },
+  /* ── Tags (P4) ── */
+  'tag.add': { zh: '添加标签', en: 'Add tag' },
+  'tag.placeholder': { zh: '输入标签名...', en: 'Type tag name...' },
+  'tag.remove': { zh: '移除标签', en: 'Remove tag' },
+  'tag.filter': { zh: '按标签筛选', en: 'Filter by tags' },
+  'tag.all': { zh: '全部', en: 'All' },
+  'tag.noTags': { zh: '暂无标签', en: 'No tags yet' },
 } as const
 
 export type MessageKey = keyof typeof messages
