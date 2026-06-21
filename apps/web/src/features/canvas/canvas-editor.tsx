@@ -41,6 +41,7 @@ import { useEffect, useRef } from 'react'
 import { Tldraw, useValue, type Editor } from '@tldraw/tldraw'
 import type { CanvasId, Card, CardService } from '@cys-stift/domain'
 import { CardShapeUtil } from './card-shape-util'
+import { CardServiceContext } from './card-service-context'
 import {
   addCardShape,
   bindCardWriteback,
@@ -82,7 +83,11 @@ export function CanvasEditor({
 }: CanvasEditorProps) {
   return (
     <div className="cv-editor">
-      <Tldraw
+      {/* F1.1: provide CardService so the card ShapeUtil.component can render
+          from the domain source of truth (title/body/type/pinned) instead of
+          staling props in tldraw's store. */}
+      <CardServiceContext.Provider value={service}>
+        <Tldraw
         shapeUtils={shapeUtils}
         hideUi
         components={{
@@ -124,6 +129,7 @@ export function CanvasEditor({
           // reactive side-effects live in the bridge components below.
         }}
       />
+      </CardServiceContext.Provider>
       <ViewPersistenceBridge editor={editor} canvasId={canvasId} />
       <DoubleClickBridge
         editor={editor}
