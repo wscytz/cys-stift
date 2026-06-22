@@ -94,6 +94,8 @@ audience: [claude, human]
 - **产出价值**:双向 DSL 特色**立即上线**(仍在 tldraw 上),抽象层让引擎可替换。
 
 ### Phase 1 — 自研 Canvas 2D 渲染器(**feature-flag 并存**,不碰 spec)
+
+> 基础骨架(SelfBuiltAdapter + 渲染 + 拖拽 + pan/zoom + `/dev/canvas-self`)的逐步 TDD 计划见 `docs/plans/2026-06-22-canvas-self-build-phase1-foundation.md`。freedraw/文本/arrow/打磨/Phase 2 各自另开 plan。
 - **T1.1** `SelfBuiltAdapter` 骨架:Canvas 2D 画布 + 视口(pan/zoom)+ 渲染循环 + 视口剔除。
 - **T1.2** 元素渲染 + 命中测试(点选/框选)+ 选择/拖拽/缩放 handle。
 - **T1.3** pan/zoom(to-cursor)+ 手绘输入(点序列)+ 文本编辑(含 CJK IME)。
