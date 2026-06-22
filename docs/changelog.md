@@ -1,6 +1,70 @@
 # 变更日志
 
-> 每完成一个 Phase 追加一段。格式：`## YYYY-MM-DD · phase N · <slug>`。
+> 每完成一个 Phase 追加一段(newest-first,新条目加在本文件顶部)。格式:`## YYYY-MM-DD · <version> · <slug>`。
+> 当前状态/版本见 [`STATE.md`](STATE.md)。
+
+---
+
+## 2026-06-21 · v0.37.0-stable · 全量加固 + 文档重构(第二个稳定版)
+
+全量 review(4 并行 reviewer + 交叉验证)驱动的加固轮。**代码:真 bug 全修 + tsc 门禁真正生效 + 隐私 allowlist 边缘补齐。文档:收敛到单一可信源 STATE.md。** 分 7 phase 独立 commit。
+
+### Phase 1 — 代码 P0 真 bug(`0b0e5db`)
+- **键盘 r/o 快捷键**:toolbar 矩形/椭圆按钮上一轮只修了 click 路径,键盘快捷键仍调 `setCurrentTool('rectangle')` 静默失败。路由统一到 `activate()`(useCallback)。
+- **prompts.ts 软删除回退绕过 allowlist**(隐私规则 #3 ⚠️):`ctx || raw` 回退对软删除卡触发,泄露 title/body。`deletedAt` 守卫移到 `||` 之前。+3 测试。
+- **画布切换丢卡片拖动位置**(🔴):`bindCardWriteback` cleanup 清 timer 不 flush → 拖卡后立即切画布丢最后一次位置。改 teardown 同步 flush。
+- **画布切换丢手绘/自由元素快照**(🔴):EditorBindingBridge 同类 bug,500ms 快照防抖 cleanup 不存。改 pending 时 fire 一次 save。
+- **`.cystift` 拖回恢复静默失败**:FileDropHandler 读异步 gap 的 `window.__cardService`,改从 `useDb()` 拿 service。
+- vitest 162 → 165,web build 0。
+
+### Phase 2 — tsc 门禁 + 存储字节精度(`a8992a7`)
+- **修 domain tsc 2 error**(card-service `media[0]?` optional-chain + search LinkPreview `fetchedAt`)。
+- **ui tsc**:`packages/ui/src/css-modules.d.ts` ambient 声明。
+- **storage-usage**:`raw.length`(UTF-16)→ `new Blob([raw]).size`(UTF-8 字节)。zh + base64 低估 ~2x。+4 测试。
+- domain/db/ui `tsc --noEmit` 全绿;vitest 165 → 169。
+
+### Phase 3 — 正确性 + CI 门禁(`1468ae4`)
+- **SQLite 持久化丢 tags**(🔴 latent):schema/codec 无 tagsJson 列,P4 标签走 SQLite 被丢成 `[]`。补 `tags_json` 列 + codec + DDL + round-trip 测试。
+- **删 MediaAsset 孤儿**(YAGNI):type+table 存在但无 repository(保留 `MediaAssetId` brand,MediaRef 用)。
+- **canvas-editor onMount race**:`onEditorReady` 从异步 `.then` 提到同步顶部,缩小 dblclick/drag 在 writeback 订阅前的 race 窗口。
+- **AI provider 卡死防护**:抽 `consumeStream()`(openai/anthropic/ollama 共享)。abort 保留部分内容(原 AbortError 丢光);max-iteration backstop(代理返回非 SSE 不再死循环);`catch` 不再静默吞。+4 测试。
+- **CI 真门禁**:`.github/workflows/ci.yml` 加 typecheck 步(domain/db/ui tsc)。原 "test = tsc && vitest" 注释是假象,test 脚本只有 vitest,类型错误静默通过。
+- domain 51/51,db 8/8,web vitest 173/173,3 包 tsc 全绿,build 0。
+
+### Phase 4 — 补建 git tag
+- v0.9.2 之后 v0.10–v0.36 共 ~42 个 tag 全部缺失(文档引用了不存在的 tag)。从 git log 还原每个版本的交付 commit,人工核对后 `git tag`。现在 `git tag | sort -V` 连续到 v0.36.0。
+- v0.27.1-review-hardening 无独立 tag(工作折进 v0.31.0 refactor)。
+
+### Phase 5 — 文档目录扁平化(`265 files renamed`)
+- `docs/memory/decisions` → `docs/decisions`,`docs/memory/feedback` → `docs/feedback`,`docs/superpowers/{plans,specs}` → `docs/{plans,specs}`,`docs/ralph/` → `docs/archive/ralph/`,`docs/evaluation-*` → `docs/archive/`,`docs/development/changelog.md` → `docs/changelog.md`,`docs/design/screenshots/` → `docs/screenshots/`。11 嵌套顶层 → 扁平集 + `docs/archive/` 隔离死流程。
+
+### Phase 6 — STATE.md + 模板 + 断链清扫
+- **新建 `docs/STATE.md`**(唯一当前状态源)+ `scripts/gen-state.mjs`(从 git tag 生成版本表)+ `scripts/gen-decisions-index.mjs`(从文件生成 INDEX.md)+ `docs/decisions/_TEMPLATE.md`(决策档模板)。
+- **删 current-session.md**(落后 18 版本,STATE.md 取代)。
+- 根 CLAUDE.md 600 字 stale 状态行 → 指向 STATE.md。
+- 全量断链清扫(phase 5 移动产生的):0 个旧路径残留。
+- 9 个未来日期 `2026-06-23` → `2026-06-21`。
+- `architecture/overview.md` 重写(原冻 Phase 0 + 错栈 wa-sqlite)。
+- `README.md` 状态段重写。
+- ADR-0003 标 superseded。
+
+### 验收(全绿)
+```
+pnpm --filter domain lint  && pnpm --filter db lint  && pnpm --filter ui lint  # 3/3 tsc
+pnpm --filter domain test   # 51/51
+pnpm --filter db test       # 8/8 (+1 tags round-trip)
+pnpm --filter web exec vitest run  # 173/173 (+8: prompts rule#3 + storage + stream-reader)
+pnpm --filter web build     # exit 0
+node scripts/gen-state.mjs  # 重生成无 drift
+git tag | sort -V           # v0.1.0 → v0.37.0 连续
+```
+
+### DEFERRED(记入 STATE.md 已知 debt,稳定版不做)
+- 颜色类型双轨制统一(ColorToken 6 色 vs TagColor 10 var)—— touches domain+UI+所有 tag 渲染,风险大。
+- Tauri Apple 签名公证(P9,需证书)。
+- 51 个旧 decision 批量加 frontmatter(模板已就位,新档用它,旧档机会主义采纳)。
+
+详见决策档:`docs/decisions/2026-06-21-p4-p7-batch.md`(review 综合)+ 各 phase commit。
 
 ---
 
