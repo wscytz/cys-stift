@@ -3,6 +3,8 @@
 > 每条一行,按日期倒序(文件名序)。详细见对应文件。
 > 新建决策档从 `_TEMPLATE.md` 起步。当前状态/版本见 `../STATE.md`,历史见 `../changelog.md`。
 
+- 2026-06-22 · [画布/语言底座调研:drawio + arch-diagram-gen + AFFiNE(BlockSuite)+ Excalidraw](2026-06-22-canvas-research-drawio-archdiag-affine.md)
+- 2026-06-22 · [开发者反馈 6/22 原件存档(.docx 转 md;第 1/2 点已修,第 3 点 → canvas-strategy plan)](2026-06-22-developer-feedback.md)
 - 2026-06-21 · [v0.27.1-review-hardening](2026-06-21-v0.27.1-review-hardening.md)
 - 2026-06-21 · [v0.25.0-tauri-global-shortcut](2026-06-21-tauri-global-shortcut.md)
 - 2026-06-21 · [v0.25.1-review-bugfixes](2026-06-21-review-bugfixes.md)
