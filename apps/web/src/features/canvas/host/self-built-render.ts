@@ -60,6 +60,17 @@ function drawElement(
       ctx.stroke()
       break
     }
+    case 'freedraw': {
+      const pts = (el.meta?.points as [number, number][] | undefined) ?? []
+      if (pts.length === 0) break
+      ctx.beginPath()
+      ctx.moveTo(pts[0]![0], pts[0]![1])
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i]![0], pts[i]![1])
+      ctx.strokeStyle = colorOf(el.color)
+      ctx.lineWidth = 2
+      ctx.stroke()
+      break
+    }
     default:
       // freedraw/text/arrow/legacy — 后续 Task。
       break

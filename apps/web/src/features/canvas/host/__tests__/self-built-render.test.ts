@@ -13,6 +13,8 @@ function mockCtx() {
     scale: (x: number, y: number) => calls.push(`scale(${x})`),
     beginPath: () => calls.push('beginPath'),
     rect: (x: number, y: number, w: number, h: number) => calls.push(`rect(${x},${y},${w},${h})`),
+    moveTo: (x: number, y: number) => calls.push(`moveTo(${x},${y})`),
+    lineTo: (x: number, y: number) => calls.push(`lineTo(${x},${y})`),
     roundRect: (x: number, y: number, w: number, h: number, r?: number) => calls.push(`roundRect(${x},${y},${w},${h})`),
     fill: () => calls.push('fill'),
     fillRect: (x: number, y: number, w: number, h: number) => calls.push(`fillRect(${x},${y},${w},${h})`),
@@ -21,6 +23,7 @@ function mockCtx() {
     set fillStyle(v: unknown) { calls.push(`fillStyle=${v}`) },
     set strokeStyle(v: unknown) { calls.push(`strokeStyle=${v}`) },
     set font(v: string) { calls.push(`font=${v}`) },
+    set lineWidth(v: unknown) { calls.push(`lineWidth=${v}`) },
     clearRect: (x: number, y: number, w: number, h: number) => calls.push(`clearRect(${x},${y},${w},${h})`),
   }
   return ctx as unknown as CanvasRenderingContext2D & { _calls: string[] }
@@ -55,5 +58,26 @@ describe('renderElements', () => {
     const ctx = mockCtx()
     const els = [{ id: 'x', kind: 'freedraw', x: 0, y: 0, w: 0, h: 0, rotation: 0 }] as CanvasElement[]
     expect(() => renderElements(ctx, els, view, 800, 600, () => '', '#0f172a')).not.toThrow()
+  })
+
+  it('draws a freedraw stroke as a polyline', () => {
+    const ctx = mockCtx()
+    const els = [
+      {
+        id: 'f1', kind: 'freedraw', x: 10, y: 10, w: 30, h: 40, rotation: 0,
+        meta: { points: [[10, 10], [40, 50], [10, 50]] },
+      },
+    ] as unknown as CanvasElement[]
+    renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => '', '#ffffff')
+    expect(ctx._calls).toContain('moveTo(10,10)')
+    expect(ctx._calls).toContain('lineTo(40,50)')
+    expect(ctx._calls).toContain('lineTo(10,50)')
+  })
+
+  it('freedraw with no points draws nothing (no throw)', () => {
+    const ctx = mockCtx()
+    const els = [{ id: 'f2', kind: 'freedraw', x: 0, y: 0, w: 0, h: 0, rotation: 0, meta: {} }] as unknown as CanvasElement[]
+    expect(() => renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => '', '#ffffff')).not.toThrow()
+    expect(ctx._calls.some((c) => c.startsWith('moveTo'))).toBe(false)
   })
 })
