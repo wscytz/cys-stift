@@ -128,11 +128,4 @@ describe('SQLite repository', () => {
     expect(service.listAll()).toHaveLength(4)
     void placed
   })
-
-  it('persists across "restart" (re-creating the handle from the same source)', () => {
-    // We can't easily persist :memory: across instances; this just confirms
-    // the public API survives handle swap. The real persistence story is
-    // verified in the /dev/db smoke page (Phase 2 T4).
-    expect(true).toBe(true)
-  })
 })

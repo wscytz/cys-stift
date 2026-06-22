@@ -131,10 +131,14 @@ export function parseDsl(dslText: string): DslOp[] {
       // Extract `from` and `to` references from the text
       const fromMatch = line.match(/from\s+(#[a-zA-Z0-9_-]+)/)
       const toMatch = line.match(/to\s+(#[a-zA-Z0-9_-]+)/)
+      // Skip arrows missing either endpoint — applyLayout would no-op them
+      // anyway (editor.getShape('shape:') → undefined), but skipping here
+      // keeps the op list honest. (v0.37.0 review.)
+      if (!fromMatch || !toMatch) continue
       ops.push({
         type: 'arrow',
-        from: fromMatch?.[1]?.replace('#', '') ?? '',
-        to: toMatch?.[1]?.replace('#', '') ?? '',
+        from: fromMatch[1]?.replace('#', '') ?? '',
+        to: toMatch[1]?.replace('#', '') ?? '',
         label: extractLabel(line),
         color: extractColor(line),
       })

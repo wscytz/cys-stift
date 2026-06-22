@@ -123,9 +123,13 @@ export class SqliteWorkspaceRepository implements WorkspaceRepository {
   }
 
   getDefault() {
+    // ORDER BY createdAt asc so "default" is deterministic (the earliest
+    // workspace) instead of "whatever row SQLite returns first". MVP has a
+    // single workspace, but this future-proofs multi-workspace. (v0.37.0 review.)
     const row = this.handle.db
       .select()
       .from(schema.workspaces)
+      .orderBy(asc(schema.workspaces.createdAt))
       .limit(1)
       .get()
     return row ? workspaceFromRow(row) : null

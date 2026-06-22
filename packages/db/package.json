@@ -8,8 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema.ts",
-    "./client": "./src/drizzle-client.ts",
-    "./persistence": "./src/persistence/index.ts"
+    "./client": "./src/drizzle-client.ts"
   },
   "scripts": {
     "build": "tsc -b",

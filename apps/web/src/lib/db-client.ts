@@ -84,7 +84,12 @@ if (typeof window !== 'undefined') {
 export function rehydrateCards(): void {
   if (typeof window === 'undefined') return
   const next = loadSnapshot()
-  if (next.cards !== _cards) {
+  // loadSnapshot() always returns a fresh array, so an identity check
+  // (`next.cards !== _cards`) would ALWAYS fire — causing every cross-tab
+  // storage event to notify every useDb() consumer, even when the parsed
+  // content is identical. Compare a cheap signature instead. (v0.37.0 review.)
+  const sig = (cs: Card[]) => `${cs.length}:${cs[0]?.id ?? ''}:${cs[cs.length - 1]?.id ?? ''}`
+  if (sig(next.cards) !== sig(_cards)) {
     _cards = next.cards
     notify()
   }

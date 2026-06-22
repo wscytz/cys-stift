@@ -112,6 +112,3 @@ export function useStorageUsage(intervalMs = 5000): StorageUsage {
   }, [intervalMs])
   return usage
 }
-
-// Internal: shared by useStorageUsage + any future live-refresh hook.
-export { CATEGORY_LABEL }
