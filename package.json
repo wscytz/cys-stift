@@ -1,8 +1,10 @@
 {
   "name": "cys-stift",
-  "version": "0.1.0",
+  "version": "0.37.0",
   "private": true,
   "description": "cy's Stift — 本地优先的灵感画布",
+  "author": "cy",
+  "license": "GPL-3.0-or-later",
   "type": "module",
   "engines": {
     "node": ">=22"
