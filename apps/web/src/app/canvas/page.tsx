@@ -111,7 +111,7 @@ export default function CanvasPage() {
     if (!cfg) return
 
     const canvasName = canvases.find((c) => c.id === activeCanvasId)?.name ?? 'canvas'
-    const snap = snapshotCanvas(editor, activeCanvasId)
+    const snap = snapshotCanvas(new TldrawAdapter(editor), service, activeCanvasId)
     const formatted = formatCanvasSnapshot(snap)
 
     const systemPrompt =
@@ -123,7 +123,7 @@ ${formatted}
 
 Output DSL like:
 [card #id] @pos(x, y)
-[free: rect at (x, y) size WxH]`
+[rect #id] @pos(x, y) @size(w, h)`
 
     try {
       const result = await streamText(cfg, { system: systemPrompt, user: userPrompt }, () => {})
@@ -144,7 +144,7 @@ Output DSL like:
         message: t('ai.error', { error: (e as Error).message }),
       })
     }
-  }, [editor, activeCanvasId, canvases, t])
+  }, [editor, activeCanvasId, canvases, service, t])
 
   // Keyboard shortcuts: + - 0 1 g. Phase 5: 4 zoom keys + snap toggle. Skip when
   // typing into an input / textarea / contenteditable so we don't break the
