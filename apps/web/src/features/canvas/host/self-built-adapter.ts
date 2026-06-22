@@ -15,6 +15,7 @@ import type {
   CanvasView,
   UserChange,
 } from './canvas-host'
+import { renderElements, readToken } from './self-built-render'
 
 export class SelfBuiltAdapter implements CanvasHost {
   private elements = new Map<string, CanvasElement>()
@@ -22,9 +23,38 @@ export class SelfBuiltAdapter implements CanvasHost {
   private userListeners = new Set<(c: UserChange) => void>()
   protected echoing = true
   protected ctx: CanvasRenderingContext2D | null
+  private getCardLabel: (id: string) => string
+  private rafId: number | null = null
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(
+    private canvas: HTMLCanvasElement,
+    opts?: { getCardLabel?: (id: string) => string },
+  ) {
     this.ctx = canvas.getContext('2d')
+    this.getCardLabel = opts?.getCardLabel ?? (() => '')
+  }
+
+  protected scheduleRender(): void {
+    if (!this.ctx) return // jsdom / 无 ctx — 跳过(host 语义照常)
+    if (this.rafId !== null) return
+    this.rafId = requestAnimationFrame(() => {
+      this.rafId = null
+      this.renderNow()
+    })
+  }
+
+  protected renderNow(): void {
+    const ctx = this.ctx
+    if (!ctx) return
+    const w = this.canvas.clientWidth || 800
+    const h = this.canvas.clientHeight || 600
+    const dpr = window.devicePixelRatio || 1
+    if (this.canvas.width !== w * dpr || this.canvas.height !== h * dpr) {
+      this.canvas.width = w * dpr
+      this.canvas.height = h * dpr
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0) // 抵消 DPR,renderElements 用 CSS px
+    renderElements(ctx, this.getElements(), this.view, w, h, this.getCardLabel, readToken('--color-canvas', '#f8fafc'))
   }
 
   getElements(): CanvasElement[] {
@@ -38,12 +68,14 @@ export class SelfBuiltAdapter implements CanvasHost {
   upsert(el: CanvasElement): void {
     this.elements.set(el.id, el)
     if (this.echoing) this.emitUser({ updated: [el], removed: [] })
+    this.scheduleRender()
   }
 
   remove(id: string): void {
     if (!this.elements.has(id)) return
     this.elements.delete(id)
     if (this.echoing) this.emitUser({ updated: [], removed: [id] })
+    this.scheduleRender()
   }
 
   batch(fn: () => void): void {
@@ -73,6 +105,7 @@ export class SelfBuiltAdapter implements CanvasHost {
 
   setView(v: CanvasView): void {
     this.view = { ...v }
+    this.scheduleRender()
   }
 
   protected emitUser(c: UserChange): void {
