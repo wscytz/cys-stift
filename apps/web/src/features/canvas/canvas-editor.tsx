@@ -53,6 +53,7 @@ import type { CanvasId, Card, CardService } from '@cys-stift/domain'
 import { CardShapeUtil } from './card-shape-util'
 import { CardServiceContext } from './card-service-context'
 import { loadCardsIntoEditor } from './canvas-binding'
+import { TldrawAdapter } from './host/tldraw-adapter'
 import { canvasViewStore } from '@/lib/canvas-view-store'
 import { canvasSnapshotStore } from '@/lib/canvas-snapshot-store'
 import { ViewPersistenceBridge } from './canvas-view-persistence-bridge'
@@ -159,7 +160,7 @@ export function CanvasEditor({
               }
               // One-shot backfill: cards in CardService but not in the snapshot
               // (new card since last visit, or first visit with no snapshot).
-              loadCardsIntoEditor(ed, service, canvasId)
+              loadCardsIntoEditor(new TldrawAdapter(ed), service, canvasId)
             })
           }}
         />

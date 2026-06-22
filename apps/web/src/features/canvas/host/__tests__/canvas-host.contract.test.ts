@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { InMemoryCanvasHost } from '../in-memory-host'
-import type { CanvasHost } from '../canvas-host'
+import type { CanvasHost, UserChange } from '../canvas-host'
 
 /**
  * 契约测试:任何 CanvasHost 实现都必须通过这套。
@@ -21,10 +21,10 @@ function runContract(name: string, make: () => CanvasHost) {
     it('remove 触发 removed id 且不再可见', () => {
       const h = make()
       h.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
-      let seen: { updated: unknown[]; removed: string[] } | null = null
-      h.onUserChange((c) => (seen = c))
+      const seen: UserChange[] = []
+      h.onUserChange((c) => seen.push(c))
       h.remove('c1')
-      expect(seen?.removed).toEqual(['c1'])
+      expect(seen[0]?.removed).toEqual(['c1'])
       expect(h.getElement('c1')).toBeUndefined()
     })
 

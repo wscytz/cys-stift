@@ -24,6 +24,7 @@ import { useEffect, useRef } from 'react'
 import type { Editor } from '@tldraw/tldraw'
 import type { CanvasId, Card, CardService } from '@cys-stift/domain'
 import { addCardShape, cardIdFromShapeId } from './canvas-binding'
+import { TldrawAdapter } from './host/tldraw-adapter'
 import { captureSinkRegistry } from '@/features/capture/capture-sink'
 import { getDeviceId } from '@/lib/device-id'
 
@@ -90,7 +91,7 @@ export function DoubleClickBridge({
         .then(({ cardId }) => {
           const card = serviceRef.current.get(cardId)
           if (card) {
-            addCardShape(editor, card)
+            addCardShape(new TldrawAdapter(editor), card)
             cbRef.current(card)
           }
         })

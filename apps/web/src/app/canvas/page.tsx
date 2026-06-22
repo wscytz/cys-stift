@@ -14,6 +14,7 @@ import { RelationPanel } from '@/features/canvas/relation-panel'
 import { CardDetailModal } from '@/features/canvas/card-detail-modal'
 import { ExportDialog } from '@/features/canvas/export-dialog'
 import { applyLayout } from '@/features/canvas/apply-layout'
+import { TldrawAdapter } from '@/features/canvas/host/tldraw-adapter'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { parseDsl } from '@/features/ai/dsl-parser'
 import { streamText } from '@/features/ai/stream-text'
@@ -65,7 +66,7 @@ export default function CanvasPage() {
   // "card is single source of truth"; this effect delivers it.
   useEffect(() => {
     if (!editor) return
-    syncCardsToEditor(editor, service, activeCanvasId)
+    syncCardsToEditor(new TldrawAdapter(editor), service, activeCanvasId)
   }, [snap, editor, activeCanvasId, service])
 
   const [creatingName, setCreatingName] = useState<string | null>(null)
@@ -135,7 +136,7 @@ Output DSL like:
         pushToast({ kind: 'info', message: t('canvas.aiLayoutEmpty') })
         return
       }
-      applyLayout(editor, ops)
+      applyLayout(new TldrawAdapter(editor), ops)
       pushToast({ kind: 'success', message: t('canvas.aiLayoutDone') })
     } catch (e) {
       pushToast({
@@ -372,23 +373,23 @@ Output DSL like:
               title: patch.title,
               body: patch.body,
             })
-            if (updated && editor) updateCardShape(editor, updated)
+            if (updated && editor) updateCardShape(new TldrawAdapter(editor), updated)
             if (updated) setDetail({ card: updated })
           }}
           onArchive={() => {
             service.archive(detail.card.id)
-            if (editor) removeCardShape(editor, detail.card.id)
+            if (editor) removeCardShape(new TldrawAdapter(editor), detail.card.id)
             setDetail(null)
           }}
           onUnarchive={() => {
             service.unarchive(detail.card.id)
             const c = service.get(detail.card.id)
-            if (c && editor) addCardShape(editor, c)
+            if (c && editor) addCardShape(new TldrawAdapter(editor), c)
             setDetail(c ? { card: c } : null)
           }}
           onDelete={() => {
             service.softDelete(detail.card.id)
-            if (editor) removeCardShape(editor, detail.card.id)
+            if (editor) removeCardShape(new TldrawAdapter(editor), detail.card.id)
             setDetail(null)
           }}
           onSendToInbox={() => {
@@ -396,7 +397,7 @@ Output DSL like:
             // reappears in /inbox via listInbox (which excludes cards
             // with canvasPosition per spec §6.11).
             service.removeFromCanvas(detail.card.id)
-            if (editor) removeCardShape(editor, detail.card.id)
+            if (editor) removeCardShape(new TldrawAdapter(editor), detail.card.id)
             setDetail(null)
           }}
         />

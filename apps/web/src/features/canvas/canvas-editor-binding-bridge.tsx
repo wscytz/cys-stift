@@ -20,6 +20,7 @@ import { useEffect } from 'react'
 import { getSnapshot, type Editor } from '@tldraw/tldraw'
 import type { CanvasId, CardService } from '@cys-stift/domain'
 import { bindCardWriteback } from './canvas-binding'
+import { TldrawAdapter } from './host/tldraw-adapter'
 import { canvasSnapshotStore } from '@/lib/canvas-snapshot-store'
 
 const VIEW_PERSIST_DEBOUNCE_MS = 500
@@ -35,7 +36,9 @@ export function EditorBindingBridge({
 }) {
   useEffect(() => {
     if (!editor) return
-    const unsubWriteback = bindCardWriteback(editor, service, canvasId)
+    // Phase 0 / T2: card writeback goes through the host; snapshot persist
+    // stays on editor.store for now (no host snapshot API yet — Phase 1/2).
+    const unsubWriteback = bindCardWriteback(new TldrawAdapter(editor), service, canvasId)
     let persistTimer: ReturnType<typeof setTimeout> | null = null
     const unsubPersist = editor.store.listen(
       () => {

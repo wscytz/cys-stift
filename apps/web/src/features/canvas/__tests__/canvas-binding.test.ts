@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   cardShapeIdOf,
   cardIdFromShapeId,
-  cardToShape,
-  shapeToCardPosition,
+  cardToElement,
+  elementToCardPosition,
 } from '../canvas-binding'
 import type { CanvasId, CardId } from '@cys-stift/domain'
 
@@ -16,6 +16,7 @@ const CARD = {
   links: [],
   codeSnippets: [],
   quotes: [],
+  tags: [],
   canvasPosition: {
     canvasId: 'canvas-1' as unknown as CanvasId,
     x: 100,
@@ -36,10 +37,10 @@ const CARD = {
 describe('cardShapeIdOf / cardIdFromShapeId roundtrip', () => {
   const input = 'test-id' as unknown as CardId
   it('encodes a card id with shape: prefix', () => {
-    expect(String(cardShapeIdOf(input))).toBe('shape:test-id')
+    expect(cardShapeIdOf(input)).toBe('shape:test-id')
   })
   it('decodes back to the original card id', () => {
-    expect(cardIdFromShapeId(String(cardShapeIdOf(input)))).toBe('test-id')
+    expect(cardIdFromShapeId(cardShapeIdOf(input))).toBe('test-id')
   })
   it('strips shape: prefix from any string', () => {
     expect(cardIdFromShapeId('shape:hello')).toBe('hello')
@@ -47,44 +48,44 @@ describe('cardShapeIdOf / cardIdFromShapeId roundtrip', () => {
   })
 })
 
-describe('cardToShape', () => {
-  it('maps card.canvasPosition onto a shape partial', () => {
-    const s = cardToShape(CARD)
-    expect(s.type).toBe('card')
-    expect(s.x).toBe(100)
-    expect(s.y).toBe(200)
-    expect(s.rotation).toBe(0.5)
-    expect(s.props).toMatchObject({ w: 320, h: 160 })
+describe('cardToElement', () => {
+  it('maps card.canvasPosition onto a host element (geometry only)', () => {
+    const el = cardToElement(CARD)
+    expect(el.kind).toBe('card')
+    expect(el.id).toBe('abc-123')
+    expect(el.x).toBe(100)
+    expect(el.y).toBe(200)
+    expect(el.rotation).toBe(0.5)
+    expect(el.w).toBe(320)
+    expect(el.h).toBe(160)
   })
   it('falls back to DEFAULT_W/H when canvasPosition is missing', () => {
     const c = { ...CARD, canvasPosition: undefined }
-    const s = cardToShape(c)
-    expect(s.props).toMatchObject({ w: 240, h: 120 })
-    expect(s.rotation).toBe(0)
+    const el = cardToElement(c)
+    expect(el.w).toBe(240)
+    expect(el.h).toBe(120)
+    expect(el.rotation).toBe(0)
   })
   it('falls back to 0 coords when position is missing', () => {
     const c = { ...CARD, canvasPosition: undefined }
-    const s = cardToShape(c)
-    expect(s.x).toBe(0)
-    expect(s.y).toBe(0)
+    const el = cardToElement(c)
+    expect(el.x).toBe(0)
+    expect(el.y).toBe(0)
   })
 })
 
-describe('shapeToCardPosition', () => {
+describe('elementToCardPosition', () => {
   it('preserves existing z and maps canvasId', () => {
-    const shape = {
-      id: 'shape:abc' as never,
-      type: 'card' as const,
+    const el = {
+      id: 'abc',
+      kind: 'card' as const,
       x: 50,
       y: 60,
+      w: 200,
+      h: 100,
       rotation: 0,
-      props: { w: 200, h: 100 },
     }
-    const pos = shapeToCardPosition(
-      shape as never,
-      'target-canvas' as unknown as CanvasId,
-      7,
-    )
+    const pos = elementToCardPosition(el, 'target-canvas' as unknown as CanvasId, 7)
     expect(pos).toEqual({
       canvasId: 'target-canvas',
       x: 50,

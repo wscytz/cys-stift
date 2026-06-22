@@ -1,18 +1,20 @@
 'use client'
 
 /**
- * Canvas binding — the spec §6.11 contract: the SQLite `cards.canvasPosition`
- * column is the single source of truth, NOT tldraw's store.
+ * Canvas binding — spec §6.11 contract: the SQLite `cards.canvasPosition`
+ * column is the single source of truth, NOT the engine's store.
  *
- *   load  : DB cards → tldraw shapes → editor   (mergeRemoteChanges so it
+ *   load  : DB cards → host elements → host   (applyWithoutEcho so it
  *           doesn't trip our own 'user'-source writeback listener)
- *   write : editor.store.listen('user') → debounce ~300ms → moveToCanvas → DB
+ *   write : host.onUserChange('user') → debounce ~300ms → moveToCanvas → DB
  *
- * The shape's id IS the domain CardId, so a shape round-trips to the same
- * card. z (stacking) is preserved per-card on drag; precise z-order syncing
- * with tldraw's internal page order is a Phase 5 refinement.
+ * The element id IS the domain CardId; the engine-specific id format
+ * (tldraw 'shape:' prefix) is handled inside the adapter.
+ *
+ * Phase 0 / T2 (2026-06-22): refactored to depend on CanvasHost instead of
+ * the tldraw Editor directly. Behaviour identical to the pre-refactor version
+ * (mergeRemoteChanges→applyWithoutEcho, store.listen→onUserChange, etc.).
  */
-import type { Editor, TLShapePartial, TLShapeId } from '@tldraw/tldraw'
 import type {
   Card,
   CardId,
@@ -20,75 +22,68 @@ import type {
   CanvasPosition,
   CardService,
 } from '@cys-stift/domain'
-import type { CardShape } from './card-shape-util'
+import type { CanvasElement, CanvasHost } from './host/canvas-host'
 
 const WRITEBACK_DEBOUNCE_MS = 300
 const DEFAULT_W = 240
 const DEFAULT_H = 120
 
-/** tldraw requires shape ids to be prefixed "shape:" — encode the card id after it. */
-export function cardShapeIdOf(cardId: CardId): TLShapeId {
-  return `shape:${cardId}` as unknown as TLShapeId
+// ── id helpers (pure; kept for double-click-bridge + tests) ──────────────────
+// The 'shape:' prefix is a tldraw convention; these stay as pure string ops so
+// callers that hold a raw tldraw shape id (e.g. a hit-test result) can recover
+// the card id without going through the host.
+
+/** tldraw shape ids are prefixed 'shape:' — encode the card id after it. */
+export function cardShapeIdOf(cardId: CardId): string {
+  return `shape:${cardId}`
 }
 
-/** Inverse of cardShapeIdOf — recover the domain CardId from a tldraw shape id. */
+/** Inverse of cardShapeIdOf — recover the domain CardId from a shape id. */
 export function cardIdFromShapeId(shapeId: string): CardId {
   return String(shapeId).replace(/^shape:/, '') as unknown as CardId
 }
 
-/** Push a single card's full state onto its editor shape (title/kind/size). */
-function writeCardToShape(editor: Editor, card: Card): void {
-  const p = card.canvasPosition
-  editor.updateShape({
-    id: cardShapeIdOf(card.id),
-    type: 'card',
-    props: {
-      w: p?.w ?? DEFAULT_W,
-      h: p?.h ?? DEFAULT_H,
-    },
-  })
-}
+// ── domain Card ↔ host element ───────────────────────────────────────────────
 
-/** Domain Card → tldraw card-shape partial. Shape id = card id. */
-/** Domain Card → tldraw card-shape partial. Shape id = "shape:" + card id. */
-export function cardToShape(card: Card): TLShapePartial {
+/** Domain Card → host CanvasElement (geometry only; content lives in CardService). */
+export function cardToElement(card: Card): CanvasElement {
   const p = card.canvasPosition
   return {
-    id: cardShapeIdOf(card.id),
-    type: 'card',
+    id: String(card.id),
+    kind: 'card',
     x: p?.x ?? 0,
     y: p?.y ?? 0,
+    w: p?.w ?? DEFAULT_W,
+    h: p?.h ?? DEFAULT_H,
     rotation: p?.rotation ?? 0,
-    props: {
-      w: p?.w ?? DEFAULT_W,
-      h: p?.h ?? DEFAULT_H,
-    },
   }
 }
 
-/** tldraw card-shape → CanvasPosition, preserving the card's existing z. */
-export function shapeToCardPosition(
-  shape: CardShape,
+/** host element (a card) → CanvasPosition, preserving the card's existing z. */
+export function elementToCardPosition(
+  el: CanvasElement,
   canvasId: CanvasId,
   existingZ: number,
 ): CanvasPosition {
   return {
     canvasId,
-    x: shape.x,
-    y: shape.y,
-    w: shape.props.w,
-    h: shape.props.h,
+    x: el.x,
+    y: el.y,
+    w: el.w,
+    h: el.h,
     z: existingZ,
-    rotation: shape.rotation,
+    rotation: el.rotation,
   }
 }
 
+// ── load / sync ──────────────────────────────────────────────────────────────
+
 /**
- * Load all cards on `canvasId` into the editor, oldest-z first so stacking
- * matches. Marked remote so it never re-triggers the writeback listener.
+ * Load all cards on `canvasId` into the host, oldest-z first so stacking
+ * matches. Marked no-echo so it never re-triggers the writeback listener.
  */
 export function loadCardsIntoEditor(
-  editor: Editor,
+  host: CanvasHost,
   service: CardService,
   canvasId: CanvasId,
 ): void {
@@ -97,63 +92,52 @@ export function loadCardsIntoEditor(
     .filter((c) => !c.archived && !c.deletedAt)
     .sort((a, b) => (a.canvasPosition?.z ?? 0) - (b.canvasPosition?.z ?? 0))
   if (cards.length === 0) return
-  editor.store.mergeRemoteChanges(() => {
+  host.applyWithoutEcho(() => {
     for (const card of cards) {
-      // B3 (v0.26.4): the DB is the source of truth. If the shape already
-      // exists (restored from the snapshot) but its position/z/rotation
-      // drifted from the DB (a concurrent tab moved it, B1 sync, or a
-      // tab-specific edit that wasn't snapshotted yet), reconcile to the
-      // DB position rather than skipping — otherwise the canvas silently
-      // shows a stale geometry. mergeRemoteChanges marks this as a
-      // 'remote' write so the writeback listener ignores it.
-      const shapeId = cardShapeIdOf(card.id)
-      const existing = editor.getShape(shapeId) as CardShape | undefined
+      // B3 (v0.26.4): the DB is the source of truth. If the element already
+      // exists (restored from the snapshot) but its position/z/rotation drifted
+      // from the DB, reconcile to the DB position rather than skipping.
+      const existing = host.getElement(String(card.id))
       const db = card.canvasPosition
       if (existing) {
         const drift =
           existing.x !== db?.x ||
           existing.y !== db?.y ||
-          existing.props.w !== (db?.w ?? DEFAULT_W) ||
-          existing.props.h !== (db?.h ?? DEFAULT_H) ||
+          existing.w !== (db?.w ?? DEFAULT_W) ||
+          existing.h !== (db?.h ?? DEFAULT_H) ||
           existing.rotation !== (db?.rotation ?? 0)
-        if (drift) editor.updateShape(cardToShape(card))
+        if (drift) host.upsert(cardToElement(card))
       } else {
-        editor.createShape(cardToShape(card))
+        host.upsert(cardToElement(card))
       }
     }
   })
 }
 
 /**
- * Subscribe to user-driven shape changes and debounce-write positions back to
- * the DB. Returns an unsubscribe (tldraw also tears this down with the editor).
+ * Subscribe to user-driven element changes and debounce-write positions back to
+ * the DB. Returns an unsubscribe.
  */
 export function bindCardWriteback(
-  editor: Editor,
+  host: CanvasHost,
   service: CardService,
   canvasId: CanvasId,
 ): () => void {
-  const pending = new Map<string, CardShape>()
+  const pending = new Map<string, CanvasElement>()
   let timer: ReturnType<typeof setTimeout> | null = null
 
   const flush = () => {
     timer = null
-    for (const shape of pending.values()) {
-      const cardId = cardIdFromShapeId(String(shape.id))
+    for (const el of pending.values()) {
+      const cardId = el.id as CardId
       const card = service.get(cardId)
       // B5 (v0.26.4): guard against clobbering a concurrent restore / move.
-      // The 300ms writeback debounce means a pending shape can race with a
-      // service mutation: if the card was soft-deleted, archived, or
-      // moved to another canvas in the meantime, writing the old drag
-      // position would either resurrect it on this canvas or corrupt its
-      // current canvasId. Skip those cases — the shape stays as-is in
-      // memory; the next syncCardsToEditor pass reconciles.
       if (!card) continue
       if (card.deletedAt) continue
       if (card.archived) continue
       if (card.canvasPosition?.canvasId !== canvasId) continue
       const z = card.canvasPosition?.z ?? 0
-      service.moveToCanvas(cardId, shapeToCardPosition(shape, canvasId, z))
+      service.moveToCanvas(cardId, elementToCardPosition(el, canvasId, z))
     }
     pending.clear()
   }
@@ -163,40 +147,27 @@ export function bindCardWriteback(
     timer = setTimeout(flush, WRITEBACK_DEBOUNCE_MS)
   }
 
-  const unsub = editor.store.listen(
-    (entry) => {
-      for (const change of Object.values(entry.changes.updated)) {
-        // changes.updated values are [from, to] tuples; [1] is the new state.
-        const after = change?.[1]
-        if (after?.typeName === 'shape' && after.type === 'card') {
-          pending.set(after.id as unknown as string, after as CardShape)
-        }
+  const unsub = host.onUserChange(({ updated, removed }) => {
+    for (const el of updated) {
+      if (el.kind === 'card') pending.set(el.id, el)
+    }
+    // Eraser-on-card interaction (v0.37.0 dev-feedback fix): a user-source
+    // removal of a card element soft-deletes the underlying card (→ /trash,
+    // recoverable) — matching the card-detail modal's delete semantics.
+    // Programmatic removals (load/sync) run under applyWithoutEcho so they're
+    // NOT 'user'-source and won't trigger this.
+    for (const id of removed) {
+      const card = service.get(id as CardId)
+      if (card && !card.deletedAt && card.canvasPosition?.canvasId === canvasId) {
+        service.softDelete(id as CardId)
       }
-      // Eraser-on-card interaction (v0.37.0 dev-feedback fix): previously the
-      // eraser removed the card SHAPE from tldraw but nothing synced the
-      // deletion back to CardService, so a refresh resurrected it via
-      // loadCardsIntoEditor. Now a user-source removal of a card shape soft-
-      // deletes the underlying card (→ /trash, recoverable) — matching the
-      // card-detail modal's delete semantics. Programmatic removals
-      // (loadCardsIntoEditor / syncCardsToEditor) run under mergeRemoteChanges
-      // so they're NOT 'user'-source and won't trigger this.
-      for (const removed of Object.values(entry.changes.removed)) {
-        if (removed?.typeName === 'shape' && removed.type === 'card') {
-          const cardId = cardIdFromShapeId(String(removed.id))
-          const card = service.get(cardId)
-          if (card && !card.deletedAt) service.softDelete(cardId)
-        }
-      }
-      if (pending.size > 0) scheduleFlush()
-    },
-    { source: 'user', scope: 'document' },
-  )
+    }
+    if (pending.size > 0) scheduleFlush()
+  })
 
-  // Review fix (v0.37.0): the 300ms writeback debounce means a card dragged
-  // then immediately followed by a canvas switch / route change / tab close
-  // would lose the last position — the teardown only unsubscribed, never
-  // flushed. We now flush synchronously before unsubscribing so no pending
-  // drag is dropped on the floor.
+  // Review fix (v0.37.0): flush synchronously before unsubscribing so a card
+  // dragged then immediately followed by a canvas switch / route change / tab
+  // close doesn't lose its last position.
   return () => {
     if (timer) {
       clearTimeout(timer)
@@ -207,57 +178,50 @@ export function bindCardWriteback(
 }
 
 /**
- * Sync CardService → editor: add card shapes that are in CardService but
- * missing from the editor (e.g. sent to canvas from inbox), remove shapes
- * that are no longer on this canvas (sent back to inbox / archived /
- * soft-deleted). Marks the writes remote so the writeback listener ignores
- * them.
+ * Sync CardService → host: add elements missing from the host (e.g. sent to
+ * canvas from inbox), remove elements no longer on this canvas (sent back to
+ * inbox / archived / soft-deleted). No-echo so the writeback listener ignores.
  */
 export function syncCardsToEditor(
-  editor: Editor,
+  host: CanvasHost,
   service: CardService,
   canvasId: CanvasId,
 ): void {
-  editor.store.mergeRemoteChanges(() => {
+  host.applyWithoutEcho(() => {
     const wanted = service
       .listOnCanvas(canvasId)
       .filter((c) => !c.archived && !c.deletedAt)
-    const wantedIds = new Set(wanted.map((c) => c.id))
+    const wantedIds = new Set(wanted.map((c) => String(c.id)))
     // Add missing.
     for (const card of wanted) {
-      if (editor.getShape(cardShapeIdOf(card.id))) continue
-      editor.createShape(cardToShape(card))
+      if (host.getElement(String(card.id))) continue
+      host.upsert(cardToElement(card))
     }
-    // Remove orphaned (on canvas but no longer in CardService on this canvas).
-    const present = editor
-      .getCurrentPageShapes()
-      .filter((s) => s.type === 'card')
-    for (const shape of present) {
-      const cid = cardIdFromShapeId(String(shape.id))
-      if (!wantedIds.has(cid)) {
-        editor.deleteShape(shape.id)
-      }
+    // Remove orphaned card elements (on canvas but no longer in CardService here).
+    for (const el of host.getElements()) {
+      if (el.kind !== 'card') continue
+      if (!wantedIds.has(el.id)) host.remove(el.id)
     }
   })
 }
 
 /**
- * Add a card to the editor (e.g. just created via double-click). Marked remote
- * so it doesn't trip the writeback listener.
+ * Add a card to the host (e.g. just created via double-click). No-echo so it
+ * doesn't trip the writeback listener.
  */
-export function addCardShape(editor: Editor, card: Card): void {
-  if (editor.getShape(cardShapeIdOf(card.id))) return
-  editor.store.mergeRemoteChanges(() => editor.createShape(cardToShape(card)))
+export function addCardShape(host: CanvasHost, card: Card): void {
+  if (host.getElement(String(card.id))) return
+  host.applyWithoutEcho(() => host.upsert(cardToElement(card)))
 }
 
-/** Sync a card's content/size onto its editor shape (e.g. after a modal edit). */
-export function updateCardShape(editor: Editor, card: Card): void {
-  if (!editor.getShape(cardShapeIdOf(card.id))) return
-  editor.store.mergeRemoteChanges(() => writeCardToShape(editor, card))
+/** Sync a card's size onto its host element (e.g. after a modal edit). */
+export function updateCardShape(host: CanvasHost, card: Card): void {
+  if (!host.getElement(String(card.id))) return
+  host.applyWithoutEcho(() => host.upsert(cardToElement(card)))
 }
 
-/** Remove a card's shape (e.g. after archive / soft-delete, both hide from canvas). */
-export function removeCardShape(editor: Editor, cardId: CardId): void {
-  if (!editor.getShape(cardShapeIdOf(cardId))) return
-  editor.store.mergeRemoteChanges(() => editor.deleteShape(cardShapeIdOf(cardId)))
+/** Remove a card's element (e.g. after archive / soft-delete, both hide it). */
+export function removeCardShape(host: CanvasHost, cardId: CardId): void {
+  if (!host.getElement(String(cardId))) return
+  host.applyWithoutEcho(() => host.remove(String(cardId)))
 }

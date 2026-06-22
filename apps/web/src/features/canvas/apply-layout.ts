@@ -1,43 +1,53 @@
 'use client'
 
 /**
- * Apply AI-generated layout DSL to the tldraw canvas (P7 v0.33.2).
+ * Apply AI-generated layout DSL to the canvas host (P7 v0.33.2; Phase 0 / T2
+ * 2026-06-22 refactored from tldraw Editor → CanvasHost).
  *
- * Takes the output of `parseDsl` and executes it against the editor:
- * - Cards: update position (x, y) and optionally color
- * - Free shapes: create or reposition rectangles / ellipses / notes
- * - Arrows: create or reposition with label
+ * Takes the output of `parseDsl` and executes it against the host:
+ * - Cards: update position (x, y) and optionally color (preserving w/h/rotation)
+ * - Free shapes: create rectangles / ellipses / notes / lines
+ * - Arrows: create with label, bound to existing card endpoints
  *
- * Design decisions:
- * - Layout is idempotent — running the same DSL twice produces the same result
- * - Missing shapes are created (for free shapes / arrows the AI might add)
+ * Design decisions (unchanged from pre-refactor):
+ * - Layout runs inside host.batch() for a single undo step
+ * - Missing cards are skipped (no-op); arrows missing an endpoint are skipped
  * - Card positions are clamped to positive coordinates
- * - Errors on individual shapes are swallowed; the rest of the layout applies
+ * - Errors on individual ops are swallowed; the rest of the layout applies
  */
-
-import type { Editor } from '@tldraw/tldraw'
+import type { CanvasHost } from './host/canvas-host'
 import type { CardId } from '@cys-stift/domain'
 import type { DslOp } from '../ai/dsl-parser'
 
+/** AI-created free shapes / arrows need a unique id (tldraw used to auto-mint). */
+function uid(prefix: string): string {
+  // crypto.randomUUID is available in the browser and in vitest's jsdom env.
+  const rand =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2)
+  return `${prefix}-${rand}`
+}
+
 /**
- * Apply a list of DSL operations to the editor. All operations are within
- * `editor.batch()` for a single undo step.
+ * Apply a list of DSL operations to the host. All operations are within
+ * `host.batch()` for a single undo step.
  */
-export function applyLayout(editor: Editor, ops: DslOp[]): void {
+export function applyLayout(host: CanvasHost, ops: DslOp[]): void {
   if (ops.length === 0) return
 
-  editor.batch(() => {
+  host.batch(() => {
     for (const op of ops) {
       try {
         switch (op.type) {
           case 'card':
-            applyCardOp(editor, op)
+            applyCardOp(host, op)
             break
           case 'free':
-            applyFreeOp(editor, op)
+            applyFreeOp(host, op)
             break
           case 'arrow':
-            applyArrowOp(editor, op)
+            applyArrowOp(host, op)
             break
         }
       } catch {
@@ -48,24 +58,24 @@ export function applyLayout(editor: Editor, ops: DslOp[]): void {
 }
 
 function applyCardOp(
-  editor: Editor,
+  host: CanvasHost,
   op: { type: 'card'; cardId: CardId; x: number; y: number; color?: string },
 ) {
-  const shapeId = `shape:${String(op.cardId)}`
-  const shape = editor.getShape(shapeId as never)
-  if (!shape) return
+  // Partial update: preserve the existing card's w/h/rotation, override x/y
+  // (and optionally color). Equivalent to tldraw's partial updateShape.
+  const existing = host.getElement(String(op.cardId))
+  if (!existing) return
 
-  editor.updateShape({
-    id: shapeId as never,
-    type: 'card',
+  host.upsert({
+    ...existing,
     x: Math.max(0, Math.round(op.x)),
     y: Math.max(0, Math.round(op.y)),
-    ...(op.color ? { props: { color: op.color } } : {}),
-  } as never)
+    ...(op.color ? { color: op.color } : {}),
+  })
 }
 
 function applyFreeOp(
-  editor: Editor,
+  host: CanvasHost,
   op: {
     type: 'free'
     shape: 'rect' | 'ellipse' | 'line' | 'note'
@@ -81,63 +91,33 @@ function applyFreeOp(
   const h = op.h ?? 150
   const x = Math.max(0, Math.round(op.x))
   const y = Math.max(0, Math.round(op.y))
+  const base = { id: uid('free'), x, y, rotation: 0 } as const
 
   switch (op.shape) {
     case 'rect':
-      editor.createShape({
-        type: 'geo',
-        x,
-        y,
-        props: {
-          geo: 'rectangle',
-          w,
-          h,
-          color: op.color ?? 'black',
-        },
-      })
+      host.upsert({ ...base, kind: 'rect', w, h, color: op.color ?? 'black' })
       break
     case 'ellipse':
-      editor.createShape({
-        type: 'geo',
-        x,
-        y,
-        props: {
-          geo: 'ellipse',
-          w,
-          h,
-          color: op.color ?? 'black',
-        },
-      })
+      host.upsert({ ...base, kind: 'ellipse', w, h, color: op.color ?? 'black' })
       break
     case 'note':
-      editor.createShape({
-        type: 'note',
-        x,
-        y,
-        props: {
-          color: op.color ?? 'yellow',
-          text: op.text ?? '',
-        },
+      host.upsert({
+        ...base,
+        kind: 'note',
+        w: 200,
+        h: 200,
+        color: op.color ?? 'yellow',
+        text: op.text ?? '',
       })
       break
     case 'line':
-      editor.createShape({
-        type: 'geo',
-        x,
-        y,
-        props: {
-          geo: 'line',
-          w,
-          h: 0,
-          color: op.color ?? 'black',
-        },
-      })
+      host.upsert({ ...base, kind: 'line', w, h: 0, color: op.color ?? 'black' })
       break
   }
 }
 
 function applyArrowOp(
-  editor: Editor,
+  host: CanvasHost,
   op: {
     type: 'arrow'
     from: string
@@ -146,20 +126,22 @@ function applyArrowOp(
     color?: string
   },
 ) {
-  const fromId = `shape:${op.from}`
-  const toId = `shape:${op.to}`
+  // Skip if either endpoint doesn't exist (was a no-op pre-refactor too).
+  const fromEl = host.getElement(op.from)
+  const toEl = host.getElement(op.to)
+  if (!fromEl || !toEl) return
 
-  const fromShape = editor.getShape(fromId as never)
-  const toShape = editor.getShape(toId as never)
-  if (!fromShape || !toShape) return
-
-  editor.createShape({
-    type: 'arrow',
-    props: {
-      start: { type: 'binding', boundShapeId: fromId, normalizedAnchor: { x: 0.5, y: 0.5 }, isExact: false },
-      end: { type: 'binding', boundShapeId: toId, normalizedAnchor: { x: 0.5, y: 0.5 }, isExact: false },
-      text: op.label ?? '',
-      color: op.color ?? 'black',
-    },
+  host.upsert({
+    id: uid('arrow'),
+    kind: 'arrow',
+    x: 0,
+    y: 0,
+    w: 0,
+    h: 0,
+    rotation: 0,
+    from: op.from,
+    to: op.to,
+    text: op.label ?? '',
+    color: op.color ?? 'black',
   })
 }
