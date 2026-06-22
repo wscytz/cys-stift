@@ -27,7 +27,9 @@ export type DslCardOp = {
 
 export type DslFreeOp = {
   type: 'free'
-  shape: 'rect' | 'ellipse' | 'line' | 'note'
+  /** Element id (round-trip with serializeCanvas's `[rect #id]` / `[text #id]`). */
+  id?: string
+  shape: 'rect' | 'ellipse' | 'line' | 'note' | 'text'
   x: number
   y: number
   w?: number
@@ -61,6 +63,9 @@ const COLOR_RE = /@color\(([a-z]+)\)/
 /** Label directive: `@label\("([^"]*)"\)` */
 const LABEL_RE = /@label\("([^"]*)"\)/
 
+/** Text directive: `@text("...")` — escape-aware (serializeCanvas escapes quotes/backslashes). */
+const TEXT_RE = /@text\("((?:[^"\\]|\\.)*)"\)/
+
 /** Size directive: `@size\((\d+),\s*(\d+)\)` or inline `size 300x400` */
 const SIZE_RE = /@size\((\d+),\s*(\d+)\)/
 const SIZE_INLINE_RE = /size\s+(\d+)x(\d+)/
@@ -86,6 +91,13 @@ function extractColor(text: string): string | undefined {
 function extractLabel(text: string): string | undefined {
   const m = text.match(LABEL_RE)
   return m?.[1] || undefined
+}
+
+/** Extract + unescape an `@text("...")` value (inverse of serializeCanvas's escapeQuoted). */
+function extractText(text: string): string | undefined {
+  const m = text.match(TEXT_RE)
+  if (!m) return undefined
+  return m[1]!.replace(/\\"/g, '"').replace(/\\\\/g, '\\')
 }
 
 function extractSize(text: string): { w: number; h: number } | null {
@@ -141,6 +153,43 @@ export function parseDsl(dslText: string): DslOp[] {
         to: toMatch[1]?.replace('#', '') ?? '',
         label: extractLabel(line),
         color: extractColor(line),
+      })
+      continue
+    }
+
+    // ── Rect line (Phase 0 / T3 unified grammar): `[rect #id] @pos(x,y) @size(w,h) @color(c)`
+    if (line.startsWith('[rect ')) {
+      const id = extractId(line)
+      if (!id) continue
+      const pos = extractPos(line)
+      if (!pos) continue
+      const size = extractSize(line)
+      ops.push({
+        type: 'free',
+        id,
+        shape: 'rect',
+        x: pos.x,
+        y: pos.y,
+        w: size?.w,
+        h: size?.h,
+        color: extractColor(line),
+      })
+      continue
+    }
+
+    // ── Text line (Phase 0 / T3): `[text #id] @pos(x,y) @text("...")`
+    if (line.startsWith('[text ')) {
+      const id = extractId(line)
+      if (!id) continue
+      const pos = extractPos(line)
+      if (!pos) continue
+      ops.push({
+        type: 'free',
+        id,
+        shape: 'text',
+        x: pos.x,
+        y: pos.y,
+        text: extractText(line),
       })
       continue
     }

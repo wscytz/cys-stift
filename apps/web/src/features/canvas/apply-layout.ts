@@ -78,7 +78,7 @@ function applyFreeOp(
   host: CanvasHost,
   op: {
     type: 'free'
-    shape: 'rect' | 'ellipse' | 'line' | 'note'
+    shape: 'rect' | 'ellipse' | 'line' | 'note' | 'text'
     x: number
     y: number
     w?: number
@@ -109,6 +109,9 @@ function applyFreeOp(
         color: op.color ?? 'yellow',
         text: op.text ?? '',
       })
+      break
+    case 'text':
+      host.upsert({ ...base, kind: 'text', w: 100, h: 40, text: op.text ?? '' })
       break
     case 'line':
       host.upsert({ ...base, kind: 'line', w, h: 0, color: op.color ?? 'black' })
