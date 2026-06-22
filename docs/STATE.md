@@ -113,6 +113,7 @@
 
 ## 下一步(等用户决定)
 
+- **画布技术路线讨论**(proposal,未定):tldraw 依赖评估 + 自研替代 + 文本描述语言 + 基座更换 — 见 `docs/plans/2026-06-22-canvas-strategy-tldraw-vs-self-build.md`。最低杠杆的起点是**画布抽象层**(隔离业务代码与 tldraw API)。任何换基座属"重新选型",需 ADR + spec 审查。
 - Tauri **签名公证**(P9 — 需 Apple 证书,用户提供)
 - AI 找重复 / cluster / 时间线(P10)
 - UX 打磨:inbox 批量 / Card markdown 双向 / minimap / undo-redo(P12)

@@ -97,15 +97,25 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<I18nCtx>(() => ({ locale, t, setLocale: doSetLocale }), [locale, t, doSetLocale])
 
-  // Hydrate from settingsStore on first mount only
+  // Hydrate from settingsStore on first mount + subscribe to external
+  // locale changes. The settings page (and any future caller) may write via
+  // settingsStore.updateLocale directly; without this subscription the
+  // provider's React state wouldn't follow and t() would keep the old locale
+  // (the v0.37.0 dev-feedback bug: settings language switch had no effect).
   useEffect(() => {
-    const stored = settingsStore.get().locale
-    if (stored === 'zh' || stored === 'en') {
-      setLocale(stored)
+    const apply = (l: Locale) => {
+      setLocale(l)
       if (typeof document !== 'undefined') {
-        document.documentElement.lang = stored === 'zh' ? 'zh-CN' : 'en'
+        document.documentElement.lang = l === 'zh' ? 'zh-CN' : 'en'
       }
     }
+    const stored = settingsStore.get().locale
+    if (stored === 'zh' || stored === 'en') apply(stored)
+    const unsub = settingsStore.subscribe(() => {
+      const l = settingsStore.get().locale
+      if (l === 'zh' || l === 'en') apply(l)
+    })
+    return unsub
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

@@ -172,6 +172,21 @@ export function bindCardWriteback(
           pending.set(after.id as unknown as string, after as CardShape)
         }
       }
+      // Eraser-on-card interaction (v0.37.0 dev-feedback fix): previously the
+      // eraser removed the card SHAPE from tldraw but nothing synced the
+      // deletion back to CardService, so a refresh resurrected it via
+      // loadCardsIntoEditor. Now a user-source removal of a card shape soft-
+      // deletes the underlying card (→ /trash, recoverable) — matching the
+      // card-detail modal's delete semantics. Programmatic removals
+      // (loadCardsIntoEditor / syncCardsToEditor) run under mergeRemoteChanges
+      // so they're NOT 'user'-source and won't trigger this.
+      for (const removed of Object.values(entry.changes.removed)) {
+        if (removed?.typeName === 'shape' && removed.type === 'card') {
+          const cardId = cardIdFromShapeId(String(removed.id))
+          const card = service.get(cardId)
+          if (card && !card.deletedAt) service.softDelete(cardId)
+        }
+      }
       if (pending.size > 0) scheduleFlush()
     },
     { source: 'user', scope: 'document' },

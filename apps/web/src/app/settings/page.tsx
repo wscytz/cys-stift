@@ -22,7 +22,7 @@ import {
  * UI are post-MVP.
  */
 export default function SettingsPage() {
-  const { t } = useI18n()
+  const { t, locale, setLocale } = useI18n()
   const { settings, ready } = useSettings()
   const sc = settings.captureShortcut
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
@@ -78,10 +78,8 @@ export default function SettingsPage() {
             <label className="set__label">{t('settings.language')}</label>
             <select
               className="set__select"
-              value={settings.locale}
-              onChange={(e) =>
-                settingsStore.updateLocale(e.target.value as 'zh' | 'en')
-              }
+              value={locale}
+              onChange={(e) => setLocale(e.target.value as 'zh' | 'en')}
             >
               <option value="zh">{t('settings.languageZh')}</option>
               <option value="en">{t('settings.languageEn')}</option>

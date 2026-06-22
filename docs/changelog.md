@@ -5,6 +5,34 @@
 
 ---
 
+## 2026-06-22 · dev-feedback · 橡皮/卡片交互 + i18n 切换 + 代码整理
+
+开发者反馈(2026-06-22)的 2 个交互 bug + 收尾整理 + 战略讨论档归档。
+
+### 交互修复
+- **橡皮擦卡片后刷新还在**(交互不一致):`bindCardWriteback` 只监听 `changes.updated`,不监听 `changes.removed` → 橡皮擦掉 card shape 但 CardService 没同步,刷新后 `loadCardsIntoEditor` 重建。现 user-source 的 card shape 移除 → `service.softDelete`(→ /trash,可恢复,与卡片详情的删除一致)。programmatic 移除走 mergeRemoteChanges 不会误触。
+- **设置里的中英切换无效**:settings page 直接调 `settingsStore.updateLocale`,但 `I18nProvider` 只在 mount 时读 locale + 经自己的 `setLocale`,没订阅 store → provider React state 不更新 → `t()` 还用旧 locale。修:settings 改走 `useI18n().setLocale`;**并**让 provider 订阅 `settingsStore.subscribe`,任何路径改 locale 都 reactively 跟随。
+- **右上角语言切换去掉**(用户要求只保留设置里的):删 `app-menu.tsx` 的 中/EN toggle(含 CSS)。
+
+### 代码整理(v0.37.0 review 收尾)
+- 删 db `./persistence` 断链 export、`@cys-stift/config` 死包(3 行 + 断链 export + 零消费)、storage-usage 孤儿 `CATEGORY_LABEL` export、db "persist across restart" no-op 测试。
+- `rehydrateCards`:loadSnapshot 总返新数组,`!== _cards` 永真 → 每次跨 tab storage event 都 notify 全部 useDb 消费者。改内容签名(length + 首尾 id)。
+- `WorkspaceRepository.getDefault` 加 `ORDER BY createdAt asc`(多 workspace 确定性)。
+- dsl-parser 跳过缺 from/to 的 arrow op + noUncheckedIndexedAccess。
+
+### 许可 + 作者
+- **LICENSE**:GPL-3.0-or-later(gnu.org 全文 + 项目版权声明)。
+- **package.json**:`license`/`author: "cy"`/version 0.37.0。
+- **git 历史重写**:26 个 commit 的 author "Claude (main) <claude@anthropic.com>" → "cy"(filter-branch,无 remote 安全)。现 168 commit 全部 author = cy,0 Claude 残留。
+
+### 战略讨论档
+- `docs/plans/2026-06-22-canvas-strategy-tldraw-vs-self-build.md`(proposal):tldraw 依赖评估 + 自研路径 + 文本描述语言 + 基座更换 + 行动时间表。未定决策,供团队讨论。
+
+### 验收
+domain 51 / db 7 / web vitest 173 / 3 包 tsc 全绿 / web build 0。
+
+---
+
 ## 2026-06-21 · v0.37.0-stable · 全量加固 + 文档重构(第二个稳定版)
 
 全量 review(4 并行 reviewer + 交叉验证)驱动的加固轮。**代码:真 bug 全修 + tsc 门禁真正生效 + 隐私 allowlist 边缘补齐。文档:收敛到单一可信源 STATE.md。** 分 7 phase 独立 commit。

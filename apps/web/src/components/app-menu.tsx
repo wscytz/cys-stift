@@ -13,7 +13,7 @@ import type { MessageKey } from '@/lib/i18n/messages'
  */
 export function AppMenu() {
   const pathname = usePathname() ?? '/'
-  const { locale, t, setLocale } = useI18n()
+  const { t } = useI18n()
 
   const onCaptureClick = () => {
     window.dispatchEvent(new CustomEvent(CAPTURE_OPEN_EVENT))
@@ -49,24 +49,6 @@ export function AppMenu() {
         ))}
       </div>
       <span className="app-menu__spacer" />
-      <div className="app-menu__locale" role="group" aria-label="Language">
-        <button
-          type="button"
-          className={`app-menu__locale-btn ${locale === 'zh' ? 'app-menu__locale-btn--active' : ''}`}
-          onClick={() => setLocale('zh')}
-          aria-pressed={locale === 'zh'}
-        >
-          中
-        </button>
-        <button
-          type="button"
-          className={`app-menu__locale-btn ${locale === 'en' ? 'app-menu__locale-btn--active' : ''}`}
-          onClick={() => setLocale('en')}
-          aria-pressed={locale === 'en'}
-        >
-          EN
-        </button>
-      </div>
       <button type="button" className="app-menu__capture" onClick={onCaptureClick}>
         {t('nav.capture')}
       </button>
@@ -118,21 +100,6 @@ const styles = `
 .app-menu__link:hover { color: var(--color-black); background: var(--color-gray-soft); }
 .app-menu__link--active { color: var(--color-black); border-bottom: 2px solid var(--color-black); }
 .app-menu__spacer { flex: 1; }
-.app-menu__locale { display: inline-flex; gap: 2px; }
-.app-menu__locale-btn {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  background: transparent;
-  color: var(--color-gray);
-  border: 0;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-.app-menu__locale-btn:hover { color: var(--color-black); background: var(--color-gray-soft); }
-.app-menu__locale-btn--active { color: var(--color-black); border-bottom: 2px solid var(--color-black); }
 .app-menu__capture {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
