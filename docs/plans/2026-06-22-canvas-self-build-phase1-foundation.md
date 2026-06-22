@@ -211,8 +211,9 @@ function mockCtx() {
     scale: (x: number, y: number) => calls.push(`scale(${x})`),
     beginPath: () => calls.push('beginPath'),
     rect: (x: number, y: number, w: number, h: number) => calls.push(`rect(${x},${y},${w},${h})`),
-    roundRect: (x: number, y: number, w: number, h: number) => calls.push(`roundRect(${x},${y},${w},${h})`),
+    roundRect: (x: number, y: number, w: number, h: number, r?: number) => calls.push(`roundRect(${x},${y},${w},${h})`),
     fill: () => calls.push('fill'),
+    fillRect: (x: number, y: number, w: number, h: number) => calls.push(`fillRect(${x},${y},${w},${h})`),
     stroke: () => calls.push('stroke'),
     fillText: (t: string, x: number, y: number) => calls.push(`fillText(${t}@${x},${y})`),
     set fillStyle(v: unknown) { calls.push(`fillStyle=${v}`) },
@@ -349,67 +350,96 @@ Expected: PASS — 3 项。
 
 - [ ] **Step 2.5:把渲染调度接进 SelfBuiltAdapter(rAF + DPR)**
 
-修改 `self-built-adapter.ts`:加 `getCardLabel` 选项、`scheduleRender()`(rAF 防抖)、`renderNow()`(取 canvas 尺寸 + 调 `renderElements`)、并在 `upsert/remove/setView` 里调 `scheduleRender()`。constructor 接 canvas 尺寸监听(ResizeObserver 可选,先取 clientWidth/Height)。
+修改 `self-built-adapter.ts`。**把 Task 1 的字段声明 + `constructor` 整体替换成下面这版**(加 `canvas`/`getCardLabel`/`rafId`),并新增 `scheduleRender`/`renderNow`;然后 `upsert`/`remove`/`setView` 末尾各加一行 `this.scheduleRender()`。文件顶部 `import { renderElements } from './self-built-render'`。
 
 ```ts
-// self-built-adapter.ts —— 在 Task 1 的类上追加(增量改动)
-// constructor 签名改为:
-constructor(
-  private canvas: HTMLCanvasElement,
-  opts?: { getCardLabel?: (id: string) => string },
-) {
-  this.ctx = canvas.getContext('2d')
-  this.getCardLabel = opts?.getCardLabel ?? (() => '')
-}
+// self-built-adapter.ts —— 替换 Task 1 的字段 + constructor:
+  private elements = new Map<string, CanvasElement>()
+  private view: CanvasView = { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }
+  private userListeners = new Set<(c: UserChange) => void>()
+  protected echoing = true
+  protected ctx: CanvasRenderingContext2D | null
+  private getCardLabel: (id: string) => string
+  private rafId: number | null = null
 
-private getCardLabel: (id: string) => string
-private rafId: number | null = null
-
-protected scheduleRender(): void {
-  if (!this.ctx) return // jsdom / 无 ctx — 跳过
-  if (this.rafId !== null) return
-  this.rafId = requestAnimationFrame(() => {
-    this.rafId = null
-    this.renderNow()
-  })
-}
-
-protected renderNow(): void {
-  const ctx = this.ctx
-  if (!ctx) return
-  const w = this.canvas.clientWidth || 800
-  const h = this.canvas.clientHeight || 600
-  const dpr = window.devicePixelRatio || 1
-  if (this.canvas.width !== w * dpr || this.canvas.height !== h * dpr) {
-    this.canvas.width = w * dpr
-    this.canvas.height = h * dpr
+  constructor(
+    private canvas: HTMLCanvasElement,
+    opts?: { getCardLabel?: (id: string) => string },
+  ) {
+    this.ctx = canvas.getContext('2d')
+    this.getCardLabel = opts?.getCardLabel ?? (() => '')
   }
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0) // 抵消 DPR,renderElements 用 CSS px
-  renderElements(ctx, this.getElements(), this.view, w, h, this.getCardLabel, '#f8fafc')
-}
+
+  protected scheduleRender(): void {
+    if (!this.ctx) return // jsdom / 无 ctx — 跳过(host 语义照常)
+    if (this.rafId !== null) return
+    this.rafId = requestAnimationFrame(() => {
+      this.rafId = null
+      this.renderNow()
+    })
+  }
+
+  protected renderNow(): void {
+    const ctx = this.ctx
+    if (!ctx) return
+    const w = this.canvas.clientWidth || 800
+    const h = this.canvas.clientHeight || 600
+    const dpr = window.devicePixelRatio || 1
+    if (this.canvas.width !== w * dpr || this.canvas.height !== h * dpr) {
+      this.canvas.width = w * dpr
+      this.canvas.height = h * dpr
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0) // 抵消 DPR,renderElements 用 CSS px
+    renderElements(ctx, this.getElements(), this.view, w, h, this.getCardLabel, readToken('--color-canvas', '#f8fafc'))
+  }
 ```
 
-在 `upsert` / `remove` / `setView` 末尾各加 `this.scheduleRender()`。文件顶部 `import { renderElements } from './self-built-render'`。
+> `readToken` 由 Task 2.6 在 `self-built-render.ts` 定义并 export;本步先在 `renderNow` 里引用它——若 2.6 还没做,可临时把背景参数写成内联 `getComputedStyle(...)` 调用或 `'#f8fafc'` fallback,2.6 抽成 `readToken` 后替换。务必在 2.6 完成前不留裸 hex 在最终代码里。
+
+```ts
+// upsert/remove/setView 末尾各加 scheduleRender(以 upsert 为例):
+  upsert(el: CanvasElement): void {
+    this.elements.set(el.id, el)
+    if (this.echoing) this.emitUser({ updated: [el], removed: [] })
+    this.scheduleRender()
+  }
+```
 
 - [ ] **Step 2.6:颜色换 token(`getComputedStyle` 读 CSS 变量)**
 
-在 `self-built-render.ts` 把硬编码色改成读 token 的 helper:
+在 `self-built-render.ts` 把所有裸 hex 换成读 token 的 helper,并 **export**(Step 2.5 的 `renderNow` 要 import 它):
 
 ```ts
-function readToken(name: string, fallback: string): string {
+export function readToken(name: string, fallback: string): string {
   if (typeof window === 'undefined') return fallback
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
   return v || fallback
 }
-
-// drawElement 的 card 填充:
-ctx.fillStyle = readToken('--color-white', '#ffffff')
-ctx.strokeStyle = readToken('--color-gray', '#e2e8f0') // 边框
-ctx.fillStyle = readToken('--color-black', '#0f172a')
-ctx.font = `500 14px ${readToken('--font-body', 'Inter, sans-serif')}`
 ```
 
-背景色由调用方传(已在 renderNow 传 `#f8fafc`)——也换成 `readToken('--color-canvas', '#f8fafc')`。
+`drawElement` 里 card 填充/边框/字 + rect 描边全走 token:
+
+```ts
+// card 分支:
+ctx.fillStyle = readToken('--color-white', '#ffffff')
+ctx.strokeStyle = readToken('--color-gray', '#e2e8f0') // 边框
+ctx.fillStyle = readToken('--color-black', '#0f172a') // 标签字
+ctx.font = `500 14px ${readToken('--font-body', 'Inter, sans-serif')}`
+
+// rect 描边:colorOf 改成 DSL 色名 → 设计 token 的映射(不是裸 hex):
+function colorOf(c: string | undefined): string {
+  const tokenFor: Record<string, string> = {
+    blue: '--color-blue',
+    red: '--color-red',
+    green: '--color-green',
+    black: '--color-black',
+  }
+  return readToken(tokenFor[c ?? 'black'] ?? '--color-black', '#0f172a')
+}
+```
+
+> `--color-blue/red/green/black` 由 tag 调色板提供(domain `TAG_COLORS` 已用这些 `var(--color-*)`),确认存在;`--color-white/gray/black` 由 `card-shape-util.tsx` 已在用。背景色已在 Step 2.5 的 `renderNow` 经 `readToken('--color-canvas', '#f8fafc')` 传入,`renderElements` 的 `background` 形参无裸 hex。`self-built-adapter.ts` 顶部:`import { renderElements, readToken } from './self-built-render'`。
+> **验收:`grep -nE '#[0-9a-fA-F]{3,6}' apps/web/src/features/canvas/host/self-built-render.ts` 只在 `readToken(..., '<hex>')` 的 fallback 位置命中,不在实际绘制路径。**
 
 - [ ] **Step 2.7:跑全部 host 测试 + build**
 
@@ -713,7 +743,14 @@ const onMove = (e: PointerEvent) => {
     this.setView({ ...this.view, panX: this.panning.fromPanX + (sx - this.panning.startSx), panY: this.panning.fromPanY + (sy - this.panning.startSy) })
   }
 }
-// onUp:清 dragId + panning
+// onUp 改(释放 capture + 清 dragId + 清 panning):
+const onUp = (e: PointerEvent) => {
+  if (this.dragId || this.panning) {
+    try { this.canvas.releasePointerCapture(e.pointerId) } catch { /* 已释放 */ }
+  }
+  this.dragId = null
+  this.panning = null
+}
 
 private panning: { startSx: number; startSy: number; fromPanX: number; fromPanY: number } | null = null
 
@@ -732,7 +769,26 @@ onWheel(sx: number, sy: number, delta: number): void {
 }
 ```
 
-在 `attachPointer` 里加滚轮监听:绑定 `wheel` → 调 `onWheel(sx, sy, e.deltaY)` + `e.preventDefault()`(在 detach 里解绑)。
+加 `wheelHandler` 字段,在 `attachPointer` 末尾绑定,并在 `detach()` 里解绑(Task 3.5 写的 `detach` 只移除了 pointerdown/move/up,**本步必须给它补 wheel 这一条**,否则 wheel 监听泄漏):
+
+```ts
+// 字段(类上):
+private wheelHandler: ((e: WheelEvent) => void) | null = null
+
+// attachPointer() 末尾追加:
+this.wheelHandler = (e: WheelEvent) => {
+  e.preventDefault()
+  const rect = this.canvas.getBoundingClientRect()
+  this.onWheel(e.clientX - rect.left, e.clientY - rect.top, e.deltaY)
+}
+this.canvas.addEventListener('wheel', this.wheelHandler, { passive: false })
+
+// detach() 追加(在移除 pointerdown/move/up 之后):
+if (this.wheelHandler) {
+  this.canvas.removeEventListener('wheel', this.wheelHandler)
+  this.wheelHandler = null
+}
+```
 
 - [ ] **Step 4.4:跑 pan/zoom 单测 + 全部 host 测试 + build**
 
