@@ -16,6 +16,7 @@ import type {
   UserChange,
 } from './canvas-host'
 import { renderElements, readToken } from './self-built-render'
+import { hitTest, screenToPage } from './self-built-hittest'
 
 export class SelfBuiltAdapter implements CanvasHost {
   private elements = new Map<string, CanvasElement>()
@@ -25,6 +26,13 @@ export class SelfBuiltAdapter implements CanvasHost {
   protected ctx: CanvasRenderingContext2D | null
   private getCardLabel: (id: string) => string
   private rafId: number | null = null
+  private dragId: string | null = null
+  private dragOffset = { x: 0, y: 0 }
+  private pointerHandlers: {
+    down: (e: PointerEvent) => void
+    move: (e: PointerEvent) => void
+    up: (e: PointerEvent) => void
+  } | null = null
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -32,6 +40,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   ) {
     this.ctx = canvas.getContext('2d')
     this.getCardLabel = opts?.getCardLabel ?? (() => '')
+    this.attachPointer()
   }
 
   protected scheduleRender(): void {
@@ -110,6 +119,60 @@ export class SelfBuiltAdapter implements CanvasHost {
 
   protected emitUser(c: UserChange): void {
     for (const l of this.userListeners) l(c)
+  }
+
+  private attachPointer(): void {
+    if (this.pointerHandlers) return
+    const onDown = (e: PointerEvent) => {
+      const rect = this.canvas.getBoundingClientRect()
+      const sx = e.clientX - rect.left
+      const sy = e.clientY - rect.top
+      const p = screenToPage(this.view, sx, sy)
+      const id = hitTest(this.getElements(), p.x, p.y)
+      if (id) {
+        const el = this.getElement(id)!
+        this.dragId = id
+        this.dragOffset = { x: p.x - el.x, y: p.y - el.y }
+        this.canvas.setPointerCapture(e.pointerId)
+      }
+      // 空白处 mousedown:pan 在 Task 4 加(T1.3 不做)。
+    }
+    const onMove = (e: PointerEvent) => {
+      if (!this.dragId) return
+      const rect = this.canvas.getBoundingClientRect()
+      const p = screenToPage(this.view, e.clientX - rect.left, e.clientY - rect.top)
+      const el = this.getElement(this.dragId)
+      if (!el) return
+      this.upsert({
+        ...el,
+        x: Math.round(p.x - this.dragOffset.x),
+        y: Math.round(p.y - this.dragOffset.y),
+      })
+    }
+    const onUp = (e: PointerEvent) => {
+      if (this.dragId) {
+        try {
+          this.canvas.releasePointerCapture(e.pointerId)
+        } catch {
+          /* 已释放 */
+        }
+        this.dragId = null
+      }
+    }
+    this.pointerHandlers = { down: onDown, move: onMove, up: onUp }
+    this.canvas.addEventListener('pointerdown', onDown)
+    this.canvas.addEventListener('pointermove', onMove)
+    this.canvas.addEventListener('pointerup', onUp)
+  }
+
+  /** 解绑指针监听(页面卸载调;为 T1.4 的 wheel 解绑铺垫)。 */
+  detach(): void {
+    if (this.pointerHandlers) {
+      this.canvas.removeEventListener('pointerdown', this.pointerHandlers.down)
+      this.canvas.removeEventListener('pointermove', this.pointerHandlers.move)
+      this.canvas.removeEventListener('pointerup', this.pointerHandlers.up)
+      this.pointerHandlers = null
+    }
   }
 
   /** 供后续 Task(渲染/交互)读取相机。 */
