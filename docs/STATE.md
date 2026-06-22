@@ -113,7 +113,7 @@
 
 ## 下一步
 
-- **画布自研 · 路线 A(已选,Phase 0 待启动)**:渐进 tldraw → 自研 Canvas 2D 渲染器;特色 = 几何元素双向文本 DSL + 手绘向量存储。计划 `docs/plans/2026-06-22-canvas-self-build-route-a.md`;调研 `docs/decisions/2026-06-22-canvas-research-drawio-archdiag-affine.md`;原 strategy proposal `docs/plans/2026-06-22-canvas-strategy-tldraw-vs-self-build.md`。Phase 0(抽象层 + 双向 DSL,零 ADR)先行;移除 tldraw(Phase 2)才走 ADR + spec §3.4/§6.x 五轮审查。
+- **画布自研 · 路线 A(Phase 0 核心完成,T0.1–T0.4 已提交)**:渐进 tldraw → 自研 Canvas 2D 渲染器;特色 = 几何元素双向文本 DSL + 手绘向量存储。计划 `docs/plans/2026-06-22-canvas-self-build-route-a.md` + Phase 0 逐步计划 `docs/plans/2026-06-22-canvas-self-build-phase0.md`;调研 `docs/decisions/2026-06-22-canvas-research-drawio-archdiag-affine.md`。**Phase 0 产出**:`CanvasHost` 引擎无关接口 + `TldrawAdapter`;业务代码(canvas-binding/apply-layout)+ AI 路径(canvas-snapshot)已改依赖 host,@tldraw 只剩 host/tldraw-adapter.ts;双向 DSL(serializeCanvas ↔ parseDsl)round-trip 上线。**剩余**(Phase 0 携转 / 早 Phase 1):relations(auto-relate/relation-inference)、view-persistence-bridge、导出层(export-svg/raster/cystift-payload)、card-shape-util 仍直调 editor;onMount 视图设置 + 快照持久化也仍在 editor。**待办**:Task 2 真实画布冒烟测试(拖拽/橡皮/切画布/AI 布局/双击建卡)。Phase 1(自研 Canvas 2D 渲染器)前需先清剩余耦合;移除 tldraw(Phase 2)走 ADR + spec §3.4/§6.x 五轮审查。
 - **画布技术路线**(原 proposal,已并入选型):tldraw 依赖评估 + 自研替代 + 文本描述语言 + 基座更换 — 见 `docs/plans/2026-06-22-canvas-strategy-tldraw-vs-self-build.md`。最低杠杆的起点是**画布抽象层**(隔离业务代码与 tldraw API)。任何换基座属"重新选型",需 ADR + spec 审查。
 - Tauri **签名公证**(P9 — 需 Apple 证书,用户提供)
 - AI 找重复 / cluster / 时间线(P10)
