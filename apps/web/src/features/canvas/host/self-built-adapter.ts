@@ -28,11 +28,18 @@ export class SelfBuiltAdapter implements CanvasHost {
   private rafId: number | null = null
   private dragId: string | null = null
   private dragOffset = { x: 0, y: 0 }
+  private panning: {
+    startSx: number
+    startSy: number
+    fromPanX: number
+    fromPanY: number
+  } | null = null
   private pointerHandlers: {
     down: (e: PointerEvent) => void
     move: (e: PointerEvent) => void
     up: (e: PointerEvent) => void
   } | null = null
+  private wheelHandler: ((e: WheelEvent) => void) | null = null
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -133,45 +140,92 @@ export class SelfBuiltAdapter implements CanvasHost {
         const el = this.getElement(id)!
         this.dragId = id
         this.dragOffset = { x: p.x - el.x, y: p.y - el.y }
-        this.canvas.setPointerCapture(e.pointerId)
+      } else {
+        // 空白处 mousedown → pan 模式
+        this.panning = {
+          startSx: sx,
+          startSy: sy,
+          fromPanX: this.view.panX,
+          fromPanY: this.view.panY,
+        }
       }
-      // 空白处 mousedown:pan 在 Task 4 加(T1.3 不做)。
+      this.canvas.setPointerCapture(e.pointerId)
     }
     const onMove = (e: PointerEvent) => {
-      if (!this.dragId) return
       const rect = this.canvas.getBoundingClientRect()
-      const p = screenToPage(this.view, e.clientX - rect.left, e.clientY - rect.top)
-      const el = this.getElement(this.dragId)
-      if (!el) return
-      this.upsert({
-        ...el,
-        x: Math.round(p.x - this.dragOffset.x),
-        y: Math.round(p.y - this.dragOffset.y),
-      })
+      const sx = e.clientX - rect.left
+      const sy = e.clientY - rect.top
+      if (this.dragId) {
+        const p = screenToPage(this.view, sx, sy)
+        const el = this.getElement(this.dragId)
+        if (el) {
+          this.upsert({
+            ...el,
+            x: Math.round(p.x - this.dragOffset.x),
+            y: Math.round(p.y - this.dragOffset.y),
+          })
+        }
+      } else if (this.panning) {
+        this.setView({
+          ...this.view,
+          panX: this.panning.fromPanX + (sx - this.panning.startSx),
+          panY: this.panning.fromPanY + (sy - this.panning.startSy),
+        })
+      }
     }
     const onUp = (e: PointerEvent) => {
-      if (this.dragId) {
+      if (this.dragId || this.panning) {
         try {
           this.canvas.releasePointerCapture(e.pointerId)
         } catch {
           /* 已释放 */
         }
-        this.dragId = null
       }
+      this.dragId = null
+      this.panning = null
     }
     this.pointerHandlers = { down: onDown, move: onMove, up: onUp }
     this.canvas.addEventListener('pointerdown', onDown)
     this.canvas.addEventListener('pointermove', onMove)
     this.canvas.addEventListener('pointerup', onUp)
+
+    // 滚轮 → zoom-to-cursor
+    this.wheelHandler = (e: WheelEvent) => {
+      e.preventDefault()
+      const rect = this.canvas.getBoundingClientRect()
+      this.onWheel(e.clientX - rect.left, e.clientY - rect.top, e.deltaY)
+    }
+    this.canvas.addEventListener('wheel', this.wheelHandler, { passive: false })
   }
 
-  /** 解绑指针监听(页面卸载调;为 T1.4 的 wheel 解绑铺垫)。 */
+  /**
+   * 滚轮缩放:以 (sx,sy) 为锚点的 zoom-to-cursor。
+   * zoom 钳制 [0.1, 8];pan 补偿使 cursor 下的页坐标在缩放前后不变。
+   */
+  onWheel(sx: number, sy: number, delta: number): void {
+    const factor = delta < 0 ? 1.1 : 1 / 1.1
+    const nextZoom = Math.min(8, Math.max(0.1, this.view.zoom * factor))
+    // zoom-to-cursor: cursor 下的页坐标缩放前后不变。
+    //   pageBefore = (sx - panX) / zoom;  pageAfter = (sx - panX') / nextZoom
+    //   → panX' = sx - pageBefore * nextZoom
+    const pageX = (sx - this.view.panX) / this.view.zoom
+    const pageY = (sy - this.view.panY) / this.view.zoom
+    const panX = sx - pageX * nextZoom
+    const panY = sy - pageY * nextZoom
+    this.setView({ ...this.view, zoom: nextZoom, panX, panY })
+  }
+
+  /** 解绑指针 + wheel 监听(页面卸载调)。 */
   detach(): void {
     if (this.pointerHandlers) {
       this.canvas.removeEventListener('pointerdown', this.pointerHandlers.down)
       this.canvas.removeEventListener('pointermove', this.pointerHandlers.move)
       this.canvas.removeEventListener('pointerup', this.pointerHandlers.up)
       this.pointerHandlers = null
+    }
+    if (this.wheelHandler) {
+      this.canvas.removeEventListener('wheel', this.wheelHandler)
+      this.wheelHandler = null
     }
   }
 

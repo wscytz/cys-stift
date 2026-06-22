@@ -20,3 +20,30 @@ describe('SelfBuiltAdapter drag → onUserChange', () => {
     expect(fired).toBe(0)
   })
 })
+
+describe('SelfBuiltAdapter pan/zoom', () => {
+  it('wheel zoom adjusts zoom + pan (zoom-to-cursor at cursor point)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.setView({ panX: 0, panY: 0, zoom: 1, gridMode: 'free' })
+    // delta < 0(放大)单步应用 1.1 因子;cursor 下页坐标应缩放前后不变。
+    const sx = 100
+    const sy = 100
+    ;(host as unknown as { onWheel: (sx: number, sy: number, delta: number) => void }).onWheel(sx, sy, -1)
+    const v = host.getView()
+    expect(v.zoom).toBeCloseTo(1.1, 5)
+    // zoom-to-cursor: page coord under cursor 不变 → panX 补偿
+    expect((sx - v.panX) / v.zoom).toBeCloseTo(100, 5)
+    expect((sy - v.panY) / v.zoom).toBeCloseTo(100, 5)
+  })
+
+  it('zoom clamps to [0.1, 8]', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.setView({ panX: 0, panY: 0, zoom: 1, gridMode: 'free' })
+    const h = host as unknown as { onWheel: (sx: number, sy: number, delta: number) => void }
+    h.onWheel(0, 0, 100) // 大幅缩小
+    expect(host.getView().zoom).toBeGreaterThanOrEqual(0.1)
+    host.setView({ panX: 0, panY: 0, zoom: 7.9, gridMode: 'free' })
+    h.onWheel(0, 0, -100) // 大幅放大
+    expect(host.getView().zoom).toBeLessThanOrEqual(8)
+  })
+})
