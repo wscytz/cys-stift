@@ -98,4 +98,4 @@ pnpm tauri dev
 
 ## 许可
 
-TBD（项目不盈利，长期保持开放优先）。
+GPL-3.0-or-later。见 [`LICENSE`](LICENSE)。
