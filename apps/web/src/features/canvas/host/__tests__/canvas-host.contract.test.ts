@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { InMemoryCanvasHost } from '../in-memory-host'
+import { SelfBuiltAdapter } from '../self-built-adapter'
 import type { CanvasHost, UserChange } from '../canvas-host'
 
 /**
@@ -68,3 +69,4 @@ function runContract(name: string, make: () => CanvasHost) {
 }
 
 runContract('InMemoryCanvasHost', () => new InMemoryCanvasHost())
+runContract('SelfBuiltAdapter', () => new SelfBuiltAdapter(document.createElement('canvas')))
