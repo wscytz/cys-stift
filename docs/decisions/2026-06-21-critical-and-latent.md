@@ -1,4 +1,4 @@
-# 2026-06-23 · v0.23.3-critical-and-latent
+# 2026-06-21 · v0.23.3-critical-and-latent
 
 > Review 驱动第二轮。5 Critical + 5 Latent,**全 10 项现场独立核对,0 误报**。
 

@@ -1,50 +1,56 @@
-# Memory 索引
+# Decisions 索引
 
-> 每条一行，按日期倒序。详细见对应文件。
+> 每条一行,按日期倒序(文件名序)。详细见对应文件。
+> 新建决策档从 `_TEMPLATE.md` 起步。当前状态/版本见 `../STATE.md`,历史见 `../changelog.md`。
 
-- [2026-06-21 · P3-P7+P11 批量交付 + 视觉 review 2 修](decisions/2026-06-21-p4-p7-batch.md) — P3 OPFS / P4 标签 / P6 AI context / P7 AI 排版 / P11 搜索增强 + 用户报的 2 真 bug(ThemeBoot 未挂载 6f5902a、toolbar 矩形/椭圆死按钮 48dfaa7 — tldraw 3.x 用 'geo' + GeoShapeGeoStyle,不是 'rectangle'/'ellipse');vitest 162/162; build 0
-- [2026-06-21 · P7 AI 排版 v0.33.2(已交付)](decisions/2026-06-21-ai-layout.md) — applyLayout(editor, ops)引擎 + canvas-toolbar 📐 按钮 + handleAILayout 全流程(snapshot→AI→parseDsl→applyLayout)+10 单测; vitest 162/162; build 0
-- [2026-06-21 · P6 AI 数据上下文 v0.33.1(已交付)](decisions/2026-06-21-ai-context.md) — ai-context.ts(manual allowlist+serializeCardForAI)+ canvas-snapshot.ts(画布几何快照+手绘线启发式)+ dsl-parser.ts(AI DSL 解析→typed ops)+ prompts.ts 迁移走 serializeCardForAI; vitest 152/152; build 0
-- [2026-06-21 · P4 标签系统 v0.32.0(已交付)](decisions/2026-06-21-tags.md) — Card.tags: TagRef[] + 10 色固定调色板 + CardService addTag/removeTag/listTags/listByTags + card-detail tag chip 输入/展示; vitest 126/126, domain 38/38; build 0
-- [2026-06-21 · P3 快照异步 v0.31.2(已交付)](decisions/2026-06-21-snapshot-offload.md) — B6 canvas snapshot save offload 到 OPFS(异步)+localStorage fallback+首次 load 自动迁移; vitest 126/126; build 0
-- [2026-06-21 · Phase canvas-export P5(已交付)](decisions/2026-06-21-canvas-export.md) — 画布导出 SVG/PNG + **.cystift 往返**(图片内嵌完整画布,拖回恢复;PNG 自写 tEXt chunk + SVG data-cystift)+ 字体 base64 嵌入 + getSvgString 首调重试 + Bauhaus 对话框; tag v0.33.0-canvas-export; vitest 52/52 + e2e PASS; 参考分析 reference-patterns.md §P5
-- [2026-06-21 · 参考项目分析 drawio + AFFiNE](../../development/reference-patterns.md) — 挖两项目可移植技术/UX,按 phase 整理(P5 导出 / P11 搜索 / P4 标签 / 存储 / P12 打磨),每条标移植方式 + 源码位置 + 不可移植清单
-- [2026-06-21 · Phase canvas-m2 智能化+多模态+传递(已交付)](decisions/2026-06-21-canvas-m2-smart.md) — edge connector drag + 文件拖拽(md/image/doc/ppt/epub) + 关键词关系推断 + 浮动面板 + 单卡导出 .md; tag v0.28.0-canvas-m2-smart; e2e 6/6; new deps: markitdownllm + pdfjs-dist
-- [2026-06-21 · Phase canvas-m3 AI(已交付)](decisions/2026-06-21-canvas-m3-ai.md) — 3 provider (OpenAI/Anthropic/Ollama) + /settings AI 面板 + 卡片 AI actions (summarize/rewrite/translate) + 画布 auto-relate; tag v0.29.0-canvas-m3-ai; e2e 7/7; new deps: eventsource-parser + vitest + jsdom
-- [2026-06-21 · AI 可访问性 & 隐私设计(纯文档,已交付)](decisions/2026-06-21-ai-accessibility-design.md) — 手动 AI context allowlist (ai-context.ts 设计) + 隐私文档双轨 (user/privacy + dev/privacy-design) + 多模态不做 + 手绘 = 几何描述 + media 二进制永不外发; tag v0.30.0-ai-accessibility; 无代码改动
-- [2026-06-21 · 用户反馈 F3 AI 数据访问 + 隐私](feedback/2026-06-21-ai-feedback.md) — 多模态不做 / 手绘 = 几何描述 / 手动而非自动 / 隐私文档双轨 / 每个 phase 必走 check-list
-- [2026-06-21 · 总推进 Roadmap](https://claude.ai/plan/serialized-floating-fog.md) — 12 个 phase(P1-P12),技术债优先;前 3 phase 详细
-- [2026-06-21 · v0.31.0-debt-cleanup (P1 已交付)](decisions/2026-06-21-debt-cleanup.md) — canvas-editor 347→166 拆分 3 bridge + B8 `__cardService` 走 Context + canvas-snapshot-store 9 单测 + 修 db-client rehydrateCards 预存 bug; vitest 21/21; build 0
-- [2026-06-21 · 用户反馈 F2:画布智能化+文件拖拽+竞品对标](feedback/2026-06-21-f2-ux-feedback.md) — 箭头智能推断+edge drag+文件拖拽导入(md/docx/xlsx)+剪贴板粘贴+竞品功能对标(Freeform/Miro);域层 drag-drop 已定义但零接线 — 域层 TS 门禁+数据丢失修复(导入/跨 tab/几何 reconcile)+M1 label 修正+import XSS 加固+canvas listener 迁 useEffect cleanup(B8)+/dev 生产门禁+CI+token 纪律;domain 26/26+db 7/7+web build 0+e2e 8/8
-- [2026-06-21 · Phase canvas-m1 画布关系(已交付)](decisions/2026-06-21-canvas-m1-relations.md) — tldraw arrow 加语义关系类型(blocks/references/derived-from/related-to)+ 选中面板 + 卡片连接徽标 + snapshot 透明持久;e2e 8/8;tag v0.27.0-canvas-m1-relations
-- [2026-06-21 · Phase canvas-bugfixes 跨 tab+DB 与 shape reconcile+删画布清 snapshot+写回 race guard(已交付)](decisions/2026-06-21-canvas-bugfixes.md) — 关闭 review B1/B3/B4/B5(critical/high);tag v0.26.4-canvas-bugfixes
-- [2026-06-20 · Phase dark-mode 暗色模式(已交付)](decisions/2026-06-20-dark-mode.md) — 关闭 spec §5.6 长期留后(:root[data-theme='dark'] + inline head script 防 flash + theme.ts + ThemeBoot);tag v0.17.0-dark-mode
-- [2026-06-20 · Phase multi-canvas-polish view per canvas + active-canvas routing(已交付)](commit 778245d) — v0.15 plan 留后(canvas-view-store Record<CanvasId> + inbox send-to-canvas 用 activeCanvasId);tag v0.16.0-multi-canvas-polish
-- [2026-06-20 · Phase multi-canvas 多画布 UI(已交付)](decisions/2026-06-20-multi-canvas.md) — spec §4.9 长期留后已补(canvas-store + canvas page 切换器 + +New/Rename/Delete + delete 预 removeFromCanvas);tag v0.15.0-multi-canvas
-- [2026-06-20 · Phase send-back canvas 卡反向回 inbox(已交付)](decisions/2026-06-20-send-back.md) — 关闭 review §🟠 UX #2(domain removeFromCanvas + canvas Modal 按钮);tag v0.14.0-send-back
-- [2026-06-20 · Phase batch-confirm archive 批量软删二次确认(已交付)](decisions/2026-06-20-batch-confirm.md) — 关闭 review §🟠 UX #3(floater Soft-delete 弹 Modal + Cancel 保留 selected);tag v0.13.0-batch-confirm
-- [2026-06-20 · Phase archive-detail archive tile 接 detail Modal(已交付)](decisions/2026-06-20-archive-detail.md) — 抽共享 CardDetailModal(inbox+archive 双消费)/actions prop/confirm 内置;关闭 review §🟠 UX #4;tag v0.12.0-archive-detail
-- [2026-06-20 · Phase canvas-refactor useEffect 驱动 canvas-editor(已交付)](decisions/2026-06-20-canvas-refactor.md) — 关闭 review #4 #5(useValue + useEffect bridge,无 dispose 猴补丁,无 listen 无 filter);tag v0.11.0-canvas-refactor
-- [2026-06-20 · Phase trash soft-delete 回收/恢复视图(已交付)](decisions/2026-06-20-trash.md) — 新 /trash 路由 + domain restore/hardDelete + AppMenu Trash 入口 + inbox 文案兑现;tag v0.10.0-trash
-- [2026-06-20 · Review bugfix #1 + #3(已修)](decisions/2026-06-20-review-bugfixes.md) — import 原子性(snapshot+回滚)+ sink 注册竞态(cancelled flag);#2/#4/#5 仍 open
-- [2026-06-19 · Review 发现(3 真 bug + 2 风险)](decisions/2026-06-19-review-findings.md) — #1 #3 已于 06-20 修;#2 也已于 06-20 修(trash 视图);#4 #5 canvas-editor 也已于 06-20 修(canvas-refactor);**全部 review findings 已关闭**
-- [2026-06-19 · Phase 9.1 JSON 反向 import](decisions/2026-06-19-phase-9.1.md) — /settings Import 按钮 + 覆盖式写回 + capture race fallback
-- [2026-06-19 · Phase 9 JSON 导出 + 用户文档](decisions/2026-06-19-phase-9.md) — /settings Export 按钮 + 开放格式 JSON + 用户文档
-- [2026-06-19 · Phase 8 Tauri 打包 STUCK](decisions/2026-06-19-phase-8-stuck.md) — 本机无 Rust,骨架已就位(Phase 0),实际构建阻塞;写 stuck 决策档
-- [2026-06-19 · Phase 6.5h 快捷键自定义](decisions/2026-06-19-phase-6.5h.md) — /settings + web-local settings-store + CaptureHost 读 settings + 5 断言 + 3 截图
-- [2026-06-19 · Phase 6.5g 菜单栏 + CaptureSinkRegistry](decisions/2026-06-19-phase-6.5g.md) — AppMenu 4 入口 + usePathname 高亮 + Capture CustomEvent + MenuCaptureSink + registry 抽象 + domain/db 零改动 + 6 断言 + 5 截图
-- [2026-06-19 · Phase 6.5f 图片上传](decisions/2026-06-19-phase-6.5f.md) — base64 inline localStorage + 详情 Modal 渲染 + UpdateCardPatch.media 扩 + 4 断言 + 3 截图
-- [2026-06-19 · Phase 6.5e 统一手动 capture](decisions/2026-06-19-phase-6.5e.md) — inbox CreateCardForm 走 WebCaptureSink(source.kind=manual)统一接口 + domain/db 零改动 + 5 断言 + 1 截图
-- [2026-06-19 · Phase 6.5d 画布视图持久化](decisions/2026-06-19-phase-6.5d.md) — web-local canvas-view-store + tldraw camera/gridMode 监听 + 防抖 500ms 写回 + 6 断言 + 4 截图
-- [2026-06-19 · Phase 6.5c Inbox→Canvas Send](decisions/2026-06-19-phase-6.5c.md) — 详情 Modal "Send to canvas" 按钮 + moveToCanvas 复用 + tldraw 自动渲染 + 6 断言 + 5 截图
-- [2026-06-19 · Phase 6.5b Inbox 多媒介编辑](decisions/2026-06-19-phase-6.5b.md) — 详情 Modal edit 模式暴露 links/code/quotes editor + editors 抽 features/card 共享 + domain/db 零改动 + 7 断言 + 6 截图
-- [2026-06-19 · Phase 6.5a 草稿自动保存](decisions/2026-06-19-phase-6.5a.md) — web-local localStorage 草稿 + 500ms 防抖 + Mini Input/CreateCardForm 接草稿 + domain/db 零改动 + 7 断言 + 6 截图
-- [2026-06-19 · Phase 7 Archive](decisions/2026-06-19-phase-7.md) — /archive 路由 + 网格/时间轴双视图 + 多选批量 + 蓝条 region + domain/db 零改动 + 8 截图 + 8 断言
-- [2026-06-19 · Phase 6 捕获入口](decisions/2026-06-19-phase-6.md) — 全局快捷键 Cmd/Ctrl+Shift+Space + Mini Input 浮层（红边 + 顶部红条）+ WebCaptureSink 走 service.fromCapture + 8 项交互断言 + 9 张截图
-- [2026-06-19 · Phase 5 Canvas 完整](decisions/2026-06-19-phase-5.md) — /canvas 工具条加 snap/free + zoom 4 按钮 + 快捷键（g + - 0 1）+ §4.3 gridSize=8 + §8 四件 + 10 张截图
-- [2026-06-19 · Phase 4 Canvas 基础](decisions/2026-06-19-phase-4.md) — /canvas + tldraw v3 + Card ShapeUtil + §6.11 DB 真相源绑定（位置跨刷新持久化）+ 6 张截图
-- [2026-06-19 · 设计定稿](decisions/2026-06-19-design-finalized.md) — spec 经五轮复查定稿，`docs/superpowers/specs/2026-06-19-cys-stift-design.md`
-- [2026-06-19 · Phase 0 脚手架](decisions/2026-06-19-phase-0.md) — monorepo + Next.js 静态导出 + Tauri 壳 + 包豪斯占位首屏
-- [2026-06-19 · Phase 1 设计系统](decisions/2026-06-19-phase-1.md) — packages/ui 组件库 + /design 视觉契约页
-- [2026-06-19 · Phase 2 数据层](decisions/2026-06-19-phase-2.md) — domain + db (drizzle/SQLite) + /dev/db 烟测页 + 持久化证据
-- [2026-06-19 · Phase 3 Inbox 业务](decisions/2026-06-19-phase-3.md) — /inbox production 路由 + 多媒介表单 + 详情/编辑/归档 + Markdown 渲染 + 8 张截图
+- 2026-06-21 · [v0.27.1-review-hardening](2026-06-21-v0.27.1-review-hardening.md)
+- 2026-06-21 · [v0.25.0-tauri-global-shortcut](2026-06-21-tauri-global-shortcut.md)
+- 2026-06-21 · [v0.25.1-review-bugfixes](2026-06-21-review-bugfixes.md)
+- 2026-06-21 · [批量交付总结(P3-P7 + P11 + 视觉 review 修)](2026-06-21-p4-p7-batch.md)
+- 2026-06-21 · [v0.23.0-modal-mini-input-polish](2026-06-21-modal-mini-input-polish.md)
+- 2026-06-21 · [v0.24.1-modal-focus-trap](2026-06-21-modal-focus-trap.md)
+- 2026-06-21 · [v0.23.1-i18n-hardening](2026-06-21-i18n-hardening.md)
+- 2026-06-21 · [v0.26.1-high-freedom-canvas-f2](2026-06-21-high-freedom-canvas-f2.md)
+- 2026-06-21 · [v0.26.0-high-freedom-canvas-f1](2026-06-21-high-freedom-canvas-f1.md)
+- 2026-06-21 · [v0.23.2-hardening](2026-06-21-hardening.md)
+- 2026-06-21 · [v0.31.0-debt-cleanup(P1)](2026-06-21-debt-cleanup.md)
+- 2026-06-21 · [v0.23.3-critical-and-latent](2026-06-21-critical-and-latent.md)
+- 2026-06-21 · [v0.24.0-card-pinning](2026-06-21-card-pinning.md)
+- 2026-06-21 · [v0.29.0-canvas-m3-ai](2026-06-21-canvas-m3-ai.md)
+- 2026-06-21 · [v0.28.0-canvas-m2-smart](2026-06-21-canvas-m2-smart.md)
+- 2026-06-21 · [v0.27.0-canvas-m1-relations](2026-06-21-canvas-m1-relations.md)
+- 2026-06-21 · [v0.33.0-canvas-export(P5)](2026-06-21-canvas-export.md)
+- 2026-06-21 · [v0.26.4-canvas-bugfixes](2026-06-21-canvas-bugfixes.md)
+- 2026-06-21 · [AI 可访问性 & 隐私设计(v0.30.0-ai-accessibility)](2026-06-21-ai-accessibility-design.md)
+- 2026-06-20 · [danger variant 重设计 + archive 文案 + favicon(v0.22.1-ux-polish-2)](2026-06-20-ux-polish-2.md)
+- 2026-06-20 · [UI polish(画布 chrome + 设置 hydration + 排版)](2026-06-20-ui-polish.md)
+- 2026-06-20 · [Phase trash · soft-delete 回收/恢复视图(2026-06-20)](2026-06-20-trash.md)
+- 2026-06-20 · [Phase send-back · canvas 卡反向回 inbox(2026-06-20)](2026-06-20-send-back.md)
+- 2026-06-20 · [Review bugfix #1 + #3 · import 不一致 + sink 注册竞态](2026-06-20-review-bugfixes.md)
+- 2026-06-20 · [实际执行(v0.22.6) · 仅 deviceId C](2026-06-20-refactor-abc.md)
+- 2026-06-20 · [Phase multi-canvas · 多画布 UI(2026-06-20)](2026-06-20-multi-canvas.md)
+- 2026-06-20 · [v0.22.3-i18n-restore + 桌面重新打包](2026-06-20-i18n-restore.md)
+- 2026-06-20 · [Phase dark-mode · 暗色模式(2026-06-20)](2026-06-20-dark-mode.md)
+- 2026-06-20 · [Phase canvas-refactor · useEffect 驱动 canvas-editor(2026-06-20)](2026-06-20-canvas-refactor.md)
+- 2026-06-20 · [Phase batch-confirm · archive 批量软删二次确认(2026-06-20)](2026-06-20-batch-confirm.md)
+- 2026-06-20 · [Phase archive-detail · archive tile 接 detail Modal(2026-06-20)](2026-06-20-archive-detail.md)
+- 2026-06-19 · [Review 发现(2026-06-19 轮 self-review)](2026-06-19-review-findings.md)
+- 2026-06-19 · [Phase 9 · JSON 导出 + 用户文档](2026-06-19-phase-9.md)
+- 2026-06-19 · [Phase 8 · Tauri 打包 — Rust 就绪(2026-06-20 纠正;原记 STUCK 是误判)](2026-06-19-phase-8-stuck.md)
+- 2026-06-19 · [Phase 7 · Archive(网格 + 时间轴 + 多选)](2026-06-19-phase-7.md)
+- 2026-06-19 · [Phase 6 · 捕获入口（全局快捷键 + Mini Input）](2026-06-19-phase-6.md)
+- 2026-06-19 · [Phase 6.5h · 快捷键自定义](2026-06-19-phase-6.5h.md)
+- 2026-06-19 · [Phase 6.5g · 菜单栏 + CaptureSinkRegistry](2026-06-19-phase-6.5g.md)
+- 2026-06-19 · [Phase 6.5f · 图片上传(占位)](2026-06-19-phase-6.5f.md)
+- 2026-06-19 · [Phase 6.5e · 统一手动 capture](2026-06-19-phase-6.5e.md)
+- 2026-06-19 · [Phase 6.5d · 画布视图持久化](2026-06-19-phase-6.5d.md)
+- 2026-06-19 · [Phase 6.5c · Inbox → Canvas Send](2026-06-19-phase-6.5c.md)
+- 2026-06-19 · [Phase 6.5b · Inbox 多媒介编辑](2026-06-19-phase-6.5b.md)
+- 2026-06-19 · [Phase 6.5a · 草稿自动保存](2026-06-19-phase-6.5a.md)
+- 2026-06-19 · [Phase 5 · Canvas 完整（snap/zoom/guides）](2026-06-19-phase-5.md)
+- 2026-06-19 · [Phase 4 · Canvas 基础（tldraw 集成）](2026-06-19-phase-4.md)
+- 2026-06-19 · [Phase 3 · Inbox 业务](2026-06-19-phase-3.md)
+- 2026-06-19 · [Phase 2 数据层完成](2026-06-19-phase-2.md)
+- 2026-06-19 · [Phase 1 设计系统完成](2026-06-19-phase-1.md)
+- 2026-06-19 · [Phase 0 脚手架完成](2026-06-19-phase-0.md)
+- 2026-06-19 · [设计定稿](2026-06-19-design-finalized.md)

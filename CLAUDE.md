@@ -9,29 +9,12 @@
 
 ## 当前状态
 
-- Phase 0 ✅ 脚手架 · Phase 1 ✅ 设计系统 · Phase 2 ✅ 数据层 · Phase 3 ✅ Inbox 业务 · Phase 4 ✅ Canvas 基础 · Phase 5 ✅ Canvas 完整 · Phase 6 ✅ 捕获入口 · Phase 7 ✅ Archive · P6.5a ✅ 草稿自动保存 · P6.5b ✅ Inbox 多媒介编辑 · P6.5c ✅ Inbox→Canvas Send · P6.5d ✅ 画布视图持久化 · P6.5e ✅ 统一手动 capture · P6.5f ✅ 图片上传 · P6.5g ✅ 菜单栏 + CaptureSinkRegistry · P6.5h ✅ 快捷键自定义 · Phase 8 ✅ Rust 就绪(2026-06-20:本就已装 cargo 1.96,根因是 PATH,cargo check 通过;2026-06-21 确认:本地可构建未签名 .app + .dmg,签名公证待 Apple 证书) · **Phase 9 ✅ JSON 导出 + 用户文档** · **Review ✅ bugfix #1+#3(import 原子性 + sink 竞态,v0.9.2)** · **Phase trash ✅ soft-delete 回收/恢复视图(/trash 路由 + domain restore/hardDelete + AppMenu Trash 入口,v0.10.0-trash)** · **Phase canvas-refactor ✅ useEffect 驱动 canvas-editor(关闭 review #4 #5,v0.11.0-canvas-refactor)** · **Phase archive-detail ✅ archive tile 接 detail Modal + 共享 CardDetailModal(关闭 review §🟠 UX #4,v0.12.0-archive-detail)** · **Phase batch-confirm ✅ archive 批量软删二次确认(关闭 review §🟠 UX #3,v0.13.0-batch-confirm)** · **Phase send-back ✅ canvas 卡反向回 inbox(domain removeFromCanvas + canvas Modal 按钮,关闭 review §🟠 UX #2,v0.14.0-send-back)** · **Refactor canvas dblclick 走 capture registry(unify 所有 capture 入口) · **Phase multi-canvas ✅ 多画布 UI(canvas-store + 切换器 + CRUD,spec §4.9 长期留后已补,v0.15.0-multi-canvas)****
-- **30 轮路线图核心 spec §8 全部完成 + review 全部 5 项 + UX 洞 #2 #3 #4 + spec §4.9 + spec §5.6 全部关闭**。Phase 8 Tauri:Rust 就绪(cargo 1.96),2026-06-21 确认:本地可构建未签名 .app + .dmg,签名公证待 Apple 证书。产品已是**完整可用的 web 应用**:捕获 / inbox(多媒介编辑)/ canvas(视图持久化 + useEffect 驱动 + dblclick 走 registry + **多画布切换/CRUD + view per canvas + active routing + 暗色模式**)/ archive(网格+时间轴+多选+详情 Modal + 批量软删二次确认)/ trash(软删恢复)/ settings(快捷键自定义+导出+导入+暗色主题切换)/ 用户文档。
-- **✅ 所有非上架代办清空**:review #1-5 + UX #2/#3/#4 + spec §4.9 多画布 + spec §5.6 暗色模式 + canvas view per canvas + canvas send-to-active + inbox dead styles cleanup 全部交付。**核心流程完整可用**。已知 open:canvas snapshot 主线程阻塞(B6)/ `__canvasEditor` global 残留(B8 — 已于 v0.27.1 修);packages/db 为 Phase 8 Tauri 预留(web 未使用,走 localStorage adapter);无 CI(2026-06-21 添加 GitHub Actions)
-- **v0.27.1 大修**(2026-06-21):导入后内存状态同步(rehydrateCards)、跨 tab Date 串重建(parseCardsRaw)、syncCardsToEditor 几何 reconcile、M1 arrow label(text prop)、onMount listener 迁 useEffect cleanup(B8)、import XSS 加固(link 白名单+media dataUrl 校验)、/dev/* 生产门禁、domain tsc 门禁、CI workflow。详见 `docs/memory/decisions/2026-06-21-canvas-m1-relations.md`。
-- **v0.29.0 M3 AI**(2026-06-21):3 provider(OpenAI/Anthropic/Ollama)+ /settings AI 面板 + 卡片 3 action(summarize/rewrite/translate)+ 画布 auto-relate + 4 个 vitest 单测 + e2e 7/7。详见 `docs/memory/decisions/2026-06-21-canvas-m3-ai.md`。
-- **v0.30.0 AI 可访问性 & 隐私设计**(2026-06-21):**纯文档**,无代码改动。8 个文档:
-  - `docs/user/privacy.md`(用户面向 — AI 看到什么 / 怎么关 / 关了会怎样)
-  - `docs/development/privacy-design.md`(开发面向 — 手动 AI context 流程 + check-list + ai-context.ts API 设计 + 画布快照 schema + DSL 输出 + 测试要求)
-  - `docs/memory/decisions/2026-06-21-ai-accessibility-design.md`(决策档)
-  - `docs/memory/feedback/2026-06-21-ai-feedback.md`(用户原话归档)
-  - 关键决策:**手动而非自动** / **多模态不做** / **手绘 = 几何描述**(不走 vision) / **media 二进制永不外发** / **软删除的卡不在 AI 视野**
-  - 每个 phase 改 AI 必走 `privacy-design.md` 第 7 节 check-list(12 项 audit)
-  - 详见 `docs/memory/decisions/2026-06-21-ai-accessibility-design.md`
-- **执行模式**：主模型（Claude）按 plan 手动执行 + 自审;Ralph 自动循环已停用（见下方"Ralph 状态"）
-- **下一个**：等用户诉求。**M3.1 实装任务**(基于 v0.30.0 设计文档,~ 400 行):
-  - `ai-context.ts`(allowlist + serializer,~ 80 行)
-  - `canvas-snapshot.ts`(画布快照 + 几何描述,~ 80 行)
-  - `dsl-parser.ts`(DSL 解析,~ 100 行)
-  - `prompts.ts` 改用新 helper + 反向断言单测
-  - toolbar "📐 AI 排版" 按钮
-  - 其他活跃候选:标签系统 / Tauri 打包 / OPFS / 录屏 / UX 打磨
-- 完整进度：`docs/development/changelog.md` + `docs/development/roadmap.md`（30 轮路线图）+ `docs/user/README.md`（用户指南）+ `docs/user/privacy.md`（**AI 隐私必读**）+ `docs/memory/context/current-session.md`（**clear 后第一份要读的交接档**）
-- 任务流程参考：`docs/ralph/README.md`（已归档，见下）
+> **单一可信源:`docs/STATE.md`。** 本文件只放不变量,不复制状态。
+> 新会话 / `/clear` 后先读 `docs/STATE.md`(版本里程碑 + 当前能力 + 下一步 + 已知 debt)。
+> 历史变更见 `docs/changelog.md`(newest-first)。
+
+- 完整进度：`docs/STATE.md`(当前状态) + `docs/changelog.md`(历史) + `docs/development/roadmap.md`（30 轮路线图）+ `docs/user/README.md`（用户指南）+ `docs/user/privacy.md`（**AI 隐私必读**）
+- 任务流程参考：`docs/archive/ralph/README.md`（已归档，见下）
 
 ## 技术栈（不可重新选型）
 
@@ -46,7 +29,7 @@
 
 ## 硬性禁止（任何模型、任何场景都适用）
 
-- ❌ **不要修改** `docs/superpowers/specs/2026-06-19-cys-stift-design.md`（spec 是五轮审查定稿）
+- ❌ **不要修改** `docs/specs/2026-06-19-cys-stift-design.md`（spec 是五轮审查定稿）
 - ❌ 不要重新选型（换框架 / 换 ORM / 换数据库）—— 要改先写 ADR
 - ❌ 不要在组件层写死颜色 hex / 像素值 —— 必须走 token（`@cys-stift/ui` 或 `@cys-stift/domain/tokens-local`）
 - ❌ 不要破坏 `packages/domain` 的零依赖特性（它不 import 任何框架）
@@ -58,13 +41,13 @@
 
 | 想知道什么 | 看哪里 |
 |---|---|
-| 整体设计 / 数据模型 / 路线图 | `docs/superpowers/specs/2026-06-19-cys-stift-design.md` |
-| 当前 phase 的实现计划 | `docs/superpowers/plans/` |
-| Ralph 任务指南 + compact/clear 规则 | `docs/ralph/README.md`（已归档） |
+| 整体设计 / 数据模型 / 路线图 | `docs/specs/2026-06-19-cys-stift-design.md` |
+| 当前 phase 的实现计划 | `docs/plans/` |
+| Ralph 任务指南 + compact/clear 规则 | `docs/archive/ralph/README.md`（已归档） |
 | 架构决策记录 | `docs/adr/` |
 | 设计 token 规则 | `docs/design/tokens.md` |
-| 跨模型记忆 | `docs/memory/MEMORY.md` |
-| 阶段变更历史 | `docs/development/changelog.md` |
+| 跨模型记忆 | `docs/decisions/INDEX.md` |
+| 阶段变更历史 | `docs/changelog.md` |
 | 开发环境搭建 | `docs/development/setup.md` |
 
 ## 验证命令（改完代码就跑）
@@ -79,11 +62,11 @@ pnpm --filter web build       # Next.js 静态导出（必须 exit 0）
 
 > **2026-06-19 起，不再跑 Ralph 自动循环。** 改为主模型（Claude）按 phase plan 手动执行 + 自审。
 >
-> - `docs/ralph/README.md` **保留为归档**，内容（任务流程、审核标准、compact/clear 规则）仍可参考，但其中的"Ralph 是执行者 / 自动循环 / stop hook"描述**不再适用**。
+> - `docs/archive/ralph/README.md` **保留为归档**，内容（任务流程、审核标准、compact/clear 规则）仍可参考，但其中的"Ralph 是执行者 / 自动循环 / stop hook"描述**不再适用**。
 > - Phase 3（Inbox）就是手动执行的第一个 phase，已完成并通过 GLM audit。
 > - `scripts/audit-glm.sh` 保留：跨模型审核（GLM-5.2，Anthropic 兼容 endpoint）仍有用，需要时手动跑。
 >
-> **如果以后想重启 Ralph**：`docs/ralph/` + 各 plan 文件都在，重新接 stop hook 即可。
+> **如果以后想重启 Ralph**：`docs/archive/ralph/` + 各 plan 文件都在，重新接 stop hook 即可。
 
 ---
 
@@ -94,7 +77,7 @@ pnpm --filter web build       # Next.js 静态导出（必须 exit 0）
 1. **当前任务的核心目标与验收标准**（来自对应 phase 的 plan）
 2. **已确认的技术选型与架构决策**（本文件"技术栈"表 + `docs/adr/`）
 3. **明确标记为「不可修改」的文件**：spec、已 tag 的 phase 产物
-4. **已验证无效、禁止重试的方案**（写在 `docs/memory/decisions/*-stuck.md`）
+4. **已验证无效、禁止重试的方案**（写在 `docs/decisions/*-stuck.md`）
 5. **当前 phase 进度**：哪个 task 在做、哪个完成、哪个卡住
 6. **未落地的决策**：对话里讨论但还没写进文件的决定
 
@@ -103,4 +86,4 @@ pnpm --filter web build       # Next.js 静态导出（必须 exit 0）
 ---
 
 > 各包的局部纪律见对应目录的 `CLAUDE.md`。
-> Ralph 已停用，但其任务流程/审核标准仍可在 `docs/ralph/README.md` 查到（归档状态）。
+> Ralph 已停用，但其任务流程/审核标准仍可在 `docs/archive/ralph/README.md` 查到（归档状态）。

@@ -1,7 +1,7 @@
 # Plan · review bugfix #1 + #3(2026-06-20)
 
-> 承接 `docs/memory/decisions/2026-06-19-review-findings.md` 的建议优先级。
-> 本档是实施前计划;完成记录见 `docs/memory/decisions/2026-06-20-review-bugfixes.md`。
+> 承接 `docs/decisions/2026-06-19-review-findings.md` 的建议优先级。
+> 本档是实施前计划;完成记录见 `docs/decisions/2026-06-20-review-bugfixes.md`。
 
 ## 背景
 

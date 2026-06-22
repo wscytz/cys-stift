@@ -1,6 +1,6 @@
 # 2026-06-21 · v0.26.1-high-freedom-canvas-f2
 
-> 高自由画布 Phase F2(工具栏)。spec: [`2026-06-21-high-freedom-canvas.md`](../../superpowers/specs/2026-06-21-high-freedom-canvas.md)。承接 F1(v0.26.0)地基。
+> 高自由画布 Phase F2(工具栏)。spec: [`2026-06-21-high-freedom-canvas.md`](../../specs/2026-06-21-high-freedom-canvas.md)。承接 F1(v0.26.0)地基。
 
 ## 背景
 

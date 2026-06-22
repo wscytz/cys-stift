@@ -1,8 +1,8 @@
 # Phase canvas-refactor · useEffect 驱动 canvas-editor(2026-06-20)
 
-> 承接 `docs/memory/decisions/2026-06-19-review-findings.md` 的 #4 + #5。
+> 承接 `docs/decisions/2026-06-19-review-findings.md` 的 #4 + #5。
 > 原始 review 给的标准修法:"把 onMount 里的 listener/timer 提到 React `useEffect`,以 editor 为 dep,cleanup 不猴补丁"。
-> Plan:[`docs/superpowers/plans/2026-06-20-canvas-editor-refactor.md`](../../superpowers/plans/2026-06-20-canvas-editor-refactor.md)
+> Plan:[`docs/plans/2026-06-20-canvas-editor-refactor.md`](../../plans/2026-06-20-canvas-editor-refactor.md)
 > Tag:**v0.11.0-canvas-refactor**
 
 ## 背景
@@ -107,7 +107,7 @@ node scripts/canvas-refactor-shots.cjs    → PASS ✓ (5/5 断言)
 
 | 想知道什么 | 看哪里 |
 |---|---|
-| 本 phase plan | `docs/superpowers/plans/2026-06-20-canvas-editor-refactor.md` |
+| 本 phase plan | `docs/plans/2026-06-20-canvas-editor-refactor.md` |
 | 主改动 | `apps/web/src/features/canvas/canvas-editor.tsx` |
 | page 1 行 | `apps/web/src/app/canvas/page.tsx`(editor prop) |
 | e2e | `scripts/canvas-refactor-shots.cjs` |

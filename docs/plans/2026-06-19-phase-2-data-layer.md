@@ -130,8 +130,8 @@
 
 ### P2-T5 · 收尾
 
-- `docs/development/changelog.md`
-- `docs/memory/decisions/2026-06-19-phase-2.md` + 更新 MEMORY.md
+- `docs/changelog.md`
+- `docs/decisions/2026-06-19-phase-2.md` + 更新 MEMORY.md
 - `git commit` + `git tag v0.3.0-phase-2`
 
 ---

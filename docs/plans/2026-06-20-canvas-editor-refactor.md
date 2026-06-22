@@ -1,6 +1,6 @@
 # Plan · Phase canvas-refactor · useEffect 驱动 canvas-editor(#4 #5)
 
-> 承接 `docs/memory/decisions/2026-06-19-review-findings.md` 的 #4 + #5。
+> 承接 `docs/decisions/2026-06-19-review-findings.md` 的 #4 + #5。
 > 目标:**唯一一次动 canvas 时顺手关掉这两个脆弱点**;不引入功能变化。
 > 本档是实施计划;执行者(主模型 Claude)照此推进 + 自审。
 

@@ -173,8 +173,8 @@
 
 ## 关联文档
 
-- 决策档:`docs/memory/decisions/2026-06-21-ai-accessibility-design.md`
+- 决策档:`docs/decisions/2026-06-21-ai-accessibility-design.md`
 - 用户隐私:`docs/user/privacy.md`
 - 开发隐私:`docs/development/privacy-design.md`
-- M3 交付:`docs/memory/decisions/2026-06-21-canvas-m3-ai.md`
-- 早期反馈 F1 / F2:`docs/memory/feedback/2026-06-19-*.md`(若有) / `docs/memory/feedback/2026-06-21-f2-ux-feedback.md`
+- M3 交付:`docs/decisions/2026-06-21-canvas-m3-ai.md`
+- 早期反馈 F1 / F2:`docs/feedback/2026-06-19-*.md`(若有) / `docs/feedback/2026-06-21-f2-ux-feedback.md`

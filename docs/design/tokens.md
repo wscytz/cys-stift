@@ -1,6 +1,6 @@
 # 设计 token · 包豪斯约束
 
-> 摘自 [`docs/superpowers/specs/2026-06-19-cys-stift-design.md` §5](../superpowers/specs/2026-06-19-cys-stift-design.md#5-ui-与设计系统包豪斯)。本文件是"规则 + 用法"，完整推理见 spec。
+> 摘自 [`docs/specs/2026-06-19-cys-stift-design.md` §5](../specs/2026-06-19-cys-stift-design.md#5-ui-与设计系统包豪斯)。本文件是"规则 + 用法"，完整推理见 spec。
 
 ---
 

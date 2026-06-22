@@ -30,8 +30,8 @@
 | `apps/web/src/app/canvas/page.tsx` | 把 `<RelationPanel editor={editor} />` 挂进 `.cv-host`,与 `<CanvasToolbar>` 同级。 | 改 |
 | `apps/web/src/lib/i18n/messages.ts` | 新增 `relation.*` 双语 key(blocks/references/derived-from/related-to/custom/title)。 | 改 |
 | `scripts/m1-relations-shots.cjs` | e2e:建两卡 → 建绑定箭头 → 选类型 → 断言视觉 + label + reload 持久化。 | 新建 |
-| `docs/memory/decisions/2026-06-21-canvas-m1-relations.md` | 决策档。 | 新建 |
-| `docs/development/changelog.md` | v0.27.0 条目。 | 改 |
+| `docs/decisions/2026-06-21-canvas-m1-relations.md` | 决策档。 | 新建 |
+| `docs/changelog.md` | v0.27.0 条目。 | 改 |
 
 ---
 
@@ -642,13 +642,13 @@ git commit -m "test(canvas-m1): e2e relation type select + reload persistence"
 ## Task 5: 决策档 + changelog
 
 **Files:**
-- Create: `docs/memory/decisions/2026-06-21-canvas-m1-relations.md`
-- Modify: `docs/development/changelog.md`(顶部加 v0.27.0 条目)
-- Modify: `docs/memory/MEMORY.md`(顶部加一行索引)
+- Create: `docs/decisions/2026-06-21-canvas-m1-relations.md`
+- Modify: `docs/changelog.md`(顶部加 v0.27.0 条目)
+- Modify: `docs/decisions/INDEX.md`(顶部加一行索引)
 
 - [ ] **Step 1: 写决策档**
 
-Create `docs/memory/decisions/2026-06-21-canvas-m1-relations.md`:
+Create `docs/decisions/2026-06-21-canvas-m1-relations.md`:
 
 ```markdown
 # 2026-06-21 · v0.27.0-canvas-m1-relations
@@ -684,7 +684,7 @@ Create `docs/memory/decisions/2026-06-21-canvas-m1-relations.md`:
 
 - [ ] **Step 2: changelog 加条目**
 
-Edit `docs/development/changelog.md` —— 在文件顶部最新条目之前插入:
+Edit `docs/changelog.md` —— 在文件顶部最新条目之前插入:
 
 ```markdown
 ## 2026-06-21 · v0.27.0-canvas-m1-relations
@@ -697,12 +697,12 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - **持久化透明**: 关系全在 arrow record,snapshot 自动保存,无新持久化层
 - **e2e**: 建两卡+绑定箭头+选类型+reload 持久 + 徽标断言 → `scripts/m1-relations-shots.cjs`
 
-详见 [`docs/memory/decisions/2026-06-21-canvas-m1-relations.md`](../memory/decisions/2026-06-21-canvas-m1-relations.md)。
+详见 [`docs/decisions/2026-06-21-canvas-m1-relations.md`](../decisions/2026-06-21-canvas-m1-relations.md)。
 ```
 
 - [ ] **Step 3: MEMORY.md 索引**
 
-Edit `docs/memory/MEMORY.md` —— 在第一行索引列表顶部(最新在上)加:
+Edit `docs/decisions/INDEX.md` —— 在第一行索引列表顶部(最新在上)加:
 
 ```markdown
 - [2026-06-21 · Phase canvas-m1 画布关系(已交付)](decisions/2026-06-21-canvas-m1-relations.md) — tldraw arrow 加语义关系类型(blocks/references/derived-from/related-to)+ 选中面板 + 卡片连接徽标 + snapshot 透明持久;tag v0.27.0-canvas-m1-relations
@@ -711,7 +711,7 @@ Edit `docs/memory/MEMORY.md` —— 在第一行索引列表顶部(最新在上)
 - [ ] **Step 4: Commit**
 
 ```bash
-git add docs/memory/decisions/2026-06-21-canvas-m1-relations.md docs/development/changelog.md docs/memory/MEMORY.md
+git add docs/decisions/2026-06-21-canvas-m1-relations.md docs/changelog.md docs/decisions/INDEX.md
 git commit -m "docs(canvas-m1): decision + changelog + memory index"
 ```
 

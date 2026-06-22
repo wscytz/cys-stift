@@ -61,8 +61,8 @@ P1 是**零行为变化**的重构 + 清理,把 v0.30.0 之前积压的债还清
 ## 关联决策
 
 - 总推进 Roadmap:`/Users/jinxunuo/.claude/plans/serialized-floating-fog.md`
-- M3 交付:`docs/memory/decisions/2026-06-21-canvas-m3-ai.md`
-- v0.30.0 AI 可访问性:`docs/memory/decisions/2026-06-21-ai-accessibility-design.md`
+- M3 交付:`docs/decisions/2026-06-21-canvas-m3-ai.md`
+- v0.30.0 AI 可访问性:`docs/decisions/2026-06-21-ai-accessibility-design.md`
 
 ## Self-Review
 

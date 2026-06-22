@@ -20,11 +20,11 @@
 
 ## 状态
 
-**Phase 0 · 脚手架**（2026-06-19）
+**完整可用的本地优先灵感画布**(v0.37.0 stable)。
 
-可跑的 monorepo 空壳：Next.js（静态导出）+ Tauri 桌面壳 + 包豪斯占位首屏 + 完整文档与工程化配置。**还没有任何业务逻辑。**
+捕获 / inbox(多媒介编辑)/ canvas(tldraw 自由画布 + 多画布 + 关系箭头 + AI 排版 + 导出)/ archive / trash / search / 标签 / AI(3 provider) 全部交付。桌面端可本地构建未签名 DMG。
 
-下一个里程碑：Phase 1 · 设计系统（Bauhaus tokens + 组件库）。
+**当前状态、版本里程碑、下一步、已知 debt 全见 [`docs/STATE.md`](docs/STATE.md)** — 单一可信源。历史见 [`docs/changelog.md`](docs/changelog.md)。
 
 ---
 
@@ -36,13 +36,13 @@ cys-stift/
 │   ├── web/             Next.js (App Router) 应用壳，静态导出
 │   └── desktop/         Tauri v2 桌面壳
 ├── packages/
-│   ├── ui/              包豪斯设计系统（Phase 1+）
-│   ├── db/              Drizzle ORM + SQLite schema（Phase 2+）
+│   ├── ui/              包豪斯设计系统
+│   ├── db/              Drizzle ORM + SQLite schema
 │   ├── domain/          核心领域模型（Phase 2+）
 │   └── config/          共享配置
 ├── docs/
-│   ├── superpowers/specs/   设计文档（定稿）
-│   ├── superpowers/plans/  阶段实现计划
+│   ├── specs/   设计文档（定稿）
+│   ├── plans/  阶段实现计划
 │   ├── architecture/       架构总览
 │   ├── adr/                架构决策记录
 │   ├── design/             设计 token 文档
@@ -64,14 +64,14 @@ cys-stift/
 
 | 你想知道什么 | 看哪里 |
 |---|---|
-| 整体设计 / 数据模型 / 路线图 | [`docs/superpowers/specs/2026-06-19-cys-stift-design.md`](./docs/superpowers/specs/2026-06-19-cys-stift-design.md) |
-| 当前阶段的实现计划 | [`docs/superpowers/plans/`](./docs/superpowers/plans/) |
+| 整体设计 / 数据模型 / 路线图 | [`docs/specs/2026-06-19-cys-stift-design.md`](./docs/specs/2026-06-19-cys-stift-design.md) |
+| 当前阶段的实现计划 | [`docs/plans/`](./docs/plans/) |
 | 架构总览 | [`docs/architecture/overview.md`](./docs/architecture/overview.md) |
 | 为什么这样设计 | [`docs/adr/`](./docs/adr/) |
 | 设计 token / 包豪斯规则 | [`docs/design/tokens.md`](./docs/design/tokens.md) |
 | 如何搭建开发环境 | [`docs/development/setup.md`](./docs/development/setup.md) |
 | 跨会话上下文 | [`docs/memory/`](./docs/memory/) |
-| 阶段变更历史 | [`docs/development/changelog.md`](./docs/development/changelog.md) |
+| 阶段变更历史 | [`docs/changelog.md`](./docs/changelog.md) |
 
 ---
 

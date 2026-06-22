@@ -185,9 +185,9 @@
 - 视觉契约：6 色 token 不破（红条 = `var(--color-red)`）；Space Grotesk + mono；8px 节奏
 
 ### P6-T6 · 收尾六件套
-- `docs/development/changelog.md` 追加 `## 2026-06-19 · phase 6 · capture entry`
-- `docs/memory/decisions/2026-06-19-phase-6.md` + `docs/memory/MEMORY.md` 索引一行
-- 更新 `docs/memory/context/current-session.md`（状态推进到 Phase 7+）
+- `docs/changelog.md` 追加 `## 2026-06-19 · phase 6 · capture entry`
+- `docs/decisions/2026-06-19-phase-6.md` + `docs/decisions/INDEX.md` 索引一行
+- 更新 `docs/STATE.md`（状态推进到 Phase 7+）
 - 更新根 `CLAUDE.md`（状态：Phase 6 ✅）
 - `git commit`（Conventional Commits，如 `feat(capture): phase 6 — global shortcut + mini input`）
 - `git tag v0.7.0-phase-6`（Phase 5 是 `v0.6.0-phase-5`，minor +1）
@@ -224,7 +224,7 @@
 
 ## 5. 审核标准（主模型自审逐项查）
 
-> 沿用 `docs/ralph/README.md` §6 归档标准。Phase 6 特别注意：
+> 沿用 `docs/archive/ralph/README.md` §6 归档标准。Phase 6 特别注意：
 
 ### 代码质量
 - [ ] `features/capture/` 切片干净（capture-sink.ts / mini-input.tsx / global-shortcut.ts 内 host 组件），不散落到 app/inbox 或 app/canvas

@@ -7,7 +7,7 @@
 |---|---|
 | 计划 | Phase 5：Canvas 完整 — 8px snap / 自由模式切换 + 缩放控件 + snap 指示线 |
 | 创建 | 2026-06-19 |
-| 范围决策 | **Lean**（仅 spec §8 4 件；视图持久化、Delete 键同步打磨留 Phase 5+，见 `docs/memory/context/current-session.md`） |
+| 范围决策 | **Lean**（仅 spec §8 4 件；视图持久化、Delete 键同步打磨留 Phase 5+，见 `docs/STATE.md`） |
 | 依据 spec | §4.3（`CanvasView = { zoom, pan, gridMode: 'snap' \| 'free', gridSize: 8 }`）/ §5.4（Canvas 视觉骨架：8px 黑条 + 8px 点阵网格背景）/ §6.3（tldraw Custom Shape API）/ §6.11（tldraw 持久化策略，本阶段不持久化 view）/ §1.4（双击建卡 + MVP 单画布）/ §8（路线图 Phase 5 段：网格 / 自由模式、缩放、对齐）/ §12（剩余风险） |
 | ADR | ADR-0005（tldraw as canvas renderer） |
 | 上游交付 | Phase 4（`/canvas` production 路由 + tldraw v3 懒载 + Card ShapeUtil + §6.11 位置持久化 + 双击建卡/开卡）|
@@ -152,9 +152,9 @@
 - 视觉对照：6 色 token 不破；黑条不变；按钮 hover/focus 红下划线（Input 同款）
 
 ### P5-T6 · 收尾四件套
-- `docs/development/changelog.md` 追加 `## 2026-06-19 · phase 5 · canvas full`
-- `docs/memory/decisions/2026-06-19-phase-5.md` + `docs/memory/MEMORY.md` 索引一行
-- 更新 `docs/memory/context/current-session.md`（状态推进到 Phase 6）
+- `docs/changelog.md` 追加 `## 2026-06-19 · phase 5 · canvas full`
+- `docs/decisions/2026-06-19-phase-5.md` + `docs/decisions/INDEX.md` 索引一行
+- 更新 `docs/STATE.md`（状态推进到 Phase 6）
 - 更新根 `CLAUDE.md`（状态：Phase 5 ✅，next Phase 6）
 - `git commit`（Conventional Commits，如 `feat(canvas): phase 5 — snap/zoom/guides`）
 - `git tag v0.6.0-phase-5`（Phase 4 是 `v0.5.0-phase-4`，minor +1）
@@ -186,7 +186,7 @@
 
 ## 5. 审核标准（主模型自审逐项查）
 
-> 沿用 `docs/ralph/README.md` §6 归档标准。Phase 5 特别注意：
+> 沿用 `docs/archive/ralph/README.md` §6 归档标准。Phase 5 特别注意：
 
 ### 代码质量
 - [ ] 工具条扩展是 client 组件内 JSX 改动，**没**抽无意义的新组件

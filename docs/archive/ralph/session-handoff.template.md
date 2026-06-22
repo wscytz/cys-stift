@@ -3,7 +3,7 @@
 > **用途**：Ralph 超长周期（过夜 / 百轮级）迭代时，用这个模板把当前进度落地，
 > 然后 `/clear` 重置上下文，下一轮读本文件继续。比反复 compact 保真度高。
 >
-> **位置**：复制本模板到 `docs/ralph/session-handoff.md`，填写后 `git commit`。
+> **位置**：复制本模板到 `docs/archive/ralph/session-handoff.md`，填写后 `git commit`。
 > 每次交接**覆盖** session-handoff.md（它是"当前快照"，不是历史档案；历史在 git log + memory/decisions）。
 
 ---
@@ -40,7 +40,7 @@ context_usage: 78%
 - [ ] T5 · 视觉验证 + commit + tag
 
 ## 关键决策（本 session 做的）
-<!-- 影响后续的决策，重要的同步写一份到 docs/memory/decisions/ -->
+<!-- 影响后续的决策，重要的同步写一份到 docs/decisions/ -->
 - 决定 X，因为 Y（commit `abc1234`）
 
 ## 已验证无效的方案（禁止重试）
@@ -54,7 +54,7 @@ context_usage: 78%
 ## 下一轮第一件事
 <!-- 明确告诉接手的自己/模型：先读哪三个文件 -->
 1. 根 `CLAUDE.md`
-2. `docs/superpowers/plans/<current-phase>.md`
+2. `docs/plans/<current-phase>.md`
 3. 本文件
 然后：<!-- 具体动作 -->
 
@@ -69,10 +69,10 @@ context_usage: 78%
 ## 使用流程
 
 1. Ralph 完成一个里程碑 / 上下文到 70–80% / 主动想重置
-2. 复制本模板到 `docs/ralph/session-handoff.md`，**如实填写**
-3. `git add docs/ralph/session-handoff.md && git commit -m "chore: ralph handoff at phase N iter M"`
+2. 复制本模板到 `docs/archive/ralph/session-handoff.md`，**如实填写**
+3. `git add docs/archive/ralph/session-handoff.md && git commit -m "chore: ralph handoff at phase N iter M"`
 4. `/clear`（彻底重置，CLAUDE.md 自动重载）
-5. 下一轮第一句话：`读 docs/ralph/session-handoff.md，继续迭代`
+5. 下一轮第一句话：`读 docs/archive/ralph/session-handoff.md，继续迭代`
 6. 模型读 handoff + CLAUDE.md + 当前 phase plan，无缝接手
 
 ## 规则

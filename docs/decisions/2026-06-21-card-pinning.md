@@ -1,4 +1,4 @@
-# 2026-06-23 · v0.24.0-card-pinning
+# 2026-06-21 · v0.24.0-card-pinning
 
 > Phase A(快速完善)。`Card.pinned` domain 字段接 UI。
 

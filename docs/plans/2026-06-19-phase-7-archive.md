@@ -147,9 +147,9 @@
 - 归档 `docs/design/screenshots/phase-7/` + README 视觉对照笔记
 
 ### P7-T7 · 收尾六件套
-- `docs/development/changelog.md` 追加 `## 2026-06-19 · phase 7 · archive`
+- `docs/changelog.md` 追加 `## 2026-06-19 · phase 7 · archive`
 - `docs/development/roadmap.md` §5 P7 行打 ✅ + 写 tag `v0.8.0-phase-7`
-- `docs/memory/decisions/2026-06-19-phase-7.md` + MEMORY 索引 + current-session 推进
+- `docs/decisions/2026-06-19-phase-7.md` + MEMORY 索引 + current-session 推进
 - 根 `CLAUDE.md` 状态推进:Phase 7 ✅
 - `git commit` (Conventional Commits)
 - `git tag v0.8.0-phase-7`

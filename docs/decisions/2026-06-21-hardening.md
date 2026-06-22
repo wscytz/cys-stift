@@ -1,4 +1,4 @@
-# 2026-06-23 · v0.23.2-hardening
+# 2026-06-21 · v0.23.2-hardening
 
 > Review 驱动的 robustness 改动,1 个 commit 闭合 4 个非 i18n 类 bug。
 

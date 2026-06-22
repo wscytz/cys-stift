@@ -1,8 +1,8 @@
 # Phase archive-detail · archive tile 接 detail Modal(2026-06-20)
 
-> 承接 `docs/memory/decisions/2026-06-19-review-findings.md` §🟠 UX 洞 #4:"archive tile 点击 no-op"。
+> 承接 `docs/decisions/2026-06-19-review-findings.md` §🟠 UX 洞 #4:"archive tile 点击 no-op"。
 > 入口已定:**archive 接入 Modal,顺手抽 inbox CardDetail 成共享组件**。
-> Plan:[`docs/superpowers/plans/2026-06-20-archive-detail.md`](../../superpowers/plans/2026-06-20-archive-detail.md)
+> Plan:[`docs/plans/2026-06-20-archive-detail.md`](../../plans/2026-06-20-archive-detail.md)
 > Tag:**v0.12.0-archive-detail**
 
 ## 背景
@@ -129,7 +129,7 @@ node scripts/archive-detail-shots.cjs    → PASS ✓ 15/15(新)
 
 | 想知道什么 | 看哪里 |
 |---|---|
-| 本 phase plan | `docs/superpowers/plans/2026-06-20-archive-detail.md` |
+| 本 phase plan | `docs/plans/2026-06-20-archive-detail.md` |
 | 共享组件 | `apps/web/src/features/card/card-detail.tsx`(新) |
 | archive 接入 | `apps/web/src/app/archive/page.tsx` |
 | inbox 改用 | `apps/web/src/app/inbox/page.tsx` |

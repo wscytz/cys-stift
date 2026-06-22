@@ -124,8 +124,8 @@
 
 ### P4-T6 · 收尾四件套
 
-- `docs/development/changelog.md` 追加 `## 2026-06-19 · phase 4 · canvas`（交付 + 核心承诺验证 + 关键决策 + 已知/后续）
-- `docs/memory/decisions/2026-06-19-phase-4.md` + `docs/memory/MEMORY.md` 索引一行
+- `docs/changelog.md` 追加 `## 2026-06-19 · phase 4 · canvas`（交付 + 核心承诺验证 + 关键决策 + 已知/后续）
+- `docs/decisions/2026-06-19-phase-4.md` + `docs/decisions/INDEX.md` 索引一行
 - `git commit`（Conventional Commits，如 `feat(canvas): phase 4 — tldraw integration + card shape`）
 - `git tag v0.5.0-phase-4`（Phase 3 是 `v0.4.0-phase-3`，minor +1）
 - `git status` 干净
@@ -153,7 +153,7 @@
 
 ## 5. 审核标准（主模型自审逐项查）
 
-> 详见 `docs/ralph/README.md` §6（归档，标准仍适用）。Phase 4 特别注意：
+> 详见 `docs/archive/ralph/README.md` §6（归档，标准仍适用）。Phase 4 特别注意：
 
 ### 代码质量
 - [ ] `/canvas` 页面 + `features/canvas/*` 全是 client 组件，没误用 server 特性

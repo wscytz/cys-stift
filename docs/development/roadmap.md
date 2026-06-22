@@ -27,13 +27,13 @@
 | **P8** | **Tauri 打包(可分发安装包)** | spec §8 Phase 8 | macOS .app/.dmg + Windows .msi + 签名 + 公证 + 自动更新骨架 | 8-10 | P6.5a-h(尽量全)、Phase 0 ✅ |
 | **P9** | **JSON 导出 + 用户文档 + 录屏** | spec §8 Phase 9 + §1.2 信念4 | 导出按钮 + 导出格式 + 文档站 + 录屏 + 更新日志页 | 2-3 | Phase 2 (schema 稳定) ✅ |
 
-**30 轮硬上限**:超出会强制收尾,写到 `docs/memory/decisions/YYYY-MM-DD-roadmap-stuck.md` 说明哪些 phase 没做、为什么。
+**30 轮硬上限**:超出会强制收尾,写到 `docs/decisions/YYYY-MM-DD-roadmap-stuck.md` 说明哪些 phase 没做、为什么。
 
 ---
 
 ## 2. 每阶段详细范围与验收锚点
 
-> 每阶段开工前都会写 `docs/superpowers/plans/YYYY-MM-DD-phase-N-<slug>.md`(沿用 P0-P6 模板),含:范围 / 任务清单 / 验收清单 / 审核标准 / 风险 / 完成信号。
+> 每阶段开工前都会写 `docs/plans/YYYY-MM-DD-phase-N-<slug>.md`(沿用 P0-P6 模板),含:范围 / 任务清单 / 验收清单 / 审核标准 / 风险 / 完成信号。
 > 本节只列**路线图层面**的范围与验收锚点,避免和 plan 文件重复。
 
 ### Phase 7 · Archive(spec §8)
@@ -261,9 +261,9 @@
 1. `pnpm --filter domain test` exit 0
 2. `pnpm --filter db test` exit 0
 3. `pnpm --filter web build` exit 0
-4. 截图归档到 `docs/design/screenshots/phase-N/`
-5. `docs/development/changelog.md` 追加
-6. `docs/memory/decisions/YYYY-MM-DD-phase-N.md` + MEMORY 索引 + current-session 推进 + 根 CLAUDE.md 状态推进 + `git commit` + `git tag v0.X.0-phase-N`
+4. 截图归档到 `docs/screenshots/phase-N/`(v0.37.0 后路径)
+5. `docs/changelog.md` 追加
+6. `docs/decisions/YYYY-MM-DD-phase-N.md`(从 `_TEMPLATE.md` 起步)+ `node scripts/gen-decisions-index.mjs` + `node scripts/gen-state.mjs`(重生成 STATE.md 版本表)+ 根 CLAUDE.md 不改状态(已指向 STATE.md)+ `git commit` + `git tag v0.X.0-phase-N`
 
 ### 3.4 Compact 触发
 
@@ -279,14 +279,14 @@
 ### 3.5 失败模式
 
 - 测试/build 红:不输出 `<promise>`,继续迭代
-- 同一失败 5 轮未解决:写到 `docs/memory/decisions/YYYY-MM-DD-<phase>-stuck.md`,说明卡在哪 + 已尝试方案 + 建议下一步
+- 同一失败 5 轮未解决:写到 `docs/decisions/YYYY-MM-DD-<phase>-stuck.md`,说明卡在哪 + 已尝试方案 + 建议下一步
 - 不允许"为通过验收而假装通过"
 
 ### 3.6 与用户的通讯
 
 - 你睡眠期间:所有产出写到仓库 + commit;不主动打扰
 - 早上起来:在终端看到一段总结(已完成的 phase 列表 + tag 列表 + 任何 stuck 决策)
-- 真正需要决策的方向问题(本路线图没覆盖的):写 `docs/memory/decisions/YYYY-MM-DD-roadmap-question.md`,等你审
+- 真正需要决策的方向问题(本路线图没覆盖的):写 `docs/decisions/YYYY-MM-DD-roadmap-question.md`,等你审
 
 ---
 

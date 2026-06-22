@@ -1,6 +1,6 @@
 # Plan · Phase archive-detail · archive tile 接 detail Modal
 
-> 承接 `docs/memory/decisions/2026-06-19-review-findings.md` §🟠 UX 洞 #4:"archive tile 点击 no-op"。
+> 承接 `docs/decisions/2026-06-19-review-findings.md` §🟠 UX 洞 #4:"archive tile 点击 no-op"。
 > 范围:**archive 引入 CardDetailModal(view + edit),点 tile → 打开详情**;顺手把 inbox 的本地 CardDetail 抽成共享组件,避免重复。
 > 本档是实施计划;执行者(主模型 Claude)照此推进 + 自审。
 

@@ -1,7 +1,7 @@
 # Phase multi-canvas · 多画布 UI(2026-06-20)
 
 > 承接 spec §4.9 schema 早已支持多画布,web 端只缺最后一块 UI 留后。
-> Plan:[`docs/superpowers/plans/2026-06-20-multi-canvas.md`](../../superpowers/plans/2026-06-20-multi-canvas.md)
+> Plan:[`docs/plans/2026-06-20-multi-canvas.md`](../../plans/2026-06-20-multi-canvas.md)
 > Tag:**v0.15.0-multi-canvas**
 
 ## 背景
@@ -120,7 +120,7 @@ node scripts/p6.5d-shots.cjs              → ✓ ALL ASSERTIONS PASS
 
 | 想知道什么 | 看哪里 |
 |---|---|
-| 本 phase plan | `docs/superpowers/plans/2026-06-20-multi-canvas.md` |
+| 本 phase plan | `docs/plans/2026-06-20-multi-canvas.md` |
 | 共享 store | `apps/web/src/lib/canvas-store.ts`(新) |
 | UI 接入 | `apps/web/src/app/canvas/page.tsx` |
 | e2e | `scripts/multi-canvas-shots.cjs` |

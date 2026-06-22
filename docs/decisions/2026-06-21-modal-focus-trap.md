@@ -1,4 +1,4 @@
-# 2026-06-23 · v0.24.1-modal-focus-trap
+# 2026-06-21 · v0.24.1-modal-focus-trap
 
 > Phase B(a11y)。ui 包 Modal 加 focus trap。
 

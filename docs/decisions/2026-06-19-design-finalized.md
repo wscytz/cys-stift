@@ -19,6 +19,6 @@
 
 ## 链接
 
-- spec: `docs/superpowers/specs/2026-06-19-cys-stift-design.md`
-- Phase 0 计划: `docs/superpowers/plans/2026-06-19-phase-0-scaffold.md`
+- spec: `docs/specs/2026-06-19-cys-stift-design.md`
+- Phase 0 计划: `docs/plans/2026-06-19-phase-0-scaffold.md`
 - 路线图: spec §8

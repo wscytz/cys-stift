@@ -1,4 +1,4 @@
-# 2026-06-23 · v0.23.0-modal-mini-input-polish
+# 2026-06-21 · v0.23.0-modal-mini-input-polish
 
 > 闭合 BUG 12 + mini-input 暗色降饱和。纯 CSS,基于 v0.22.1 干净基线,无新依赖。
 

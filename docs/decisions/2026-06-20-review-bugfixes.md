@@ -13,7 +13,7 @@
 
 ## 范围
 
-按 [`docs/superpowers/plans/2026-06-20-review-bugfixes.md`](../../superpowers/plans/2026-06-20-review-bugfixes.md) 全部完成。
+按 [`docs/plans/2026-06-20-review-bugfixes.md`](../../plans/2026-06-20-review-bugfixes.md) 全部完成。
 
 ### ✅ 做了
 

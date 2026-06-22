@@ -1,7 +1,7 @@
 # AI 隐私设计 & 数据访问规范(开发面向)
 
 > 本文给后续每个 phase 改 AI 功能时的**强制 check-list**。  
-> 用户面向说明见 `docs/user/privacy.md`,决策背景见 `docs/memory/decisions/2026-06-21-ai-accessibility-design.md`。
+> 用户面向说明见 `docs/user/privacy.md`,决策背景见 `docs/decisions/2026-06-21-ai-accessibility-design.md`。
 
 ---
 
@@ -418,9 +418,9 @@ console.log('\n[8] AI context: deviceId never leaks')
 ## 相关文档
 
 - 用户面向:`docs/user/privacy.md`
-- 决策档:`docs/memory/decisions/2026-06-21-ai-accessibility-design.md`
-- 用户反馈原话:`docs/memory/feedback/2026-06-21-ai-feedback.md`
-- M3 交付:`docs/memory/decisions/2026-06-21-canvas-m3-ai.md`
+- 决策档:`docs/decisions/2026-06-21-ai-accessibility-design.md`
+- 用户反馈原话:`docs/feedback/2026-06-21-ai-feedback.md`
+- M3 交付:`docs/decisions/2026-06-21-canvas-m3-ai.md`
 - M3 后续路线:同上决策档末尾
 
 ---

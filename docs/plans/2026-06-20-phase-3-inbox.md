@@ -110,7 +110,7 @@
   - 截图归档 `docs/design/screenshots/phase-3/`
   - README 笔记逐项打勾
 - `pnpm --filter web build` exit 0
-- changelog + memory/decisions/phase-3 + MEMORY.md 索引
+- changelog + decisions/phase-3 + MEMORY.md 索引
 - `git commit` + `git tag v0.4.0-phase-3`
 
 ---
@@ -133,7 +133,7 @@
 
 ## 5. 审核标准（智谱会逐项查，Ralph 第一轮就要达标）
 
-> 详见 `docs/ralph/README.md` §6。Phase 3 特别注意：
+> 详见 `docs/archive/ralph/README.md` §6。Phase 3 特别注意：
 
 ### 代码质量
 - [ ] `/inbox` 页面是 `'use client'`，没误用 server 特性

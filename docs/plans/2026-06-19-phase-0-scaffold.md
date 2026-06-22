@@ -4,7 +4,7 @@
 |---|---|
 | 计划 | Phase 0：脚手架 |
 | 创建 | 2026-06-19 |
-| 依据 spec | `docs/superpowers/specs/2026-06-19-cys-stift-design.md`（§3.1 / §6 / §8 / §11） |
+| 依据 spec | `docs/specs/2026-06-19-cys-stift-design.md`（§3.1 / §6 / §8 / §11） |
 | 受众 | 人类 + 任意 LLM（实现者可能是 Claude / GPT，macOS 或 Windows） |
 
 ---
@@ -88,17 +88,17 @@
 - `docs/README.md`：文档导航（指向各子目录）。
 - `docs/architecture/overview.md`：从 spec §3 抽取的架构总览（分层 + 仓库结构）。
 - `docs/adr/`：0001-monorepo / 0002-feature-sliced / 0003-local-first-wasm-sqlite / 0004-bauhaus-tokens / 0005-tldraw-canvas / 0006-tauri-shell（每个：背景 / 决策 / 后果，各 5–10 行）。
-- `docs/memory/README.md`（记忆系统使用说明）+ `docs/memory/MEMORY.md`（索引，先放一条指向 spec 定稿的条目）。
+- `docs/memory/README.md`（记忆系统使用说明）+ `docs/decisions/INDEX.md`（索引，先放一条指向 spec 定稿的条目）。
 - `docs/design/tokens.md`：包豪斯 token 说明（从 spec §5 抽取）。
 - `docs/development/setup.md`：mac/win 开发环境搭建步骤（含前置条件）。
-- `docs/development/changelog.md`：首条 "Phase 0 scaffold"。
+- `docs/changelog.md`：首条 "Phase 0 scaffold"。
 - **验证**：目录与文件齐全；MEMORY.md 索引格式正确。
 
 ### T7 · git 初始化与首次提交
 - `git init`（默认分支 `main`）。
 - `git add -A && git commit -m "chore: phase 0 scaffold"`。
 - `git tag v0.1.0-phase-0`。
-- 同步写入 `docs/memory/decisions/2026-06-19-phase-0.md`（阶段记录）。
+- 同步写入 `docs/decisions/2026-06-19-phase-0.md`（阶段记录）。
 - **验证**：`git log --oneline` 见 1 个 commit；`git tag` 见 `v0.1.0-phase-0`；spec 文档在此 commit 内。
 
 ---

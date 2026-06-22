@@ -1,4 +1,4 @@
-# 2026-06-23 · v0.23.1-i18n-hardening
+# 2026-06-21 · v0.23.1-i18n-hardening
 
 > Review 驱动的 i18n hardening,1 个 commit 闭合 6 处硬编码英文 + 1 个 dev 调试辅助。
 

@@ -4,7 +4,7 @@
 |---|---|
 | 计划 | Phase 1：设计系统 |
 | 创建 | 2026-06-19 |
-| 依据 spec | `docs/superpowers/specs/2026-06-19-cys-stift-design.md` §5、ADR-0004 |
+| 依据 spec | `docs/specs/2026-06-19-cys-stift-design.md` §5、ADR-0004 |
 | 上游交付 | Phase 0（scaffold） |
 | 下游交付 | Phase 2（数据层）前必须就位 |
 
@@ -102,9 +102,9 @@
 
 ### P1-T5 · 收尾
 
-- `docs/development/changelog.md` 加 Phase 1 段
-- `docs/memory/decisions/2026-06-19-phase-1.md`
-- `docs/memory/MEMORY.md` 索引加一条
+- `docs/changelog.md` 加 Phase 1 段
+- `docs/decisions/2026-06-19-phase-1.md`
+- `docs/decisions/INDEX.md` 索引加一条
 - `git commit` + `git tag v0.2.0-phase-1`
 
 ---

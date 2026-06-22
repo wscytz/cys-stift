@@ -14,7 +14,7 @@
 
 ## Global Constraints(继承根 CLAUDE.md)
 
-- ❌ **不要修改** `docs/superpowers/specs/2026-06-19-cys-stift-design.md`(spec 五轮审查定稿)
+- ❌ **不要修改** `docs/specs/2026-06-19-cys-stift-design.md`(spec 五轮审查定稿)
 - ❌ 不引入新依赖
 - ❌ 不动 packages/domain 零依赖特性
 - ❌ 不写 hex,颜色走 token(`var(--color-*)`)
@@ -32,8 +32,8 @@
 |---|---|---|
 | `apps/web/src/features/card/card-detail.tsx` | Modify | 加 1 条 CSS 选择器(`.cd > :first-child { margin-top: ... }`) |
 | `apps/web/src/features/capture/mini-input.tsx` | Modify | 改 1 行 CSS(`border: 2px` → `border: 1px`) |
-| `docs/development/changelog.md` | Modify | 加 v0.23.0 条目 |
-| `docs/memory/decisions/2026-06-23-modal-mini-input-polish.md` | Create | decision record |
+| `docs/changelog.md` | Modify | 加 v0.23.0 条目 |
+| `docs/decisions/2026-06-21-modal-mini-input-polish.md` | Create | decision record |
 
 不创建新组件、不动 ui 包、不动 domain 包、不动 i18n、不动 db。
 
@@ -201,12 +201,12 @@ git commit -m "polish(mini-input): thin frame border 2px → 1px for dark-mode r
 ### Task 3: 写 changelog + decision record
 
 **Files:**
-- Modify: `docs/development/changelog.md`(追加条目,不动旧内容)
-- Create: `docs/memory/decisions/2026-06-23-modal-mini-input-polish.md`
+- Modify: `docs/changelog.md`(追加条目,不动旧内容)
+- Create: `docs/decisions/2026-06-21-modal-mini-input-polish.md`
 
 - [ ] **Step 1: 追加 changelog 条目**
 
-打开 `docs/development/changelog.md`,在最顶部(`## 2026-06-...` 之前)**之前**找到最新版本行(如 `## 2026-06-20 · v0.22.1-ux-polish-2`),在它**之前**追加:
+打开 `docs/changelog.md`,在最顶部(`## 2026-06-...` 之前)**之前**找到最新版本行(如 `## 2026-06-20 · v0.22.1-ux-polish-2`),在它**之前**追加:
 
 ```markdown
 ## 2026-06-20 · v0.23.0-modal-mini-input-polish
@@ -220,17 +220,17 @@ git commit -m "polish(mini-input): thin frame border 2px → 1px for dark-mode r
 - domain 26/26 + db 7/7 + web build 14 页 exit 0
 - puppeteer mini-audit 6/6 页 passed, 0 console error, 0 overflow
 
-详见 [`docs/memory/decisions/2026-06-23-modal-mini-input-polish.md`](../memory/decisions/2026-06-23-modal-mini-input-polish.md)。
+详见 [`docs/decisions/2026-06-21-modal-mini-input-polish.md`](../decisions/2026-06-21-modal-mini-input-polish.md)。
 ```
 
 注意:`<commit-hash>` 占位符在 commit 之后用 `git log --oneline -2` 的实际 hash 替换。
 
 - [ ] **Step 2: 写 decision record**
 
-创建 `docs/memory/decisions/2026-06-23-modal-mini-input-polish.md`:
+创建 `docs/decisions/2026-06-21-modal-mini-input-polish.md`:
 
 ```markdown
-# 2026-06-23 · v0.23.0-modal-mini-input-polish
+# 2026-06-21 · v0.23.0-modal-mini-input-polish
 
 > 闭合 BUG 12 + mini-input 暗色降饱和。纯 CSS,基于 v0.22.1 干净基线,无新依赖。
 
@@ -289,8 +289,8 @@ git commit -m "polish(mini-input): thin frame border 2px → 1px for dark-mode r
 - [ ] **Step 3: 验证**
 
 ```bash
-ls docs/memory/decisions/2026-06-23-modal-mini-input-polish.md
-grep "v0.23.0-modal-mini-input-polish" docs/development/changelog.md
+ls docs/decisions/2026-06-21-modal-mini-input-polish.md
+grep "v0.23.0-modal-mini-input-polish" docs/changelog.md
 ```
 
 期望:文件存在,changelog 含新条目。
@@ -299,7 +299,7 @@ grep "v0.23.0-modal-mini-input-polish" docs/development/changelog.md
 
 ```bash
 cd /Users/jinxunuo/projects/cys-stift
-git add docs/development/changelog.md docs/memory/decisions/2026-06-23-modal-mini-input-polish.md
+git add docs/changelog.md docs/decisions/2026-06-21-modal-mini-input-polish.md
 git commit -m "docs: changelog + decision record for v0.23.0 modal & mini-input polish"
 ```
 

@@ -1,6 +1,6 @@
 # Plan · Phase batch-soft-delete-confirm · 批量软删二次确认(2026-06-20)
 
-> 承接 `docs/memory/decisions/2026-06-19-review-findings.md` §🟠 UX 洞 #3:"批量 soft-delete 无二次确认"。
+> 承接 `docs/decisions/2026-06-19-review-findings.md` §🟠 UX 洞 #3:"批量 soft-delete 无二次确认"。
 > 入口:archive floater 的 Soft-delete 按钮前弹 Modal(沿用 inbox/trash 已有 confirm 文案风格)。
 > 本档是实施计划;执行者(主模型 Claude)照此推进 + 自审。
 

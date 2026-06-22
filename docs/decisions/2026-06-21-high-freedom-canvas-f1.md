@@ -1,6 +1,6 @@
 # 2026-06-21 · v0.26.0-high-freedom-canvas-f1
 
-> 高自由画布 Phase F1(地基)。spec: [`docs/superpowers/specs/2026-06-21-high-freedom-canvas.md`](../../superpowers/specs/2026-06-21-high-freedom-canvas.md)。plan: [`docs/superpowers/plans/2026-06-21-high-freedom-canvas-f1.md`](../../superpowers/plans/2026-06-21-high-freedom-canvas-f1.md)。
+> 高自由画布 Phase F1(地基)。spec: [`docs/specs/2026-06-21-high-freedom-canvas.md`](../../specs/2026-06-21-high-freedom-canvas.md)。plan: [`docs/plans/2026-06-21-high-freedom-canvas-f1.md`](../../plans/2026-06-21-high-freedom-canvas-f1.md)。
 
 ## 背景
 

@@ -100,7 +100,7 @@
 │   ├── memory/                   # 跨模型 / 跨会话记忆
 │   ├── design/                   # Bauhaus tokens & 设计系统
 │   ├── development/              # 开发指南、变更日志
-│   └── superpowers/specs/        # 设计文档（本文件）
+│   └── specs/        # 设计文档（本文件）
 ├── .gitignore
 ├── .gitattributes                # 强制 LF
 ├── .editorconfig
@@ -665,7 +665,7 @@ export interface CaptureSink {
 每阶段交付：
 - 可运行的 build
 - 简短 demo（截图 / 录屏 / 文件清单）
-- 阶段总结文档（追加到 `docs/development/changelog.md`）
+- 阶段总结文档（追加到 `docs/changelog.md`）
 
 ---
 

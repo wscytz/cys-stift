@@ -111,7 +111,7 @@ border: 1px solid var(--color-red);
 
 ## 全局约束(继承根 CLAUDE.md)
 
-- ❌ 不改 spec `docs/superpowers/specs/2026-06-19-cys-stift-design.md`
+- ❌ 不改 spec `docs/specs/2026-06-19-cys-stift-design.md`
 - ❌ 不引入新依赖
 - ❌ 不动 packages/domain 零依赖特性
 - ❌ 不写 hex,颜色走 token

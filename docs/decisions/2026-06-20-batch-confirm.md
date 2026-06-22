@@ -1,7 +1,7 @@
 # Phase batch-confirm · archive 批量软删二次确认(2026-06-20)
 
-> 承接 `docs/memory/decisions/2026-06-19-review-findings.md` §🟠 UX 洞 #3:"archive 批量 soft-delete 无二次确认"。
-> Plan:[`docs/superpowers/plans/2026-06-20-batch-soft-delete-confirm.md`](../../superpowers/plans/2026-06-20-batch-soft-delete-confirm.md)
+> 承接 `docs/decisions/2026-06-19-review-findings.md` §🟠 UX 洞 #3:"archive 批量 soft-delete 无二次确认"。
+> Plan:[`docs/plans/2026-06-20-batch-soft-delete-confirm.md`](../../plans/2026-06-20-batch-soft-delete-confirm.md)
 > Tag:**v0.13.0-batch-confirm**
 
 ## 背景
@@ -112,7 +112,7 @@ node scripts/batch-soft-delete-confirm-shots.cjs       → PASS ✓ 15/15(新)
 
 | 想知道什么 | 看哪里 |
 |---|---|
-| 本 phase plan | `docs/superpowers/plans/2026-06-20-batch-soft-delete-confirm.md` |
+| 本 phase plan | `docs/plans/2026-06-20-batch-soft-delete-confirm.md` |
 | 主改动 | `apps/web/src/app/archive/page.tsx`(+42 行) |
 | e2e | `scripts/batch-soft-delete-confirm-shots.cjs` |
 | 截图 | `docs/design/screenshots/phase-batch-confirm/` |

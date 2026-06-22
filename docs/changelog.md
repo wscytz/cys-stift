@@ -28,7 +28,7 @@ P1(技术债清扫 — 零行为变化):
 - **canvas-snapshot-store 单测**: 9 个 it(save→load 往返 / corrupt JSON 容错 / SSR no-op / quota 异常不 throw / canvas 隔离 / remove no-op),为 P3 B6 offload 铺安全网。
 - **测试**: vitest 12 → 21(12 AI + 9 snapshot-store);domain 26/26;db 7/7;build exit 0
 - **e2e**: m3 7/7 + canvas-refactor PASS + m1 7/8(1 个预存 bug 与本次无关)
-- **新增 P1.5 决策档**: [`docs/memory/decisions/2026-06-21-debt-cleanup.md`](../memory/decisions/2026-06-21-debt-cleanup.md)
+- **新增 P1.5 决策档**: [`docs/decisions/2026-06-21-debt-cleanup.md`](../decisions/2026-06-21-debt-cleanup.md)
 
 详见决策档。
 
@@ -40,8 +40,8 @@ AI 可访问性 & 隐私设计(**纯文档**,无代码改动):
 
 - **`docs/user/privacy.md`**:中英双语,UI 友好。AI 看到什么 / 看不到什么 / 怎么关 / 关了会怎样 / API key 怎么存 / 多 provider 行为差异 / 手绘 = 几何描述 / 多模态不做
 - **`docs/development/privacy-design.md`**:开发面向。三条原则(显式 allowlist / 手动 / 本地优先)、手动 AI context 流程、12 项 phase check-list、`ai-context.ts` API 设计、`canvas-snapshot.ts` schema、DSL 输出格式、测试要求、未来扩展
-- **决策档**:`docs/memory/decisions/2026-06-21-ai-accessibility-design.md`
-- **用户原话归档**:`docs/memory/feedback/2026-06-21-ai-feedback.md`
+- **决策档**:`docs/decisions/2026-06-21-ai-accessibility-design.md`
+- **用户原话归档**:`docs/feedback/2026-06-21-ai-feedback.md`
 - **关键决策**:
   - 手动 `ai-context.ts` allowlist,不自动化 codegen
   - 多模态(GPT-4V / Claude Vision)**永久不做**
@@ -55,7 +55,7 @@ AI 可访问性 & 隐私设计(**纯文档**,无代码改动):
 
 **M3.1 实装任务不在本 phase**:ai-context.ts / canvas-snapshot.ts / dsl-parser.ts / toolbar "📐 AI 排版" 按钮(~ 400 行,基于本文档设计)
 
-详见 [`docs/memory/decisions/2026-06-21-ai-accessibility-design.md`](../memory/decisions/2026-06-21-ai-accessibility-design.md)。
+详见 [`docs/decisions/2026-06-21-ai-accessibility-design.md`](../decisions/2026-06-21-ai-accessibility-design.md)。
 
 ---
 
@@ -73,7 +73,7 @@ M3(AI 元素 — 完全可选 / 本地优先 / 密钥不外泄):
 - **新 dep**: eventsource-parser (1 runtime) + vitest + @vitest/ui + jsdom (3 dev)
 - **e2e**: `scripts/m3-shots.cjs`(7/7 passed)
 
-详见 [`docs/memory/decisions/2026-06-21-canvas-m3-ai.md`](../memory/decisions/2026-06-21-canvas-m3-ai.md)。
+详见 [`docs/decisions/2026-06-21-canvas-m3-ai.md`](../decisions/2026-06-21-canvas-m3-ai.md)。
 
 ---
 
@@ -89,7 +89,7 @@ M2(画布智能化 + 多模态入口 + 传递出口): P0/P1 四个能力 + 单�
 - **新 dep**: markitdownllm 0.1.5 + pdfjs-dist 6.0.227 (markitdownllm 的 pdf 转换依赖)
 - **e2e**: `scripts/m2-shots.cjs` 6/6 passed (edge connector + inference + floating panel + file drop + export)
 
-详见 [`docs/memory/decisions/2026-06-21-canvas-m2-smart.md`](../memory/decisions/2026-06-21-canvas-m2-smart.md)。
+详见 [`docs/decisions/2026-06-21-canvas-m2-smart.md`](../decisions/2026-06-21-canvas-m2-smart.md)。
 
 ---
 
@@ -104,7 +104,7 @@ M2(画布智能化 + 多模态入口 + 传递出口): P0/P1 四个能力 + 单�
 - **canvas 生命周期**:writeback + snapshot listener 迁 EditorBindingBridge useEffect(清除 __canvasEditor = B8)
 - **web**:删除 unused deps(better-sqlite3/@cys-stift/db/@types)、/dev/\* prod 门禁(NODE_ENV)、scrim token("rgba leak"修)、search/settings/design 加 role="main"
 - **CI**:新增 `.github/workflows/ci.yml`(domain+db 带有 tsc 门禁的 test + web build)
-- **决策**:`docs/memory/decisions/2026-06-21-canvas-bugfixes.md` 更新(UI polish + label fix notes)
+- **决策**:`docs/decisions/2026-06-21-canvas-bugfixes.md` 更新(UI polish + label fix notes)
 
 ---
 
@@ -118,7 +118,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - **持久化透明**: 关系全在 arrow record,snapshot 自动保存,无新持久化层
 - **e2e**: 建两卡+绑定箭头+选 Blocks+reload 持久 + 徽标 + infer 反查 → `scripts/m1-relations-shots.cjs` 8/8
 
-详见 [`docs/memory/decisions/2026-06-21-canvas-m1-relations.md`](../memory/decisions/2026-06-21-canvas-m1-relations.md)。
+详见 [`docs/decisions/2026-06-21-canvas-m1-relations.md`](../decisions/2026-06-21-canvas-m1-relations.md)。
 
 ---
 
@@ -139,7 +139,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - `pnpm tauri dev`（待 Rust 装好）
 - Windows 端复验待切到 Windows 后进行
 
-详见 [`docs/superpowers/plans/2026-06-19-phase-0-scaffold.md`](../superpowers/plans/2026-06-19-phase-0-scaffold.md)。
+详见 [`docs/plans/2026-06-19-phase-0-scaffold.md`](../plans/2026-06-19-phase-0-scaffold.md)。
 
 ---
 
@@ -163,7 +163,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - 7 个组件每个在 `/design` 有可见展示
 - Modal / Tooltip 静态截图受限（hover/click 触发），交互验证留后续 phase
 
-详见 [`docs/superpowers/plans/2026-06-19-phase-1-design-system.md`](../superpowers/plans/2026-06-19-phase-1-design-system.md) + [`docs/design/screenshots/phase-1/README.md`](../design/screenshots/phase-1/README.md)。
+详见 [`docs/plans/2026-06-19-phase-1-design-system.md`](../plans/2026-06-19-phase-1-design-system.md) + [`docs/design/screenshots/phase-1/README.md`](../design/screenshots/phase-1/README.md)。
 
 ## 2026-06-19 · phase 2 · data layer
 
@@ -186,7 +186,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - Tauri 端 Tauri fs 落盘验证（Phase 6/8）
 - MediaAsset 真实落盘（业务用，Phase 3+）
 
-详见 [`docs/superpowers/plans/2026-06-19-phase-2-data-layer.md`](../superpowers/plans/2026-06-19-phase-2-data-layer.md) + [`docs/design/screenshots/phase-2/README.md`](../design/screenshots/phase-2/README.md)。
+详见 [`docs/plans/2026-06-19-phase-2-data-layer.md`](../plans/2026-06-19-phase-2-data-layer.md) + [`docs/design/screenshots/phase-2/README.md`](../design/screenshots/phase-2/README.md)。
 
 ---
 
@@ -217,7 +217,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - 全局快捷键 + mini input → Phase 6
 - wa-sqlite + OPFS 替换 localStorage → Phase 2.5
 
-详见 [`docs/superpowers/plans/2026-06-20-phase-3-inbox.md`](../superpowers/plans/2026-06-20-phase-3-inbox.md) + [`docs/design/screenshots/phase-3/README.md`](../design/screenshots/phase-3/README.md)。
+详见 [`docs/plans/2026-06-20-phase-3-inbox.md`](../plans/2026-06-20-phase-3-inbox.md) + [`docs/design/screenshots/phase-3/README.md`](../design/screenshots/phase-3/README.md)。
 
 ---
 
@@ -250,7 +250,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - Delete 键删 shape 与 DB 的同步（MVP 以 Modal 软删为准）→ Phase 5 打磨
 - wa-sqlite + OPFS 替换 localStorage → Phase 2.5
 
-详见 [`docs/superpowers/plans/2026-06-19-phase-4-canvas.md`](../superpowers/plans/2026-06-19-phase-4-canvas.md) + [`docs/design/screenshots/phase-4/README.md`](../design/screenshots/phase-4/README.md)。
+详见 [`docs/plans/2026-06-19-phase-4-canvas.md`](../plans/2026-06-19-phase-4-canvas.md) + [`docs/design/screenshots/phase-4/README.md`](../design/screenshots/phase-4/README.md)。
 
 ---
 
@@ -287,7 +287,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - tldraw chrome 完整换肤 → 后续
 - inbox → canvas send / 多画布 UI / `/canvas?id=` 深链 → 留后
 
-详见 [`docs/superpowers/plans/2026-06-19-phase-5-canvas-full.md`](../superpowers/plans/2026-06-19-phase-5-canvas-full.md) + [`docs/design/screenshots/phase-5/README.md`](../design/screenshots/phase-5/README.md)。
+详见 [`docs/plans/2026-06-19-phase-5-canvas-full.md`](../plans/2026-06-19-phase-5-canvas-full.md) + [`docs/design/screenshots/phase-5/README.md`](../design/screenshots/phase-5/README.md)。
 
 ---
 
@@ -331,7 +331,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - 手动 capture（inbox CreateCardForm）改用 WebCaptureSink → 留 Phase 6+（避免触碰 tagged Phase 3）
 - `Cmd+Shift+Space` macOS Spotlight 冲突 → 浏览器内可拦截；OS 级是用户的，浏览器无法阻止
 
-详见 [`docs/superpowers/plans/2026-06-19-phase-6-capture-entry.md`](../superpowers/plans/2026-06-19-phase-6-capture-entry.md) + [`docs/design/screenshots/phase-6/README.md`](../design/screenshots/phase-6/README.md)。
+详见 [`docs/plans/2026-06-19-phase-6-capture-entry.md`](../plans/2026-06-19-phase-6-capture-entry.md) + [`docs/design/screenshots/phase-6/README.md`](../design/screenshots/phase-6/README.md)。
 
 ---
 
@@ -365,7 +365,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - 标签 / 全文搜索 / 按媒介类型分组 → P6.5+ / P9
 - Archive 卡片入画布 → P6.5c inbox→canvas send 的反向复用
 
-详见 [`docs/superpowers/plans/2026-06-19-phase-7-archive.md`](../superpowers/plans/2026-06-19-phase-7-archive.md) + [`docs/design/screenshots/phase-7/README.md`](../design/screenshots/phase-7/README.md)。
+详见 [`docs/plans/2026-06-19-phase-7-archive.md`](../plans/2026-06-19-phase-7-archive.md) + [`docs/design/screenshots/phase-7/README.md`](../design/screenshots/phase-7/README.md)。
 
 ---
 
@@ -402,7 +402,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - 草稿手动清除按钮 → 留后
 - wa-sqlite 替换 localStorage → Phase 2.5
 
-详见 [`docs/superpowers/plans/2026-06-19-phase-6.5a-drafts.md`](../superpowers/plans/2026-06-19-phase-6.5a-drafts.md) + [`docs/design/screenshots/phase-6.5a/README.md`](../design/screenshots/phase-6.5a/README.md)。
+详见 [`docs/plans/2026-06-19-phase-6.5a-drafts.md`](../plans/2026-06-19-phase-6.5a-drafts.md) + [`docs/design/screenshots/phase-6.5a/README.md`](../design/screenshots/phase-6.5a/README.md)。
 
 ---
 
@@ -439,7 +439,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - Edit-mode 草稿 → 后续 P6.5+
 - Edit 实时预览 → 留后
 
-详见 [`docs/superpowers/plans/2026-06-19-phase-6.5b-multi-media-edit.md`](../superpowers/plans/2026-06-19-phase-6.5b-multi-media-edit.md) + [`docs/design/screenshots/phase-6.5b/README.md`](../design/screenshots/phase-6.5b/README.md)。
+详见 [`docs/plans/2026-06-19-phase-6.5b-multi-media-edit.md`](../plans/2026-06-19-phase-6.5b-multi-media-edit.md) + [`docs/design/screenshots/phase-6.5b/README.md`](../design/screenshots/phase-6.5b/README.md)。
 
 ---
 
@@ -479,7 +479,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - "Open on canvas" link → 留 P6.5+
 - 并发 z 计算竞态 → 留后
 
-详见 [`docs/superpowers/plans/2026-06-19-phase-6.5c-inbox-to-canvas.md`](../superpowers/plans/2026-06-19-phase-6.5c-inbox-to-canvas.md) + [`docs/design/screenshots/phase-6.5c/README.md`](../design/screenshots/phase-6.5c/README.md)。
+详见 [`docs/plans/2026-06-19-phase-6.5c-inbox-to-canvas.md`](../plans/2026-06-19-phase-6.5c-inbox-to-canvas.md) + [`docs/design/screenshots/phase-6.5c/README.md`](../design/screenshots/phase-6.5c/README.md)。
 
 ---
 
@@ -514,7 +514,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - 多画布 view 分 canvasId → spec §4.9 schema 留位,UI 留后
 - 视图 history → 留后
 
-详见 [`docs/superpowers/plans/2026-06-19-phase-6.5d-canvas-view-persist.md`](../superpowers/plans/2026-06-19-phase-6.5d-canvas-view-persist.md) + [`docs/design/screenshots/phase-6.5d/README.md`](../design/screenshots/phase-6.5d/README.md)。
+详见 [`docs/plans/2026-06-19-phase-6.5d-canvas-view-persist.md`](../plans/2026-06-19-phase-6.5d-canvas-view-persist.md) + [`docs/design/screenshots/phase-6.5d/README.md`](../design/screenshots/phase-6.5d/README.md)。
 
 ---
 
@@ -541,7 +541,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - CaptureSinkRegistry(多 sink 注册)→ P6.5g
 - TauriCaptureSink / MenubarCaptureSink → P6.5g
 
-详见 [`docs/superpowers/plans/2026-06-19-phase-6.5e-unify-manual-capture.md`](../superpowers/plans/2026-06-19-phase-6.5e-unify-manual-capture.md) + [`docs/design/screenshots/phase-6.5e/README.md`](../design/screenshots/phase-6.5e/README.md)。
+详见 [`docs/plans/2026-06-19-phase-6.5e-unify-manual-capture.md`](../plans/2026-06-19-phase-6.5e-unify-manual-capture.md) + [`docs/design/screenshots/phase-6.5e/README.md`](../design/screenshots/phase-6.5e/README.md)。
 
 ---
 
@@ -572,7 +572,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - 拖放上传 → 留后
 - OG 图片抓取 → 留后
 
-详见 [`docs/superpowers/plans/2026-06-19-phase-6.5f-media-upload.md`](../superpowers/plans/2026-06-19-phase-6.5f-media-upload.md) + [`docs/design/screenshots/phase-6.5f/README.md`](../design/screenshots/phase-6.5f/README.md)。
+详见 [`docs/plans/2026-06-19-phase-6.5f-media-upload.md`](../plans/2026-06-19-phase-6.5f-media-upload.md) + [`docs/design/screenshots/phase-6.5f/README.md`](../design/screenshots/phase-6.5f/README.md)。
 
 ---
 
@@ -602,7 +602,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - Webhook / mobile / alfred sink → 留后
 - 菜单栏用户自定义 → P6.5h
 
-详见 [`docs/superpowers/plans/2026-06-19-phase-6.5g-menubar.md`](../superpowers/plans/2026-06-19-phase-6.5g-menubar.md) + [`docs/design/screenshots/phase-6.5g/README.md`](../design/screenshots/phase-6.5g/README.md)。
+详见 [`docs/plans/2026-06-19-phase-6.5g-menubar.md`](../plans/2026-06-19-phase-6.5g-menubar.md) + [`docs/design/screenshots/phase-6.5g/README.md`](../design/screenshots/phase-6.5g/README.md)。
 
 ---
 
@@ -633,7 +633,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - canvas 快捷键自定义 → 留后
 - Tauri 端读 settings → Phase 8
 
-详见 [`docs/superpowers/plans/2026-06-19-phase-6.5h-keymap-custom.md`](../superpowers/plans/2026-06-19-phase-6.5h-keymap-custom.md) + [`docs/design/screenshots/phase-6.5h/README.md`](../design/screenshots/phase-6.5h/README.md)。
+详见 [`docs/plans/2026-06-19-phase-6.5h-keymap-custom.md`](../plans/2026-06-19-phase-6.5h-keymap-custom.md) + [`docs/design/screenshots/phase-6.5h/README.md`](../design/screenshots/phase-6.5h/README.md)。
 
 ---
 
@@ -641,7 +641,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 
 **状态**:🟡 STUCK — 本机无 `rustc`/`cargo`,Phase 0 已搭好完整 `apps/desktop/src-tauri/` 骨架,实际构建 + global-shortcut plugin + 签名 + CI 需 Rust。按 roadmap §3.5 失败模式,写 stuck 决策档而非未经验证 Rust 代码。
 
-详见 [`docs/memory/decisions/2026-06-19-phase-8-stuck.md`](../memory/decisions/2026-06-19-phase-8-stuck.md)。
+详见 [`docs/decisions/2026-06-19-phase-8-stuck.md`](../decisions/2026-06-19-phase-8-stuck.md)。
 
 ---
 
@@ -674,7 +674,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - 录屏 → 留后
 - `/changelog` 路由 → 留后
 
-详见 [`docs/superpowers/plans/2026-06-19-phase-9-export.md`](../superpowers/plans/2026-06-19-phase-9-export.md) + [`docs/design/screenshots/phase-9/README.md`](../design/screenshots/phase-9/README.md) + [`docs/user/README.md`](../user/README.md)。
+详见 [`docs/plans/2026-06-19-phase-9-export.md`](../plans/2026-06-19-phase-9-export.md) + [`docs/design/screenshots/phase-9/README.md`](../design/screenshots/phase-9/README.md) + [`docs/user/README.md`](../user/README.md)。
 
 ---
 
@@ -703,13 +703,13 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - 冲突解决 → 覆盖
 - 导入预览 / 撤销 → 留后
 
-详见 [`docs/superpowers/plans/2026-06-19-phase-9.1-import.md`](../superpowers/plans/2026-06-19-phase-9.1-import.md) + [`docs/design/screenshots/phase-9.1/README.md`](../design/screenshots/phase-9.1/README.md)。
+详见 [`docs/plans/2026-06-19-phase-9.1-import.md`](../plans/2026-06-19-phase-9.1-import.md) + [`docs/design/screenshots/phase-9.1/README.md`](../design/screenshots/phase-9.1/README.md)。
 
 ---
 
 ## 2026-06-20 · review bugfix · #1 import 不一致 + #3 sink 注册竞态
 
-**交付**:承接 self-review([`decisions/2026-06-19-review-findings.md`](../memory/decisions/2026-06-19-review-findings.md))的建议优先级 #1 + #3。① `apps/web/src/lib/export-service.ts`(`importFromJson`)写入段重写:先序列化全部待写项 → 快照旧值 → 写入 → 任一抛错逐条回滚(序列化/写入抛错都返回 `ok:false` 且任何 key 不被半覆盖);② `apps/web/src/app/inbox/page.tsx`(manual sink)+ `apps/web/src/features/capture/capture-host.tsx`(shortcut + menubar)effect 加 `cancelled` flag,杜绝 unmount 后 dynamic import resolve 注册 phantom sink。`scripts/import-rollback-shots.cjs`(新)e2e + 截图。
+**交付**:承接 self-review([`decisions/2026-06-19-review-findings.md`](../decisions/2026-06-19-review-findings.md))的建议优先级 #1 + #3。① `apps/web/src/lib/export-service.ts`(`importFromJson`)写入段重写:先序列化全部待写项 → 快照旧值 → 写入 → 任一抛错逐条回滚(序列化/写入抛错都返回 `ok:false` 且任何 key 不被半覆盖);② `apps/web/src/app/inbox/page.tsx`(manual sink)+ `apps/web/src/features/capture/capture-host.tsx`(shortcut + menubar)effect 加 `cancelled` flag,杜绝 unmount 后 dynamic import resolve 注册 phantom sink。`scripts/import-rollback-shots.cjs`(新)e2e + 截图。
 
 **核心承诺验证**:
 
@@ -732,7 +732,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - #4 / #5 canvas-editor 脆弱点(下次动 canvas)
 - UX 洞(批量 soft-delete 二次确认 / send-to-canvas 反向 / archive tile no-op / OPFS 真实落盘)
 
-详见 [`docs/superpowers/plans/2026-06-20-review-bugfixes.md`](../superpowers/plans/2026-06-20-review-bugfixes.md) + [`docs/memory/decisions/2026-06-20-review-bugfixes.md`](../memory/decisions/2026-06-20-review-bugfixes.md) + [`docs/design/screenshots/review-import-rollback/`](../design/screenshots/review-import-rollback/)。
+详见 [`docs/plans/2026-06-20-review-bugfixes.md`](../plans/2026-06-20-review-bugfixes.md) + [`docs/decisions/2026-06-20-review-bugfixes.md`](../decisions/2026-06-20-review-bugfixes.md) + [`docs/design/screenshots/review-import-rollback/`](../design/screenshots/review-import-rollback/)。
 
 ---
 
@@ -772,7 +772,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - UX 洞(批量 soft-delete 二次确认 / send-to-canvas 反向 / archive tile no-op / OPFS 真实落盘)
 - Phase 8 Tauri build(Rust 就绪)+ 签名公证(需 Apple 证书)
 
-详见 [`docs/superpowers/plans/2026-06-20-trash-recovery.md`](../superpowers/plans/2026-06-20-trash-recovery.md) + [`docs/memory/decisions/2026-06-20-trash.md`](../memory/decisions/2026-06-20-trash.md) + [`docs/design/screenshots/phase-trash/`](../design/screenshots/phase-trash/)。
+详见 [`docs/plans/2026-06-20-trash-recovery.md`](../plans/2026-06-20-trash-recovery.md) + [`docs/decisions/2026-06-20-trash.md`](../decisions/2026-06-20-trash.md) + [`docs/design/screenshots/phase-trash/`](../design/screenshots/phase-trash/)。
 
 ---
 
@@ -810,7 +810,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - view 持久化迁到 domain `CanvasService.updateView`(Phase 8 Tauri 时统一)
 - "重置 view" 按钮(已知 UX 缺口)
 
-详见 [`docs/superpowers/plans/2026-06-20-canvas-editor-refactor.md`](../superpowers/plans/2026-06-20-canvas-editor-refactor.md) + [`docs/memory/decisions/2026-06-20-canvas-refactor.md`](../memory/decisions/2026-06-20-canvas-refactor.md) + [`docs/design/screenshots/phase-canvas-refactor/`](../design/screenshots/phase-canvas-refactor/)。
+详见 [`docs/plans/2026-06-20-canvas-editor-refactor.md`](../plans/2026-06-20-canvas-editor-refactor.md) + [`docs/decisions/2026-06-20-canvas-refactor.md`](../decisions/2026-06-20-canvas-refactor.md) + [`docs/design/screenshots/phase-canvas-refactor/`](../design/screenshots/phase-canvas-refactor/)。
 
 ---
 
@@ -852,7 +852,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - inbox page 内的 dead styles 清理(`.link-list` / `.code-block` / `.media-list` 等现在无 JSX 引用 — 留后,YAGNI)
 - Phase 8 Tauri build + 签名公证(需 Apple 证书)
 
-详见 [`docs/superpowers/plans/2026-06-20-archive-detail.md`](../superpowers/plans/2026-06-20-archive-detail.md) + [`docs/memory/decisions/2026-06-20-archive-detail.md`](../memory/decisions/2026-06-20-archive-detail.md) + [`docs/design/screenshots/phase-archive-detail/`](../design/screenshots/phase-archive-detail/)。
+详见 [`docs/plans/2026-06-20-archive-detail.md`](../plans/2026-06-20-archive-detail.md) + [`docs/decisions/2026-06-20-archive-detail.md`](../decisions/2026-06-20-archive-detail.md) + [`docs/design/screenshots/phase-archive-detail/`](../design/screenshots/phase-archive-detail/)。
 
 ---
 
@@ -890,7 +890,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - 输入卡名 "delete" 才确认的高强度确认(信任 Modal 拦截,匹配现有 confirm 风格)
 - 把 batch confirm 抽到 features/card 共享组件(archive 是唯一批量场景,YAGNI)
 
-详见 [`docs/superpowers/plans/2026-06-20-batch-soft-delete-confirm.md`](../superpowers/plans/2026-06-20-batch-soft-delete-confirm.md) + [`docs/memory/decisions/2026-06-20-batch-confirm.md`](../memory/decisions/2026-06-20-batch-confirm.md) + [`docs/design/screenshots/phase-batch-confirm/`](../design/screenshots/phase-batch-confirm/)。
+详见 [`docs/plans/2026-06-20-batch-soft-delete-confirm.md`](../plans/2026-06-20-batch-soft-delete-confirm.md) + [`docs/decisions/2026-06-20-batch-confirm.md`](../decisions/2026-06-20-batch-confirm.md) + [`docs/design/screenshots/phase-batch-confirm/`](../design/screenshots/phase-batch-confirm/)。
 
 ---
 
@@ -915,7 +915,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - **canvas 按钮 conditional render**:`card.canvasPosition && onSendToInbox` — 已是 inbox 卡的画布上不应显示此按钮(虽然 inbox 卡不会到画布,但兜底)。
 - **0 新依赖** + **没碰 spec** + **ui 零改动**(只 canvas 局部组件加 prop)
 
-详见 [`docs/memory/decisions/2026-06-20-send-back.md`](../memory/decisions/2026-06-20-send-back.md) + [`docs/design/screenshots/phase-send-back/`](../design/screenshots/phase-send-back/)。
+详见 [`docs/decisions/2026-06-20-send-back.md`](../decisions/2026-06-20-send-back.md) + [`docs/design/screenshots/phase-send-back/`](../design/screenshots/phase-send-back/)。
 
 ---
 
@@ -983,7 +983,7 @@ M1(画布关系):给 tldraw arrow 加语义关系类型。
 - 暗色模式 / 标签搜索 / OPFS / 录屏
 - Phase 8 Tauri build + 签名公证
 
-详见 [`docs/superpowers/plans/2026-06-20-multi-canvas.md`](../superpowers/plans/2026-06-20-multi-canvas.md) + [`docs/memory/decisions/2026-06-20-multi-canvas.md`](../memory/decisions/2026-06-20-multi-canvas.md) + [`docs/design/screenshots/phase-multi-canvas/`](../design/screenshots/phase-multi-canvas/)。
+详见 [`docs/plans/2026-06-20-multi-canvas.md`](../plans/2026-06-20-multi-canvas.md) + [`docs/decisions/2026-06-20-multi-canvas.md`](../decisions/2026-06-20-multi-canvas.md) + [`docs/design/screenshots/phase-multi-canvas/`](../design/screenshots/phase-multi-canvas/)。
 
 ---
 
@@ -1042,7 +1042,7 @@ Tag **v0.17.0-dark-mode**。
 
 **已知 / 后续**:**无遗留可补功能**(除 Phase 8 Tauri build / 签名公证)。
 
-详见 [`docs/memory/decisions/2026-06-20-dark-mode.md`](../memory/decisions/2026-06-20-dark-mode.md) + [`docs/design/screenshots/phase-dark-mode/`](../design/screenshots/phase-dark-mode/)。
+详见 [`docs/decisions/2026-06-20-dark-mode.md`](../decisions/2026-06-20-dark-mode.md) + [`docs/design/screenshots/phase-dark-mode/`](../design/screenshots/phase-dark-mode/)。
 
 ---
 
@@ -1059,7 +1059,7 @@ UI polish 三合一,不动数据/接口/依赖,基于 v0.15 干净基线重启(v
 - puppeteer mini-audit 6/6 页 passed, 0 console error, 0 overflow
 - 6 张截图 commit 到 `docs/design/screenshots/phase-canvas-polish/`
 
-详见 [`docs/memory/decisions/2026-06-20-ui-polish.md`](../memory/decisions/2026-06-20-ui-polish.md)。
+详见 [`docs/decisions/2026-06-20-ui-polish.md`](../decisions/2026-06-20-ui-polish.md)。
 
 ---
 
@@ -1076,7 +1076,7 @@ UX walkthrough 修复 5 个真 bug(plan 完成后 puppeteer-driven deep walkthro
 
 **已知遗留**(out of scope,需更大改动): Soft-delete 按钮红色 variant 与 Capture 红色冲突、Archive tab 空文案不准确、Capture placeholder 红色对比度差、favicon.ico 404。
 
-详见 [`docs/memory/decisions/2026-06-20-ui-polish.md`](../memory/decisions/2026-06-20-ui-polish.md) 后续 §v0.22.0-ux-polish。
+详见 [`docs/decisions/2026-06-20-ui-polish.md`](../decisions/2026-06-20-ui-polish.md) 后续 §v0.22.0-ux-polish。
 
 ---
 
@@ -1088,7 +1088,7 @@ UX walkthrough 修复 5 个真 bug(plan 完成后 puppeteer-driven deep walkthro
 - **fix(inbox)**: archived tab 空文案改为"Nothing archived yet." + 完整操作引导(指明入口 + 解释归档 vs 软删除)
 - **feat(web)**: SVG favicon(`apps/web/src/app/icon.svg`),Next.js App Router 自动发现 + 注入 `<link rel="icon">` → 消掉 favicon.ico 404
 
-详见 [`docs/memory/decisions/2026-06-20-ux-polish-2.md`](../memory/decisions/2026-06-20-ux-polish-2.md)。
+详见 [`docs/decisions/2026-06-20-ux-polish-2.md`](../decisions/2026-06-20-ux-polish-2.md)。
 
 ---
 
@@ -1104,7 +1104,7 @@ UX walkthrough 修复 5 个真 bug(plan 完成后 puppeteer-driven deep walkthro
 - domain 26/26 + db 7/7 + web build 14 页 exit 0
 - puppeteer mini-audit 6/6 页 passed, 0 console error, 0 overflow
 
-详见 [`docs/memory/decisions/2026-06-23-modal-mini-input-polish.md`](../memory/decisions/2026-06-23-modal-mini-input-polish.md)。
+详见 [`docs/decisions/2026-06-21-modal-mini-input-polish.md`](../decisions/2026-06-21-modal-mini-input-polish.md)。
 
 ---
 
@@ -1127,7 +1127,7 @@ Review 驱动的 i18n hardening。修了 6 处硬编码英文 + 1 个调试辅�
 - domain 26/26 + db 7/7 + web build 14 页 exit 0
 - 7 个文件 / +48 -29 行 / 1 个 commit
 
-详见 [`docs/memory/decisions/2026-06-23-i18n-hardening.md`](../memory/decisions/2026-06-23-i18n-hardening.md)。
+详见 [`docs/decisions/2026-06-21-i18n-hardening.md`](../decisions/2026-06-21-i18n-hardening.md)。
 
 ---
 
@@ -1145,7 +1145,7 @@ Review 驱动的 robustness 改动,4 个非 i18n 类 bug(并发 / 校验 / local
 - domain 26/26 + db 7/7 + web build 14 页 exit 0
 - 4 个文件 / +123 -15 行 / 1 个 commit
 
-详见 [`docs/memory/decisions/2026-06-23-hardening.md`](../memory/decisions/2026-06-23-hardening.md)。
+详见 [`docs/decisions/2026-06-21-hardening.md`](../decisions/2026-06-21-hardening.md)。
 
 ---
 
@@ -1176,7 +1176,7 @@ Review 驱动第二轮。3 个并行 Explore agent 全代码 + UX walkthrough + 
 - domain 26/26 + db 7/7 + web build 14 页 exit 0
 - 10 个文件 / +172 -46 行 / 2 个 commit
 
-详见 [`docs/memory/decisions/2026-06-23-critical-and-latent.md`](../memory/decisions/2026-06-23-critical-and-latent.md)。
+详见 [`docs/decisions/2026-06-21-critical-and-latent.md`](../decisions/2026-06-21-critical-and-latent.md)。
 
 ---
 
@@ -1200,7 +1200,7 @@ Phase A(快速完善)。给 `Card.pinned`(domain Phase 2 就有但无 UI)接上�
 - 7 个文件 / +235 -31 行 / 1 个 commit
 - pinned 状态持久(reload 后仍在),i18n 中英切换正确
 
-详见 [`docs/memory/decisions/2026-06-23-card-pinning.md`](../memory/decisions/2026-06-23-card-pinning.md)。
+详见 [`docs/decisions/2026-06-21-card-pinning.md`](../decisions/2026-06-21-card-pinning.md)。
 
 ---
 
@@ -1221,7 +1221,7 @@ Phase B(a11y)。ui 包 Modal 加 focus trap,所有 Modal(card-detail / archive b
 - domain 26/26 + db 7/7 + web build 14 页 exit 0
 - 3 个文件 / +90 -9 行 / 1 个 commit
 
-详见 [`docs/memory/decisions/2026-06-23-modal-focus-trap.md`](../memory/decisions/2026-06-23-modal-focus-trap.md)。
+详见 [`docs/decisions/2026-06-21-modal-focus-trap.md`](../decisions/2026-06-21-modal-focus-trap.md)。
 
 ---
 
@@ -1243,7 +1243,7 @@ Phase C(战略级)。桌面端全局快捷键:app 后台/失焦时 ⌘⇧Space(m
 - ⚠️ **全局唤起效果未经 GUI 实测**(无 GUI 环境),交付代码 + .app,用户手动测:最小化/切后台后按 ⌘⇧Space 应唤起窗口 + Mini Input
 - 7 个文件 / +262 -9 行 / 1 个 commit
 
-详见 [`docs/memory/decisions/2026-06-21-tauri-global-shortcut.md`](../memory/decisions/2026-06-21-tauri-global-shortcut.md)。
+详见 [`docs/decisions/2026-06-21-tauri-global-shortcut.md`](../decisions/2026-06-21-tauri-global-shortcut.md)。
 
 ---
 
@@ -1269,7 +1269,7 @@ Review 驱动。3 个并行 Explore agent 复核 v0.24-v0.25,6 项全修(4 真 b
 
 **defer 的 latent**(不修):pinFirst 未 memo(卡片量小 perf 可忽略)/ register 失败无 in-app 反馈 / emit 广播多 webview(单窗口无影响)/ auto-repeat 重复 emit(setOpen 幂等)/ window label 隐式 "main"(默认值稳定)
 
-详见 [`docs/memory/decisions/2026-06-21-review-bugfixes.md`](../memory/decisions/2026-06-21-review-bugfixes.md)。
+详见 [`docs/decisions/2026-06-21-review-bugfixes.md`](../decisions/2026-06-21-review-bugfixes.md)。
 
 ---
 
@@ -1283,7 +1283,7 @@ Review 驱动。3 个并行 Explore agent 复核 v0.24-v0.25,6 项全修(4 真 b
 - **B5**: `bindCardWriteback` flush guard: 卡被删/归档/移走时跳过写回,防 300ms 窗口覆盖 → `cf2eba0`
 - **e2e**: 17/17 通过(新增 5 断言覆盖 4 bug)
 
-详见 [`docs/memory/decisions/2026-06-21-canvas-bugfixes.md`](../memory/decisions/2026-06-21-canvas-bugfixes.md)。
+详见 [`docs/decisions/2026-06-21-canvas-bugfixes.md`](../decisions/2026-06-21-canvas-bugfixes.md)。
 
 ---
 
@@ -1304,7 +1304,7 @@ Review 驱动。3 个并行 Explore agent 复核 v0.24-v0.25,6 项全修(4 真 b
 
 **验收**:domain 26/26 + db 7/7 + web build exit 0。GUI 可见改进:card body preview + pinned 星 + inbox→画布实时同步。自由元素(便签/文本/形状/箭头/手绘)持久化**已就位但待 F2 工具栏才能创建测试**(F1 阶段 hideUi 未放工具)。
 
-详见 [`docs/memory/decisions/2026-06-21-high-freedom-canvas-f1.md`](../memory/decisions/2026-06-21-high-freedom-canvas-f1.md)。
+详见 [`docs/decisions/2026-06-21-high-freedom-canvas-f1.md`](../decisions/2026-06-21-high-freedom-canvas-f1.md)。
 
 ---
 
@@ -1323,13 +1323,13 @@ Review 驱动。3 个并行 Explore agent 复核 v0.24-v0.25,6 项全修(4 真 b
 
 **验收**:domain 26/26 + db 7/7 + web build exit 0。GUI:工具栏切换工具,画布加便签/文本/形状/箭头/手绘,与灵感卡共存,刷新持久(F1 snapshot)。**需 GUI 实测**(无 headless canvas 测试)。
 
-详见 [`docs/memory/decisions/2026-06-21-high-freedom-canvas-f2.md`](../memory/decisions/2026-06-21-high-freedom-canvas-f2.md)。
+详见 [`docs/decisions/2026-06-21-high-freedom-canvas-f2.md`](../decisions/2026-06-21-high-freedom-canvas-f2.md)。
 
 ---
 
 ## 2026-06-21 · v0.36.0-search
 
-P11(全文搜索增强 — 倒叙记录在 [`2026-06-21-p4-p7-batch.md`](../memory/decisions/2026-06-21-p4-p7-batch.md) P11 段):
+P11(全文搜索增强 — 倒叙记录在 [`2026-06-21-p4-p7-batch.md`](../decisions/2026-06-21-p4-p7-batch.md) P11 段):
 
 - **scoring**: title 命中 +1.5/token,body/tags/links/code/quotes 命中 +1.0/token。Sort by score desc, then capturedAt desc
 - **normalise/tokenise**: 剥控制字符 + lowercase + 塌空白 + 空白 split(基础安全网,防 XSS/markdown 注入到正则)

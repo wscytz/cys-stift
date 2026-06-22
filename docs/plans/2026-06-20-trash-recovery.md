@@ -1,6 +1,6 @@
 # Plan · Phase trash · soft-delete 回收/恢复视图(2026-06-20)
 
-> 承接 `docs/memory/decisions/2026-06-19-review-findings.md` 的 #2(产品决策)。
+> 承接 `docs/decisions/2026-06-19-review-findings.md` 的 #2(产品决策)。
 > 入口已定:**新 `/trash` 路由**(活跃 inbox / 归档 archive / 删除 trash 三分离)。
 > 本档是 compact 前落盘的实施计划;执行者(主模型 Claude)照此推进 + 自审。
 
