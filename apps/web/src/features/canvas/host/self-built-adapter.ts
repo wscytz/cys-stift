@@ -17,6 +17,7 @@ import type {
 } from './canvas-host'
 import { renderElements, readToken } from './self-built-render'
 import { hitTest, screenToPage } from './self-built-hittest'
+import { commitFreedraw } from './self-built-freedraw'
 
 export class SelfBuiltAdapter implements CanvasHost {
   private elements = new Map<string, CanvasElement>()
@@ -40,6 +41,8 @@ export class SelfBuiltAdapter implements CanvasHost {
     up: (e: PointerEvent) => void
   } | null = null
   private wheelHandler: ((e: WheelEvent) => void) | null = null
+  private activeTool: 'select' | 'freedraw' = 'select'
+  private currentStroke: { points: [number, number][] } | null = null
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -70,7 +73,19 @@ export class SelfBuiltAdapter implements CanvasHost {
       this.canvas.height = h * dpr
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0) // 抵消 DPR,renderElements 用 CSS px
-    renderElements(ctx, this.getElements(), this.view, w, h, this.getCardLabel, readToken('--color-canvas', '#f8fafc'))
+    const preview =
+      this.currentStroke && this.currentStroke.points.length > 0
+        ? [commitFreedraw('__preview', this.currentStroke.points)]
+        : []
+    renderElements(
+      ctx,
+      [...this.getElements(), ...preview],
+      this.view,
+      w,
+      h,
+      this.getCardLabel,
+      readToken('--color-canvas', '#f8fafc'),
+    )
   }
 
   getElements(): CanvasElement[] {
@@ -115,6 +130,20 @@ export class SelfBuiltAdapter implements CanvasHost {
     }
   }
 
+  /** 切换工具(渲染器自身方法,不上 CanvasHost 接口)。 */
+  setTool(t: 'select' | 'freedraw'): void {
+    this.activeTool = t
+    // 切工具时放弃进行中的笔画
+    if (t !== 'freedraw' && this.currentStroke) {
+      this.currentStroke = null
+      this.scheduleRender()
+    }
+  }
+
+  getTool(): 'select' | 'freedraw' {
+    return this.activeTool
+  }
+
   getView(): CanvasView {
     return { ...this.view }
   }
@@ -135,6 +164,16 @@ export class SelfBuiltAdapter implements CanvasHost {
       const sx = e.clientX - rect.left
       const sy = e.clientY - rect.top
       const p = screenToPage(this.view, sx, sy)
+      if (this.activeTool === 'freedraw') {
+        this.currentStroke = { points: [[Math.round(p.x), Math.round(p.y)]] }
+        try {
+          this.canvas.setPointerCapture(e.pointerId)
+        } catch {
+          /* jsdom 无 setPointerCapture / 已捕获 */
+        }
+        this.scheduleRender()
+        return
+      }
       const id = hitTest(this.getElements(), p.x, p.y)
       if (id) {
         const el = this.getElement(id)!
@@ -149,12 +188,22 @@ export class SelfBuiltAdapter implements CanvasHost {
           fromPanY: this.view.panY,
         }
       }
-      this.canvas.setPointerCapture(e.pointerId)
+      try {
+        this.canvas.setPointerCapture(e.pointerId)
+      } catch {
+        /* jsdom 无 setPointerCapture / 已捕获 */
+      }
     }
     const onMove = (e: PointerEvent) => {
       const rect = this.canvas.getBoundingClientRect()
       const sx = e.clientX - rect.left
       const sy = e.clientY - rect.top
+      if (this.currentStroke) {
+        const p = screenToPage(this.view, sx, sy)
+        this.currentStroke.points.push([Math.round(p.x), Math.round(p.y)])
+        this.scheduleRender()
+        return
+      }
       if (this.dragId) {
         const p = screenToPage(this.view, sx, sy)
         const el = this.getElement(this.dragId)
@@ -174,6 +223,21 @@ export class SelfBuiltAdapter implements CanvasHost {
       }
     }
     const onUp = (e: PointerEvent) => {
+      if (this.currentStroke) {
+        const id =
+          'freedraw-' +
+          (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : Math.random().toString(36).slice(2))
+        this.upsert(commitFreedraw(id, this.currentStroke.points))
+        this.currentStroke = null
+        try {
+          this.canvas.releasePointerCapture(e.pointerId)
+        } catch {
+          /* 已释放 */
+        }
+        return
+      }
       if (this.dragId || this.panning) {
         try {
           this.canvas.releasePointerCapture(e.pointerId)

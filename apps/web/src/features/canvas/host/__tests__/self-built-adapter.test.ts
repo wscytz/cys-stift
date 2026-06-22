@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { SelfBuiltAdapter } from '../self-built-adapter'
+import type { CanvasElement } from '../canvas-host'
 
 describe('SelfBuiltAdapter drag → onUserChange', () => {
   it('upsert during drag emits UserChange (canvas-binding writes back via this)', () => {
@@ -45,5 +46,56 @@ describe('SelfBuiltAdapter pan/zoom', () => {
     host.setView({ panX: 0, panY: 0, zoom: 7.9, gridMode: 'free' })
     h.onWheel(0, 0, -100) // 大幅放大
     expect(host.getView().zoom).toBeLessThanOrEqual(8)
+  })
+})
+
+describe('SelfBuiltAdapter freedraw input', () => {
+  function dispatch(canvas: HTMLCanvasElement, type: string, x: number, y: number) {
+    canvas.dispatchEvent(
+      new PointerEvent(type, {
+        pointerId: 1,
+        pointerType: 'mouse',
+        bubbles: true,
+        clientX: x,
+        clientY: y,
+      }),
+    )
+  }
+
+  it('select 模式(默认)不产 freedraw', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    dispatch(canvas, 'pointerdown', 10, 10)
+    dispatch(canvas, 'pointermove', 50, 50)
+    dispatch(canvas, 'pointerup', 50, 50)
+    expect(host.getElements().filter((e) => e.kind === 'freedraw')).toHaveLength(0)
+  })
+
+  it('freedraw 模式:down/move/up 产一个 freedraw 元素,点序列 + bbox 正确', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('freedraw')
+
+    const changes: { updated: CanvasElement[]; removed: string[] }[] = []
+    host.onUserChange((c) => changes.push(c as never))
+
+    dispatch(canvas, 'pointerdown', 10, 10)
+    dispatch(canvas, 'pointermove', 40, 50)
+    dispatch(canvas, 'pointerup', 40, 50)
+
+    const freedraws = host.getElements().filter((e) => e.kind === 'freedraw')
+    expect(freedraws).toHaveLength(1)
+    expect(freedraws[0]).toMatchObject({ kind: 'freedraw', x: 10, y: 10, w: 30, h: 40 })
+    expect((freedraws[0]!.meta?.points as unknown[]).length).toBe(2)
+    // commit 触发一次 onUserChange
+    expect(changes.some((c) => c.updated.some((e) => e.kind === 'freedraw'))).toBe(true)
+  })
+
+  it('getTool/setTool', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const h = host as unknown as { getTool: () => string; setTool: (t: string) => void }
+    expect(h.getTool()).toBe('select')
+    h.setTool('freedraw')
+    expect(h.getTool()).toBe('freedraw')
   })
 })
