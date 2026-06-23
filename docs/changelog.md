@@ -33,6 +33,11 @@ P2 引擎抽包后的衔接打磨 + 增值功能。
 - **手绘③ 猜箭头转真 arrow**:本地几何猜是箭头且够自信 → FreedrawPanel「转为箭头」一键替换(自由箭头,无 from/to)。`arrowEndpoints` 扩支持自由箭头几何端点 + `freedrawToArrow`。
 - 全程守 R2 隐私:手绘点序列纯本地,不外发 AI(② AI 介入手绘按用户决定不做)。
 
+### 引擎交互鲁棒性 · 第二轮(2026-06-23)
+- **hitTest/选择 支持负 bbox**:自由箭头(`freedrawToArrow` 产出,w/h 可负表方向)带出新缝——hitTest/handleAtPoint/选中框按 `x..x+w` 取范围假设 w≥0,负 bbox 区间为空 → 反向自由箭头点不中/选不了/移不动(同 freedraw 移动 bug 同源)。`bounds.normalizeBox`(w/h<0 翻转)接入三处。
+- **矩阵测试扩列**:hitTest(中心点命中自己)+ 键盘微移两列,先红后绿。键盘微移又照出 freedraw 只移 bbox 不移 points(同 drag),一并修。矩阵现全覆盖 card/rect/text/freedraw × drag/resize/hitTest/键盘微移——这类 kind×操作疏漏自动抓住。
+- `bounds.ts` 补直接单测(此前仅经 svg/contract 间接覆盖)。
+
 
 
 开发者反馈(2026-06-22)的 2 个交互 bug + 收尾整理 + 战略讨论档归档。
