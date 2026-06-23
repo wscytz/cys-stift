@@ -39,9 +39,10 @@ Phase 0 + Phase 1 已完成:CanvasHost 引擎无关接口 + SelfBuiltAdapter(Can
 - `/canvas` 渲染从 `<TldrawCanvas>` 切到 `<SelfCanvas>`(SelfBuiltAdapter 主路由版)。
 - SelfBuiltAdapter 主路由版接通:CardService 全量卡片加载 / 多画布切换 / 视图持久化(pan-zoom-snap)/ 双击开 CardDetailModal / 发回 inbox / 归档 / 软删。
 - 卡片用 SelfBuiltAdapter 现有简化渲染(只 title)先跑通——完整渲染留子项目 2。
-- tldraw 代码(TldrawAdapter/card-shape-util/TldrawCanvas)**暂留不删**(不再挂主路由,但留着给导出/关系过渡用 + fallback 代码参考)。
+- **page 改造**:`/canvas` page 顶部 tldraw import(`useValue`/`Editor`/`TldrawCanvas`/`CanvasToolbar`/`RelationPanel`/`ExportDialog`)在切 self 后变成死代码。子项目 1 把 page 拆成:`<SelfCanvas>`(新,SelfBuiltAdapter 主路由版)接管画布 + 卡片交互;tldraw 专用的 `CanvasToolbar`/`RelationPanel`/`ExportDialog` **暂时从 page 移除**(它们绑 tldraw,子项目 2/3/4 再以 self 版接回)。page 顶部 `useValue`/`Editor` import 删除。结果:子项目 1 后 page 只剩 self 路径 + CardDetailModal(已 largely host 无关)。
+- tldraw 代码(TldrawAdapter/card-shape-util/TldrawCanvas/CanvasToolbar/RelationPanel/ExportDialog)**暂留不删**(文件留着给子项目 2/3/4 改造参考 + 导出/关系过渡;只是不再被 page import)。
 - **验收**:主路由 `/canvas` 用 SelfBuiltAdapter 跑,卡片加载/拖拽/多画布/双击开卡/发回/归档/删除全通;`pnpm --filter web build` exit 0;现有 web 测试不退化。AI 布局复用(Phase 0 已 host 无关)。
-- **缺口(留后续子项目)**:卡片完整渲染(子2)、toolbar 工具(子2)、导出(子3)、关系 panel(子4)。
+- **缺口(留后续子项目)**:卡片完整渲染(子2)、toolbar 工具(子2)、导出(子3)、关系 panel(子4)。子项目 1 后 page 暂无 toolbar/导出/关系入口(功能倒退,用户已接受)。
 
 ### 子项目 2:卡片完整渲染 + toolbar 迁 self 工具
 - SelfBuiltAdapter 的 card 画全:类型标(NOTE/LINK/CODE/QUOTE/IMAGE)+ body 预览(3 行截断)+ pinned 星 + 颜色 token。对齐 `card-shape-util` 现有视觉(token,不裸 hex)。
