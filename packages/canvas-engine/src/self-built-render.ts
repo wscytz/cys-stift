@@ -1,6 +1,7 @@
 
 import type { CanvasElement, CanvasView } from './canvas-host'
 import { arrowEndpoints, dashPattern, arrowheadPoints } from './self-built-arrow'
+import { normalizeBox } from './bounds'
 
 /**
  * 纯渲染函数:把元素画到 ctx 上,带相机(pan/zoom)变换。
@@ -234,14 +235,15 @@ export function drawSelectionOutlines(
   const hs = 3 / view.zoom // handle 半边长 → 6px 方块
   for (const el of elements) {
     if (!sel.has(el.id)) continue
+    const b = normalizeBox(el) // 负 bbox(自由箭头)归一化,选中框/handle 才画对
     // dashed 选中框(外扩 2px)
-    ctx.strokeRect(el.x - 2, el.y - 2, el.w + 4, el.h + 4)
+    ctx.strokeRect(b.x - 2, b.y - 2, b.w + 4, b.h + 4)
     // 四角 handle 方块(白填 + 蓝描)
     const corners: [number, number][] = [
-      [el.x, el.y],
-      [el.x + el.w, el.y],
-      [el.x, el.y + el.h],
-      [el.x + el.w, el.y + el.h],
+      [b.x, b.y],
+      [b.x + b.w, b.y],
+      [b.x, b.y + b.h],
+      [b.x + b.w, b.y + b.h],
     ]
     ctx.setLineDash([])
     ctx.fillStyle = tokenResolver('--color-white', '#ffffff')

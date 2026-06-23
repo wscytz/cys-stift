@@ -1,5 +1,6 @@
 
 import type { CanvasElement, CanvasView } from './canvas-host'
+import { normalizeBox } from './bounds'
 
 /** 屏幕坐标(CSS px)→ 页坐标(扣 pan、除 zoom)。 */
 export function screenToPage(
@@ -21,7 +22,8 @@ export function hitTest(
 ): string | null {
   for (let i = elements.length - 1; i >= 0; i--) {
     const el = elements[i]!
-    if (pageX >= el.x && pageX <= el.x + el.w && pageY >= el.y && pageY <= el.y + el.h) {
+    const b = normalizeBox(el) // 负 bbox(自由箭头方向编码)归一化,否则区间为空命不中
+    if (pageX >= b.x && pageX <= b.x + b.w && pageY >= b.y && pageY <= b.y + b.h) {
       return el.id
     }
   }

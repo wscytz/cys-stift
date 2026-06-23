@@ -1,4 +1,6 @@
 
+import { normalizeBox } from './bounds'
+
 /** resize handle:四角。 */
 export type Handle = 'nw' | 'ne' | 'sw' | 'se'
 
@@ -12,11 +14,12 @@ export function handleAtPoint(
   zoom: number,
 ): Handle | null {
   const tol = HANDLE_HIT_PX / zoom
+  const b = normalizeBox(el) // 负 bbox 归一化,四角才算对
   const corners: Record<Handle, { x: number; y: number }> = {
-    nw: { x: el.x, y: el.y },
-    ne: { x: el.x + el.w, y: el.y },
-    sw: { x: el.x, y: el.y + el.h },
-    se: { x: el.x + el.w, y: el.y + el.h },
+    nw: { x: b.x, y: b.y },
+    ne: { x: b.x + b.w, y: b.y },
+    sw: { x: b.x, y: b.y + b.h },
+    se: { x: b.x + b.w, y: b.y + b.h },
   }
   for (const k of Object.keys(corners) as Handle[]) {
     const c = corners[k]

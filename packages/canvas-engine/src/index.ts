@@ -79,5 +79,5 @@ export { marqueeSelect } from './self-built-marquee'
 export { arrowKeyDelta, selectAllIds, parseKeyboardAction } from './self-built-keyboard'
 
 // ── 通用 AABB 几何(供 SVG 导出 bbox 计算) ─────────────────────────────────────
-export { unionBounds, expandBounds } from './bounds'
+export { unionBounds, expandBounds, normalizeBox } from './bounds'
 export type { Bounds } from './bounds'

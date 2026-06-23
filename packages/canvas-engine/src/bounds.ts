@@ -16,6 +16,23 @@ export interface Bounds {
 }
 
 /**
+ * 纯函数 — 归一化 box:保证 w/h ≥ 0。负 w/h(如自由箭头用 bbox 编码方向、或 resize
+ * 拖过对角)翻转 x/y 到左上角。
+ *
+ * 为什么需要:hitTest / handleAtPoint / 选中框 都按 `x..x+w` 取范围,假设 w≥0;
+ * 负 bbox 会让范围为空(命中失败)或角算错(选不中/无法 resize)。几何函数应对
+ * 「任意符号 bbox」鲁棒——引擎不假设调用方只传正 bbox。正 bbox 原样返回。
+ */
+export function normalizeBox(b: Bounds): Bounds {
+  return {
+    x: b.w < 0 ? b.x + b.w : b.x,
+    y: b.h < 0 ? b.y + b.h : b.y,
+    w: Math.abs(b.w),
+    h: Math.abs(b.h),
+  }
+}
+
+/**
  * 纯函数 — 轴对齐 box 的并集。空列表 → null。
  * 用来算一组 shape 的内容包围盒 + 推导导出尺寸。
  */

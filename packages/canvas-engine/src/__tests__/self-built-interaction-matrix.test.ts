@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { SelfBuiltAdapter } from '../self-built-adapter'
+import { hitTest } from '../self-built-hittest'
 import type { CanvasElement } from '../canvas-host'
 
 /**
@@ -92,3 +93,23 @@ describe('交互矩阵 — 每种 kind × resize(SE 角)', () => {
     })
   }
 })
+
+describe('交互矩阵 — 每种 kind × hitTest(中心点命中自己)', () => {
+  for (const kind of MOVABLE_KINDS) {
+    it(`${kind}:bbox 中心点能命中自己`, () => {
+      const el = elementOfKind(kind) // bbox (100,100,100,100),中心 (150,150)
+      expect(hitTest([el], 150, 150)).toBe('e1')
+    })
+  }
+
+  // 自由箭头形态:w/h 可负(表方向)。hitTest 的 x..x+w 假设 w≥0 → 负则区间空 →
+  // 反向画的自由箭头点不中(选不了/删不了/移不动)。这格当前 FAIL,步骤 1 修。
+  it('自由箭头(负 bbox)中心点能命中自己', () => {
+    const freeArrow: CanvasElement = {
+      id: 'fa', kind: 'arrow', x: 200, y: 200, w: -100, h: -100, rotation: 0,
+    }
+    // bbox 实际覆盖 (100,100)..(200,200),中心 (150,150)
+    expect(hitTest([freeArrow], 150, 150)).toBe('fa')
+  })
+})
+
