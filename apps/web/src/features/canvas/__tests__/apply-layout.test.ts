@@ -114,4 +114,101 @@ describe('applyLayout', () => {
       ]),
     ).not.toThrow()
   })
+
+  // ── arrow relation signature update — DSL symmetry fix 1 ──
+
+  it('updates an existing arrow (by id) dash/arrowhead/color/label, keeping from/to', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'src')
+    seedCard(host, 'dst')
+    // Pre-existing arrow with old signature.
+    host.upsert({
+      id: 'arr1',
+      kind: 'arrow',
+      x: 0,
+      y: 0,
+      w: 0,
+      h: 0,
+      rotation: 0,
+      from: 'src',
+      to: 'dst',
+      text: 'old',
+      color: 'black',
+      dash: 'solid',
+      arrowhead: 'arrow',
+    })
+
+    applyLayout(host, [
+      {
+        type: 'arrow',
+        id: 'arr1',
+        from: 'src',
+        to: 'dst',
+        label: 'references',
+        color: 'red',
+        dash: 'dashed',
+        arrowhead: 'triangle',
+      },
+    ])
+
+    const arrow = host.getElement('arr1')
+    // from/to preserved (they were on the existing element; op provided same).
+    expect(arrow).toMatchObject({
+      id: 'arr1',
+      kind: 'arrow',
+      from: 'src',
+      to: 'dst',
+      text: 'references',
+      color: 'red',
+      dash: 'dashed',
+      arrowhead: 'triangle',
+    })
+    // No second arrow created.
+    expect(host.getElements().filter((e) => e.kind === 'arrow')).toHaveLength(1)
+  })
+
+  it('creates a new arrow when id is missing or not found (existing behavior)', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'src')
+    seedCard(host, 'dst')
+
+    applyLayout(host, [{ type: 'arrow', from: 'src', to: 'dst', label: 'ref' }])
+
+    const arrow = host.getElements().find((e) => e.kind === 'arrow')
+    expect(arrow).toMatchObject({ kind: 'arrow', from: 'src', to: 'dst', text: 'ref' })
+  })
+
+  // ── card size — DSL symmetry fix 2 ──
+
+  it('updates an existing card size when op has w/h', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'a1', 0, 0) // default w:240, h:120
+
+    applyLayout(host, [
+      { type: 'card', cardId: 'a1' as CardId, x: 100, y: 200, w: 300, h: 150, color: 'blue' },
+    ])
+
+    expect(host.getElement('a1')).toMatchObject({ x: 100, y: 200, w: 300, h: 150, color: 'blue' })
+  })
+
+  it('preserves existing card w/h when op omits them', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'a1', 0, 0) // w:240, h:120
+
+    applyLayout(host, [{ type: 'card', cardId: 'a1' as CardId, x: 50, y: 60 }])
+
+    expect(host.getElement('a1')).toMatchObject({ x: 50, y: 60, w: 240, h: 120 })
+  })
+
+  // ── text color — DSL symmetry fix 3 ──
+
+  it('creates a text shape with the op color', () => {
+    const host = new InMemoryCanvasHost()
+    applyLayout(host, [
+      { type: 'free', shape: 'text', x: 10, y: 20, text: 'hi', color: 'red' },
+    ])
+
+    const el = host.getElements().find((e) => e.kind === 'text')
+    expect(el).toMatchObject({ kind: 'text', x: 10, y: 20, text: 'hi', color: 'red' })
+  })
 })

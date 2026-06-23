@@ -10,8 +10,8 @@
  * Grammar (active kinds only; see CanvasElementKind active/legacy split):
  *   [card #<id>] @pos(<x>,<y>) @size(<w>,<h>) @color(<c>)
  *   [rect #<id>] @pos(<x>,<y>) @size(<w>,<h>) @color(<c>)
- *   [text #<id>] @pos(<x>,<y>) @text("<t>")
- *   [arrow #<id>] from #<a> to #<b> @label("<l>") @color(<c>)
+ *   [text #<id>] @pos(<x>,<y>) @text("<t>") @color(<c>)
+ *   [arrow #<id>] from #<a> to #<b> @label("<l>") @color(<c>) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none)
  *   [freedraw #<id>] @pos(<x>,<y>)            ← metadata only, NO point sequence
  *
  * Legacy kinds (ellipse/line/note/image) are NOT serialized — they're not in
@@ -50,12 +50,16 @@ function serializeElement(e: CanvasElement): string {
     case 'rect':
       return `[rect #${e.id}] ${pos} @size(${Math.round(e.w)},${Math.round(e.h)})${color}`
     case 'text':
-      return `[text #${e.id}] ${pos} @text("${escapeQuoted(e.text ?? '')}")`
+      return (
+        `[text #${e.id}] ${pos} @text("${escapeQuoted(e.text ?? '')}")` + color
+      )
     case 'arrow':
       return (
         `[arrow #${e.id}] from #${e.from ?? ''} to #${e.to ?? ''}` +
         (e.text ? ` @label("${escapeQuoted(e.text)}")` : '') +
-        color
+        color +
+        (e.dash ? ` @dash(${e.dash})` : '') +
+        (e.arrowhead ? ` @arrowhead(${e.arrowhead})` : '')
       )
     case 'freedraw':
       // Position only — never the point sequence (R2 + privacy).

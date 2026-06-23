@@ -108,4 +108,68 @@ describe('parseDsl', () => {
       expect(op.y).toBe(20)
     }
   })
+
+  // ── arrow relation signature (dash + arrowhead + id) — DSL symmetry fix 1 ──
+
+  it('parses an arrow with id + dash + arrowhead + label + color + endpoints', () => {
+    const result = parseDsl(
+      '[arrow #arr1] from #a to #b @label("references") @color(blue) @dash(dashed) @arrowhead(triangle)',
+    )
+    expect(result).toHaveLength(1)
+    const op = result[0]!
+    if (op.type !== 'arrow') throw new Error('expected arrow op')
+    expect(op.id).toBe('arr1')
+    expect(op.from).toBe('a')
+    expect(op.to).toBe('b')
+    expect(op.label).toBe('references')
+    expect(op.color).toBe('blue')
+    expect(op.dash).toBe('dashed')
+    expect(op.arrowhead).toBe('triangle')
+  })
+
+  it('parses an arrow with dotted dash + none arrowhead', () => {
+    const result = parseDsl('[arrow #arr2] from #a to #b @dash(dotted) @arrowhead(none)')
+    const op = result[0]!
+    if (op.type !== 'arrow') throw new Error('expected arrow op')
+    expect(op.dash).toBe('dotted')
+    expect(op.arrowhead).toBe('none')
+  })
+
+  it('parses an arrow without dash/arrowhead (backward compat: both undefined)', () => {
+    const result = parseDsl('[arrow #arr3] from #a to #b')
+    const op = result[0]!
+    if (op.type !== 'arrow') throw new Error('expected arrow op')
+    expect(op.dash).toBeUndefined()
+    expect(op.arrowhead).toBeUndefined()
+  })
+
+  // ── card size — DSL symmetry fix 2 ──
+
+  it('parses a card with @size(w,h)', () => {
+    const result = parseDsl('[card #abc123] @pos(300, 400) @size(240, 120) @color(blue)')
+    expect(result).toHaveLength(1)
+    const op = result[0]!
+    if (op.type !== 'card') throw new Error('expected card op')
+    expect(op.w).toBe(240)
+    expect(op.h).toBe(120)
+  })
+
+  it('parses a card without @size (w/h undefined)', () => {
+    const result = parseDsl('[card #abc123] @pos(300, 400)')
+    const op = result[0]!
+    if (op.type !== 'card') throw new Error('expected card op')
+    expect(op.w).toBeUndefined()
+    expect(op.h).toBeUndefined()
+  })
+
+  // ── text color — DSL symmetry fix 3 ──
+
+  it('parses a text line with @color', () => {
+    const result = parseDsl('[text #t1] @pos(5,6) @text("hello") @color(red)')
+    expect(result).toHaveLength(1)
+    const op = result[0]!
+    if (op.type !== 'free' || op.shape !== 'text') throw new Error('expected free:text op')
+    expect(op.color).toBe('red')
+    expect(op.text).toBe('hello')
+  })
 })

@@ -59,10 +59,18 @@ export function applyLayout(host: CanvasHost, ops: DslOp[]): void {
 
 function applyCardOp(
   host: CanvasHost,
-  op: { type: 'card'; cardId: CardId; x: number; y: number; color?: string },
+  op: {
+    type: 'card'
+    cardId: CardId
+    x: number
+    y: number
+    w?: number
+    h?: number
+    color?: string
+  },
 ) {
   // Partial update: preserve the existing card's w/h/rotation, override x/y
-  // (and optionally color). Equivalent to tldraw's partial updateShape.
+  // (and optionally color/size). Equivalent to tldraw's partial updateShape.
   const existing = host.getElement(String(op.cardId))
   if (!existing) return
 
@@ -70,6 +78,8 @@ function applyCardOp(
     ...existing,
     x: Math.max(0, Math.round(op.x)),
     y: Math.max(0, Math.round(op.y)),
+    ...(op.w !== undefined ? { w: op.w } : {}),
+    ...(op.h !== undefined ? { h: op.h } : {}),
     ...(op.color ? { color: op.color } : {}),
   })
 }
@@ -111,7 +121,14 @@ function applyFreeOp(
       })
       break
     case 'text':
-      host.upsert({ ...base, kind: 'text', w: 100, h: 40, text: op.text ?? '' })
+      host.upsert({
+        ...base,
+        kind: 'text',
+        w: 100,
+        h: 40,
+        text: op.text ?? '',
+        ...(op.color ? { color: op.color } : {}),
+      })
       break
     case 'line':
       host.upsert({ ...base, kind: 'line', w, h: 0, color: op.color ?? 'black' })
@@ -123,12 +140,34 @@ function applyArrowOp(
   host: CanvasHost,
   op: {
     type: 'arrow'
+    id?: string
     from: string
     to: string
     label?: string
     color?: string
+    dash?: 'solid' | 'dashed' | 'dotted'
+    arrowhead?: 'arrow' | 'triangle' | 'none'
   },
 ) {
+  // Update-in-place path: if the op carries an id and the host already has
+  // that arrow, rewrite its relation signature (dash/arrowhead/color/label)
+  // while keeping from/to — this lets the AI change an existing arrow's
+  // semantics instead of stacking a duplicate. (DSL symmetry fix 1.)
+  if (op.id) {
+    const existing = host.getElement(op.id)
+    if (existing && existing.kind === 'arrow') {
+      host.upsert({
+        ...existing,
+        ...(op.dash ? { dash: op.dash } : {}),
+        ...(op.arrowhead ? { arrowhead: op.arrowhead } : {}),
+        ...(op.color ? { color: op.color } : {}),
+        ...(op.label !== undefined ? { text: op.label } : {}),
+      })
+      return
+    }
+  }
+
+  // Create path (original behavior): mint a new arrow bound to two endpoints.
   // Skip if either endpoint doesn't exist (was a no-op pre-refactor too).
   const fromEl = host.getElement(op.from)
   const toEl = host.getElement(op.to)
@@ -146,5 +185,7 @@ function applyArrowOp(
     to: op.to,
     text: op.label ?? '',
     color: op.color ?? 'black',
+    ...(op.dash ? { dash: op.dash } : {}),
+    ...(op.arrowhead ? { arrowhead: op.arrowhead } : {}),
   })
 }

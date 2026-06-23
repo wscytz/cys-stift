@@ -28,6 +28,57 @@ describe('serializeCanvas — active kinds', () => {
     ])
     expect(out).toContain('@text("say \\"hi\\"")')
   })
+
+  // ── arrow relation signature (dash + arrowhead) — DSL symmetry fix 1 ──
+
+  it('emits arrow dash + arrowhead when present', () => {
+    const out = serializeCanvas([
+      {
+        id: 'a1',
+        kind: 'arrow',
+        x: 0,
+        y: 0,
+        w: 0,
+        h: 0,
+        rotation: 0,
+        from: 'c1',
+        to: 'r1',
+        text: 'ref',
+        color: 'red',
+        dash: 'dashed',
+        arrowhead: 'triangle',
+      },
+    ])
+    expect(out).toContain('[arrow #a1] from #c1 to #r1')
+    expect(out).toContain('@label("ref")')
+    expect(out).toContain('@color(red)')
+    expect(out).toContain('@dash(dashed)')
+    expect(out).toContain('@arrowhead(triangle)')
+  })
+
+  it('omits arrow dash/arrowhead when absent', () => {
+    const out = serializeCanvas([
+      { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'r1' },
+    ])
+    expect(out).not.toContain('@dash(')
+    expect(out).not.toContain('@arrowhead(')
+  })
+
+  // ── text color — DSL symmetry fix 3 ──
+
+  it('emits text @color when present', () => {
+    const out = serializeCanvas([
+      { id: 't1', kind: 'text', x: 5, y: 6, w: 0, h: 0, rotation: 0, text: 'hi', color: 'red' },
+    ])
+    expect(out).toContain('[text #t1] @pos(5,6) @text("hi") @color(red)')
+  })
+
+  it('omits text @color when absent', () => {
+    const out = serializeCanvas([
+      { id: 't1', kind: 'text', x: 5, y: 6, w: 0, h: 0, rotation: 0, text: 'hi' },
+    ])
+    expect(out).not.toContain('@color(')
+  })
 })
 
 describe('serializeCanvas — exclusions (R2 + privacy)', () => {

@@ -22,6 +22,8 @@ export type DslCardOp = {
   cardId: CardId
   x: number
   y: number
+  w?: number
+  h?: number
   color?: string
 }
 
@@ -40,10 +42,18 @@ export type DslFreeOp = {
 
 export type DslArrowOp = {
   type: 'arrow'
+  /** Arrow element id (round-trip with serializeCanvas's `[arrow #id]`). When
+   *  present and the host already has this arrow, applyArrowOp updates it in
+   *  place (changing its relation signature) instead of creating a new one. */
+  id?: string
   from: string
   to: string
   label?: string
   color?: string
+  /** Relation signature line style (semantics): solid/dashed/dotted. */
+  dash?: 'solid' | 'dashed' | 'dotted'
+  /** Relation signature terminal (semantics): arrow/triangle/none. */
+  arrowhead?: 'arrow' | 'triangle' | 'none'
 }
 
 export type DslOp = DslCardOp | DslFreeOp | DslArrowOp
@@ -69,6 +79,10 @@ const TEXT_RE = /@text\("((?:[^"\\]|\\.)*)"\)/
 /** Size directive: `@size\((\d+),\s*(\d+)\)` or inline `size 300x400` */
 const SIZE_RE = /@size\((\d+),\s*(\d+)\)/
 const SIZE_INLINE_RE = /size\s+(\d+)x(\d+)/
+
+/** Arrow relation signature — line style + terminal (semantics). */
+const DASH_RE = /@dash\((solid|dashed|dotted)\)/
+const ARROWHEAD_RE = /@arrowhead\((arrow|triangle|none)\)/
 
 function extractId(text: string): string | null {
   const m = text.match(ID_RE)
@@ -108,6 +122,22 @@ function extractSize(text: string): { w: number; h: number } | null {
   return null
 }
 
+function extractDash(
+  text: string,
+): 'solid' | 'dashed' | 'dotted' | undefined {
+  return text.match(DASH_RE)?.[1] as 'solid' | 'dashed' | 'dotted' | undefined
+}
+
+function extractArrowhead(
+  text: string,
+): 'arrow' | 'triangle' | 'none' | undefined {
+  return text.match(ARROWHEAD_RE)?.[1] as
+    | 'arrow'
+    | 'triangle'
+    | 'none'
+    | undefined
+}
+
 /**
  * Parse a DSL block (the AI's output) into a list of layout operations.
  *
@@ -126,11 +156,14 @@ export function parseDsl(dslText: string): DslOp[] {
       if (!id) continue
       const pos = extractPos(line)
       if (!pos) continue
+      const size = extractSize(line)
       ops.push({
         type: 'card',
         cardId: id as CardId,
         x: pos.x,
         y: pos.y,
+        w: size?.w,
+        h: size?.h,
         color: extractColor(line),
       })
       continue
@@ -149,10 +182,13 @@ export function parseDsl(dslText: string): DslOp[] {
       if (!fromMatch || !toMatch) continue
       ops.push({
         type: 'arrow',
+        id,
         from: fromMatch[1]?.replace('#', '') ?? '',
         to: toMatch[1]?.replace('#', '') ?? '',
         label: extractLabel(line),
         color: extractColor(line),
+        dash: extractDash(line),
+        arrowhead: extractArrowhead(line),
       })
       continue
     }
@@ -177,7 +213,7 @@ export function parseDsl(dslText: string): DslOp[] {
       continue
     }
 
-    // ── Text line (Phase 0 / T3): `[text #id] @pos(x,y) @text("...")`
+    // ── Text line (Phase 0 / T3): `[text #id] @pos(x,y) @text("...") @color(c)`
     if (line.startsWith('[text ')) {
       const id = extractId(line)
       if (!id) continue
@@ -190,6 +226,7 @@ export function parseDsl(dslText: string): DslOp[] {
         x: pos.x,
         y: pos.y,
         text: extractText(line),
+        color: extractColor(line),
       })
       continue
     }
