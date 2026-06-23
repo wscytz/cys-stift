@@ -142,6 +142,18 @@ describe('drawSelectionOutlines', () => {
     expect(ctx._calls.some((c) => c.startsWith('setLineDash'))).toBe(true)
   })
 
+  it('draws handle squares at the 4 corners of selected elements', () => {
+    const ctx = mockCtx()
+    const els = [{ id: 'c1', kind: 'card', x: 10, y: 20, w: 100, h: 60, rotation: 0 }] as unknown as CanvasElement[]
+    drawSelectionOutlines(ctx, ['c1'], els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' })
+    // handle hs=3(zoom1):nw(10,20)→ fillRect(7,17,6,6);se(110,80)→ fillRect(107,77,6,6)
+    expect(ctx._calls).toContain('fillRect(7,17,6,6)')
+    expect(ctx._calls).toContain('fillRect(107,77,6,6)')
+    // ne(110,20)→ strokeRect(107,17,6,6);sw(10,80)→ strokeRect(7,77,6,6)
+    expect(ctx._calls).toContain('strokeRect(107,17,6,6)')
+    expect(ctx._calls).toContain('strokeRect(7,77,6,6)')
+  })
+
   it('with empty selection draws nothing', () => {
     const ctx = mockCtx()
     drawSelectionOutlines(ctx, [], [], { panX: 0, panY: 0, zoom: 1, gridMode: 'free' })

@@ -154,9 +154,25 @@ export function drawSelectionOutlines(
   ctx.strokeStyle = readToken('--color-blue', '#1d4ed8')
   ctx.lineWidth = 1.5 / view.zoom
   ctx.setLineDash([6 / view.zoom, 4 / view.zoom])
+  const hs = 3 / view.zoom // handle 半边长 → 6px 方块
   for (const el of elements) {
     if (!sel.has(el.id)) continue
-    ctx.strokeRect(el.x - 2, el.y - 2, el.w + 4, el.h + 4) // 外扩 2px
+    // dashed 选中框(外扩 2px)
+    ctx.strokeRect(el.x - 2, el.y - 2, el.w + 4, el.h + 4)
+    // 四角 handle 方块(白填 + 蓝描)
+    const corners: [number, number][] = [
+      [el.x, el.y],
+      [el.x + el.w, el.y],
+      [el.x, el.y + el.h],
+      [el.x + el.w, el.y + el.h],
+    ]
+    ctx.setLineDash([])
+    ctx.fillStyle = readToken('--color-white', '#ffffff')
+    for (const [cx, cy] of corners) {
+      ctx.fillRect(cx - hs, cy - hs, hs * 2, hs * 2)
+      ctx.strokeRect(cx - hs, cy - hs, hs * 2, hs * 2)
+    }
+    ctx.setLineDash([6 / view.zoom, 4 / view.zoom]) // 复位 dash 给下一个元素
   }
   ctx.restore()
 }
