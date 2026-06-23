@@ -49,3 +49,20 @@ scripts/_*.cjs
 
 # Undocumented UX-audit scratch screenshots (auto-generated, no doc reference)
 docs/design/screenshots/phase-ux-mmxa/
+
+# ── AI 开发过程文档(不上公开仓库) ─────────────────────────────────────────
+# 这些是 AI 辅助开发的过程产物(plans / decisions / ADR / 审查 / 反馈 /
+# superpowers 技能 / 归档 / 冒烟截图),对 GitHub 访客无价值且含大量内部讨论。
+# 公开仓库只保留:产品门面(README)、设计契约(specs / design)、用户文档
+# (user)、开发指南(development)、架构(architecture)、状态(STATE / changelog)、
+# 参考(reference)。要恢复某目录公开,在对应行前加 `!` 例外。
+docs/plans/
+docs/decisions/
+docs/adr/
+docs/reviews/
+docs/feedback/
+docs/archive/
+docs/superpowers/
+docs/design/screenshots/
+docs/screenshots/
+
