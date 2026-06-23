@@ -15,7 +15,7 @@ import type {
   CanvasView,
   UserChange,
 } from './canvas-host'
-import { renderElements, readToken, drawSelectionOutlines, drawMarquee } from './self-built-render'
+import { renderElements, readToken, drawSelectionOutlines, drawMarquee, type CardInfo } from './self-built-render'
 import { hitTest, screenToPage } from './self-built-hittest'
 import { commitFreedraw } from './self-built-freedraw'
 import { handleAtPoint, resizeGeometry, type Handle } from './self-built-resize'
@@ -29,7 +29,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   private userListeners = new Set<(c: UserChange) => void>()
   protected echoing = true
   protected ctx: CanvasRenderingContext2D | null
-  private getCardLabel: (id: string) => string
+  private getCardInfo: (id: string) => CardInfo | null
   private rafId: number | null = null
   private dragId: string | null = null
   private dragOffset = { x: 0, y: 0 }
@@ -59,10 +59,10 @@ export class SelfBuiltAdapter implements CanvasHost {
 
   constructor(
     private canvas: HTMLCanvasElement,
-    opts?: { getCardLabel?: (id: string) => string },
+    opts?: { getCardInfo?: (id: string) => CardInfo | null },
   ) {
     this.ctx = canvas.getContext('2d')
-    this.getCardLabel = opts?.getCardLabel ?? (() => '')
+    this.getCardInfo = opts?.getCardInfo ?? (() => null)
     this.attachPointer()
     this.attachKeyboard()
   }
@@ -97,7 +97,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       this.view,
       w,
       h,
-      this.getCardLabel,
+      this.getCardInfo,
       readToken('--color-canvas', '#f8fafc'),
     )
     drawSelectionOutlines(ctx, this.getSelectedIds(), this.getElements(), this.view)

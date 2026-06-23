@@ -27,6 +27,7 @@ function mockCtx() {
     set font(v: string) { calls.push(`font=${v}`) },
     set lineWidth(v: unknown) { calls.push(`lineWidth=${v}`) },
     clearRect: (x: number, y: number, w: number, h: number) => calls.push(`clearRect(${x},${y},${w},${h})`),
+    measureText: (s: string) => ({ width: s.length * 7 }),
   }
   return ctx as unknown as CanvasRenderingContext2D & { _calls: string[] }
 }
@@ -36,7 +37,7 @@ describe('renderElements', () => {
 
   it('applies the camera transform (translate + scale) around the draw', () => {
     const ctx = mockCtx()
-    renderElements(ctx, [], view, 800, 600, () => '', '#0f172a')
+    renderElements(ctx, [], view, 800, 600, () => null, '#0f172a')
     expect(ctx._calls).toContain('clearRect(0,0,800,600)')
     expect(ctx._calls).toContain('save')
     expect(ctx._calls).toContain('translate(10,20)')
@@ -50,16 +51,25 @@ describe('renderElements', () => {
       { id: 'c1', kind: 'card', x: 100, y: 50, w: 240, h: 120, rotation: 0 },
       { id: 'r1', kind: 'rect', x: 0, y: 0, w: 50, h: 30, rotation: 0, color: 'blue' },
     ]
-    renderElements(ctx, els, view, 800, 600, (id) => (id === 'c1' ? 'Title' : ''), '#0f172a')
+    renderElements(
+      ctx,
+      els,
+      view,
+      800,
+      600,
+      (id) => (id === 'c1' ? { title: 'Title', body: '', type: 'note', pinned: false } : null),
+      '#0f172a',
+    )
     expect(ctx._calls.some((c) => c.startsWith('roundRect(100,50,240,120)'))).toBe(true)
-    expect(ctx._calls).toContain('fillText(Title@110,70)')
+    // title @ (el.x+10, el.y+10+16) = (110, 76)
+    expect(ctx._calls.some((c) => c.startsWith('fillText(Title@110,76)'))).toBe(true)
     expect(ctx._calls.some((c) => c.startsWith('rect(0,0,50,30)'))).toBe(true)
   })
 
   it('skips unknown kinds without throwing', () => {
     const ctx = mockCtx()
     const els = [{ id: 'x', kind: 'freedraw', x: 0, y: 0, w: 0, h: 0, rotation: 0 }] as CanvasElement[]
-    expect(() => renderElements(ctx, els, view, 800, 600, () => '', '#0f172a')).not.toThrow()
+    expect(() => renderElements(ctx, els, view, 800, 600, () => null, '#0f172a')).not.toThrow()
   })
 
   it('draws a freedraw stroke as a polyline', () => {
@@ -70,7 +80,7 @@ describe('renderElements', () => {
         meta: { points: [[10, 10], [40, 50], [10, 50]] },
       },
     ] as unknown as CanvasElement[]
-    renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => '', '#ffffff')
+    renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => null, '#ffffff')
     expect(ctx._calls).toContain('moveTo(10,10)')
     expect(ctx._calls).toContain('lineTo(40,50)')
     expect(ctx._calls).toContain('lineTo(10,50)')
@@ -79,7 +89,7 @@ describe('renderElements', () => {
   it('freedraw with no points draws nothing (no throw)', () => {
     const ctx = mockCtx()
     const els = [{ id: 'f2', kind: 'freedraw', x: 0, y: 0, w: 0, h: 0, rotation: 0, meta: {} }] as unknown as CanvasElement[]
-    expect(() => renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => '', '#ffffff')).not.toThrow()
+    expect(() => renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => null, '#ffffff')).not.toThrow()
     expect(ctx._calls.some((c) => c.startsWith('moveTo'))).toBe(false)
   })
 
@@ -90,7 +100,7 @@ describe('renderElements', () => {
       { id: 'cb', kind: 'card', x: 200, y: 0, w: 100, h: 100, rotation: 0 },
       { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'cb', text: 'rel' },
     ] as unknown as CanvasElement[]
-    renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => '', '#ffffff')
+    renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => null, '#ffffff')
     // from=(100,50) → to=(200,50):主线
     expect(ctx._calls).toContain('moveTo(100,50)')
     expect(ctx._calls).toContain('lineTo(200,50)')
@@ -104,7 +114,7 @@ describe('renderElements', () => {
       { id: 'ca', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 },
       { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'ghost' },
     ] as unknown as CanvasElement[]
-    expect(() => renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => '', '#ffffff')).not.toThrow()
+    expect(() => renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => null, '#ffffff')).not.toThrow()
     // 不画 arrow 主线(没有 (100,50) 那种)— 只检查没有 moveTo(100,50)
     expect(ctx._calls.some((c) => c === 'moveTo(100,50)')).toBe(false)
   })
@@ -114,7 +124,7 @@ describe('renderElements', () => {
     const els = [
       { id: 't1', kind: 'text', x: 10, y: 20, w: 100, h: 36, rotation: 0, text: 'hello\nworld' },
     ] as unknown as CanvasElement[]
-    renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => '', '#ffffff')
+    renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => null, '#ffffff')
     // 行 1 @ y=20,行 2 @ y=20+18=38
     expect(ctx._calls).toContain('fillText(hello@10,20)')
     expect(ctx._calls).toContain('fillText(world@10,38)')
@@ -123,8 +133,34 @@ describe('renderElements', () => {
   it('text with empty string draws nothing (no throw)', () => {
     const ctx = mockCtx()
     const els = [{ id: 't2', kind: 'text', x: 0, y: 0, w: 1, h: 1, rotation: 0, text: '' }] as unknown as CanvasElement[]
-    expect(() => renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => '', '#ffffff')).not.toThrow()
+    expect(() => renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => null, '#ffffff')).not.toThrow()
     expect(ctx._calls.some((c) => c.startsWith('fillText'))).toBe(false)
+  })
+
+  it('card 渲染:类型标 + title + body + pinned(对齐 card-shape-util)', () => {
+    const ctx = mockCtx()
+    const els = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 240, h: 120, rotation: 0 },
+    ] as unknown as CanvasElement[]
+    const info = (id: string) =>
+      id === 'c1'
+        ? { title: 'My Card', body: 'body line', type: 'note', pinned: true }
+        : null
+    renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, info as never, '#ffffff')
+    // 类型标 @ (10, 10);title @ (10, 26);body @ (10, 48);pinned ★ @ 右上
+    expect(ctx._calls.some((c) => c.startsWith('fillText(NOTE@'))).toBe(true)
+    expect(ctx._calls.some((c) => c.startsWith('fillText(My Card@'))).toBe(true)
+    expect(ctx._calls.some((c) => c.startsWith('fillText(body line@'))).toBe(true)
+    expect(ctx._calls.some((c) => c.startsWith('fillText(★@'))).toBe(true)
+  })
+
+  it('card with missing info draws placeholder (no throw)', () => {
+    const ctx = mockCtx()
+    const els = [{ id: 'ghost', kind: 'card', x: 0, y: 0, w: 240, h: 120, rotation: 0 }] as unknown as CanvasElement[]
+    expect(() =>
+      renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => null, '#ffffff'),
+    ).not.toThrow()
+    expect(ctx._calls.some((c) => c.startsWith('fillText((untitled)@'))).toBe(true)
   })
 })
 

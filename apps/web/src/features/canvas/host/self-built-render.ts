@@ -7,20 +7,22 @@ import { arrowEndpoints } from './self-built-arrow'
  * 纯渲染函数:把元素画到 ctx 上,带相机(pan/zoom)变换。
  * - 先 clearRect 整个画布(背景色)。
  * - save → translate(panX,panY) → scale(zoom) → 画元素 → restore。
- * - card = 圆角矩形 + 标签(从 getCardLabel);rect = 矩形。其它 kind 本期不画。
+ * - card = 圆角矩形 + 类型标 + title + body 3 行 + pinned ★(从 getCardInfo);rect = 矩形。其它 kind 本期不画。
  *
  * 纯函数(无 DOM 副作用)以便单测(mock ctx)。
  *
  * 颜色/字体走设计 token(readToken 读 CSS 变量),不在绘制路径写裸 hex;
  * 仅 readToken 的 fallback 形参里保留 hex 兜底。
  */
+export type CardInfo = { title: string; body: string; type: string; pinned: boolean }
+
 export function renderElements(
   ctx: CanvasRenderingContext2D,
   elements: CanvasElement[],
   view: CanvasView,
   cssWidth: number,
   cssHeight: number,
-  getCardLabel: (id: string) => string,
+  getCardInfo: (id: string) => CardInfo | null,
   background: string,
 ): void {
   ctx.clearRect(0, 0, cssWidth, cssHeight)
@@ -31,7 +33,7 @@ export function renderElements(
   ctx.translate(view.panX, view.panY)
   ctx.scale(view.zoom, view.zoom)
   for (const el of elements) {
-    drawElement(ctx, el, elements, getCardLabel)
+    drawElement(ctx, el, elements, getCardInfo)
   }
   ctx.restore()
 }
@@ -40,19 +42,51 @@ function drawElement(
   ctx: CanvasRenderingContext2D,
   el: CanvasElement,
   allElements: CanvasElement[],
-  getCardLabel: (id: string) => string,
+  getCardInfo: (id: string) => CardInfo | null,
 ): void {
   switch (el.kind) {
     case 'card': {
+      const info = getCardInfo(el.id)
+      // 卡片背景 + 边框
       ctx.beginPath()
       ctx.roundRect(el.x, el.y, el.w, el.h, 4)
       ctx.fillStyle = readToken('--color-white', '#ffffff')
       ctx.fill()
       ctx.strokeStyle = readToken('--color-gray', '#e2e8f0')
+      ctx.lineWidth = 1
       ctx.stroke()
+      // 内容(对齐 card-shape-util:类型标 mono 灰 + title display + body 3 行)
+      const pad = 10
+      ctx.textBaseline = 'top'
+      if (!info) {
+        ctx.fillStyle = readToken('--color-gray', '#94a3b8')
+        ctx.font = `12px ${readToken('--font-mono', 'monospace')}`
+        ctx.fillText('(untitled)', el.x + pad, el.y + pad)
+        break
+      }
+      // pinned ★ 右上
+      if (info.pinned) {
+        ctx.fillStyle = readToken('--color-yellow', '#eab308')
+        ctx.font = `14px ${readToken('--font-mono', 'monospace')}`
+        ctx.fillText('★', el.x + el.w - 18, el.y + 6)
+      }
+      // 类型标(mono 灰 大写)
+      ctx.fillStyle = readToken('--color-gray', '#64748b')
+      ctx.font = `10px ${readToken('--font-mono', 'monospace')}`
+      ctx.fillText(info.type.toUpperCase(), el.x + pad, el.y + pad)
+      // title(display,500)
       ctx.fillStyle = readToken('--color-black', '#0f172a')
-      ctx.font = `500 14px ${readToken('--font-body', 'Inter, sans-serif')}`
-      ctx.fillText(getCardLabel(el.id) || '(untitled)', el.x + 10, el.y + 20)
+      ctx.font = `500 15px ${readToken('--font-display', 'Inter, sans-serif')}`
+      ctx.fillText(info.title || '(untitled)', el.x + pad, el.y + pad + 16)
+      // body(3 行截断)
+      if (info.body) {
+        ctx.fillStyle = readToken('--color-black-soft', '#475569')
+        ctx.font = `12px ${readToken('--font-body', 'Inter, sans-serif')}`
+        const lines = wrapLines(info.body, el.w - pad * 2, ctx)
+        for (let i = 0; i < Math.min(3, lines.length); i++) {
+          ctx.fillText(lines[i]!, el.x + pad, el.y + pad + 38 + i * 16)
+        }
+      }
       break
     }
     case 'rect': {
@@ -196,4 +230,27 @@ export function drawMarquee(
   ctx.setLineDash([4 / view.zoom, 4 / view.zoom])
   ctx.strokeRect(rect.x, rect.y, rect.w, rect.h)
   ctx.restore()
+}
+
+/** 按可用宽度把文本拆成行(Canvas 2D 无自动换行)。纯函数。 */
+export function wrapLines(text: string, maxWidth: number, ctx: CanvasRenderingContext2D): string[] {
+  const out: string[] = []
+  for (const para of text.split('\n')) {
+    if (para === '') {
+      out.push('')
+      continue
+    }
+    let line = ''
+    for (const ch of para) {
+      const test = line + ch
+      if (ctx.measureText(test).width > maxWidth && line) {
+        out.push(line)
+        line = ch
+      } else {
+        line = test
+      }
+    }
+    if (line) out.push(line)
+  }
+  return out
 }

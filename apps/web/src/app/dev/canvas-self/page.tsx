@@ -37,7 +37,10 @@ export default function CanvasSelfPage() {
     const canvas = canvasRef.current
     if (!canvas) return
     const adapter = new SelfBuiltAdapter(canvas, {
-      getCardLabel: (id) => service.get(id as never)?.title ?? '',
+      getCardInfo: (id) => {
+        const c = service.get(id as never)
+        return c ? { title: c.title, body: c.body ?? '', type: c.type, pinned: c.pinned } : null
+      },
     })
     adapterRef.current = adapter
     if (typeof window !== 'undefined') {
