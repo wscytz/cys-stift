@@ -1,5 +1,4 @@
 // apps/web/src/features/canvas/host/self-built-marquee.ts
-'use client'
 
 import type { CanvasElement } from './canvas-host'
 

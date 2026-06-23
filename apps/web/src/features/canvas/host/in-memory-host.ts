@@ -1,4 +1,3 @@
-'use client'
 
 import type { CanvasElement, CanvasHost, CanvasView, UserChange } from './canvas-host'
 /**

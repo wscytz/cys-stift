@@ -1,4 +1,3 @@
-'use client'
 
 import type { CanvasElement, CanvasView } from './canvas-host'
 import { arrowEndpoints, dashPattern, arrowheadPoints } from './self-built-arrow'

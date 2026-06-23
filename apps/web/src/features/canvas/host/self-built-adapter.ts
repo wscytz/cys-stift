@@ -1,4 +1,3 @@
-'use client'
 
 /**
  * SelfBuiltAdapter — CanvasHost 的自研 Canvas 2D 实现(Phase 1)。

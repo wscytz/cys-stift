@@ -1,4 +1,3 @@
-'use client'
 
 /** resize handle:四角。 */
 export type Handle = 'nw' | 'ne' | 'sw' | 'se'

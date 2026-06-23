@@ -1,5 +1,4 @@
 // apps/web/src/features/canvas/host/self-built-text.ts
-'use client'
 
 /**
  * text(文本编辑)纯函数:度量 + IME 守卫。

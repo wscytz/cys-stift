@@ -1,4 +1,3 @@
-'use client'
 
 /**
  * CanvasHost — 引擎无关的画布接口(Phase 0 / 路线 A)。
