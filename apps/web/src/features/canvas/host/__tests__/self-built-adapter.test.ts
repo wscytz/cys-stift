@@ -126,3 +126,44 @@ describe('SelfBuiltAdapter text 模式', () => {
     expect(fired).toBe(0) // text 模式 pointerdown/move/up 全 no-op → 不触发 onUserChange。listener 在 upsert(c1) 之后才加,所以初始 upsert 那次也没被计数 → fired 恒为 0。
   })
 })
+
+describe('SelfBuiltAdapter selection', () => {
+  function dispatch(canvas: HTMLCanvasElement, type: string, x: number, y: number) {
+    canvas.dispatchEvent(
+      new PointerEvent(type, {
+        pointerId: 1,
+        pointerType: 'mouse',
+        bubbles: true,
+        clientX: x,
+        clientY: y,
+      }),
+    )
+  }
+
+  it('getSelectedIds/setSelectedIds round-trip', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const h = host as unknown as { getSelectedIds: () => string[]; setSelectedIds: (ids: string[]) => void }
+    expect(h.getSelectedIds()).toEqual([])
+    h.setSelectedIds(['a', 'b'])
+    expect(h.getSelectedIds()).toEqual(['a', 'b'])
+  })
+
+  it('select 模式点元素 → 选中该元素(单选替换)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'c2', kind: 'card', x: 200, y: 0, w: 100, h: 100, rotation: 0 })
+    ;(host as unknown as { setSelectedIds: (ids: string[]) => void }).setSelectedIds(['c2'])
+    dispatch(canvas, 'pointerdown', 50, 50) // 命中 c1
+    expect((host as unknown as { getSelectedIds: () => string[] }).getSelectedIds()).toEqual(['c1'])
+  })
+
+  it('点空白 → 清空选择', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    ;(host as unknown as { setSelectedIds: (ids: string[]) => void }).setSelectedIds(['c1'])
+    dispatch(canvas, 'pointerdown', 500, 500) // 空白
+    expect((host as unknown as { getSelectedIds: () => string[] }).getSelectedIds()).toEqual([])
+  })
+})

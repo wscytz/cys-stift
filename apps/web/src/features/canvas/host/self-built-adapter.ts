@@ -43,6 +43,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   private wheelHandler: ((e: WheelEvent) => void) | null = null
   private activeTool: 'select' | 'freedraw' | 'text' = 'select'
   private currentStroke: { points: [number, number][] } | null = null
+  private selectedIds = new Set<string>()
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -144,6 +145,16 @@ export class SelfBuiltAdapter implements CanvasHost {
     return this.activeTool
   }
 
+  /** 当前选中元素 id(渲染器自身状态,不上 CanvasHost)。 */
+  getSelectedIds(): string[] {
+    return [...this.selectedIds]
+  }
+
+  setSelectedIds(ids: string[]): void {
+    this.selectedIds = new Set(ids)
+    this.scheduleRender()
+  }
+
   getView(): CanvasView {
     return { ...this.view }
   }
@@ -180,8 +191,10 @@ export class SelfBuiltAdapter implements CanvasHost {
         const el = this.getElement(id)!
         this.dragId = id
         this.dragOffset = { x: p.x - el.x, y: p.y - el.y }
+        this.setSelectedIds([id]) // 命中即选中(单选替换)
       } else {
-        // 空白处 mousedown → pan 模式
+        // 空白处 mousedown → pan 模式 + 清选择
+        this.setSelectedIds([])
         this.panning = {
           startSx: sx,
           startSy: sy,
