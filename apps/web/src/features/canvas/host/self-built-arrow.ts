@@ -51,3 +51,18 @@ export function arrowEndpoints(
     to: borderPoint(tc, toEl.w / 2, toEl.h / 2, fc),
   }
 }
+
+/**
+ * 连接预览端点:from = fromEl 朝 pointer 的边框交点;to = pointer(预览时指针当临时 to)。
+ * 纯函数。pointer 在元素内 → from = 中心(退化)。
+ */
+export function arrowPreviewEndpoints(
+  fromEl: CanvasElement,
+  pointer: { x: number; y: number },
+): { from: Point; to: Point } {
+  const fc = elementCenter(fromEl)
+  return {
+    from: borderPoint(fc, fromEl.w / 2, fromEl.h / 2, pointer),
+    to: { x: pointer.x, y: pointer.y },
+  }
+}
