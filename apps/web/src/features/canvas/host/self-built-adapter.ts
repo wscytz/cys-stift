@@ -44,6 +44,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   private activeTool: 'select' | 'freedraw' | 'text' = 'select'
   private currentStroke: { points: [number, number][] } | null = null
   private selectedIds = new Set<string>()
+  private keyHandler: ((e: KeyboardEvent) => void) | null = null
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -52,6 +53,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     this.ctx = canvas.getContext('2d')
     this.getCardLabel = opts?.getCardLabel ?? (() => '')
     this.attachPointer()
+    this.attachKeyboard()
   }
 
   protected scheduleRender(): void {
@@ -278,6 +280,27 @@ export class SelfBuiltAdapter implements CanvasHost {
   }
 
   /**
+   * 挂 window keydown:Delete/Backspace 删选中(严守卫)。
+   * activeTool==='text'(文本编辑中)或焦点在 INPUT/TEXTAREA 时不触发,防误删。
+   * 选择空不触发。detach 解绑,防泄漏。
+   */
+  private attachKeyboard(): void {
+    if (this.keyHandler) return
+    this.keyHandler = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+      if (this.activeTool === 'text') return // 文本编辑中不删
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return // 焦点在输入框不删
+      if (this.selectedIds.size === 0) return
+      e.preventDefault()
+      const ids = [...this.selectedIds]
+      this.setSelectedIds([])
+      for (const id of ids) this.remove(id) // echo → onUserChange
+    }
+    window.addEventListener('keydown', this.keyHandler)
+  }
+
+  /**
    * 滚轮缩放:以 (sx,sy) 为锚点的 zoom-to-cursor。
    * zoom 钳制 [0.1, 8];pan 补偿使 cursor 下的页坐标在缩放前后不变。
    */
@@ -305,6 +328,10 @@ export class SelfBuiltAdapter implements CanvasHost {
     if (this.wheelHandler) {
       this.canvas.removeEventListener('wheel', this.wheelHandler)
       this.wheelHandler = null
+    }
+    if (this.keyHandler) {
+      window.removeEventListener('keydown', this.keyHandler)
+      this.keyHandler = null
     }
   }
 

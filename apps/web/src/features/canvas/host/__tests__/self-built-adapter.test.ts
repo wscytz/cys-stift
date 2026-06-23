@@ -166,4 +166,43 @@ describe('SelfBuiltAdapter selection', () => {
     dispatch(canvas, 'pointerdown', 500, 500) // 空白
     expect((host as unknown as { getSelectedIds: () => string[] }).getSelectedIds()).toEqual([])
   })
+
+  function keydown(key: string, target: unknown = window) {
+    const ev = new KeyboardEvent('keydown', { key, bubbles: true })
+    Object.defineProperty(ev, 'target', { value: target, writable: false })
+    window.dispatchEvent(ev)
+  }
+
+  it('Delete 键删选中元素(非 text 模式 + target 非 input)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'c2', kind: 'card', x: 200, y: 0, w: 100, h: 100, rotation: 0 })
+    dispatch(canvas, 'pointerdown', 50, 50) // 选中 c1
+    const removed: string[] = []
+    host.onUserChange((c) => removed.push(...c.removed))
+    keydown('Delete')
+    expect(host.getElement('c1')).toBeUndefined()
+    expect(host.getElement('c2')).toBeDefined() // 只删选中的
+    expect(removed).toContain('c1')
+    expect((host as unknown as { getSelectedIds: () => string[] }).getSelectedIds()).toEqual([])
+  })
+
+  it('text 模式 Delete 不删(文本编辑中)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['c1'])
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('text')
+    keydown('Delete')
+    expect(host.getElement('c1')).toBeDefined() // 没删
+  })
+
+  it('焦点在 textarea 时 Delete 不删', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['c1'])
+    const fakeTextarea = { tagName: 'TEXTAREA' } as unknown as EventTarget
+    keydown('Delete', fakeTextarea)
+    expect(host.getElement('c1')).toBeDefined() // 没删
+  })
 })
