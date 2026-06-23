@@ -115,3 +115,23 @@ export function resolveExportShapes(
   }
   return editor.getCurrentPageShapes().map((s) => s.id)
 }
+
+// ── host adapter (CanvasElement[]; 零 tldraw) ──────────────────────────────────
+
+import type { CanvasElement, CanvasHost } from './host/canvas-host'
+
+/**
+ * 解析要导出的元素(scope=selection 用 host.getSelectedIds;diagram/page 用全部)。
+ * 替代旧的 resolveExportShapes(editor)(tldraw)。新导出层用本函数。
+ */
+export function resolveExportElements(
+  host: CanvasHost,
+  scope: ExportScope,
+): CanvasElement[] {
+  const all = host.getElements()
+  if (scope === 'selection') {
+    const sel = new Set(host.getSelectedIds())
+    if (sel.size > 0) return all.filter((e) => sel.has(e.id))
+  }
+  return all
+}

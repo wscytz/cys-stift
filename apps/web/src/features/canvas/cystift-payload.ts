@@ -4,29 +4,31 @@
  * P5.4 — the `.cystift` roundtrip payload (drawio P5-7).
  *
  * A `.cystift.svg` / `.cystift.png` carries the full canvas — cards (domain
- * content) + tldraw snapshot (geometry: card shapes, freeform draw, arrows)
- * + canvas meta — embedded IN the image file. Drop the file back onto the
- * app and the canvas is restored onto a fresh canvas. Single-file portable
- * cards, no sidecar.
+ * content) + CanvasElement[] (geometry: card shapes, freeform draw, arrows,
+ * rects, text) + canvas meta — embedded IN the image file. Drop the file back
+ * onto the app and the canvas is restored onto a fresh canvas. Single-file
+ * portable cards, no sidecar.
  *
- * Why both cards AND snapshot: the card shape in tldraw stores geometry +
- * a card-id reference; the card CONTENT (title/body/links/…) lives in the
- * CardService. Restoring fully needs both.
+ * Why both cards AND elements: the card element stores geometry + a card-id
+ * reference; the card CONTENT (title/body/links/…) lives in the CardService.
+ * Restoring fully needs both. The geometry is now a transparent
+ * `CanvasElement[]` (was an opaque tldraw `getSnapshot` before Phase 2 子3).
  *
  * Re-import remaps card ids (CardService.create mints fresh ids) and rewrites
- * the snapshot's `shape:<oldId>` references to match, so importing the same
- * `.cystift` twice never collides.
+ * the elements' card id + arrow from/to references to match, so importing the
+ * same `.cystift` twice never collides. Elements are restored via `host.upsert`
+ * when a host is supplied (drop-in restore path); without a host only the
+ * cards are restored (legacy/drag-drop fallback).
  */
-import { getSnapshot, type Editor } from '@tldraw/tldraw'
 import type { Card, CardId, CardService, CanvasId } from '@cys-stift/domain'
 import { canvasStore } from '@/lib/canvas-store'
-import { canvasSnapshotStore, type CanvasSnapshot } from '@/lib/canvas-snapshot-store'
 import {
   writePngTextChunk,
   readPngTextChunk,
   encodePayload,
   decodePayload,
 } from '@/lib/png-text-chunk'
+import type { CanvasElement, CanvasHost } from './host/canvas-host'
 
 const CYSTIFT_KEY = 'cystift'
 const CYSTIFT_ATTR = 'data-cystift'
@@ -39,14 +41,15 @@ export interface CystiftPayload {
   canvas: { id: string; name: string }
   /** Cards on this canvas at export time (content source of truth). */
   cards: Card[]
-  /** tldraw serialized store (geometry). Opaque — restored verbatim modulo
-   *  the card-id remap. */
-  snapshot: unknown
+  /** Geometry as a transparent CanvasElement[] (was opaque tldraw snapshot).
+   *  Old `.cystift` files (pre-子3) carry a `snapshot` field instead — restore
+   *  degrades to `payload.elements ?? []` (cards-only) for those. */
+  elements: CanvasElement[]
 }
 
-/** Build the payload from a live editor + service. */
+/** Build the payload from a live host + service. */
 export function buildCystiftPayload(
-  editor: Editor,
+  host: CanvasHost,
   service: CardService,
   canvasId: CanvasId,
   canvasName: string,
@@ -56,20 +59,25 @@ export function buildCystiftPayload(
     app: 'cys-stift',
     canvas: { id: canvasId, name: canvasName },
     cards: service.listOnCanvas(canvasId),
-    snapshot: getSnapshot(editor.store),
+    elements: host.getElements(),
   }
 }
 
 /**
  * Restore a payload onto a FRESH canvas (never clobbers an existing one).
  * Creates the canvas, re-imports the cards (new ids, positions remapped to
- * the new canvas), rewrites the snapshot's card-shape ids to match, saves
- * the snapshot, and switches to the new canvas. Returns the new canvas id
- * (or null if the payload is bad).
+ * the new canvas), then — when a host is supplied — re-inserts the geometry
+ * elements via host.upsert (card ids + arrow from/to remapped to the new
+ * card ids). Returns the new canvas id (or null if the payload is bad).
+ *
+ * `host` is optional: the legacy drag-drop path has no live host for the new
+ * canvas, so it degrades to restoring cards only (geometry lost). Callers
+ * with a host (e.g. the export-restore flow) pass it to restore full geometry.
  */
 export async function restoreCystiftPayload(
   payload: CystiftPayload,
   service: CardService,
+  host?: CanvasHost,
 ): Promise<CanvasId | null> {
   if (!payload || payload.app !== 'cys-stift' || !Array.isArray(payload.cards)) {
     return null
@@ -77,13 +85,10 @@ export async function restoreCystiftPayload(
   const name = (payload.canvas?.name || 'restored canvas') + ' · ' + 'restored'
   const newCanvasId = canvasStore.create(name)
 
-  // Rewrite card-shape ids in the snapshot to the freshly-minted ids. We
-  // work on the serialized JSON string so every reference (shape id, arrow
-  // bindings, etc.) is caught in one pass.
-  let snapJson = JSON.stringify(payload.snapshot ?? {})
+  // card id 重映射:旧 cardId → 新 cardId(service.create 生成)。
+  const idMap = new Map<string, string>()
   for (const card of payload.cards) {
     const oldId = String(card.id)
-    // Clone the card onto the new canvas via the service (fresh id).
     const created = service.create({
       title: card.title,
       body: card.body,
@@ -98,23 +103,26 @@ export async function restoreCystiftPayload(
         ? { ...card.canvasPosition, canvasId: newCanvasId }
         : undefined,
     })
-    if (oldId && oldId !== String(created.id)) {
-      // Card shape ids are `shape:<cardId>`. Replace the literal token so
-      // ids + any binding references follow the card.
-      const before = `shape:${oldId}`
-      const after = `shape:${String(created.id)}`
-      snapJson = snapJson.split(before).join(after)
-    }
+    idMap.set(oldId, String(created.id))
   }
 
-  let snapshot: CanvasSnapshot
-  try {
-    snapshot = JSON.parse(snapJson) as CanvasSnapshot
-  } catch {
-    snapshot = {} as CanvasSnapshot
+  // 恢复几何元素:card 用新 id;arrow 的 from/to 重映射。旧 .cystift 文件
+  // (含 snapshot,无 elements)降级为空元素(只恢复 cards)。
+  const elements = (payload.elements ?? []) as CanvasElement[]
+  if (host && elements.length > 0) {
+    host.applyWithoutEcho(() => {
+      for (const el of elements) {
+        const newEl: CanvasElement = { ...el }
+        if (el.kind === 'card' && idMap.has(el.id)) {
+          newEl.id = idMap.get(el.id)!
+        }
+        if (el.from && idMap.has(el.from)) newEl.from = idMap.get(el.from)!
+        if (el.to && idMap.has(el.to)) newEl.to = idMap.get(el.to)!
+        host.upsert(newEl)
+      }
+    })
   }
-  await canvasSnapshotStore.save(newCanvasId, snapshot)
-  // canvasStore.create already made the new canvas active; ensure it.
+
   canvasStore.setActive(newCanvasId)
   return newCanvasId
 }
@@ -154,10 +162,13 @@ export async function extractCystiftFromPng(
 }
 
 /** Detect + restore a `.cystift` payload from a dropped File (PNG or SVG).
- *  Returns the new canvas id, or null if the file isn't a cystift file. */
+ *  Returns the new canvas id, or null if the file isn't a cystift file.
+ *  `host` optional — when supplied, geometry elements are restored via
+ *  host.upsert; without it only cards are restored (drag-drop fallback). */
 export async function restoreFromFile(
   file: File,
   service: CardService,
+  host?: CanvasHost,
 ): Promise<CanvasId | null> {
   const isPng = file.type === 'image/png' || file.name.toLowerCase().endsWith('.png')
   const isSvg = file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')
@@ -167,14 +178,14 @@ export async function restoreFromFile(
     const text = await file.text()
     const payload = extractCystiftFromSvg(text)
     if (!payload) return null
-    return await restoreCystiftPayload(payload, service)
+    return await restoreCystiftPayload(payload, service, host)
   }
 
   // PNG — read bytes, look for the cystift tEXt chunk.
   const buf = new Uint8Array(await file.arrayBuffer())
   const payload = await extractCystiftFromPng(buf)
   if (!payload) return null
-  return await restoreCystiftPayload(payload, service)
+  return await restoreCystiftPayload(payload, service, host)
 }
 
 /** Quick check whether a File MIGHT be a cystift file (cheap — name/mime

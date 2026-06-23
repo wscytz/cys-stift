@@ -7,6 +7,7 @@ import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
 import { SelfCanvas, type SelfCanvasHandle } from '@/features/canvas/self-canvas'
 import { CardDetailModal } from '@/features/canvas/card-detail-modal'
+import { ExportDialog } from '@/features/canvas/export-dialog'
 import { applyLayout } from '@/features/canvas/apply-layout'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { parseDsl } from '@/features/ai/dsl-parser'
@@ -54,6 +55,7 @@ export default function CanvasPage() {
   const [creatingName, setCreatingName] = useState<string | null>(null)
   const [renamingId, setRenamingId] = useState<CanvasId | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<CanvasId | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
 
   const onCanvas = service
     .listOnCanvas(activeCanvasId)
@@ -230,6 +232,8 @@ Output DSL like:
         <SnapToggle mode={snapMode} onToggle={toggleSnap} disabled={!adapterReady} />
         <span className="tb-divider" aria-hidden="true" />
         <ZoomGroup adapterReady={adapterReady} onZoom={zoomBy} />
+        <span className="tb-divider" aria-hidden="true" />
+        <Button variant="ghost" onClick={() => setExportOpen(true)} disabled={!adapterReady} title={t('canvas.export')}>{t('canvas.export')}</Button>
       </Toolbar>
 
       <div className="cv-host">
@@ -309,6 +313,15 @@ Output DSL like:
           }}
         />
       )}
+
+      <ExportDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        host={handle.current.adapter}
+        service={service}
+        canvasId={activeCanvasId}
+        canvasName={activeCanvas?.name ?? ''}
+      />
 
       <style>{styles}</style>
     </main>

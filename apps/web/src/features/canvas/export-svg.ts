@@ -3,12 +3,12 @@
 /**
  * P5.2 — canvas → SVG export (drawio P5-3, P5-4, P5-5).
  *
- * Pipeline:
+ * Pipeline (Phase 2 子3: host-based, zero tldraw):
  *   1. `await document.fonts.ready` — the #1 "missing font in export" cause
  *      is timing, not embedding (drawio `export.js:777`).
- *   2. `editor.getSvgString(shapes, { scale, background, padding })` — tldraw
- *      does the shape→SVG walk + the symmetric border (our `border` maps to
- *      its native `padding`).
+ *   2. `elementsToSvg(elements, view, getCardInfo, opts)` — our pure
+ *      CanvasElement[] → SVG walker (replaces tldraw's getSvgString + the
+ *      10× retry loop; geometry is now synchronous + deterministic).
  *   3. Post-process the SVG string:
  *      - embedFonts: scan `<text font-family=…>`, match against the page's
  *        `@font-face` rules (next/font self-hosts woff2 under
@@ -16,14 +16,12 @@
  *        NEVER use Google-Fonts `@import` — local-first means the export
  *        must render offline.
  *      - embedImages: inline any non-`data:` `<image href>` / `<img src>`
- *        (tldraw assets are already data URLs; this is a safety net for
- *        URL-referenced images).
+ *        (a safety net for URL-referenced images).
  *      - embedCystift: stash the full-canvas payload as `data-cystift` so the
  *        `.cystift.svg` round-trips back into the app.
  */
-import type { Editor } from '@tldraw/tldraw'
 import {
-  resolveExportShapes,
+  resolveExportElements,
   getSafeFileName,
   type ExportScope,
 } from './export-bounds'
@@ -32,12 +30,14 @@ import {
   buildCystiftPayload,
   type CystiftPayload,
 } from './cystift-payload'
+import { elementsToSvg } from './host/elements-to-svg'
+import type { CanvasHost } from './host/canvas-host'
 import type { CardService, CanvasId } from '@cys-stift/domain'
 
 export interface CanvasSvgExportOptions {
   scope?: ExportScope
   scale?: number
-  /** Symmetric px border around content (maps to tldraw `padding`). */
+  /** Symmetric px border around content. */
   border?: number
   /** Include the background colour? false = transparent. */
   background?: boolean
@@ -54,7 +54,7 @@ export interface CanvasSvgExportResult {
 }
 
 export async function exportCanvasSvg(
-  editor: Editor,
+  host: CanvasHost,
   service: CardService,
   canvasId: CanvasId,
   canvasName: string,
@@ -69,8 +69,25 @@ export async function exportCanvasSvg(
     embedImages = true,
     embedCystift = true,
   } = opts
+  void scale // 保留签名兼容;rasterize 在 export-raster 用 bitmap scale。
 
-  // 1. Fonts ready (best-effort; non-browser envs skip).
+  // 1. Resolve elements + render (synchronous; no tldraw retry loop).
+  const elements = resolveExportElements(host, scope)
+  if (elements.length === 0) return null
+  const view = host.getView()
+
+  // getCardInfo:从 service 读(同 SelfCanvas 的 getCardInfo)。
+  const getCardInfo = (id: string) => {
+    const card = service.get(id as never)
+    return card
+      ? { title: card.title, body: card.body ?? '', type: card.type, pinned: card.pinned }
+      : null
+  }
+
+  const result = elementsToSvg(elements, view, getCardInfo, { background, border })
+  let svg = result.svg
+
+  // 2. Fonts ready (best-effort; non-browser envs skip).
   if (embedFonts && typeof document !== 'undefined') {
     try {
       await (document as unknown as { fonts?: { ready: Promise<unknown> } }).fonts
@@ -80,26 +97,11 @@ export async function exportCanvasSvg(
     }
   }
 
-  // 2. Resolve shapes + render. tldraw's getSvgString can return undefined
-  //    on the FIRST export right after shapes are created (assets / render
-  //    not yet settled) — retry a few times so a user's first export doesn't
-  //    silently come back empty.
-  const shapeIds = resolveExportShapes(editor, scope)
-  if (shapeIds.length === 0) return null
-  const svgOpts = { scale, background, padding: border }
-  let result = await editor.getSvgString(shapeIds as never, svgOpts)
-  for (let attempt = 0; attempt < 10 && !result; attempt++) {
-    await new Promise((r) => setTimeout(r, 150))
-    result = await editor.getSvgString(shapeIds as never, svgOpts)
-  }
-  if (!result) return null
-
   // 3. Post-process the SVG string.
-  let svg = result.svg
   if (embedFonts) svg = await embedFontsInSvg(svg)
   if (embedImages) svg = await embedImagesInSvg(svg)
   if (embedCystift) {
-    const payload = buildCystiftPayload(editor, service, canvasId, canvasName)
+    const payload = buildCystiftPayload(host, service, canvasId, canvasName)
     svg = embedCystiftInSvg(svg, payload)
   }
 

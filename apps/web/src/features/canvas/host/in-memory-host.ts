@@ -23,6 +23,15 @@ export class InMemoryCanvasHost implements CanvasHost {
     return this.elements.get(id)
   }
 
+  private selectedIds = new Set<string>()
+  getSelectedIds(): string[] {
+    return [...this.selectedIds]
+  }
+  /** 测试辅助:设置选中(契约测试/导出测试用)。 */
+  setSelectedIds(ids: string[]): void {
+    this.selectedIds = new Set(ids)
+  }
+
   upsert(el: CanvasElement): void {
     this.elements.set(el.id, el)
     if (this.echoing) this.emit({ updated: [el], removed: [] })

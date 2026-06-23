@@ -177,6 +177,12 @@ export class TldrawAdapter implements CanvasHost {
     return shapeToElement(s as TLShape) ?? undefined
   }
 
+  getSelectedIds(): string[] {
+    return this.editor
+      .getSelectedShapes()
+      .map((s) => fromShapeId((s as { id: unknown }).id))
+  }
+
   upsert(el: CanvasElement): void {
     const sid = toShapeId(el.id) as never
     const existing = this.editor.getShape(sid)

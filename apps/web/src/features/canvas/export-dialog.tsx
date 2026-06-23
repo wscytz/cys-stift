@@ -17,7 +17,6 @@
  * to drop the file back onto the app to restore.
  */
 import { useState } from 'react'
-import { useValue, type Editor } from '@tldraw/tldraw'
 import { Modal, Button } from '@cys-stift/ui'
 import type { CanvasId, CardService } from '@cys-stift/domain'
 import { useI18n } from '@/lib/i18n'
@@ -33,20 +32,21 @@ import {
   type RasterFormat,
 } from './export-raster'
 import type { ExportScope } from './export-bounds'
+import type { CanvasHost } from './host/canvas-host'
 
 type Format = 'svg' | RasterFormat
 
 export function ExportDialog({
   open,
   onClose,
-  editor,
+  host,
   service,
   canvasId,
   canvasName,
 }: {
   open: boolean
   onClose: () => void
-  editor: Editor | null
+  host: CanvasHost | null
   service: CardService
   canvasId: CanvasId
   canvasName: string
@@ -60,23 +60,21 @@ export function ExportDialog({
   const [busy, setBusy] = useState(false)
 
   // Reactive selection count — disable the "selection" scope when empty.
-  const selectedCount = useValue(
-    'export selection',
-    () => editor?.getSelectedShapes().length ?? 0,
-    [editor],
-  )
+  // (host.getSelectedIds 是命令式读;open 时每次 render 取当前值即可——
+  //  dialog 打开期间用户不交互画布选择,值稳定。)
+  const selectedCount = host?.getSelectedIds().length ?? 0
   const scopeIsSelection = scope === 'selection'
   const selectionDisabled = selectedCount === 0
 
   const doExport = async () => {
-    if (!editor || busy) return
+    if (!host || busy) return
     setBusy(true)
     try {
       const effectiveScope: ExportScope =
         scopeIsSelection && selectionDisabled ? 'diagram' : scope
       const baseName = canvasName || 'canvas'
       if (format === 'svg') {
-        const result = await exportCanvasSvg(editor, service, canvasId, canvasName, {
+        const result = await exportCanvasSvg(host, service, canvasId, canvasName, {
           scope: effectiveScope,
           scale: 1,
           border,
@@ -88,7 +86,7 @@ export function ExportDialog({
         }
         downloadSvg(result.svg, baseName)
       } else {
-        const blob = await exportCanvasImage(editor, service, canvasId, canvasName, {
+        const blob = await exportCanvasImage(host, service, canvasId, canvasName, {
           scope: effectiveScope,
           scale,
           border,
@@ -206,7 +204,7 @@ export function ExportDialog({
         <Button
           variant="primary"
           onClick={doExport}
-          disabled={!editor || busy}
+          disabled={!host || busy}
         >
           {busy ? '…' : t('canvas.exportDo')}
         </Button>

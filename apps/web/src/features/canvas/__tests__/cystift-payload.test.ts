@@ -30,7 +30,7 @@ const PAYLOAD: CystiftPayload = {
       archived: false,
     },
   ],
-  snapshot: { schema: 1, store: {} },
+  elements: [],
 }
 
 describe('.cystift SVG roundtrip (data-cystift attribute)', () => {

@@ -74,6 +74,8 @@ export interface CanvasHost {
   /** 当前页可见元素(已排除引擎内部隐藏)。 */
   getElements(): CanvasElement[]
   getElement(id: string): CanvasElement | undefined
+  /** 当前选中的元素 id(导出层 scope=selection 用)。 */
+  getSelectedIds(): string[]
   /** create-or-update。 */
   upsert(el: CanvasElement): void
   remove(id: string): void
