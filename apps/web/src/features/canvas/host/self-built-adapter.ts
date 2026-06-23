@@ -21,6 +21,7 @@ import { commitFreedraw } from './self-built-freedraw'
 import { handleAtPoint, resizeGeometry, type Handle } from './self-built-resize'
 import { marqueeSelect } from './self-built-marquee'
 import { arrowPreviewEndpoints } from './self-built-arrow'
+import { arrowKeyDelta, selectAllIds, parseKeyboardAction } from './self-built-keyboard'
 
 export class SelfBuiltAdapter implements CanvasHost {
   private elements = new Map<string, CanvasElement>()
@@ -523,15 +524,42 @@ export class SelfBuiltAdapter implements CanvasHost {
   private attachKeyboard(): void {
     if (this.keyHandler) return
     this.keyHandler = (e: KeyboardEvent) => {
-      if (e.key !== 'Delete' && e.key !== 'Backspace') return
-      if (this.activeTool === 'text') return // 文本编辑中不删
+      // 守卫:text 模式 / 焦点在输入框
       const t = e.target as HTMLElement | null
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return // 焦点在输入框不删
-      if (this.selectedIds.size === 0) return
-      e.preventDefault()
-      const ids = [...this.selectedIds]
-      this.setSelectedIds([])
-      for (const id of ids) this.remove(id) // echo → onUserChange
+      const inInput = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')
+      if (this.activeTool === 'text' || inInput) {
+        // 文本编辑中:只可能 IME;不拦截任何键(Delete/微移/undo 都不触发)
+        return
+      }
+      // undo/redo/selectAll(守 isComposing——IME 组合态不 undo)
+      const action = parseKeyboardAction(e)
+      if (action) {
+        if (e.isComposing) return
+        e.preventDefault()
+        if (action === 'undo') this.undo()
+        else if (action === 'redo') this.redo()
+        else if (action === 'selectAll') this.setSelectedIds(selectAllIds(this.getElements()))
+        return
+      }
+      // Delete/Backspace(现有)
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (this.selectedIds.size === 0) return
+        e.preventDefault()
+        const ids = [...this.selectedIds]
+        this.setSelectedIds([])
+        for (const id of ids) this.remove(id) // echo → onUserChange
+        return
+      }
+      // 方向键微移
+      const delta = arrowKeyDelta(e.key, e.shiftKey)
+      if (delta) {
+        if (this.selectedIds.size === 0) return
+        e.preventDefault()
+        for (const id of this.selectedIds) {
+          const el = this.getElement(id)
+          if (el) this.upsert({ ...el, x: el.x + delta.dx, y: el.y + delta.dy })
+        }
+      }
     }
     window.addEventListener('keydown', this.keyHandler)
   }

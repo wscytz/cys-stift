@@ -386,3 +386,54 @@ describe('SelfBuiltAdapter undo/redo', () => {
     expect(count).toBe(50)
   })
 })
+
+describe('SelfBuiltAdapter keyboard actions', () => {
+  function keydown(key: string, opts: { ctrl?: boolean; meta?: boolean; shift?: boolean; isComposing?: boolean; target?: unknown } = {}) {
+    const ev = new KeyboardEvent('keydown', {
+      key,
+      bubbles: true,
+      ctrlKey: !!opts.ctrl,
+      metaKey: !!opts.meta,
+      shiftKey: !!opts.shift,
+    })
+    if (opts.isComposing !== undefined) Object.defineProperty(ev, 'isComposing', { value: opts.isComposing, configurable: true })
+    if (opts.target !== undefined) Object.defineProperty(ev, 'target', { value: opts.target, configurable: true })
+    window.dispatchEvent(ev)
+  }
+
+  it('方向键微移选中元素(+1px)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['c1'])
+    keydown('ArrowRight')
+    expect(host.getElement('c1')?.x).toBe(1)
+    keydown('ArrowDown', { shift: true }) // +10
+    expect(host.getElement('c1')?.y).toBe(10)
+  })
+
+  it('Ctrl+A 全选', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    host.upsert({ id: 'b', kind: 'card', x: 20, y: 0, w: 10, h: 10, rotation: 0 })
+    keydown('a', { ctrl: true })
+    expect((host as unknown as { getSelectedIds: () => string[] }).getSelectedIds().sort()).toEqual(['a', 'b'])
+  })
+
+  it('Ctrl+Z undo 微移', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['c1'])
+    keydown('ArrowRight') // x→1
+    keydown('z', { ctrl: true }) // undo → x→0
+    expect(host.getElement('c1')?.x).toBe(0)
+  })
+
+  it('IME 组合态 Ctrl+Z 不触发 undo', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['c1'])
+    keydown('ArrowRight') // x→1,进 undo 栈
+    keydown('z', { ctrl: true, isComposing: true }) // IME 中 → 不 undo
+    expect(host.getElement('c1')?.x).toBe(1) // 仍 1
+  })
+})
