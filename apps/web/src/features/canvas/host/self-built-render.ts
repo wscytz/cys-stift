@@ -176,3 +176,24 @@ export function drawSelectionOutlines(
   }
   ctx.restore()
 }
+
+/** 画框选预览矩形(dashed + 半透明填充,在相机变换内)。空 rect 不画。 */
+export function drawMarquee(
+  ctx: CanvasRenderingContext2D,
+  rect: { x: number; y: number; w: number; h: number },
+  view: CanvasView,
+): void {
+  if (rect.w === 0 || rect.h === 0) return
+  ctx.save()
+  ctx.translate(view.panX, view.panY)
+  ctx.scale(view.zoom, view.zoom)
+  ctx.fillStyle = readToken('--color-blue', '#1d4ed8')
+  ctx.globalAlpha = 0.1
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h)
+  ctx.globalAlpha = 1
+  ctx.strokeStyle = readToken('--color-blue', '#1d4ed8')
+  ctx.lineWidth = 1 / view.zoom
+  ctx.setLineDash([4 / view.zoom, 4 / view.zoom])
+  ctx.strokeRect(rect.x, rect.y, rect.w, rect.h)
+  ctx.restore()
+}

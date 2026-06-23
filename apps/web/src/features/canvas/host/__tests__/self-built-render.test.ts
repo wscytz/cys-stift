@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { renderElements, drawSelectionOutlines } from '../self-built-render'
+import { renderElements, drawSelectionOutlines, drawMarquee } from '../self-built-render'
 import type { CanvasElement, CanvasView } from '../canvas-host'
 
 /** mock CanvasRenderingContext2D:记录所有方法调用。 */
@@ -158,5 +158,15 @@ describe('drawSelectionOutlines', () => {
     const ctx = mockCtx()
     drawSelectionOutlines(ctx, [], [], { panX: 0, panY: 0, zoom: 1, gridMode: 'free' })
     expect(ctx._calls.some((c) => c.startsWith('strokeRect'))).toBe(false)
+  })
+})
+
+describe('drawMarquee', () => {
+  it('draws a dashed semi-transparent rect', () => {
+    const ctx = mockCtx()
+    drawMarquee(ctx, { x: 10, y: 20, w: 100, h: 60 }, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' })
+    expect(ctx._calls.some((c) => c.startsWith('fillRect(10,20,100,60)'))).toBe(true)
+    expect(ctx._calls.some((c) => c.startsWith('strokeRect(10,20,100,60)'))).toBe(true)
+    expect(ctx._calls.some((c) => c.startsWith('setLineDash'))).toBe(true)
   })
 })
