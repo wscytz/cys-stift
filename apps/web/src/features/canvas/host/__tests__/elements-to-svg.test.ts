@@ -41,6 +41,44 @@ describe('elementsToSvg', () => {
     expect(r.svg).toContain('<line')
   })
 
+  it('arrow 带 dash=dashed → SVG <line> 含 stroke-dasharray', () => {
+    const els: CanvasElement[] = [
+      { id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'b', kind: 'card', x: 300, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b', dash: 'dashed' },
+    ]
+    const r = elementsToSvg(els, view, () => null, { background: false, border: 0 })
+    expect(r.svg).toContain('stroke-dasharray')
+  })
+
+  it('arrow arrowhead=triangle → SVG <polygon>(实心三角);=none → 无箭头', () => {
+    const base: CanvasElement[] = [
+      { id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'b', kind: 'card', x: 300, y: 0, w: 100, h: 100, rotation: 0 },
+    ]
+    const tri = elementsToSvg(
+      [...base, { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b', arrowhead: 'triangle' }],
+      view, () => null, { background: false, border: 0 },
+    )
+    expect(tri.svg).toContain('<polygon')
+    const none = elementsToSvg(
+      [...base, { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b', arrowhead: 'none' }],
+      view, () => null, { background: false, border: 0 },
+    )
+    expect(none.svg).not.toContain('<polygon')
+    expect(none.svg).not.toContain('<polyline')
+  })
+
+  it('arrow 默认(无 arrowhead 字段)→ 开口 V <polyline>', () => {
+    const els: CanvasElement[] = [
+      { id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'b', kind: 'card', x: 300, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b' },
+    ]
+    const r = elementsToSvg(els, view, () => null, { background: false, border: 0 })
+    expect(r.svg).toContain('<polyline')
+  })
+
   it('border 加 padding(width/height 含 2×border)', () => {
     const els: CanvasElement[] = [
       { id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 50, rotation: 0 },

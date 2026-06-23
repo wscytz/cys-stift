@@ -126,7 +126,13 @@ export function RelationPanel({
           >
             <span
               className="cv-relation__swatch"
-              style={{ background: rt.swatch }}
+              style={{
+                // 线型预览:用 border-top 的样式体现 solid/dashed/dotted,颜色=关系色。
+                // 这样 swatch 一眼读出「颜色 + 线型」两维签名(箭头形在画布上看)。
+                borderTopStyle:
+                  rt.dash === 'dashed' ? 'dashed' : rt.dash === 'dotted' ? 'dotted' : 'solid',
+                borderTopColor: rt.swatch,
+              }}
               aria-hidden="true"
             />
             <span className="cv-relation__label">{t(rt.labelKey)}</span>
@@ -212,10 +218,10 @@ const styles = `
 }
 .cv-relation__swatch {
   display: inline-block;
-  width: 10px;
-  height: 10px;
-  border: 1px solid var(--color-black);
-  border-radius: 2px;
+  width: 16px;
+  height: 0;
+  /* 线型预览:3px 顶边,样式/颜色由 inline style 按关系类型设置(solid/dashed/dotted)。 */
+  border-top: 3px solid var(--color-black);
   flex: 0 0 auto;
 }
 .cv-relation__label {
@@ -230,9 +236,8 @@ const styles = `
   border-color: var(--color-black);
 }
 .cv-relation__btn--active .cv-relation__swatch {
-  /* invert swatch border in active state so the dot reads as inset rather
-   * than disappearing into the dark background */
-  border-color: var(--color-white);
+  /* active 态深底:线型颜色由 inline borderTopColor(关系色)决定,已能在深底读出;
+   * 此处不再强制改色(旧填充方块的反色规则已不适用线型预览)。 */
 }
 .cv-relation__btn:focus-visible {
   outline: 2px solid var(--color-red);

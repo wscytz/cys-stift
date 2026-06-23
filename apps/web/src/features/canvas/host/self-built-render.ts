@@ -1,7 +1,7 @@
 'use client'
 
 import type { CanvasElement, CanvasView } from './canvas-host'
-import { arrowEndpoints } from './self-built-arrow'
+import { arrowEndpoints, dashPattern, arrowheadPoints } from './self-built-arrow'
 
 /**
  * 纯渲染函数:把元素画到 ctx 上,带相机(pan/zoom)变换。
@@ -110,25 +110,42 @@ function drawElement(
     case 'arrow': {
       const { from, to } = arrowEndpoints(el, allElements)
       if (!from || !to) break
+      const stroke = colorOf(el.color)
+      // 线段(语义线型:dash)
       ctx.beginPath()
       ctx.moveTo(from.x, from.y)
       ctx.lineTo(to.x, to.y)
-      ctx.strokeStyle = colorOf(el.color)
+      ctx.strokeStyle = stroke
       ctx.lineWidth = 2
+      ctx.setLineDash(dashPattern(el.dash))
       ctx.stroke()
-      // V 形箭头 @ to,沿 from→to 方向
+      ctx.setLineDash([]) // 复位,免污染后续绘制
+      // 箭头头(语义箭头形:arrow=开口V / triangle=实心 / none=无)
       const angle = Math.atan2(to.y - from.y, to.x - from.x)
-      const head = 10
-      ctx.beginPath()
-      ctx.moveTo(to.x, to.y)
-      ctx.lineTo(to.x - head * Math.cos(angle - Math.PI / 6), to.y - head * Math.sin(angle - Math.PI / 6))
-      ctx.moveTo(to.x, to.y)
-      ctx.lineTo(to.x - head * Math.cos(angle + Math.PI / 6), to.y - head * Math.sin(angle + Math.PI / 6))
-      ctx.stroke()
+      const headKind = el.arrowhead ?? 'arrow'
+      const pts = arrowheadPoints(headKind, to, angle)
+      if (pts.length === 3) {
+        const [left, tip, right] = pts as [typeof to, typeof to, typeof to]
+        if (headKind === 'triangle') {
+          ctx.beginPath()
+          ctx.moveTo(tip.x, tip.y)
+          ctx.lineTo(left.x, left.y)
+          ctx.lineTo(right.x, right.y)
+          ctx.closePath()
+          ctx.fillStyle = stroke
+          ctx.fill()
+        } else {
+          ctx.beginPath()
+          ctx.moveTo(left.x, left.y)
+          ctx.lineTo(tip.x, tip.y)
+          ctx.lineTo(right.x, right.y)
+          ctx.stroke()
+        }
+      }
       if (el.text) {
         const mx = (from.x + to.x) / 2
         const my = (from.y + to.y) / 2
-        ctx.fillStyle = colorOf(el.color)
+        ctx.fillStyle = stroke
         ctx.font = `12px ${readToken('--font-body', 'Inter, sans-serif')}`
         ctx.fillText(el.text, mx, my)
       }
@@ -151,12 +168,22 @@ function drawElement(
   }
 }
 
-/** 把 DSL color 名(blue/red/...)映射成设计 token(不是裸 hex);未知/缺省回退黑色 token。 */
-function colorOf(c: string | undefined): string {
+/**
+ * 把 DSL/关系 color 名映射成设计 token(Bauhaus 6 原色,不写裸 hex)。
+ *
+ * 约束(packages/ui 铁律):6 原色 red/yellow/blue/black/white/gray,**不引第七色**。
+ * 故这里**没有 green**(曾误映射 `green→--color-green`,但该 token 不存在且违反
+ * 6 原色约束,已删)。`grey`/`gray` 都映射到 `--color-gray`(关系类型 related-to
+ * 用 'grey',此前漏映射被回退成黑色——真 bug,此处修)。未知/缺省回退黑色 token。
+ */
+export function colorOf(c: string | undefined): string {
   const tokenFor: Record<string, string> = {
     blue: '--color-blue',
     red: '--color-red',
-    green: '--color-green',
+    yellow: '--color-yellow',
+    gray: '--color-gray',
+    grey: '--color-gray',
+    white: '--color-white',
     black: '--color-black',
   }
   return readToken(tokenFor[c ?? 'black'] ?? '--color-black', '#0f172a')

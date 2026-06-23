@@ -1,8 +1,8 @@
 'use client'
 
 import type { CanvasElement, CanvasView } from './canvas-host'
-import { readToken } from './self-built-render'
-import { arrowEndpoints } from './self-built-arrow'
+import { readToken, colorOf } from './self-built-render'
+import { arrowEndpoints, dashPattern, arrowheadPoints } from './self-built-arrow'
 import { unionBounds, expandBounds, type Bounds } from '../export-bounds'
 
 export interface ElementsToSvgOptions {
@@ -92,30 +92,47 @@ function elementToSvg(
       return parts.join('')
     }
     case 'rect':
-      return `<rect x="${x}" y="${y}" width="${el.w}" height="${el.h}" fill="none" stroke="${strokeColor(el.color)}"/>`
+      return `<rect x="${x}" y="${y}" width="${el.w}" height="${el.h}" fill="none" stroke="${colorOf(el.color)}"/>`
     case 'ellipse':
-      return `<ellipse cx="${x + el.w / 2}" cy="${y + el.h / 2}" rx="${el.w / 2}" ry="${el.h / 2}" fill="none" stroke="${strokeColor(el.color)}"/>`
+      return `<ellipse cx="${x + el.w / 2}" cy="${y + el.h / 2}" rx="${el.w / 2}" ry="${el.h / 2}" fill="none" stroke="${colorOf(el.color)}"/>`
     case 'freedraw': {
       const pts = (el.meta?.points as [number, number][] | undefined) ?? []
       if (pts.length === 0) return ''
       const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]! + dx} ${p[1]! + dy}`).join(' ')
-      return `<path d="${d}" fill="none" stroke="${strokeColor(el.color)}" stroke-width="2"/>`
+      return `<path d="${d}" fill="none" stroke="${colorOf(el.color)}" stroke-width="2"/>`
     }
     case 'text':
       return `<text x="${x}" y="${y + 14}" fill="${c.textCol}" font-family="${c.fontBody}" font-size="14">${esc(el.text ?? '')}</text>`
     case 'arrow': {
       const { from, to } = arrowEndpoints(el, allElements)
       if (!from || !to) return ''
-      return `<line x1="${from.x + dx}" y1="${from.y + dy}" x2="${to.x + dx}" y2="${to.y + dy}" stroke="${strokeColor(el.color)}" stroke-width="2"/>`
+      const stroke = colorOf(el.color)
+      const fx = from.x + dx, fy = from.y + dy
+      const tx = to.x + dx, ty = to.y + dy
+      const dashArr = dashPattern(el.dash)
+      const dashAttr = dashArr.length ? ` stroke-dasharray="${dashArr.join(' ')}"` : ''
+      const segs: string[] = [
+        `<line x1="${fx}" y1="${fy}" x2="${tx}" y2="${ty}" stroke="${stroke}" stroke-width="2"${dashAttr}/>`,
+      ]
+      // 箭头头(与实时渲染同源几何;dash 不应用到箭头头)
+      const angle = Math.atan2(ty - fy, tx - fx)
+      const headKind = el.arrowhead ?? 'arrow'
+      const pts = arrowheadPoints(headKind, { x: tx, y: ty }, angle)
+      if (pts.length === 3) {
+        const [left, tip, right] = pts
+        if (headKind === 'triangle') {
+          segs.push(`<polygon points="${tip!.x},${tip!.y} ${left!.x},${left!.y} ${right!.x},${right!.y}" fill="${stroke}"/>`)
+        } else {
+          segs.push(`<polyline points="${left!.x},${left!.y} ${tip!.x},${tip!.y} ${right!.x},${right!.y}" fill="none" stroke="${stroke}" stroke-width="2"/>`)
+        }
+      }
+      if (el.text) {
+        const mx = (fx + tx) / 2, my = (fy + ty) / 2
+        segs.push(`<text x="${mx}" y="${my}" fill="${stroke}" font-family="${c.fontBody}" font-size="12">${esc(el.text)}</text>`)
+      }
+      return segs.join('')
     }
     default:
       return ''
   }
-}
-
-function strokeColor(c: string | undefined): string {
-  const map: Record<string, string> = {
-    blue: '--color-blue', red: '--color-red', green: '--color-green', black: '--color-black',
-  }
-  return readToken(map[c ?? 'black'] ?? '--color-black', '#0f172a')
 }

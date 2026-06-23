@@ -66,3 +66,47 @@ export function arrowPreviewEndpoints(
     to: { x: pointer.x, y: pointer.y },
   }
 }
+
+// ── 语义关系签名:线型(dash)+ 箭头形(arrowhead)纯几何 ────────────────────
+// 这是 cy's Stift 区别于 tldraw/excalidraw 的特色:箭头不是「用户手选样式的几何
+// 箭头」,而是「每种语义关系一个固定三维视觉签名」(线型+箭头形+颜色)。下面的
+// 纯函数被实时渲染(Canvas 2D)与 SVG 导出共用,保证两处签名一致。
+
+/** dash 线型 → dash 段长数组(基准宽度 2px)。solid → [](实线)。lineWidth 缩放由调用方处理。 */
+export function dashPattern(dash: CanvasElement['dash']): number[] {
+  switch (dash) {
+    case 'dashed':
+      return [8, 6]
+    case 'dotted':
+      return [1.5, 5]
+    case 'solid':
+    default:
+      return []
+  }
+}
+
+/**
+ * 箭头头几何:给定线段终点 tip 与来向角 angle,返回构成箭头的点。
+ * - 'arrow' = 开口 V(两条边线,不闭合)→ 返回 [left, tip, right]
+ * - 'triangle' = 实心三角(闭合填充)→ 返回 [left, tip, right](调用方 closePath+fill)
+ * - 'none' = 无箭头 → 返回 []
+ * size = 箭头边长(默认 10);spread = 半张角(默认 π/6)。纯函数。
+ */
+export function arrowheadPoints(
+  kind: CanvasElement['arrowhead'],
+  tip: Point,
+  angle: number,
+  size = 10,
+  spread = Math.PI / 6,
+): Point[] {
+  if (kind === 'none') return []
+  const left: Point = {
+    x: tip.x - size * Math.cos(angle - spread),
+    y: tip.y - size * Math.sin(angle - spread),
+  }
+  const right: Point = {
+    x: tip.x - size * Math.cos(angle + spread),
+    y: tip.y - size * Math.sin(angle + spread),
+  }
+  return [left, tip, right]
+}

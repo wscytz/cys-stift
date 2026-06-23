@@ -48,6 +48,10 @@ export interface CanvasElement {
   rotation: number
   /** 样式色(token 名或引擎色名,如 'blue');freedraw 不用。 */
   color?: string
+  /** arrow 线型(语义关系签名的一维):solid/dashed/dotted。缺省按 solid 渲染。 */
+  dash?: 'solid' | 'dashed' | 'dotted'
+  /** arrow 终点箭头形(语义关系签名的一维):arrow=开口V / triangle=实心三角 / none=无。缺省 arrow。 */
+  arrowhead?: 'arrow' | 'triangle' | 'none'
   /** note/text 的文本;arrow 的 label。 */
   text?: string
   /** arrow 端点(id 引用,无 '#' 前缀)。 */

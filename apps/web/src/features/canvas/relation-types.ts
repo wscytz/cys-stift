@@ -20,17 +20,13 @@
 import type { CanvasHost, CanvasElement } from './host/canvas-host'
 import type { MessageKey } from '@/lib/i18n/messages'
 
-// Arrow style unions (kept as plain string unions for future use; the Canvas
-// 2D arrow currently only renders `color` — dash/arrowhead are reserved for
-// later). No tldraw import — these are just descriptive string unions now.
-export type ArrowColor =
-  | 'black' | 'blue' | 'red' | 'green' | 'grey'
-  | 'light-blue' | 'light-green' | 'light-red' | 'light-violet'
-  | 'orange' | 'violet' | 'yellow'
-export type ArrowDash = 'solid' | 'dashed' | 'dotted' | 'draw'
-export type ArrowArrowhead =
-  | 'arrow' | 'bar' | 'diamond' | 'dot' | 'inverted'
-  | 'none' | 'pipe' | 'square' | 'triangle'
+// Arrow 样式联合类型。颜色收紧到 Bauhaus 6 原色里实际用得到的几种(red/blue/
+// black/grey)——不再带 tldraw 调色板的 green/light-*/orange/violet(那些既无对应
+// 设计 token,也违反「6 原色」铁律)。dash/arrowhead 现已由 Canvas 2D arrow 渲染
+// (语义三维签名:线型 + 箭头形 + 颜色)。
+export type ArrowColor = 'black' | 'blue' | 'red' | 'grey'
+export type ArrowDash = 'solid' | 'dashed' | 'dotted'
+export type ArrowArrowhead = 'arrow' | 'triangle' | 'none'
 
 export type RelationTypeId = 'blocks' | 'references' | 'derived-from' | 'related-to'
 
@@ -106,8 +102,11 @@ export function inferRelationType(el: CanvasElement): RelationType | null {
 
 /**
  * Apply a relation type to an arrow via host.upsert (one write). Writes the
- * arrow's `color` + visible text label (`text`). Everything persists via the
- * host snapshot (no separate store).
+ * arrow's full visual signature: `color` + `dash`(线型) + `arrowhead`(箭头形)
+ * + visible text label (`text`). All persist via the host snapshot (no separate
+ * store), so the semantic signature survives reload. 这是与 tldraw/excalidraw
+ * 的差异点——它们的箭头是用户手选样式的几何箭头,我们的是「每种语义关系一个
+ * 固定的三维视觉签名」(线型+箭头形+颜色),一眼读出卡片间关系性质。
  *
  * No-ops if the element isn't an arrow (defensive — the panel only ever calls
  * this on a selected arrow, but a stale selection could race).
@@ -120,5 +119,11 @@ export function applyRelationType(
 ): void {
   const el = host.getElement(arrowId)
   if (!el || el.kind !== 'arrow') return
-  host.upsert({ ...el, color: type.color, text: label })
+  host.upsert({
+    ...el,
+    color: type.color,
+    dash: type.dash,
+    arrowhead: type.arrowhead,
+    text: label,
+  })
 }

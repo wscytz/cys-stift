@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { elementCenter, borderPoint, arrowEndpoints } from '../self-built-arrow'
+import {
+  elementCenter,
+  borderPoint,
+  arrowEndpoints,
+  dashPattern,
+  arrowheadPoints,
+} from '../self-built-arrow'
 import type { CanvasElement } from '../canvas-host'
 
 describe('elementCenter', () => {
@@ -44,5 +50,40 @@ describe('arrowEndpoints', () => {
   it('to 元素缺失 → 都 null', () => {
     const ghost = { ...arrow, to: 'ghost' } as CanvasElement
     expect(arrowEndpoints(ghost, [cardA])).toEqual({ from: null, to: null })
+  })
+})
+
+describe('dashPattern — 语义线型', () => {
+  it('solid / undefined → 空数组(实线)', () => {
+    expect(dashPattern('solid')).toEqual([])
+    expect(dashPattern(undefined)).toEqual([])
+  })
+  it('dashed → 段+隙', () => {
+    expect(dashPattern('dashed')).toEqual([8, 6])
+  })
+  it('dotted → 短点', () => {
+    expect(dashPattern('dotted')).toEqual([1.5, 5])
+  })
+})
+
+describe('arrowheadPoints — 语义箭头形', () => {
+  const tip = { x: 100, y: 0 }
+  it('none → 无点(不画箭头)', () => {
+    expect(arrowheadPoints('none', tip, 0)).toEqual([])
+  })
+  it('arrow → [left, tip, right] 三点(开口 V)', () => {
+    const pts = arrowheadPoints('arrow', tip, 0, 10)
+    expect(pts).toHaveLength(3)
+    expect(pts[1]).toEqual(tip) // 中点是 tip
+  })
+  it('triangle → 同样三点(调用方闭合填充)', () => {
+    const pts = arrowheadPoints('triangle', tip, 0, 10)
+    expect(pts).toHaveLength(3)
+    expect(pts[1]).toEqual(tip)
+  })
+  it('沿来向角:水平 angle=0 时两翼点 x < tip(在 tip 后方)', () => {
+    const [left, , right] = arrowheadPoints('arrow', tip, 0, 10)
+    expect(left!.x).toBeLessThan(tip.x)
+    expect(right!.x).toBeLessThan(tip.x)
   })
 })

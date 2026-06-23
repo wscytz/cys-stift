@@ -90,6 +90,16 @@ describe('applyRelationType (via host.upsert)', () => {
     expect(el.color).toBe(rt.color)
     expect(el.text).toBe('blocks')
   })
+  it('writes the full visual signature: dash + arrowhead (语义三维签名)', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 's', to: 't' })
+    const refs = RELATION_TYPES.find((r) => r.id === 'references')! // blue dashed none
+    applyRelationType(host, 'a', refs, 'references')
+    const el = host.getElement('a')!
+    expect(el.color).toBe(refs.color)
+    expect(el.dash).toBe(refs.dash)
+    expect(el.arrowhead).toBe(refs.arrowhead)
+  })
   it('no-ops on a non-arrow element', () => {
     const host = new InMemoryCanvasHost()
     host.upsert({

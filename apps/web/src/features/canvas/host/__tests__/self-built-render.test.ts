@@ -12,6 +12,7 @@ function mockCtx() {
     translate: (x: number, y: number) => calls.push(`translate(${x},${y})`),
     scale: (x: number, y: number) => calls.push(`scale(${x})`),
     beginPath: () => calls.push('beginPath'),
+    closePath: () => calls.push('closePath'),
     rect: (x: number, y: number, w: number, h: number) => calls.push(`rect(${x},${y},${w},${h})`),
     moveTo: (x: number, y: number) => calls.push(`moveTo(${x},${y})`),
     lineTo: (x: number, y: number) => calls.push(`lineTo(${x},${y})`),
@@ -106,6 +107,31 @@ describe('renderElements', () => {
     expect(ctx._calls).toContain('lineTo(200,50)')
     // label 画在中点 (150,50)
     expect(ctx._calls.some((c) => c.startsWith('fillText(rel@150,50)'))).toBe(true)
+  })
+
+  it('renders an arrow with dashed line + triangle head (语义签名)', () => {
+    const ctx = mockCtx()
+    const els = [
+      { id: 'ca', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'cb', kind: 'card', x: 200, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'cb', dash: 'dashed', arrowhead: 'triangle' },
+    ] as unknown as CanvasElement[]
+    renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => null, '#ffffff')
+    expect(ctx._calls).toContain('setLineDash(8,6)') // dashed → [8,6]
+    expect(ctx._calls).toContain('setLineDash()') // 复位免污染
+    expect(ctx._calls).toContain('closePath') // triangle 闭合填充
+  })
+
+  it('renders an arrow with arrowhead=none (无箭头头,只画线)', () => {
+    const ctx = mockCtx()
+    const els = [
+      { id: 'ca', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'cb', kind: 'card', x: 200, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'cb', arrowhead: 'none' },
+    ] as unknown as CanvasElement[]
+    renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => null, '#ffffff')
+    expect(ctx._calls).toContain('moveTo(100,50)') // 主线还在
+    expect(ctx._calls).not.toContain('closePath') // 无三角填充
   })
 
   it('arrow with missing endpoint draws nothing (no throw)', () => {
