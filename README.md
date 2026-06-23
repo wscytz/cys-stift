@@ -22,7 +22,7 @@
 
 **完整可用的本地优先灵感画布**(v0.37.0 stable)。
 
-捕获 / inbox(多媒介编辑)/ canvas(tldraw 自由画布 + 多画布 + 关系箭头 + AI 排版 + 导出)/ archive / trash / search / 标签 / AI(3 provider) 全部交付。桌面端可本地构建未签名 DMG。
+捕获 / inbox(多媒介编辑)/ canvas(自研 Canvas 2D 画布 + 多画布 + 语义关系箭头 + AI 排版 + 导出)/ archive / trash / search / 标签 / AI(3 provider) 全部交付。桌面端可本地构建未签名 DMG。
 
 **当前状态、版本里程碑、下一步、已知 debt 全见 [`docs/STATE.md`](docs/STATE.md)** — 单一可信源。历史见 [`docs/changelog.md`](docs/changelog.md)。
 
