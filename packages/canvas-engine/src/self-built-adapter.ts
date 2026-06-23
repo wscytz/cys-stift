@@ -629,7 +629,14 @@ export class SelfBuiltAdapter implements CanvasHost {
         e.preventDefault()
         for (const id of this.selectedIds) {
           const el = this.getElement(id)
-          if (el) this.upsert({ ...el, x: el.x + delta.dx, y: el.y + delta.dy })
+          if (!el) continue
+          if (el.kind === 'freedraw') {
+            // freedraw 真身=点序列:微移也须平移 points(同 drag,别只移 bbox)
+            const moved = translateFreedraw(el, delta.dx, delta.dy)
+            if (moved) this.upsert(moved)
+          } else {
+            this.upsert({ ...el, x: el.x + delta.dx, y: el.y + delta.dy })
+          }
         }
       }
     }

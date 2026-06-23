@@ -113,3 +113,28 @@ describe('交互矩阵 — 每种 kind × hitTest(中心点命中自己)', () =>
   })
 })
 
+describe('交互矩阵 — 每种 kind × 键盘微移(方向键)', () => {
+  function keydown(key: string, shift = false) {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey: shift, bubbles: true }))
+  }
+  for (const kind of MOVABLE_KINDS) {
+    it(`${kind}:方向键微移后视觉真身平移了`, () => {
+      const { host, setSel } = makeHost()
+      host.upsert(elementOfKind(kind))
+      setSel(['e1'])
+      keydown('ArrowRight') // +1 px x
+      keydown('ArrowDown') // +1 px y
+      const el = host.getElement('e1')!
+      expect(el.x).toBe(101)
+      expect(el.y).toBe(101)
+      if (kind === 'freedraw') {
+        // 真身=点序列:键盘微移也须平移 points(同 drag,别只移 bbox)
+        const pts = el.meta?.points as [number, number][]
+        expect(pts[0]![0]).toBe(101)
+        expect(pts[0]![1]).toBe(101)
+      }
+    })
+  }
+})
+
+
