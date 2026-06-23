@@ -48,3 +48,61 @@ export function commitFreedraw(
   if (color !== undefined) el.color = color
   return el
 }
+
+/**
+ * 平移一条 freedraw:点序列整体偏移 (dx,dy),bbox 跟随。drag 用。
+ *
+ * freedraw 的 meta.points 是**绝对页坐标**,渲染用 points 不用 bbox——所以移动时
+ * 只改 bbox 无效(笔画原地不动),必须同时平移点序列。非 freedraw / 无点 → null
+ * (调用方回退现有 bbox-only 逻辑)。纯函数,不改原元素。
+ */
+export function translateFreedraw(
+  el: CanvasElement,
+  dx: number,
+  dy: number,
+): CanvasElement | null {
+  const pts = freedrawPointsOf(el)
+  if (!pts) return null
+  return {
+    ...el,
+    x: el.x + dx,
+    y: el.y + dy,
+    meta: { ...el.meta, points: pts.map(([x, y]) => [x + dx, y + dy] as [number, number]) },
+  }
+}
+
+/**
+ * 把一条 freedraw 的点序列从当前 bbox 线性映射到 newBox(resize 用)。每个点按
+ * 旧 bbox→新 box 的比例缩放 + 平移。退化轴(旧 w 或 h 为 0:单点 / 纯水平 / 纯垂直
+ * 笔画)→ 该轴不缩放只平移(防除零)。非 freedraw / 无点 → null。纯函数。
+ */
+export function scaleFreedrawToBox(
+  el: CanvasElement,
+  newBox: { x: number; y: number; w: number; h: number },
+): CanvasElement | null {
+  const pts = freedrawPointsOf(el)
+  if (!pts) return null
+  const sx = el.w === 0 ? 1 : newBox.w / el.w
+  const sy = el.h === 0 ? 1 : newBox.h / el.h
+  const mapped = pts.map(([x, y]) => {
+    const nx = el.w === 0 ? x + (newBox.x - el.x) : newBox.x + (x - el.x) * sx
+    const ny = el.h === 0 ? y + (newBox.y - el.y) : newBox.y + (y - el.y) * sy
+    return [nx, ny] as [number, number]
+  })
+  return {
+    ...el,
+    x: newBox.x,
+    y: newBox.y,
+    w: newBox.w,
+    h: newBox.h,
+    meta: { ...el.meta, points: mapped },
+  }
+}
+
+/** 取 freedraw 的点序列;非 freedraw / 无点 → null。 */
+function freedrawPointsOf(el: CanvasElement): [number, number][] | null {
+  if (el.kind !== 'freedraw') return null
+  const pts = (el.meta as { points?: unknown } | undefined)?.points
+  if (!Array.isArray(pts) || pts.length === 0) return null
+  return pts as [number, number][]
+}

@@ -17,7 +17,7 @@ import type {
 import { sortByLayer, sanitizeView, ZOOM_MIN, ZOOM_MAX } from './canvas-host'
 import { renderElements, drawSelectionOutlines, drawMarquee, domTokenResolver, type CardInfo, type TokenResolver } from './self-built-render'
 import { hitTest, screenToPage } from './self-built-hittest'
-import { commitFreedraw } from './self-built-freedraw'
+import { commitFreedraw, translateFreedraw, scaleFreedrawToBox } from './self-built-freedraw'
 import { handleAtPoint, resizeGeometry, type Handle } from './self-built-resize'
 import { marqueeSelect } from './self-built-marquee'
 import { arrowPreviewEndpoints } from './self-built-arrow'
@@ -432,7 +432,13 @@ export class SelfBuiltAdapter implements CanvasHost {
         const el = this.getElement(this.resizing.id)
         if (el) {
           const g = resizeGeometry(this.resizing.handle, this.resizing.start, p)
-          this.upsert({ ...el, x: g.x, y: g.y, w: g.w, h: g.h })
+          if (el.kind === 'freedraw') {
+            // freedraw 真身=点序列:把点序列从旧 bbox 线性映射到新 box(不只改 bbox)。
+            const scaled = scaleFreedrawToBox(el, g)
+            if (scaled) this.upsert(scaled)
+          } else {
+            this.upsert({ ...el, x: g.x, y: g.y, w: g.w, h: g.h })
+          }
         }
         return
       }
@@ -441,7 +447,16 @@ export class SelfBuiltAdapter implements CanvasHost {
         for (const sid of this.dragGroup.ids) {
           const el = this.getElement(sid)
           const off = this.dragGroup.offsets.get(sid)
-          if (el && off) this.upsert({ ...el, x: Math.round(p.x - off.x), y: Math.round(p.y - off.y) })
+          if (!el || !off) continue
+          const nx = Math.round(p.x - off.x)
+          const ny = Math.round(p.y - off.y)
+          if (el.kind === 'freedraw') {
+            // freedraw 真身=点序列:按位移平移点序列(不只改 bbox)。
+            const moved = translateFreedraw(el, nx - el.x, ny - el.y)
+            if (moved) this.upsert(moved)
+          } else {
+            this.upsert({ ...el, x: nx, y: ny })
+          }
         }
         return
       }
@@ -449,11 +464,14 @@ export class SelfBuiltAdapter implements CanvasHost {
         const p = screenToPage(this.view, sx, sy)
         const el = this.getElement(this.dragId)
         if (el) {
-          this.upsert({
-            ...el,
-            x: Math.round(p.x - this.dragOffset.x),
-            y: Math.round(p.y - this.dragOffset.y),
-          })
+          const nx = Math.round(p.x - this.dragOffset.x)
+          const ny = Math.round(p.y - this.dragOffset.y)
+          if (el.kind === 'freedraw') {
+            const moved = translateFreedraw(el, nx - el.x, ny - el.y)
+            if (moved) this.upsert(moved)
+          } else {
+            this.upsert({ ...el, x: nx, y: ny })
+          }
         }
       } else if (this.panning) {
         this.setView({

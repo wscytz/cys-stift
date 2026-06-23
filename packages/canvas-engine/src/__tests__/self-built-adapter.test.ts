@@ -286,6 +286,21 @@ describe('SelfBuiltAdapter multiselect', () => {
     expect(host.getElement('b')).toMatchObject({ x: 110, y: 10 }) // b 也移 +10
   })
 
+  it('混合选区组移动:card 走 bbox、freedraw 走点序列,都跟着移', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'c', kind: 'card', x: 0, y: 0, w: 50, h: 50, rotation: 0 })
+    host.upsert({ id: 'd', kind: 'freedraw', x: 100, y: 0, w: 50, h: 50, rotation: 0, meta: { points: [[100, 0], [150, 50]] } })
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['c', 'd'])
+    dispatch(canvas, 'pointerdown', 25, 25) // 拖 card c
+    dispatch(canvas, 'pointermove', 35, 35) // +10,+10
+    dispatch(canvas, 'pointerup', 35, 35)
+    expect(host.getElement('c')).toMatchObject({ x: 10, y: 10 }) // card bbox 移
+    const d = host.getElement('d')!
+    expect(d).toMatchObject({ x: 110, y: 10 }) // freedraw bbox 移
+    expect(d.meta?.points).toEqual([[110, 10], [160, 60]]) // 且点序列也跟着移 +10
+  })
+
   it('shift+空白拖拽 → 框选(命中相交元素)', () => {
     const host = new SelfBuiltAdapter(document.createElement('canvas'))
     const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
