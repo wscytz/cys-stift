@@ -515,14 +515,16 @@ const check = (n, ok, d = '') => { ok ? (pass++, console.log(`  ✓ ${n}${d ? ' 
   let x1 = await page.evaluate(() => window.__selfAdapter.getElement('ca').x)
   check('arrow keys nudge +3', x1 === 303, `x=${x1}`)
 
-  // Ctrl/Meta+Z undo → x 回 300
+  // Ctrl/Meta+Z undo ×3 → 撤 3 次微移,x 回 300(实现:每次微移=1 undo 条目)
   const isMac = process.platform === 'darwin'
-  await page.keyboard.down(isMac ? 'Meta' : 'Control')
-  await page.keyboard.press('z')
-  await page.keyboard.up(isMac ? 'Meta' : 'Control')
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.down(isMac ? 'Meta' : 'Control')
+    await page.keyboard.press('z')
+    await page.keyboard.up(isMac ? 'Meta' : 'Control')
+  }
   await wait(200)
   let x2 = await page.evaluate(() => window.__selfAdapter.getElement('ca').x)
-  check('Ctrl+Z undo nudges back', x2 === 300, `x=${x2}`)
+  check('Ctrl+Z ×3 undo nudges back to 300', x2 === 300, `x=${x2}`)
 
   await page.screenshot({ path: path.join(out, 'keyboard.png') })
   await browser.close()
@@ -540,7 +542,7 @@ cd /Users/jinxunuo/projects/cys-stift && pnpm --filter web build
 # node scripts/phase1-keyboard-smoke.cjs
 # 跑完 kill python(释放 3016)
 ```
-Expected: 3/3 绿(挂载、方向键 +3、Ctrl+Z undo 回 300)。
+Expected: 3/3 绿(挂载、方向键 +3、Ctrl+Z ×3 undo 回 300)。
 
 - [ ] **Step 4.3:Commit**
 
