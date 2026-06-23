@@ -39,6 +39,24 @@ describe('snapshotCanvas → formatCanvasSnapshot', () => {
     expect(text).toContain('[rect] @pos(50, 50)')
     expect(text).toContain('[text] @pos(5, 6) @text("note")')
   })
+
+  it('renders arrow relation signature (color + dash + arrowhead) — AI 改签名需看到现状', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    host.upsert({ id: 'c2', kind: 'card', x: 100, y: 0, w: 10, h: 10, rotation: 0 })
+    host.upsert({
+      id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0,
+      from: 'c1', to: 'c2', color: 'blue', dash: 'dashed', arrowhead: 'none',
+    })
+    const snap = snapshotCanvas(host, stubService({ c1: 'A', c2: 'B' }), CV)
+    expect(snap.arrows[0]?.color).toBe('blue')
+    expect(snap.arrows[0]?.dash).toBe('dashed')
+    expect(snap.arrows[0]?.arrowhead).toBe('none')
+    const text = formatCanvasSnapshot(snap)
+    expect(text).toContain('@color(blue)')
+    expect(text).toContain('@dash(dashed)')
+    expect(text).toContain('@arrowhead(none)')
+  })
 })
 
 describe('canvas snapshot — privacy reverse-asserts (R2 + allowlist)', () => {

@@ -120,15 +120,18 @@ export default function CanvasPage() {
     const formatted = formatCanvasSnapshot(snap)
 
     const systemPrompt =
-      'You are a canvas layout assistant. Given a list of cards and shapes with positions, suggest new positions to organize them better. Group related items together. Output DSL directives only — no explanations.'
+      'You are a canvas editing assistant. Given the current canvas (cards, shapes, arrows with their relation signatures), output DSL directives to improve it. You may reposition/resize cards, change colors, and rewrite arrow relation signatures (dash line style + arrowhead shape). Reuse an existing element #id to UPDATE it (its endpoints are kept); omit the id to CREATE new. Output DSL directives only — no explanations.'
 
-    const userPrompt = `Organize these items into a clean layout. Keep items within reasonable proximity. Do NOT move items that are already well-placed.
+    const userPrompt = `Improve this canvas. Reorganize positions, adjust sizes/colors, and refine arrow relation signatures where appropriate. Do NOT change items that are already well-placed.
 
 ${formatted}
 
-Output DSL like:
-[card #id] @pos(x, y)
-[rect #id] @pos(x, y) @size(w, h)`
+Output DSL (one directive per line):
+[card #id] @pos(x, y) @size(w, h) @color(blue|red|black|grey|yellow)
+[rect #id] @pos(x, y) @size(w, h) @color(c)
+[text #id] @pos(x, y) @text("...") @color(c)
+[arrow #id] from #a to #b @label("...") @color(c) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none)
+Rules: reuse an existing #id to UPDATE it (from/to kept); colors limited to blue/red/black/grey/yellow.`
 
     try {
       const result = await streamText(cfg, { system: systemPrompt, user: userPrompt }, () => {})

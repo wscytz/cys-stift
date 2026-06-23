@@ -36,6 +36,10 @@ export interface SnapshotArrow {
   from: string
   to: string
   label?: string
+  /** 关系签名(语义三维:颜色 + 线型 + 箭头形)。AI 改签名需要先看到现状。 */
+  color?: string
+  dash?: 'solid' | 'dashed' | 'dotted'
+  arrowhead?: 'arrow' | 'triangle' | 'none'
 }
 
 export type FreeShape =
@@ -93,6 +97,9 @@ export function snapshotCanvas(
           from: el.from ?? '',
           to: el.to ?? '',
           label: el.text,
+          color: el.color,
+          dash: el.dash,
+          arrowhead: el.arrowhead,
         })
         break
       case 'rect':
@@ -139,8 +146,13 @@ export function formatCanvasSnapshot(snapshot: CanvasSnapshotOutput): string {
   }
 
   for (const a of snapshot.arrows) {
-    const label = a.label ? ` @label("${a.label}")` : ''
-    parts.push(`[arrow #${a.id}] from #${a.from} to #${a.to}${label}`)
+    // 输出完整关系签名(颜色 + 线型 + 箭头形),让 AI 看到现状并能改。
+    const seg: string[] = [`[arrow #${a.id}] from #${a.from} to #${a.to}`]
+    if (a.label) seg.push(`@label("${a.label}")`)
+    if (a.color) seg.push(`@color(${a.color})`)
+    if (a.dash) seg.push(`@dash(${a.dash})`)
+    if (a.arrowhead) seg.push(`@arrowhead(${a.arrowhead})`)
+    parts.push(seg.join(' '))
   }
 
   for (const fs of snapshot.freeShapes) {
