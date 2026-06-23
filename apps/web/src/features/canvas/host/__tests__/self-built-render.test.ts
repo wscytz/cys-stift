@@ -106,4 +106,22 @@ describe('renderElements', () => {
     // 不画 arrow 主线(没有 (100,50) 那种)— 只检查没有 moveTo(100,50)
     expect(ctx._calls.some((c) => c === 'moveTo(100,50)')).toBe(false)
   })
+
+  it('renders text (multi-line, top baseline)', () => {
+    const ctx = mockCtx()
+    const els = [
+      { id: 't1', kind: 'text', x: 10, y: 20, w: 100, h: 36, rotation: 0, text: 'hello\nworld' },
+    ] as unknown as CanvasElement[]
+    renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => '', '#ffffff')
+    // 行 1 @ y=20,行 2 @ y=20+18=38
+    expect(ctx._calls).toContain('fillText(hello@10,20)')
+    expect(ctx._calls).toContain('fillText(world@10,38)')
+  })
+
+  it('text with empty string draws nothing (no throw)', () => {
+    const ctx = mockCtx()
+    const els = [{ id: 't2', kind: 'text', x: 0, y: 0, w: 1, h: 1, rotation: 0, text: '' }] as unknown as CanvasElement[]
+    expect(() => renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => '', '#ffffff')).not.toThrow()
+    expect(ctx._calls.some((c) => c.startsWith('fillText'))).toBe(false)
+  })
 })

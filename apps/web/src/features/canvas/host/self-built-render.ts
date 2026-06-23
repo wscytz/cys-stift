@@ -100,8 +100,19 @@ function drawElement(
       }
       break
     }
+    case 'text': {
+      const lines = (el.text ?? '').split('\n')
+      if (lines.length === 0 || (lines.length === 1 && lines[0] === '')) break
+      ctx.fillStyle = colorOf(el.color)
+      ctx.font = `14px ${readToken('--font-body', 'Inter, sans-serif')}`
+      ctx.textBaseline = 'top'
+      for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i]!, el.x, el.y + i * 18)
+      }
+      break
+    }
     default:
-      // text/legacy — 后续 Task。
+      // legacy — 后续 Task。
       break
   }
 }
