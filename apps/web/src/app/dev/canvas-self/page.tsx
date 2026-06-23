@@ -14,7 +14,7 @@ import { SelfBuiltAdapter } from '@/features/canvas/host/self-built-adapter'
 import { measureText, textEditKeyAction } from '@/features/canvas/host/self-built-text'
 import { readToken } from '@/features/canvas/host/self-built-render'
 
-type Tool = 'select' | 'freedraw' | 'text'
+type Tool = 'select' | 'freedraw' | 'text' | 'connect'
 
 interface EditSession {
   screenX: number
@@ -131,6 +131,7 @@ export default function CanvasSelfPage() {
         {btn('select', 'Select')}
         {btn('freedraw', 'Draw')}
         {btn('text', 'Text')}
+        {btn('connect', 'Connect')}
       </div>
       <canvas
         ref={canvasRef}
