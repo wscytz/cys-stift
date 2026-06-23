@@ -10,6 +10,7 @@ import { CardDetailModal } from '@/features/canvas/card-detail-modal'
 import { ExportDialog } from '@/features/canvas/export-dialog'
 import { applyLayout } from '@/features/canvas/apply-layout'
 import { RelationPanel } from '@/features/canvas/relation-panel'
+import { FreedrawPanel } from '@/features/canvas/freedraw-panel'
 import { Minimap } from '@/features/canvas/minimap-component'
 import { autoRelate } from '@/features/canvas/auto-relate'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
@@ -365,6 +366,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept); colors limited to blue
           </div>
         )}
         <RelationPanel host={handle.current.adapter} canvasEl={canvasElRef.current} />
+        <FreedrawPanel host={handle.current.adapter} canvasEl={canvasElRef.current} />
         <Minimap host={handle.current.adapter} canvasEl={canvasElRef.current} />
       </div>
 

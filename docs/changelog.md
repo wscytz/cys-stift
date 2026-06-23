@@ -21,6 +21,7 @@ P2 引擎抽包后的衔接打磨 + 增值功能。
 - **minimap 鸟瞰导航**(`aec2480`)。
 - **渲染性能基线**:`render.bench.ts`(renderElements 100=0.3ms/1k=3.4ms/5k=24ms 线性;sortByLayer 每帧<2% 非热点;hitTest<5µs),填 STATE 未压测盲点(`dfe33dc`)。
 - **AI 找相似(cluster)**:读画布卡的 allowlist 字段 → AI 分组近重复/相似卡 → 落 `related-to` 关系箭头连组内成员(**非破坏性**:只加关系,不合并/删卡)。防御性输出解析(白名单 id 校验 + 绝不抛)。新 `cluster.ts` 纯逻辑 + 20 单测。
+- **手绘语义识别(辅助)**:选中手绘 → **本地几何启发式**(直线度/闭合度/细长比)粗判「像箭头/装饰」+ 置信度,**点序列绝不外发**(笔迹隐私,R2)。装饰可一键【复制】偏移副本(画一次到处盖)。非破坏性,不自动改。新 `freedraw-classify.ts`(引擎纯函数,零依赖)+ 15 单测 + `FreedrawPanel`。
 
 ### AI 隐私(cluster)
 - 走 `serializeCardsForAI`(allowlist + 软删除过滤);无 `source.deviceId` / 无 `media.dataUrl` / 无 vision。`docs/user/privacy.md` 更新 AI 动作清单 + cluster 说明。

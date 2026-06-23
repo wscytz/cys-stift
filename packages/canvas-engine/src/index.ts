@@ -59,6 +59,14 @@ export type { ElementsToSvgOptions } from './elements-to-svg'
 // ── freedraw(手绘) ──────────────────────────────────────────────────────────
 export { commitFreedraw, bboxOf } from './self-built-freedraw'
 
+// ── freedraw 语义识别(本地几何启发式;手绘点序列 R2 隐私,不外泄,不走 AI) ──────
+export {
+  classifyFreedraw,
+  duplicateFreedraw,
+  freedrawPoints,
+} from './freedraw-classify'
+export type { FreedrawKind, FreedrawClassification } from './freedraw-classify'
+
 // ── resize handle ───────────────────────────────────────────────────────────
 export { handleAtPoint, resizeGeometry } from './self-built-resize'
 export type { Handle } from './self-built-resize'

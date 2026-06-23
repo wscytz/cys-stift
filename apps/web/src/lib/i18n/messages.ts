@@ -302,6 +302,11 @@ export const messages = {
   'canvas.aiClusterNone': { zh: '未找到相似卡片', en: 'No similar cards found' },
   'canvas.aiClusterEmpty': { zh: 'AI 未返回有效分组', en: 'AI returned no valid clusters' },
   'canvas.aiClusterTooFew': { zh: '卡片太少,无需分组', en: 'Too few cards to cluster' },
+  'freedraw.title': { zh: '手绘', en: 'Sketch' },
+  'freedraw.looksArrow': { zh: '看起来像箭头', en: 'Looks like an arrow' },
+  'freedraw.looksDecoration': { zh: '看起来像装饰', en: 'Looks like decoration' },
+  'freedraw.looksUnknown': { zh: '说不准是什么', en: 'Not sure what this is' },
+  'freedraw.duplicate': { zh: '复制', en: 'Duplicate' },
 } as const
 
 export type MessageKey = keyof typeof messages
