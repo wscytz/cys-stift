@@ -1,9 +1,21 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
+// Mock the freeform store so we can assert canvas deletion cleans up its
+// persisted non-card elements (and leftover tldraw snapshots).
+const freeformRemove = vi.fn(async () => {})
+vi.mock('../canvas-freeform-store', () => ({
+  canvasFreeformStore: {
+    load: vi.fn(async () => null),
+    save: vi.fn(async () => {}),
+    remove: freeformRemove,
+  },
+}))
+
 let canvasStore: typeof import('../canvas-store').canvasStore
 
 beforeEach(async () => {
   vi.resetModules()
+  freeformRemove.mockClear()
   window.localStorage.clear()
   canvasStore = (await import('../canvas-store')).canvasStore
 })
@@ -76,6 +88,19 @@ describe('canvasStore.delete', () => {
   })
   it('no-ops for unknown id', () => {
     expect(canvasStore.delete('ghost-id' as never)).toBe(false)
+  })
+  it('cleans up freeform-store data when deleting a non-default canvas', () => {
+    const created = canvasStore.create('temp')
+    canvasStore.delete(created)
+    expect(freeformRemove).toHaveBeenCalledWith(created)
+  })
+  it('does not clean up freeform data when refusing to delete the default canvas', () => {
+    canvasStore.delete(canvasStore.get().canvases[0]!.id)
+    expect(freeformRemove).not.toHaveBeenCalled()
+  })
+  it('does not clean up freeform data for an unknown id', () => {
+    canvasStore.delete('ghost-id' as never)
+    expect(freeformRemove).not.toHaveBeenCalled()
   })
 })
 

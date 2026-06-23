@@ -8,7 +8,7 @@ import {
   type CanvasId,
 } from '@cys-stift/domain'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
-import { canvasSnapshotStore } from './canvas-snapshot-store'
+import { canvasFreeformStore } from './canvas-freeform-store'
 
 // ── Multi-canvas store (spec §4.9, Phase multi-canvas 2026-06-20) ──────────
 // Web-local canvas list + active selection. The Canvas type already
@@ -242,11 +242,12 @@ export const canvasStore = {
       activeCanvasId: wasActive ? DEFAULT_CANVAS_ID : _snap.activeCanvasId,
     }
     persist()
-    // B4 (v0.26.4): free the snapshot's localStorage quota — otherwise a
-    // canvas deletion leaves its full document (shapes, hand-draw paths)
-    // stranded forever. Callers should have already moved cards back to
-    // inbox before delete, so the snapshot is safe to drop.
-    canvasSnapshotStore.remove(id).catch(() => {})
+    // B4 (v0.26.4): free the persisted freeform data — otherwise a canvas
+    // deletion leaves its non-card elements (text / freedraw / arrows / rects)
+    // stranded forever. Callers should have already moved cards back to inbox
+    // before delete. canvasFreeformStore.remove also cleans up any leftover
+    // pre-self-built tldraw snapshot for this canvas.
+    canvasFreeformStore.remove(id).catch(() => {})
     return true
   },
 }

@@ -19,6 +19,7 @@ import {
   loadCardsIntoEditor,
   bindCardWriteback,
 } from './canvas-binding'
+import { attachCanvasFreeformPersistence } from './canvas-freeform-binding'
 import { SelfBuiltAdapter } from './host/self-built-adapter'
 import { canvasViewStore } from '@/lib/canvas-view-store'
 import { screenToPage } from './host/self-built-hittest'
@@ -83,6 +84,10 @@ export function SelfCanvas({
     adapter.setView({ panX: view.panX, panY: view.panY, zoom: view.zoom, gridMode: view.gridMode })
 
     loadCardsIntoEditor(adapter, service, canvasId)
+    // freeform 元素(text/freedraw/arrow/rect)持久化:load 恢复 + 用户改动 debounce 写回。
+    // card 几何不在此(走 bindCardWriteback → DB,单一可信源)。须在 loadCardsIntoEditor
+    // 之后 attach,以便 restore 时能跳过同 id 的 card。
+    const unbindFreeform = attachCanvasFreeformPersistence(adapter, canvasId)
     const unbind = bindCardWriteback(adapter, service, canvasId)
 
     // 视图持久化:onViewChange + 500ms debounce 写 canvasViewStore(替代轮询)。
@@ -112,6 +117,7 @@ export function SelfCanvas({
         })
       }
       unbindView()
+      unbindFreeform()
       unbind()
       adapter.detach()
       adapterInner.current = null
