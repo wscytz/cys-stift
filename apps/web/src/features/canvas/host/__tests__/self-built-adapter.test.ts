@@ -437,3 +437,33 @@ describe('SelfBuiltAdapter keyboard actions', () => {
     expect(host.getElement('c1')?.x).toBe(1) // 仍 1
   })
 })
+
+describe('SelfBuiltAdapter onViewChange', () => {
+  it('setView 触发 onViewChange', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'), {
+      getCardInfo: () => null,
+    })
+    const views: { zoom: number }[] = []
+    ;(host as unknown as { onViewChange: (cb: (v: { zoom: number }) => void) => () => void }).onViewChange((v) => views.push(v))
+    host.setView({ panX: 0, panY: 0, zoom: 2, gridMode: 'free' })
+    expect(views.some((v) => v.zoom === 2)).toBe(true)
+  })
+
+  it('onViewChange 取消订阅后不再触发', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'), { getCardInfo: () => null })
+    let fired = 0
+    const unsub = (host as unknown as { onViewChange: (cb: () => void) => () => void }).onViewChange(() => fired++)
+    unsub()
+    host.setView({ panX: 1, panY: 0, zoom: 1, gridMode: 'free' })
+    expect(fired).toBe(0)
+  })
+
+  it('getCardInfo 构造选项不抛(从 service 读 type/body/pinned 的能力验证)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'), {
+      getCardInfo: (id) => (id === 'c1' ? { title: 'T', body: 'B', type: 'note', pinned: false } : null),
+    })
+    // getCardInfo 不直接暴露;这里只验构造不抛 + 实例可用。
+    expect(host).toBeDefined()
+    expect(host.getView().zoom).toBe(1)
+  })
+})

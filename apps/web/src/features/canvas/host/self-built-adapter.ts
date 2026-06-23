@@ -27,6 +27,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   private elements = new Map<string, CanvasElement>()
   private view: CanvasView = { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }
   private userListeners = new Set<(c: UserChange) => void>()
+  private viewListeners = new Set<(v: CanvasView) => void>()
   protected echoing = true
   protected ctx: CanvasRenderingContext2D | null
   private getCardInfo: (id: string) => CardInfo | null
@@ -172,6 +173,14 @@ export class SelfBuiltAdapter implements CanvasHost {
     }
   }
 
+  /** 订阅视图(pan/zoom/grid)变更。返回取消订阅(同 onUserChange 模式)。 */
+  onViewChange(cb: (v: CanvasView) => void): () => void {
+    this.viewListeners.add(cb)
+    return () => {
+      this.viewListeners.delete(cb)
+    }
+  }
+
   /** 切换工具(渲染器自身方法,不上 CanvasHost 接口)。 */
   setTool(t: 'select' | 'freedraw' | 'text' | 'connect'): void {
     this.activeTool = t
@@ -203,6 +212,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   setView(v: CanvasView): void {
     this.view = { ...v }
     this.scheduleRender()
+    for (const l of this.viewListeners) l(this.view)
   }
 
   protected emitUser(c: UserChange): void {
