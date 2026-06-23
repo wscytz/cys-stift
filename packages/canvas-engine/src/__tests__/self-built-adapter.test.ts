@@ -348,6 +348,106 @@ describe('SelfBuiltAdapter connect', () => {
   })
 })
 
+describe('SelfBuiltAdapter undo coalescing (drag/resize/batch → 1 step)', () => {
+  function dispatch(canvas: HTMLCanvasElement, type: string, x: number, y: number) {
+    canvas.dispatchEvent(
+      new PointerEvent(type, { pointerId: 1, pointerType: 'mouse', bubbles: true, clientX: x, clientY: y }),
+    )
+  }
+
+  // 通过 undo 步数验证 coalescing:undo 到空,统计可 undo 的步数(= undoStack 深度)。
+  function undoSteps(host: SelfBuiltAdapter): number {
+    const h = host as unknown as { canUndo: () => boolean; undo: () => void }
+    let count = 0
+    while (h.canUndo()) { h.undo(); count++ }
+    return count
+  }
+
+  it('drag:down→move×3→up 合并为 1 undo 步(不是 3+)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    // 初始元素(程序性 upsert = 1 undo 步)
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    const before = undoSteps(host) // 初始 upsert = 1 步
+    expect(before).toBe(1)
+
+    // 重新建一个干净的 host 跑 drag(避免初始 upsert 干扰计数)
+    const host2 = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas2 = (host2 as unknown as { canvas: HTMLCanvasElement }).canvas
+    host2.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 }) // +1 步
+    dispatch(canvas2, 'pointerdown', 50, 50) // 命中 → drag 开始(批前 +1 步 + coalescing)
+    dispatch(canvas2, 'pointermove', 60, 60) // 改位置(coalesced,不推)
+    dispatch(canvas2, 'pointermove', 70, 70) // 改位置(coalesced)
+    dispatch(canvas2, 'pointermove', 80, 80) // 改位置(coalesced)
+    dispatch(canvas2, 'pointerup', 80, 80) // 结束
+    expect(host2.getElement('c1')).toMatchObject({ x: 30, y: 30 }) // 实际拖动了
+    // 总 undo 步 = 初始 upsert(1) + drag(1) = 2,不是 1+4=5
+    expect(undoSteps(host2)).toBe(2)
+  })
+
+  it('resize:down(handle)→move×2→up 合并为 1 undo 步', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'c1', kind: 'card', x: 100, y: 100, w: 100, h: 100, rotation: 0 }) // +1 步
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['c1'])
+    dispatch(canvas, 'pointerdown', 200, 200) // SE 角 → resize 开始(+1 步 + coalescing)
+    dispatch(canvas, 'pointermove', 180, 180) // 缩放(coalesced)
+    dispatch(canvas, 'pointermove', 160, 160) // 缩放(coalesced)
+    dispatch(canvas, 'pointerup', 160, 160)
+    expect(host.getElement('c1')).toMatchObject({ x: 100, y: 100, w: 60, h: 60 }) // 实际缩放了
+    // 总 = 初始(1) + resize(1) = 2,不是 1+3=4
+    expect(undoSteps(host)).toBe(2)
+  })
+
+  it('batch:批内多次 upsert/remove 合并为 1 undo 步', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.batch(() => {
+      host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+      host.upsert({ id: 'b', kind: 'card', x: 20, y: 0, w: 10, h: 10, rotation: 0 })
+      host.remove('a')
+    })
+    // 批内 3 次变更 → 1 undo 步
+    expect(undoSteps(host)).toBe(1)
+    // undo 后恢复到批前(空)
+    const h = host as unknown as { undo: () => void }
+    h.undo()
+    expect(host.getElements()).toHaveLength(0)
+  })
+
+  it('单次程序性 upsert 仍各自 1 步(不被 coalescing 吞)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    host.upsert({ id: 'b', kind: 'card', x: 20, y: 0, w: 10, h: 10, rotation: 0 })
+    host.upsert({ id: 'c', kind: 'card', x: 40, y: 0, w: 10, h: 10, rotation: 0 })
+    expect(undoSteps(host)).toBe(3)
+  })
+
+  it('drag coalescing 在 onUp 后关闭:后续单次 upsert 恢复各自 1 步', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 }) // +1
+    dispatch(canvas, 'pointerdown', 50, 50) // drag 开始 +1 + coalescing
+    dispatch(canvas, 'pointermove', 60, 60)
+    dispatch(canvas, 'pointerup', 60, 60) // coalescing 关
+    // 之后单次程序性 upsert 应各自 +1(说明 coalescing 已复位为 false)
+    host.upsert({ id: 'c2', kind: 'card', x: 200, y: 0, w: 10, h: 10, rotation: 0 }) // +1
+    expect(undoSteps(host)).toBe(3) // 初始(1) + drag(1) + 单次(1)
+  })
+
+  it('嵌套 batch 不重复推快照', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.batch(() => {
+      host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+      host.batch(() => {
+        host.upsert({ id: 'b', kind: 'card', x: 20, y: 0, w: 10, h: 10, rotation: 0 })
+      })
+      host.upsert({ id: 'c', kind: 'card', x: 40, y: 0, w: 10, h: 10, rotation: 0 })
+    })
+    // 整个外层 batch = 1 undo 步(内层不额外推)
+    expect(undoSteps(host)).toBe(1)
+  })
+})
+
 describe('SelfBuiltAdapter undo/redo', () => {
   it('pushUndo(经 user-change)存栈;undo 恢复;redo 重做', () => {
     const host = new SelfBuiltAdapter(document.createElement('canvas'))

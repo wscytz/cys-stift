@@ -58,6 +58,10 @@ export class SelfBuiltAdapter implements CanvasHost {
   private undoStack: CanvasElement[][] = []
   private redoStack: CanvasElement[][] = []
   private static readonly UNDO_LIMIT = 50
+  /** coalescing=true 期间,echo 的 upsert/remove 不推快照(连续操作合并为 1 undo 步)。
+   *  drag / resize 开始时置 true(批前已 pushUndo 一次),onUp 置 false。
+   *  batch() 也用此门控实现分组。 */
+  private coalescing = false
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -141,7 +145,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   }
 
   upsert(el: CanvasElement): void {
-    if (this.echoing) this.pushUndo() // 变更前快照(供 undo 恢复到本次 upsert 前)
+    if (this.echoing && !this.coalescing) this.pushUndo() // 变更前快照(供 undo 恢复到本次 upsert 前);coalescing 期间不推(由 drag/resize/batch 批前推一次)
     this.elements.set(el.id, el)
     if (this.echoing) this.emitUser({ updated: [el], removed: [] })
     this.scheduleRender()
@@ -149,14 +153,22 @@ export class SelfBuiltAdapter implements CanvasHost {
 
   remove(id: string): void {
     if (!this.elements.has(id)) return
-    if (this.echoing) this.pushUndo() // 变更前快照
+    if (this.echoing && !this.coalescing) this.pushUndo() // 变更前快照;coalescing 期间不推
     this.elements.delete(id)
     if (this.echoing) this.emitUser({ updated: [], removed: [id] })
     this.scheduleRender()
   }
 
   batch(fn: () => void): void {
-    fn // TODO(Phase 1 后续):undo 分组
+    // undo 分组:批前推一次快照(批内所有变更合并为 1 undo 步)。嵌套 batch 不重复推。
+    const wasCoalescing = this.coalescing
+    if (!wasCoalescing) this.pushUndo()
+    this.coalescing = true
+    try {
+      fn()
+    } finally {
+      this.coalescing = wasCoalescing
+    }
   }
 
   applyWithoutEcho(fn: () => void): void {
@@ -335,6 +347,9 @@ export class SelfBuiltAdapter implements CanvasHost {
           const handle = handleAtPoint(sel, p, this.view.zoom)
           if (handle) {
             this.resizing = { id: selId, handle, start: { x: sel.x, y: sel.y, w: sel.w, h: sel.h } }
+            // resize 开始:批前推一次快照,后续 onMove 的连续 upsert 合并为这一步。
+            this.pushUndo()
+            this.coalescing = true
             try {
               this.canvas.setPointerCapture(e.pointerId)
             } catch {
@@ -365,6 +380,9 @@ export class SelfBuiltAdapter implements CanvasHost {
         }
         this.dragGroup = { ids: [...this.selectedIds], offsets }
         this.dragId = id // 兼容现有 onMove 的 dragId 检查;onMove 优先用 dragGroup
+        // drag 开始:批前推一次快照,后续 onMove 的连续 upsert 合并为这一步(coalescing)。
+        this.pushUndo()
+        this.coalescing = true
       } else if (!e.shiftKey) {
         // 空白 + 无 shift → pan + 清选择(现有)
         this.setSelectedIds([])
@@ -441,6 +459,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       }
     }
     const onUp = (e: PointerEvent) => {
+      this.coalescing = false // 任何交互结束 → 关闭 coalescing(drag/resize 的连续 upsert 批到此为止)
       if (this.connecting) {
         const rect = this.canvas.getBoundingClientRect()
         const sx = e.clientX - rect.left
