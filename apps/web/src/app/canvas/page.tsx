@@ -287,6 +287,7 @@ Output DSL like:
           key={activeCanvasId}
           canvasId={activeCanvasId}
           service={service}
+          tool={tool}
           onOpenCard={(card) => setDetail({ card })}
           adapterRef={handle}
           canvasElRef={canvasElRef}
