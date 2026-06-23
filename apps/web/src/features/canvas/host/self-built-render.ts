@@ -134,3 +134,29 @@ export function readToken(name: string, fallback: string): string {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
   return v || fallback
 }
+
+/**
+ * 画选中高亮:对 selectedIds 命中的元素画 dashed 框(在相机变换内)。
+ * lineWidth/dash 除以 zoom 抵消缩放,视觉宽度恒定。空选择不画。
+ * 纯函数(自己 save/translate/scale/restore),便于单测。
+ */
+export function drawSelectionOutlines(
+  ctx: CanvasRenderingContext2D,
+  selectedIds: string[],
+  elements: CanvasElement[],
+  view: CanvasView,
+): void {
+  if (selectedIds.length === 0) return
+  const sel = new Set(selectedIds)
+  ctx.save()
+  ctx.translate(view.panX, view.panY)
+  ctx.scale(view.zoom, view.zoom)
+  ctx.strokeStyle = readToken('--color-blue', '#1d4ed8')
+  ctx.lineWidth = 1.5 / view.zoom
+  ctx.setLineDash([6 / view.zoom, 4 / view.zoom])
+  for (const el of elements) {
+    if (!sel.has(el.id)) continue
+    ctx.strokeRect(el.x - 2, el.y - 2, el.w + 4, el.h + 4) // 外扩 2px
+  }
+  ctx.restore()
+}

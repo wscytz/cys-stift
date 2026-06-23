@@ -15,7 +15,7 @@ import type {
   CanvasView,
   UserChange,
 } from './canvas-host'
-import { renderElements, readToken } from './self-built-render'
+import { renderElements, readToken, drawSelectionOutlines } from './self-built-render'
 import { hitTest, screenToPage } from './self-built-hittest'
 import { commitFreedraw } from './self-built-freedraw'
 
@@ -87,6 +87,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       this.getCardLabel,
       readToken('--color-canvas', '#f8fafc'),
     )
+    drawSelectionOutlines(ctx, this.getSelectedIds(), this.getElements(), this.view)
   }
 
   getElements(): CanvasElement[] {

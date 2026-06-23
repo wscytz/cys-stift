@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { renderElements } from '../self-built-render'
+import { renderElements, drawSelectionOutlines } from '../self-built-render'
 import type { CanvasElement, CanvasView } from '../canvas-host'
 
 /** mock CanvasRenderingContext2D:记录所有方法调用。 */
@@ -15,6 +15,8 @@ function mockCtx() {
     rect: (x: number, y: number, w: number, h: number) => calls.push(`rect(${x},${y},${w},${h})`),
     moveTo: (x: number, y: number) => calls.push(`moveTo(${x},${y})`),
     lineTo: (x: number, y: number) => calls.push(`lineTo(${x},${y})`),
+    setLineDash: (arr: number[]) => calls.push(`setLineDash(${arr.join(',')})`),
+    strokeRect: (x: number, y: number, w: number, h: number) => calls.push(`strokeRect(${x},${y},${w},${h})`),
     roundRect: (x: number, y: number, w: number, h: number, r?: number) => calls.push(`roundRect(${x},${y},${w},${h})`),
     fill: () => calls.push('fill'),
     fillRect: (x: number, y: number, w: number, h: number) => calls.push(`fillRect(${x},${y},${w},${h})`),
@@ -123,5 +125,26 @@ describe('renderElements', () => {
     const els = [{ id: 't2', kind: 'text', x: 0, y: 0, w: 1, h: 1, rotation: 0, text: '' }] as unknown as CanvasElement[]
     expect(() => renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => '', '#ffffff')).not.toThrow()
     expect(ctx._calls.some((c) => c.startsWith('fillText'))).toBe(false)
+  })
+})
+
+describe('drawSelectionOutlines', () => {
+  it('draws a dashed rect only around selected elements', () => {
+    const ctx = mockCtx()
+    const els = [
+      { id: 'c1', kind: 'card', x: 10, y: 20, w: 100, h: 60, rotation: 0 },
+      { id: 'c2', kind: 'card', x: 200, y: 0, w: 100, h: 60, rotation: 0 },
+    ] as unknown as CanvasElement[]
+    drawSelectionOutlines(ctx, ['c1'], els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' })
+    // 只画 c1 的框(c1 外扩 2px:strokeRect(8,18,104,64));c2 不画
+    expect(ctx._calls).toContain('strokeRect(8,18,104,64)')
+    expect(ctx._calls.some((c) => c.startsWith('strokeRect(198'))).toBe(false)
+    expect(ctx._calls.some((c) => c.startsWith('setLineDash'))).toBe(true)
+  })
+
+  it('with empty selection draws nothing', () => {
+    const ctx = mockCtx()
+    drawSelectionOutlines(ctx, [], [], { panX: 0, panY: 0, zoom: 1, gridMode: 'free' })
+    expect(ctx._calls.some((c) => c.startsWith('strokeRect'))).toBe(false)
   })
 })
