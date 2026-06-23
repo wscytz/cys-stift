@@ -3,9 +3,11 @@
 /**
  * P5.1 — export bounds + shape resolution (drawio P5-1/P5-2).
  *
- * The pure core (`unionBounds`, `expandBounds`, `getSafeFileName`) has zero
- * tldraw dependency and is unit-tested. The `resolveExportShapes` adapter
- * bridges to a live tldraw Editor.
+ * The pure AABB geometry (`unionBounds`, `expandBounds`, `Bounds`) now lives in
+ * `@cys-stift/canvas-engine`(通用几何,引擎自包含);这里 re-export 以保持现有
+ * public API(`./export-bounds` 的消费者名不变)。`getSafeFileName` /
+ * `resolveExportShapes` / `resolveExportElements` / `ExportScope` 仍是本文件
+ * 的导出(它们是 export 业务,不是引擎几何)。
  *
  * drawio picks export bounds from one of three sources based on `exportType`
  * (page / diagram / selection). On tldraw we don't recompute geometry by hand
@@ -15,48 +17,10 @@
  * directly onto tldraw's native `padding` option (drawio's `border`).
  */
 
-/** Axis-aligned box in page coordinates. Compatible with tldraw's `Box`
- *  shape (x/y/w/h), kept as a plain interface so the pure helpers below
- *  don't import tldraw. */
-export interface Bounds {
-  x: number
-  y: number
-  w: number
-  h: number
-}
+// 引擎层通用 AABB 几何(原在本文件,抽出后引擎自包含;这里 re-export 保 API)。
+export { unionBounds, expandBounds, type Bounds } from '@cys-stift/canvas-engine'
 
 export type ExportScope = 'diagram' | 'selection' | 'page'
-
-/**
- * PURE — union of axis-aligned boxes. Returns null for an empty list.
- * Used to compute the content bounds of a shape set and to derive export
- * dimensions. Tested without tldraw.
- */
-export function unionBounds(boxes: Bounds[]): Bounds | null {
-  if (boxes.length === 0) return null
-  let minX = Infinity
-  let minY = Infinity
-  let maxX = -Infinity
-  let maxY = -Infinity
-  for (const b of boxes) {
-    if (b.x < minX) minX = b.x
-    if (b.y < minY) minY = b.y
-    if (b.x + b.w > maxX) maxX = b.x + b.w
-    if (b.y + b.h > maxY) maxY = b.y + b.h
-  }
-  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
-}
-
-/**
- * PURE — expand a box by `border` on all sides. When `shadow` is on and
- * border is zero, add a small slack (drawio: `+5`) so a drop-shadow filter
- * isn't clipped at the canvas edge. Tested without tldraw.
- */
-export function expandBounds(b: Bounds, border: number, shadow = false): Bounds {
-  const slack = shadow && border === 0 ? 5 : 0
-  const t = border + slack
-  return { x: b.x - t, y: b.y - t, w: b.w + 2 * t, h: b.h + 2 * t }
-}
 
 /**
  * PURE — sanitize a user-facing string into a safe cross-platform filename.
@@ -118,7 +82,7 @@ export function resolveExportShapes(
 
 // ── host adapter (CanvasElement[]; 零 tldraw) ──────────────────────────────────
 
-import type { CanvasElement, CanvasHost } from './host/canvas-host'
+import type { CanvasElement, CanvasHost } from '@cys-stift/canvas-engine'
 
 /**
  * 解析要导出的元素(scope=selection 用 host.getSelectedIds;diagram/page 用全部)。

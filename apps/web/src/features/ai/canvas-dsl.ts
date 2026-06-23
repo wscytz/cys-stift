@@ -18,7 +18,7 @@
  * the active set. freedraw emits position only; its point sequence stays in the
  * engine store (R2: hand-draw is vector; also keeps point data out of AI view).
  */
-import type { CanvasElement } from '../canvas/host/canvas-host'
+import type { CanvasElement } from '@cys-stift/canvas-engine'
 
 /** Kinds the DSL serializes. Legacy kinds are skipped. */
 const DSL_KINDS: ReadonlySet<string> = new Set([

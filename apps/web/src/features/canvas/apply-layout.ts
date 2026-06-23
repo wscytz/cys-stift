@@ -15,7 +15,7 @@
  * - Card positions are clamped to positive coordinates
  * - Errors on individual ops are swallowed; the rest of the layout applies
  */
-import type { CanvasHost } from './host/canvas-host'
+import type { CanvasHost } from '@cys-stift/canvas-engine'
 import type { CardId } from '@cys-stift/domain'
 import type { DslOp } from '../ai/dsl-parser'
 

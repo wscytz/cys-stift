@@ -30,8 +30,8 @@ import {
   buildCystiftPayload,
   type CystiftPayload,
 } from './cystift-payload'
-import { elementsToSvg } from './host/elements-to-svg'
-import type { CanvasHost } from './host/canvas-host'
+import { elementsToSvg } from '@cys-stift/canvas-engine'
+import type { CanvasHost } from '@cys-stift/canvas-engine'
 import type { CardService, CanvasId } from '@cys-stift/domain'
 
 export interface CanvasSvgExportOptions {

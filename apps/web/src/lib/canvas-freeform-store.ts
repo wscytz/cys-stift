@@ -26,7 +26,7 @@
  * SSR 安全:window 未定义时 load 返回 null、save/remove no-op。
  */
 import type { CanvasId } from '@cys-stift/domain'
-import type { CanvasElement } from '@/features/canvas/host/canvas-host'
+import type { CanvasElement } from '@cys-stift/canvas-engine'
 
 const KEY_PREFIX = 'cys-stift.canvas-freeform.'
 const KEY_SUFFIX = '.v1'

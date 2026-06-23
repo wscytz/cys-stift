@@ -32,7 +32,7 @@ import {
   type RasterFormat,
 } from './export-raster'
 import type { ExportScope } from './export-bounds'
-import type { CanvasHost } from './host/canvas-host'
+import type { CanvasHost } from '@cys-stift/canvas-engine'
 
 type Format = 'svg' | RasterFormat
 

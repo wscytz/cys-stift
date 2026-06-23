@@ -2,7 +2,7 @@
 import type { CanvasElement, CanvasView } from './canvas-host'
 import { colorOf, domTokenResolver, type TokenResolver } from './self-built-render'
 import { arrowEndpoints, dashPattern, arrowheadPoints } from './self-built-arrow'
-import { unionBounds, expandBounds, type Bounds } from '../export-bounds'
+import { unionBounds, expandBounds, type Bounds } from './bounds'
 
 export interface ElementsToSvgOptions {
   background: boolean

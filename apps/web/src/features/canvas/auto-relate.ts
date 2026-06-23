@@ -19,7 +19,7 @@
 
 import type { CardId, CardService } from '@cys-stift/domain'
 import { inferRelationTypeFromContext } from './relation-inference'
-import type { CanvasHost } from './host/canvas-host'
+import type { CanvasHost } from '@cys-stift/canvas-engine'
 
 export interface AutoRelateResult {
   arrowsCreated: number

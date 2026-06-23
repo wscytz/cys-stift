@@ -17,7 +17,7 @@
  * The registry is web-local (not domain) because it maps to canvas style
  * strings; domain must stay zero-dependency.
  */
-import type { CanvasHost, CanvasElement } from './host/canvas-host'
+import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
 import type { MessageKey } from '@/lib/i18n/messages'
 
 // Arrow 样式联合类型。颜色收紧到 Bauhaus 6 原色里实际用得到的几种(red/blue/

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import type { CanvasId } from '@cys-stift/domain'
-import type { CanvasElement } from '@/features/canvas/host/canvas-host'
+import type { CanvasElement } from '@cys-stift/canvas-engine'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

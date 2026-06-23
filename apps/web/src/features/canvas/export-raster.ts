@@ -23,7 +23,7 @@ import {
 } from './cystift-payload'
 import { getSafeFileName } from './export-bounds'
 import type { ExportScope } from './export-bounds'
-import type { CanvasHost } from './host/canvas-host'
+import type { CanvasHost } from '@cys-stift/canvas-engine'
 
 export type RasterFormat = 'png' | 'jpeg'
 

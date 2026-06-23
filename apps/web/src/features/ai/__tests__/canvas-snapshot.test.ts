@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { snapshotCanvas, formatCanvasSnapshot } from '../canvas-snapshot'
-import { InMemoryCanvasHost } from '../../canvas/host/in-memory-host'
+import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
 import type { CardService, CardId, CanvasId } from '@cys-stift/domain'
 
 /** Minimal CardService stub — snapshotCanvas only calls service.get(id).title. */

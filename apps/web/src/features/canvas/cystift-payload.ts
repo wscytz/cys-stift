@@ -28,7 +28,7 @@ import {
   encodePayload,
   decodePayload,
 } from '@/lib/png-text-chunk'
-import type { CanvasElement, CanvasHost } from './host/canvas-host'
+import type { CanvasElement, CanvasHost } from '@cys-stift/canvas-engine'
 
 const CYSTIFT_KEY = 'cystift'
 const CYSTIFT_ATTR = 'data-cystift'

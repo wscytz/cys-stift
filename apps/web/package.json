@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@cys-stift/canvas-engine": "workspace:*",
     "@cys-stift/domain": "workspace:*",
     "@cys-stift/ui": "workspace:*",
     "eventsource-parser": "1.1.2",

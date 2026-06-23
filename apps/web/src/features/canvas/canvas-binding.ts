@@ -22,7 +22,7 @@ import type {
   CanvasPosition,
   CardService,
 } from '@cys-stift/domain'
-import type { CanvasElement, CanvasHost } from './host/canvas-host'
+import type { CanvasElement, CanvasHost } from '@cys-stift/canvas-engine'
 
 const WRITEBACK_DEBOUNCE_MS = 300
 const DEFAULT_W = 240

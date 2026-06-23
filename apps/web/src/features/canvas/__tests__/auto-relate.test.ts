@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { autoRelate } from '../auto-relate'
-import { InMemoryCanvasHost } from '../host/in-memory-host'
+import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
 import type { Card, CardService, CardId } from '@cys-stift/domain'
 
 // Minimal Card-like object for keyword inference.

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { applyLayout } from '../apply-layout'
-import { InMemoryCanvasHost } from '../host/in-memory-host'
-import type { CanvasHost } from '../host/canvas-host'
+import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
+import type { CanvasHost } from '@cys-stift/canvas-engine'
 import type { DslOp } from '../../ai/dsl-parser'
 import type { CardId } from '@cys-stift/domain'
 

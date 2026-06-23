@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { serializeCanvas } from '../canvas-dsl'
 import { parseDsl } from '../dsl-parser'
-import type { CanvasElement } from '../../canvas/host/canvas-host'
+import type { CanvasElement } from '@cys-stift/canvas-engine'
 
 describe('serializeCanvas — active kinds', () => {
   it('emits card with pos + size + color', () => {

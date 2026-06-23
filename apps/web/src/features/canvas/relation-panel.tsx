@@ -35,7 +35,7 @@ import {
 } from './relation-types'
 import { inferRelationTypeFromContext } from './relation-inference'
 import { useCardService } from './card-service-context'
-import type { CanvasHost, CanvasElement } from './host/canvas-host'
+import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
 
 export function RelationPanel({
   host,

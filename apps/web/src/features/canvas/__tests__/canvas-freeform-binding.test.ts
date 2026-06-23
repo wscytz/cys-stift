@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { CanvasId } from '@cys-stift/domain'
-import { InMemoryCanvasHost } from '../host/in-memory-host'
-import type { CanvasElement } from '../host/canvas-host'
+import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
+import type { CanvasElement } from '@cys-stift/canvas-engine'
 import type { CanvasFreeformSnapshot } from '@/lib/canvas-freeform-store'
 import {
   attachCanvasFreeformPersistence,

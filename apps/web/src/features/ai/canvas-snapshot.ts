@@ -17,7 +17,7 @@
  *   (soft-deleted cards aren't on the host; deviceId isn't geometry).
  */
 import type { CanvasId, CardId, CardService } from '@cys-stift/domain'
-import type { CanvasHost } from '../canvas/host/canvas-host'
+import type { CanvasHost } from '@cys-stift/canvas-engine'
 
 // ── Shape interfaces ─────────────────────────────────────────────────────────
 

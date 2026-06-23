@@ -10,9 +10,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useDb } from '@/lib/db-client'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import { loadCardsIntoEditor, bindCardWriteback } from '@/features/canvas/canvas-binding'
-import { SelfBuiltAdapter } from '@/features/canvas/host/self-built-adapter'
-import { measureText, textEditKeyAction } from '@/features/canvas/host/self-built-text'
-import { readToken } from '@/features/canvas/host/self-built-render'
+import { SelfBuiltAdapter } from '@cys-stift/canvas-engine'
+import { measureText, textEditKeyAction } from '@cys-stift/canvas-engine'
+import { readToken } from '@cys-stift/canvas-engine'
 
 type Tool = 'select' | 'freedraw' | 'text' | 'connect'
 

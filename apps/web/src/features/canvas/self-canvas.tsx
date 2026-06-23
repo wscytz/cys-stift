@@ -20,11 +20,11 @@ import {
   bindCardWriteback,
 } from './canvas-binding'
 import { attachCanvasFreeformPersistence } from './canvas-freeform-binding'
-import { SelfBuiltAdapter } from './host/self-built-adapter'
+import { SelfBuiltAdapter } from '@cys-stift/canvas-engine'
 import { canvasViewStore } from '@/lib/canvas-view-store'
-import { screenToPage } from './host/self-built-hittest'
-import { measureText, textEditKeyAction } from './host/self-built-text'
-import { readToken } from './host/self-built-render'
+import { screenToPage } from '@cys-stift/canvas-engine'
+import { measureText, textEditKeyAction } from '@cys-stift/canvas-engine'
+import { readToken } from '@cys-stift/canvas-engine'
 
 /** 浮动 textarea 编辑会话:屏幕锚点(textarea 定位)+ 页锚点(text 元素落点)。 */
 interface EditSession {

@@ -17,7 +17,7 @@
  *  - disposed 守卫:卸载后迟到的 load 不再 upsert;cleanup 同步 flush pending save。
  */
 import type { CanvasId } from '@cys-stift/domain'
-import type { CanvasElement, CanvasHost } from './host/canvas-host'
+import type { CanvasElement, CanvasHost } from '@cys-stift/canvas-engine'
 import { canvasFreeformStore } from '@/lib/canvas-freeform-store'
 
 const DEFAULT_DEBOUNCE_MS = 500

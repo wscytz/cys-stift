@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { serializeCanvas } from '../canvas-dsl'
 import { parseDsl } from '../dsl-parser'
-import type { CanvasElement } from '../../canvas/host/canvas-host'
+import type { CanvasElement } from '@cys-stift/canvas-engine'
 
 /**
  * Round-trip losslessness suite — the cornerstone of cy's Stift's "translit"

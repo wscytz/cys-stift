@@ -7,8 +7,8 @@ import {
   type RelationTypeId,
 } from '../relation-types'
 import { inferRelationTypeFromContext } from '../relation-inference'
-import { InMemoryCanvasHost } from '../host/in-memory-host'
-import type { CanvasElement } from '../host/canvas-host'
+import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
+import type { CanvasElement } from '@cys-stift/canvas-engine'
 import type { Card } from '@cys-stift/domain'
 
 // Minimal Card-like objects for context inference.
