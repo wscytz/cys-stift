@@ -1,5 +1,5 @@
 
-import { sortByLayer } from './canvas-host'
+import { sortByLayer, sanitizeView } from './canvas-host'
 import type { CanvasElement, CanvasHost, CanvasView, UserChange } from './canvas-host'
 /**
  * InMemoryCanvasHost — 纯内存 CanvasHost,单测用,无 tldraw 依赖。
@@ -87,7 +87,8 @@ export class InMemoryCanvasHost implements CanvasHost {
   }
 
   setView(v: CanvasView): void {
-    this.view = { ...v }
+    // 与 SelfBuiltAdapter 同契约:净化脏 view(zoom 钳 + 非有限值兜底)。
+    this.view = sanitizeView(v)
     for (const l of this.viewListeners) l(this.view)
   }
 

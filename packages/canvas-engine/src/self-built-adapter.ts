@@ -14,7 +14,7 @@ import type {
   CanvasView,
   UserChange,
 } from './canvas-host'
-import { sortByLayer } from './canvas-host'
+import { sortByLayer, sanitizeView, ZOOM_MIN, ZOOM_MAX } from './canvas-host'
 import { renderElements, drawSelectionOutlines, drawMarquee, domTokenResolver, type CardInfo, type TokenResolver } from './self-built-render'
 import { hitTest, screenToPage } from './self-built-hittest'
 import { commitFreedraw } from './self-built-freedraw'
@@ -245,7 +245,9 @@ export class SelfBuiltAdapter implements CanvasHost {
   }
 
   setView(v: CanvasView): void {
-    this.view = { ...v }
+    // 引擎自我防御:净化脏 view(zoom 钳 [0.1,8] + 非有限值兜底)——不信任调用方
+    // (.cystift / localStorage / AI 可能传 zoom=0/NaN,会让 screenToPage 除 0 失真)。
+    this.view = sanitizeView(v)
     this.scheduleRender()
     for (const l of this.viewListeners) l(this.view)
   }
@@ -622,7 +624,7 @@ export class SelfBuiltAdapter implements CanvasHost {
    */
   onWheel(sx: number, sy: number, delta: number): void {
     const factor = delta < 0 ? 1.1 : 1 / 1.1
-    const nextZoom = Math.min(8, Math.max(0.1, this.view.zoom * factor))
+    const nextZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, this.view.zoom * factor))
     // zoom-to-cursor: cursor 下的页坐标缩放前后不变。
     //   pageBefore = (sx - panX) / zoom;  pageAfter = (sx - panX') / nextZoom
     //   → panX' = sx - pageBefore * nextZoom

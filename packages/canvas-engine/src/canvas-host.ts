@@ -97,6 +97,31 @@ export interface CanvasView {
   gridMode: 'snap' | 'free'
 }
 
+/** zoom 合法区间。低于则交互坐标(screenToPage/handleAtPoint 除 zoom)失真,
+ *  高于则溢出。引擎层强约束——不信任调用方传干净 view。 */
+export const ZOOM_MIN = 0.1
+export const ZOOM_MAX = 8
+
+/**
+ * 净化一个 view:zoom 钳到 [ZOOM_MIN, ZOOM_MAX] 且非有限值(NaN/±Infinity)兜底;
+ * pan 非有限值兜底 0;gridMode 非法值兜底 'free'。
+ *
+ * 为什么在引擎层做:view 可能来自脏来源(.cystift 导入 / localStorage / AI 输出),
+ * zoom=0/负/NaN 会让 screenToPage(除 zoom)产出 Infinity/NaN 坐标 → 全画布交互失灵。
+ * 引擎是独立资产,setView 必须自我防御,而非假设调用方已钳制。纯函数,可单测。
+ */
+export function sanitizeView(v: CanvasView): CanvasView {
+  const finite = (n: number, fallback: number): number =>
+    Number.isFinite(n) ? n : fallback
+  const zoom = finite(v.zoom, 1)
+  return {
+    panX: finite(v.panX, 0),
+    panY: finite(v.panY, 0),
+    zoom: Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom)),
+    gridMode: v.gridMode === 'snap' ? 'snap' : 'free',
+  }
+}
+
 /** 一次「用户源」变更:被改/被创建的元素 + 被删的 id。 */
 export interface UserChange {
   updated: CanvasElement[]

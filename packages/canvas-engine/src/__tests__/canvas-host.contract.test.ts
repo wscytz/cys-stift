@@ -66,6 +66,18 @@ function runContract(name: string, make: () => CanvasHost) {
       expect(h.getView()).toEqual({ panX: 5, panY: 6, zoom: 2, gridMode: 'snap' })
     })
 
+    it('setView 净化脏 view:zoom=0 钳到 0.1(防交互坐标除 0 失真)', () => {
+      const h = make()
+      h.setView({ panX: 0, panY: 0, zoom: 0, gridMode: 'free' })
+      expect(h.getView().zoom).toBe(0.1)
+    })
+
+    it('setView 净化脏 view:zoom=NaN 兜底 1', () => {
+      const h = make()
+      h.setView({ panX: 0, panY: 0, zoom: NaN, gridMode: 'free' })
+      expect(h.getView().zoom).toBe(1)
+    })
+
     it('onSelectionChange 在选区实际变化时触发,带新 id 列表', () => {
       const h = make()
       const seen: string[][] = []

@@ -18,7 +18,7 @@ export type {
   CanvasView,
   UserChange,
 } from './canvas-host'
-export { ACTIVE_CANVAS_KINDS, KIND_LAYER, sortByLayer } from './canvas-host'
+export { ACTIVE_CANVAS_KINDS, KIND_LAYER, sortByLayer, sanitizeView, ZOOM_MIN, ZOOM_MAX } from './canvas-host'
 
 // ── 实现 ────────────────────────────────────────────────────────────────────
 export { SelfBuiltAdapter } from './self-built-adapter'
