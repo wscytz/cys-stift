@@ -11,7 +11,6 @@
   "dependencies": {
     "@cys-stift/domain": "workspace:*",
     "@cys-stift/ui": "workspace:*",
-    "@tldraw/tldraw": "3.15.6",
     "eventsource-parser": "1.1.2",
     "markitdownllm": "^0.1.5",
     "next": "15.0.3",

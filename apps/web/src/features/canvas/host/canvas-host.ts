@@ -3,7 +3,7 @@
 /**
  * CanvasHost — 引擎无关的画布接口(Phase 0 / 路线 A)。
  *
- * 业务代码(绑定 / DSL / 快照 / 关系)只依赖此接口,不直接 import @tldraw/tldraw。
+ * 业务代码(绑定 / DSL / 快照 / 关系)只依赖此接口,不直接 import 渲染器实现。
  * 本期唯一实现是 TldrawAdapter(Task 2);Phase 1 加 SelfBuiltAdapter(Canvas 2D)。
  *
  * id 约定:CanvasElement.id = domain CardId(无 'shape:' 前缀)。引擎特定的 id 格式化
