@@ -18,11 +18,14 @@ import {
   classifyFreedraw,
   duplicateFreedraw,
   freedrawPoints,
+  freedrawToArrow,
   type FreedrawKind,
 } from '@cys-stift/canvas-engine'
 import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
 
 const DUP_OFFSET = 24
+/** 判为 arrow 且置信度 ≥ 此阈值,才提供「转为箭头」(保守:低置信不打扰)。 */
+const TO_ARROW_CONFIDENCE = 0.6
 
 function shortId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID().slice(0, 8)
@@ -76,6 +79,18 @@ export function FreedrawPanel({
     host.setSelectedIds([dup.id]) // 选中新副本,可连点连复制
   }
 
+  // ③ 特殊互动:本地猜是箭头且够自信 → 一键转真 arrow(替换手绘,单步可 undo)。
+  const canToArrow = kind === 'arrow' && confidence >= TO_ARROW_CONFIDENCE
+  const toArrow = () => {
+    const arrow = freedrawToArrow(el, `arrow-${shortId()}`)
+    if (!arrow) return
+    host.batch(() => {
+      host.remove(el.id)
+      host.upsert(arrow)
+    })
+    host.setSelectedIds([arrow.id])
+  }
+
   return (
     <div
       className="cv-freedraw"
@@ -91,6 +106,16 @@ export function FreedrawPanel({
         {t(guessKey(kind))}
         <span className="cv-freedraw__conf">{Math.round(confidence * 100)}%</span>
       </span>
+      {canToArrow && (
+        <button
+          type="button"
+          className="cv-freedraw__btn"
+          onClick={toArrow}
+          title={t('freedraw.toArrow')}
+        >
+          {t('freedraw.toArrow')}
+        </button>
+      )}
       <button
         type="button"
         className="cv-freedraw__btn"

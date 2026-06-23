@@ -307,6 +307,7 @@ export const messages = {
   'freedraw.looksDecoration': { zh: '看起来像装饰', en: 'Looks like decoration' },
   'freedraw.looksUnknown': { zh: '说不准是什么', en: 'Not sure what this is' },
   'freedraw.duplicate': { zh: '复制', en: 'Duplicate' },
+  'freedraw.toArrow': { zh: '转为箭头', en: 'Convert to arrow' },
 } as const
 
 export type MessageKey = keyof typeof messages

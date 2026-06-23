@@ -64,6 +64,7 @@ export {
   classifyFreedraw,
   duplicateFreedraw,
   freedrawPoints,
+  freedrawToArrow,
 } from './freedraw-classify'
 export type { FreedrawKind, FreedrawClassification } from './freedraw-classify'
 

@@ -157,3 +157,32 @@ export function duplicateFreedraw(
     meta: { ...el.meta, points: moved },
   }
 }
+
+/**
+ * 把一条手绘转成**自由箭头**(③ 特殊互动:本地猜是箭头 → 一键转真 arrow)。
+ *
+ * 端点取点序列的首尾点(用户画箭头通常一笔从尾扫到头)。arrow 用 bbox 编码线段:
+ * x,y = 起点(首点),w,h = 终点-起点(可负表方向)——见 arrowEndpoints 的自由箭头分支。
+ *
+ * 这是「自由箭头」:无 from/to(不连卡片),与卡片间的**语义关系箭头**不同(后者有
+ * from/to + 关系签名)。默认签名 solid + 开口V(中性箭头);不带 color(走默认描边)。
+ *
+ * 非 freedraw / 点序列 <2 → null。纯函数,不改原元素。
+ */
+export function freedrawToArrow(el: CanvasElement, newId: string): CanvasElement | null {
+  const pts = freedrawPoints(el)
+  if (!pts || pts.length < 2) return null
+  const start = pts[0]!
+  const end = pts[pts.length - 1]!
+  return {
+    id: newId,
+    kind: 'arrow',
+    x: start[0],
+    y: start[1],
+    w: end[0] - start[0],
+    h: end[1] - start[1],
+    rotation: 0,
+    dash: 'solid',
+    arrowhead: 'arrow',
+  }
+}

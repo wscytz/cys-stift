@@ -3,6 +3,7 @@ import {
   classifyFreedraw,
   duplicateFreedraw,
   freedrawPoints,
+  freedrawToArrow,
 } from '../freedraw-classify'
 import type { CanvasElement } from '../canvas-host'
 
@@ -132,5 +133,30 @@ describe('duplicateFreedraw', () => {
   it('非 freedraw → null', () => {
     const card: CanvasElement = { id: 'c', kind: 'card', x: 0, y: 0, w: 1, h: 1, rotation: 0 }
     expect(duplicateFreedraw(card, 'x', 1, 1)).toBeNull()
+  })
+})
+
+// ── freedrawToArrow ───────────────────────────────────────────────────────────
+
+describe('freedrawToArrow', () => {
+  it('首尾点 → 自由箭头端点(bbox 编码线段),默认 solid+arrow 签名', () => {
+    const el = freedrawEl([[10, 20], [50, 40], [110, 60]], 'f')
+    const arrow = freedrawToArrow(el, 'a1')!
+    expect(arrow.kind).toBe('arrow')
+    expect(arrow.id).toBe('a1')
+    // 起点=首点 (10,20);终点=尾点 (110,60) → w=100,h=40
+    expect(arrow).toMatchObject({ x: 10, y: 20, w: 100, h: 40, dash: 'solid', arrowhead: 'arrow' })
+    // 自由箭头:无 from/to
+    expect(arrow.from).toBeUndefined()
+    expect(arrow.to).toBeUndefined()
+  })
+
+  it('点序列 <2 → null', () => {
+    expect(freedrawToArrow(freedrawEl([[5, 5]], 'f'), 'a')).toBeNull()
+  })
+
+  it('非 freedraw → null', () => {
+    const card: CanvasElement = { id: 'c', kind: 'card', x: 0, y: 0, w: 1, h: 1, rotation: 0 }
+    expect(freedrawToArrow(card, 'a')).toBeNull()
   })
 })

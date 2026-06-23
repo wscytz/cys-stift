@@ -51,6 +51,18 @@ describe('arrowEndpoints', () => {
     const ghost = { ...arrow, to: 'ghost' } as CanvasElement
     expect(arrowEndpoints(ghost, [cardA])).toEqual({ from: null, to: null })
   })
+  it('自由箭头(无 from/to,bbox 非零)→ 端点 = bbox 两角', () => {
+    const free = { id: 'fa', kind: 'arrow', x: 10, y: 20, w: 100, h: 40, rotation: 0 } as CanvasElement
+    expect(arrowEndpoints(free, [])).toEqual({ from: { x: 10, y: 20 }, to: { x: 110, y: 60 } })
+  })
+  it('自由箭头 w/h 可负(表方向)', () => {
+    const free = { id: 'fa', kind: 'arrow', x: 100, y: 100, w: -50, h: -30, rotation: 0 } as CanvasElement
+    expect(arrowEndpoints(free, [])).toEqual({ from: { x: 100, y: 100 }, to: { x: 50, y: 70 } })
+  })
+  it('无 from/to 且 bbox 零 → null(不画)', () => {
+    const empty = { id: 'fa', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0 } as CanvasElement
+    expect(arrowEndpoints(empty, [])).toEqual({ from: null, to: null })
+  })
 })
 
 describe('dashPattern — 语义线型', () => {

@@ -33,8 +33,14 @@ export function borderPoint(
 }
 
 /**
- * 解析 arrow 的 from/to 端点(各自指向对方元素的边框交点)。
- * 任一端元素找不到 → 都返 null(渲染时不画半截箭头)。
+ * 解析 arrow 的 from/to 端点。
+ *
+ * 两种 arrow:
+ *  - **关系箭头**:有 from/to 指向元素 id → 端点 = 各自朝对方的边框交点。
+ *  - **自由箭头**:无 from/to(或指向的元素已不存在)→ 端点 = arrow 自身 bbox 的
+ *    两个角(起点 (x,y),终点 (x+w, y+h);w/h 可负表方向)。手绘转箭头用这种。
+ *
+ * 关系箭头任一端元素找不到、且 arrow 自身无尺寸(w=h=0)→ 返 null(不画半截)。
  */
 export function arrowEndpoints(
   arrow: CanvasElement,
@@ -42,13 +48,22 @@ export function arrowEndpoints(
 ): { from: Point | null; to: Point | null } {
   const fromEl = arrow.from ? elements.find((e) => e.id === arrow.from) : undefined
   const toEl = arrow.to ? elements.find((e) => e.id === arrow.to) : undefined
-  if (!fromEl || !toEl) return { from: null, to: null }
-  const fc = elementCenter(fromEl)
-  const tc = elementCenter(toEl)
-  return {
-    from: borderPoint(fc, fromEl.w / 2, fromEl.h / 2, tc),
-    to: borderPoint(tc, toEl.w / 2, toEl.h / 2, fc),
+  if (fromEl && toEl) {
+    const fc = elementCenter(fromEl)
+    const tc = elementCenter(toEl)
+    return {
+      from: borderPoint(fc, fromEl.w / 2, fromEl.h / 2, tc),
+      to: borderPoint(tc, toEl.w / 2, toEl.h / 2, fc),
+    }
   }
+  // 自由箭头:无有效 from/to 端元素,但自身 bbox 描述一条线段(w/h 非零)。
+  if (arrow.w !== 0 || arrow.h !== 0) {
+    return {
+      from: { x: arrow.x, y: arrow.y },
+      to: { x: arrow.x + arrow.w, y: arrow.y + arrow.h },
+    }
+  }
+  return { from: null, to: null }
 }
 
 /**
