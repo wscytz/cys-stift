@@ -26,6 +26,13 @@ P2 引擎抽包后的衔接打磨 + 增值功能。
 ### AI 隐私(cluster)
 - 走 `serializeCardsForAI`(allowlist + 软删除过滤);无 `source.deviceId` / 无 `media.dataUrl` / 无 vision。`docs/user/privacy.md` 更新 AI 动作清单 + cluster 说明。
 
+### 引擎离线鲁棒性 + 手绘底座(2026-06-23 第二批)
+- **setView 自我防御**:`sanitizeView` 净化脏 view(zoom 钳 [0.1,8] + 非有限值兜底)——引擎独立资产不信任调用方(.cystift/localStorage/AI 传 zoom=0/NaN 会让 screenToPage 除 0,整块画布交互失灵)。
+- **手绘移动 bug 修复**(底座):freedraw 真身=`meta.points`(绝对坐标),drag/resize 此前只改 bbox 不变换点序列 → 拖动/缩放手绘笔画原地不动。这是边界疏漏(freedraw phase 不管 move,move phase 只用 card 测,落两 phase 交界缝隙;详见 plan §5 归因)。新 `translateFreedraw`/`scaleFreedrawToBox` + adapter 接线。
+- **交互矩阵测试**:`self-built-interaction-matrix.test.ts` 遍历每种 kind × {drag,resize} 断言视觉真身变,先红(freedraw 两格)后绿——这类 kind×操作疏漏以后自动抓住,不靠人记得测。
+- **手绘③ 猜箭头转真 arrow**:本地几何猜是箭头且够自信 → FreedrawPanel「转为箭头」一键替换(自由箭头,无 from/to)。`arrowEndpoints` 扩支持自由箭头几何端点 + `freedrawToArrow`。
+- 全程守 R2 隐私:手绘点序列纯本地,不外发 AI(② AI 介入手绘按用户决定不做)。
+
 
 
 开发者反馈(2026-06-22)的 2 个交互 bug + 收尾整理 + 战略讨论档归档。
