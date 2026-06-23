@@ -41,7 +41,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     up: (e: PointerEvent) => void
   } | null = null
   private wheelHandler: ((e: WheelEvent) => void) | null = null
-  private activeTool: 'select' | 'freedraw' = 'select'
+  private activeTool: 'select' | 'freedraw' | 'text' = 'select'
   private currentStroke: { points: [number, number][] } | null = null
 
   constructor(
@@ -131,7 +131,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   }
 
   /** 切换工具(渲染器自身方法,不上 CanvasHost 接口)。 */
-  setTool(t: 'select' | 'freedraw'): void {
+  setTool(t: 'select' | 'freedraw' | 'text'): void {
     this.activeTool = t
     // 切工具时放弃进行中的笔画
     if (t !== 'freedraw' && this.currentStroke) {
@@ -140,7 +140,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     }
   }
 
-  getTool(): 'select' | 'freedraw' {
+  getTool(): 'select' | 'freedraw' | 'text' {
     return this.activeTool
   }
 
@@ -160,6 +160,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   private attachPointer(): void {
     if (this.pointerHandlers) return
     const onDown = (e: PointerEvent) => {
+      if (this.activeTool === 'text') return // text 模式:不 drag/pan/freedraw,让页面 onClick 放 textarea
       const rect = this.canvas.getBoundingClientRect()
       const sx = e.clientX - rect.left
       const sy = e.clientY - rect.top

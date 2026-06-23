@@ -99,3 +99,30 @@ describe('SelfBuiltAdapter freedraw input', () => {
     expect(h.getTool()).toBe('freedraw')
   })
 })
+
+describe('SelfBuiltAdapter text 模式', () => {
+  function dispatch(canvas: HTMLCanvasElement, type: string, x: number, y: number) {
+    canvas.dispatchEvent(
+      new PointerEvent(type, {
+        pointerId: 1,
+        pointerType: 'mouse',
+        bubbles: true,
+        clientX: x,
+        clientY: y,
+      }),
+    )
+  }
+
+  it('text 模式:pointerdown 不触发 drag/pan/freedraw(no-op)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('text')
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 }) // 可被拖拽的卡片
+    let fired = 0
+    host.onUserChange(() => fired++)
+    dispatch(canvas, 'pointerdown', 50, 50) // 命中卡片
+    dispatch(canvas, 'pointermove', 80, 80)
+    dispatch(canvas, 'pointerup', 80, 80)
+    expect(fired).toBe(0) // text 模式 pointerdown/move/up 全 no-op → 不触发 onUserChange。listener 在 upsert(c1) 之后才加,所以初始 upsert 那次也没被计数 → fired 恒为 0。
+  })
+})
