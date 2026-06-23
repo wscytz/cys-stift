@@ -7,7 +7,7 @@
 ## 产品一句话
 
 **cy's Stift** — 本地优先的灵感画布,包豪斯风格 UI。灵感 3 秒记,画布上慢慢养。
-(Next.js 15 静态导出 + tldraw + React 19 + TS strict;桌面壳 Tauri v2;数据 localStorage + OPFS,离线可用。)
+(Next.js 15 静态导出 + 自研 Canvas 2D + React 19 + TS strict;桌面壳 Tauri v2;数据 localStorage + OPFS,离线可用。)
 
 ## 版本里程碑(从 git tag)
 
@@ -104,7 +104,7 @@
 
 - **捕获**:全局快捷键 + Mini Input + 文件拖拽 + `.cystift` 文件拖回恢复
 - **inbox**:多媒介编辑(链接/代码/引用/媒体)+ 草稿自动保存 + 发送到画布
-- **canvas**:tldraw 自由画布(矩形/椭圆/箭头/便签/文本/手绘)+ 多画布 CRUD + 视图持久化 + 关系箭头 + AI 排版 + 导出 SVG/PNG
+- **canvas**:自研 Canvas 2D 自由画布(矩形/椭圆/箭头/便签/文本/手绘)+ 多画布 CRUD + 视图持久化 + 关系箭头 + AI 排版 + 导出 SVG/PNG
 - **archive**:网格/时间轴 + 多选批量 + 详情 Modal
 - **trash**:软删恢复
 - **search**:全文检索(title 1.5x 权重 + body 摘要 + pinned 前置)
@@ -113,7 +113,7 @@
 
 ## 下一步
 
-- **画布自研 · 路线 A(Phase 0-2 全完成;tldraw 已移除)**:渐进 tldraw → 自研 Canvas 2D 渲染器**收口**;特色 = 几何元素双向文本 DSL + 手绘向量 + 关系箭头(渲染+connect+关系 panel+auto-relate)+ 文本编辑(IME)+ 选择/删除/resize/多选组移动/键盘微移/undo-redo + 导出(SVG/PNG/.cystift 全走 CanvasElement)。ADR `docs/adr/2026-06-23-remove-tldraw.md`;Phase 2 spec `docs/superpowers/specs/2026-06-23-phase2-canvas-replace-tldraw.md`;计划 `docs/plans/2026-06-22-canvas-self-build-route-a.md` + 逐步(phase0 / phase1-foundation/-freedraw/-arrow/-text/-selection/-resize/-multiselect/-connect/-keyboard / phase2-sub1/-sub2/-sub3/-sub4);调研 `docs/decisions/2026-06-22-canvas-research-drawio-archdiag-affine.md`;冒烟 `scripts/phase0-smoke.cjs` / `phase1-{,freedraw-,arrow-,text-,selection-,resize-,multiselect-,connect-,keyboard-}smoke.cjs` / `phase2-{main,sub2,sub3,sub4}-smoke.cjs`。**Phase 0**:CanvasHost + TldrawAdapter(已删),核心业务逻辑 + AI 路径上 host。**Phase 1**:SelfBuiltAdapter(Canvas 2D)功能完备。**Phase 2**:主路由切 SelfCanvas + 卡片渲染/toolbar + 导出层迁 CanvasElement + 关系层迁 host。**子5(收口,已完成)**:删 tldraw 依赖 + 11 个 tldraw 代码文件(tldraw-canvas/canvas-editor+3 bridges/canvas-toolbar/card-shape-util/card-handles/tldraw-adapter+test/dev/tldraw)+ ADR。`@tldraw/tldraw` 从 package.json 移除;零 `@tldraw` import;/canvas First Load JS **649kB→176kB**(降 ~470kB)。309 web 测试 + build exit 0 + 14 套冒烟。**唯一未完成**:spec §3.4/§6.x 修订(tldraw → 自研渲染器)走**五轮审查**——spec 冻结,改要审查,待用户启动。**子5 后 debt 收口(2026-06-23,已完成)**:① text 编辑接主路由(SelfCanvas 移植浮动 textarea 编辑会话,Text 工具点 canvas 起 textarea / IME / Ctrl+Enter 提交 / Escape 取消 / 切工具收起);② **freeform 持久化层**(新 `canvas-freeform-store` per-canvas OPFS 主+localStorage 回退,只存非 card 的 `CanvasElement[]`,card 仍走 DB 单一可信源;新 `canvas-freeform-binding` hydrate+debounce save+card 过滤+race/echo/disposed 守卫;接入 SelfCanvas;删旧 tldraw 形状孤儿 `canvas-snapshot-store`)——325 web 测试 + build exit 0 + phase2-{text-main,freeform-persist} 冒烟;③ **选区轮询 → onSelectionChange 事件**(CanvasHost 接口加 `onSelectionChange`/`setSelectedIds`/`onViewChange`;SelfBuiltAdapter + InMemoryCanvasHost 实现,选区实际变化才 emit;RelationPanel 用 selection/view/user 事件替 200ms 轮询,page auto-relate 按钮用 onSelectionChange 替 300ms 轮询;零 setInterval 残留)——331 web 测试 + build exit 0。**剩余 debt**:`--color-green`/`--color-canvas` token 未定义(readToken 回退兜底,colorOf 已不再映射 green);undo 粒度=每次变更 1 步;跨 card/freeform 的 z-order 不完整保留(freeform 恢复后通常压在 card 之上)。④ **关系箭头语义三维签名 + token 规范**(2026-06-23):关系箭头做出 cy's Stift 特色——每种语义关系一个固定三维视觉签名(线型 dash + 箭头形 arrowhead + 颜色),区别于 tldraw/excalidraw 的「用户手选样式几何箭头」。`CanvasElement` 加 `dash`/`arrowhead` 字段;`applyRelationType` 写完整签名;实时渲染(setLineDash + 开口V/实心三角/无箭头)+ SVG 导出(stroke-dasharray + polygon/polyline)同源几何(`dashPattern`/`arrowheadPoints` 纯函数);RelationPanel swatch 显线型;`.cystift` 往返自动携带。规范修复:删 `colorOf`/`strokeColor` 的 green 映射(违反 Bauhaus 6 原色铁律,第七色),加 grey→`--color-gray`(修 related-to 灰色被画成黑色真 bug),`ArrowColor` 联合收紧到实际用色——348 web 测试 + build exit 0 + phase2-relation-signature 冒烟。
+- **画布自研 · 路线 A(Phase 0-2 全完成;tldraw 已移除)**:渐进 tldraw → 自研 Canvas 2D 渲染器**收口**;特色 = 几何元素双向文本 DSL + 手绘向量 + 关系箭头(渲染+connect+关系 panel+auto-relate)+ 文本编辑(IME)+ 选择/删除/resize/多选组移动/键盘微移/undo-redo + 导出(SVG/PNG/.cystift 全走 CanvasElement)。ADR `docs/adr/2026-06-23-remove-tldraw.md`;Phase 2 spec `docs/superpowers/specs/2026-06-23-phase2-canvas-replace-tldraw.md`;计划 `docs/plans/2026-06-22-canvas-self-build-route-a.md` + 逐步(phase0 / phase1-foundation/-freedraw/-arrow/-text/-selection/-resize/-multiselect/-connect/-keyboard / phase2-sub1/-sub2/-sub3/-sub4);调研 `docs/decisions/2026-06-22-canvas-research-drawio-archdiag-affine.md`;冒烟 `scripts/phase0-smoke.cjs` / `phase1-{,freedraw-,arrow-,text-,selection-,resize-,multiselect-,connect-,keyboard-}smoke.cjs` / `phase2-{main,sub2,sub3,sub4}-smoke.cjs`。**Phase 0**:CanvasHost + TldrawAdapter(已删),核心业务逻辑 + AI 路径上 host。**Phase 1**:SelfBuiltAdapter(Canvas 2D)功能完备。**Phase 2**:主路由切 SelfCanvas + 卡片渲染/toolbar + 导出层迁 CanvasElement + 关系层迁 host。**子5(收口,已完成)**:删 tldraw 依赖 + 11 个 tldraw 代码文件(tldraw-canvas/canvas-editor+3 bridges/canvas-toolbar/card-shape-util/card-handles/tldraw-adapter+test/dev/tldraw)+ ADR。`@tldraw/tldraw` 从 package.json 移除;零 `@tldraw` import;/canvas First Load JS **649kB→176kB**(降 ~470kB)。309 web 测试 + build exit 0 + 14 套冒烟。**spec 画布章节修订已完成(2026-06-23)**:tldraw → 自研 Canvas 2D,五轮审查通过 + 用户终审;见 `docs/decisions/2026-06-23-spec-canvas-selfbuilt-revision.md`。**子5 后 debt 收口(2026-06-23,已完成)**:① text 编辑接主路由(SelfCanvas 移植浮动 textarea 编辑会话,Text 工具点 canvas 起 textarea / IME / Ctrl+Enter 提交 / Escape 取消 / 切工具收起);② **freeform 持久化层**(新 `canvas-freeform-store` per-canvas OPFS 主+localStorage 回退,只存非 card 的 `CanvasElement[]`,card 仍走 DB 单一可信源;新 `canvas-freeform-binding` hydrate+debounce save+card 过滤+race/echo/disposed 守卫;接入 SelfCanvas;删旧 tldraw 形状孤儿 `canvas-snapshot-store`)——325 web 测试 + build exit 0 + phase2-{text-main,freeform-persist} 冒烟;③ **选区轮询 → onSelectionChange 事件**(CanvasHost 接口加 `onSelectionChange`/`setSelectedIds`/`onViewChange`;SelfBuiltAdapter + InMemoryCanvasHost 实现,选区实际变化才 emit;RelationPanel 用 selection/view/user 事件替 200ms 轮询,page auto-relate 按钮用 onSelectionChange 替 300ms 轮询;零 setInterval 残留)——331 web 测试 + build exit 0。**剩余 debt**:`--color-green`/`--color-canvas` token 未定义(readToken 回退兜底,colorOf 已不再映射 green);undo 粒度=每次变更 1 步;跨 card/freeform 的 z-order 不完整保留(freeform 恢复后通常压在 card 之上)。④ **关系箭头语义三维签名 + token 规范**(2026-06-23):关系箭头做出 cy's Stift 特色——每种语义关系一个固定三维视觉签名(线型 dash + 箭头形 arrowhead + 颜色),区别于 tldraw/excalidraw 的「用户手选样式几何箭头」。`CanvasElement` 加 `dash`/`arrowhead` 字段;`applyRelationType` 写完整签名;实时渲染(setLineDash + 开口V/实心三角/无箭头)+ SVG 导出(stroke-dasharray + polygon/polyline)同源几何(`dashPattern`/`arrowheadPoints` 纯函数);RelationPanel swatch 显线型;`.cystift` 往返自动携带。规范修复:删 `colorOf`/`strokeColor` 的 green 映射(违反 Bauhaus 6 原色铁律,第七色),加 grey→`--color-gray`(修 related-to 灰色被画成黑色真 bug),`ArrowColor` 联合收紧到实际用色——348 web 测试 + build exit 0 + phase2-relation-signature 冒烟。
 - **画布技术路线**(原 proposal,已并入选型):tldraw 依赖评估 + 自研替代 + 文本描述语言 + 基座更换 — 见 `docs/plans/2026-06-22-canvas-strategy-tldraw-vs-self-build.md`。最低杠杆的起点是**画布抽象层**(隔离业务代码与 tldraw API)。任何换基座属"重新选型",需 ADR + spec 审查。
 - Tauri **签名公证**(P9 — 需 Apple 证书,用户提供)
 - AI 找重复 / cluster / 时间线(P10)
@@ -128,7 +128,7 @@
 ## 约束(不可遗忘,详见根 `CLAUDE.md`)
 
 - spec `docs/specs/2026-06-19-cys-stift-design.md` 冻结,不改
-- 技术栈不重选(Next.js / tldraw / SQLite / Drizzle)
+- 技术栈不重选(Next.js / 自研 Canvas 2D / SQLite / Drizzle)
 - `packages/domain` 零依赖
 - 颜色/像素走 token,不写死 hex
 - AI 隐私:`source.deviceId` / `media.dataUrl` / 软删除卡 永不进 prompt(allowlist 强制)

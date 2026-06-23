@@ -68,7 +68,7 @@
 | Q2 | 卡片能装什么 | **B. 多媒介** | 标题 + 正文 + 图片 + 链接 + 代码 + 引用 |
 | Q3 | 卡的来源 | **B. 快速捕获为主** | 全局快捷键 → mini input → Inbox → Canvas |
 | Q4 | 画布的"无限"感 | **C. 网格无限** | 强网格默认 + 自由模式可选 |
-| Q5 | 技术栈 | **A. Next.js + SQLite + Tauri + tldraw** | 客户端 local-first（无 server） |
+| Q5 | 技术栈 | **A. Next.js + SQLite + Tauri + 自研 Canvas 2D 渲染器** | 客户端 local-first（无 server） |
 | Q6 | 基座范围 | **C. 基座 + 快速捕获 + 包豪斯设计系统** | |
 | Q7 | 包豪斯原色 + 可换色 | **功能区划 + 红色默认 + 可重映射** | token 集固定 6 色 |
 | Q8 | 字体 | **B. Space Grotesk + Inter** | |
@@ -151,7 +151,7 @@ apps/web/src/
 ├── features/
 │   ├── capture/                  # 捕获入口
 │   ├── card/                     # 卡片 CRUD
-│   ├── canvas/                   # 画布（tldraw 封装）
+│   ├── canvas/                   # 画布（自研 Canvas 2D + CanvasHost 抽象）
 │   └── archive/                  # 归档视图
 ├── entities/
 │   ├── card/
@@ -541,7 +541,7 @@ export const defaultRegionColor: Record<Region, RegionToken> = {
 ### 5.4 三个视图的视觉骨架
 
 - **Inbox**：8px 红条顶部 + 卡片网格（snap 8px，240px 固定宽）
-- **Canvas**：8px 黑条顶部 + 8px 点阵网格背景 + tldraw 渲染
+- **Canvas**：8px 黑条顶部 + 8px 点阵网格背景 + 自研 Canvas 2D 渲染
 - **Archive**：8px 蓝条顶部 + 网格视图（默认）+ 时间轴视图
 
 ### 5.5 Mini Input（捕获弹窗）
@@ -569,9 +569,9 @@ MVP **不做**。预留 token 抽象，未来加。
 - 未来无痛迁 Turso（libSQL 协议）或 Postgres（Drizzle schema 写法是标准 SQL）
 
 ### 6.3 画布
-- **tldraw v3 Custom Shape API**（`Card` 作为 `ShapeUtil`）
+- **自研 Canvas 2D 渲染器**：`CanvasElement`（`kind: card | arrow | freedraw | text | rect`）为统一模型，业务依赖引擎无关的 `CanvasHost` 接口，主路由以 `SelfBuiltAdapter` 实现；关系箭头用「语义三维签名」（线型 + 箭头形 + 颜色）区分卡片间关系性质。
 - 不选 Excalidraw / Konva / React Flow（语义不匹配或开发量大）
-- 风险预案：tldraw 只用渲染层 + 相机，业务在自己手里
+- 风险预案（已兑现）：渲染层 + 相机自研，业务全在自己手里（见 ADR 2026-06-23）
 
 ### 6.4 桌面壳
 - **Tauri v2 + Rust**
@@ -590,7 +590,7 @@ MVP **不做**。预留 token 抽象，未来加。
 ### 6.7 状态管理
 - **客户端数据**：直接读 Repository（WASM SQLite），变更后用轻量订阅 / 事件刷新 UI（TanStack Query 可选作缓存层）
 - **客户端 UI 状态**：Zustand
-- **画布内部**：tldraw store（编辑器内部状态；与 DB 的同步见 §6.11）
+- **画布内部**：自研 adapter 内部状态（`CanvasElement` Map + `CanvasView` + 选区 + undo/redo 栈；与 DB 的同步见 §6.11）
 
 ### 6.8 校验
 - **Zod 4** —— schema 同时给 Drizzle / tRPC / 表单用
@@ -604,15 +604,16 @@ MVP **不做**。预留 token 抽象，未来加。
 - **pnpm 9+**
 - **Node 22 LTS**（`.nvmrc` 锁定）
 
-### 6.11 tldraw 持久化策略（关键）
+### 6.11 画布持久化策略（关键）
 
-Card 是 tldraw 的自定义 Shape，但**数据真相源是 SQLite 的 `cards.canvasPosition` 列**，不是 tldraw 自带 store。绑定方式：
+Card 是 `CanvasElement`（`kind='card'`），但**卡片几何的数据真相源是 SQLite 的 `cards.canvasPosition` 列**，不是画布内部状态。绑定方式：
 
-- **加载**：从 DB 读卡片 → 转成 tldraw shapes → 注入 editor。
-- **编辑**：监听 tldraw `onChange`，**防抖（~300ms）后**写回 DB 的 `canvasX/Y/W/H/Z/rotation`。
-- tldraw 的序列化快照（snapshot）**不作为持久化主存储**，仅用于编辑器内部 undo/redo。
+- **加载**：从 DB 读卡片 → 转成 `CanvasElement`（`kind='card'`）→ `host.upsert`（`applyWithoutEcho`，不触发回写监听）。
+- **编辑**：监听 `host.onUserChange`，**防抖（~300ms）后**写回 DB 的 `canvasX/Y/W/H/Z/rotation`。
+- **卡片几何 vs undo/redo**：DB 是单一真相源；画布内部状态仅用于 undo/redo（adapter 内 50 步快照栈）。
+- **freeform 元素**（`text` / `freedraw` / `arrow` / `rect`）：不进 DB，per-canvas 持久化到 `canvas-freeform-store`（OPFS 主 + localStorage 回退），与 `.cystift` 导出同源（`host.getElements()` ↔ `host.upsert` 往返）。
 
-这样 Inbox / Archive 能用 `canvas_id IS NULL` 直接查询（见 §4.7 索引），不被 tldraw 黑盒挡住。
+这样 Inbox / Archive 能用 `canvas_id IS NULL` 直接查询（见 §4.7 索引），不被画布内部状态挡住。
 
 ### 6.12 路由与静态导出
 
@@ -653,7 +654,7 @@ export interface CaptureSink {
 | **1** | 设计系统 | Bauhaus tokens + Storybook 化组件库 |
 | **2** | 数据层 | Domain 模型 + Drizzle schema + 迁移 |
 | **3** | Inbox | 创建 / 查看 / 删除卡片（含多媒介） |
-| **4** | Canvas 基础 | tldraw 集成 + Card shape |
+| **4** | Canvas 基础 | ~~tldraw 集成 + Card shape~~（后由路线 A 自研 Canvas 2D 替换，见 ADR 2026-06-23） |
 | **5** | Canvas 完整 | 网格 / 自由模式、缩放、对齐 |
 | **6** | 捕获入口 | 全局快捷键 + 菜单栏 + mini input |
 | **7** | Archive | 网格 / 时间轴视图 |
@@ -728,12 +729,12 @@ docs/memory/
 
 | 风险 | 触发条件 | 回退方案 |
 |---|---|---|
-| tldraw 不满足需求 | Card shape 性能受限 | 仅用渲染层 + 相机，业务在自己手里 |
+| 自研渲染器交互打磨长尾 | 对齐成熟画布产品的细化打磨 | 持续迭代；测试 + 冒烟兜底；若长期不达标可再评估开源替代（见 ADR 2026-06-23） |
 | Tauri Mobile 不成熟 | 后期做移动 | PWA 兜底，等 Tauri Mobile |
 | SQLite 单文件过大 | 卡片超 10 万 | 迁移 Turso（libSQL 协议兼容），schema 不变 |
 | pnpm monorepo 复杂度 | 包依赖混乱 | 退回单包结构 |
 | 同步 / CRDT 冲突 | 接入云同步时 | schema 已同步就绪（§4.10），用 Yjs / Automerge，逐表启用 |
-| tldraw ↔ DB 双写 | 位置数据不一致 | DB 为唯一真相源 + onChange 防抖回写（§6.11） |
+| 画布状态 ↔ DB 双写 | 位置数据不一致 | DB 为唯一真相源 + `onUserChange` 防抖回写（§6.11） |
 | Drizzle 无 Tauri SQL 驱动 | 桌面端 DB 访问 | **已决**：渲染进程内 WASM SQLite，单一 Drizzle 驱动（见 §3.4） |
 | WASM SQLite 性能 | 卡片量极大 | 个人量级够用；超大时迁 Turso（libSQL 协议） |
 | 静态导出 + 动态路由 | 想用 `/canvas/[id]` 深链 | 画布 / 卡片选择走客户端状态（§6.12） |
