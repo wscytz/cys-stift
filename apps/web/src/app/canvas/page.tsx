@@ -35,6 +35,7 @@ export default function CanvasPage() {
   const handle = useRef<SelfCanvasHandle>({ adapter: null })
   const [detail, setDetail] = useState<{ card: Card } | null>(null)
   const [snapMode, setSnapMode] = useState<'snap' | 'free'>('snap')
+  const [tool, setTool] = useState<'select' | 'freedraw' | 'text' | 'connect'>('select')
 
   const { snapshot: canvasesSnap } = useCanvases()
   const activeCanvasId = canvasesSnap.activeCanvasId
@@ -181,6 +182,12 @@ Output DSL like:
     : 0
   const adapterReady = !!handle.current.adapter
 
+  // adapter ready 时同步工具(切 canvas 重建 adapter 后恢复当前 tool)。
+  useEffect(() => {
+    handle.current.adapter?.setTool(tool)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool, adapterReady])
+
   return (
     <main className="page">
       <Toolbar region="canvas">
@@ -205,6 +212,20 @@ Output DSL like:
         {aiEnabled && (
           <Button variant="ghost" onClick={handleAILayout} disabled={!adapterReady} title="AI layout">AI</Button>
         )}
+        <span className="tb-divider" aria-hidden="true" />
+        {(['select', 'freedraw', 'text', 'connect'] as const).map((tk) => (
+          <button
+            key={tk}
+            type="button"
+            className={`tb-snap${tool === tk ? ' tb-snap--snap' : ''}`}
+            onClick={() => setTool(tk)}
+            disabled={!adapterReady}
+            aria-pressed={tool === tk}
+            style={{ textTransform: 'none', letterSpacing: 0 }}
+          >
+            {tk === 'select' ? 'Select' : tk === 'freedraw' ? 'Draw' : tk === 'text' ? 'Text' : 'Connect'}
+          </button>
+        ))}
         <span className="tb-divider" aria-hidden="true" />
         <SnapToggle mode={snapMode} onToggle={toggleSnap} disabled={!adapterReady} />
         <span className="tb-divider" aria-hidden="true" />

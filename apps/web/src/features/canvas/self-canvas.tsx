@@ -56,27 +56,33 @@ export function SelfCanvas({
     loadCardsIntoEditor(adapter, service, canvasId)
     const unbind = bindCardWriteback(adapter, service, canvasId)
 
-    // 视图变更写回 canvasViewStore(debounce 500ms,同 tldraw 版)。
-    let timer: ReturnType<typeof setTimeout> | null = null
-    const writeView = () => {
-      const v = adapter.getView()
-      canvasViewStore.update(canvasId, {
-        zoom: v.zoom,
-        panX: v.panX,
-        panY: v.panY,
-        gridMode: v.gridMode,
-      })
-    }
-    const interval = window.setInterval(() => {
-      // SelfBuiltAdapter 无 onViewChange;轮询视图(pan/zoom 时 setView 改了 view)。
-      // 轻量:每 500ms 查一次,有变才写。子项目 2 接 toolbar 时再优化成事件。
-      writeView()
-    }, 500)
+    // 视图持久化:onViewChange + 500ms debounce 写 canvasViewStore(替代轮询)。
+    let viewTimer: ReturnType<typeof setTimeout> | null = null
+    const unbindView = adapter.onViewChange(() => {
+      if (viewTimer) clearTimeout(viewTimer)
+      viewTimer = setTimeout(() => {
+        const v = adapter.getView()
+        canvasViewStore.update(canvasId, {
+          zoom: v.zoom,
+          panX: v.panX,
+          panY: v.panY,
+          gridMode: v.gridMode,
+        })
+      }, 500)
+    })
 
     return () => {
-      if (timer) clearTimeout(timer)
-      window.clearInterval(interval)
-      writeView() // 卸载前 flush
+      if (viewTimer) {
+        clearTimeout(viewTimer)
+        const v = adapter.getView()
+        canvasViewStore.update(canvasId, {
+          zoom: v.zoom,
+          panX: v.panX,
+          panY: v.panY,
+          gridMode: v.gridMode,
+        })
+      }
+      unbindView()
       unbind()
       adapter.detach()
       adapterInner.current = null
