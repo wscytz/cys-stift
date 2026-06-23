@@ -250,3 +250,51 @@ describe('SelfBuiltAdapter resize', () => {
     expect(host.getElement('c1')).toMatchObject({ w: 100, h: 100 }) // 尺寸没变
   })
 })
+
+describe('SelfBuiltAdapter multiselect', () => {
+  function dispatch(canvas: HTMLCanvasElement, type: string, x: number, y: number, shift = false) {
+    canvas.dispatchEvent(
+      new PointerEvent(type, { pointerId: 1, pointerType: 'mouse', bubbles: true, clientX: x, clientY: y, shiftKey: shift }),
+    )
+  }
+
+  it('shift-click 切换选择(累加/移除)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 50, h: 50, rotation: 0 })
+    host.upsert({ id: 'b', kind: 'card', x: 100, y: 0, w: 50, h: 50, rotation: 0 })
+    dispatch(canvas, 'pointerdown', 25, 25) // 选 a
+    dispatch(canvas, 'pointerup', 25, 25)
+    dispatch(canvas, 'pointerdown', 125, 25, true) // shift+点 b → 累加
+    dispatch(canvas, 'pointerup', 125, 25, true)
+    expect((host as unknown as { getSelectedIds: () => string[] }).getSelectedIds().sort()).toEqual(['a', 'b'])
+    dispatch(canvas, 'pointerdown', 125, 25, true) // shift+再点 b → 移除
+    dispatch(canvas, 'pointerup', 125, 25, true)
+    expect((host as unknown as { getSelectedIds: () => string[] }).getSelectedIds()).toEqual(['a'])
+  })
+
+  it('组移动:拖任一选中元素,全组移', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 50, h: 50, rotation: 0 })
+    host.upsert({ id: 'b', kind: 'card', x: 100, y: 0, w: 50, h: 50, rotation: 0 })
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['a', 'b'])
+    dispatch(canvas, 'pointerdown', 25, 25) // 拖 a(已选中)
+    dispatch(canvas, 'pointermove', 35, 35) // +10,+10
+    dispatch(canvas, 'pointerup', 35, 35)
+    expect(host.getElement('a')).toMatchObject({ x: 10, y: 10 })
+    expect(host.getElement('b')).toMatchObject({ x: 110, y: 10 }) // b 也移 +10
+  })
+
+  it('shift+空白拖拽 → 框选(命中相交元素)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 50, h: 50, rotation: 0 })
+    host.upsert({ id: 'b', kind: 'card', x: 100, y: 0, w: 50, h: 50, rotation: 0 })
+    host.upsert({ id: 'c', kind: 'card', x: 0, y: 100, w: 50, h: 50, rotation: 0 })
+    dispatch(canvas, 'pointerdown', -10, -10, true) // shift+空白
+    dispatch(canvas, 'pointermove', 60, 60, true)
+    dispatch(canvas, 'pointerup', 60, 60, true)
+    expect((host as unknown as { getSelectedIds: () => string[] }).getSelectedIds()).toEqual(['a']) // 框选只命中 a
+  })
+})

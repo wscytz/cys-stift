@@ -15,10 +15,11 @@ import type {
   CanvasView,
   UserChange,
 } from './canvas-host'
-import { renderElements, readToken, drawSelectionOutlines } from './self-built-render'
+import { renderElements, readToken, drawSelectionOutlines, drawMarquee } from './self-built-render'
 import { hitTest, screenToPage } from './self-built-hittest'
 import { commitFreedraw } from './self-built-freedraw'
 import { handleAtPoint, resizeGeometry, type Handle } from './self-built-resize'
+import { marqueeSelect } from './self-built-marquee'
 
 export class SelfBuiltAdapter implements CanvasHost {
   private elements = new Map<string, CanvasElement>()
@@ -46,6 +47,8 @@ export class SelfBuiltAdapter implements CanvasHost {
   private currentStroke: { points: [number, number][] } | null = null
   private selectedIds = new Set<string>()
   private resizing: { id: string; handle: Handle; start: { x: number; y: number; w: number; h: number } } | null = null
+  private dragGroup: { ids: string[]; offsets: Map<string, { x: number; y: number }> } | null = null
+  private marquee: { startX: number; startY: number; curX: number; curY: number } | null = null
   private keyHandler: ((e: KeyboardEvent) => void) | null = null
 
   constructor(
@@ -92,6 +95,14 @@ export class SelfBuiltAdapter implements CanvasHost {
       readToken('--color-canvas', '#f8fafc'),
     )
     drawSelectionOutlines(ctx, this.getSelectedIds(), this.getElements(), this.view)
+    if (this.marquee) {
+      drawMarquee(ctx, {
+        x: Math.min(this.marquee.startX, this.marquee.curX),
+        y: Math.min(this.marquee.startY, this.marquee.curY),
+        w: Math.abs(this.marquee.curX - this.marquee.startX),
+        h: Math.abs(this.marquee.curY - this.marquee.startY),
+      }, this.view)
+    }
   }
 
   getElements(): CanvasElement[] {
@@ -191,6 +202,20 @@ export class SelfBuiltAdapter implements CanvasHost {
         this.scheduleRender()
         return
       }
+      // shift + 空白 → 框选(优先,在 resize-hit 之前)
+      if (this.activeTool === 'select' && e.shiftKey) {
+        const hitId = hitTest(this.getElements(), p.x, p.y)
+        if (!hitId) {
+          this.marquee = { startX: p.x, startY: p.y, curX: p.x, curY: p.y }
+          try {
+            this.canvas.setPointerCapture(e.pointerId)
+          } catch {
+            /* jsdom 无 setPointerCapture / 已捕获 */
+          }
+          this.scheduleRender()
+          return
+        }
+      }
       // resize handle 优先:选中元素的四角(仅 select 模式)
       if (this.activeTool === 'select' && this.selectedIds.size > 0) {
         const selId = [...this.selectedIds][0]!
@@ -211,11 +236,26 @@ export class SelfBuiltAdapter implements CanvasHost {
       const id = hitTest(this.getElements(), p.x, p.y)
       if (id) {
         const el = this.getElement(id)!
-        this.dragId = id
-        this.dragOffset = { x: p.x - el.x, y: p.y - el.y }
-        this.setSelectedIds([id]) // 命中即选中(单选替换)
-      } else {
-        // 空白处 mousedown → pan 模式 + 清选择
+        if (e.shiftKey) {
+          // shift-toggle:在则移除,不在则累加
+          const next = new Set(this.selectedIds)
+          if (next.has(id)) next.delete(id)
+          else next.add(id)
+          this.setSelectedIds([...next])
+        } else {
+          // 普通点:该元素已选中 → 保留组(准备组移动);否则单选替换
+          if (!this.selectedIds.has(id)) this.setSelectedIds([id])
+        }
+        // 组移动:拖动所有选中元素(记录每个的 offset)
+        const offsets = new Map<string, { x: number; y: number }>()
+        for (const sid of this.selectedIds) {
+          const sel = this.getElement(sid)
+          if (sel) offsets.set(sid, { x: p.x - sel.x, y: p.y - sel.y })
+        }
+        this.dragGroup = { ids: [...this.selectedIds], offsets }
+        this.dragId = id // 兼容现有 onMove 的 dragId 检查;onMove 优先用 dragGroup
+      } else if (!e.shiftKey) {
+        // 空白 + 无 shift → pan + 清选择(现有)
         this.setSelectedIds([])
         this.panning = {
           startSx: sx,
@@ -234,6 +274,13 @@ export class SelfBuiltAdapter implements CanvasHost {
       const rect = this.canvas.getBoundingClientRect()
       const sx = e.clientX - rect.left
       const sy = e.clientY - rect.top
+      if (this.marquee) {
+        const p = screenToPage(this.view, sx, sy)
+        this.marquee.curX = p.x
+        this.marquee.curY = p.y
+        this.scheduleRender()
+        return
+      }
       if (this.currentStroke) {
         const p = screenToPage(this.view, sx, sy)
         this.currentStroke.points.push([Math.round(p.x), Math.round(p.y)])
@@ -246,6 +293,15 @@ export class SelfBuiltAdapter implements CanvasHost {
         if (el) {
           const g = resizeGeometry(this.resizing.handle, this.resizing.start, p)
           this.upsert({ ...el, x: g.x, y: g.y, w: g.w, h: g.h })
+        }
+        return
+      }
+      if (this.dragGroup) {
+        const p = screenToPage(this.view, sx, sy)
+        for (const sid of this.dragGroup.ids) {
+          const el = this.getElement(sid)
+          const off = this.dragGroup.offsets.get(sid)
+          if (el && off) this.upsert({ ...el, x: Math.round(p.x - off.x), y: Math.round(p.y - off.y) })
         }
         return
       }
@@ -268,6 +324,29 @@ export class SelfBuiltAdapter implements CanvasHost {
       }
     }
     const onUp = (e: PointerEvent) => {
+      if (this.marquee) {
+        const r = {
+          x: Math.min(this.marquee.startX, this.marquee.curX),
+          y: Math.min(this.marquee.startY, this.marquee.curY),
+          w: Math.abs(this.marquee.curX - this.marquee.startX),
+          h: Math.abs(this.marquee.curY - this.marquee.startY),
+        }
+        const hit = marqueeSelect(r, this.getElements())
+        if (e.shiftKey) {
+          const next = new Set(this.selectedIds)
+          for (const id of hit) next.add(id)
+          this.setSelectedIds([...next])
+        } else {
+          this.setSelectedIds(hit)
+        }
+        this.marquee = null
+        try {
+          this.canvas.releasePointerCapture(e.pointerId)
+        } catch {
+          /* 已释放 */
+        }
+        return
+      }
       if (this.resizing) {
         this.resizing = null
         try {
@@ -300,6 +379,7 @@ export class SelfBuiltAdapter implements CanvasHost {
         }
       }
       this.dragId = null
+      this.dragGroup = null
       this.panning = null
     }
     this.pointerHandlers = { down: onDown, move: onMove, up: onUp }
