@@ -76,6 +76,8 @@ export interface CanvasHost {
   getElement(id: string): CanvasElement | undefined
   /** 当前选中的元素 id(导出层 scope=selection 用)。 */
   getSelectedIds(): string[]
+  /** 设置选区(实际变化时触发 onSelectionChange)。 */
+  setSelectedIds(ids: string[]): void
   /** create-or-update。 */
   upsert(el: CanvasElement): void
   remove(id: string): void
@@ -85,6 +87,11 @@ export interface CanvasHost {
   applyWithoutEcho(fn: () => void): void
   /** 订阅「用户源」变更(拖拽/绘制/删除)→ 回写 DB + 快照持久化。返回取消订阅。 */
   onUserChange(cb: (c: UserChange) => void): () => void
+  /** 订阅选区变更(setSelectedIds 实际改变时触发)。返回取消订阅。
+   *  替代选区轮询(RelationPanel / auto-relate 按钮)。 */
+  onSelectionChange(cb: (ids: string[]) => void): () => void
   getView(): CanvasView
   setView(v: CanvasView): void
+  /** 订阅视图(pan/zoom/grid)变更。返回取消订阅。 */
+  onViewChange(cb: (v: CanvasView) => void): () => void
 }

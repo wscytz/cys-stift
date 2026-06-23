@@ -206,25 +206,26 @@ Output DSL like:
     ? service.listOnCanvas(confirmDeleteId).filter((c) => !c.deletedAt).length
     : 0
   const adapterReady = !!handle.current.adapter
-  // Poll selection so the auto-relate button reflects the current card
-  // selection (SelfBuiltAdapter has no selection-change event yet; 子5).
+  // Reflect the current card selection on the auto-relate button via the
+  // host's onSelectionChange event (debt 收口 2026-06-23, 替原 300ms 轮询)。
   const [selectedCardCount, setSelectedCardCount] = useState(0)
   useEffect(() => {
-    const id = window.setInterval(() => {
-      const adapter = handle.current.adapter
-      if (!adapter) {
-        if (selectedCardCount !== 0) setSelectedCardCount(0)
-        return
-      }
-      const n = adapter
-        .getSelectedIds()
+    const adapter = handle.current.adapter
+    if (!adapter) {
+      setSelectedCardCount(0)
+      return
+    }
+    const recount = (ids: string[]) => {
+      const n = ids
         .map((sid) => adapter.getElement(sid))
         .filter((el) => !!el && el.kind === 'card').length
       setSelectedCardCount((prev) => (prev !== n ? n : prev))
-    }, 300)
-    return () => window.clearInterval(id)
+    }
+    recount(adapter.getSelectedIds()) // 初始同步(adapter 刚就绪/切画布重建)
+    const unsub = adapter.onSelectionChange(recount)
+    return () => unsub()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adapterReady])
+  }, [adapterReady, activeCanvasId])
   const showAutoRelate = aiEnabled && selectedCardCount >= 2
 
   // adapter ready 时同步工具(切 canvas 重建 adapter 后恢复当前 tool)。

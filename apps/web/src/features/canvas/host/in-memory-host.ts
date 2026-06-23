@@ -1,7 +1,6 @@
 'use client'
 
 import type { CanvasElement, CanvasHost, CanvasView, UserChange } from './canvas-host'
-
 /**
  * InMemoryCanvasHost — 纯内存 CanvasHost,单测用,无 tldraw 依赖。
  *
@@ -13,6 +12,8 @@ export class InMemoryCanvasHost implements CanvasHost {
   private elements = new Map<string, CanvasElement>()
   private view: CanvasView = { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }
   private listeners = new Set<(c: UserChange) => void>()
+  private selectionListeners = new Set<(ids: string[]) => void>()
+  private viewListeners = new Set<(v: CanvasView) => void>()
   private echoing = true
 
   getElements(): CanvasElement[] {
@@ -27,9 +28,24 @@ export class InMemoryCanvasHost implements CanvasHost {
   getSelectedIds(): string[] {
     return [...this.selectedIds]
   }
-  /** 测试辅助:设置选中(契约测试/导出测试用)。 */
+  /** 测试辅助:设置选中(契约测试/导出测试用)。实际变化时触发 onSelectionChange。 */
   setSelectedIds(ids: string[]): void {
-    this.selectedIds = new Set(ids)
+    const next = new Set(ids)
+    const changed =
+      next.size !== this.selectedIds.size ||
+      [...next].some((id) => !this.selectedIds.has(id))
+    this.selectedIds = next
+    if (changed) {
+      const snapshot = [...this.selectedIds]
+      for (const l of this.selectionListeners) l(snapshot)
+    }
+  }
+
+  onSelectionChange(cb: (ids: string[]) => void): () => void {
+    this.selectionListeners.add(cb)
+    return () => {
+      this.selectionListeners.delete(cb)
+    }
   }
 
   upsert(el: CanvasElement): void {
@@ -71,6 +87,14 @@ export class InMemoryCanvasHost implements CanvasHost {
 
   setView(v: CanvasView): void {
     this.view = { ...v }
+    for (const l of this.viewListeners) l(this.view)
+  }
+
+  onViewChange(cb: (v: CanvasView) => void): () => void {
+    this.viewListeners.add(cb)
+    return () => {
+      this.viewListeners.delete(cb)
+    }
   }
 
   private emit(c: UserChange): void {

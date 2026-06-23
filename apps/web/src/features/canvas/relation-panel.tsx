@@ -14,11 +14,12 @@
  * visual signature. The user can override by clicking a different type.
  *
  * v0.32.0 (Phase 2 子4): migrated off tldraw. Selection is read from
- * `host.getSelectedIds()` + `host.getElement()`. The SelfBuiltAdapter does
- * not emit a selection-change event yet, so the panel polls selection every
- * 200ms (YAGNI placeholder; onSelectionChange is deferred to 子5). Panel
- * position is computed from the arrow's from/to element bboxes (page coords)
- * translated to screen coords via the canvas element's rect + the host view.
+ * `host.getSelectedIds()` + `host.getElement()`. Re-render is driven by host
+ * events (debt 收口 2026-06-23, 替原 200ms 轮询):onSelectionChange(选区变)
+ * + onViewChange(pan/zoom 改面板位置)+ onUserChange(applyRelationType 改 arrow
+ * 颜色/label)。Panel position is computed from the arrow's from/to element
+ * bboxes (page coords) translated to screen coords via the canvas element's
+ * rect + the host view.
  *
  * The panel unmounts (returns null) when nothing or something-other-than-
  * an-arrow is selected.
@@ -45,13 +46,20 @@ export function RelationPanel({
 }) {
   const { t } = useI18n()
   const cardService = useCardService()
-  // Poll selection every 200ms. SelfBuiltAdapter doesn't emit selection
-  // change yet; onSelectionChange deferred to 子5.
+  // Re-render on host events instead of polling (替原 200ms 轮询):
+  // selection change(显隐/换 arrow)+ view change(pan/zoom 改位置)+
+  // user change(applyRelationType 改 arrow 颜色/label 后刷新高亮)。
   const [, force] = useState(0)
   useEffect(() => {
-    const id = window.setInterval(() => force((n) => n + 1), 200)
-    return () => window.clearInterval(id)
-  }, [])
+    if (!host) return
+    const bump = () => force((n) => n + 1)
+    const unsubs = [
+      host.onSelectionChange(bump),
+      host.onViewChange(bump),
+      host.onUserChange(bump),
+    ]
+    return () => unsubs.forEach((u) => u())
+  }, [host])
 
   if (!host) return null
   const sel = host.getSelectedIds()

@@ -28,6 +28,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   private view: CanvasView = { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }
   private userListeners = new Set<(c: UserChange) => void>()
   private viewListeners = new Set<(v: CanvasView) => void>()
+  private selectionListeners = new Set<(ids: string[]) => void>()
   protected echoing = true
   protected ctx: CanvasRenderingContext2D | null
   private getCardInfo: (id: string) => CardInfo | null
@@ -201,8 +202,25 @@ export class SelfBuiltAdapter implements CanvasHost {
   }
 
   setSelectedIds(ids: string[]): void {
-    this.selectedIds = new Set(ids)
+    // 仅在选区实际变化时 emit(去抖)——避免拖拽/点击重复设同一选区刷爆订阅者。
+    const next = new Set(ids)
+    const changed =
+      next.size !== this.selectedIds.size ||
+      [...next].some((id) => !this.selectedIds.has(id))
+    this.selectedIds = next
     this.scheduleRender()
+    if (changed) {
+      const snapshot = [...this.selectedIds]
+      for (const l of this.selectionListeners) l(snapshot)
+    }
+  }
+
+  /** 订阅选区变更(setSelectedIds 实际改变时触发)。返回取消订阅。 */
+  onSelectionChange(cb: (ids: string[]) => void): () => void {
+    this.selectionListeners.add(cb)
+    return () => {
+      this.selectionListeners.delete(cb)
+    }
   }
 
   getView(): CanvasView {

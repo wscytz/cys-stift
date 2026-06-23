@@ -65,6 +65,33 @@ function runContract(name: string, make: () => CanvasHost) {
       h.setView({ panX: 5, panY: 6, zoom: 2, gridMode: 'snap' })
       expect(h.getView()).toEqual({ panX: 5, panY: 6, zoom: 2, gridMode: 'snap' })
     })
+
+    it('onSelectionChange 在选区实际变化时触发,带新 id 列表', () => {
+      const h = make()
+      const seen: string[][] = []
+      h.onSelectionChange((ids) => seen.push(ids))
+      h.setSelectedIds(['a'])
+      h.setSelectedIds(['a', 'b'])
+      expect(seen).toEqual([['a'], ['a', 'b']])
+    })
+
+    it('onSelectionChange 在选区未变化时不触发(去抖)', () => {
+      const h = make()
+      let fired = 0
+      h.onSelectionChange(() => fired++)
+      h.setSelectedIds(['a'])
+      h.setSelectedIds(['a']) // 同一选区,不应再触发
+      expect(fired).toBe(1)
+    })
+
+    it('onSelectionChange 取消订阅后不再触发', () => {
+      const h = make()
+      let fired = 0
+      const unsub = h.onSelectionChange(() => fired++)
+      unsub()
+      h.setSelectedIds(['a'])
+      expect(fired).toBe(0)
+    })
   })
 }
 
