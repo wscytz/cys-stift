@@ -52,6 +52,9 @@ export class SelfBuiltAdapter implements CanvasHost {
   private marquee: { startX: number; startY: number; curX: number; curY: number } | null = null
   private connecting: { fromId: string; pointer: { x: number; y: number } } | null = null
   private keyHandler: ((e: KeyboardEvent) => void) | null = null
+  private undoStack: CanvasElement[][] = []
+  private redoStack: CanvasElement[][] = []
+  private static readonly UNDO_LIMIT = 50
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -133,6 +136,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   }
 
   upsert(el: CanvasElement): void {
+    if (this.echoing) this.pushUndo() // 变更前快照(供 undo 恢复到本次 upsert 前)
     this.elements.set(el.id, el)
     if (this.echoing) this.emitUser({ updated: [el], removed: [] })
     this.scheduleRender()
@@ -140,6 +144,7 @@ export class SelfBuiltAdapter implements CanvasHost {
 
   remove(id: string): void {
     if (!this.elements.has(id)) return
+    if (this.echoing) this.pushUndo() // 变更前快照
     this.elements.delete(id)
     if (this.echoing) this.emitUser({ updated: [], removed: [id] })
     this.scheduleRender()
@@ -200,7 +205,49 @@ export class SelfBuiltAdapter implements CanvasHost {
   }
 
   protected emitUser(c: UserChange): void {
+    // pushUndo 已在 upsert/remove 的 echo 分支(变更前)调过;此处只广播。
     for (const l of this.userListeners) l(c)
+  }
+
+  private pushUndo(): void {
+    this.undoStack.push(this.snapshot())
+    if (this.undoStack.length > SelfBuiltAdapter.UNDO_LIMIT) this.undoStack.shift()
+    this.redoStack = [] // 新 user-change 清 redo
+  }
+
+  private snapshot(): CanvasElement[] {
+    return this.getElements().map((e) => ({ ...e, meta: e.meta ? { ...e.meta } : undefined }))
+  }
+
+  canUndo(): boolean {
+    return this.undoStack.length > 0
+  }
+
+  canRedo(): boolean {
+    return this.redoStack.length > 0
+  }
+
+  undo(): void {
+    const prev = this.undoStack.pop()
+    if (!prev) return
+    this.redoStack.push(this.snapshot())
+    this.restore(prev)
+  }
+
+  redo(): void {
+    const next = this.redoStack.pop()
+    if (!next) return
+    this.undoStack.push(this.snapshot())
+    this.restore(next)
+  }
+
+  /** 用快照替换所有元素(不进栈、不触发 onUserChange)。 */
+  private restore(snapshot: CanvasElement[]): void {
+    this.applyWithoutEcho(() => {
+      this.elements.clear()
+      for (const el of snapshot) this.elements.set(el.id, el)
+    })
+    this.scheduleRender()
   }
 
   private attachPointer(): void {

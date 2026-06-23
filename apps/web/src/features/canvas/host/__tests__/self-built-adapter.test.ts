@@ -347,3 +347,42 @@ describe('SelfBuiltAdapter connect', () => {
     expect(host.getElements().filter((e) => e.kind === 'arrow')).toHaveLength(0)
   })
 })
+
+describe('SelfBuiltAdapter undo/redo', () => {
+  it('pushUndo(经 user-change)存栈;undo 恢复;redo 重做', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const h = host as unknown as { undo: () => void; redo: () => void; canUndo: () => boolean; canRedo: () => boolean }
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 }) // 进栈前快照=空
+    expect(h.canUndo()).toBe(true)
+    host.upsert({ id: 'c2', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    // undo → 回到只有 c2(撤掉 c2 的 upsert,恢复 c2 upsert 前的快照=只有 c1)
+    h.undo()
+    expect(host.getElements().map((e) => e.id)).toEqual(['c1'])
+    expect(h.canRedo()).toBe(true)
+    h.redo()
+    expect(host.getElements().map((e) => e.id).sort()).toEqual(['c1', 'c2'])
+  })
+
+  it('new user-change 清空 redo 栈', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const h = host as unknown as { undo: () => void; redo: () => void; canRedo: () => boolean }
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    host.upsert({ id: 'c2', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    h.undo() // 回到 c1
+    expect(h.canRedo()).toBe(true)
+    host.upsert({ id: 'c3', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 }) // 新变更清 redo
+    expect(h.canRedo()).toBe(false)
+  })
+
+  it('undo 栈上限 50(第 51 步丢弃最旧)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const h = host as unknown as { canUndo: () => boolean; undo: () => void }
+    for (let i = 0; i < 55; i++) {
+      host.upsert({ id: 'c' + i, kind: 'card', x: i, y: 0, w: 10, h: 10, rotation: 0 })
+    }
+    // undo 50 次应还能再 undo(false);第 51 次到空
+    let count = 0
+    while (h.canUndo()) { h.undo(); count++ }
+    expect(count).toBe(50)
+  })
+})
