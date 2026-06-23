@@ -1,28 +1,29 @@
 'use client'
 
 /**
- * RelationPanel (M1) — floats above the canvas when exactly one arrow is
- * selected. Clicking a relation type rewrites the arrow's native style props
- * (color/dash/arrowheadEnd/labelColor) via applyRelationType. The active
- * type is reverse-inferred from the arrow's current props, so re-selecting
- * the same arrow shows the right highlight even after reload (state lives in
- * the arrow record, not React).
+ * RelationPanel (M1, v0.32.0 Phase 2 子4) — floats above the canvas when
+ * exactly one arrow is selected. Clicking a relation type rewrites the
+ * arrow's color + text label via applyRelationType (host.upsert). The active
+ * type is reverse-inferred from the arrow's current color+text, so
+ * re-selecting the same arrow shows the right highlight even after reload
+ * (state lives in the arrow element, not React).
  *
- * M2.3 — when the arrow has no type yet (text prop empty), run keyword
- * inference on the bound source/target cards. If a non-null type is
- * returned, auto-apply it so the new arrow already shows the right
+ * M2.3 — when the arrow has no type yet (text empty), run keyword inference
+ * on the bound source/target cards (arrow.from / arrow.to). If a non-null
+ * type is returned, auto-apply it so the new arrow already shows the right
  * visual signature. The user can override by clicking a different type.
  *
- * Reads selection reactively via useValue; the panel unmounts (returns null)
- * when nothing or something-other-than-an-arrow is selected.
+ * v0.32.0 (Phase 2 子4): migrated off tldraw. Selection is read from
+ * `host.getSelectedIds()` + `host.getElement()`. The SelfBuiltAdapter does
+ * not emit a selection-change event yet, so the panel polls selection every
+ * 200ms (YAGNI placeholder; onSelectionChange is deferred to 子5). Panel
+ * position is computed from the arrow's from/to element bboxes (page coords)
+ * translated to screen coords via the canvas element's rect + the host view.
  *
- * v0.31.0 (P1.2 debt cleanup): Card lookup now goes through
- * `useCardService()` (the existing CardServiceContext) instead of reading
- * the `window.__cardService` global. The panel is a child of
- * `<CardServiceContext.Provider>` inside CanvasEditor, so the hook resolves.
+ * The panel unmounts (returns null) when nothing or something-other-than-
+ * an-arrow is selected.
  */
-import { useEffect, useRef, type RefObject } from 'react'
-import { useValue, type Editor, type TLShapeId } from '@tldraw/tldraw'
+import { useEffect, useRef, useState } from 'react'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useI18n } from '@/lib/i18n'
 import {
@@ -33,129 +34,56 @@ import {
 } from './relation-types'
 import { inferRelationTypeFromContext } from './relation-inference'
 import { useCardService } from './card-service-context'
+import type { CanvasHost, CanvasElement } from './host/canvas-host'
 
-export function RelationPanel({ editor }: { editor: Editor | null }) {
+export function RelationPanel({
+  host,
+  canvasEl,
+}: {
+  host: CanvasHost | null
+  canvasEl: HTMLCanvasElement | null
+}) {
   const { t } = useI18n()
-  // v0.31.0 (P1.2): read the service via context, mirror it into a ref so
-  // the useValue callbacks below can read the latest value without re-running
-  // the hook tree (useValue's fn isn't a hook context).
   const cardService = useCardService()
-  const serviceRef = useRef(cardService)
-  serviceRef.current = cardService
-  // The selected arrow id, reactive. Returns null until exactly one arrow is
-  // selected; useValue re-runs whenever the instance page-state changes.
-  const selectedArrowId = useValue(
-    'relation selected arrow',
-    () => {
-      if (!editor) return null
-      const sel = editor.getSelectedShapes()
-      if (sel.length !== 1) return null
-      const s = sel[0]
-      if (!s || s.type !== 'arrow') return null
-      return s.id as string
-    },
-    [editor],
-  )
-
-  // The active relation type, inferred from the arrow's current props so the
-  // highlight survives reload (no React state to restore).
-  const activeType = useValue(
-    'relation active type',
-    () => {
-      if (!selectedArrowId || !editor) return null
-      const shape = editor.getShape(selectedArrowId as TLShapeId) as
-        | { props?: { color?: string; dash?: string; arrowheadEnd?: string; labelColor?: string } }
-        | undefined
-      if (!shape?.props) return null
-      return inferRelationType(shape.props)
-    },
-    [editor, selectedArrowId],
-  )
-
-  // M2.3 — keyword inference. Reads the two cards bound to the arrow (one
-  // per terminal), looks them up in CardService, returns the best
-  // keyword-matched relation type. Only used when the arrow has no
-  // user-set type yet.
-  const inferredType = useValue(
-    'relation inferred type',
-    () => {
-      if (!editor || !selectedArrowId) return null
-      // Skip inference if the user already set a type (text prop non-empty).
-      const arrow = editor.getShape(selectedArrowId as TLShapeId) as
-        | { props?: { text?: string } }
-        | undefined
-      if (arrow?.props?.text) return null
-      const bindings = editor.getBindingsToShape(
-        selectedArrowId as TLShapeId,
-        'arrow',
-      )
-      const cardIds: string[] = []
-      for (const b of bindings) {
-        const shape = editor.getShape(b.toId)
-        if (shape?.type === 'card') {
-          cardIds.push(String(shape.id).replace(/^shape:/, ''))
-        }
-      }
-      if (cardIds.length < 2) return null
-      const sourceId = cardIds[0]
-      const targetId = cardIds[1]
-      if (!sourceId || !targetId) return null
-      const svc = serviceRef.current
-      if (!svc) return null
-      const source = svc.get(sourceId as CardId)
-      const target = svc.get(targetId as CardId)
-      return inferRelationTypeFromContext(
-        source,
-        target,
-      )
-    },
-    [editor, selectedArrowId],
-  )
-
-  // M2.3 — auto-apply the inferred type on panel open. We only write ONCE
-  // per (arrowId, inferredType) pair so the user can still override by
-  // clicking a different button after.
-  const applied = useRef<string | null>(null)
+  // Poll selection every 200ms. SelfBuiltAdapter doesn't emit selection
+  // change yet; onSelectionChange deferred to 子5.
+  const [, force] = useState(0)
   useEffect(() => {
-    if (!editor || !selectedArrowId || !inferredType || activeType) return
-    const key = `${selectedArrowId}:${inferredType.id}`
-    if (applied.current === key) return
-    applied.current = key
-    applyRelationType(
-      editor,
-      selectedArrowId as TLShapeId,
-      inferredType,
-      t(inferredType.labelKey),
-    )
-  }, [editor, selectedArrowId, inferredType, activeType, t])
+    const id = window.setInterval(() => force((n) => n + 1), 200)
+    return () => window.clearInterval(id)
+  }, [])
 
-  // M2.4 — panel position. Floats above the arrow's page-space bounding
-  // box, translated to screen coords via the tldraw container offset.
-  const position = useValue(
-    'relation panel position',
-    () => {
-      if (!editor || !selectedArrowId) return null
-      const b = editor.getShapePageBounds(selectedArrowId as TLShapeId)
-      if (!b) return null
-      const container = editor.getContainer()
-      const rect = container?.getBoundingClientRect()
-      const offX = rect?.left ?? 0
-      const offY = rect?.top ?? 0
-      // Anchor above-center of arrow bounds; panel height ≈ 44px, gap 12px.
-      return {
-        left: b.x + b.w / 2 - offX,
-        top: b.y - offY - 56,
-      }
-    },
-    [editor, selectedArrowId],
-  )
+  if (!host) return null
+  const sel = host.getSelectedIds()
+  if (sel.length !== 1) return null
+  const arrowId = sel[0]!
+  const arrow = host.getElement(arrowId)
+  if (!arrow || arrow.kind !== 'arrow') return null
 
-  if (!selectedArrowId || !editor) return null
+  const activeType = inferRelationType(arrow)
 
-  // Display type: prefer the arrow's own active type, fall back to inferred
-  // (so the user sees a highlight even before the auto-apply effect runs).
-  const displayType: RelationType | null = activeType ?? inferredType
+  // Keyword inference when the arrow has no type yet.
+  let inferred: RelationType | null = null
+  if (!activeType && arrow.from && arrow.to) {
+    const a = cardService?.get(arrow.from as CardId)
+    const b = cardService?.get(arrow.to as CardId)
+    if (a && b) inferred = inferRelationTypeFromContext(a as Card, b as Card)
+  }
 
+  // Auto-apply inferred type once per (arrowId, inferredType) pair.
+  const appliedKey = useRef<string | null>(null)
+  useEffect(() => {
+    if (!inferred || activeType) return
+    const key = `${arrow.id}:${inferred.id}`
+    if (appliedKey.current === key) return
+    appliedKey.current = key
+    applyRelationType(host, arrow.id, inferred, inferred.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arrow.id, inferred?.id, activeType?.id, host])
+
+  const displayType: RelationType | null = activeType ?? inferred
+
+  const position = computePanelPosition(arrow, host, canvasEl)
   const panelStyle = position
     ? {
         position: 'fixed' as const,
@@ -163,7 +91,7 @@ export function RelationPanel({ editor }: { editor: Editor | null }) {
         top: `${position.top}px`,
         transform: 'translateX(-50%)',
       }
-    : { display: 'none' }
+    : { display: 'none' as const }
 
   return (
     <div
@@ -184,7 +112,7 @@ export function RelationPanel({ editor }: { editor: Editor | null }) {
             type="button"
             data-relation-id={rt.id}
             className={`cv-relation__btn ${isActive ? 'cv-relation__btn--active' : ''}`}
-            onClick={() => applyRelationType(editor, selectedArrowId as never, rt, t(rt.labelKey))}
+            onClick={() => applyRelationType(host, arrow.id, rt, rt.id)}
             aria-pressed={isActive}
             title={t(rt.labelKey)}
           >
@@ -200,6 +128,34 @@ export function RelationPanel({ editor }: { editor: Editor | null }) {
       <style>{styles}</style>
     </div>
   )
+}
+
+/**
+ * Panel position: midpoint between the arrow's from/to element centers (page
+ * coords), translated to screen coords via the canvas rect + host view
+ * (pan/zoom). Anchored above-center of that midpoint; panel height ≈ 44px,
+ * gap 12px. Returns null when the from/to elements can't be resolved or the
+ * canvas rect is unavailable.
+ */
+function computePanelPosition(
+  arrow: CanvasElement,
+  host: CanvasHost,
+  canvasEl: HTMLCanvasElement | null,
+): { left: number; top: number } | null {
+  if (!arrow.from || !arrow.to || !canvasEl) return null
+  const fromEl = host.getElement(arrow.from)
+  const toEl = host.getElement(arrow.to)
+  if (!fromEl || !toEl) return null
+  const view = host.getView()
+  const rect = canvasEl.getBoundingClientRect()
+  const cx = (fromEl.x + fromEl.w / 2 + toEl.x + toEl.w / 2) / 2
+  const cy = (fromEl.y + fromEl.h / 2 + toEl.y + toEl.h / 2) / 2
+  const screenX = rect.left + view.panX + cx * view.zoom
+  const screenY = rect.top + view.panY + cy * view.zoom
+  return {
+    left: screenX,
+    top: screenY - 56,
+  }
 }
 
 const styles = `

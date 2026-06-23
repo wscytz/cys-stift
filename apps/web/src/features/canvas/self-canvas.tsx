@@ -28,17 +28,24 @@ export function SelfCanvas({
   service,
   onOpenCard,
   adapterRef,
+  canvasElRef,
 }: {
   canvasId: CanvasId
   service: CardService
   onOpenCard: (card: Card) => void
   adapterRef: React.MutableRefObject<SelfCanvasHandle>
+  /** Page-supplied ref so the RelationPanel can read the canvas rect for
+   *  positioning (子4: panel floats above selected arrow, needs screen coords). */
+  canvasElRef?: React.MutableRefObject<HTMLCanvasElement | null>
 }) {
-  const canvasElRef = useRef<HTMLCanvasElement>(null)
+  const innerCanvasRef = useRef<HTMLCanvasElement>(null)
   const adapterInner = useRef<SelfBuiltAdapter | null>(null)
 
   useEffect(() => {
-    const canvas = canvasElRef.current
+    const canvas = innerCanvasRef.current
+    if (canvas) {
+      if (canvasElRef) canvasElRef.current = canvas
+    }
     if (!canvas) return
     const adapter = new SelfBuiltAdapter(canvas, {
       getCardInfo: (id) => {
@@ -87,13 +94,14 @@ export function SelfCanvas({
       adapter.detach()
       adapterInner.current = null
       adapterRef.current = { adapter: null }
+      if (canvasElRef) canvasElRef.current = null
     }
   }, [canvasId, service, adapterRef])
 
   // 双击开卡:select 模式下 dblclick 命中卡元素 → onOpenCard。
   const onDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const adapter = adapterInner.current
-    const canvas = canvasElRef.current
+    const canvas = innerCanvasRef.current
     if (!adapter || !canvas) return
     if (adapter.getTool() !== 'select') return
     const rect = canvas.getBoundingClientRect()
@@ -116,7 +124,7 @@ export function SelfCanvas({
 
   return (
     <canvas
-      ref={canvasElRef}
+      ref={innerCanvasRef}
       onDoubleClick={onDoubleClick}
       style={{ width: '100%', height: '100%', display: 'block', touchAction: 'none' }}
     />

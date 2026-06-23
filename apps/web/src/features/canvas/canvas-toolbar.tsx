@@ -32,8 +32,6 @@ import { useI18n } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n/messages'
 import { CanvasIcon, type CanvasIconId } from './canvas-icon'
 import { useAIEnabled } from '@/features/ai/ai-settings-provider'
-import { autoRelate } from './auto-relate'
-import { pushToast } from '@/lib/toast-store'
 
 // v0.31.x review fix: tldraw 3.x collapsed the per-shape tools (rectangle /
 // ellipse / triangle / …) into a single 'geo' tool whose concrete geometry
@@ -87,19 +85,10 @@ export function CanvasToolbar({
     () => (editor ? editor.getStyleForNextShape(GeoShapeGeoStyle) : null),
     [editor],
   )
-  // M3.5 — selection-driven auto-relate button. Re-evaluates on every
-  // tldraw store change so a click that selects a second card shows the
-  // button immediately.
-  const selectedCardsCount = useValue(
-    'canvas selected cards',
-    () => {
-      if (!editor) return 0
-      return editor.getSelectedShapes().filter((s) => s.type === 'card').length
-    },
-    [editor],
-  )
+  // M3.5 — selection-driven auto-relate moved to the main /canvas toolbar
+  // (Phase 2 子4). This legacy tldraw toolbar is no longer mounted.
   const aiEnabled = useAIEnabled()
-  const showAutoRelate = aiEnabled && selectedCardsCount >= 2
+  const showAutoRelate = false
 
   // v0.31.x review fix: tldraw 3.x collapsed rectangle/ellipse/triangle/…
   // into a single 'geo' tool whose geometry is a per-shape style. Both the
@@ -179,23 +168,9 @@ export function CanvasToolbar({
         <button
           type="button"
           className="cv-toolbar__btn cv-toolbar__btn--ai"
-          onClick={() => {
-            if (!editor) return
-            const ids = editor
-              .getSelectedShapes()
-              .filter((s) => s.type === 'card')
-              .map((s) => String(s.id).replace(/^shape:/, ''))
-            const { arrowsCreated } = autoRelate(editor, ids, service)
-            pushToast({
-              kind: arrowsCreated > 0 ? 'success' : 'info',
-              message:
-                arrowsCreated > 0
-                  ? t('canvas.autoRelateDone', { n: String(arrowsCreated) })
-                  : t('canvas.autoRelateNone'),
-            })
-          }}
           title={t('canvas.autoRelate')}
           aria-label={t('canvas.autoRelate')}
+          disabled
         >
           ✨
         </button>

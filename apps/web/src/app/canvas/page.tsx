@@ -9,6 +9,8 @@ import { SelfCanvas, type SelfCanvasHandle } from '@/features/canvas/self-canvas
 import { CardDetailModal } from '@/features/canvas/card-detail-modal'
 import { ExportDialog } from '@/features/canvas/export-dialog'
 import { applyLayout } from '@/features/canvas/apply-layout'
+import { RelationPanel } from '@/features/canvas/relation-panel'
+import { autoRelate } from '@/features/canvas/auto-relate'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { parseDsl } from '@/features/ai/dsl-parser'
 import { streamText } from '@/features/ai/stream-text'
@@ -34,6 +36,7 @@ export default function CanvasPage() {
   const { snap, service } = useDb()
   void snap
   const handle = useRef<SelfCanvasHandle>({ adapter: null })
+  const canvasElRef = useRef<HTMLCanvasElement | null>(null)
   const [detail, setDetail] = useState<{ card: Card } | null>(null)
   const [snapMode, setSnapMode] = useState<'snap' | 'free'>('snap')
   const [tool, setTool] = useState<'select' | 'freedraw' | 'text' | 'connect'>('select')
@@ -86,6 +89,26 @@ export default function CanvasPage() {
   )
 
   const aiEnabled = useAIEnabled()
+
+  const handleAutoRelate = useCallback(() => {
+    const adapter = handle.current.adapter
+    if (!adapter) return
+    const ids = adapter
+      .getSelectedIds()
+      .map((id) => adapter.getElement(id))
+      .filter((el) => !!el && el.kind === 'card')
+      .map((el) => el!.id)
+    if (ids.length < 2) return
+    const { arrowsCreated } = autoRelate(adapter, ids, service)
+    pushToast({
+      kind: arrowsCreated > 0 ? 'success' : 'info',
+      message:
+        arrowsCreated > 0
+          ? t('canvas.autoRelateDone', { n: String(arrowsCreated) })
+          : t('canvas.autoRelateNone'),
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [service, t])
 
   const handleAILayout = useCallback(async () => {
     const adapter = handle.current.adapter
@@ -183,6 +206,26 @@ Output DSL like:
     ? service.listOnCanvas(confirmDeleteId).filter((c) => !c.deletedAt).length
     : 0
   const adapterReady = !!handle.current.adapter
+  // Poll selection so the auto-relate button reflects the current card
+  // selection (SelfBuiltAdapter has no selection-change event yet; 子5).
+  const [selectedCardCount, setSelectedCardCount] = useState(0)
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const adapter = handle.current.adapter
+      if (!adapter) {
+        if (selectedCardCount !== 0) setSelectedCardCount(0)
+        return
+      }
+      const n = adapter
+        .getSelectedIds()
+        .map((sid) => adapter.getElement(sid))
+        .filter((el) => !!el && el.kind === 'card').length
+      setSelectedCardCount((prev) => (prev !== n ? n : prev))
+    }, 300)
+    return () => window.clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adapterReady])
+  const showAutoRelate = aiEnabled && selectedCardCount >= 2
 
   // adapter ready 时同步工具(切 canvas 重建 adapter 后恢复当前 tool)。
   useEffect(() => {
@@ -214,6 +257,9 @@ Output DSL like:
         {aiEnabled && (
           <Button variant="ghost" onClick={handleAILayout} disabled={!adapterReady} title="AI layout">AI</Button>
         )}
+        {showAutoRelate && (
+          <Button variant="ghost" onClick={handleAutoRelate} title={t('canvas.autoRelate')}>{t('canvas.autoRelate')}</Button>
+        )}
         <span className="tb-divider" aria-hidden="true" />
         {(['select', 'freedraw', 'text', 'connect'] as const).map((tk) => (
           <button
@@ -243,6 +289,7 @@ Output DSL like:
           service={service}
           onOpenCard={(card) => setDetail({ card })}
           adapterRef={handle}
+          canvasElRef={canvasElRef}
         />
         {onCanvas === 0 && (
           <div className="cv-empty" aria-hidden="true">
@@ -250,6 +297,7 @@ Output DSL like:
             <span className="cv-empty__hint">{t('canvas.emptyHint')}</span>
           </div>
         )}
+        <RelationPanel host={handle.current.adapter} canvasEl={canvasElRef.current} />
       </div>
 
       <Modal open={creatingName !== null} onClose={() => setCreatingName(null)} title={t('canvas.newModalTitle')}>

@@ -4,34 +4,29 @@
  * M3.5 — Canvas auto-relate action. Given a set of selected card IDs,
  * infer a relation type for each pair (using the M2.3 keyword matcher
  * — no AI model needed) and create one arrow per pair with the inferred
- * type applied.
+ * type applied (color + text label).
  *
- * Reuses M2.1's `createArrowFromHandle` so the arrow + 2-binding
- * construction stays in one verified place. Pairs that produce no
- * keyword hit are skipped (the user didn't leave enough text on the
- * cards for the heuristic to fire — better to leave the canvas alone
- * than to plant a meaningless arrow).
+ * v0.32.0 (Phase 2 子4): migrated off tldraw. Arrows are now created via
+ * `host.upsert` (from/to = the card id pair + inferred relation color/text).
+ * `createArrowFromHandle` (tldraw-specific) is retired. Pairs that produce
+ * no keyword hit are skipped (the user didn't leave enough text on the
+ * cards for the heuristic to fire — better to leave the canvas alone than
+ * to plant a meaningless arrow).
  *
- * v0.31.0 (P1.2 debt cleanup): CardService is now passed in as an
- * argument rather than read from the `window.__cardService` global.
- * The caller (canvas-toolbar) is inside `<CardServiceContext.Provider>`,
- * so it can read the service via `useCardService()` and pass it down
- * — keeps the helper a pure function and lets it be unit-tested
- * without a window object.
+ * CardService is passed in as an argument (kept pure + unit-testable without
+ * a window object).
  */
 
-import type { Editor, TLShapeId } from '@tldraw/tldraw'
-import type { Card, CardId, CardService } from '@cys-stift/domain'
+import type { CardId, CardService } from '@cys-stift/domain'
 import { inferRelationTypeFromContext } from './relation-inference'
-import { applyRelationType } from './relation-types'
-import { createArrowFromHandle } from './card-handles'
+import type { CanvasHost } from './host/canvas-host'
 
 export interface AutoRelateResult {
   arrowsCreated: number
 }
 
 export function autoRelate(
-  editor: Editor,
+  host: CanvasHost,
   cardIds: string[],
   service: CardService,
 ): AutoRelateResult {
@@ -43,20 +38,30 @@ export function autoRelate(
     for (let j = i + 1; j < cardIds.length; j++) {
       const idB = cardIds[j]
       if (!idB) continue
-      const a: Card | null = service.get(idA as CardId)
-      const b: Card | null = service.get(idB as CardId)
+      const a = service.get(idA as CardId)
+      const b = service.get(idB as CardId)
       if (!a || !b) continue
       const relation = inferRelationTypeFromContext(a, b)
       if (!relation) continue
-      const targetBounds = editor.getShapePageBounds(
-        `shape:${idB}` as TLShapeId,
-      )
-      if (!targetBounds) continue
-      const arrowId = createArrowFromHandle(editor, idA as CardId, targetBounds.center)
-      if (arrowId) {
-        applyRelationType(editor, arrowId, relation, relation.id)
-        created++
-      }
+      const arrowId =
+        'arrow-' +
+        (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : Math.random().toString(36).slice(2))
+      host.upsert({
+        id: arrowId,
+        kind: 'arrow',
+        x: 0,
+        y: 0,
+        w: 0,
+        h: 0,
+        rotation: 0,
+        from: idA,
+        to: idB,
+        color: relation.color,
+        text: relation.id,
+      })
+      created++
     }
   }
   return { arrowsCreated: created }

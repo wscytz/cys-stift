@@ -3,9 +3,12 @@ import {
   RELATION_TYPES,
   relationTypeById,
   inferRelationType,
+  applyRelationType,
   type RelationTypeId,
 } from '../relation-types'
 import { inferRelationTypeFromContext } from '../relation-inference'
+import { InMemoryCanvasHost } from '../host/in-memory-host'
+import type { CanvasElement } from '../host/canvas-host'
 import type { Card } from '@cys-stift/domain'
 
 // Minimal Card-like objects for context inference.
@@ -38,20 +41,71 @@ describe('relationTypeById', () => {
   })
 })
 
-describe('inferRelationType (props → registry)', () => {
-  it('matches blocks props', () => {
+describe('inferRelationType (from CanvasElement)', () => {
+  const baseArrow = (over: Partial<CanvasElement> = {}): CanvasElement => ({
+    id: 'a',
+    kind: 'arrow',
+    x: 0,
+    y: 0,
+    w: 0,
+    h: 0,
+    rotation: 0,
+    from: 's',
+    to: 't',
+    ...over,
+  })
+  it('matches blocks (color+text)', () => {
     const t = RELATION_TYPES.find((r) => r.id === 'blocks')!
-    expect(inferRelationType({ color: t.color, dash: t.dash, arrowheadEnd: t.arrowhead, labelColor: t.labelColor })?.id).toBe('blocks')
+    expect(inferRelationType(baseArrow({ color: t.color, text: t.id }))?.id).toBe('blocks')
   })
-  it('matches references props', () => {
+  it('matches references (color+text)', () => {
     const t = RELATION_TYPES.find((r) => r.id === 'references')!
-    expect(inferRelationType({ color: t.color, dash: t.dash, arrowheadEnd: t.arrowhead, labelColor: t.labelColor })?.id).toBe('references')
+    expect(inferRelationType(baseArrow({ color: t.color, text: t.id }))?.id).toBe('references')
   })
-  it('returns null when props differ from every registry type', () => {
-    expect(inferRelationType({ color: 'orange', dash: 'dotted', arrowheadEnd: 'diamond', labelColor: 'red' })).toBeNull()
+  it('returns null when color/text differ from every registry type', () => {
+    expect(inferRelationType(baseArrow({ color: 'orange', text: 'whatever' }))).toBeNull()
   })
-  it('returns null for empty props', () => {
-    expect(inferRelationType({})).toBeNull()
+  it('returns null for arrow with no color/text', () => {
+    expect(inferRelationType(baseArrow())).toBeNull()
+  })
+})
+
+describe('applyRelationType (via host.upsert)', () => {
+  it('rewrites the arrow color + text', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({
+      id: 'a',
+      kind: 'arrow',
+      x: 0,
+      y: 0,
+      w: 0,
+      h: 0,
+      rotation: 0,
+      from: 's',
+      to: 't',
+    })
+    const rt = RELATION_TYPES[0]! // blocks (color red)
+    applyRelationType(host, 'a', rt, 'blocks')
+    const el = host.getElement('a')!
+    expect(el.color).toBe(rt.color)
+    expect(el.text).toBe('blocks')
+  })
+  it('no-ops on a non-arrow element', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({
+      id: 'c',
+      kind: 'rect',
+      x: 0,
+      y: 0,
+      w: 10,
+      h: 10,
+      rotation: 0,
+    })
+    const rt = RELATION_TYPES[0]!
+    applyRelationType(host, 'c', rt, 'blocks')
+    const el = host.getElement('c')!
+    expect(el.color).toBeUndefined()
+    expect(el.text).toBeUndefined()
   })
 })
 

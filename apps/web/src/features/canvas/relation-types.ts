@@ -2,22 +2,27 @@
 
 /**
  * Relation types (M1) — map a semantic relationship (blocks / references /
- * derived-from / related-to) onto tldraw's NATIVE arrow style props. No tldraw
- * fork, no extra persistence layer: the type is fully encoded in the arrow
- * record (color / dash / arrowheadEnd / labelColor + the rich-text label),
- * which the F1.5 snapshot already saves transparently.
+ * derived-from / related-to) onto a Canvas arrow's NATIVE style props
+ * (`color` + `text` label). No tldraw fork, no extra persistence layer: the
+ * type is fully encoded in the arrow CanvasElement (color + text), which the
+ * Phase 1 host snapshot already saves transparently.
  *
- * The registry is web-local (not domain) because it references tldraw style
- * enums; domain must stay zero-dependency. Plain string unions mirror tldraw's
- * TLColorStyle / dash / arrowhead unions so the data block stays pure (no
- * tldraw import at module top — only applyRelationType pulls in tldraw).
+ * v0.32.0 (Phase 2 子4): the registry migrated off tldraw. `inferRelationType`
+ * now reads from a `CanvasElement` (arrow's color+text), and
+ * `applyRelationType` writes via `host.upsert` (no more editor.updateShape).
+ * The tldraw-style unions (`ArrowColor` / `ArrowDash` / `ArrowArrowhead`) are
+ * kept as plain string unions for future use (dash not rendered by Canvas 2D
+ * arrow yet — YAGNI), but no tldraw import remains in this file.
+ *
+ * The registry is web-local (not domain) because it maps to canvas style
+ * strings; domain must stay zero-dependency.
  */
-import { type Editor, type TLShapeId } from '@tldraw/tldraw'
+import type { CanvasHost, CanvasElement } from './host/canvas-host'
 import type { MessageKey } from '@/lib/i18n/messages'
 
-// tldraw arrow style unions (mirror @tldraw/tldraw TLColorStyle /
-// DefaultDashStyle / arrowhead enums — kept as plain string unions so the
-// RELATION_TYPES data block is pure and free of runtime tldraw imports).
+// Arrow style unions (kept as plain string unions for future use; the Canvas
+// 2D arrow currently only renders `color` — dash/arrowhead are reserved for
+// later). No tldraw import — these are just descriptive string unions now.
 export type ArrowColor =
   | 'black' | 'blue' | 'red' | 'green' | 'grey'
   | 'light-blue' | 'light-green' | 'light-red' | 'light-violet'
@@ -36,9 +41,8 @@ export interface RelationType {
   dash: ArrowDash
   arrowhead: ArrowArrowhead
   labelColor: ArrowColor
-  /** Maps the tldraw color to a real CSS color token so the panel can show
-   *  an actual colored bar (not the tldraw palette which the design system
-   *  doesn't expose). Falls back to --color-black if a tldraw color has no
+  /** Maps the relation color to a real CSS color token so the panel can show
+   *  an actual colored bar. Falls back to --color-black if a color has no
    *  matching project token. */
   swatch: string
 }
@@ -87,54 +91,34 @@ export function relationTypeById(id: RelationTypeId): RelationType | undefined {
 }
 
 /**
- * Reverse-lookup: given an arrow's current native props, find the registry
- * type whose visual signature matches. Returns null when the user hand-edited
- * the arrow (so the panel shows "custom" rather than a stale type).
+ * Reverse-lookup: given an arrow CanvasElement, find the registry type whose
+ * visual signature matches (color + text === rt.id). Returns null when the
+ * arrow has no type set yet (color/text empty) or was hand-edited.
+ *
+ * Match rule: el.color === rt.color && el.text === rt.id. The text label is
+ * the relation type id (e.g. 'blocks'), so the highlight survives reload
+ * (state lives in the arrow element, not React).
  */
-export function inferRelationType(props: {
-  color?: string
-  dash?: string
-  arrowheadEnd?: string
-  labelColor?: string
-}): RelationType | null {
-  return (
-    RELATION_TYPES.find(
-      (t) =>
-        t.color === props.color &&
-        t.dash === props.dash &&
-        t.arrowhead === props.arrowheadEnd &&
-        t.labelColor === props.labelColor,
-    ) ?? null
-  )
+export function inferRelationType(el: CanvasElement): RelationType | null {
+  if (!el.color || !el.text) return null
+  return RELATION_TYPES.find((rt) => rt.color === el.color && el.text === rt.id) ?? null
 }
 
 /**
- * Apply a relation type to an arrow in one updateShape call. Writes native
- * arrow props (color/dash/arrowheadEnd/labelColor) + the visible text label
- * via the native `text` prop. Everything persists via the F1.5 snapshot (no
- * separate store). Not wrapped in mergeRemoteChanges: this is a user-driven
- * style choice, and only `card` shapes have a writeback listener
- * (canvas-binding.ts:166-178) — arrows are not observed.
+ * Apply a relation type to an arrow via host.upsert (one write). Writes the
+ * arrow's `color` + visible text label (`text`). Everything persists via the
+ * host snapshot (no separate store).
  *
- * Note: tldraw 3.15's arrow label prop is `text: string` (NOT `richText` —
- * that key is create-only and rejected by updateShape's validator). Verified
- * against @tldraw/tldraw 3.15.6.
+ * No-ops if the element isn't an arrow (defensive — the panel only ever calls
+ * this on a selected arrow, but a stale selection could race).
  */
 export function applyRelationType(
-  editor: Editor,
-  arrowId: TLShapeId,
+  host: CanvasHost,
+  arrowId: string,
   type: RelationType,
   label: string,
 ): void {
-  editor.updateShape({
-    id: arrowId,
-    type: 'arrow',
-    props: {
-      color: type.color,
-      dash: type.dash,
-      arrowheadEnd: type.arrowhead,
-      labelColor: type.labelColor,
-      text: label,
-    },
-  })
+  const el = host.getElement(arrowId)
+  if (!el || el.kind !== 'arrow') return
+  host.upsert({ ...el, color: type.color, text: label })
 }
