@@ -9,13 +9,13 @@ jobs:
   verify:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
+      # 不指定 version:自动从 package.json 的 packageManager(pnpm@9.15.0)读,
+      # 避免与 packageManager 字段冲突(ERR_PNPM_BAD_PM_VERSION)。
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
