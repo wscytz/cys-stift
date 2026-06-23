@@ -92,6 +92,27 @@ function runContract(name: string, make: () => CanvasHost) {
       h.setSelectedIds(['a'])
       expect(fired).toBe(0)
     })
+
+    it('getElements 按确定性 z 序分层(rect<freedraw<card<arrow<text),与插入序无关', () => {
+      // 故意「反序」插入:先 text、再 card、再 rect —— getElements 必须仍按 KIND_LAYER 出。
+      const h = make()
+      h.upsert({ id: 't', kind: 'text', x: 0, y: 0, w: 1, h: 1, rotation: 0 })
+      h.upsert({ id: 'c', kind: 'card', x: 0, y: 0, w: 1, h: 1, rotation: 0 })
+      h.upsert({ id: 'r', kind: 'rect', x: 0, y: 0, w: 1, h: 1, rotation: 0 })
+      h.upsert({ id: 'f', kind: 'freedraw', x: 0, y: 0, w: 1, h: 1, rotation: 0 })
+      h.upsert({ id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c', to: 'c' })
+      expect(h.getElements().map((e) => e.kind)).toEqual([
+        'rect', 'freedraw', 'card', 'arrow', 'text',
+      ])
+    })
+
+    it('同 kind 内保插入序(后建在上)', () => {
+      const h = make()
+      h.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 1, h: 1, rotation: 0 })
+      h.upsert({ id: 'c2', kind: 'card', x: 0, y: 0, w: 1, h: 1, rotation: 0 })
+      h.upsert({ id: 'c3', kind: 'card', x: 0, y: 0, w: 1, h: 1, rotation: 0 })
+      expect(h.getElements().map((e) => e.id)).toEqual(['c1', 'c2', 'c3'])
+    })
   })
 }
 

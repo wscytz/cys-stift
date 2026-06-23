@@ -14,6 +14,7 @@ import type {
   CanvasView,
   UserChange,
 } from './canvas-host'
+import { sortByLayer } from './canvas-host'
 import { renderElements, drawSelectionOutlines, drawMarquee, domTokenResolver, type CardInfo, type TokenResolver } from './self-built-render'
 import { hitTest, screenToPage } from './self-built-hittest'
 import { commitFreedraw } from './self-built-freedraw'
@@ -137,7 +138,9 @@ export class SelfBuiltAdapter implements CanvasHost {
   }
 
   getElements(): CanvasElement[] {
-    return [...this.elements.values()]
+    // 确定性 z 序:按 KIND_LAYER 稳定排序(见 canvas-host)。渲染 / hitTest / SVG /
+    // 快照 / DSL / .cystift 全读这个顺序,五视图一致,reload 视觉不变。
+    return sortByLayer([...this.elements.values()])
   }
 
   getElement(id: string): CanvasElement | undefined {

@@ -1,5 +1,6 @@
 
 import type { CanvasElement, CanvasView } from './canvas-host'
+import { sortByLayer } from './canvas-host'
 import { colorOf, domTokenResolver, type TokenResolver } from './self-built-render'
 import { arrowEndpoints, dashPattern, arrowheadPoints } from './self-built-arrow'
 import { unionBounds, expandBounds, type Bounds } from './bounds'
@@ -24,7 +25,8 @@ export function elementsToSvg(
   opts: ElementsToSvgOptions,
   tokenResolver: TokenResolver = domTokenResolver,
 ): { svg: string; width: number; height: number } {
-  // 1. 算 bbox(页坐标),平移到 (border, border) 起。
+  // 0. 确定性 z 序:与实时渲染完全一致(防御性——即使调用方传未排序数组,SVG 仍按
+  //    KIND_LAYER 出,五视图视觉对齐)。bbox 用全部元素算,与顺序无关。
   const boxes: Bounds[] = elements.map((e) => ({ x: e.x, y: e.y, w: e.w, h: e.h }))
   const raw = unionBounds(boxes) ?? { x: 0, y: 0, w: 1, h: 1 }
   const expanded = expandBounds(raw, opts.border)
@@ -32,6 +34,8 @@ export function elementsToSvg(
   const height = Math.max(1, Math.round(expanded.h))
   const dx = -expanded.x
   const dy = -expanded.y
+
+  const layered = sortByLayer(elements)
 
   // 2. 颜色(tokenResolver 解析具体值;SVG 无 CSS 变量上下文)。
   const bg = opts.background ? tokenResolver('--color-white', '#ffffff') : 'transparent'
@@ -51,8 +55,8 @@ export function elementsToSvg(
   if (opts.background) {
     parts.push(`<rect x="0" y="0" width="${width}" height="${height}" fill="${bg}"/>`)
   }
-  for (const el of elements) {
-    parts.push(elementToSvg(el, dx, dy, getCardInfo, { cardFill, cardStroke, textCol, grayCol, yellow, fontBody, fontDisplay, fontMono }, elements, tokenResolver))
+  for (const el of layered) {
+    parts.push(elementToSvg(el, dx, dy, getCardInfo, { cardFill, cardStroke, textCol, grayCol, yellow, fontBody, fontDisplay, fontMono }, layered, tokenResolver))
   }
   parts.push('</svg>')
   return { svg: parts.join(''), width, height }

@@ -37,6 +37,36 @@ export const ACTIVE_CANVAS_KINDS: readonly ActiveCanvasKind[] = [
   'rect',
 ]
 
+/**
+ * 确定性 z 序:按 kind 分层(同 kind 内保插入序「后建在上」)。
+ *
+ * 渲染顺序 = getElements() 顺序 = hitTest/SVG/快照/DSL/.cystift 全用同一份。
+ * 透明统一模型要求「z 序是模型的属性,一次决定,五个视图全一致」——以前 z 序
+ * 是 Map 插入序(card 同步先入、freeform 异步后入 → freeform 总压 card 上;reload
+ * 前后不一致)。现在由 KIND_LAYER 固定,与建/载顺序无关,reload 视觉不变。
+ *
+ * 底 → 顶:rect(背景框)< freedraw(草图层)< card(主内容)< arrow(关系,压卡边可见)
+ *        < text(浮标,永远可读)。
+ *
+ * 想调层级:改下面这张表即可,所有视图自动跟上。
+ */
+export const KIND_LAYER: Record<CanvasElementKind, number> = {
+  rect: 0,
+  freedraw: 1,
+  card: 2,
+  note: 2, // legacy note → text 层(语义并入 text),与 card 同档不抢
+  image: 2, // legacy image → card 档(并入卡片 MediaRef)
+  arrow: 3,
+  ellipse: 3, // legacy ellipse → arrow 档(装饰层)
+  line: 3, // legacy line → arrow 档(线形)
+  text: 4,
+}
+
+/** 把元素数组按 KIND_LAYER 稳定排序(同层保原序)。用于 getElements / SVG。 */
+export function sortByLayer<T extends CanvasElement>(elements: T[]): T[] {
+  return [...elements].sort((a, b) => KIND_LAYER[a.kind] - KIND_LAYER[b.kind])
+}
+
 export interface CanvasElement {
   id: string
   kind: CanvasElementKind

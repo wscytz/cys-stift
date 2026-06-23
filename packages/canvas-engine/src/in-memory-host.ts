@@ -1,4 +1,5 @@
 
+import { sortByLayer } from './canvas-host'
 import type { CanvasElement, CanvasHost, CanvasView, UserChange } from './canvas-host'
 /**
  * InMemoryCanvasHost — 纯内存 CanvasHost,单测用,无 tldraw 依赖。
@@ -16,7 +17,8 @@ export class InMemoryCanvasHost implements CanvasHost {
   private echoing = true
 
   getElements(): CanvasElement[] {
-    return [...this.elements.values()]
+    // 确定性 z 序:按 KIND_LAYER 稳定排序(见 canvas-host),与 SelfBuiltAdapter 一致。
+    return sortByLayer([...this.elements.values()])
   }
 
   getElement(id: string): CanvasElement | undefined {
