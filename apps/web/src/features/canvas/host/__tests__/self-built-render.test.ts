@@ -80,4 +80,30 @@ describe('renderElements', () => {
     expect(() => renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => '', '#ffffff')).not.toThrow()
     expect(ctx._calls.some((c) => c.startsWith('moveTo'))).toBe(false)
   })
+
+  it('renders an arrow as a line + arrowhead between two cards (border endpoints)', () => {
+    const ctx = mockCtx()
+    const els = [
+      { id: 'ca', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'cb', kind: 'card', x: 200, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'cb', text: 'rel' },
+    ] as unknown as CanvasElement[]
+    renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => '', '#ffffff')
+    // from=(100,50) → to=(200,50):主线
+    expect(ctx._calls).toContain('moveTo(100,50)')
+    expect(ctx._calls).toContain('lineTo(200,50)')
+    // label 画在中点 (150,50)
+    expect(ctx._calls.some((c) => c.startsWith('fillText(rel@150,50)'))).toBe(true)
+  })
+
+  it('arrow with missing endpoint draws nothing (no throw)', () => {
+    const ctx = mockCtx()
+    const els = [
+      { id: 'ca', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 },
+      { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'ghost' },
+    ] as unknown as CanvasElement[]
+    expect(() => renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => '', '#ffffff')).not.toThrow()
+    // 不画 arrow 主线(没有 (100,50) 那种)— 只检查没有 moveTo(100,50)
+    expect(ctx._calls.some((c) => c === 'moveTo(100,50)')).toBe(false)
+  })
 })

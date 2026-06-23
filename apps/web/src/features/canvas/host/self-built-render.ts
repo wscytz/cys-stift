@@ -1,6 +1,7 @@
 'use client'
 
 import type { CanvasElement, CanvasView } from './canvas-host'
+import { arrowEndpoints } from './self-built-arrow'
 
 /**
  * 纯渲染函数:把元素画到 ctx 上,带相机(pan/zoom)变换。
@@ -30,7 +31,7 @@ export function renderElements(
   ctx.translate(view.panX, view.panY)
   ctx.scale(view.zoom, view.zoom)
   for (const el of elements) {
-    drawElement(ctx, el, getCardLabel)
+    drawElement(ctx, el, elements, getCardLabel)
   }
   ctx.restore()
 }
@@ -38,6 +39,7 @@ export function renderElements(
 function drawElement(
   ctx: CanvasRenderingContext2D,
   el: CanvasElement,
+  allElements: CanvasElement[],
   getCardLabel: (id: string) => string,
 ): void {
   switch (el.kind) {
@@ -71,8 +73,35 @@ function drawElement(
       ctx.stroke()
       break
     }
+    case 'arrow': {
+      const { from, to } = arrowEndpoints(el, allElements)
+      if (!from || !to) break
+      ctx.beginPath()
+      ctx.moveTo(from.x, from.y)
+      ctx.lineTo(to.x, to.y)
+      ctx.strokeStyle = colorOf(el.color)
+      ctx.lineWidth = 2
+      ctx.stroke()
+      // V 形箭头 @ to,沿 from→to 方向
+      const angle = Math.atan2(to.y - from.y, to.x - from.x)
+      const head = 10
+      ctx.beginPath()
+      ctx.moveTo(to.x, to.y)
+      ctx.lineTo(to.x - head * Math.cos(angle - Math.PI / 6), to.y - head * Math.sin(angle - Math.PI / 6))
+      ctx.moveTo(to.x, to.y)
+      ctx.lineTo(to.x - head * Math.cos(angle + Math.PI / 6), to.y - head * Math.sin(angle + Math.PI / 6))
+      ctx.stroke()
+      if (el.text) {
+        const mx = (from.x + to.x) / 2
+        const my = (from.y + to.y) / 2
+        ctx.fillStyle = colorOf(el.color)
+        ctx.font = `12px ${readToken('--font-body', 'Inter, sans-serif')}`
+        ctx.fillText(el.text, mx, my)
+      }
+      break
+    }
     default:
-      // freedraw/text/arrow/legacy — 后续 Task。
+      // text/legacy — 后续 Task。
       break
   }
 }
