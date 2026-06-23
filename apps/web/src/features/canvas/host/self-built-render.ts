@@ -16,6 +16,19 @@ import { arrowEndpoints, dashPattern, arrowheadPoints } from './self-built-arrow
  */
 export type CardInfo = { title: string; body: string; type: string; pinned: boolean }
 
+/**
+ * 可注入的 token 解析器:把设计 token 名解析成具体值。
+ * 默认实现 domTokenResolver 直接 getComputedStyle 读 CSS 变量(= cys-stift DOM 行为);
+ * 消费者可注入自己的(如 SVG 导出 / 独立 package 上下文),引擎核心不耦合 DOM 也不认识 cys-stift 调色板。
+ */
+export type TokenResolver = (name: string, fallback: string) => string
+
+export const domTokenResolver: TokenResolver = (name, fallback) => {
+  if (typeof window === 'undefined') return fallback
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return v || fallback
+}
+
 export function renderElements(
   ctx: CanvasRenderingContext2D,
   elements: CanvasElement[],
@@ -24,6 +37,7 @@ export function renderElements(
   cssHeight: number,
   getCardInfo: (id: string) => CardInfo | null,
   background: string,
+  tokenResolver: TokenResolver = domTokenResolver,
 ): void {
   ctx.clearRect(0, 0, cssWidth, cssHeight)
   ctx.fillStyle = background
@@ -33,7 +47,7 @@ export function renderElements(
   ctx.translate(view.panX, view.panY)
   ctx.scale(view.zoom, view.zoom)
   for (const el of elements) {
-    drawElement(ctx, el, elements, getCardInfo)
+    drawElement(ctx, el, elements, getCardInfo, tokenResolver)
   }
   ctx.restore()
 }
@@ -43,6 +57,7 @@ function drawElement(
   el: CanvasElement,
   allElements: CanvasElement[],
   getCardInfo: (id: string) => CardInfo | null,
+  tokenResolver: TokenResolver,
 ): void {
   switch (el.kind) {
     case 'card': {
@@ -50,38 +65,38 @@ function drawElement(
       // 卡片背景 + 边框
       ctx.beginPath()
       ctx.roundRect(el.x, el.y, el.w, el.h, 4)
-      ctx.fillStyle = readToken('--color-white', '#ffffff')
+      ctx.fillStyle = tokenResolver('--color-white', '#ffffff')
       ctx.fill()
-      ctx.strokeStyle = readToken('--color-gray', '#e2e8f0')
+      ctx.strokeStyle = tokenResolver('--color-gray', '#e2e8f0')
       ctx.lineWidth = 1
       ctx.stroke()
       // 内容(对齐 card-shape-util:类型标 mono 灰 + title display + body 3 行)
       const pad = 10
       ctx.textBaseline = 'top'
       if (!info) {
-        ctx.fillStyle = readToken('--color-gray', '#94a3b8')
-        ctx.font = `12px ${readToken('--font-mono', 'monospace')}`
+        ctx.fillStyle = tokenResolver('--color-gray', '#94a3b8')
+        ctx.font = `12px ${tokenResolver('--font-mono', 'monospace')}`
         ctx.fillText('(untitled)', el.x + pad, el.y + pad)
         break
       }
       // pinned ★ 右上
       if (info.pinned) {
-        ctx.fillStyle = readToken('--color-yellow', '#eab308')
-        ctx.font = `14px ${readToken('--font-mono', 'monospace')}`
+        ctx.fillStyle = tokenResolver('--color-yellow', '#eab308')
+        ctx.font = `14px ${tokenResolver('--font-mono', 'monospace')}`
         ctx.fillText('★', el.x + el.w - 18, el.y + 6)
       }
       // 类型标(mono 灰 大写)
-      ctx.fillStyle = readToken('--color-gray', '#64748b')
-      ctx.font = `10px ${readToken('--font-mono', 'monospace')}`
+      ctx.fillStyle = tokenResolver('--color-gray', '#64748b')
+      ctx.font = `10px ${tokenResolver('--font-mono', 'monospace')}`
       ctx.fillText(info.type.toUpperCase(), el.x + pad, el.y + pad)
       // title(display,500)
-      ctx.fillStyle = readToken('--color-black', '#0f172a')
-      ctx.font = `500 15px ${readToken('--font-display', 'Inter, sans-serif')}`
+      ctx.fillStyle = tokenResolver('--color-black', '#0f172a')
+      ctx.font = `500 15px ${tokenResolver('--font-display', 'Inter, sans-serif')}`
       ctx.fillText(info.title || '(untitled)', el.x + pad, el.y + pad + 16)
       // body(3 行截断)
       if (info.body) {
-        ctx.fillStyle = readToken('--color-black-soft', '#475569')
-        ctx.font = `12px ${readToken('--font-body', 'Inter, sans-serif')}`
+        ctx.fillStyle = tokenResolver('--color-black-soft', '#475569')
+        ctx.font = `12px ${tokenResolver('--font-body', 'Inter, sans-serif')}`
         const lines = wrapLines(info.body, el.w - pad * 2, ctx)
         for (let i = 0; i < Math.min(3, lines.length); i++) {
           ctx.fillText(lines[i]!, el.x + pad, el.y + pad + 38 + i * 16)
@@ -92,7 +107,7 @@ function drawElement(
     case 'rect': {
       ctx.beginPath()
       ctx.rect(el.x, el.y, el.w, el.h)
-      ctx.strokeStyle = colorOf(el.color)
+      ctx.strokeStyle = colorOf(el.color, tokenResolver)
       ctx.stroke()
       break
     }
@@ -102,7 +117,7 @@ function drawElement(
       ctx.beginPath()
       ctx.moveTo(pts[0]![0], pts[0]![1])
       for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i]![0], pts[i]![1])
-      ctx.strokeStyle = colorOf(el.color)
+      ctx.strokeStyle = colorOf(el.color, tokenResolver)
       ctx.lineWidth = 2
       ctx.stroke()
       break
@@ -110,7 +125,7 @@ function drawElement(
     case 'arrow': {
       const { from, to } = arrowEndpoints(el, allElements)
       if (!from || !to) break
-      const stroke = colorOf(el.color)
+      const stroke = colorOf(el.color, tokenResolver)
       // 线段(语义线型:dash)
       ctx.beginPath()
       ctx.moveTo(from.x, from.y)
@@ -146,7 +161,7 @@ function drawElement(
         const mx = (from.x + to.x) / 2
         const my = (from.y + to.y) / 2
         ctx.fillStyle = stroke
-        ctx.font = `12px ${readToken('--font-body', 'Inter, sans-serif')}`
+        ctx.font = `12px ${tokenResolver('--font-body', 'Inter, sans-serif')}`
         ctx.fillText(el.text, mx, my)
       }
       break
@@ -154,8 +169,8 @@ function drawElement(
     case 'text': {
       const lines = (el.text ?? '').split('\n')
       if (lines.length === 0 || (lines.length === 1 && lines[0] === '')) break
-      ctx.fillStyle = colorOf(el.color)
-      ctx.font = `14px ${readToken('--font-body', 'Inter, sans-serif')}`
+      ctx.fillStyle = colorOf(el.color, tokenResolver)
+      ctx.font = `14px ${tokenResolver('--font-body', 'Inter, sans-serif')}`
       ctx.textBaseline = 'top'
       for (let i = 0; i < lines.length; i++) {
         ctx.fillText(lines[i]!, el.x, el.y + i * 18)
@@ -176,7 +191,7 @@ function drawElement(
  * 6 原色约束,已删)。`grey`/`gray` 都映射到 `--color-gray`(关系类型 related-to
  * 用 'grey',此前漏映射被回退成黑色——真 bug,此处修)。未知/缺省回退黑色 token。
  */
-export function colorOf(c: string | undefined): string {
+export function colorOf(c: string | undefined, tokenResolver: TokenResolver = domTokenResolver): string {
   const tokenFor: Record<string, string> = {
     blue: '--color-blue',
     red: '--color-red',
@@ -186,15 +201,16 @@ export function colorOf(c: string | undefined): string {
     white: '--color-white',
     black: '--color-black',
   }
-  return readToken(tokenFor[c ?? 'black'] ?? '--color-black', '#0f172a')
+  return tokenResolver(tokenFor[c ?? 'black'] ?? '--color-black', '#0f172a')
 }
 
-/** 读 CSS 变量(设计 token);SSR 或变量缺失时回退 fallback。 */
-export function readToken(name: string, fallback: string): string {
-  if (typeof window === 'undefined') return fallback
-  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-  return v || fallback
-}
+/**
+ * 读 CSS 变量(设计 token);SSR 或变量缺失时回退 fallback。
+ *
+ * = domTokenResolver 的别名(UI 层 self-canvas.tsx / dev/page.tsx 仍用此名,保留 DOM 调用)。
+ * 引擎核心改走可注入的 tokenResolver;默认 = domTokenResolver(= 此函数),现有行为不变。
+ */
+export const readToken: TokenResolver = domTokenResolver
 
 /**
  * 画选中高亮:对 selectedIds 命中的元素画 dashed 框(在相机变换内)。
@@ -206,13 +222,14 @@ export function drawSelectionOutlines(
   selectedIds: string[],
   elements: CanvasElement[],
   view: CanvasView,
+  tokenResolver: TokenResolver = domTokenResolver,
 ): void {
   if (selectedIds.length === 0) return
   const sel = new Set(selectedIds)
   ctx.save()
   ctx.translate(view.panX, view.panY)
   ctx.scale(view.zoom, view.zoom)
-  ctx.strokeStyle = readToken('--color-blue', '#1d4ed8')
+  ctx.strokeStyle = tokenResolver('--color-blue', '#1d4ed8')
   ctx.lineWidth = 1.5 / view.zoom
   ctx.setLineDash([6 / view.zoom, 4 / view.zoom])
   const hs = 3 / view.zoom // handle 半边长 → 6px 方块
@@ -228,7 +245,7 @@ export function drawSelectionOutlines(
       [el.x + el.w, el.y + el.h],
     ]
     ctx.setLineDash([])
-    ctx.fillStyle = readToken('--color-white', '#ffffff')
+    ctx.fillStyle = tokenResolver('--color-white', '#ffffff')
     for (const [cx, cy] of corners) {
       ctx.fillRect(cx - hs, cy - hs, hs * 2, hs * 2)
       ctx.strokeRect(cx - hs, cy - hs, hs * 2, hs * 2)
@@ -243,16 +260,17 @@ export function drawMarquee(
   ctx: CanvasRenderingContext2D,
   rect: { x: number; y: number; w: number; h: number },
   view: CanvasView,
+  tokenResolver: TokenResolver = domTokenResolver,
 ): void {
   if (rect.w === 0 || rect.h === 0) return
   ctx.save()
   ctx.translate(view.panX, view.panY)
   ctx.scale(view.zoom, view.zoom)
-  ctx.fillStyle = readToken('--color-blue', '#1d4ed8')
+  ctx.fillStyle = tokenResolver('--color-blue', '#1d4ed8')
   ctx.globalAlpha = 0.1
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h)
   ctx.globalAlpha = 1
-  ctx.strokeStyle = readToken('--color-blue', '#1d4ed8')
+  ctx.strokeStyle = tokenResolver('--color-blue', '#1d4ed8')
   ctx.lineWidth = 1 / view.zoom
   ctx.setLineDash([4 / view.zoom, 4 / view.zoom])
   ctx.strokeRect(rect.x, rect.y, rect.w, rect.h)

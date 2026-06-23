@@ -15,7 +15,7 @@ import type {
   CanvasView,
   UserChange,
 } from './canvas-host'
-import { renderElements, readToken, drawSelectionOutlines, drawMarquee, type CardInfo } from './self-built-render'
+import { renderElements, drawSelectionOutlines, drawMarquee, domTokenResolver, type CardInfo, type TokenResolver } from './self-built-render'
 import { hitTest, screenToPage } from './self-built-hittest'
 import { commitFreedraw } from './self-built-freedraw'
 import { handleAtPoint, resizeGeometry, type Handle } from './self-built-resize'
@@ -32,6 +32,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   protected echoing = true
   protected ctx: CanvasRenderingContext2D | null
   private getCardInfo: (id: string) => CardInfo | null
+  private tokenResolver: TokenResolver
   private rafId: number | null = null
   private dragId: string | null = null
   private dragOffset = { x: 0, y: 0 }
@@ -61,10 +62,11 @@ export class SelfBuiltAdapter implements CanvasHost {
 
   constructor(
     private canvas: HTMLCanvasElement,
-    opts?: { getCardInfo?: (id: string) => CardInfo | null },
+    opts?: { getCardInfo?: (id: string) => CardInfo | null; tokenResolver?: TokenResolver },
   ) {
     this.ctx = canvas.getContext('2d')
     this.getCardInfo = opts?.getCardInfo ?? (() => null)
+    this.tokenResolver = opts?.tokenResolver ?? domTokenResolver
     this.attachPointer()
     this.attachKeyboard()
   }
@@ -100,16 +102,17 @@ export class SelfBuiltAdapter implements CanvasHost {
       w,
       h,
       this.getCardInfo,
-      readToken('--color-canvas', '#f8fafc'),
+      this.tokenResolver('--color-canvas', '#f8fafc'),
+      this.tokenResolver,
     )
-    drawSelectionOutlines(ctx, this.getSelectedIds(), this.getElements(), this.view)
+    drawSelectionOutlines(ctx, this.getSelectedIds(), this.getElements(), this.view, this.tokenResolver)
     if (this.marquee) {
       drawMarquee(ctx, {
         x: Math.min(this.marquee.startX, this.marquee.curX),
         y: Math.min(this.marquee.startY, this.marquee.curY),
         w: Math.abs(this.marquee.curX - this.marquee.startX),
         h: Math.abs(this.marquee.curY - this.marquee.startY),
-      }, this.view)
+      }, this.view, this.tokenResolver)
     }
     if (this.connecting) {
       const fromEl = this.getElement(this.connecting.fromId)
@@ -119,7 +122,7 @@ export class SelfBuiltAdapter implements CanvasHost {
         ctx.save()
         ctx.translate(this.view.panX, this.view.panY)
         ctx.scale(this.view.zoom, this.view.zoom)
-        ctx.strokeStyle = readToken('--color-blue', '#1d4ed8')
+        ctx.strokeStyle = this.tokenResolver('--color-blue', '#1d4ed8')
         ctx.lineWidth = 2 / this.view.zoom
         ctx.beginPath()
         ctx.moveTo(from.x, from.y)

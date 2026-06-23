@@ -1,7 +1,7 @@
 'use client'
 
 import type { CanvasElement, CanvasView } from './canvas-host'
-import { readToken, colorOf } from './self-built-render'
+import { colorOf, domTokenResolver, type TokenResolver } from './self-built-render'
 import { arrowEndpoints, dashPattern, arrowheadPoints } from './self-built-arrow'
 import { unionBounds, expandBounds, type Bounds } from '../export-bounds'
 
@@ -17,12 +17,13 @@ interface CardInfo {
   pinned: boolean
 }
 
-/** CanvasElement[] → SVG 字符串(对齐 self-built-render 视觉;颜色 readToken 解析具体值)。 */
+/** CanvasElement[] → SVG 字符串(对齐 self-built-render 视觉;颜色 tokenResolver 解析具体值)。 */
 export function elementsToSvg(
   elements: CanvasElement[],
   view: CanvasView,
   getCardInfo: (id: string) => CardInfo | null,
   opts: ElementsToSvgOptions,
+  tokenResolver: TokenResolver = domTokenResolver,
 ): { svg: string; width: number; height: number } {
   // 1. 算 bbox(页坐标),平移到 (border, border) 起。
   const boxes: Bounds[] = elements.map((e) => ({ x: e.x, y: e.y, w: e.w, h: e.h }))
@@ -33,16 +34,16 @@ export function elementsToSvg(
   const dx = -expanded.x
   const dy = -expanded.y
 
-  // 2. 颜色(readToken 解析具体值;SVG 无 CSS 变量上下文)。
-  const bg = opts.background ? readToken('--color-white', '#ffffff') : 'transparent'
-  const cardFill = readToken('--color-white', '#ffffff')
-  const cardStroke = readToken('--color-gray', '#e2e8f0')
-  const textCol = readToken('--color-black', '#0f172a')
-  const grayCol = readToken('--color-gray', '#64748b')
-  const yellow = readToken('--color-yellow', '#eab308')
-  const fontBody = readToken('--font-body', 'Inter, sans-serif')
-  const fontDisplay = readToken('--font-display', 'Inter, sans-serif')
-  const fontMono = readToken('--font-mono', 'monospace')
+  // 2. 颜色(tokenResolver 解析具体值;SVG 无 CSS 变量上下文)。
+  const bg = opts.background ? tokenResolver('--color-white', '#ffffff') : 'transparent'
+  const cardFill = tokenResolver('--color-white', '#ffffff')
+  const cardStroke = tokenResolver('--color-gray', '#e2e8f0')
+  const textCol = tokenResolver('--color-black', '#0f172a')
+  const grayCol = tokenResolver('--color-gray', '#64748b')
+  const yellow = tokenResolver('--color-yellow', '#eab308')
+  const fontBody = tokenResolver('--font-body', 'Inter, sans-serif')
+  const fontDisplay = tokenResolver('--font-display', 'Inter, sans-serif')
+  const fontMono = tokenResolver('--font-mono', 'monospace')
 
   void view // 导出时 view 不参与坐标变换(导出通常 zoom=1,pan=0);保留参数为 Task 2-4 兼容。
 
@@ -52,7 +53,7 @@ export function elementsToSvg(
     parts.push(`<rect x="0" y="0" width="${width}" height="${height}" fill="${bg}"/>`)
   }
   for (const el of elements) {
-    parts.push(elementToSvg(el, dx, dy, getCardInfo, { cardFill, cardStroke, textCol, grayCol, yellow, fontBody, fontDisplay, fontMono }, elements))
+    parts.push(elementToSvg(el, dx, dy, getCardInfo, { cardFill, cardStroke, textCol, grayCol, yellow, fontBody, fontDisplay, fontMono }, elements, tokenResolver))
   }
   parts.push('</svg>')
   return { svg: parts.join(''), width, height }
@@ -69,6 +70,7 @@ function elementToSvg(
   getCardInfo: (id: string) => CardInfo | null,
   c: { cardFill: string; cardStroke: string; textCol: string; grayCol: string; yellow: string; fontBody: string; fontDisplay: string; fontMono: string },
   allElements: CanvasElement[],
+  tokenResolver: TokenResolver,
 ): string {
   const x = el.x + dx
   const y = el.y + dy
@@ -92,21 +94,21 @@ function elementToSvg(
       return parts.join('')
     }
     case 'rect':
-      return `<rect x="${x}" y="${y}" width="${el.w}" height="${el.h}" fill="none" stroke="${colorOf(el.color)}"/>`
+      return `<rect x="${x}" y="${y}" width="${el.w}" height="${el.h}" fill="none" stroke="${colorOf(el.color, tokenResolver)}"/>`
     case 'ellipse':
-      return `<ellipse cx="${x + el.w / 2}" cy="${y + el.h / 2}" rx="${el.w / 2}" ry="${el.h / 2}" fill="none" stroke="${colorOf(el.color)}"/>`
+      return `<ellipse cx="${x + el.w / 2}" cy="${y + el.h / 2}" rx="${el.w / 2}" ry="${el.h / 2}" fill="none" stroke="${colorOf(el.color, tokenResolver)}"/>`
     case 'freedraw': {
       const pts = (el.meta?.points as [number, number][] | undefined) ?? []
       if (pts.length === 0) return ''
       const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]! + dx} ${p[1]! + dy}`).join(' ')
-      return `<path d="${d}" fill="none" stroke="${colorOf(el.color)}" stroke-width="2"/>`
+      return `<path d="${d}" fill="none" stroke="${colorOf(el.color, tokenResolver)}" stroke-width="2"/>`
     }
     case 'text':
       return `<text x="${x}" y="${y + 14}" fill="${c.textCol}" font-family="${c.fontBody}" font-size="14">${esc(el.text ?? '')}</text>`
     case 'arrow': {
       const { from, to } = arrowEndpoints(el, allElements)
       if (!from || !to) return ''
-      const stroke = colorOf(el.color)
+      const stroke = colorOf(el.color, tokenResolver)
       const fx = from.x + dx, fy = from.y + dy
       const tx = to.x + dx, ty = to.y + dy
       const dashArr = dashPattern(el.dash)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { renderElements, drawSelectionOutlines, drawMarquee } from '../self-built-render'
+import { renderElements, drawSelectionOutlines, drawMarquee, colorOf, domTokenResolver } from '../self-built-render'
 import type { CanvasElement, CanvasView } from '../canvas-host'
 
 /** mock CanvasRenderingContext2D:记录所有方法调用。 */
@@ -230,5 +230,63 @@ describe('drawMarquee', () => {
     expect(ctx._calls.some((c) => c.startsWith('fillRect(10,20,100,60)'))).toBe(true)
     expect(ctx._calls.some((c) => c.startsWith('strokeRect(10,20,100,60)'))).toBe(true)
     expect(ctx._calls.some((c) => c.startsWith('setLineDash'))).toBe(true)
+  })
+})
+
+/**
+ * 注入测试:证明 renderElements / drawSelectionOutlines / drawMarquee / colorOf
+ * 接受自定义 tokenResolver 并实际使用它(默认 = domTokenResolver,行为不变)。
+ * 这是「引擎解耦 cys-stift token 体系」的新能力回归保护。
+ */
+describe('tokenResolver 注入(引擎解耦)', () => {
+  /** stub resolver:回显 token 名(像 self-built-color.test 那样 stub getComputedStyle)。 */
+  const echo: (name: string, fb: string) => string = (name, fb) => name || fb
+
+  it('renderElements 传 mock tokenResolver → fillStyle/strokeStyle 含 token 名', () => {
+    const ctx = mockCtx()
+    const els: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 240, h: 120, rotation: 0 },
+    ] as unknown as CanvasElement[]
+    renderElements(
+      ctx,
+      els,
+      { panX: 0, panY: 0, zoom: 1, gridMode: 'free' },
+      800,
+      600,
+      () => null,
+      'transparent',
+      echo,
+    )
+    // 卡片分支用了 tokenResolver('--color-white'…) / ('--color-gray'…) → fillStyle 含 token 名
+    expect(ctx._calls.some((c) => c === 'fillStyle=--color-white')).toBe(true)
+    expect(ctx._calls.some((c) => c === 'strokeStyle=--color-gray')).toBe(true)
+  })
+
+  it('drawSelectionOutlines 传 mock tokenResolver → 选中框 strokeStyle 含 token 名', () => {
+    const ctx = mockCtx()
+    const els = [{ id: 'c1', kind: 'card', x: 10, y: 20, w: 100, h: 60, rotation: 0 }] as unknown as CanvasElement[]
+    drawSelectionOutlines(ctx, ['c1'], els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, echo)
+    expect(ctx._calls.some((c) => c === 'strokeStyle=--color-blue')).toBe(true)
+    // handle 白填也来自 tokenResolver
+    expect(ctx._calls.some((c) => c === 'fillStyle=--color-white')).toBe(true)
+  })
+
+  it('drawMarquee 传 mock tokenResolver → fill/stroke 含 token 名', () => {
+    const ctx = mockCtx()
+    drawMarquee(ctx, { x: 10, y: 20, w: 100, h: 60 }, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, echo)
+    expect(ctx._calls.some((c) => c === 'fillStyle=--color-blue')).toBe(true)
+    expect(ctx._calls.some((c) => c === 'strokeStyle=--color-blue')).toBe(true)
+  })
+
+  it('colorOf 传 mock tokenResolver → 映射 token 经 resolver 返回', () => {
+    expect(colorOf('blue', echo)).toBe('--color-blue')
+    expect(colorOf('green', echo)).toBe('--color-black') // 未知色回退 black,经 resolver 回显 token 名
+  })
+
+  it('默认 tokenResolver = domTokenResolver(不传参数行为不变)', () => {
+    expect(domTokenResolver('--color-nonexistent-token', '#deadbe')).toBe('#deadbe') // jsdom 无此 CSS 变量 → fallback
+    // 不传 tokenResolver 调 colorOf 也走默认 = domTokenResolver → jsdom 无 --color-blue 变量
+    // → 走 colorOf 内部定义的 fallback '#0f172a'(注意:不是 #1d4ed8,那是 drawSelectionOutlines 的 fallback)。
+    expect(colorOf('blue')).toBe('#0f172a')
   })
 })
