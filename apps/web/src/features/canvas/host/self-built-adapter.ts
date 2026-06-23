@@ -20,6 +20,7 @@ import { hitTest, screenToPage } from './self-built-hittest'
 import { commitFreedraw } from './self-built-freedraw'
 import { handleAtPoint, resizeGeometry, type Handle } from './self-built-resize'
 import { marqueeSelect } from './self-built-marquee'
+import { arrowPreviewEndpoints } from './self-built-arrow'
 
 export class SelfBuiltAdapter implements CanvasHost {
   private elements = new Map<string, CanvasElement>()
@@ -43,12 +44,13 @@ export class SelfBuiltAdapter implements CanvasHost {
     up: (e: PointerEvent) => void
   } | null = null
   private wheelHandler: ((e: WheelEvent) => void) | null = null
-  private activeTool: 'select' | 'freedraw' | 'text' = 'select'
+  private activeTool: 'select' | 'freedraw' | 'text' | 'connect' = 'select'
   private currentStroke: { points: [number, number][] } | null = null
   private selectedIds = new Set<string>()
   private resizing: { id: string; handle: Handle; start: { x: number; y: number; w: number; h: number } } | null = null
   private dragGroup: { ids: string[]; offsets: Map<string, { x: number; y: number }> } | null = null
   private marquee: { startX: number; startY: number; curX: number; curY: number } | null = null
+  private connecting: { fromId: string; pointer: { x: number; y: number } } | null = null
   private keyHandler: ((e: KeyboardEvent) => void) | null = null
 
   constructor(
@@ -103,6 +105,23 @@ export class SelfBuiltAdapter implements CanvasHost {
         h: Math.abs(this.marquee.curY - this.marquee.startY),
       }, this.view)
     }
+    if (this.connecting) {
+      const fromEl = this.getElement(this.connecting.fromId)
+      if (fromEl) {
+        const { from, to } = arrowPreviewEndpoints(fromEl, this.connecting.pointer)
+        // 预览只画线(不带 V 箭头头,简化;真 arrow commit 后有箭头头)。颜色走 token。
+        ctx.save()
+        ctx.translate(this.view.panX, this.view.panY)
+        ctx.scale(this.view.zoom, this.view.zoom)
+        ctx.strokeStyle = readToken('--color-blue', '#1d4ed8')
+        ctx.lineWidth = 2 / this.view.zoom
+        ctx.beginPath()
+        ctx.moveTo(from.x, from.y)
+        ctx.lineTo(to.x, to.y)
+        ctx.stroke()
+        ctx.restore()
+      }
+    }
   }
 
   getElements(): CanvasElement[] {
@@ -148,7 +167,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   }
 
   /** 切换工具(渲染器自身方法,不上 CanvasHost 接口)。 */
-  setTool(t: 'select' | 'freedraw' | 'text'): void {
+  setTool(t: 'select' | 'freedraw' | 'text' | 'connect'): void {
     this.activeTool = t
     // 切工具时放弃进行中的笔画
     if (t !== 'freedraw' && this.currentStroke) {
@@ -157,7 +176,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     }
   }
 
-  getTool(): 'select' | 'freedraw' | 'text' {
+  getTool(): 'select' | 'freedraw' | 'text' | 'connect' {
     return this.activeTool
   }
 
@@ -200,6 +219,20 @@ export class SelfBuiltAdapter implements CanvasHost {
           /* jsdom 无 setPointerCapture / 已捕获 */
         }
         this.scheduleRender()
+        return
+      }
+      // connect 模式:命中元素 → 开连接;空白 → 不开;都不进 drag/pan
+      if (this.activeTool === 'connect') {
+        const id = hitTest(this.getElements(), p.x, p.y)
+        if (id) {
+          this.connecting = { fromId: id, pointer: { x: p.x, y: p.y } }
+          try {
+            this.canvas.setPointerCapture(e.pointerId)
+          } catch {
+            /* jsdom 无 setPointerCapture / 已捕获 */
+          }
+          this.scheduleRender()
+        }
         return
       }
       // shift + 空白 → 框选(优先,在 resize-hit 之前)
@@ -274,6 +307,12 @@ export class SelfBuiltAdapter implements CanvasHost {
       const rect = this.canvas.getBoundingClientRect()
       const sx = e.clientX - rect.left
       const sy = e.clientY - rect.top
+      if (this.connecting) {
+        const p = screenToPage(this.view, sx, sy)
+        this.connecting.pointer = { x: p.x, y: p.y }
+        this.scheduleRender()
+        return
+      }
       if (this.marquee) {
         const p = screenToPage(this.view, sx, sy)
         this.marquee.curX = p.x
@@ -324,6 +363,39 @@ export class SelfBuiltAdapter implements CanvasHost {
       }
     }
     const onUp = (e: PointerEvent) => {
+      if (this.connecting) {
+        const rect = this.canvas.getBoundingClientRect()
+        const sx = e.clientX - rect.left
+        const sy = e.clientY - rect.top
+        const p = screenToPage(this.view, sx, sy)
+        const toId = hitTest(this.getElements(), p.x, p.y)
+        if (toId && toId !== this.connecting.fromId) {
+          const id =
+            'arrow-' +
+            (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+              ? crypto.randomUUID()
+              : Math.random().toString(36).slice(2))
+          this.upsert({
+            id,
+            kind: 'arrow',
+            x: 0,
+            y: 0,
+            w: 0,
+            h: 0,
+            rotation: 0,
+            from: this.connecting.fromId,
+            to: toId,
+            color: 'black',
+          })
+        }
+        this.connecting = null
+        try {
+          this.canvas.releasePointerCapture(e.pointerId)
+        } catch {
+          /* 已释放 */
+        }
+        return
+      }
       if (this.marquee) {
         const r = {
           x: Math.min(this.marquee.startX, this.marquee.curX),

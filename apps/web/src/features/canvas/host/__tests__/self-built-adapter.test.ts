@@ -298,3 +298,52 @@ describe('SelfBuiltAdapter multiselect', () => {
     expect((host as unknown as { getSelectedIds: () => string[] }).getSelectedIds()).toEqual(['a']) // 框选只命中 a
   })
 })
+
+describe('SelfBuiltAdapter connect', () => {
+  function dispatch(canvas: HTMLCanvasElement, type: string, x: number, y: number) {
+    canvas.dispatchEvent(
+      new PointerEvent(type, { pointerId: 1, pointerType: 'mouse', bubbles: true, clientX: x, clientY: y }),
+    )
+  }
+
+  it('connect 模式:从 a 拖到 b → commit arrow(from=a to=b)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'b', kind: 'card', x: 300, y: 0, w: 100, h: 100, rotation: 0 })
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('connect')
+    const changes: { updated: CanvasElement[]; removed: string[] }[] = []
+    host.onUserChange((c) => changes.push(c as never))
+
+    dispatch(canvas, 'pointerdown', 50, 50) // 命中 a
+    dispatch(canvas, 'pointermove', 350, 50) // 拖到 b 上
+    dispatch(canvas, 'pointerup', 350, 50) // 松手在 b
+
+    const arrows = host.getElements().filter((e) => e.kind === 'arrow')
+    expect(arrows).toHaveLength(1)
+    expect(arrows[0]).toMatchObject({ kind: 'arrow', from: 'a', to: 'b' })
+    expect(changes.some((c) => c.updated.some((e) => e.kind === 'arrow'))).toBe(true)
+  })
+
+  it('connect 松手在空白 → 取消(不 commit arrow)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('connect')
+    dispatch(canvas, 'pointerdown', 50, 50) // 命中 a
+    dispatch(canvas, 'pointermove', 500, 500) // 拖到空白
+    dispatch(canvas, 'pointerup', 500, 500)
+    expect(host.getElements().filter((e) => e.kind === 'arrow')).toHaveLength(0)
+  })
+
+  it('connect 模式 down 在空白 → 不开连接(无 from)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('connect')
+    dispatch(canvas, 'pointerdown', 500, 500) // 空白
+    dispatch(canvas, 'pointermove', 50, 50)
+    dispatch(canvas, 'pointerup', 50, 50)
+    expect(host.getElements().filter((e) => e.kind === 'arrow')).toHaveLength(0)
+  })
+})
