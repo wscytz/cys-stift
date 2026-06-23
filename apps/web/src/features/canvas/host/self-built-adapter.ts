@@ -18,6 +18,7 @@ import type {
 import { renderElements, readToken, drawSelectionOutlines } from './self-built-render'
 import { hitTest, screenToPage } from './self-built-hittest'
 import { commitFreedraw } from './self-built-freedraw'
+import { handleAtPoint, resizeGeometry, type Handle } from './self-built-resize'
 
 export class SelfBuiltAdapter implements CanvasHost {
   private elements = new Map<string, CanvasElement>()
@@ -44,6 +45,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   private activeTool: 'select' | 'freedraw' | 'text' = 'select'
   private currentStroke: { points: [number, number][] } | null = null
   private selectedIds = new Set<string>()
+  private resizing: { id: string; handle: Handle; start: { x: number; y: number; w: number; h: number } } | null = null
   private keyHandler: ((e: KeyboardEvent) => void) | null = null
 
   constructor(
@@ -189,6 +191,23 @@ export class SelfBuiltAdapter implements CanvasHost {
         this.scheduleRender()
         return
       }
+      // resize handle 优先:选中元素的四角(仅 select 模式)
+      if (this.activeTool === 'select' && this.selectedIds.size > 0) {
+        const selId = [...this.selectedIds][0]!
+        const sel = this.getElement(selId)
+        if (sel) {
+          const handle = handleAtPoint(sel, p, this.view.zoom)
+          if (handle) {
+            this.resizing = { id: selId, handle, start: { x: sel.x, y: sel.y, w: sel.w, h: sel.h } }
+            try {
+              this.canvas.setPointerCapture(e.pointerId)
+            } catch {
+              /* jsdom 无 setPointerCapture */
+            }
+            return
+          }
+        }
+      }
       const id = hitTest(this.getElements(), p.x, p.y)
       if (id) {
         const el = this.getElement(id)!
@@ -221,6 +240,15 @@ export class SelfBuiltAdapter implements CanvasHost {
         this.scheduleRender()
         return
       }
+      if (this.resizing) {
+        const p = screenToPage(this.view, sx, sy)
+        const el = this.getElement(this.resizing.id)
+        if (el) {
+          const g = resizeGeometry(this.resizing.handle, this.resizing.start, p)
+          this.upsert({ ...el, x: g.x, y: g.y, w: g.w, h: g.h })
+        }
+        return
+      }
       if (this.dragId) {
         const p = screenToPage(this.view, sx, sy)
         const el = this.getElement(this.dragId)
@@ -240,6 +268,15 @@ export class SelfBuiltAdapter implements CanvasHost {
       }
     }
     const onUp = (e: PointerEvent) => {
+      if (this.resizing) {
+        this.resizing = null
+        try {
+          this.canvas.releasePointerCapture(e.pointerId)
+        } catch {
+          /* 已释放 */
+        }
+        return
+      }
       if (this.currentStroke) {
         const id =
           'freedraw-' +

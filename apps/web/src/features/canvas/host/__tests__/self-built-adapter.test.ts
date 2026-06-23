@@ -206,3 +206,47 @@ describe('SelfBuiltAdapter selection', () => {
     expect(host.getElement('c1')).toBeDefined() // 没删
   })
 })
+
+describe('SelfBuiltAdapter resize', () => {
+  function dispatch(canvas: HTMLCanvasElement, type: string, x: number, y: number) {
+    canvas.dispatchEvent(
+      new PointerEvent(type, { pointerId: 1, pointerType: 'mouse', bubbles: true, clientX: x, clientY: y }),
+    )
+  }
+
+  it('select 模式拖 SE handle → 缩放元素(fixed=nw)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'c1', kind: 'card', x: 100, y: 100, w: 100, h: 100, rotation: 0 })
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['c1'])
+    // SE 角在 (200,200);down 在 SE → 进 resize;move 到 (150,150) → se 缩到 {100,100,50,50}
+    dispatch(canvas, 'pointerdown', 200, 200)
+    dispatch(canvas, 'pointermove', 150, 150)
+    dispatch(canvas, 'pointerup', 150, 150)
+    expect(host.getElement('c1')).toMatchObject({ x: 100, y: 100, w: 50, h: 50 })
+  })
+
+  it('freedraw 模式不 resize(工具不是 select)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'c1', kind: 'card', x: 100, y: 100, w: 100, h: 100, rotation: 0 })
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['c1'])
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('freedraw')
+    dispatch(canvas, 'pointerdown', 200, 200) // freedraw 模式 → 画笔画,不 resize
+    dispatch(canvas, 'pointermove', 150, 150)
+    dispatch(canvas, 'pointerup', 150, 150)
+    expect(host.getElement('c1')).toMatchObject({ x: 100, y: 100, w: 100, h: 100 }) // 没缩放
+  })
+
+  it('没选中元素时不 resize(pointerdown 走 hit/drag)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'c1', kind: 'card', x: 100, y: 100, w: 100, h: 100, rotation: 0 })
+    // 没 setSelectedIds → selectedIds 空 → handle 检查跳过 → down 在 SE(200,200)其实 hitTest 命中 c1 body → drag
+    dispatch(canvas, 'pointerdown', 200, 200)
+    dispatch(canvas, 'pointermove', 150, 150)
+    dispatch(canvas, 'pointerup', 150, 150)
+    // 拖动(c1 中心 150,150 → offset 50,50;move 到 150,150 → x=100,y=100)其实没移;但绝不是 resize
+    expect(host.getElement('c1')).toMatchObject({ w: 100, h: 100 }) // 尺寸没变
+  })
+})
