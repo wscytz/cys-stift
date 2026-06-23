@@ -41,25 +41,34 @@ export function serializeCard(card: Card, opts: SerializeOptions = {}): string {
     lines.push('')
   }
 
-  // Media section
+  // Media section — only emit when at least one ref resolves to an asset.
+  // Otherwise an orphan-ref card (e.g. cleaned storage export) would produce
+  // a misleading empty `## 媒体` heading with no content. Collect first,
+  // skip missing assets, then decide.
   if (card.media.length > 0) {
-    lines.push('## 媒体')
+    const resolved: { ref: Card['media'][number]; asset: NonNullable<ReturnType<typeof mediaStore.getAsset>> }[] = []
     for (const ref of card.media) {
       const asset = mediaStore.getAsset(ref.assetId)
       if (!asset) continue
-      if (
-        asset.kind === 'image' &&
-        inlineImages &&
-        isSafeImageDataUrl(asset.dataUrl, maxInlineImageBytes)
-      ) {
-        lines.push(`![${ref.caption ?? asset.mimeType}](${asset.dataUrl})`)
-      } else {
-        lines.push(
-          `- (${asset.mimeType}, ${asset.byteSize} bytes): ${ref.caption ?? ''}`,
-        )
-      }
+      resolved.push({ ref, asset })
     }
-    lines.push('')
+    if (resolved.length > 0) {
+      lines.push('## 媒体')
+      for (const { ref, asset } of resolved) {
+        if (
+          asset.kind === 'image' &&
+          inlineImages &&
+          isSafeImageDataUrl(asset.dataUrl, maxInlineImageBytes)
+        ) {
+          lines.push(`![${ref.caption ?? asset.mimeType}](${asset.dataUrl})`)
+        } else {
+          lines.push(
+            `- (${asset.mimeType}, ${asset.byteSize} bytes): ${ref.caption ?? ''}`,
+          )
+        }
+      }
+      lines.push('')
+    }
   }
 
   // Links

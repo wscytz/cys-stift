@@ -177,17 +177,39 @@ describe('serializeCard — media section', () => {
     expect(md).toContain('- (image/png, 999999 bytes): big')
   })
 
-  it('emits the media heading but skips the missing ref (no bullet, no data URL)', () => {
-    // Behaviour note: the serializer emits `## 媒体` whenever card.media is
-    // non-empty, THEN iterates refs and `continue`s past any whose asset is
-    // missing. So a card whose only ref points at a missing asset still gets
-    // an empty media heading. We assert the safe part: no bullet, no data URL.
+  it('omits the media section entirely when all refs point at missing assets', () => {
+    // Bug fix: previously the serializer emitted `## 媒体` whenever
+    // card.media.length > 0, THEN skipped missing assets via `continue`,
+    // leaving a misleading empty `## 媒体` heading with no content. A
+    // cleaned-storage export (orphan refs) must not produce a phantom
+    // section. Now we collect assets first and only emit the heading when
+    // at least one asset resolves.
     const card = makeCard({
-      media: [{ assetId: 'ma-missing' as unknown as MediaAssetId, order: 0 }],
+      media: [
+        { assetId: 'ma-missing-1' as unknown as MediaAssetId, order: 0 },
+        { assetId: 'ma-missing-2' as unknown as MediaAssetId, order: 1 },
+      ],
     })
     const md = serializeCard(card)
+    expect(md).not.toContain('## 媒体')
     expect(md).not.toMatch(/^-\s/m) // no media bullet line
     expect(md).not.toContain('data:image')
+  })
+
+  it('emits the media heading + content when at least one asset resolves', () => {
+    // Mixed: one missing ref, one present asset → the section is emitted
+    // with only the present asset's bullet/image (existing behaviour,
+    // must not regress).
+    putImageAsset('ma-present')
+    const card = makeCard({
+      media: [
+        { assetId: 'ma-missing' as unknown as MediaAssetId, order: 0 },
+        { assetId: 'ma-present' as unknown as MediaAssetId, order: 1, caption: 'cap' },
+      ],
+    })
+    const md = serializeCard(card)
+    expect(md).toContain('## 媒体')
+    expect(md).toContain('![cap](data:image/png;base64,aGVsbG8=)')
   })
 
   it('omits the media section entirely when the card has no media', () => {

@@ -7,14 +7,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 // hook is a thin wrapper over useSyncExternalStore + the store API exercised
 // below.
 //
-// IMPORTANT behaviour note (discovered while writing these tests): the bare
-// store API (get / upsert / clear) does NOT call hydrateOnce(). Only the
-// useDraft hook's useEffect triggers hydration. That means a pre-existing
-// localStorage entry is NOT visible via draftStore.get() on a cold module load
-// unless the hook runs first. The tests below assert the *actual* store
-// behaviour (in-memory + persist-to-localStorage), and document the
-// "pre-existing data needs the hook" contract explicitly rather than pretending
-// the store hydrates on its own.
+// Hydration behaviour: every public store method (get / upsert / clear) calls
+// hydrateOnce() before touching _drafts, so a pre-existing localStorage draft
+// IS visible via draftStore.get() on a cold module load — no need to run the
+// hook first. This matches the canvas-view-store / settings-store pattern
+// (each public method hydrates). See the "cold-start hydration" suite.
 
 const STORAGE_KEY = 'cys-stift.drafts.v1'
 
@@ -99,9 +96,11 @@ describe('draftStore.clear — drop a draft', () => {
 
 describe('draftStore — corruption resilience', () => {
   it('does not throw when localStorage contains corrupt JSON', () => {
-    // The store only loads via the hook's hydrateOnce; the in-memory state
-    // starts empty regardless. We assert the store stays usable (no throw on
-    // subsequent writes/reads) when the raw value is garbage.
+    // loadDrafts() catches JSON.parse failures and returns {} (no throw),
+    // so a corrupt payload just looks like empty storage. hydrateOnce()
+    // (now called by every public method) runs loadDrafts under that guard.
+    // We assert the store stays usable (no throw on subsequent writes/reads)
+    // when the raw value is garbage.
     window.localStorage.setItem(STORAGE_KEY, '{ this is NOT json {{{')
     store.upsert('capture', { text: 'after-corruption' })
     expect(store.get<{ text: string }>('capture')!.payload).toEqual({
@@ -111,6 +110,34 @@ describe('draftStore — corruption resilience', () => {
     expect(() =>
       JSON.parse(window.localStorage.getItem(STORAGE_KEY)!),
     ).not.toThrow()
+  })
+})
+
+describe('draftStore — cold-start hydration', () => {
+  it('get() reads a pre-existing localStorage draft without the hook running first', async () => {
+    // Bug fix: previously hydrateOnce() only fired from the useDraft hook's
+    // useEffect, so a cold module load + bare draftStore.get(key) could NOT
+    // see a pre-existing localStorage draft. Now every public method
+    // (get/upsert/clear) calls hydrateOnce() first, matching the
+    // canvas-view-store / settings-store pattern.
+    vi.resetModules()
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        drafts: {
+          capture: {
+            kind: 'capture',
+            payload: { text: 'pre-existing' },
+            updatedAt: '2026-06-22T00:00:00.000Z',
+          },
+        },
+      }),
+    )
+    const coldStore = (await import('../draft-store')).draftStore
+    // No hook, no upsert — straight read on a freshly loaded module.
+    const d = coldStore.get<{ text: string }>('capture')
+    expect(d).not.toBeNull()
+    expect(d!.payload).toEqual({ text: 'pre-existing' })
   })
 })
 

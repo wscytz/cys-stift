@@ -90,11 +90,13 @@ function subscribe(cb: () => void) {
 
 export const draftStore = {
   get<P = unknown>(kind: DraftKind): Draft & { payload: P } | null {
+    hydrateOnce()
     const d = _drafts[kind]
     if (!d) return null
     return d as Draft & { payload: P }
   },
   upsert(kind: DraftKind, payload: unknown): void {
+    hydrateOnce()
     const next: DraftMap = { ..._drafts }
     next[kind] = { kind, payload, updatedAt: new Date().toISOString() }
     _drafts = next
@@ -102,6 +104,7 @@ export const draftStore = {
     notify()
   },
   clear(kind: DraftKind): void {
+    hydrateOnce()
     if (!_drafts[kind]) return
     const next: DraftMap = { ..._drafts }
     delete next[kind]
