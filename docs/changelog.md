@@ -5,7 +5,27 @@
 
 ---
 
-## 2026-06-22 · dev-feedback · 橡皮/卡片交互 + i18n 切换 + 代码整理
+## 2026-06-23 · canvas-engine-polish · 引擎独立化 + P3/P4 衔接打磨 + AI cluster
+
+P2 引擎抽包后的衔接打磨 + 增值功能。
+
+### 画布引擎独立化(北极星)
+- 自研画布核心抽成 **`packages/canvas-engine`**:零业务依赖 / 框架无关 / token 注入 / 独立测试套(156)+ README + standalone 活证据。ADR `docs/adr/2026-06-23-canvas-engine-extract.md`。
+
+### P3 衔接打磨
+- **undo coalescing**:拖拽 / resize 的连续变更合并为 1 undo 步(`a108c34`)。
+- **`.cystift` 拖放几何恢复**:拖放建新画布无 host,freeform 几何曾静默丢失;现持久化到新画布 `canvasFreeformStore`,新 host mount 时 hydrate(`566bf46`)。
+- **确定性 z 序**:z 序升级为模型属性,`KIND_LAYER` 固定分层(rect<freedraw<card<arrow<text,同 kind 保插入序),`getElements` 稳定排序 → 渲染/hitTest/SVG/快照/DSL/.cystift 五视图一致,reload 视觉不变(`ff34c3c`)。
+
+### P4 增值
+- **minimap 鸟瞰导航**(`aec2480`)。
+- **渲染性能基线**:`render.bench.ts`(renderElements 100=0.3ms/1k=3.4ms/5k=24ms 线性;sortByLayer 每帧<2% 非热点;hitTest<5µs),填 STATE 未压测盲点(`dfe33dc`)。
+- **AI 找相似(cluster)**:读画布卡的 allowlist 字段 → AI 分组近重复/相似卡 → 落 `related-to` 关系箭头连组内成员(**非破坏性**:只加关系,不合并/删卡)。防御性输出解析(白名单 id 校验 + 绝不抛)。新 `cluster.ts` 纯逻辑 + 20 单测。
+
+### AI 隐私(cluster)
+- 走 `serializeCardsForAI`(allowlist + 软删除过滤);无 `source.deviceId` / 无 `media.dataUrl` / 无 vision。`docs/user/privacy.md` 更新 AI 动作清单 + cluster 说明。
+
+
 
 开发者反馈(2026-06-22)的 2 个交互 bug + 收尾整理 + 战略讨论档归档。
 

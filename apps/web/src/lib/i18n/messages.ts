@@ -297,6 +297,11 @@ export const messages = {
   'canvas.aiLayout': { zh: 'AI 排版', en: 'AI layout' },
   'canvas.aiLayoutDone': { zh: 'AI 排版已应用', en: 'AI layout applied' },
   'canvas.aiLayoutEmpty': { zh: 'AI 未返回有效排版', en: 'AI returned no valid layout' },
+  'canvas.aiCluster': { zh: 'AI 找相似', en: 'AI cluster' },
+  'canvas.aiClusterDone': { zh: '已连 {n} 条相似关系', en: 'Created {n} similarity links' },
+  'canvas.aiClusterNone': { zh: '未找到相似卡片', en: 'No similar cards found' },
+  'canvas.aiClusterEmpty': { zh: 'AI 未返回有效分组', en: 'AI returned no valid clusters' },
+  'canvas.aiClusterTooFew': { zh: '卡片太少,无需分组', en: 'Too few cards to cluster' },
 } as const
 
 export type MessageKey = keyof typeof messages

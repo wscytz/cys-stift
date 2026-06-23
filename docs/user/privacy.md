@@ -15,7 +15,9 @@
 
 ## AI 看到了什么(逐字段)
 
-下表列出了 AI 在做 **summarize / rewrite / translate / auto-relate / 画布排版** 等动作时,会收到的字段。**未列出的字段一律不发送**。
+下表列出了 AI 在做 **summarize / rewrite / translate / auto-relate / 画布排版 / 找相似(cluster)** 等动作时,会收到的字段。**未列出的字段一律不发送**。
+
+> **找相似(cluster,2026-06-23)**:读画布上多张卡的允许字段(同下表),让 AI 把近重复 / 相似卡分组,落成 `related-to` 关系箭头连接组内成员——**非破坏性**(只加关系,不合并、不删卡)。AI **看不到**卡的 `source.deviceId`、`media.dataUrl`(图片/PDF 二进制)、软删除卡;输出经白名单 id 校验(模型编造的 id 一律丢弃)。无 vision 模型(永久不做)。
 
 ### ✅ AI 可以看到的(默认)
 

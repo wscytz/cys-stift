@@ -15,6 +15,12 @@ import { autoRelate } from '@/features/canvas/auto-relate'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { parseDsl } from '@/features/ai/dsl-parser'
 import { streamText } from '@/features/ai/stream-text'
+import {
+  buildClusterUserPrompt,
+  parseClusters,
+  applyClusters,
+  CLUSTER_SYSTEM_PROMPT,
+} from '@/features/ai/cluster'
 import { useAIEnabled, getCurrentAI } from '@/features/ai/ai-settings-provider'
 import { pushToast } from '@/lib/toast-store'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
@@ -153,6 +159,58 @@ Rules: reuse an existing #id to UPDATE it (from/to kept); colors limited to blue
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCanvasId, service, t])
 
+  // AI cluster(找重复 / 找相似):读画布上的卡 → AI 分组 → 落 related-to 关系箭头
+  // 连组内成员(非破坏性:只加关系,不合并不删卡)。走 serializeCardsForAI(allowlist
+  // + 软删除过滤,无 deviceId / 无 media.dataUrl),遵守 AI 隐私铁律(无 vision)。
+  const handleAICluster = useCallback(async () => {
+    const adapter = handle.current.adapter
+    if (!adapter) return
+    const cfg = getCurrentAI()
+    if (!cfg) return
+
+    const cards = service
+      .listOnCanvas(activeCanvasId)
+      .filter((c) => !c.archived && !c.deletedAt)
+    if (cards.length < 2) {
+      pushToast({ kind: 'info', message: t('canvas.aiClusterTooFew') })
+      return
+    }
+    const knownIds = new Set(cards.map((c) => String(c.id)))
+    const userPrompt = buildClusterUserPrompt(cards)
+    if (!userPrompt) {
+      pushToast({ kind: 'info', message: t('canvas.aiClusterTooFew') })
+      return
+    }
+
+    try {
+      const result = await streamText(
+        cfg,
+        { system: CLUSTER_SYSTEM_PROMPT, user: userPrompt, maxTokens: 1024, temperature: 0.2 },
+        () => {},
+      )
+      if (!result?.content) {
+        pushToast({ kind: 'info', message: t('canvas.aiClusterEmpty') })
+        return
+      }
+      const clusters = parseClusters(result.content, knownIds)
+      if (clusters.length === 0) {
+        pushToast({ kind: 'info', message: t('canvas.aiClusterNone') })
+        return
+      }
+      const res = applyClusters(adapter, clusters, service, activeCanvasId)
+      pushToast({
+        kind: res.arrowsCreated > 0 ? 'success' : 'info',
+        message:
+          res.arrowsCreated > 0
+            ? t('canvas.aiClusterDone', { n: String(res.arrowsCreated) })
+            : t('canvas.aiClusterNone'),
+      })
+    } catch (e) {
+      pushToast({ kind: 'error', message: t('ai.error', { error: (e as Error).message }) })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCanvasId, service, t])
+
   // 键盘:+ - 0 1 g(同 tldraw 版,改用 adapter)。input/textarea 时跳过。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -260,7 +318,10 @@ Rules: reuse an existing #id to UPDATE it (from/to kept); colors limited to blue
         <span className="crumb-spacer" />
         <span className="tb-divider" aria-hidden="true" />
         {aiEnabled && (
-          <Button variant="ghost" onClick={handleAILayout} disabled={!adapterReady} title="AI layout">AI</Button>
+          <>
+            <Button variant="ghost" onClick={handleAILayout} disabled={!adapterReady} title="AI layout">AI</Button>
+            <Button variant="ghost" onClick={handleAICluster} disabled={!adapterReady} title={t('canvas.aiCluster')}>{t('canvas.aiCluster')}</Button>
+          </>
         )}
         {showAutoRelate && (
           <Button variant="ghost" onClick={handleAutoRelate} title={t('canvas.autoRelate')}>{t('canvas.autoRelate')}</Button>
