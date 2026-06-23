@@ -1,9 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   embedCystiftInSvg,
   extractCystiftFromSvg,
+  restoreCystiftPayload,
 } from '../cystift-payload'
 import type { CystiftPayload } from '../cystift-payload'
+import type { CanvasElement } from '@cys-stift/canvas-engine'
 
 const SAMPLE_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"><rect width="100" height="50"/></svg>'
@@ -69,5 +71,82 @@ describe('.cystift SVG roundtrip (data-cystift attribute)', () => {
     expect(out).toContain('width="100"')
     // The SVG still closes.
     expect(out.trim().endsWith('</svg>')).toBe(true)
+  })
+})
+
+// ── drag-drop geometry restore (no host) ──────────────────────────────────────
+// 回归(2026-06-23):拖放路径无 host,曾静默丢弃 freeform 几何。现在无 host 时
+// freeform 元素持久化到新画布的 canvasFreeformStore,新 host mount 时 hydrate。
+// 这里用「无 OPFS → 回退 localStorage」的假 store 验证写到了正确画布的 key。
+
+function noOpfs() {
+  vi.stubGlobal('navigator', { ...navigator, storage: undefined })
+}
+
+function makeService() {
+  const created: { id: string; title: string }[] = []
+  let n = 0
+  return {
+    listOnCanvas: () => [] as never[],
+    create: (c: { title: string }) => {
+      n += 1
+      const id = `new-${n}`
+      created.push({ id, title: c.title })
+      return { id, ...c } as never
+    },
+  } as never
+}
+
+describe('.cystift restore — drag-drop (no host) persists freeform geometry', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.unstubAllGlobals()
+    noOpfs()
+    window.localStorage.clear()
+  })
+
+  it('persists freeform elements into the NEW canvas store when no host is supplied', async () => {
+    const arrow: CanvasElement = {
+      id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0,
+      from: 'card-1', to: 'card-2', dash: 'dashed', arrowhead: 'none', color: 'blue',
+    }
+    const payload: CystiftPayload = {
+      ...PAYLOAD,
+      cards: [
+        { ...(PAYLOAD.cards[0] as object), id: 'card-1' as never },
+        { ...(PAYLOAD.cards[0] as object), id: 'card-2' as never, title: '乙' },
+      ] as never,
+      elements: [
+        arrow,
+        { id: 't1', kind: 'text', x: 5, y: 5, w: 40, h: 18, rotation: 0, text: '注', color: 'black' },
+      ],
+    }
+
+    const newId = await restoreCystiftPayload(payload, makeService(), undefined)
+    expect(newId).not.toBeNull()
+
+    // The new canvas's freeform store now carries the geometry.
+    const { canvasFreeformStore } = await import('@/lib/canvas-freeform-store')
+    const snap = await canvasFreeformStore.load(newId as never)
+    expect(snap).not.toBeNull()
+    const ids = snap!.elements.map((e) => e.id)
+    expect(ids).toContain('t1')
+
+    // arrow survived + its from/to were remapped to the new card ids.
+    const restoredArrow = snap!.elements.find((e) => e.kind === 'arrow')!
+    expect(restoredArrow).toBeDefined()
+    expect(restoredArrow.from).toMatch(/^new-/)
+    expect(restoredArrow.to).toMatch(/^new-/)
+    expect(restoredArrow.dash).toBe('dashed')
+    expect(restoredArrow.arrowhead).toBe('none')
+  })
+
+  it('does NOT persist when the payload carries no geometry (cards-only legacy file)', async () => {
+    const payload: CystiftPayload = { ...PAYLOAD, elements: [] }
+    const newId = await restoreCystiftPayload(payload, makeService(), undefined)
+    const { canvasFreeformStore } = await import('@/lib/canvas-freeform-store')
+    const snap = await canvasFreeformStore.load(newId as never)
+    // Nothing written (and cards still restored to DB via service.create).
+    expect(snap?.elements ?? []).toEqual([])
   })
 })

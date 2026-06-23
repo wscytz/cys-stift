@@ -22,6 +22,7 @@
  */
 import type { Card, CardId, CardService, CanvasId } from '@cys-stift/domain'
 import { canvasStore } from '@/lib/canvas-store'
+import { canvasFreeformStore } from '@/lib/canvas-freeform-store'
 import {
   writePngTextChunk,
   readPngTextChunk,
@@ -71,8 +72,11 @@ export function buildCystiftPayload(
  * card ids). Returns the new canvas id (or null if the payload is bad).
  *
  * `host` is optional: the legacy drag-drop path has no live host for the new
- * canvas, so it degrades to restoring cards only (geometry lost). Callers
- * with a host (e.g. the export-restore flow) pass it to restore full geometry.
+ * canvas, so it previously lost the geometry (cards-only restore). Now, when
+ * no host is supplied, the freeform elements are persisted into the new
+ * canvas's freeform store — the host that mounts for that canvas hydrates them
+ * on load. Callers with a host (e.g. the export-restore flow) pass it to
+ * restore full geometry directly.
  */
 export async function restoreCystiftPayload(
   payload: CystiftPayload,
@@ -109,18 +113,29 @@ export async function restoreCystiftPayload(
   // 恢复几何元素:card 用新 id;arrow 的 from/to 重映射。旧 .cystift 文件
   // (含 snapshot,无 elements)降级为空元素(只恢复 cards)。
   const elements = (payload.elements ?? []) as CanvasElement[]
-  if (host && elements.length > 0) {
+  // 重映射 card id + arrow from/to(无论有无 host 都要重映射,因为下面要么进 host
+  // 要么进 freeform store,两者都用新 id)。
+  const remapped: CanvasElement[] = []
+  for (const el of elements) {
+    const newEl: CanvasElement = { ...el }
+    if (el.kind === 'card' && idMap.has(el.id)) {
+      newEl.id = idMap.get(el.id)!
+    }
+    if (el.from && idMap.has(el.from)) newEl.from = idMap.get(el.from)!
+    if (el.to && idMap.has(el.to)) newEl.to = idMap.get(el.to)!
+    remapped.push(newEl)
+  }
+
+  if (host && remapped.length > 0) {
+    // 有 host:直接 upsert(导出-恢复路径,host 即新画布的 host)。
     host.applyWithoutEcho(() => {
-      for (const el of elements) {
-        const newEl: CanvasElement = { ...el }
-        if (el.kind === 'card' && idMap.has(el.id)) {
-          newEl.id = idMap.get(el.id)!
-        }
-        if (el.from && idMap.has(el.from)) newEl.from = idMap.get(el.from)!
-        if (el.to && idMap.has(el.to)) newEl.to = idMap.get(el.to)!
-        host.upsert(newEl)
-      }
+      for (const el of remapped) host.upsert(el)
     })
+  } else if (remapped.length > 0) {
+    // 无 host(拖放路径,host 还没为新画布建):把 freeform 元素持久化到新画布的
+    // freeform store——新画布的 host mount 时 hydrate 会恢复它们。card 几何走 DB
+    // (loadCardsIntoEditor 从 canvasPosition 重建),不进 store(三层防双写)。
+    void canvasFreeformStore.save(newCanvasId, remapped)
   }
 
   canvasStore.setActive(newCanvasId)
