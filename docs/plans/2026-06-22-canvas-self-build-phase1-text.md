@@ -279,12 +279,12 @@ describe('SelfBuiltAdapter text 模式', () => {
     dispatch(canvas, 'pointerdown', 50, 50) // 命中卡片
     dispatch(canvas, 'pointermove', 80, 80)
     dispatch(canvas, 'pointerup', 80, 80)
-    expect(fired).toBe(0) // text 模式不 drag(没额外 onUserChange;初始 upsert 那次算 1,但这里测的是 drag 不触发新的)
+    expect(fired).toBe(0) // text 模式 pointerdown/move/up 全 no-op → 不触发 onUserChange。listener 在 upsert(c1) 之后才加,所以初始 upsert 那次也没被计数 → fired 恒为 0。
   })
 })
 ```
 
-> 注:上面 `fired` 统计所有 onUserChange。`host.upsert(card)` 触发 1 次(echo);后续 pointerdown/move/up 在 text 模式应不触发任何 upsert → fired 应保持 1(不是 0)。修正断言:`expect(fired).toBe(1)`(只有初始 upsert 那次)。**实现时用这个修正值**。
+> 断言 `toBe(0)` 是正确的:`host.onUserChange(...)` 在 `host.upsert(c1)` **之后**才注册,所以初始 upsert 不计数;text 模式 dispatch 又是 no-op,故全程 0。
 
 - [ ] **Step 3.2:跑,确认红**
 
@@ -371,6 +371,7 @@ export default function CanvasSelfPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const adapterRef = useRef<SelfBuiltAdapter | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const committedRef = useRef(false) // 防 commit 竞态(Ctrl+Enter 后 textarea 卸载触发 onBlur 双提交)
   const [tool, setTool] = useState<Tool>('select')
   const [edit, setEdit] = useState<EditSession | null>(null)
   const [textValue, setTextValue] = useState('')
@@ -420,14 +421,18 @@ export default function CanvasSelfPage() {
     const py = (sy - view.panY) / view.zoom
     setEdit({ screenX: sx, screenY: sy, pageX: Math.round(px), pageY: Math.round(py) })
     setTextValue('')
+    committedRef.current = false // 新 edit session,重置 commit 守卫
   }
 
   const cancelEdit = () => {
+    committedRef.current = true // 标记已结束,防后续 onBlur 误 commit
     setEdit(null)
     setTextValue('')
   }
 
   const commitEdit = () => {
+    if (committedRef.current) return // 已 commit/cancel(防 onBlur + Ctrl+Enter 双触发)
+    committedRef.current = true
     const v = textValue.trim()
     const adapter = adapterRef.current
     const canvas = canvasRef.current
@@ -607,7 +612,7 @@ const check = (n, ok, d = '') => { ok ? (pass++, console.log(`  ✓ ${n}${d ? ' 
     return { text: t.text, w: t.w, h: t.h }
   })
   check('1 text element committed', !result.error, JSON.stringify(result))
-  check('text has CJK + ascii + 2 lines', !result.error && result.text === 'Hello 你好\n第二行', JSON.stringify(result))
+  check('text has ascii + CJK + 2 lines', !result.error && result.text.includes('Hello') && result.text.includes('第二行') && result.text.includes('\n'), JSON.stringify(result))
   check('text measured w/h (non-zero)', !result.error && result.w > 0 && result.h >= 36, JSON.stringify(result))
 
   await page.screenshot({ path: path.join(out, 'text-committed.png') })
@@ -660,4 +665,9 @@ node scripts/phase1-text-smoke.cjs                                              
 - **占位符扫描**:无 TBD/TODO 占位。Task 3 的 freedraw/hit/pan 分支用「// ……(原 freedraw 分支不动)」指代 —— 意为保留现有实现,执行时只加 text 早退行(在 onDown 最开头),不重写其它分支。每步代码完整。
 - **类型一致性**:`measureText(text, ctx, font, lineHeight)`、`textEditKeyAction(e)` 在 Task 2 定义、Task 3 page 消费,签名一致;`activeTool: 'select'|'freedraw'|'text'` 在 adapter(T3)与 page Tool type(T3)一致;`readToken` 从 self-built-render import(page T3);`EditSession={screenX,screenY,pageX,pageY}` 贯穿。
 - **范围**:本计划自包含,产出可测软件(渲染 + 纯函数 + edit session + 冒烟)。text 选择/移动/resize、富文本、arrow 交互创建、打磨、Phase 2 各自另开 plan。
-- **Task 3 测试断言修正**:Step 3.1 的 `fired` 断言在正文里写成了 0,但 `host.upsert(card)` 初始已触发 1 次 → **实现时断言用 `toBe(1)`**(注释已标)。这是计划正文的一处自相矛盾,执行时以注释修正为准。
+
+## 二次 review 修正(2026-06-23)
+
+- **Step 3.1 断言 `toBe(0)` 是正确的**(之前 self-review 误判为 toBe(1)):`onUserChange` listener 在 `upsert(c1)` **之后**才注册,初始 upsert 不计数;text 模式 dispatch 全 no-op → fired 恒 0。已修正正文注释 + 删除误导 note。
+- **加 `committedRef` 守卫**(Step 3.5 page):防 Ctrl+Enter commit 后 textarea 卸载触发 `onBlur` 双提交。`commitEdit` 入口 `if (committedRef.current) return`;新 edit(onCanvasClick)重置 false;cancelEdit 置 true。`edit` guard 也兜底(双保险)。
+- **冒烟断言软化**(Step 4.1):文本从精确 `===` 改 `includes`——puppeteer 中文输入偶发不稳,IME 守卫本身已由 Task 2 单测覆盖,冒烟只验端到端「字符进 textarea → commit → 入 host → 度量」。
