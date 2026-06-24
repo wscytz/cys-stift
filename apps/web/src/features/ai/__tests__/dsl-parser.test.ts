@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseDsl, type DslOp } from '../dsl-parser'
+import { parseDsl, parseDslWithDiagnostics, type DslOp } from '../dsl-parser'
 
 describe('parseDsl', () => {
   it('parses a card positioning directive', () => {
@@ -212,5 +212,64 @@ describe('parseDsl', () => {
     expect(result).toHaveLength(2)
     expect(result[0]?.type).toBe('card')
     expect(result[1]?.type).toBe('free')
+  })
+})
+
+describe('parseDslWithDiagnostics', () => {
+  it('returns no errors for a valid block', () => {
+    const { ops, errors } = parseDslWithDiagnostics(
+      '[card #a1] @pos(1,2)\n[rect #r1] @pos(3,4) @size(10,10)',
+    )
+    expect(errors).toEqual([])
+    expect(ops).toHaveLength(2)
+  })
+
+  it('reports a card line missing @pos', () => {
+    const { ops, errors } = parseDslWithDiagnostics('[card #a1] @color(red)')
+    expect(ops).toHaveLength(0)
+    expect(errors).toHaveLength(1)
+    expect(errors[0]!.message).toMatch(/pos/i)
+    expect(errors[0]!.line).toBe(1)
+    expect(errors[0]!.text).toContain('[card #a1]')
+  })
+
+  it('reports a card line missing #id', () => {
+    const { errors } = parseDslWithDiagnostics('[card @pos(1,2)')
+    expect(errors).toHaveLength(1)
+    expect(errors[0]!.message).toMatch(/id/i)
+  })
+
+  it('reports an unrecognized element kind', () => {
+    const { errors } = parseDslWithDiagnostics('[foo #x] @pos(1,2)')
+    expect(errors).toHaveLength(1)
+    expect(errors[0]!.message.toLowerCase()).toContain('unrecognized')
+  })
+
+  it('reports correct line numbers in a mixed block', () => {
+    const dsl = [
+      '[card #a1] @pos(1,2)', // line 1 valid
+      '[card #a2] @color(red)', // line 2 malformed (no pos)
+      '[arrow #arr1] from #a1 to #a2', // line 3 valid
+      '[bad #x] @pos(1,2)', // line 4 unrecognized
+    ].join('\n')
+    const { ops, errors } = parseDslWithDiagnostics(dsl)
+    expect(ops).toHaveLength(2)
+    expect(errors).toHaveLength(2)
+    expect(errors.map((e) => e.line)).toEqual([2, 4])
+  })
+
+  it('does not report comments, blank lines, or free-form prose', () => {
+    const { errors } = parseDslWithDiagnostics(
+      '# a comment line\n\nsome free-form prose\n[card #a1] @pos(1,2)',
+    )
+    expect(errors).toEqual([])
+  })
+
+  it('parseDsl wrapper still returns plain DslOp[]', () => {
+    const result = parseDsl('[card #a1] @pos(1,2)\n[rect #r1] @pos(3,4) @size(10,10)')
+    expect(Array.isArray(result)).toBe(true)
+    expect(result).toHaveLength(2)
+    expect(result[0]!.type).toBe('card')
+    expect(result[1]!.type).toBe('free')
   })
 })

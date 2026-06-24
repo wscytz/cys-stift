@@ -77,6 +77,16 @@ export type DslArrowOp = {
 
 export type DslOp = DslCardOp | DslFreeOp | DslArrowOp
 
+/** A diagnostic describing a single malformed DSL line that was dropped. */
+export type DslDiagnostic = {
+  /** 1-based original line number in the source text. */
+  line: number
+  /** The trimmed source line that failed to parse. */
+  text: string
+  /** Short technical reason (English, dev-facing — dialog prefixes i18n). */
+  message: string
+}
+
 // ── Parser ───────────────────────────────────────────────────────────────────
 
 /** Card reference: `#id` or `shape:cardId` */
@@ -155,23 +165,48 @@ function extractArrowhead(
 }
 
 /**
- * Parse a DSL block (the AI's output) into a list of layout operations.
+ * Parse a DSL block into ops AND per-line diagnostics for dropped lines.
  *
- * Graceful: unrecognized lines are skipped (no throw). The DSL is
- * intended for AI-to-machine communication — if the AI produces
- * invalid syntax, we silently ignore bad lines.
+ * Unlike {@link parseDsl}, this preserves 1-based original line numbers so
+ * the editor can tell the user WHICH lines were dropped and why (the
+ * "transliteration core selling point" — silent data loss is a trust
+ * problem). Lines are classified:
+ *
+ * - empty / `# comment` / non-`[`-prefixed prose → skipped silently (no error)
+ * - a `[`-prefixed line that fails to parse → records a {@link DslDiagnostic}
+ *
+ * `ops` from this function are identical to what {@link parseDsl} returns.
  */
-export function parseDsl(dslText: string): DslOp[] {
-  const lines = dslText.split('\n').map((l) => l.trim()).filter(Boolean)
+export function parseDslWithDiagnostics(dslText: string): {
+  ops: DslOp[]
+  errors: DslDiagnostic[]
+} {
   const ops: DslOp[] = []
+  const errors: DslDiagnostic[] = []
 
-  for (const line of lines) {
+  const rawLines = dslText.split('\n')
+  for (let i = 0; i < rawLines.length; i++) {
+    const lineNo = i + 1
+    const line = rawLines[i]!.trim()
+    if (!line) continue
+    // `#` comment lines (serializeCanvasReadable title etc.) → skip silently.
+    if (line.startsWith('#')) continue
+    // Non-`[`-prefixed lines are free-form prose the user/AI may include.
+    // Only `[`-prefixed lines that fail to parse are errors.
+    if (!line.startsWith('[')) continue
+
     // ── Card line: `[card #abc123] @pos(300, 400)`
     if (line.startsWith('[card ')) {
       const id = extractId(line)
-      if (!id) continue
+      if (!id) {
+        errors.push({ line: lineNo, text: line, message: 'missing #id' })
+        continue
+      }
       const pos = extractPos(line)
-      if (!pos) continue
+      if (!pos) {
+        errors.push({ line: lineNo, text: line, message: 'missing @pos' })
+        continue
+      }
       const size = extractSize(line)
       ops.push({
         type: 'card',
@@ -189,7 +224,10 @@ export function parseDsl(dslText: string): DslOp[] {
     //    Free arrow (no from/to): `[arrow #id] @pos(x,y) @size(w,h) + sig`
     if (line.startsWith('[arrow ')) {
       const id = extractId(line)
-      if (!id) continue
+      if (!id) {
+        errors.push({ line: lineNo, text: line, message: 'missing #id' })
+        continue
+      }
       const fromMatch = line.match(/from\s+(#[a-zA-Z0-9_-]+)/)
       const toMatch = line.match(/to\s+(#[a-zA-Z0-9_-]+)/)
 
@@ -209,7 +247,14 @@ export function parseDsl(dslText: string): DslOp[] {
         // 自由箭头:无 from/to,需 pos + size(w/h 可负,编码线段方向)
         const pos = extractPos(line)
         const size = extractSize(line)
-        if (!pos || !size) continue
+        if (!pos || !size) {
+          errors.push({
+            line: lineNo,
+            text: line,
+            message: 'free arrow missing @pos/@size',
+          })
+          continue
+        }
         ops.push({
           type: 'arrow',
           id,
@@ -232,9 +277,15 @@ export function parseDsl(dslText: string): DslOp[] {
     // ── Rect line (Phase 0 / T3 unified grammar): `[rect #id] @pos(x,y) @size(w,h) @color(c)`
     if (line.startsWith('[rect ')) {
       const id = extractId(line)
-      if (!id) continue
+      if (!id) {
+        errors.push({ line: lineNo, text: line, message: 'missing #id' })
+        continue
+      }
       const pos = extractPos(line)
-      if (!pos) continue
+      if (!pos) {
+        errors.push({ line: lineNo, text: line, message: 'missing @pos' })
+        continue
+      }
       const size = extractSize(line)
       ops.push({
         type: 'free',
@@ -252,9 +303,15 @@ export function parseDsl(dslText: string): DslOp[] {
     // ── Text line (Phase 0 / T3): `[text #id] @pos(x,y) @text("...") @color(c)`
     if (line.startsWith('[text ')) {
       const id = extractId(line)
-      if (!id) continue
+      if (!id) {
+        errors.push({ line: lineNo, text: line, message: 'missing #id' })
+        continue
+      }
       const pos = extractPos(line)
-      if (!pos) continue
+      if (!pos) {
+        errors.push({ line: lineNo, text: line, message: 'missing @pos' })
+        continue
+      }
       ops.push({
         type: 'free',
         id,
@@ -266,7 +323,28 @@ export function parseDsl(dslText: string): DslOp[] {
       })
       continue
     }
+
+    // ── `[`-prefixed but no recognized kind prefix (e.g. `[foo #x] ...`)
+    errors.push({
+      line: lineNo,
+      text: line,
+      message: 'unrecognized element kind',
+    })
   }
 
-  return ops
+  return { ops, errors }
+}
+
+/**
+ * Parse a DSL block (the AI's output) into a list of layout operations.
+ *
+ * Graceful: unrecognized lines are skipped (no throw). The DSL is
+ * intended for AI-to-machine communication — if the AI produces
+ * invalid syntax, we silently ignore bad lines.
+ *
+ * Thin wrapper over {@link parseDslWithDiagnostics}: returns only the ops
+ * (the diagnostics are irrelevant for the AI path). Behavior is unchanged.
+ */
+export function parseDsl(dslText: string): DslOp[] {
+  return parseDslWithDiagnostics(dslText).ops
 }
