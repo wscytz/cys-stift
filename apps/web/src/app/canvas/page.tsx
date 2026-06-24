@@ -16,7 +16,7 @@ import { FreedrawPanel } from '@/features/canvas/freedraw-panel'
 import { Minimap } from '@/features/canvas/minimap-component'
 import { autoRelate } from '@/features/canvas/auto-relate'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
-import { parseDsl } from '@/features/ai/dsl-parser'
+import { parseDsl, parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
 import { streamText } from '@/features/ai/stream-text'
 import {
   buildClusterUserPrompt,
@@ -46,6 +46,7 @@ export default function CanvasPage() {
   const { snap, service, ready } = useDb()
   void snap
   const handle = useRef<SelfCanvasHandle>({ adapter: null })
+  const adapterReady = !!handle.current.adapter
   const canvasElRef = useRef<HTMLCanvasElement | null>(null)
   const [detail, setDetail] = useState<{ card: Card } | null>(null)
   const [snapMode, setSnapMode] = useState<'snap' | 'free'>('snap')
@@ -275,6 +276,60 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     return () => window.removeEventListener('keydown', onKey)
   }, [zoomBy, toggleSnap])
 
+  // 转义双向桥入口:画布页粘贴纯文本 DSL → 直接应用(不必打开 DSL 模态)。
+  // 与全局 FileDropHandler 并存:它只处理文件项,纯文本 early-return;本监听
+  // 只对 DSL 文本 preventDefault。input/textarea/contentEditable 时跳过。
+  useEffect(() => {
+    if (!adapterReady) return
+    const isEditable = (el: EventTarget | null): boolean => {
+      if (!(el instanceof HTMLElement)) return false
+      if (el.isContentEditable) return true
+      const tag = el.tagName
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+    }
+    const onPaste = (e: ClipboardEvent) => {
+      if (isEditable(e.target)) return
+      const items = e.clipboardData?.items
+      if (!items) return
+      let textItem: DataTransferItem | null = null
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i]
+        if (it && it.kind === 'string' && (it.type === 'text/plain' || it.type === 'text')) {
+          textItem = it
+          break
+        }
+      }
+      if (!textItem) return
+      // 同步 preventDefault(避免浏览器把文本塞进聚焦元素),再异步判断+应用。
+      e.preventDefault()
+      textItem.getAsString((raw) => {
+        const text = raw ?? ''
+        const looksLikeDsl = text.split('\n').some((ln) =>
+          /^\s*\[(card|arrow|rect|text|freedraw)\b/i.test(ln),
+        )
+        if (!looksLikeDsl) return
+        const { ops, errors } = parseDslWithDiagnostics(text)
+        if (ops.length === 0) {
+          pushToast({ kind: 'info', message: t('canvas.pasteDslNone') })
+          return
+        }
+        const adapter = handle.current.adapter
+        if (!adapter) return
+        const { applied, skipped } = applyLayout(adapter, ops)
+        if (applied === 0) {
+          pushToast({ kind: 'info', message: t('canvas.pasteDslNone') })
+        } else if (skipped > 0 || errors.length > 0) {
+          pushToast({ kind: 'info', message: t('canvas.pasteDslPartial', { applied: String(applied), skipped: String(skipped + errors.length) }) })
+        } else {
+          pushToast({ kind: 'success', message: t('canvas.pasteDslApplied', { n: String(applied) }) })
+        }
+      })
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adapterReady, t])
+
   const switchCanvas = (id: CanvasId) => {
     if (id === activeCanvasId) return
     setDetail(null)
@@ -312,7 +367,6 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
   const cardCountOnTarget = confirmDeleteId
     ? service.listOnCanvas(confirmDeleteId).filter((c) => !c.deletedAt).length
     : 0
-  const adapterReady = !!handle.current.adapter
   // Reflect the current card selection on the auto-relate button via the
   // host's onSelectionChange event (debt 收口 2026-06-23, 替原 300ms 轮询)。
   const [selectedCardCount, setSelectedCardCount] = useState(0)

@@ -179,6 +179,11 @@ export const messages = {
   'canvas.dslAllInvalid': { zh: '全部 {n} 行都无法识别,未应用任何改动', en: 'All {n} line(s) were invalid — nothing applied' },
   'canvas.dslPreviewOk': { zh: '{n} 条指令待应用', en: '{n} directive(s) ready to apply' },
   'canvas.dslPreviewIssues': { zh: '{ok} 条有效 · {bad} 条无效', en: '{ok} valid · {bad} invalid' },
+  'canvas.dslCopyAsPrompt': { zh: '复制为 AI 提示词', en: 'Copy as AI prompt' },
+  'canvas.dslPromptCopied': { zh: '已复制 AI 提示词——粘进任意 LLM 即可驱动画布', en: 'AI prompt copied — paste into any LLM to drive the canvas' },
+  'canvas.pasteDslApplied': { zh: '已应用 {n} 条 DSL 指令', en: 'Applied {n} DSL ops' },
+  'canvas.pasteDslPartial': { zh: '应用 {applied} 条,{skipped} 条跳过', en: 'Applied {applied}, skipped {skipped}' },
+  'canvas.pasteDslNone': { zh: '剪贴板文本不是有效的 DSL', en: 'Clipboard text is not valid DSL' },
 
   /* ── Canvas shortcuts help (R3.5) ── */
   'canvas.shortcuts': { zh: '快捷键', en: 'Shortcuts' },

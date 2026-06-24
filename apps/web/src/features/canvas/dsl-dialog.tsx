@@ -14,12 +14,13 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { Modal, Button } from '@cys-stift/ui'
-import type { CardId, CardService } from '@cys-stift/domain'
+import type { CardId, CanvasId, CardService } from '@cys-stift/domain'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
 import { pushToast } from '@/lib/toast-store'
 import { serializeCanvasReadable } from '../ai/canvas-dsl'
 import { parseDslWithDiagnostics, type DslDiagnostic } from '../ai/dsl-parser'
+import { buildCanvasPrompt } from '../ai/canvas-prompt'
 import { applyLayout } from './apply-layout'
 
 export function DslDialog({
@@ -110,6 +111,20 @@ export function DslDialog({
     }
   }
 
+  // 「复制为 AI 提示词」:把当前画布打包成可直接粘进任意 LLM 网页版的提示词
+  // (画布快照 + DSL 语法 + 指令)。转义双向桥的出口——不依赖内置 AI。
+  const copyAsPrompt = async () => {
+    if (!host) return
+    try {
+      // canvasId 不进 snapshotCanvas(host 自带元素),传占位即可。
+      const prompt = buildCanvasPrompt(host, service, '' as unknown as CanvasId)
+      await navigator.clipboard.writeText(prompt)
+      pushToast({ kind: 'success', message: t('canvas.dslPromptCopied') })
+    } catch {
+      pushToast({ kind: 'error', message: t('canvas.dslCopyFail') })
+    }
+  }
+
   const download = () => {
     const baseName = canvasName || 'canvas'
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
@@ -170,6 +185,7 @@ export function DslDialog({
       )}
       <div className="dsl-actions">
         <Button variant="ghost" onClick={copy}>{t('canvas.dslCopy')}</Button>
+        <Button variant="ghost" onClick={copyAsPrompt}>{t('canvas.dslCopyAsPrompt')}</Button>
         <Button variant="ghost" onClick={download}>{t('canvas.dslDownload')}</Button>
         <span className="dsl-spacer" />
         <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
