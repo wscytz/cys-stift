@@ -267,6 +267,7 @@ export const messages = {
   'storage.category.media': { zh: '媒体', en: 'Media' },
   'storage.category.canvas': { zh: '画布快照', en: 'Canvas snapshots' },
   'storage.category.other': { zh: '其他', en: 'Other' },
+  'storage.quotaExceeded': { zh: '存储已满,无法保存——请导出备份后删除部分卡片/媒体', en: 'Storage full — could not save. Export a backup then delete some cards/media' },
 
   /* ── Search ── */
   'search.crumb': { zh: '搜索', en: 'search' },

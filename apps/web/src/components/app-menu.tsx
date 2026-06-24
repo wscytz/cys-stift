@@ -1,10 +1,13 @@
 'use client'
 
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { CAPTURE_OPEN_EVENT } from '@/features/capture/capture-host'
 import { useI18n } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n/messages'
+import { onQuotaExceeded } from '@/lib/db-client'
+import { pushToast } from '@/lib/toast-store'
 
 /**
  * AppMenu — global top menu bar (v0.22.3-i18n-restore).
@@ -14,6 +17,14 @@ import type { MessageKey } from '@/lib/i18n/messages'
 export function AppMenu() {
   const pathname = usePathname() ?? '/'
   const { t } = useI18n()
+
+  // 审计 H1:db-client 是非 React 模块,无法直接 pushToast。AppMenu 全局挂载
+  // 且是 'use client',这里订阅一次配额写入失败事件并提示用户(防静默丢卡片)。
+  useEffect(() => {
+    return onQuotaExceeded(() => {
+      pushToast({ kind: 'error', message: t('storage.quotaExceeded') })
+    })
+  }, [t])
 
   const onCaptureClick = () => {
     window.dispatchEvent(new CustomEvent(CAPTURE_OPEN_EVENT))

@@ -34,9 +34,25 @@ function loadSnapshot(): Snapshot {
   }
 }
 
-function saveSnapshot(snap: Snapshot) {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snap))
+/**
+ * 写快照到 localStorage。返回 true=成功,false=配额满(QuotaExceeded)
+ * 或其他写入异常——吞错而非抛,让调用方(insert/update/delete)决定回滚。
+ *
+ * 为什么吞:配额满是用户可感知的运行时状态(存储计量会警告),不该让一次
+ * setItem 抛错炸掉整个卡片操作链路。调用方拿到 false 后回滚内存数组,
+ * 保证「内存 = localStorage」一致性,避免「用户看到卡但 reload 丢」的
+ * 静默数据丢失(审计 H1)。
+ */
+function saveSnapshot(snap: Snapshot): boolean {
+  if (typeof window === 'undefined') return true
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snap))
+    return true
+  } catch (e) {
+    // QuotaExceededError 或 SecurityError(隐私模式)——吞,返回 false。
+    console.warn('[db-client] persist failed (quota?)', e)
+    return false
+  }
 }
 
 // ── In-memory + localStorage-backed CardRepository ──────────────────────────
@@ -49,9 +65,29 @@ function notify() {
   for (const sub of _subscribers) sub()
 }
 
-function persist() {
-  saveSnapshot({ cards: _cards })
+// ── Quota 失败回调(审计 H1)─────────────────────────────────────────────────
+// db-client 是非 React 模块(无 hook 上下文),不能直接 pushToast/i18n。
+// 暴露订阅点:React 层(如 AppMenu,全局挂载的 'use client' 组件)订阅一次,
+// 收到配额失败时展示 toast。
+type QuotaCallback = () => void
+const _quotaSubscribers = new Set<QuotaCallback>()
+
+function notifyQuota(): void {
+  for (const cb of _quotaSubscribers) cb()
+}
+
+/** 订阅配额写入失败事件(卡片操作无法持久化时触发)。返回取消订阅。 */
+export function onQuotaExceeded(cb: QuotaCallback): () => void {
+  _quotaSubscribers.add(cb)
+  return () => {
+    _quotaSubscribers.delete(cb)
+  }
+}
+
+function persist(): boolean {
+  const ok = saveSnapshot({ cards: _cards })
   notify()
+  return ok
 }
 
 // B1 (v0.26.4): cross-tab sync. localStorage 'storage' events fire in OTHER
@@ -104,16 +140,28 @@ function hydrateOnce() {
 
 const cardRepo = {
   insert(card: Card) {
+    const prev = _cards
     _cards = [..._cards, card]
-    persist()
+    if (!persist()) {
+      _cards = prev // 回滚:内存与 localStorage 一致,不留孤儿
+      notifyQuota()
+    }
   },
   update(card: Card) {
+    const prev = _cards
     _cards = _cards.map((c) => (c.id === card.id ? card : c))
-    persist()
+    if (!persist()) {
+      _cards = prev
+      notifyQuota()
+    }
   },
   delete(id: CardId) {
+    const prev = _cards
     _cards = _cards.filter((c) => c.id !== id)
-    persist()
+    if (!persist()) {
+      _cards = prev
+      notifyQuota()
+    }
   },
   getById(id: CardId) {
     return _cards.find((c) => c.id === id) ?? null
@@ -178,4 +226,10 @@ export function resetDb() {
     window.localStorage.removeItem(STORAGE_KEY)
   }
   notify()
+}
+
+// ── 测试导出(仅 __tests__ 用;非公开 API)──────────────────────────────────
+export const __test__ = {
+  saveSnapshot,
+  cardRepo,
 }

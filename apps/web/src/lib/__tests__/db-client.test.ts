@@ -300,3 +300,49 @@ describe('db-client — SSR safety', () => {
     }
   })
 })
+
+// ── QuotaExceeded 防护(审计 H1)────────────────────────────────────────────
+// saveSnapshot 必须吞 QuotaExceededError 并返回 false,而非抛错导致调用方
+// 崩溃。卡片 insert/update/delete 据此决定是否回滚内存 + 提示用户。
+describe('saveSnapshot QuotaExceeded 防护', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('saveSnapshot 在 QuotaExceeded 时返回 false 而非抛错', async () => {
+    // 触发配额错误:mock setItem 抛 DOMException(QuotaExceededError)
+    const quotaErr = new DOMException('quota exceeded', 'QuotaExceededError')
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw quotaErr
+    })
+    const { __test__ } = await import('../db-client')
+    const ok = __test__.saveSnapshot({ cards: [] })
+    expect(ok).toBe(false)
+  })
+
+  it('saveSnapshot 成功时返回 true', async () => {
+    const { __test__ } = await import('../db-client')
+    const ok = __test__.saveSnapshot({ cards: [] })
+    expect(ok).toBe(true)
+  })
+
+  it('insert 在配额满时回滚内存数组(不残留未持久化的卡)', async () => {
+    const { __test__, rehydrateCards } = await import('../db-client')
+    const { cardRepo } = __test__
+    // 先正常插一张基线卡
+    const base = makeCard({ id: toCardId('base-1') })
+    cardRepo.insert(base)
+    rehydrateCards()
+    // 现在 mock 配额失败,再插一张 —— 应回滚,内存里只剩 base
+    const quotaErr = new DOMException('quota exceeded', 'QuotaExceededError')
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw quotaErr
+    })
+    const doomed = makeCard({ id: toCardId('doomed-1') })
+    expect(() => cardRepo.insert(doomed)).not.toThrow()
+    rehydrateCards()
+    const all = cardRepo.listAll()
+    expect(all.map((c) => c.id)).toEqual(['base-1'])
+  })
+})
