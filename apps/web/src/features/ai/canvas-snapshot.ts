@@ -17,7 +17,8 @@
  *   (soft-deleted cards aren't on the host; deviceId isn't geometry).
  */
 import type { CanvasId, CardId, CardService } from '@cys-stift/domain'
-import type { CanvasHost } from '@cys-stift/canvas-engine'
+import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
+import { serializeElement } from './canvas-dsl'
 
 // ── Shape interfaces ─────────────────────────────────────────────────────────
 
@@ -43,9 +44,9 @@ export interface SnapshotArrow {
 }
 
 export type FreeShape =
-  | { kind: 'rect'; x: number; y: number; w: number; h: number }
-  | { kind: 'text'; x: number; y: number; text: string }
-  | { kind: 'freedraw'; x: number; y: number }
+  | { kind: 'rect'; id: string; x: number; y: number; w: number; h: number; color?: string }
+  | { kind: 'text'; id: string; x: number; y: number; w: number; h: number; text: string; color?: string }
+  | { kind: 'freedraw'; id: string; x: number; y: number }
 
 export interface CanvasSnapshotOutput {
   cards: SnapshotCard[]
@@ -102,14 +103,14 @@ export function snapshotCanvas(
         })
         break
       case 'rect':
-        freeShapes.push({ kind: 'rect', x, y, w: Math.round(el.w), h: Math.round(el.h) })
+        freeShapes.push({ kind: 'rect', id: el.id, x, y, w: Math.round(el.w), h: Math.round(el.h), color: el.color })
         break
       case 'text':
-        freeShapes.push({ kind: 'text', x, y, text: el.text ?? '' })
+        freeShapes.push({ kind: 'text', id: el.id, x, y, w: Math.round(el.w), h: Math.round(el.h), text: el.text ?? '', color: el.color })
         break
       case 'freedraw':
         // Position only — NEVER the point sequence (R2 + privacy).
-        freeShapes.push({ kind: 'freedraw', x, y })
+        freeShapes.push({ kind: 'freedraw', id: el.id, x, y })
         break
       default:
         // line/image (legacy) — not surfaced to the AI.
@@ -133,36 +134,34 @@ export function formatCanvasSnapshot(snapshot: CanvasSnapshotOutput): string {
   )
 
   for (const c of snapshot.cards) {
-    const colorHint = c.color ? `, color ${c.color}` : ''
-    parts.push(
-      `[card #${c.id}] @pos(${c.x}, ${c.y}) @size(${c.w}x${c.h})${colorHint}`,
-    )
+    // 重建 CanvasElement 调 serializeElement(唯一文法源:AI 看到的 = parser 能读回的)。
+    // header 行 + card `  title: ...` 行被 parser 逐行静默跳过,不影响 round-trip。
+    const el: CanvasElement = {
+      id: c.id, kind: 'card', x: c.x, y: c.y, w: c.w, h: c.h, rotation: 0, color: c.color,
+    }
+    parts.push(serializeElement(el))
     parts.push(`  title: ${c.title || '(untitled)'}`)
   }
 
   for (const a of snapshot.arrows) {
-    // 输出完整关系签名(颜色 + 线型 + 箭头形),让 AI 看到现状并能改。
-    const seg: string[] = [`[arrow #${a.id}] from #${a.from} to #${a.to}`]
-    if (a.label) seg.push(`@label("${a.label}")`)
-    if (a.color) seg.push(`@color(${a.color})`)
-    if (a.dash) seg.push(`@dash(${a.dash})`)
-    if (a.arrowhead) seg.push(`@arrowhead(${a.arrowhead})`)
-    parts.push(seg.join(' '))
+    // 关系箭头几何由 from/to 算;x/y/w/h=0(serializeElement 的 arrow 分支对有 from/to
+    // 的输出 `from #a to #b`,不输出 size)。from/to 空串时走自由箭头分支,行为一致。
+    const el: CanvasElement = {
+      id: a.id, kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0,
+      from: a.from, to: a.to, text: a.label, color: a.color, dash: a.dash, arrowhead: a.arrowhead,
+    }
+    parts.push(serializeElement(el))
   }
 
   for (const fs of snapshot.freeShapes) {
-    switch (fs.kind) {
-      case 'rect':
-        parts.push(`[rect] @pos(${fs.x}, ${fs.y}) @size(${fs.w}x${fs.h})`)
-        break
-      case 'text':
-        parts.push(`[text] @pos(${fs.x}, ${fs.y}) @text("${fs.text.slice(0, 200)}")`)
-        break
-      case 'freedraw':
-        // Position only — no points.
-        parts.push(`[freedraw] @pos(${fs.x}, ${fs.y})`)
-        break
-    }
+    // 重建 CanvasElement 调 serializeElement(唯一文法源,保证 AI 看到的 = parser 能读回的)。
+    const el: CanvasElement =
+      fs.kind === 'rect'
+        ? { id: fs.id, kind: 'rect', x: fs.x, y: fs.y, w: fs.w, h: fs.h, rotation: 0, color: fs.color }
+        : fs.kind === 'text'
+          ? { id: fs.id, kind: 'text', x: fs.x, y: fs.y, w: fs.w, h: fs.h, rotation: 0, text: fs.text, color: fs.color }
+          : { id: fs.id, kind: 'freedraw', x: fs.x, y: fs.y, w: 0, h: 0, rotation: 0 }
+    parts.push(serializeElement(el))
   }
 
   return parts.join('\n')
