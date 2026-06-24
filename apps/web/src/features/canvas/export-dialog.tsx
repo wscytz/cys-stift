@@ -16,7 +16,7 @@
  * metadata channel we use). The black info card explains this so users know
  * to drop the file back onto the app to restore.
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Modal, Button } from '@cys-stift/ui'
 import type { CanvasId, CardService } from '@cys-stift/domain'
 import { useI18n } from '@/lib/i18n'
@@ -57,6 +57,16 @@ export function ExportDialog({
   const [scale, setScale] = useState(2)
   const [border, setBorder] = useState(16)
   const [opaque, setOpaque] = useState(true)
+
+  // Escape 关闭模态(与 CardDetailModal 一致;Modal 只处理 backdrop 点击)。
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
   const [busy, setBusy] = useState(false)
 
   // Reactive selection count — disable the "selection" scope when empty.

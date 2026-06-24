@@ -156,7 +156,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
   return (
     <form className="ccf" onSubmit={handleSubmit} aria-labelledby={`${formId}-h`}>
       <h2 id={`${formId}-h`} className="ccf__h">
-        New card
+        {t('inbox.create.heading')}
       </h2>
 
       <Input
@@ -181,7 +181,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
         />
       </label>
 
-      <div className="ccf__sections" role="group" aria-label="Add media">
+      <div className="ccf__sections" role="group" aria-label={t('inbox.create.mediaAria')}>
         <button
           type="button"
           className="ccf__toggle"
@@ -190,7 +190,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
             setOpenSection((s) => (s === 'links' ? null : 'links'))
           }
         >
-          + Link {links.length > 0 && <Tag color="red">{links.length}</Tag>}
+          {t('inbox.create.addLink')} {links.length > 0 && <Tag color="red">{links.length}</Tag>}
         </button>
         <button
           type="button"
@@ -200,7 +200,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
             setOpenSection((s) => (s === 'code' ? null : 'code'))
           }
         >
-          + Code {codes.length > 0 && <Tag color="yellow">{codes.length}</Tag>}
+          {t('inbox.create.addCode')} {codes.length > 0 && <Tag color="yellow">{codes.length}</Tag>}
         </button>
         <button
           type="button"
@@ -210,7 +210,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
             setOpenSection((s) => (s === 'quotes' ? null : 'quotes'))
           }
         >
-          + Quote {quotes.length > 0 && <Tag color="blue">{quotes.length}</Tag>}
+          {t('inbox.create.addQuote')} {quotes.length > 0 && <Tag color="blue">{quotes.length}</Tag>}
         </button>
       </div>
 
@@ -219,7 +219,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
           items={links}
           onChange={setLinksAndPersist}
           make={() => ({ url: '' })}
-          label="URL"
+          label={t('inbox.create.urlLabel')}
           placeholder="https://…"
           fieldKey="url"
         />
@@ -237,7 +237,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
         </Button>
         <span className="ccf__actions-spacer" />
         <Button type="button" variant="ghost" onClick={reset}>
-          Clear
+          {t('inbox.create.clear')}
         </Button>
       </div>
       {persistFailed && (

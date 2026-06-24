@@ -267,7 +267,7 @@ export function CardDetailModal({
               </div>
               <MarkdownBody source={card.body} />
               {card.media.length > 0 && (
-                <Section label="Media">
+                <Section label={t('card.detail.media')}>
                   <ul className="cd__media-list">
                     {card.media.map((m, i) => {
                       const asset = mediaStore.getAsset(m.assetId)
@@ -367,7 +367,7 @@ export function CardDetailModal({
             <>
               <Input
                 name="edit-title"
-                label="Title"
+                label={t('card.detail.fieldTitle')}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 maxLength={200}
@@ -382,7 +382,7 @@ export function CardDetailModal({
                 />
               </label>
               <div className="cd__field">
-                <span className="cd__label">Media (images / files)</span>
+                <span className="cd__label">{t('card.detail.mediaFiles')}</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -419,7 +419,7 @@ export function CardDetailModal({
                                 prev.filter((x) => x.assetId !== m.assetId),
                               )
                             }}
-                            aria-label="Remove media"
+                            aria-label={t('card.detail.removeMediaAria')}
                           >
                             ×
                           </button>
@@ -433,7 +433,7 @@ export function CardDetailModal({
                 items={links}
                 onChange={setLinks}
                 make={() => ({ url: '' })}
-                label="Link"
+                label={t('card.detail.linkLabel')}
                 placeholder="https://…"
                 fieldKey="url"
               />
@@ -534,8 +534,8 @@ export function CardDetailModal({
                       disabled={aiAction === 'translate'}
                       aria-label={t('card.translate')}
                     >
-                      <option value="en">→ EN</option>
-                      <option value="zh">→ ZH</option>
+                      <option value="en">{t('card.detail.translateToEn')}</option>
+                      <option value="zh">{t('card.detail.translateToZh')}</option>
                     </select>
                     <Button
                       variant="secondary"

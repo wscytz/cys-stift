@@ -46,6 +46,17 @@ export function DslDialog({
     return { opCount: ops.length, errCount: parseErrors.length }
   }, [text])
 
+  // Escape 关闭模态(与 CardDetailModal 一致;Modal 组件只处理 backdrop 点击,
+  // Escape 由调用方负责)。textarea 里 Escape 仍关模态——DSL 编辑器的「完成」手势。
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
   // 打开时填充当前画布文本(serializeCanvasReadable,card 附 title 注释)。
   // 同时清空诊断列表:刚序列化的文本恒为合法,无 parse 错误。
   useEffect(() => {

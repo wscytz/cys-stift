@@ -1,6 +1,7 @@
 'use client'
 
 import type { CodeBlock, LinkPreview, Quote } from '@cys-stift/domain'
+import { useI18n } from '@/lib/i18n'
 
 // ── Editor row shapes (in-progress drafts; typed payloads are built at save) ──
 
@@ -35,6 +36,7 @@ export function ListEditor<T extends Record<string, string>>({
   placeholder,
   fieldKey,
 }: ListEditorProps<T>) {
+  const { t } = useI18n()
   return (
     <div className="le">
       <ul className="le__list">
@@ -53,7 +55,7 @@ export function ListEditor<T extends Record<string, string>>({
             <button
               type="button"
               className="le__remove"
-              aria-label={`Remove ${label} ${i + 1}`}
+              aria-label={t('editor.removeAria', { label, n: i + 1 })}
               onClick={() => onChange(items.filter((_, j) => j !== i))}
             >
               ×
@@ -66,7 +68,7 @@ export function ListEditor<T extends Record<string, string>>({
         className="le__add"
         onClick={() => onChange([...items, make()])}
       >
-        + Add {label.toLowerCase()}
+        {t('editor.add', { label: label.toLowerCase() })}
       </button>
     </div>
   )
@@ -81,6 +83,7 @@ export function CodeEditor({
   items: DraftCode[]
   onChange: (next: DraftCode[]) => void
 }) {
+  const { t } = useI18n()
   return (
     <div className="le">
       <ul className="le__list">
@@ -90,7 +93,7 @@ export function CodeEditor({
               <input
                 className="le__lang"
                 value={item.language}
-                placeholder="language (e.g. ts)"
+                placeholder={t('editor.codeLangPlaceholder')}
                 onChange={(e) => {
                   const next = items.slice()
                   const prev = next[i] as DraftCode
@@ -110,7 +113,7 @@ export function CodeEditor({
             <textarea
               className="le__code-area"
               value={item.code}
-              placeholder="code…"
+              placeholder={t('editor.codePlaceholder')}
               rows={3}
               onChange={(e) => {
                 const next = items.slice()
@@ -127,7 +130,7 @@ export function CodeEditor({
         className="le__add"
         onClick={() => onChange([...items, { language: '', code: '' }])}
       >
-        + Add code block
+        {t('editor.addCode')}
       </button>
     </div>
   )
@@ -142,6 +145,7 @@ export function QuoteEditor({
   items: DraftQuote[]
   onChange: (next: DraftQuote[]) => void
 }) {
+  const { t } = useI18n()
   return (
     <div className="le">
       <ul className="le__list">
@@ -150,7 +154,7 @@ export function QuoteEditor({
             <textarea
               className="le__quote-text"
               value={item.text}
-              placeholder="quote text…"
+              placeholder={t('editor.quotePlaceholder')}
               rows={2}
               onChange={(e) => {
                 const next = items.slice()
@@ -162,7 +166,7 @@ export function QuoteEditor({
             <input
               className="le__input"
               value={item.attribution}
-              placeholder="attribution (author / source)"
+              placeholder={t('editor.attributionPlaceholder')}
               onChange={(e) => {
                 const next = items.slice()
                 const prev = next[i] as DraftQuote
@@ -186,7 +190,7 @@ export function QuoteEditor({
         className="le__add"
         onClick={() => onChange([...items, { text: '', attribution: '' }])}
       >
-        + Add quote
+        {t('editor.addQuote')}
       </button>
     </div>
   )

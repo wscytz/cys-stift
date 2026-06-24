@@ -36,6 +36,16 @@ export const messages = {
   'home.feature.archive.title': { zh: 'Archive', en: 'Archive' },
   'home.feature.archive.desc': { zh: '归档即分类。网格或时间轴查看，多选删除，回收站可恢复。', en: 'Archive as taxonomy. Grid or timeline, batch actions, recoverable.' },
 
+  /* ── Editor row labels (shared ListEditor / CodeEditor / QuoteEditor) ── */
+  'editor.add': { zh: '+ 添加{label}', en: '+ Add {label}' },
+  'editor.addCode': { zh: '+ 添加代码块', en: '+ Add code block' },
+  'editor.addQuote': { zh: '+ 添加引用', en: '+ Add quote' },
+  'editor.codeLangPlaceholder': { zh: '语言(如 ts)', en: 'language (e.g. ts)' },
+  'editor.codePlaceholder': { zh: '代码…', en: 'code…' },
+  'editor.quotePlaceholder': { zh: '引用文字…', en: 'quote text…' },
+  'editor.attributionPlaceholder': { zh: '出处(作者 / 来源)', en: 'attribution (author / source)' },
+  'editor.removeAria': { zh: '移除{label} {n}', en: 'Remove {label} {n}' },
+
   /* ── Inbox ── */
   'inbox.crumb': { zh: '收件箱', en: 'inbox' },
   'inbox.tab.inbox': { zh: '活跃', en: 'Active' },
@@ -47,6 +57,13 @@ export const messages = {
   'inbox.create.placeholder': { zh: '灵感标题…', en: 'Idea title…' },
   'inbox.create.bodyPlaceholder': { zh: 'Markdown 笔记（可选）', en: 'Markdown body (optional)' },
   'inbox.create.submit': { zh: '加入收件箱', en: 'Add to inbox' },
+  'inbox.create.heading': { zh: '新卡片', en: 'New card' },
+  'inbox.create.clear': { zh: '清空', en: 'Clear' },
+  'inbox.create.mediaAria': { zh: '添加媒体', en: 'Add media' },
+  'inbox.create.addLink': { zh: '+ 链接', en: '+ Link' },
+  'inbox.create.addCode': { zh: '+ 代码', en: '+ Code' },
+  'inbox.create.addQuote': { zh: '+ 引用', en: '+ Quote' },
+  'inbox.create.urlLabel': { zh: 'URL', en: 'URL' },
 
   /* ── Card detail ── */
   'card.detail.title': { zh: '编辑卡片', en: 'Edit card' },
@@ -71,6 +88,12 @@ export const messages = {
   'card.detail.deleteConfirmTitle': { zh: '软删除这张卡片？', en: 'Soft-delete this card?' },
   'card.detail.deleteConfirmBody': { zh: '卡片将从画布上隐藏并标记为已删除。记录保留在存储中，你可以稍后从数据库恢复。', en: 'The card will be hidden and marked as deleted. The record stays in storage so you can recover it later.' },
   'card.detail.editHint': { zh: '这里有意不暴露链接/代码/引用的编辑（Phase 4 MVP），详情视图会显示已持久化的内容。', en: 'Editing links / code / quotes is intentionally not exposed here (Phase 4 MVP). The detail view shows persisted media.' },
+  'card.detail.media': { zh: '媒体', en: 'Media' },
+  'card.detail.mediaFiles': { zh: '媒体(图片 / 文件)', en: 'Media (images / files)' },
+  'card.detail.removeMediaAria': { zh: '移除媒体', en: 'Remove media' },
+  'card.detail.linkLabel': { zh: '链接', en: 'Link' },
+  'card.detail.translateToEn': { zh: '→ 英文', en: '→ English' },
+  'card.detail.translateToZh': { zh: '→ 中文', en: '→ Chinese' },
 
   /* ── Canvas ── */
   'canvas.crumb': { zh: '画布', en: 'canvas' },
