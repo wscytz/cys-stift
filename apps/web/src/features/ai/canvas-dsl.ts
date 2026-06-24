@@ -41,7 +41,7 @@ export function serializeCanvas(elements: CanvasElement[]): string {
     .join('\n')
 }
 
-function serializeElement(e: CanvasElement): string {
+export function serializeElement(e: CanvasElement): string {
   const pos = `@pos(${Math.round(e.x)},${Math.round(e.y)})`
   const color = e.color ? ` @color(${e.color})` : ''
   switch (e.kind) {
@@ -53,14 +53,20 @@ function serializeElement(e: CanvasElement): string {
       return (
         `[text #${e.id}] ${pos} @text("${escapeQuoted(e.text ?? '')}")` + color
       )
-    case 'arrow':
-      return (
-        `[arrow #${e.id}] from #${e.from ?? ''} to #${e.to ?? ''}` +
+    case 'arrow': {
+      // Shared relation signature (label/color/dash/arrowhead).
+      const sig =
         (e.text ? ` @label("${escapeQuoted(e.text)}")` : '') +
         color +
         (e.dash ? ` @dash(${e.dash})` : '') +
         (e.arrowhead ? ` @arrowhead(${e.arrowhead})` : '')
-      )
+      if (e.from && e.to) {
+        // Relation arrow: endpoint references.
+        return `[arrow #${e.id}] from #${e.from} to #${e.to}${sig}`
+      }
+      // Free arrow: bbox encodes the segment (w/h may be negative for direction).
+      return `[arrow #${e.id}] ${pos} @size(${Math.round(e.w)},${Math.round(e.h)})${sig}`
+    }
     case 'freedraw':
       // Position only — never the point sequence (R2 + privacy).
       return `[freedraw #${e.id}] ${pos}`

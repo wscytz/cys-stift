@@ -88,8 +88,8 @@ const LABEL_RE = /@label\("([^"]*)"\)/
 /** Text directive: `@text("...")` — escape-aware (serializeCanvas escapes quotes/backslashes). */
 const TEXT_RE = /@text\("((?:[^"\\]|\\.)*)"\)/
 
-/** Size directive: `@size\((\d+),\s*(\d+)\)` */
-const SIZE_RE = /@size\((\d+),\s*(\d+)\)/
+/** Size directive: `@size(w,h)` — supports negative values (free arrow direction encoding). */
+const SIZE_RE = /@size\((-?\d+),\s*(-?\d+)\)/
 
 /** Arrow relation signature — line style + terminal (semantics). */
 const DASH_RE = /@dash\((solid|dashed|dotted)\)/

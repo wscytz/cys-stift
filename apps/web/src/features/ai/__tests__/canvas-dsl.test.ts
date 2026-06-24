@@ -64,6 +64,54 @@ describe('serializeCanvas — active kinds', () => {
     expect(out).not.toContain('@arrowhead(')
   })
 
+  // ── free arrow (bbox-encoded, no from/to) — Step 2 SIZE_RE negative ──
+
+  it('serializes free arrow with bbox (no from/to)', () => {
+    const out = serializeCanvas([
+      { id: 'fa1', kind: 'arrow', x: 10, y: 20, w: 100, h: 50, rotation: 0, dash: 'solid', arrowhead: 'arrow' },
+    ])
+    expect(out).toContain('[arrow #fa1] @pos(10,20) @size(100,50)')
+    expect(out).not.toContain('from #')
+    expect(out).not.toContain('to #')
+  })
+
+  it('serializes free arrow with negative size (direction)', () => {
+    const out = serializeCanvas([
+      { id: 'fa2', kind: 'arrow', x: 10, y: 20, w: -80, h: 30, rotation: 0 },
+    ])
+    expect(out).toContain('@size(-80,30)')
+  })
+
+  it('serializes relation arrow unchanged', () => {
+    const out = serializeCanvas([
+      { id: 'ra1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2', text: 'ref' },
+    ])
+    expect(out).toContain('[arrow #ra1] from #c1 to #c2')
+    expect(out).not.toContain('@size(')
+  })
+
+  it('serializes free arrow signature (label/color/dash/arrowhead)', () => {
+    const out = serializeCanvas([
+      {
+        id: 'fa3',
+        kind: 'arrow',
+        x: 10,
+        y: 20,
+        w: 100,
+        h: 50,
+        rotation: 0,
+        text: 'note',
+        color: 'red',
+        dash: 'dashed',
+        arrowhead: 'triangle',
+      },
+    ])
+    expect(out).toContain('@label("note")')
+    expect(out).toContain('@color(red)')
+    expect(out).toContain('@dash(dashed)')
+    expect(out).toContain('@arrowhead(triangle)')
+  })
+
   // ── text color — DSL symmetry fix 3 ──
 
   it('emits text @color when present', () => {
