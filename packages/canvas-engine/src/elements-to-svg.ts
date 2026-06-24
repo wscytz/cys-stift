@@ -98,8 +98,13 @@ function elementToSvg(
       }
       return parts.join('')
     }
-    case 'rect':
-      return `<rect x="${x}" y="${y}" width="${el.w}" height="${el.h}" fill="none" stroke="${colorOf(el.color, tokenResolver)}"/>`
+    case 'rect': {
+      // 对齐实时渲染 self-built-render.ts:108-109:ctx.rect 支持负 w/h(从对角画);
+      // SVG <rect> 负宽高不渲染 → 归一化到左上角正宽高(导入 upsert 不经 MIN_SIZE
+      // clamp,可造出负 rect;与 hitTest/选中框/self-built-render 同源 normalizeBox)。
+      const b = normalizeBox(el)
+      return `<rect x="${b.x + dx}" y="${b.y + dy}" width="${b.w}" height="${b.h}" fill="none" stroke="${colorOf(el.color, tokenResolver)}"/>`
+    }
     case 'ellipse':
       return `<ellipse cx="${x + el.w / 2}" cy="${y + el.h / 2}" rx="${el.w / 2}" ry="${el.h / 2}" fill="none" stroke="${colorOf(el.color, tokenResolver)}"/>`
     case 'freedraw': {
@@ -108,8 +113,16 @@ function elementToSvg(
       const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]! + dx} ${p[1]! + dy}`).join(' ')
       return `<path d="${d}" fill="none" stroke="${colorOf(el.color, tokenResolver)}" stroke-width="2"/>`
     }
-    case 'text':
-      return `<text x="${x}" y="${y + 14}" fill="${colorOf(el.color, tokenResolver)}" font-family="${c.fontBody}" font-size="14">${esc(el.text ?? '')}</text>`
+    case 'text': {
+      // 对齐实时渲染 self-built-render.ts:170-177:split('\n') 逐行 fillText,
+      // textBaseline='top',行高 18px。SVG <text> 的 \n 不产生换行 → 逐行输出 <text>。
+      const lines = (el.text ?? '').split('\n')
+      // render line 171 早退:纯空文本(lines==[''])不画。
+      if (lines.length === 0 || (lines.length === 1 && lines[0] === '')) return ''
+      return lines.map((ln, i) =>
+        `<text x="${x}" y="${y + 14 + i * 18}" fill="${colorOf(el.color, tokenResolver)}" font-family="${c.fontBody}" font-size="14">${esc(ln)}</text>`,
+      ).join('')
+    }
     case 'arrow': {
       const { from, to } = arrowEndpoints(el, allElements)
       if (!from || !to) return ''

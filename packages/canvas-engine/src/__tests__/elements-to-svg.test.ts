@@ -177,3 +177,66 @@ describe('elementsToSvg — text 元素尊重 el.color(H2:导出不再恒黑)', 
     expect(fill).toBe(blueVal)      // 尊重 el.color = blue(与实时渲染同源)
   })
 })
+
+describe('elementsToSvg — text 多行 + rect 负 bbox(M1+M3:导出对齐实时渲染)', () => {
+  const view = { panX: 0, panY: 0, zoom: 1, gridMode: 'free' as const }
+
+  it('M1:多行 text 按 \\n split 成多个 <text>,行高 18(对齐 render fillText)', () => {
+    // 实时渲染 self-built-render.ts:170-177:text.split('\n') 逐行 fillText,
+    // textBaseline='top',行高 18px。SVG 单 <text> 的 \n 不换行 → 导出全挤一行。
+    // 修法:split 成多 <text>,每行 y = base + i*18(base = y+14 对齐首行 baseline)。
+    const el: CanvasElement = {
+      id: 't1', kind: 'text', x: 10, y: 10, w: 0, h: 0, rotation: 0,
+      text: 'line1\nline2\nline3',
+    }
+    const r = elementsToSvg(
+      [el], view, () => null,
+      { background: false, border: 0 }, domTokenResolver,
+    )
+    // border:0 → bbox {x:10,y:10,w:0,h:0} → dx=-10,dy=-10 → x=0,y=0
+    // → 首行 y=0+14=14,次行 32,三行 50。
+    const textTags = r.svg.match(/<text/g) ?? []
+    expect(textTags.length).toBe(3)
+    const ys = [...r.svg.matchAll(/<text[^>]*?\sy="(-?[\d.]+)"/g)].map((m) => Number(m[1]))
+    expect(ys).toHaveLength(3)
+    expect(ys[0]).toBe(14)
+    expect(ys[1]).toBe(32)
+    expect(ys[2]).toBe(50)
+  })
+
+  it('M1:纯空文本(text:"")早退,不输出 <text(对齐 render line 171 早退)', () => {
+    // render:lines.length===1 && lines[0]==='' → break,不画。
+    const el: CanvasElement = {
+      id: 't2', kind: 'text', x: 10, y: 10, w: 0, h: 0, rotation: 0,
+      text: '',
+    }
+    const r = elementsToSvg(
+      [el], view, () => null,
+      { background: false, border: 0 }, domTokenResolver,
+    )
+    expect(r.svg).not.toContain('<text')
+  })
+
+  it('M3:负 bbox rect 归一化后 width/height 为正(对齐 render ctx.rect 支持负值)', () => {
+    // 实时渲染 self-built-render.ts:108-109:ctx.rect(el.x,el.y,el.w,el.h),
+    // Canvas 2D 支持负值(从对角画);SVG <rect> 负宽高不渲染 → 导出空白。
+    // 导入 upsert 不经 MIN_SIZE clamp,可造出负 rect。修法:rect 分支用 normalizeBox。
+    // 原始 {x:200,y:200,w:-100,h:-80} 实际覆盖 (100,120)..(200,200)。
+    const el: CanvasElement = {
+      id: 'r1', kind: 'rect', x: 200, y: 200, w: -100, h: -80, rotation: 0,
+    }
+    const r = elementsToSvg(
+      [el], view, () => null,
+      { background: false, border: 0 }, domTokenResolver,
+    )
+    // 归一化后 w=100,h=80;border:0 → dx=-100,dy=-120 → rect x=0,y=0。
+    expect(r.svg).not.toContain('width="-100"')
+    expect(r.svg).not.toContain('height="-80"')
+    const w = Number(r.svg.match(/<rect[^>]*?\swidth="(-?[\d.]+)"/)?.[1])
+    const h = Number(r.svg.match(/<rect[^>]*?\sheight="(-?[\d.]+)"/)?.[1])
+    expect(Number.isFinite(w)).toBe(true)
+    expect(Number.isFinite(h)).toBe(true)
+    expect(w).toBe(100)
+    expect(h).toBe(80)
+  })
+})
