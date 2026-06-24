@@ -10,14 +10,17 @@
  * Design decisions:
  * - Card TITLES are included (AI needs content to group/cluster) — read from
  *   CardService, never from the host element (which carries geometry only).
- * - Hand-draw (freedraw) is included as **position only** — NEVER the point
- *   sequence (R2: hand-draw is vector; also keeps bulk point data out of the
- *   AI view). No vision models (permanent decision).
+ * - Hand-draw (freedraw) is included as **position + an R2-safe shape
+ *   descriptor** (discrete label like circle/arrow + scalar geometric ratios)
+ *   computed locally — NEVER the raw point sequence (R2: hand-draw is vector;
+ *   also keeps bulk point data out of the AI view). No vision models (permanent
+ *   decision).
  * - media binary / deviceId / soft-deleted cards are never in the snapshot
  *   (soft-deleted cards aren't on the host; deviceId isn't geometry).
  */
 import type { CanvasId, CardId, CardService } from '@cys-stift/domain'
 import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
+import { classifyFreedraw, recognizeShape, freedrawPoints } from '@cys-stift/canvas-engine'
 import { serializeElement } from './canvas-dsl'
 
 // ── Shape interfaces ─────────────────────────────────────────────────────────
@@ -52,7 +55,17 @@ export interface SnapshotArrow {
 export type FreeShape =
   | { kind: 'rect'; id: string; x: number; y: number; w: number; h: number; color?: string }
   | { kind: 'text'; id: string; x: number; y: number; w: number; h: number; text: string; color?: string }
-  | { kind: 'freedraw'; id: string; x: number; y: number }
+  | {
+      kind: 'freedraw'
+      id: string
+      x: number
+      y: number
+      /** R2-safe shape descriptor (discrete label + confidence, NEVER points). */
+      shape?: 'circle' | 'rect' | 'triangle' | 'check' | 'arrow' | 'unknown'
+      shapeConfidence?: number
+      /** Scalar geometric ratios — privacy-safe (not point data). */
+      features?: { straightness: number; closure: number; elongation: number; pointCount: number }
+    }
 
 export interface CanvasSnapshotOutput {
   cards: SnapshotCard[]
@@ -119,10 +132,32 @@ export function snapshotCanvas(
       case 'text':
         freeShapes.push({ kind: 'text', id: el.id, x, y, w: Math.round(el.w), h: Math.round(el.h), text: el.text ?? '', color: el.color })
         break
-      case 'freedraw':
-        // Position only — NEVER the point sequence (R2 + privacy).
-        freeShapes.push({ kind: 'freedraw', id: el.id, x, y })
+      case 'freedraw': {
+        // Position always + R2-safe shape descriptor (discrete label + scalar
+        // ratios; NEVER the point sequence). Recognition runs locally via the
+        // canvas-engine; any failure degrades to position-only (no throw).
+        const fs: Extract<FreeShape, { kind: 'freedraw' }> = { kind: 'freedraw', id: el.id, x, y }
+        try {
+          const pts = freedrawPoints(el)
+          if (pts && pts.length > 0) {
+            const classify = classifyFreedraw(pts)
+            if (classify.kind === 'arrow') {
+              fs.shape = 'arrow'
+              fs.shapeConfidence = classify.confidence
+            } else {
+              // decoration/unknown → narrow to a specific 2D shape via $1.
+              const rec = recognizeShape(pts.map(([px, py]) => ({ x: px, y: py })))
+              fs.shape = rec.shape
+              fs.shapeConfidence = rec.confidence
+            }
+            fs.features = classify.features
+          }
+        } catch {
+          // Recognition must never block the snapshot — fall back to position-only.
+        }
+        freeShapes.push(fs)
         break
+      }
       default:
         // line/image (legacy) — not surfaced to the AI.
         break
@@ -175,6 +210,13 @@ export function formatCanvasSnapshot(snapshot: CanvasSnapshotOutput): string {
           ? { id: fs.id, kind: 'text', x: fs.x, y: fs.y, w: fs.w, h: fs.h, rotation: 0, text: fs.text, color: fs.color }
           : { id: fs.id, kind: 'freedraw', x: fs.x, y: fs.y, w: 0, h: 0, rotation: 0 }
     parts.push(serializeElement(el))
+    // freedraw: append a R2-safe shape annotation line when recognized (mirrors
+    // the card `title:` pattern). The parser skips annotation lines (they don't
+    // start with `[kind `), so this stays round-trip-safe. NEVER point data.
+    if (fs.kind === 'freedraw' && fs.shape) {
+      const pct = Math.round((fs.shapeConfidence ?? 0) * 100)
+      parts.push(`  shape: ${fs.shape} (${pct}%)`)
+    }
   }
 
   return parts.join('\n')

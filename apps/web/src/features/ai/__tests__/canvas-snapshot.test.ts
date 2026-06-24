@@ -139,3 +139,90 @@ describe('canvas snapshot — privacy reverse-asserts (R2 + allowlist)', () => {
     // them from the host; this just confirms a missing title degrades safely.
   })
 })
+
+// ── freedraw shape descriptor (R2-safe: discrete label + scalar ratios, NEVER points) ──
+
+/** A clean circle point sequence (page coords) — recognizable by recognizeShape. */
+function circlePath(cx: number, cy: number, r: number, n = 48): [number, number][] {
+  const pts: [number, number][] = []
+  for (let i = 0; i <= n; i++) {
+    const a = (i / n) * Math.PI * 2
+    pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r])
+  }
+  return pts
+}
+
+describe('canvas snapshot — freedraw shape descriptor', () => {
+  it('a recognizable freedraw carries shape + shapeConfidence + features', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({
+      id: 'f1', kind: 'freedraw', x: 100, y: 100, w: 0, h: 0, rotation: 0,
+      meta: { points: circlePath(150, 150, 50) },
+    })
+    const snap = snapshotCanvas(host, stubService({}), CV)
+    const f = snap.freeShapes.find((s) => s.kind === 'freedraw')
+    expect(f).toBeDefined()
+    expect(f!.kind).toBe('freedraw')
+    if (f!.kind === 'freedraw') {
+      // circle is the expected recognized shape; confidence should be positive.
+      expect(['circle', 'rect', 'triangle', 'check', 'arrow', 'unknown']).toContain(f!.shape)
+      // For a clean circle, the descriptor should NOT stay unknown.
+      expect(f!.shape).not.toBe('unknown')
+      expect(f!.shapeConfidence).toBeGreaterThan(0)
+      // features are 4 scalar ratios (privacy-safe), present with all keys.
+      expect(f!.features).toBeDefined()
+      expect(Object.keys(f!.features!).sort()).toEqual(
+        ['closure', 'elongation', 'pointCount', 'straightness'],
+      )
+    }
+  })
+
+  it('a degenerate freedraw (1 point) does not throw and still captures position', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({
+      id: 'f1', kind: 'freedraw', x: 7, y: 8, w: 0, h: 0, rotation: 0,
+      meta: { points: [[5, 5]] },
+    })
+    // Must not throw.
+    const snap = snapshotCanvas(host, stubService({}), CV)
+    const f = snap.freeShapes.find((s) => s.kind === 'freedraw')
+    expect(f).toBeDefined()
+    expect(f!.x).toBe(7)
+    expect(f!.y).toBe(8)
+    // shape may be undefined or 'unknown' — but no crash either way.
+    if (f!.kind === 'freedraw') {
+      expect(['circle', 'rect', 'triangle', 'check', 'arrow', 'unknown', undefined]).toContain(
+        f!.shape,
+      )
+    }
+  })
+
+  it('R2 privacy: snapshot text NEVER contains interior point coordinates', () => {
+    const host = new InMemoryCanvasHost()
+    // Interior point 200,200 is deliberately distinct from the bbox pos and from
+    // any rounded boundary number — it must not survive into the AI text.
+    host.upsert({
+      id: 'f1', kind: 'freedraw', x: 100, y: 100, w: 0, h: 0, rotation: 0,
+      meta: { points: [[100, 100], [200, 200], [300, 100]] },
+    })
+    const text = formatCanvasSnapshot(snapshotCanvas(host, stubService({}), CV))
+    // Position still captured.
+    expect(text).toContain('[freedraw #f1]')
+    // The interior coordinate "200" must never appear — only the single @pos.
+    expect(text).not.toContain('200')
+    // No point-array serialization leaks through.
+    expect(text).not.toContain('points')
+  })
+
+  it('a recognized freedraw emits a `shape:` annotation line', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({
+      id: 'f1', kind: 'freedraw', x: 100, y: 100, w: 0, h: 0, rotation: 0,
+      meta: { points: circlePath(150, 150, 50) },
+    })
+    const text = formatCanvasSnapshot(snapshotCanvas(host, stubService({}), CV))
+    expect(text).toContain('[freedraw #f1] @pos(100,100)')
+    // The shape annotation line mirrors the card `title:` pattern.
+    expect(text).toMatch(/shape: \w+ \(\d+%\)/)
+  })
+})
