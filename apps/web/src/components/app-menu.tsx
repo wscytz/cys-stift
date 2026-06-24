@@ -7,6 +7,8 @@ import { CAPTURE_OPEN_EVENT } from '@/features/capture/capture-host'
 import { useI18n } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n/messages'
 import { onQuotaExceeded } from '@/lib/db-client'
+import { onQuotaExceeded as onMediaQuota } from '@/lib/media-store'
+import { onQuotaExceeded as onFreeformQuota } from '@/lib/canvas-freeform-store'
 import { pushToast } from '@/lib/toast-store'
 
 /**
@@ -18,12 +20,20 @@ export function AppMenu() {
   const pathname = usePathname() ?? '/'
   const { t } = useI18n()
 
-  // 审计 H1:db-client 是非 React 模块,无法直接 pushToast。AppMenu 全局挂载
-  // 且是 'use client',这里订阅一次配额写入失败事件并提示用户(防静默丢卡片)。
+  // 审计 H1 + R2.3/2.4:db-client / media-store / canvas-freeform-store 都是非
+  // React 模块,无法直接 pushToast。AppMenu 全局挂载且是 'use client',这里订阅
+  // 三个 store 的配额写入失败事件并提示用户(防静默丢卡片/媒体/画布几何)。
   useEffect(() => {
-    return onQuotaExceeded(() => {
-      pushToast({ kind: 'error', message: t('storage.quotaExceeded') })
-    })
+    const message = t('storage.quotaExceeded')
+    const toast = () => pushToast({ kind: 'error', message })
+    const unsubs = [
+      onQuotaExceeded(toast),
+      onMediaQuota(toast),
+      onFreeformQuota(toast),
+    ]
+    return () => {
+      unsubs.forEach((u) => u())
+    }
   }, [t])
 
   const onCaptureClick = () => {
