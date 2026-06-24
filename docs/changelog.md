@@ -5,6 +5,30 @@
 
 ---
 
+## 2026-06-24 · dsl-bidirectional-symmetry · DSL 双向对称补全(核心卖点"转义"修复)
+
+审计发现核心卖点"转义"(画布↔文字双向,任何 AI 廉价驱动画布编辑)的基石是裂的:**两套序列化器分裂**。`serializeCanvas` 自洽往返但只测试用;`formatCanvasSnapshot`(生产喂 AI)手写格式与 parser 对不上——size 叉号、free shape 无 `#id`、card color 语法不一致 → 真实链路 SN→P→A 在 rect/text 整行读不回。且 prompt 教的语法与喂 AI 看的现状又不一致。9 步 TDD(subagent 编排,各一 commit)修复。
+
+### 修复
+- **legacy 清理**(`5920f3b`):删 parser `[free:` 死代码分支 + apply ellipse/note/line create + snapshot ellipse/note 输出;DslFreeOp 收敛为 rect/text 判别联合,applyFreeOp 参数改用 DslFreeOp 类型对齐。引擎层 LegacyCanvasKind/SVG/渲染分支保留(读旧画布需要)。
+- **自由箭头完整 bbox 往返**(`b4625aa`/`67659ce`/`f262dea`):自由箭头(无 from/to,bbox 编码线段,w/h 可负表方向)此前 serialize 产空 `from # to #` → parser 丢弃整元素。serialize 区分关系/自由箭头(有 from/to→关系箭头;否则→`@pos+@size`+签名)+ SIZE_RE 支持负数;parse 无 from/to 走自由箭头 op(带 freeArrow/x/y/w/h);apply 自由箭头 create+update 路径(无需端点存在,负 size 保留)。
+- **rect/text update-by-id**(`a70ec65`):applyFreeOp 永远 `uid('free')` 丢 op.id → rect/text 无法 update,每次 apply 新建叠上去。加 update 路径(对齐 applyArrowOp:op.id 命中同 kind 元素→覆盖提供字段保留其余;kind 不匹配或 id 不存在→create)。text create 不再硬编码 100×40。
+- **统一 formatCanvasSnapshot**(`4157767`,核心):复用 `serializeElement`(唯一文法源)——对每个 snapshot 条目重建 CanvasElement 调 serializeElement,消除两套序列化器分裂。AI 看到的=serializeElement 输出=prompt 教的格式=parser 能读回的格式,三方一致。snapshotCanvas 补回 rect/text/freedraw 丢失的 id/color/w/h。
+- **grey/gray 归一化**(`13b9ac4`):inferRelationType 严格匹配 `grey`(注册表英式),AI 写 `gray`(美式)反推失败→RelationPanel 显示无类型。归一化 gray→grey。
+- **prompt 修正**(`cb61d0f`):对齐统一文法,说清 card update-only(内容来自 inbox)、rect/text 可 create/update、自由箭头 `@pos+@size`(w/h 可负表方向)、reuse `#id` update / omit create。
+- **端到端往返测试**(`9步末`):新增 `dsl-e2e-roundtrip.test.ts`——serialize→parse→apply→re-serialize 逐字节比对,证明真实链路对 5 个 active kind 双向无损(现有 roundtrip 只到 parse,绕过了丢 id bug)。+ 生产链路自由箭头 bbox 修补(SnapshotArrow 加 x/y/w/h,自由箭头生产链路也完整往返)。
+
+### 设计决策(用户定)
+- 自由箭头做**完整 bbox 往返**(非标不往返)——彻底派。
+- legacy 死代码**顺手清掉**(纯减法)。
+- card 保持 **update-only**(AI 不建孤儿卡片,内容来自 CardService domain)。
+- freedraw 保持**单向**(R2 隐私,点序列绝不外发 AI)。
+
+### 验证
+457 web 测试(34 文件)+ 280 引擎测试 + web build exit 0 + tsc 零新增。计划 `docs/plans/2026-06-24-dsl-bidirectional-symmetry.md`。
+
+---
+
 ## 2026-06-24 · canvas-engine-polish · 引擎鲁棒性第五轮(渲染/导出层一致性)
 
 交互矩阵探照灯扩到**导出维度**——实时渲染(`self-built-render.ts`)画对的、SVG 导出(`elements-to-svg.ts`)出错。根因:导出层是另一套独立 switch,没人保证与渲染 switch 对齐(同前几轮交互层缝同构,只是维度换到导出)。Explore subagent 系统扫描 + 主模型核对全文,修 2 高 2 中 1 低,各步 TDD 红→绿、独立 commit。
