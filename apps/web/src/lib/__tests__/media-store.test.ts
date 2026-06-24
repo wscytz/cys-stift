@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mediaStore, type MediaAssetData } from '../media-store'
+import { mediaStore, onQuotaExceeded, type MediaAssetData } from '../media-store'
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -87,5 +87,68 @@ describe('mediaStore.attach — crypto.subtle integration', () => {
     expect(asset?.checksum).toBe('deadbeef')
     expect(asset?.kind).toBe('file')
     expect(asset?.mimeType).toBe('text/plain')
+  })
+})
+
+describe('mediaStore.attach — quota failure', () => {
+  // jsdom ships setItem on Storage.prototype (not an own prop on the
+  // localStorage instance), so vi.spyOn(window.localStorage,'setItem')
+  // silently no-ops. Override the prototype method instead and restore it
+  // after each case.
+  function throwOnSetItem() {
+    const orig = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem')
+    Object.defineProperty(Storage.prototype, 'setItem', {
+      configurable: true,
+      value: () => {
+        throw new DOMException('quota', 'QuotaExceededError')
+      },
+    })
+    return () => {
+      if (orig) Object.defineProperty(Storage.prototype, 'setItem', orig)
+    }
+  }
+
+  it('throws and stores nothing when localStorage.setItem throws QuotaExceededError', async () => {
+    vi.stubGlobal('crypto', {
+      subtle: {
+        digest: (_algo: string, _buf: Uint8Array) =>
+          Promise.resolve(new Uint8Array([0xde, 0xad]).buffer as ArrayBuffer),
+      },
+      randomUUID: () => '00000000-0000-0000-0000-000000000000',
+      getRandomValues: (arr: Uint8Array) => arr,
+    })
+
+    const restoreSetItem = throwOnSetItem()
+
+    const file = new File(['x'], 'x.png', { type: 'image/png' })
+    await expect(mediaStore.attach(file)).rejects.toThrow()
+
+    expect(mediaStore.getAsset('ma-anything' as never)).toBeNull()
+    restoreSetItem()
+    vi.unstubAllGlobals()
+  })
+
+  it('notifies quota subscribers when attach fails on quota', async () => {
+    vi.stubGlobal('crypto', {
+      subtle: {
+        digest: (_algo: string, _buf: Uint8Array) =>
+          Promise.resolve(new Uint8Array([0xde, 0xad]).buffer as ArrayBuffer),
+      },
+      randomUUID: () => '00000000-0000-0000-0000-000000000000',
+      getRandomValues: (arr: Uint8Array) => arr,
+    })
+    const restoreSetItem = throwOnSetItem()
+
+    let fired = false
+    const unsub = onQuotaExceeded(() => { fired = true })
+
+    const file = new File(['x'], 'x.png', { type: 'image/png' })
+    await expect(mediaStore.attach(file)).rejects.toThrow()
+    await new Promise((r) => setTimeout(r, 20))
+
+    expect(fired).toBe(true)
+    unsub()
+    restoreSetItem()
+    vi.unstubAllGlobals()
   })
 })

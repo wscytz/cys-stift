@@ -13,6 +13,24 @@ import type { MediaAssetId, MediaRef } from '@cys-stift/domain'
 const STORAGE_KEY = 'cys-stift.media.v1'
 const SOFT_LIMIT_BYTES = 500 * 1024 // 500 KB recommended ceiling
 
+// ── Quota 失败回调(镜像 db-client 模式)──────────────────────────────────────
+// mediaStore 是非 React 模块(无 hook 上下文),不能直接 pushToast/i18n。
+// 暴露订阅点:React 层订阅一次,收到配额失败时展示 toast。
+type QuotaCallback = () => void
+const _quotaSubscribers = new Set<QuotaCallback>()
+
+function notifyQuota(): void {
+  for (const cb of _quotaSubscribers) cb()
+}
+
+/** 订阅媒体存储配额写入失败事件。返回取消订阅。 */
+export function onQuotaExceeded(cb: QuotaCallback): () => void {
+  _quotaSubscribers.add(cb)
+  return () => {
+    _quotaSubscribers.delete(cb)
+  }
+}
+
 export interface MediaAssetData {
   id: MediaAssetId
   kind: 'image' | 'file'
@@ -40,12 +58,18 @@ function loadAssets(): AssetMap {
   }
 }
 
-function saveAssets(map: AssetMap) {
-  if (typeof window === 'undefined') return
+function saveAssets(map: AssetMap): boolean {
+  if (typeof window === 'undefined') return true
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ assets: map }))
-  } catch {
-    // Quota exceeded — most likely. We've already warned at attach time.
+    return true
+  } catch (err) {
+    // QuotaExceededError / SecurityError — most likely. We've already warned
+    // at attach time for soft size; here the actual write failed. Surface it
+    // so attach() can reject instead of returning a dangling MediaRef.
+    console.warn('[mediaStore] saveAssets failed:', err)
+    notifyQuota()
+    return false
   }
 }
 
@@ -112,7 +136,10 @@ export const mediaStore = {
     return enqueueWrite(() => {
       const all = loadAssets()
       all[id] = asset
-      saveAssets(all)
+      const ok = saveAssets(all)
+      if (!ok) {
+        throw new Error('mediaStore.attach: storage quota exceeded')
+      }
       const ref: MediaRef = { assetId: id, order: 0 }
       return ref
     })
