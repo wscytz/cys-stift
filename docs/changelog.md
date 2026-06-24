@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-06-24 · dsl-productize · 转义产品化 · DSL 模态编辑器(核心卖点可见)
+
+转义(画布↔文字 DSL 双向)是 cy's Stift 的核心卖点,但此前只在 AI layout 按钮后跑——`handleAILayout` 把画布序列化喂 AI,AI 返回 DSL 静默 apply,用户全程看不到文本。核心卖点对用户完全不可感知。本轮让它从"架构能力"变成用户可摸到的一等公民功能。3 步 TDD(subagent 编排)。
+
+### 修复
+- **serializeCanvasReadable**(`7020f1c`):新增面向人的序列化变体——每元素一行(同 serializeCanvas),card 行后附 `  # title: <title>` 注释(parser 逐行 trim 后 `#` 不匹配 `[kind` 前缀 → 静默跳过,apply 无影响)。不动 serializeCanvas(保 e2e 逐字节往返断言)。title 换行压平防破坏单行。
+- **DslDialog 组件**(未push):工具栏加 DSL 按钮(不门控 aiEnabled,所有用户可用)→ 模态:textarea 显示当前画布文本,可编辑/粘贴,应用/复制/下载。复用 parseDsl + applyLayout + serializeCanvasReadable,零新逻辑;应用走 host.batch 单 undo 步,不关闭模态供继续编辑。照 export-dialog 结构(Modal+Button+内联 token 化 style+pushToast+i18n)。
+
+### 结果
+转义成为用户可感知的双向功能:用户能直接看到画布的文字形态、编辑它、应用回去;能复制/下载文本拿走。这是引擎几轮投资的回报点。card 保持 update-only(内容来自 CardService);freedraw 点序列不进 DSL(R2 隐私)。
+
+### 验证
+471 web 测试 + build exit 0 + tsc 零新增。
+
+---
+
 ## 2026-06-24 · json-export-canvas · JSON 全量备份补画布几何(数据可迁移信念4 闭合)
 
 审计发现 JSON 全量备份(`apps/web/src/lib/export-service.ts`)只读写 4 个 localStorage key(cards/media/drafts/settings),不含 canvas 列表和 freeform 几何 → 导入新设备画布全丢、卡片变孤儿。这是产品"数据可迁移"承诺(spec §1.2 信念4)的核心载体却裂的。2 步 TDD(subagent 编排)修复。

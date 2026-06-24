@@ -92,7 +92,7 @@ Next.js 15 静态导出 + React 19 + TS strict + 自研 Canvas 2D + Tauri v2 + S
 
 - JSON 全量备份不完整(不含画布几何)= 数据可迁移信念 4 裂的(spec P9)
 - Tauri 未签名分发(spec P8,需 Apple 证书)
-- 转义还没成为用户可感知的功能(只接在 AI layout 按钮后)
+- 转义已产品化:DSL 模态编辑器(`dsl-dialog.tsx`)——工具栏 DSL 按钮 → 模态看/编/应用/复制/下载画布文本,不门控 AI,所有用户可用(2026-06-24)
 
 ---
 
