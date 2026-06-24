@@ -80,6 +80,28 @@ describe('buildClusterUserPrompt', () => {
     expect(CLUSTER_SYSTEM_PROMPT.length).toBeGreaterThan(0)
     expect(CLUSTER_SYSTEM_PROMPT.toLowerCase()).toContain('json')
   })
+
+  // A 方向闭环:cluster prompt 接画布快照(含 freedraw shape 行)
+  it('includes the canvas snapshot (with freedraw shape) when provided', () => {
+    const cards = [fakeCard('1', '苹果'), fakeCard('2', '橘子')]
+    const snapshot = '[card #1] @pos(0,0)\n[freedraw #f1] @pos(50,50)\n  shape: circle (85%)'
+    const prompt = buildClusterUserPrompt(cards, snapshot)
+    expect(prompt).toContain('苹果')
+    expect(prompt).toContain('shape: circle')
+    expect(prompt).toContain('freedraw')
+  })
+
+  it('works without a snapshot (backward compat — single arg)', () => {
+    const prompt = buildClusterUserPrompt([fakeCard('1', 'x')])
+    expect(prompt).toContain('x')
+    expect(prompt).not.toContain('shape:')
+  })
+
+  it('still returns empty when cards are soft-deleted even with a snapshot', () => {
+    const c = fakeCard('1', 'X')
+    c.deletedAt = new Date()
+    expect(buildClusterUserPrompt([c], '[freedraw #f1] shape: circle (90%)')).toBe('')
+  })
 })
 
 // ── parseClusters ─────────────────────────────────────────────────────────────

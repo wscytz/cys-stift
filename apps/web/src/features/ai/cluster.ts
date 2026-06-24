@@ -47,19 +47,28 @@ const RELATED_TO = relationTypeById('related-to')!
 export const CLUSTER_SYSTEM_PROMPT =
   'You are a similarity analyzer for an inspiration canvas. Given a list of cards, group cards that are near-duplicates or clearly related in meaning. ' +
   'Output ONLY a JSON array (no markdown, no prose). Each element: {"ids":["id",...],"kind":"duplicate"|"related","reason":"<short, why they belong together>"}. ' +
-  'Rules: ids MUST come from the provided [card #id] list; only group 2+ cards that genuinely share a topic; "duplicate" = same idea repeated, "related" = different but connected; if nothing clusters, output [].'
+  'Rules: ids MUST come from the provided [card #id] list; only group 2+ cards that genuinely share a topic; "duplicate" = same idea repeated, "related" = different but connected; if nothing clusters, output []. ' +
+  'The canvas may also contain freeform (hand-drawn) shapes — shown as "[freedraw #id] @pos(...)" followed by a "shape: <circle|rect|triangle|check|arrow|unknown> (<conf>%)" line. You MAY use these shapes as a spatial hint when grouping (e.g. cards enclosed by a drawn circle may belong together), but ids in your output MUST still be card ids only.'
 
 /**
  * 构造 cluster 的用户提示。走 serializeCardsForAI(allowlist + 软删除过滤)。
  * cards 为空或全软删 → 返回 ''(调用方据此跳过,不发空请求)。
+ *
+ * canvasSnapshot(可选,来自 formatCanvasSnapshot)携带画布布局文本,含 freedraw
+ * 的 shape 描述行(A 方向闭环):让 AI 看到手绘形状作为空间分组提示。为空则只发卡片
+ * (向后兼容,旧调用 + 单测不受影响)。R2 安全:snapshot 只含离散 shape 标签 +
+ * 标量比例,绝不含 freedraw 点坐标(见 snapshotCanvas)。
  */
-export function buildClusterUserPrompt(cards: Card[]): string {
+export function buildClusterUserPrompt(cards: Card[], canvasSnapshot = ''): string {
   const formatted = serializeCardsForAI(cards)
   if (!formatted.trim()) return ''
+  const snapshotBlock = canvasSnapshot.trim()
+    ? `\nCanvas layout (cards + freeform shapes — use shapes only as a spatial hint, group by card ids):\n${canvasSnapshot.trim()}\n`
+    : ''
   return `Find duplicate and related cards. Group 2+ cards that share a topic into clusters. Use the exact [card #id] values.
 
 ${formatted}
-
+${snapshotBlock}
 Output JSON array only:`
 }
 

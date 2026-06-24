@@ -211,7 +211,10 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         return
       }
       const knownIds = new Set(cards.map((c) => String(c.id)))
-      const userPrompt = buildClusterUserPrompt(cards)
+      // A 方向闭环:把画布快照(含 freedraw shape 行)喂给 cluster,让 AI 看到手绘
+      // 形状作为空间分组提示。snapshotCanvas 守 R2(freedraw 只发 shape 标签不发点坐标)。
+      const canvasSnapshot = formatCanvasSnapshot(snapshotCanvas(adapter, service, activeCanvasId))
+      const userPrompt = buildClusterUserPrompt(cards, canvasSnapshot)
       if (!userPrompt) {
         pushToast({ kind: 'info', message: t('canvas.aiClusterTooFew') })
         return
