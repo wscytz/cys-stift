@@ -5,6 +5,28 @@
 
 ---
 
+## 2026-06-24 · canvas-engine-polish · 引擎鲁棒性第五轮(渲染/导出层一致性)
+
+交互矩阵探照灯扩到**导出维度**——实时渲染(`self-built-render.ts`)画对的、SVG 导出(`elements-to-svg.ts`)出错。根因:导出层是另一套独立 switch,没人保证与渲染 switch 对齐(同前几轮交互层缝同构,只是维度换到导出)。Explore subagent 系统扫描 + 主模型核对全文,修 2 高 2 中 1 低,各步 TDD 红→绿、独立 commit。
+
+### 修复
+- **H1 — SVG 导出 bbox 并集归一化负 bbox**(`42fd233`):自由箭头反向画 w/h<0,`unionBounds` 用 `x+w` 算 maxX 算反 → 并集尺寸为负 → 钳 1×1px,箭头导出崩/被裁(PNG 同路径)。实时渲染用 `arrowEndpoints`(支持负 bbox)、hitTest/选中框都 `normalizeBox`,唯独导出 bbox 并集漏。修 `boxes.map(normalizeBox)`,与渲染/交互层同源。
+- **H2 — SVG text 尊重 el.color**(`c7f0780`):text 分支 fill 硬写 `c.textCol`(恒 `--color-black`),实时渲染却用 `colorOf(el.color)`;rect/freedraw/arrow 导出都用了 `colorOf` 唯独 text 漏 → 彩色 text 实时画对、导出变黑。修 `fill=colorOf(el.color, tokenResolver)`。测试注入 stub `TokenResolver`(jsdom 无 CSS 变量,`domTokenResolver` 黑蓝同回退无法验红)。
+- **M1 — SVG text 多行**(`11c9f6c`):单个 `<text>` 的 `\n` 不换行,render 按 `split('\n')` 逐行行高 18。修逐行 `<text>`、y 递增 18、纯空文本早退(对齐 render line 171)。
+- **M3 — SVG rect 负 bbox**(`11c9f6c`):SVG 负宽高不渲染,Canvas 2D `ctx.rect` 支持负值(导入 upsert 不经 MIN_SIZE clamp 可造负 rect)。修 `normalizeBox` 后正宽高。
+- **L1 — freedraw 单点可见**(`23378df`):单点(纯点击造)只 `moveTo` 无 `lineTo` → `stroke` 画不出 = 不可见幽灵;SVG 同理 `d="M x y"` 空 path + `fill=none`。修 render `arc`+`fill`、SVG `<circle r=2>`,两视图半径/颜色同源(`colorOf`)。
+
+### 审后不修(归别处)
+- **M2 JSON 导出不含画布几何**:apps/web `export-service` scope,需先确认是否刻意只管 card → 单独议。
+- **M4 自由箭头 DSL 往返整元素丢失**:归 DSL 双向 P0 缺口(arrow 那条),归 DSL 轮次。
+- **L2/L3 SVG text 基线/body 换行精确对齐**:SVG 无 `measureText`,精确对齐成本高,接受差异。
+- **L4 borderPoint 负 bbox 端点**:仅导入可造,极边缘,YAGNI。
+
+### 验证
+280 引擎测试 + web build exit 0。计划 `docs/plans/2026-06-24-engine-interaction-hardening-5.md`。
+
+---
+
 ## 2026-06-23 · canvas-engine-polish · 引擎独立化 + P3/P4 衔接打磨 + AI cluster
 
 P2 引擎抽包后的衔接打磨 + 增值功能。
