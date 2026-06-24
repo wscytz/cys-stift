@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-06-24 · json-export-canvas · JSON 全量备份补画布几何(数据可迁移信念4 闭合)
+
+审计发现 JSON 全量备份(`apps/web/src/lib/export-service.ts`)只读写 4 个 localStorage key(cards/media/drafts/settings),不含 canvas 列表和 freeform 几何 → 导入新设备画布全丢、卡片变孤儿。这是产品"数据可迁移"承诺(spec §1.2 信念4)的核心载体却裂的。2 步 TDD(subagent 编排)修复。
+
+### 修复
+- **Step A — 导出侧**(`08fd11d`):`ExportPayload` 加 `canvases` + `freeform` 两可选字段(复用 `CanvasFreeformSnapshot`,与 .cystift 同源 `CanvasElement[]`,三路径在"画布几何"上统一);`buildExportPayload`/`downloadExport` 改 async——读 canvases(localStorage 同步取 .snapshot,不触发 store hydrate)+ 遍历 canvas 读 freeform(OPFS 异步)。SSR 早退空 payload。
+- **Step B — 导入侧**(`c9910e1`,闭环):`importFromJson` 改 async——写 canvases(纳入现有同步 snapshot+rollback 机制)+ freeform(OPFS 异步,在 localStorage 写成功后才写,best-effort 不纳入 rollback,覆盖语义);`ImportResult` 加 canvases/freeformCanvases 计数;向后兼容(旧 JSON 无这两字段→跳过)。
+
+### 结果
+JSON 全量备份 round-trip 闭环:导出含画布几何 → 导入新设备画布完整还原 + 卡片不孤儿(canvas 列表还原,card 的 canvasPosition.canvasId 对得上真实存在的 canvas)。
+
+### 验证
+464 web 测试(34 文件)+ build exit 0 + tsc 零新增。测试:完整 round-trip 还原(cards+canvases+freeform)+ 孤儿消除(card 带 canvasPosition 指向非 default canvas,往返后仍绑定)+ 向后兼容(旧 JSON)。
+
+---
+
 ## 2026-06-24 · dsl-bidirectional-symmetry · DSL 双向对称补全(核心卖点"转义"修复)
 
 审计发现核心卖点"转义"(画布↔文字双向,任何 AI 廉价驱动画布编辑)的基石是裂的:**两套序列化器分裂**。`serializeCanvas` 自洽往返但只测试用;`formatCanvasSnapshot`(生产喂 AI)手写格式与 parser 对不上——size 叉号、free shape 无 `#id`、card color 语法不一致 → 真实链路 SN→P→A 在 rect/text 整行读不回。且 prompt 教的语法与喂 AI 看的现状又不一致。9 步 TDD(subagent 编排,各一 commit)修复。
