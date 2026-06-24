@@ -96,8 +96,12 @@ const ID_RE = /#([a-zA-Z0-9_-]+:[a-zA-Z0-9_-]+|[a-zA-Z0-9_-]+)/
 const POS_RE = /@pos\((\d+),\s*(\d+)\)/
 const AT_RE = /at\s+\((\d+),\s*(\d+)\)/
 
-/** Color directive: `@color\((red|yellow|blue|black|white|gray|teal|pink|orange|purple|green)\)` */
-const COLOR_RE = /@color\(([a-z]+)\)/
+/** Color directive: Bauhaus 6 原色 + grey 别名。引擎 colorOf 只认这 7 个
+ *  名字(red/yellow/blue/black/white/gray/grey)。其他写法(green/teal/pink/
+ *  orange/purple)不匹配 → color 字段 undefined → 渲染回退默认色(而非
+ *  静默变黑)。审计 H3:此前正则 `[a-z]+` 接受任意小写色名,越界色被引擎
+ *  colorOf 回退成黑色,造成转义契约的静默违反。 */
+const COLOR_RE = /@color\((red|yellow|blue|black|white|gray|grey)\)/
 
 /** Label directive: `@label\("([^"]*)"\)` */
 const LABEL_RE = /@label\("([^"]*)"\)/

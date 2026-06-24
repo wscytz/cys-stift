@@ -273,3 +273,40 @@ describe('parseDslWithDiagnostics', () => {
     expect(result[1]!.type).toBe('free')
   })
 })
+
+// ── COLOR_RE Bauhaus 6 色收窄(审计 H3)─────────────────────────────────────
+describe('COLOR_RE Bauhaus 6 色', () => {
+  it('接受 6 个 Bauhaus 原色', () => {
+    for (const c of ['red', 'yellow', 'blue', 'black', 'white', 'gray']) {
+      const ops = parseDsl(`[rect #r1] @pos(0,0) @size(10,10) @color(${c})`)
+      expect(ops, `color ${c} 应被接受`).toHaveLength(1)
+      if (ops[0] && ops[0].type === 'free') {
+        expect(ops[0].color).toBe(c)
+      }
+    }
+  })
+
+  it('接受 grey(gray 的别名,引擎 colorOf 映射到 --color-gray)', () => {
+    const ops = parseDsl('[rect #r1] @pos(0,0) @size(10,10) @color(grey)')
+    expect(ops).toHaveLength(1)
+    if (ops[0] && ops[0].type === 'free') expect(ops[0].color).toBe('grey')
+  })
+
+  it('拒绝 green(非 Bauhaus 色)——color 字段 undefined,渲染回退默认而非静默变黑', () => {
+    const ops = parseDsl('[rect #r1] @pos(0,0) @size(10,10) @color(green)')
+    expect(ops).toHaveLength(1) // 行本身仍被解析(pos/size 有效)
+    if (ops[0] && ops[0].type === 'free') {
+      expect(ops[0].color).toBeUndefined() // color 指令被忽略
+    }
+  })
+
+  it('拒绝 teal/pink/orange/purple(非 Bauhaus 色)', () => {
+    for (const c of ['teal', 'pink', 'orange', 'purple']) {
+      const ops = parseDsl(`[rect #r1] @pos(0,0) @size(10,10) @color(${c})`)
+      expect(ops, `color ${c} 应被忽略`).toHaveLength(1)
+      if (ops[0] && ops[0].type === 'free') {
+        expect(ops[0].color).toBeUndefined()
+      }
+    }
+  })
+})
