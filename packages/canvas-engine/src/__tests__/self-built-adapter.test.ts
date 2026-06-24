@@ -27,9 +27,12 @@ describe('SelfBuiltAdapter pan/zoom', () => {
     const host = new SelfBuiltAdapter(document.createElement('canvas'))
     host.setView({ panX: 0, panY: 0, zoom: 1, gridMode: 'free' })
     // delta < 0(放大)单步应用 1.1 因子;cursor 下页坐标应缩放前后不变。
+    // ctrlKey=true → 走 zoom 分支(pinch / ctrl+滚轮)。
     const sx = 100
     const sy = 100
-    ;(host as unknown as { onWheel: (sx: number, sy: number, delta: number) => void }).onWheel(sx, sy, -1)
+    ;(host as unknown as {
+      onWheel: (sx: number, sy: number, deltaX: number, deltaY: number, ctrlKey: boolean) => void
+    }).onWheel(sx, sy, 0, -1, true)
     const v = host.getView()
     expect(v.zoom).toBeCloseTo(1.1, 5)
     // zoom-to-cursor: page coord under cursor 不变 → panX 补偿
@@ -40,11 +43,13 @@ describe('SelfBuiltAdapter pan/zoom', () => {
   it('zoom clamps to [0.1, 8]', () => {
     const host = new SelfBuiltAdapter(document.createElement('canvas'))
     host.setView({ panX: 0, panY: 0, zoom: 1, gridMode: 'free' })
-    const h = host as unknown as { onWheel: (sx: number, sy: number, delta: number) => void }
-    h.onWheel(0, 0, 100) // 大幅缩小
+    const h = host as unknown as {
+      onWheel: (sx: number, sy: number, deltaX: number, deltaY: number, ctrlKey: boolean) => void
+    }
+    h.onWheel(0, 0, 0, 100, true) // 大幅缩小
     expect(host.getView().zoom).toBeGreaterThanOrEqual(0.1)
     host.setView({ panX: 0, panY: 0, zoom: 7.9, gridMode: 'free' })
-    h.onWheel(0, 0, -100) // 大幅放大
+    h.onWheel(0, 0, 0, -100, true) // 大幅放大
     expect(host.getView().zoom).toBeLessThanOrEqual(8)
   })
 })
@@ -645,5 +650,40 @@ describe('SelfBuiltAdapter interaction-state reset (R1.4 / R1.5)', () => {
     // undo 后若 dragGroup 仍残留,这条 move 会按陈旧 offset 把 c1 挪到错坐标
     dispatch(canvas, 'pointermove', 80, 80)
     expect(host.getElement('c1')).toMatchObject({ x: 0, y: 0 }) // 没动 = dragGroup 已清
+  })
+})
+
+describe('SelfBuiltAdapter onWheel — pan vs zoom', () => {
+  it('pans (no ctrlKey): wheel delta moves pan, zoom unchanged', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const before = host.getView()
+    ;(host as unknown as {
+      onWheel: (sx: number, sy: number, deltaX: number, deltaY: number, ctrlKey: boolean) => void
+    }).onWheel(400, 300, 0, 100, false)
+    const after = host.getView()
+    expect(after.zoom).toBe(before.zoom)
+    expect(after.panY).not.toBe(before.panY)
+  })
+
+  it('zooms on ctrlKey (pinch / ctrl+wheel): zoom-to-cursor', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const before = host.getView()
+    ;(host as unknown as {
+      onWheel: (sx: number, sy: number, deltaX: number, deltaY: number, ctrlKey: boolean) => void
+    }).onWheel(400, 300, 0, -100, true)
+    const after = host.getView()
+    expect(after.zoom).toBeGreaterThan(before.zoom)
+  })
+
+  it('pans horizontally with deltaX (no ctrlKey)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const before = host.getView()
+    ;(host as unknown as {
+      onWheel: (sx: number, sy: number, deltaX: number, deltaY: number, ctrlKey: boolean) => void
+    }).onWheel(400, 300, 50, 0, false)
+    const after = host.getView()
+    expect(after.panX).not.toBe(before.panX)
+    expect(after.panY).toBe(before.panY)
+    expect(after.zoom).toBe(before.zoom)
   })
 })

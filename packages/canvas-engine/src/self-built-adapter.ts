@@ -645,11 +645,17 @@ export class SelfBuiltAdapter implements CanvasHost {
     this.canvas.addEventListener('pointermove', onMove)
     this.canvas.addEventListener('pointerup', onUp)
 
-    // 滚轮 → zoom-to-cursor
+    // 滚轮/触摸板:ctrlKey(pinch 或 ctrl+滚轮)→ zoom-to-cursor;否则 → pan。
     this.wheelHandler = (e: WheelEvent) => {
       e.preventDefault()
       const rect = this.canvas.getBoundingClientRect()
-      this.onWheel(e.clientX - rect.left, e.clientY - rect.top, e.deltaY)
+      this.onWheel(
+        e.clientX - rect.left,
+        e.clientY - rect.top,
+        e.deltaX,
+        e.deltaY,
+        e.ctrlKey,
+      )
     }
     this.canvas.addEventListener('wheel', this.wheelHandler, { passive: false })
   }
@@ -717,20 +723,24 @@ export class SelfBuiltAdapter implements CanvasHost {
   }
 
   /**
-   * 滚轮缩放:以 (sx,sy) 为锚点的 zoom-to-cursor。
-   * zoom 钳制 [0.1, 8];pan 补偿使 cursor 下的页坐标在缩放前后不变。
+   * 滚轮/触摸板:ctrlKey(pinch 或 ctrl+滚轮)→ zoom-to-cursor;否则 → pan。
+   * macOS 触摸板双指滑动 = wheel 无 ctrlKey(应 pan);pinch = wheel + ctrlKey(应 zoom)。
+   * 主流画布(Figma/tldraw)同此规范:滚轮 pan,ctrl+滚轮 zoom。
    */
-  onWheel(sx: number, sy: number, delta: number): void {
-    const factor = delta < 0 ? 1.1 : 1 / 1.1
-    const nextZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, this.view.zoom * factor))
-    // zoom-to-cursor: cursor 下的页坐标缩放前后不变。
-    //   pageBefore = (sx - panX) / zoom;  pageAfter = (sx - panX') / nextZoom
-    //   → panX' = sx - pageBefore * nextZoom
-    const pageX = (sx - this.view.panX) / this.view.zoom
-    const pageY = (sy - this.view.panY) / this.view.zoom
-    const panX = sx - pageX * nextZoom
-    const panY = sy - pageY * nextZoom
-    this.setView({ ...this.view, zoom: nextZoom, panX, panY })
+  onWheel(sx: number, sy: number, deltaX: number, deltaY: number, ctrlKey: boolean): void {
+    if (ctrlKey) {
+      // zoom-to-cursor:以 (sx,sy) 为锚点。zoom 钳制 [0.1, 8];pan 补偿使 cursor 下页坐标缩放前后不变。
+      const factor = deltaY < 0 ? 1.1 : 1 / 1.1
+      const nextZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, this.view.zoom * factor))
+      const pageX = (sx - this.view.panX) / this.view.zoom
+      const pageY = (sy - this.view.panY) / this.view.zoom
+      const panX = sx - pageX * nextZoom
+      const panY = sy - pageY * nextZoom
+      this.setView({ ...this.view, zoom: nextZoom, panX, panY })
+    } else {
+      // pan:delta 直接平移(触摸板双指滑动 / 鼠标滚轮)。
+      this.setView({ ...this.view, panX: this.view.panX - deltaX, panY: this.view.panY - deltaY })
+    }
   }
 
   /** 解绑指针 + wheel 监听(页面卸载调)。 */
