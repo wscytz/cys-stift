@@ -5,6 +5,34 @@
 
 ---
 
+## 2026-06-24 · mainline-b-plus-a · 主线推进:转义信任裂缝修复 + AI 介入手绘(增值)
+
+打磨已有功能(转义核心卖点的诚实性)+ 推进第三层增值主线(AI 介入手绘,守 R2 隐私)。同时收尾 UI 一致性(canvas 工具栏溢出)+ 交付闭环(Windows Tauri CI)。
+
+### 转义打磨 · 核心 卖点信任裂缝(`64153b6` + `4d0599c`)
+转义是核心卖点,但 DSL 编辑器有 HIGH 信任裂缝:**parseDsl 静默丢弃坏行**——用户写 10 行(7 对 3 错 `@pos` 拼成 `@ps`),toast 说"应用 7 条",3 行静默消失,用户以为全生效。空输入 vs 全写错也分不清。
+- **parseDslWithDiagnostics**:返回 `{ops, errors: DslDiagnostic[]}`(DslDiagnostic = {line(1-based), text, message}),每个 continue 丢弃前记诊断。`parseDsl` 改薄 wrapper 返回 `.ops`,**AI 路径零变化**。诊断分类:missing #id / missing @pos / free arrow 缺 @pos@size / unrecognized kind;`#` 注释和散文行静默跳过(只 `[` 前缀行失败才报错)。
+- **dsl-dialog 展示诊断**:textarea 下方渲染诊断列表(行号+原因,Bauhaus red-soft + red 左边栏);全部行无效 → "全部 N 行无法识别" toast + 不应用;空 vs 全错区分;混合有效/无效 → toast 诚实报 applied + skipped(含 parse 错)。核心卖点不再静默丢用户输入。
+
+### AI 介入手绘 · 第三层增值主线(`a0b891f`)
+此前 AI 只看到 `[freedraw #id] @pos(x,y)`——不知手绘是什么形状,无法智能 cluster/auto-relate 手绘元素。现在 freedraw 元素带 R2 安全的形状描述:
+- shape: circle/rect/triangle/check/arrow/unknown(离散标签)+ shapeConfidence + features{straightness, closure, elongation, pointCount}(4 个标量比例)
+- snapshotCanvas 本地跑 classifyFreedraw + recognizeShape(失败退化到仅位置,不抛)
+- formatCanvasSnapshot 输出 `shape: circle (85%)` 注释行(parser 跳过注释行,round-trip 安全)
+- **R2 隐私**:点序列绝不进 snapshot 文本(只有离散标签 + 标量比例)。反向断言测试:多点 freedraw 的 snapshot 文本不含内部点坐标。
+- privacy.md 更新:用户面向说明手绘形状描述发给 AI 的隐私边界(本地识别,只发标签不发笔迹)。
+
+### UI 收尾
+- **canvas 工具栏溢出修复**(`b2b611e`):@cys-stift/ui Toolbar `.content` flex 子元素 min-width:auto 无法收缩,canvas 工具栏 1756px 溢出 1280px 视口。加 `min-width:0` + `overflow-x:auto`。
+
+### 交付闭环
+- **Windows Tauri CI**(`d0f7fcf` + `8569193`):加 build-tauri-windows job(windows-latest,NSIS installer artifact)。macOS 无法 cross-compile Windows(缺 llvm-rc)。pnpm/action-setup v4→v5(Node 20 deprecation)。rust-toolchain setup + `tauri build --ci`。
+
+### 验证
+485 web 测试 + 280 引擎测试 + build exit 0 + tsc 零新增。R2 反向断言覆盖。
+
+---
+
 ## 2026-06-24 · polish-six · 打磨六主干(已落地功能完成度/体验/鲁棒性)
 
 转义产品化 + JSON 备份 + 引擎鲁棒性都落地后,做一轮"打磨已有功能"而非找新缝。6 个主干,各一 commit。
