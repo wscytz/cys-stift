@@ -138,6 +138,50 @@ describe('交互矩阵 — 每种 kind × 键盘微移(方向键)', () => {
   }
 })
 
+// ── Escape 清选区(交互矩阵未覆盖的「键盘×选择」格子) ───────────────────────
+// 通用画布/编辑器习惯:框选一堆元素后按 Esc 清选区,免得必须点空白。
+// keyHandler 守卫已排除 text 模式/输入框(编辑时按 Esc 不误清画布选区)。
+
+describe('交互矩阵 — Escape 清空选区', () => {
+  function keydown(key: string, shift = false) {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey: shift, bubbles: true }))
+  }
+
+  it('Escape 清空选区:有选区时按 Esc → getSelectedIds 为空', () => {
+    const { host, setSel } = makeHost()
+    const h = host as unknown as { getSelectedIds: () => string[] }
+    host.upsert({ id: 'e1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    setSel(['e1'])
+    expect(h.getSelectedIds()).toEqual(['e1'])
+    keydown('Escape')
+    expect(h.getSelectedIds()).toEqual([])
+  })
+
+  it('选区已空时 Escape 无副作用:不崩、仍为空', () => {
+    const { host, setSel } = makeHost()
+    const h = host as unknown as { getSelectedIds: () => string[] }
+    host.upsert({ id: 'e1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    setSel([]) // 选区本就空
+    keydown('Escape') // 不应崩、不应 preventDefault(让 Esc 冒泡)
+    expect(h.getSelectedIds()).toEqual([])
+  })
+
+  it('Escape 后 onSelectionChange 收到空选区(UI 同步清选中框)', () => {
+    const { host, setSel } = makeHost()
+    const h = host as unknown as {
+      onSelectionChange: (cb: (ids: string[]) => void) => () => void
+    }
+    const events: string[][] = []
+    h.onSelectionChange((ids) => events.push([...ids]))
+    host.upsert({ id: 'e1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    setSel(['e1']) // emit ['e1']
+    events.length = 0 // 只看 Escape 后的那次 emit
+    keydown('Escape')
+    // setSelectedIds([]) emit 选区变更 → listener 收到 []
+    expect(events).toEqual([[]])
+  })
+})
+
 // ── 关系箭头可选中(探照灯:关系箭头 bbox w=h=0 → bbox 命中失败) ──────────────
 // 关系箭头(connect 工具创建)bbox 是 x=y=w=h=0(端点由 from/to 引用算),hitTest 按
 // bbox 只有单点命中 → 选不中/删不掉/改不了关系类型。这格当前 FAIL,步骤 1+2 修。

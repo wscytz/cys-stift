@@ -609,6 +609,13 @@ export class SelfBuiltAdapter implements CanvasHost {
         // 文本编辑中:只可能 IME;不拦截任何键(Delete/微移/undo 都不触发)
         return
       }
+      // Escape:取消选区(通用画布习惯)。text/输入框已在上守卫排除。
+      if (e.key === 'Escape') {
+        if (this.selectedIds.size === 0) return
+        e.preventDefault()
+        this.setSelectedIds([])
+        return
+      }
       // undo/redo/selectAll(守 isComposing——IME 组合态不 undo)
       const action = parseKeyboardAction(e)
       if (action) {
