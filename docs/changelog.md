@@ -5,7 +5,17 @@
 
 ---
 
-## 2026-06-24 · canvas-usability · 画布可用性修复(pan + 工具栏重构 + minimap)
+## 2026-06-24 · dsl-pos-modal · DSL 负坐标 bug + Modal 滚动/关闭入口
+
+用户实测「复制为 AI 提示词」粘回画布全失败 + 二级页面看不完。两个修复。
+
+- **DSL `@pos` 支持负坐标**(`80acf86`):`POS_RE` 此前 `\d+` 只认正数,但画布元素拖到原点左/上方后 `serializeCanvasReadable` 输出 `@pos(-54,150)` → parser 报 `missing @pos` → 整张画布的 DSL 往返断裂。**转义核心卖点的真 bug**:负坐标元素复制出去的 DSL 粘回来全失败(用户实测 7 卡全无效)。修:`POS_RE`/`AT_RE` 改 `(-?\d+)`(对齐 `SIZE_RE` 早有的负数支持)。加负坐标往返测试。
+- **Modal max-height + body 滚动 + ×关闭按钮**(`b04bd4a`):`@cys-stift/ui` Modal 的 `.frame` 此前无高度上限 → 卡片详情等内容多时撑出视口,底部按钮看不到也无法滚(用户:"看不完、没有可拉的条轴")。且无显式关闭按钮(只 Esc + backdrop 点击,用户:"没退出按钮")。修:`.frame` 加 `max-height: calc(100vh - 2*space-4)` + `.body` `overflow-y:auto`(title 行固定不滚,提供稳定关闭入口);title 行加显式 `×` 关闭按钮。**一处改,所有二级页面受益**(卡片详情/导出/DSL/版本对比/快捷键/设置确认)。
+
+### 验证
+523 web 测试 + 313 引擎测试 + tsc 零新增(22 基线无关)+ build exit 0。puppeteer 测 1280/900 宽各页面无横向溢出。
+
+
 
 用户实测打包版反馈「画布完全不能用」三问题,逐个修。计划 `docs/superpowers/plans/2026-06-24-canvas-usability.md`。
 
