@@ -91,6 +91,15 @@ export function DslDialog({
   return (
     <Modal open={open} onClose={onClose} title={t('canvas.dslTitle')}>
       <p className="dsl-lede">{t('canvas.dslLede')}</p>
+      <details className="dsl-syntax">
+        <summary className="dsl-syntax__summary">{t('canvas.dslSyntaxTitle')}</summary>
+        <p className="dsl-syntax__body">{t('canvas.dslSyntaxBody')}</p>
+        <pre className="dsl-syntax__code">{`[card #id] @pos(x, y) @size(w, h) @color(blue|red|black|grey|yellow)
+[rect #id] @pos(x, y) @size(w, h) @color(c)
+[text #id] @pos(x, y) @text("...") @color(c)
+[arrow #id] from #a to #b @label("...") @color(c) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none)
+[arrow #id] @pos(x, y) @size(w, h) @color(c)   # 自由箭头(无 from/to;w/h 可负表方向)`}</pre>
+      </details>
       <textarea
         className="dsl-text"
         value={text}
@@ -112,6 +121,19 @@ export function DslDialog({
 
 const styles = `
 .dsl-lede { margin: 0 0 var(--space-3); font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black-soft); line-height: 1.5; }
+.dsl-syntax { margin: 0 0 var(--space-3); border: var(--border-hairline); border-radius: var(--radius-sm); background: var(--color-gray-soft); }
+.dsl-syntax__summary {
+  cursor: pointer; padding: var(--space-2);
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  text-transform: uppercase; letter-spacing: 0.14em; color: var(--color-gray);
+}
+.dsl-syntax__body { margin: 0 var(--space-2) var(--space-2); font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black-soft); line-height: 1.5; }
+.dsl-syntax__code {
+  margin: 0 var(--space-2) var(--space-2); padding: var(--space-2);
+  background: var(--color-black); color: var(--color-white);
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  border-radius: var(--radius-sm); line-height: 1.6; overflow-x: auto;
+}
 .dsl-text {
   width: 100%; min-height: 320px; box-sizing: border-box;
   padding: var(--space-2);

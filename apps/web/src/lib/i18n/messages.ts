@@ -134,6 +134,8 @@ export const messages = {
   'canvas.dsl': { zh: 'DSL', en: 'DSL' },
   'canvas.dslTitle': { zh: '画布转义', en: 'Canvas DSL' },
   'canvas.dslLede': { zh: '画布的文字形态。编辑或粘贴 DSL 指令,应用回画布。每行一个元素;# 开头的注释行会被忽略。', en: 'The canvas as text. Edit or paste DSL directives and apply them back. One element per line; lines starting with # are ignored.' },
+  'canvas.dslSyntaxTitle': { zh: '语法速查', en: 'Syntax cheat sheet' },
+  'canvas.dslSyntaxBody': { zh: '每行一个元素。带已有 #id 的更新该元素;省略 #id 新建(rect/text/自由箭头可新建,card 只能更新——内容来自收件箱)。', en: 'One element per line. With an existing #id it updates; omit #id to create (rect/text/free arrow create; cards are update-only — content comes from the inbox).' },
   'canvas.dslApply': { zh: '应用', en: 'Apply' },
   'canvas.dslApplied': { zh: '已应用 {n} 条指令', en: 'Applied {n} directives' },
   'canvas.dslAppliedSkipped': { zh: '已应用 {applied} 条,{skipped} 条跳过(card/端点不存在等)', en: 'Applied {applied}, skipped {skipped} (missing card/endpoint etc.)' },
