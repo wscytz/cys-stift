@@ -221,7 +221,9 @@ export const messages = {
   'settings.exportJson': { zh: '导出 JSON', en: 'Export JSON' },
   'settings.importJson': { zh: '导入 JSON', en: 'Import JSON' },
   'settings.importHint': { zh: '会覆盖当前数据——请先导出备份。成功后会重新加载。', en: 'Overwrites current data — export a backup first. Reloads on success.' },
-  'settings.importOk': { zh: '已导入 {cards} 张卡片 · {mediaAssets} 个媒体。正在重新加载…', en: 'Imported {cards} cards · {mediaAssets} media. Reloading…' },
+  'settings.importConfirmTitle': { zh: '确认导入', en: 'Confirm import' },
+  'settings.importConfirmBody': { zh: '导入将覆盖当前所有数据(卡片 / 画布 / 媒体 / 设置)。此操作不可撤销,建议先导出备份。确认继续?', en: 'Importing overwrites all current data (cards / canvases / media / settings). This cannot be undone — export a backup first. Continue?' },
+  'settings.importOk': { zh: '已导入 {cards} 张卡片 · {mediaAssets} 个媒体 · {canvases} 个画布 · {freeform} 组画布几何。正在重新加载…', en: 'Imported {cards} cards · {mediaAssets} media · {canvases} canvases · {freeform} freeform sets. Reloading…' },
   'settings.importFail': { zh: '导入失败：{error}', en: 'Import failed: {error}' },
 
   /* ── AI (v0.29.0) ── */

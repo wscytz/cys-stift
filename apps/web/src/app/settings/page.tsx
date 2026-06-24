@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Toolbar } from '@cys-stift/ui'
+import { Toolbar, Modal, Button } from '@cys-stift/ui'
 import { settingsStore, useSettings } from '@/lib/settings-store'
 import { rehydrateCards } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
@@ -26,10 +26,19 @@ export default function SettingsPage() {
   const { settings, ready } = useSettings()
   const sc = settings.captureShortcut
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
 
+  // 选文件后先弹确认门(覆盖不可撤销),确认后才真正导入。
   const handleImportFile = (files: FileList | null) => {
     if (!files || files.length === 0) return
     const file = files[0]
+    if (!file) return
+    setPendingFile(file)
+  }
+
+  const confirmImport = () => {
+    const file = pendingFile
+    setPendingFile(null)
     if (!file) return
     const reader = new FileReader()
     reader.onload = async () => {
@@ -205,7 +214,12 @@ export default function SettingsPage() {
                 }`}
               >
                 {importResult.ok
-                  ? t('settings.importOk', { cards: importResult.cards, mediaAssets: importResult.mediaAssets })
+                  ? t('settings.importOk', {
+                      cards: importResult.cards,
+                      mediaAssets: importResult.mediaAssets,
+                      canvases: importResult.canvases ?? 0,
+                      freeform: importResult.freeformCanvases ?? 0,
+                    })
                   : t('settings.importFail', { error: importResult.error ?? '' })}
               </p>
             )}
@@ -218,6 +232,22 @@ export default function SettingsPage() {
           <Link href="/inbox" className="footnote__link">inbox</Link>
         </p>
       </div>
+
+      <Modal
+        open={pendingFile !== null}
+        onClose={() => setPendingFile(null)}
+        title={t('settings.importConfirmTitle')}
+      >
+        <p className="set__confirm-body">{t('settings.importConfirmBody')}</p>
+        <div className="set__confirm-actions">
+          <Button variant="ghost" onClick={() => setPendingFile(null)}>
+            {t('common.cancel')}
+          </Button>
+          <Button variant="primary" onClick={confirmImport}>
+            {t('settings.importJson')}
+          </Button>
+        </div>
+      </Modal>
 
       <style>{styles}</style>
     </main>
@@ -260,6 +290,8 @@ const styles = `
 .set__import-hint { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
 .set__import-result { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black-soft); }
 .set__import-result--error { color: var(--color-red); }
+.set__confirm-body { margin: 0 0 var(--space-3); font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black-soft); line-height: 1.5; }
+.set__confirm-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
 .set__warn {
   margin: var(--space-2) 0;
   padding: var(--space-2) var(--space-3);
