@@ -1,5 +1,6 @@
 @import '@cys-stift/ui/tokens.css';
 @import 'tailwindcss';
+@import './shared.css';
 
 /* AppMenu (position:sticky) occupies normal flow space at the top of
  * <body>. Canvas page subtracts this so it doesn't overflow by

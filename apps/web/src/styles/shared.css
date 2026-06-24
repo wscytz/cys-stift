@@ -1,0 +1,208 @@
+/**
+ * Shared UI patterns — Bauhaus design language.
+ * Import this from globals.css to make patterns available app-wide.
+ * Each pattern is documented with its intended use.
+ *
+ * Principles:
+ *   - mono labels: uppercase, letter-spacing 0.12em (consistent across all UI chrome)
+ *   - display titles: Space Grotesk, negative letter-spacing
+ *   - callouts: hard offset shadow (no blur), Bauhaus primary colors only
+ *   - spacing: 8px grid via var(--space-*)
+ */
+
+/* ── 1. Mono label (all UI chrome: labels, crumbs, eyebrows, tags) ──────────── */
+.mono-label {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-gray);
+}
+.mono-label--dark {
+  color: var(--color-black-soft);
+}
+
+/* ── 2. Display title (page and section headings) ───────────────────────────── */
+.display-title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.display-title--lg {
+  font-size: var(--font-size-2xl);
+}
+
+/* ── 3. Eyebrow (above titles, small uppercase label) ───────────────────────── */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--color-gray);
+  margin: 0;
+}
+
+/* ── 4. Page content container ──────────────────────────────────────────────── */
+.page-content {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── 5. Section (heading + content group) ───────────────────────────────────── */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.section__h {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.section__lede {
+  margin: 0;
+  color: var(--color-black-soft);
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+  max-width: 60ch;
+  overflow: hidden;
+}
+
+/* ── 6. Field row (label + control) ─────────────────────────────────────────── */
+.field-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* ── 7. Crumb navigation (breadcrumb trail) ─────────────────────────────────── */
+.crumb {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-gray);
+}
+.crumb--here { color: var(--color-black); }
+.crumb-sep { color: var(--color-gray); }
+.crumb-spacer { flex: 1; }
+
+/* ── 8. Divider ─────────────────────────────────────────────────────────────── */
+.divider {
+  height: 1px;
+  background: var(--color-gray-soft);
+  border: none;
+  margin: 0;
+}
+
+/* ── 9. Bauhaus callout blocks ──────────────────────────────────────────────── */
+.bauhaus-callout {
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-hairline);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+.bauhaus-callout--warn {
+  background: var(--color-yellow);
+  border-color: var(--color-black);
+}
+.bauhaus-callout--inverted {
+  background: var(--color-black);
+  color: var(--color-white);
+  border-color: var(--color-black);
+  box-shadow: var(--shadow-md);
+}
+.bauhaus-callout--inverted:hover {
+  box-shadow: 3px 3px 0 0 var(--color-red);
+}
+.bauhaus-callout--muted {
+  background: var(--color-gray-soft);
+  color: var(--color-black-soft);
+}
+
+/* ── 10. Action row (button group) ──────────────────────────────────────────── */
+.action-row {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.action-row--end { justify-content: flex-end; }
+
+/* ── 11. Footnote / footer links ────────────────────────────────────────────── */
+.footnote {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-gray);
+  margin: 0;
+  padding-top: var(--space-2);
+  border-top: var(--border-hairline);
+}
+.footnote__link {
+  color: var(--color-blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ── 12. Mono text / code inline ────────────────────────────────────────────── */
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+.mono--xs { font-size: var(--font-size-xs); }
+
+/* ── 13. Button base variants (referenced by page-level components) ──────────── */
+.btn-ghost {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: transparent;
+  color: var(--color-black);
+  border: var(--border-hairline);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.btn-ghost:hover:not(:disabled) { box-shadow: 2px 2px 0 0 var(--color-black); }
+.btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-primary {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: var(--color-black);
+  color: var(--color-white);
+  border: var(--border-hairline);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.btn-primary:hover:not(:disabled) { box-shadow: 2px 2px 0 0 var(--color-red); }
+.btn-primary:active { transform: translate(1px, 1px); box-shadow: none; }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-danger {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: var(--color-white);
+  color: var(--color-red);
+  border: var(--border-hairline);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.btn-danger:hover { box-shadow: 2px 2px 0 0 var(--color-red); }

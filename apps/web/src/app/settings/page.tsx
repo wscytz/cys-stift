@@ -76,15 +76,16 @@ export default function SettingsPage() {
         <span className="crumb">{t('brand.name')}</span>
         <span className="crumb-sep">/</span>
         <span className="crumb crumb--here">{t('settings.crumb')}</span>
+        <span className="crumb-spacer" />
       </Toolbar>
 
-      <div className="content">
+      <div className="page-content">
         <StorageMeter />
-        <section className="set">
-          <h2 className="set__h">{t('settings.language')}</h2>
-          <p className="set__lede">{t('settings.languageLede')}</p>
-          <div className="set__row">
-            <label className="set__label">{t('settings.language')}</label>
+        <section className="section">
+          <h2 className="section__h">{t('settings.language')}</h2>
+          <p className="section__lede">{t('settings.languageLede')}</p>
+          <div className="field-row">
+            <label className="mono-label">{t('settings.language')}</label>
             <select
               className="set__select"
               value={locale}
@@ -96,11 +97,11 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="set">
-          <h2 className="set__h">{t('settings.appearance')}</h2>
-          <p className="set__lede">{t('settings.appearanceLede')}</p>
-          <div className="set__row">
-            <label className="set__label">{t('settings.theme')}</label>
+        <section className="section">
+          <h2 className="section__h">{t('settings.appearance')}</h2>
+          <p className="section__lede">{t('settings.appearanceLede')}</p>
+          <div className="field-row">
+            <label className="mono-label">{t('settings.theme')}</label>
             <select
               className="set__select"
               value={settings.theme}
@@ -117,11 +118,11 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="set">
-          <h2 className="set__h">{t('settings.captureShortcut')}</h2>
-          <p className="set__lede">{t('settings.captureShortcutLede')}</p>
-          <div className="set__row">
-            <label className="set__label">{t('settings.modifier')}</label>
+        <section className="section">
+          <h2 className="section__h">{t('settings.captureShortcut')}</h2>
+          <p className="section__lede">{t('settings.captureShortcutLede')}</p>
+          <div className="field-row">
+            <label className="mono-label">{t('settings.modifier')}</label>
             <select
               className="set__select"
               value={sc.modKey}
@@ -135,8 +136,8 @@ export default function SettingsPage() {
               <option value="ctrl">{t('settings.modifierCtrl')}</option>
             </select>
           </div>
-          <div className="set__row">
-            <label className="set__label">{t('settings.shift')}</label>
+          <div className="field-row">
+            <label className="mono-label">{t('settings.shift')}</label>
             <input
               type="checkbox"
               checked={sc.shift}
@@ -145,8 +146,8 @@ export default function SettingsPage() {
               }
             />
           </div>
-          <div className="set__row">
-            <label className="set__label">{t('settings.key')}</label>
+          <div className="field-row">
+            <label className="mono-label">{t('settings.key')}</label>
             <select
               className="set__select"
               value={sc.code}
@@ -161,9 +162,9 @@ export default function SettingsPage() {
               ))}
             </select>
           </div>
-          <p className="set__current">
+          <p className="mono">
             {t('settings.current')}:{' '}
-            <code>
+            <code className="set__current-code">
               {(sc.modKey === 'meta' ? '⌘' : 'Ctrl') +
                 (sc.shift ? '+⇧' : '') +
                 '+' +
@@ -171,17 +172,17 @@ export default function SettingsPage() {
             </code>{' '}
             {ready ? '' : t('settings.currentSuffix')}
           </p>
-          <p className="set__hint">{t('settings.captureHint')}</p>
+          <p className="mono mono--xs">{t('settings.captureHint')}</p>
         </section>
 
         <AISettingsPanel />
 
-        <section className="set">
-          <h2 className="set__h">{t('settings.data')}</h2>
-          <p className="set__lede">{t('settings.dataLede')}</p>
+        <section className="section">
+          <h2 className="section__h">{t('settings.data')}</h2>
+          <p className="section__lede">{t('settings.dataLede')}</p>
           <button
             type="button"
-            className="set__export"
+            className="btn-primary"
             onClick={async () => {
               const bytes = await downloadExport()
               const payload = await buildExportPayload()
@@ -194,7 +195,7 @@ export default function SettingsPage() {
             {t('settings.exportJson')}
           </button>
           <div className="set__import">
-            <label className="set__import-label">
+            <label className="mono-label">
               {t('settings.importJson')}
               <input
                 type="file"
@@ -206,10 +207,10 @@ export default function SettingsPage() {
                 className="set__file"
               />
             </label>
-            <p className="set__import-hint">{t('settings.importHint')}</p>
+            <p className="mono mono--xs">{t('settings.importHint')}</p>
             {importResult && (
               <p
-                className={`set__import-result ${
+                className={`mono mono--xs ${
                   importResult.ok ? '' : 'set__import-result--error'
                 }`}
               >
@@ -226,11 +227,11 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <p className="footnote">
+        <footer className="footnote">
           <Link href="/" className="footnote__link">← {t('common.home')}</Link>
           {' · '}
           <Link href="/inbox" className="footnote__link">{t('nav.inbox')}</Link>
-        </p>
+        </footer>
       </div>
 
       <Modal
@@ -249,101 +250,16 @@ export default function SettingsPage() {
         </div>
       </Modal>
 
-      <style>{styles}</style>
-    </main>
-  )
-}
-
-const styles = `
+      <style>{`
 .page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
-.crumb { font-family: var(--font-mono); font-size: var(--font-size-sm); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-gray); }
-.crumb--here { color: var(--color-black); }
-.crumb-sep { color: var(--color-gray); }
-.content { max-width: 720px; margin: 0 auto; padding: var(--space-5) var(--space-4); display: flex; flex-direction: column; gap: var(--space-4); }
-.set { display: flex; flex-direction: column; gap: var(--space-3); }
-.set__h { margin: 0; font-family: var(--font-display); font-size: var(--font-size-xl); font-weight: 500; letter-spacing: -0.01em; }
-.set__lede { margin: 0; color: var(--color-black-soft); font-size: var(--font-size-base); line-height: 1.6; max-width: 60ch; overflow: hidden; }
-.set__row { display: grid; grid-template-columns: 120px 1fr; align-items: center; gap: var(--space-3); }
-.set__label { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-gray); }
 .set__select { font-family: var(--font-body); font-size: var(--font-size-base); padding: var(--space-1) var(--space-2); border: var(--border-hairline); border-radius: var(--radius-sm); background: var(--color-white); color: var(--color-black); }
-.set__current { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-sm); color: var(--color-black-soft); }
-.set__current code { background: var(--color-gray-soft); padding: 2px var(--space-1); border-radius: 2px; }
-.set__hint { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); line-height: 1.6; }
-.set__export {
-  align-self: flex-start;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  background: var(--color-black);
-  color: var(--color-white);
-  border: var(--border-hairline);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-.set__export:hover { box-shadow: 2px 2px 0 0 var(--color-red); }
-.set__export:active { transform: translate(1px, 1px); box-shadow: none; }
+.set__current-code { background: var(--color-gray-soft); padding: 2px var(--space-1); border-radius: 2px; }
 .set__import { margin-top: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); }
-.set__import-label { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-gray); cursor: pointer; }
 .set__file { margin-top: var(--space-1); font-family: var(--font-body); font-size: var(--font-size-sm); }
-.set__import-hint { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
-.set__import-result { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black-soft); }
 .set__import-result--error { color: var(--color-red); }
 .set__confirm-body { margin: 0 0 var(--space-3); font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black-soft); line-height: 1.5; }
 .set__confirm-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
-.set__warn {
-  margin: var(--space-2) 0;
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-yellow);
-  border: 2px solid var(--color-black);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
+`}</style>
+    </main>
+  )
 }
-.set__input {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  padding: var(--space-1) var(--space-2);
-  border: var(--border-hairline);
-  border-radius: var(--radius-sm);
-  background: var(--color-white);
-  color: var(--color-black);
-  max-width: 360px;
-  width: 100%;
-}
-.set__input:disabled { background: var(--color-gray-soft); opacity: 0.6; }
-.set__keyWrap { display: flex; gap: var(--space-2); align-items: center; max-width: 480px; }
-.set__btnGhost {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  background: transparent;
-  border: var(--border-hairline);
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.set__btnGhost:disabled { opacity: 0.4; cursor: not-allowed; }
-.set__actions { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
-.set__btn {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  background: var(--color-white);
-  color: var(--color-black);
-  border: var(--border-hairline);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-.set__btn:hover:not(:disabled) { box-shadow: 2px 2px 0 0 var(--color-black); }
-.set__btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.set__btn--primary { background: var(--color-black); color: var(--color-white); }
-.set__btn--primary:hover:not(:disabled) { box-shadow: 2px 2px 0 0 var(--color-red); }
-.footnote { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); margin: 0; padding-top: var(--space-2); border-top: var(--border-hairline); }
-.footnote__link { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; }
-`
