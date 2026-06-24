@@ -20,7 +20,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { Button, Input } from '@cys-stift/ui'
-import { draftStore, useDraft } from '@/lib/draft-store'
+import { draftStore, useDraft, isDraftPersistOk } from '@/lib/draft-store'
 import { useDebouncedCallback } from '@/lib/use-debounced-callback'
 import { useI18n } from '@/lib/i18n'
 
@@ -48,18 +48,24 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
   // re-enters submit() before setOpen(false) closes the modal — two
   // cards get created. Latch until the parent unmounts/closes us.
   const [submitting, setSubmitting] = useState(false)
+  // R2.10: surface silent autosave failures (quota exceeded) so the user
+  // knows the draft won't survive a reload. Re-checked after each debounced
+  // persist; isDraftPersistOk() is a module-level flag, not reactive.
+  const [persistFailed, setPersistFailed] = useState(false)
   const bodyRef = useRef<HTMLTextAreaElement | null>(null)
 
   // Debounced autosave (spec §5.5). 500ms of silence → persist. The store
-  // write is best-effort; failure (quota) is swallowed inside draft-store.
+  // write is best-effort; failure (quota) is recorded in the store flag.
   const persistDraft = useDebouncedCallback((t: string, b: string) => {
     // Only persist if there's something worth saving — an empty draft is
     // treated as "no draft" so we don't leave stale empty records behind.
     if (t.trim().length === 0 && b.trim().length === 0) {
       draftStore.clear('capture')
+      setPersistFailed(!isDraftPersistOk())
       return
     }
     draftStore.upsert('capture', { title: t, body: b } satisfies CaptureDraftPayload)
+    setPersistFailed(!isDraftPersistOk())
   }, 500)
 
   // On open transition (false → true): restore the latest persisted draft.
@@ -173,6 +179,9 @@ if (
         </div>
         <div className="mi-actions">
           <span className="mi-hint">{navigator.platform?.includes('Mac') ? '⌘↩' : 'Ctrl+Enter'} {t('card.detail.save')} · esc {t('card.detail.cancel')}</span>
+          {persistFailed && (
+            <span className="mi-warn" role="alert">{t('draft.persistFailed')}</span>
+          )}
           <Button variant="ghost" onClick={onClose}>
             {t('card.detail.cancel')}
           </Button>
@@ -238,6 +247,10 @@ const styles = `
 .mi-hint {
   flex: 1; font-family: var(--font-mono); font-size: var(--font-size-xs);
   color: var(--color-gray); text-transform: lowercase;
+}
+.mi-warn {
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  color: var(--color-red); text-transform: lowercase;
 }
 @media (max-width: 720px) {
   .mi-backdrop { padding-top: 12vh; }

@@ -38,13 +38,17 @@ function loadDrafts(): DraftMap {
   }
 }
 
-function saveDrafts(map: DraftMap) {
-  if (typeof window === 'undefined') return
+function saveDrafts(map: DraftMap): boolean {
+  if (typeof window === 'undefined') return true
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ drafts: map }))
+    return true
   } catch {
     // Quota exceeded / private mode — drafts are best-effort. The user's
-    // input still lives in component state for the current session.
+    // input still lives in component state for the current session. R2.10:
+    // surface the failure (return false) instead of swallowing it silently
+    // so the UI can warn that the draft may not survive a reload.
+    return false
   }
 }
 
@@ -53,6 +57,20 @@ function saveDrafts(map: DraftMap) {
 let _drafts: DraftMap = {}
 let _hydrated = false
 const _subscribers = new Set<() => void>()
+
+// R2.10: remember whether the last saveDrafts() call succeeded so the UI can
+// warn when autosave is silently failing (quota exceeded). Defaults to true
+// (no failure observed yet).
+let _lastSaveOk = true
+
+/**
+ * Returns whether the most recent draft write persisted to localStorage.
+ * false means the last upsert/clear hit QuotaExceededError (or similar) —
+ * the draft lives only in component state and will be lost on reload.
+ */
+export function isDraftPersistOk(): boolean {
+  return _lastSaveOk
+}
 
 function notify() {
   for (const sub of _subscribers) sub()
@@ -100,7 +118,7 @@ export const draftStore = {
     const next: DraftMap = { ..._drafts }
     next[kind] = { kind, payload, updatedAt: new Date().toISOString() }
     _drafts = next
-    saveDrafts(_drafts)
+    _lastSaveOk = saveDrafts(_drafts)
     notify()
   },
   clear(kind: DraftKind): void {
@@ -109,7 +127,7 @@ export const draftStore = {
     const next: DraftMap = { ..._drafts }
     delete next[kind]
     _drafts = next
-    saveDrafts(_drafts)
+    _lastSaveOk = saveDrafts(_drafts)
     notify()
   },
 }

@@ -3,7 +3,7 @@
 import { useState, useTransition, useEffect, useId } from 'react'
 import { Button, Input, Tag } from '@cys-stift/ui'
 import type { CodeBlock, LinkPreview, Quote } from '@cys-stift/domain'
-import { draftStore, useDraft } from '@/lib/draft-store'
+import { draftStore, useDraft, isDraftPersistOk } from '@/lib/draft-store'
 import { useDebouncedCallback } from '@/lib/use-debounced-callback'
 import {
   CodeEditor,
@@ -61,6 +61,8 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
   const [codes, setCodes] = useState<DraftCode[]>([])
   const [quotes, setQuotes] = useState<DraftQuote[]>([])
   const [pending, startTransition] = useTransition()
+  // R2.10: surface silent autosave failures (quota exceeded).
+  const [persistFailed, setPersistFailed] = useState(false)
 
   const formId = useId()
 
@@ -87,9 +89,11 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
         p.quotes.some((q) => q.text.trim().length > 0)
       if (!hasContent) {
         draftStore.clear('manual')
+        setPersistFailed(!isDraftPersistOk())
         return
       }
       draftStore.upsert('manual', p)
+      setPersistFailed(!isDraftPersistOk())
     },
     500,
   )
@@ -236,6 +240,9 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
           Clear
         </Button>
       </div>
+      {persistFailed && (
+        <p className="ccf__warn" role="alert">{t('draft.persistFailed')}</p>
+      )}
 
       <style>{styles}</style>
       <style>{editorStyles}</style>
@@ -297,4 +304,9 @@ const styles = `
 .ccf__toggle:hover { background: var(--color-red-soft); }
 .ccf__actions { display: flex; gap: var(--space-2); align-items: center; }
 .ccf__actions-spacer { flex: 1; }
+.ccf__warn {
+  margin: 0;
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  color: var(--color-red);
+}
 `

@@ -141,6 +141,34 @@ describe('draftStore — cold-start hydration', () => {
   })
 })
 
+describe('draftStore — persistence status (R2.10)', () => {
+  it('isDraftPersistOk() is true on the happy path', async () => {
+    const { draftStore, isDraftPersistOk } = await import('../draft-store')
+    draftStore.upsert('capture', { text: 'happy' })
+    expect(isDraftPersistOk()).toBe(true)
+  })
+
+  it('reports false when setItem throws QuotaExceededError, then recovers', async () => {
+    const { draftStore, isDraftPersistOk } = await import('../draft-store')
+    // jsdom's localStorage.setItem is a non-writable inherited method, so we
+    // must spy on Storage.prototype to intercept the call.
+    const spy = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(() => {
+        throw new DOMException('quota exceeded', 'QuotaExceededError')
+      })
+    try {
+      draftStore.upsert('capture', { text: 'too big' })
+      expect(isDraftPersistOk()).toBe(false)
+    } finally {
+      spy.mockRestore()
+    }
+    // Next successful save resets the flag.
+    draftStore.upsert('capture', { text: 'recovered' })
+    expect(isDraftPersistOk()).toBe(true)
+  })
+})
+
 describe('draftStore — SSR safety', () => {
   it('upsert / clear / get do not throw when window is undefined', async () => {
     const originalWindow = globalThis.window
