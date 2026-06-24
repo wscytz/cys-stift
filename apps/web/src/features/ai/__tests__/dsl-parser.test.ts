@@ -202,4 +202,15 @@ describe('parseDsl', () => {
     const result = parseDsl('[arrow #fa3] @color(red)')
     expect(result).toHaveLength(0)
   })
+
+  // ── # 注释行被静默跳过(serializeCanvasReadable 的 title 注释)──
+
+  it('parseDsl 跳过 # 注释行', () => {
+    const result = parseDsl(
+      '[card #c1] @pos(0,0) @size(10,10)\n  # title: hello\n[rect #r1] @pos(5,5) @size(20,20)',
+    )
+    expect(result).toHaveLength(2)
+    expect(result[0]?.type).toBe('card')
+    expect(result[1]?.type).toBe('free')
+  })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { serializeCanvas } from '../canvas-dsl'
+import { serializeCanvas, serializeCanvasReadable } from '../canvas-dsl'
 import { parseDsl } from '../dsl-parser'
 import type { CanvasElement } from '@cys-stift/canvas-engine'
 
@@ -189,5 +189,71 @@ describe('canvas DSL round-trip (serialize → parse)', () => {
     const ops = parseDsl(serializeCanvas(elements))
     const arrow = ops.find((o) => o.type === 'arrow')
     expect(arrow).toMatchObject({ from: 'c1', to: 'r1', label: 'ref' })
+  })
+})
+
+describe('serializeCanvasReadable — card 行后附 title 注释', () => {
+  it('card 行后附 # title 注释', () => {
+    const elements: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 100, y: 200, w: 240, h: 120, rotation: 0, color: 'blue' },
+    ]
+    const out = serializeCanvasReadable(elements, (id) => (id === 'c1' ? 'My Card' : undefined))
+    const lines = out.split('\n')
+    expect(lines[0]).toBe('[card #c1] @pos(100,200) @size(240,120) @color(blue)')
+    expect(lines[1]).toBe('  # title: My Card')
+  })
+
+  it('无 getCardTitle 时附 (untitled)', () => {
+    const elements: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 },
+    ]
+    const out = serializeCanvasReadable(elements)
+    expect(out).toContain('  # title: (untitled)')
+  })
+
+  it('非 card 元素不附注释', () => {
+    const elements: CanvasElement[] = [
+      { id: 'r1', kind: 'rect', x: 10, y: 20, w: 300, h: 400, rotation: 0, color: 'red' },
+      { id: 't1', kind: 'text', x: 5, y: 6, w: 0, h: 0, rotation: 0, text: 'hello' },
+      { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'r1', text: 'ref' },
+      { id: 'f1', kind: 'freedraw', x: 5, y: 6, w: 0, h: 0, rotation: 0 },
+    ]
+    const out = serializeCanvasReadable(elements, () => 'should-not-appear')
+    expect(out).not.toContain('# title:')
+  })
+
+  it('多 card 各附自己的 title', () => {
+    const elements: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 },
+      { id: 'c2', kind: 'card', x: 20, y: 20, w: 10, h: 10, rotation: 0 },
+    ]
+    const out = serializeCanvasReadable(elements, (id) => (id === 'c1' ? 'First' : 'Second'))
+    expect(out).toContain('  # title: First')
+    expect(out).toContain('  # title: Second')
+  })
+
+  it('title 含换行被压平', () => {
+    const elements: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 },
+    ]
+    const out = serializeCanvasReadable(elements, () => 'a\nb')
+    expect(out).toContain('  # title: a b')
+    // 换行被压平 → 注释仍是单行,只产生一行 title 注释。
+    expect(out.split('\n').filter((l) => l.includes('# title:'))).toHaveLength(1)
+  })
+
+  it('注释行被 parseDsl 跳过(往返不崩)', () => {
+    const elements: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 100, y: 200, w: 240, h: 120, rotation: 0, color: 'blue' },
+      { id: 'r1', kind: 'rect', x: 10, y: 20, w: 300, h: 400, rotation: 0, color: 'red' },
+      { id: 't1', kind: 'text', x: 5, y: 6, w: 0, h: 0, rotation: 0, text: 'hello' },
+      { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'r1', text: 'ref' },
+      { id: 'f1', kind: 'freedraw', x: 5, y: 6, w: 0, h: 0, rotation: 0 },
+    ]
+    const out = serializeCanvasReadable(elements, (id) => `title-${id}`)
+    expect(() => parseDsl(out)).not.toThrow()
+    const ops = parseDsl(out)
+    // card + rect + text + arrow = 4(freedraw 不被 parse,注释行被跳过)。
+    expect(ops).toHaveLength(4)
   })
 })
