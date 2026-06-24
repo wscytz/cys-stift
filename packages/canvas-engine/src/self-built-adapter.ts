@@ -34,8 +34,6 @@ export class SelfBuiltAdapter implements CanvasHost {
   private getCardInfo: (id: string) => CardInfo | null
   private tokenResolver: TokenResolver
   private rafId: number | null = null
-  private dragId: string | null = null
-  private dragOffset = { x: 0, y: 0 }
   private panning: {
     startSx: number
     startSy: number
@@ -407,7 +405,6 @@ export class SelfBuiltAdapter implements CanvasHost {
           if (sel) offsets.set(sid, { x: p.x - sel.x, y: p.y - sel.y })
         }
         this.dragGroup = { ids: [...this.selectedIds], offsets }
-        this.dragId = id // 兼容现有 onMove 的 dragId 检查;onMove 优先用 dragGroup
         // drag 开始:批前推一次快照,后续 onMove 的连续 upsert 合并为这一步(coalescing)。
         this.pushUndo()
         this.coalescing = true
@@ -483,20 +480,7 @@ export class SelfBuiltAdapter implements CanvasHost {
         }
         return
       }
-      if (this.dragId) {
-        const p = screenToPage(this.view, sx, sy)
-        const el = this.getElement(this.dragId)
-        if (el) {
-          const nx = Math.round(p.x - this.dragOffset.x)
-          const ny = Math.round(p.y - this.dragOffset.y)
-          if (el.kind === 'freedraw') {
-            const moved = translateFreedraw(el, nx - el.x, ny - el.y)
-            if (moved) this.upsert(moved)
-          } else {
-            this.upsert({ ...el, x: nx, y: ny })
-          }
-        }
-      } else if (this.panning) {
+      if (this.panning) {
         this.setView({
           ...this.view,
           panX: this.panning.fromPanX + (sx - this.panning.startSx),
@@ -586,14 +570,13 @@ export class SelfBuiltAdapter implements CanvasHost {
         }
         return
       }
-      if (this.dragId || this.panning) {
+      if (this.panning) {
         try {
           this.canvas.releasePointerCapture(e.pointerId)
         } catch {
           /* 已释放 */
         }
       }
-      this.dragId = null
       this.dragGroup = null
       this.panning = null
     }
