@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "cy's Stift",
+  "productName": "cys-stift",
   "version": "0.37.0",
   "identifier": "com.cys-stift.desktop",
   "build": {
