@@ -45,6 +45,10 @@ P2 引擎抽包后的衔接打磨 + 增值功能。
 - **全程本地,点序列不外发**(选 \$1 的核心原因——守 R2 隐私,不做②AI 介入手绘)。FreedrawPanel 升级显示具体形状。
 - 诚实记论文限制:旋转/缩放/平移不变 → 无法区分朝向/比例。
 
+### 引擎交互鲁棒性 · 第三轮(2026-06-24)
+- **关系箭头可选中(修真 bug)**:关系箭头(connect 创建)bbox w=h=0 → hitTest/marquee 按 bbox 命不中 → 选不了/删不掉/改不了关系类型。矩阵探照灯照出(测试此前零覆盖「arrow 能选中」)。修:`hitTest` arrow 走线段距离命中(点到 from→to 线段距离<6px/zoom;+zoom 参数);`marqueeSelect` arrow 走线段-框相交(端点在内或线段穿框)。自由箭头统一走线段。
+- 矩阵扩「关系箭头选中」列(中点命中/偏离/框选)+ hittest/marquee 单测固化。线段几何:pointToSegmentDistance + segmentIntersectsRect(segSeg 跨立判定)。
+
 
 
 开发者反馈(2026-06-22)的 2 个交互 bug + 收尾整理 + 战略讨论档归档。
