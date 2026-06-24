@@ -11,6 +11,7 @@ import { useCanvases } from '@/lib/canvas-store'
 import { captureSinkRegistry } from '@/features/capture/capture-sink'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
+import { PageLoading } from '@/components/page-loading'
 import { typeKeyOf } from '@/lib/type-label'
 import { getDeviceId } from '@/lib/device-id'
 import { pushToast } from '@/lib/toast-store'
@@ -104,7 +105,9 @@ export default function InboxPage() {
           />
         )}
 
-        {visible.length === 0 ? (
+        {!ready ? (
+          <PageLoading />
+        ) : visible.length === 0 ? (
           <EmptyState view={view} />
         ) : (
           <ul className="grid">

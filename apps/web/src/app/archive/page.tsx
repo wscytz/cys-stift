@@ -6,6 +6,7 @@ import { Button, Card as UICard, Modal, Tag, Toolbar } from '@cys-stift/ui'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
+import { PageLoading } from '@/components/page-loading'
 import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
 import { Timeline } from '@/features/archive/timeline'
 import { CardDetailModal } from '@/features/card/card-detail'
@@ -138,7 +139,9 @@ export default function ArchivePage() {
       </Toolbar>
 
       <div className="page-content page-content--wide">
-        {cards.length === 0 ? (
+        {!ready ? (
+          <PageLoading />
+        ) : cards.length === 0 ? (
           <EmptyState />
         ) : view === 'grid' ? (
           <ul className="grid">

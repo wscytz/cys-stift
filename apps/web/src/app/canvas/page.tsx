@@ -42,7 +42,7 @@ import { canvasViewStore } from '@/lib/canvas-view-store'
  */
 export default function CanvasPage() {
   const { t } = useI18n()
-  const { snap, service } = useDb()
+  const { snap, service, ready } = useDb()
   void snap
   const handle = useRef<SelfCanvasHandle>({ adapter: null })
   const canvasElRef = useRef<HTMLCanvasElement | null>(null)
@@ -411,7 +411,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           adapterRef={handle}
           canvasElRef={canvasElRef}
         />
-        {onCanvas === 0 && (
+        {!ready ? null : onCanvas === 0 && (
           <div className="cv-empty" aria-hidden="true">
             <span className="eyebrow">{t('canvas.emptyTitle')}</span>
             <span className="mono">{t('canvas.emptyHint')}</span>

@@ -6,6 +6,7 @@ import { Button, Card as UICard, Modal, Tag, Toolbar } from '@cys-stift/ui'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
+import { PageLoading } from '@/components/page-loading'
 import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
 
 /**
@@ -55,7 +56,9 @@ export default function TrashPage() {
       </Toolbar>
 
       <div className="page-content page-content--wide">
-        {trashed.length === 0 ? (
+        {!ready ? (
+          <PageLoading />
+        ) : trashed.length === 0 ? (
           <EmptyState />
         ) : (
           <ul className="grid">
