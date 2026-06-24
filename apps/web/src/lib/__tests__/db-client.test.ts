@@ -164,6 +164,45 @@ describe('rehydrateCards — content-signature stability (v0.37.0 regression gua
   })
 })
 
+// ── rehydrateCards — middle-card edit (R2.5 signature coverage) ──────────────
+// History (R2.5): the v0.37.0 signature `${length}:${firstId}:${lastId}` only
+// covers endpoints. A cross-tab edit to a MIDDLE card (same length, same first
+// and last id, but a middle card's title/updatedAt changed) produces an
+// identical signature → rehydrate treats it as "no change" → the in-memory
+// cache is never updated → stale data in the current tab. The fix makes the
+// signature cover every card's updatedAt (sum + count), so any content change
+// is detected while still avoiding the array-identity false-fire. This test
+// asserts the OBSERVABLE consequence: after rehydrate, the in-memory cardRepo
+// reflects the middle-card change (it did not with the old weak signature).
+describe('rehydrateCards — middle-card edit (R2.5)', () => {
+  it('picks up a cross-tab edit to a middle card (same length, same endpoints)', async () => {
+    const { __test__ } = await import('../db-client')
+    const { cardRepo } = __test__
+    const base1 = makeCard({ id: toCardId('base-1'), title: 'one' })
+    const base2 = makeCard({ id: toCardId('base-2'), title: 'two' })
+    const base3 = makeCard({ id: toCardId('base-3'), title: 'three' })
+    window.localStorage.setItem(STORAGE_KEY, serializeCards([base1, base2, base3]))
+    rehydrateCards() // populate in-memory cache
+    expect(cardRepo.getById(toCardId('base-2'))!.title).toBe('two')
+
+    // Simulate a cross-tab edit: another tab rewrote base-2's title and bumped
+    // its updatedAt, but length + first/last id are unchanged. Under the old
+    // signature this payload produced the SAME signature → rehydrate no-op'd.
+    const edited2 = makeCard({
+      id: toCardId('base-2'),
+      title: 'two EDITED',
+      updatedAt: new Date('2026-06-23T11:00:00.000Z'),
+    })
+    window.localStorage.setItem(STORAGE_KEY, serializeCards([base1, edited2, base3]))
+    rehydrateCards()
+
+    // The in-memory cache must now reflect the edited middle card.
+    expect(cardRepo.getById(toCardId('base-2'))!.title).toBe('two EDITED')
+    const titles = cardRepo.listAll().map((c) => c.title)
+    expect(titles).toEqual(['one', 'two EDITED', 'three'])
+  })
+})
+
 // ── Cross-tab storage event sync ─────────────────────────────────────────────
 describe('db-client — cross-tab storage event sync', () => {
   it('does not throw when a storage event fires on the cards key', () => {

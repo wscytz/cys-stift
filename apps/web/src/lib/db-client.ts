@@ -124,7 +124,17 @@ export function rehydrateCards(): void {
   // (`next.cards !== _cards`) would ALWAYS fire — causing every cross-tab
   // storage event to notify every useDb() consumer, even when the parsed
   // content is identical. Compare a cheap signature instead. (v0.37.0 review.)
-  const sig = (cs: Card[]) => `${cs.length}:${cs[0]?.id ?? ''}:${cs[cs.length - 1]?.id ?? ''}`
+  //
+  // R2.5: the old signature (length + first/last id) missed cross-tab edits to
+  // a MIDDLE card — same length, same endpoints, but a middle card's content
+  // changed. Summing every card's updatedAt timestamp catches any content
+  // change (any card mutation bumps its updatedAt) while staying a pure cheap
+  // string that does not false-fire on the fresh array identity.
+  const sig = (cs: Card[]): string => {
+    let sum = 0
+    for (const c of cs) sum += c.updatedAt.getTime()
+    return `${cs.length}:${sum}`
+  }
   if (sig(next.cards) !== sig(_cards)) {
     _cards = next.cards
     notify()

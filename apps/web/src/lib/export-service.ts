@@ -38,6 +38,12 @@ export interface ExportPayload {
   canvases?: CanvasesEnvelope
   /** per-canvas freeform 几何,key=canvasId。复用 CanvasFreeformSnapshot(与 .cystift 同源 CanvasElement[])。 */
   freeform?: Record<string, CanvasFreeformSnapshot>
+  /**
+   * per-canvas view(zoom/pan/gridMode/gridSize),key=canvasId。
+   * 与 canvas-view-store 的 `{ views: Record<CanvasId, CanvasView> }` 同形;
+   * 这里只存 `.views` 部分以保持 payload 扁平。旧版 JSON 无此字段(向后兼容)。
+   */
+  canvasView?: Record<string, unknown>
 }
 
 function readJson(key: string): unknown {
@@ -97,6 +103,13 @@ export async function buildExportPayload(): Promise<ExportPayload> {
     if (entries.length > 0) freeform = Object.fromEntries(entries)
   }
 
+  // canvas-view(zoom/pan/gridMode/gridSize per canvas,canvas-view-store)。
+  // 直接读原始 key 取 `.views`,与 canvases/freeform 同样不触发 store hydrate 副作用。
+  const canvasViewPayload = readJson('cys-stift.canvas-view.v1') as {
+    views?: Record<string, unknown>
+  } | null
+  const canvasView = canvasViewPayload?.views
+
   return {
     version: EXPORT_FORMAT_VERSION,
     exportedAt: new Date().toISOString(),
@@ -107,6 +120,7 @@ export async function buildExportPayload(): Promise<ExportPayload> {
     settings: settingsPayload?.settings,
     ...(canvasesEnvelope ? { canvases: canvasesEnvelope } : {}),
     ...(freeform ? { freeform } : {}),
+    ...(canvasView ? { canvasView } : {}),
   }
 }
 
@@ -281,6 +295,15 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
       writes.push({
         key: 'cys-stift.canvases.v1',
         value: JSON.stringify({ snapshot: payload.canvases }),
+      })
+    }
+    // canvas-view(zoom/pan/gridMode/gridSize per canvas):与 canvases 同走同步
+    // localStorage 写 + rollback。payload 存扁平 views map,写回时还原为
+    // canvas-view-store 的 `{ views }` envelope。旧 JSON 无 canvasView 字段 → 跳过。
+    if (payload.canvasView && typeof payload.canvasView === 'object') {
+      writes.push({
+        key: 'cys-stift.canvas-view.v1',
+        value: JSON.stringify({ views: payload.canvasView }),
       })
     }
   } catch (e) {

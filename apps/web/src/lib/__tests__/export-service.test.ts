@@ -27,6 +27,7 @@ const MEDIA_KEY = 'cys-stift.media.v1'
 const DRAFTS_KEY = 'cys-stift.drafts.v1'
 const SETTINGS_KEY = 'cys-stift.settings.v1'
 const CANVASES_KEY = 'cys-stift.canvases.v1'
+const CANVAS_VIEW_KEY = 'cys-stift.canvas-view.v1'
 
 function makeCard(overrides: Partial<Card> = {}): Card {
   return {
@@ -89,6 +90,14 @@ function seedCanvases(canvases: Canvas[], activeCanvasId: string) {
     CANVASES_KEY,
     JSON.stringify({ snapshot: { canvases, activeCanvasId } }),
   )
+}
+
+/**
+ * Seed the per-canvas view store (matches canvas-view-store saveViewMap shape:
+ * `{ views: Record<CanvasId, CanvasView> }`). zoom/pan/gridMode/gridSize per canvas.
+ */
+function seedCanvasView(views: Record<string, unknown>) {
+  window.localStorage.setItem(CANVAS_VIEW_KEY, JSON.stringify({ views }))
 }
 
 // ── buildExportPayload ────────────────────────────────────────────────────
@@ -237,6 +246,78 @@ describe('buildExportPayload — canvases + freeform', () => {
     expect(payload.canvases!.canvases).toHaveLength(1)
     // No freeform was saved → empty entries → field omitted.
     expect(payload.freeform).toBeUndefined()
+  })
+})
+
+// ── buildExportPayload — canvasView (per-canvas zoom/pan/gridMode) ────────────
+
+// R2.1: the canvas-view store (cys-stift.canvas-view.v1) holds per-canvas
+// zoom/pan/gridMode/gridSize. It was absent from export/import, so migrating
+// devices silently lost every canvas's view. These tests cover export reads it,
+// import writes it, and a full round-trip preserves it. Backward compat: an old
+// JSON without the field still imports (skipped, no key written).
+describe('buildExportPayload + import — canvasView (R2.1)', () => {
+  const knownViews = {
+    'canvas-a': { zoom: 1.5, panX: 10, panY: -20, gridMode: 'snap', gridSize: 8 },
+    'canvas-b': { zoom: 0.5, panX: 0, panY: 100, gridMode: 'free', gridSize: 16 },
+  }
+
+  it('buildExportPayload includes canvasView when the store is seeded', async () => {
+    seedCanvasView(knownViews)
+    const payload = await mod.buildExportPayload()
+    expect(payload.canvasView).toBeDefined()
+    expect(payload.canvasView).toEqual(knownViews)
+  })
+
+  it('omits canvasView (undefined) when the store is absent', async () => {
+    seedStores({ cards: [makeCard()] }) // no canvas-view key
+    const payload = await mod.buildExportPayload()
+    expect(payload.canvasView).toBeUndefined()
+  })
+
+  it('import writes canvasView to localStorage when the payload has it', async () => {
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      cards: [{ id: 'c1', title: 't', body: 'b' }],
+      canvasView: knownViews,
+    })
+    expect(window.localStorage.getItem(CANVAS_VIEW_KEY)).toBeNull()
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(true)
+    const restored = JSON.parse(window.localStorage.getItem(CANVAS_VIEW_KEY)!) as {
+      views: Record<string, unknown>
+    }
+    expect(restored.views).toEqual(knownViews)
+  })
+
+  it('round-trips canvasView through export → wipe → import (no loss)', async () => {
+    seedCanvasView(knownViews)
+    const json = JSON.stringify(await mod.buildExportPayload())
+    window.localStorage.clear()
+    expect(window.localStorage.getItem(CANVAS_VIEW_KEY)).toBeNull()
+
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(true)
+
+    const restored = JSON.parse(window.localStorage.getItem(CANVAS_VIEW_KEY)!) as {
+      views: Record<string, unknown>
+    }
+    expect(restored.views).toEqual(knownViews)
+  })
+
+  it('backward compat: legacy JSON without canvasView still imports (no key written)', async () => {
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      cards: [{ id: 'c1', title: 't', body: 'b' }],
+      // no canvasView field
+    })
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(true)
+    expect(window.localStorage.getItem(CANVAS_VIEW_KEY)).toBeNull()
   })
 })
 
