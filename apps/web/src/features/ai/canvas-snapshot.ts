@@ -41,6 +41,12 @@ export interface SnapshotArrow {
   color?: string
   dash?: 'solid' | 'dashed' | 'dotted'
   arrowhead?: 'arrow' | 'triangle' | 'none'
+  /** 自由箭头 bbox(无 from/to 时线段几何由 bbox 编码;w/h 可负表方向)。
+   *  关系箭头不设(端点由 from/to 引用算)。 */
+  x?: number
+  y?: number
+  w?: number
+  h?: number
 }
 
 export type FreeShape =
@@ -91,7 +97,10 @@ export function snapshotCanvas(
         })
         break
       }
-      case 'arrow':
+      case 'arrow': {
+        // 关系箭头(from/to 都有)只携带端点引用;自由箭头(无 from/to)用 bbox
+        // 编码线段(w/h 可负表方向),否则 formatCanvasSnapshot 重建时几何丢失。
+        const hasEndpoints = !!(el.from && el.to)
         arrows.push({
           id: el.id,
           from: el.from ?? '',
@@ -100,8 +109,10 @@ export function snapshotCanvas(
           color: el.color,
           dash: el.dash,
           arrowhead: el.arrowhead,
+          ...(hasEndpoints ? {} : { x, y, w: Math.round(el.w), h: Math.round(el.h) }),
         })
         break
+      }
       case 'rect':
         freeShapes.push({ kind: 'rect', id: el.id, x, y, w: Math.round(el.w), h: Math.round(el.h), color: el.color })
         break
@@ -144,10 +155,12 @@ export function formatCanvasSnapshot(snapshot: CanvasSnapshotOutput): string {
   }
 
   for (const a of snapshot.arrows) {
-    // 关系箭头几何由 from/to 算;x/y/w/h=0(serializeElement 的 arrow 分支对有 from/to
-    // 的输出 `from #a to #b`,不输出 size)。from/to 空串时走自由箭头分支,行为一致。
+    // 关系箭头(有 from/to):x/y/w/h=0,serializeElement 输出 `from #a to #b`(无 size)。
+    // 自由箭头(无 from/to):带 bbox,serializeElement 输出 `@pos+@size`(w/h 可负表方向)。
     const el: CanvasElement = {
-      id: a.id, kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0,
+      id: a.id, kind: 'arrow',
+      x: a.x ?? 0, y: a.y ?? 0, w: a.w ?? 0, h: a.h ?? 0,
+      rotation: 0,
       from: a.from, to: a.to, text: a.label, color: a.color, dash: a.dash, arrowhead: a.arrowhead,
     }
     parts.push(serializeElement(el))
