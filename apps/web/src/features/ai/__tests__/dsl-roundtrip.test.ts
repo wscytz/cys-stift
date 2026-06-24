@@ -64,6 +64,18 @@ describe('DSL round-trip (serialize → parse) — lossless on all active kinds'
       dash: 'dashed',
       arrowhead: 'triangle',
     },
+    // free arrow (no from/to; bbox encodes the segment; w negative = direction)
+    {
+      id: 'fa1',
+      kind: 'arrow',
+      x: 10,
+      y: 20,
+      w: 100,
+      h: -50,
+      rotation: 0,
+      dash: 'solid',
+      arrowhead: 'arrow',
+    },
     // freedraw (position only — NOT round-tripped by design)
     {
       id: 'f1',
@@ -79,13 +91,14 @@ describe('DSL round-trip (serialize → parse) — lossless on all active kinds'
 
   const text = serializeCanvas(elements)
 
-  it('serializes all 5 active kinds (each on its own line)', () => {
+  it('serializes all 5 active kinds (each element on its own line)', () => {
     const lines = text.split('\n').filter(Boolean)
-    expect(lines).toHaveLength(5)
+    expect(lines).toHaveLength(6)
     expect(text).toContain('[card #c1]')
     expect(text).toContain('[rect #r1]')
     expect(text).toContain('[text #t1]')
     expect(text).toContain('[arrow #a1]')
+    expect(text).toContain('[arrow #fa1]')
     expect(text).toContain('[freedraw #f1]')
   })
 
@@ -116,6 +129,19 @@ describe('DSL round-trip (serialize → parse) — lossless on all active kinds'
     expect(arrow.arrowhead).toBe('triangle')
   })
 
+  it('free arrow round-trips id + pos + size (negative) + signature', () => {
+    const fa = parseDsl(text).find((o) => o.type === 'arrow' && o.freeArrow)
+    if (fa?.type !== 'arrow') throw new Error('expected free arrow op')
+    expect(fa.freeArrow).toBe(true)
+    expect(fa.id).toBe('fa1')
+    expect(fa.x).toBe(10)
+    expect(fa.y).toBe(20)
+    expect(fa.w).toBe(100)
+    expect(fa.h).toBe(-50)
+    expect(fa.dash).toBe('solid')
+    expect(fa.arrowhead).toBe('arrow')
+  })
+
   // ── freedraw: the deliberate asymmetry guard ──
 
   it('freedraw is serialized (position only) — point sequence stays out of DSL', () => {
@@ -128,7 +154,7 @@ describe('DSL round-trip (serialize → parse) — lossless on all active kinds'
     const ops = parseDsl(text)
     const freedrawOps = ops.filter((o) => o.type === 'free' && (o as { shape?: string }).shape === 'freedraw')
     expect(freedrawOps).toHaveLength(0)
-    // 4 ops parsed (card, rect, text, arrow) — freedraw line is dropped.
-    expect(ops).toHaveLength(4)
+    // 5 ops parsed (card, rect, text, relation arrow, free arrow) — freedraw line is dropped.
+    expect(ops).toHaveLength(5)
   })
 })

@@ -66,6 +66,13 @@ export type DslArrowOp = {
   dash?: 'solid' | 'dashed' | 'dotted'
   /** Relation signature terminal (semantics): arrow/triangle/none. */
   arrowhead?: 'arrow' | 'triangle' | 'none'
+  /** 自由箭头标记:无 from/to,pos+size 编码线段 bbox。 */
+  freeArrow?: boolean
+  /** 自由箭头 bbox(仅 freeArrow=true 时有意义)。 */
+  x?: number
+  y?: number
+  w?: number
+  h?: number
 }
 
 export type DslOp = DslCardOp | DslFreeOp | DslArrowOp
@@ -179,26 +186,46 @@ export function parseDsl(dslText: string): DslOp[] {
     }
 
     // ── Arrow line: `[arrow #arr1] from #a to #b @label("ref")`
+    //    Free arrow (no from/to): `[arrow #id] @pos(x,y) @size(w,h) + sig`
     if (line.startsWith('[arrow ')) {
       const id = extractId(line)
       if (!id) continue
-      // Extract `from` and `to` references from the text
       const fromMatch = line.match(/from\s+(#[a-zA-Z0-9_-]+)/)
       const toMatch = line.match(/to\s+(#[a-zA-Z0-9_-]+)/)
-      // Skip arrows missing either endpoint — applyLayout would no-op them
-      // anyway (editor.getShape('shape:') → undefined), but skipping here
-      // keeps the op list honest. (v0.37.0 review.)
-      if (!fromMatch || !toMatch) continue
-      ops.push({
-        type: 'arrow',
-        id,
-        from: fromMatch[1]?.replace('#', '') ?? '',
-        to: toMatch[1]?.replace('#', '') ?? '',
-        label: extractLabel(line),
-        color: extractColor(line),
-        dash: extractDash(line),
-        arrowhead: extractArrowhead(line),
-      })
+
+      if (fromMatch && toMatch) {
+        // 关系箭头
+        ops.push({
+          type: 'arrow',
+          id,
+          from: fromMatch[1]!.replace('#', ''),
+          to: toMatch[1]!.replace('#', ''),
+          label: extractLabel(line),
+          color: extractColor(line),
+          dash: extractDash(line),
+          arrowhead: extractArrowhead(line),
+        })
+      } else {
+        // 自由箭头:无 from/to,需 pos + size(w/h 可负,编码线段方向)
+        const pos = extractPos(line)
+        const size = extractSize(line)
+        if (!pos || !size) continue
+        ops.push({
+          type: 'arrow',
+          id,
+          from: '',
+          to: '',
+          freeArrow: true,
+          x: pos.x,
+          y: pos.y,
+          w: size.w,
+          h: size.h,
+          label: extractLabel(line),
+          color: extractColor(line),
+          dash: extractDash(line),
+          arrowhead: extractArrowhead(line),
+        })
+      }
       continue
     }
 

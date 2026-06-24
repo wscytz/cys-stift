@@ -154,4 +154,52 @@ describe('parseDsl', () => {
     expect(op.color).toBe('red')
     expect(op.text).toBe('hello')
   })
+
+  // ── free arrow (no from/to) — DSL symmetry Step 3 ──
+
+  it('parses a free arrow (no from/to, pos+size)', () => {
+    const result = parseDsl(
+      '[arrow #fa1] @pos(10,20) @size(100,50) @color(red) @dash(solid) @arrowhead(arrow)',
+    )
+    expect(result).toHaveLength(1)
+    const op = result[0]!
+    if (op.type !== 'arrow') throw new Error('expected arrow op')
+    expect(op.freeArrow).toBe(true)
+    expect(op.id).toBe('fa1')
+    expect(op.x).toBe(10)
+    expect(op.y).toBe(20)
+    expect(op.w).toBe(100)
+    expect(op.h).toBe(50)
+    expect(op.color).toBe('red')
+    expect(op.dash).toBe('solid')
+    expect(op.arrowhead).toBe('arrow')
+    expect(op.from).toBe('')
+    expect(op.to).toBe('')
+  })
+
+  it('parses free arrow with negative size', () => {
+    const result = parseDsl('[arrow #fa2] @pos(100,50) @size(-80,30)')
+    expect(result).toHaveLength(1)
+    const op = result[0]!
+    if (op.type !== 'arrow') throw new Error('expected arrow op')
+    expect(op.w).toBe(-80)
+    expect(op.h).toBe(30)
+    expect(op.freeArrow).toBe(true)
+  })
+
+  it('parses relation arrow unchanged', () => {
+    const result = parseDsl('[arrow #a1] from #c1 to #c2 @label("ref")')
+    expect(result).toHaveLength(1)
+    const op = result[0]!
+    if (op.type !== 'arrow') throw new Error('expected arrow op')
+    expect(op.from).toBe('c1')
+    expect(op.to).toBe('c2')
+    expect(op.freeArrow).toBeUndefined()
+    expect(op.label).toBe('ref')
+  })
+
+  it('free arrow without pos+size is skipped', () => {
+    const result = parseDsl('[arrow #fa3] @color(red)')
+    expect(result).toHaveLength(0)
+  })
 })
