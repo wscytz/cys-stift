@@ -39,12 +39,12 @@ export default function SearchPage() {
   return (
     <main className="page">
       <Toolbar region="system">
-        <span className="crumb">cy&rsquo;s stift</span>
+        <span className="crumb">{t('brand.name')}</span>
         <span className="crumb-sep">/</span>
         <span className="crumb crumb--here">{t('search.crumb')}</span>
       </Toolbar>
 
-      <div className="content">
+      <div className="page-content page-content--wide">
         <input
           autoFocus
           className="search-input"
@@ -60,7 +60,7 @@ export default function SearchPage() {
           <p className="search-hint">{t('search.noMatch', { q: query })}</p>
         ) : (
           <>
-            <p className="search-count">{t('search.resultsCount', { n: results.length })}</p>
+            <p className="mono-label">{t('search.resultsCount', { n: results.length })}</p>
             <ul className="grid">
               {results.map((r) => (
                 <li key={r.card.id}>
@@ -120,10 +120,6 @@ function SnippetLine({ result, query }: { result: SearchResult; query: string })
 
 const styles = `
 .page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
-.crumb { font-family: var(--font-mono); font-size: var(--font-size-sm); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-gray); }
-.crumb--here { color: var(--color-black); }
-.crumb-sep { color: var(--color-gray); }
-.content { max-width: 1120px; margin: 0 auto; padding: var(--space-5) var(--space-4); display: flex; flex-direction: column; gap: var(--space-4); }
 .search-input {
   width: 100%; height: 48px; padding: 0 var(--space-3);
   font-family: var(--font-body); font-size: var(--font-size-lg);
@@ -133,7 +129,6 @@ const styles = `
 }
 .search-input:focus { border-color: var(--color-black); border-width: 2px; padding: 0 calc(var(--space-3) - 1px); }
 .search-hint { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-sm); color: var(--color-gray); }
-.search-count { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); text-transform: uppercase; letter-spacing: 0.12em; }
 .search-snippet {
   margin: var(--space-1) 0 0; font-family: var(--font-mono);
   font-size: var(--font-size-xs); color: var(--color-gray);
