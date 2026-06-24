@@ -110,7 +110,7 @@ export function FreedrawPanel({
       aria-label={t('freedraw.title')}
       style={panelStyle}
     >
-      <span className="cv-freedraw__eyebrow" aria-hidden="true">
+      <span className="eyebrow" aria-hidden="true">
         {t('freedraw.title')}
       </span>
       <span className="cv-freedraw__sep" aria-hidden="true" />
@@ -182,13 +182,6 @@ const styles = `
   box-shadow: 4px 4px 0 0 var(--color-black);
   font-family: var(--font-mono);
   white-space: nowrap;
-}
-.cv-freedraw__eyebrow {
-  padding: 0 var(--space-2);
-  font-size: var(--font-size-xs);
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--color-gray);
 }
 .cv-freedraw__sep {
   width: 1px;

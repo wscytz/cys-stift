@@ -108,7 +108,7 @@ export function RelationPanel({
       aria-label={t('relation.title')}
       style={panelStyle}
     >
-      <span className="cv-relation__eyebrow" aria-hidden="true">
+      <span className="eyebrow" aria-hidden="true">
         {t('relation.title')}
       </span>
       <span className="cv-relation__sep" aria-hidden="true" />
@@ -185,13 +185,6 @@ const styles = `
   box-shadow: 4px 4px 0 0 var(--color-black);
   font-family: var(--font-mono);
   white-space: nowrap;
-}
-.cv-relation__eyebrow {
-  padding: 0 var(--space-2);
-  font-size: var(--font-size-xs);
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--color-gray);
 }
 .cv-relation__sep {
   width: 1px;
