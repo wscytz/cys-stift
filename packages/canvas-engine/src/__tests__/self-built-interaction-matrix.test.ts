@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { SelfBuiltAdapter } from '../self-built-adapter'
 import { hitTest } from '../self-built-hittest'
+import { marqueeSelect } from '../self-built-marquee'
 import type { CanvasElement } from '../canvas-host'
 
 /**
@@ -136,5 +137,35 @@ describe('交互矩阵 — 每种 kind × 键盘微移(方向键)', () => {
     })
   }
 })
+
+// ── 关系箭头可选中(探照灯:关系箭头 bbox w=h=0 → bbox 命中失败) ──────────────
+// 关系箭头(connect 工具创建)bbox 是 x=y=w=h=0(端点由 from/to 引用算),hitTest 按
+// bbox 只有单点命中 → 选不中/删不掉/改不了关系类型。这格当前 FAIL,步骤 1+2 修。
+
+describe('交互矩阵 — 关系箭头可选中', () => {
+  // 两 card 横向排列,arrow 连接它们。线段从 (100,50)→(200,50),中点 (150,50)。
+  const cardA: CanvasElement = { id: 'ca', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 }
+  const cardB: CanvasElement = { id: 'cb', kind: 'card', x: 200, y: 0, w: 100, h: 100, rotation: 0 }
+  const arrow: CanvasElement = {
+    id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'cb',
+  }
+  const els = [cardA, cardB, arrow]
+
+  it('hitTest:点在线段中点 → 命中 arrow', () => {
+    // 线段中点 (150,50)。当前 bbox 命中:w=h=0 → 命不中(返 null 或 card)。
+    expect(hitTest(els, 150, 50)).toBe('ar')
+  })
+
+  it('hitTest:点偏离线段 → 不命中 arrow', () => {
+    // (150, 200) 远离线段 → 不应是 arrow。
+    expect(hitTest(els, 150, 200)).not.toBe('ar')
+  })
+
+  it('marqueeSelect:框覆盖线段中点 → 选中 arrow', () => {
+    // 框 (140,40,20,20) 覆盖中点 (150,50)。当前 arrow w=h=0 → rectsIntersect 几乎框不中。
+    expect(marqueeSelect({ x: 140, y: 40, w: 20, h: 20 }, els)).toContain('ar')
+  })
+})
+
 
 

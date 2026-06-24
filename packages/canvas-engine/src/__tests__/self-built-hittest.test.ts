@@ -27,4 +27,27 @@ describe('hitTest', () => {
     ]
     expect(hitTest(overlap, 50, 50)).toBe('top') // 数组末尾 = 最上层
   })
+
+  // 关系箭头:bbox w=h=0,按线段距离命中(from/to 端点连线)。
+  const arrowEls: CanvasElement[] = [
+    { id: 'ca', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+    { id: 'cb', kind: 'card', x: 200, y: 0, w: 100, h: 100, rotation: 0 },
+    { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'cb' },
+  ]
+  it('关系箭头:点在线段中点 → 命中(线段距离命中,bbox 命不中)', () => {
+    // 线段 (100,50)→(200,50),中点 (150,50)
+    expect(hitTest(arrowEls, 150, 50)).toBe('ar')
+  })
+  it('关系箭头:点偏离线段 → 不命中', () => {
+    expect(hitTest(arrowEls, 150, 200)).not.toBe('ar')
+  })
+  it('关系箭头:点在端点附近 → 命中(容差内)', () => {
+    expect(hitTest(arrowEls, 102, 52)).toBe('ar') // 端点 (100,50) 附近 2px
+  })
+  it('zoom 影响容差:zoom 大 → 页坐标容差小', () => {
+    // zoom=0.5 → 页容差 12px;(150,62) 距线段 12px,边界。
+    expect(hitTest(arrowEls, 150, 62, 0.5)).toBe('ar')
+    // zoom=2 → 页容差 3px;(150,62) 距线段 12px > 3 → 不命中。
+    expect(hitTest(arrowEls, 150, 62, 2)).not.toBe('ar')
+  })
 })

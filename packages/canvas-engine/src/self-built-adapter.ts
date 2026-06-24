@@ -318,7 +318,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       }
       // connect 模式:命中元素 → 开连接;空白 → 不开;都不进 drag/pan
       if (this.activeTool === 'connect') {
-        const id = hitTest(this.getElements(), p.x, p.y)
+        const id = hitTest(this.getElements(), p.x, p.y, this.view.zoom)
         if (id) {
           this.connecting = { fromId: id, pointer: { x: p.x, y: p.y } }
           try {
@@ -332,7 +332,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       }
       // shift + 空白 → 框选(优先,在 resize-hit 之前)
       if (this.activeTool === 'select' && e.shiftKey) {
-        const hitId = hitTest(this.getElements(), p.x, p.y)
+        const hitId = hitTest(this.getElements(), p.x, p.y, this.view.zoom)
         if (!hitId) {
           this.marquee = { startX: p.x, startY: p.y, curX: p.x, curY: p.y }
           try {
@@ -364,7 +364,7 @@ export class SelfBuiltAdapter implements CanvasHost {
           }
         }
       }
-      const id = hitTest(this.getElements(), p.x, p.y)
+      const id = hitTest(this.getElements(), p.x, p.y, this.view.zoom)
       if (id) {
         const el = this.getElement(id)!
         if (e.shiftKey) {
@@ -488,7 +488,7 @@ export class SelfBuiltAdapter implements CanvasHost {
         const sx = e.clientX - rect.left
         const sy = e.clientY - rect.top
         const p = screenToPage(this.view, sx, sy)
-        const toId = hitTest(this.getElements(), p.x, p.y)
+        const toId = hitTest(this.getElements(), p.x, p.y, this.view.zoom)
         if (toId && toId !== this.connecting.fromId) {
           const id =
             'arrow-' +
