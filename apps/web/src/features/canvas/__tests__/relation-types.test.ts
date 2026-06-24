@@ -68,6 +68,13 @@ describe('inferRelationType (from CanvasElement)', () => {
   it('returns null for arrow with no color/text', () => {
     expect(inferRelationType(baseArrow())).toBeNull()
   })
+  it('matches related-to with canonical grey', () => {
+    expect(inferRelationType(baseArrow({ color: 'grey', text: 'related-to' }))?.id).toBe('related-to')
+  })
+  it('normalizes gray → grey (AI may write American spelling)', () => {
+    // 注册表用 'grey';AI 写 'gray' 时 colorOf 渲染对但严格匹配会漏 → 归一化后应命中。
+    expect(inferRelationType(baseArrow({ color: 'gray', text: 'related-to' }))?.id).toBe('related-to')
+  })
 })
 
 describe('applyRelationType (via host.upsert)', () => {

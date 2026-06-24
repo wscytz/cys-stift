@@ -97,7 +97,11 @@ export function relationTypeById(id: RelationTypeId): RelationType | undefined {
  */
 export function inferRelationType(el: CanvasElement): RelationType | null {
   if (!el.color || !el.text) return null
-  return RELATION_TYPES.find((rt) => rt.color === el.color && el.text === rt.id) ?? null
+  // grey/gray 归一化:注册表用 'grey'(英式),AI/用户可能写 'gray'(美式)。
+  // colorOf 已双向映射到 --color-gray 渲染正确,但此处严格匹配 rt.color='grey'
+  // 会漏(反推失败 → RelationPanel 显示无类型)。归一化后再匹配。
+  const normalizedColor = el.color === 'gray' ? 'grey' : el.color
+  return RELATION_TYPES.find((rt) => rt.color === normalizedColor && el.text === rt.id) ?? null
 }
 
 /**
