@@ -137,7 +137,7 @@ export default function ArchivePage() {
         )}
       </Toolbar>
 
-      <div className="content">
+      <div className="page-content page-content--wide">
         {cards.length === 0 ? (
           <EmptyState />
         ) : view === 'grid' ? (
@@ -275,8 +275,8 @@ function EmptyState() {
     <UICard>
       <div className="empty">
         <div className="empty__bar" aria-hidden="true" />
-        <p className="empty__eyebrow">{t('archive.crumb')}</p>
-        <h2 className="empty__h">{t('archive.empty')}</h2>
+        <p className="eyebrow">{t('archive.crumb')}</p>
+        <h2 className="display-title display-title--lg">{t('archive.empty')}</h2>
       </div>
     </UICard>
   )
@@ -284,16 +284,6 @@ function EmptyState() {
 
 const styles = `
 .page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
-.crumb {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--color-gray);
-}
-.crumb--here { color: var(--color-black); }
-.crumb-sep { color: var(--color-gray); }
-.crumb-spacer { flex: 1; }
 .tab {
   height: 32px;
   padding: 0 var(--space-2);
@@ -310,8 +300,6 @@ const styles = `
 .tab--active { color: var(--color-black); border-bottom-color: var(--color-blue); }
 .tab-sep { width: 1px; height: 24px; background: var(--color-gray-soft); margin: 0 var(--space-1); }
 
-.content { max-width: 1120px; margin: 0 auto; padding: var(--space-5) var(--space-4); display: flex; flex-direction: column; gap: var(--space-4); }
-
 .grid {
   list-style: none;
   margin: 0;
@@ -323,12 +311,6 @@ const styles = `
 
 .empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) 0; }
 .empty__bar { width: 64px; height: 8px; background: var(--color-blue); }
-.empty__eyebrow { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.16em; color: var(--color-gray); }
-.empty__h { margin: 0; font-family: var(--font-display); font-size: var(--font-size-2xl); font-weight: 500; letter-spacing: -0.01em; }
-.empty__lede { margin: 0; color: var(--color-black-soft); font-size: var(--font-size-base); line-height: 1.6; max-width: 60ch; }
-
-.footnote { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); margin: 0; padding-top: var(--space-2); border-top: var(--border-hairline); }
-.footnote__link { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; }
 
 .floater {
   position: fixed;
