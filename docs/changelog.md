@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-06-24 · polish-six · 打磨六主干(已落地功能完成度/体验/鲁棒性)
+
+转义产品化 + JSON 备份 + 引擎鲁棒性都落地后,做一轮"打磨已有功能"而非找新缝。6 个主干,各一 commit。
+
+### 修复
+- **DSL Apply 文本同步 + 生效计数**(`bbfb822`,合并主干1+2):① 真 bug——apply 后不重序列化 textarea,host 同引用 + batch 原地变更使填充 text 的 useEffect 不重跑 → 文本框显示旧文本 → 重复 Apply 对 create 类 op(rect/text/自由箭头无 id)造副本。修:apply 末尾 setText(serializeCanvasReadable)。② 反馈不诚实——toast 报 parse 的 op 数非实际生效数。修:applyLayout 返回 {applied,skipped}(各 applyXxxOp 返回 boolean,per-op throw 计 skipped);toast 改"应用 N 条 M 条跳过"。
+- **DSL 语法速查内嵌**(`dcabf50`):编辑器只一句话 lede 不教语法。加可折叠 details 速查:5 kind 示例行 + 注释规则 + card 只更新约束。i18n 双语。
+- **Escape 取消选区**(`5831b1c`):keyHandler 无 Escape,只能点空白取消。加 Escape 清选区(通用画布习惯),守卫 text/输入框已排除。矩阵补 Escape 列。
+- **多选 resize 一致性**(`e9f6810`):resize handle 多选时只缩第一个元素误导。改 size===1:多选时禁用 resize 只允许组移动(组缩放复杂功能留后)。矩阵补多选 resize 格子 + 单选对照组。
+- **JSON 导入确认门**(`0cf1000`):导入是裸 file input,选错文件零确认覆盖全数据。加 Modal 确认门(警告覆盖不可撤销建议先备份)+ 导入明细加 canvases/freeform 组数。
+
+### 验证
+474 web 测试 + 285 引擎测试 + build exit 0 + tsc 零新增。
+
+---
+
 ## 2026-06-24 · dsl-productize · 转义产品化 · DSL 模态编辑器(核心卖点可见)
 
 转义(画布↔文字 DSL 双向)是 cy's Stift 的核心卖点,但此前只在 AI layout 按钮后跑——`handleAILayout` 把画布序列化喂 AI,AI 返回 DSL 静默 apply,用户全程看不到文本。核心卖点对用户完全不可感知。本轮让它从"架构能力"变成用户可摸到的一等公民功能。3 步 TDD(subagent 编排)。
