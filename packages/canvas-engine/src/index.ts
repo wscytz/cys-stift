@@ -79,6 +79,10 @@ export {
 } from './gesture-recognizer'
 export type { Point, GestureTemplate, RecognitionResult } from './gesture-recognizer'
 
+// ── 手绘形状模板 + recognizeShape(本地,认具体装饰形状;点序列不外发) ──────────
+export { recognizeShape, BUILTIN_SHAPE_TEMPLATES } from './gesture-templates'
+export type { ShapeName, ShapeRecognition } from './gesture-templates'
+
 // ── resize handle ───────────────────────────────────────────────────────────
 export { handleAtPoint, resizeGeometry } from './self-built-resize'
 export type { Handle } from './self-built-resize'
