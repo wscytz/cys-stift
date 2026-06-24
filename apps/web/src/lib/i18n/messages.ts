@@ -153,6 +153,8 @@ export const messages = {
   'canvas.dslErrorsTitle': { zh: '{n} 行无法识别', en: '{n} line(s) could not be parsed' },
   'canvas.dslErrorLine': { zh: '第 {line} 行:', en: 'Line {line}:' },
   'canvas.dslAllInvalid': { zh: '全部 {n} 行都无法识别,未应用任何改动', en: 'All {n} line(s) were invalid — nothing applied' },
+  'canvas.dslPreviewOk': { zh: '{n} 条指令待应用', en: '{n} directive(s) ready to apply' },
+  'canvas.dslPreviewIssues': { zh: '{ok} 条有效 · {bad} 条无效', en: '{ok} valid · {bad} invalid' },
 
   /* ── Canvas relations (M1) ── */
   'relation.title': { zh: '关系类型', en: 'Relation type' },

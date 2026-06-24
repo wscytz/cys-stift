@@ -12,7 +12,7 @@
  * 不门控 AI:所有用户可用,这是核心卖点而非 AI 附属。模态照 export-dialog
  * 的结构(Modal + Button + 内联 token 化 <style> + pushToast + i18n)。
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Modal, Button } from '@cys-stift/ui'
 import type { CardId, CardService } from '@cys-stift/domain'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
@@ -38,6 +38,13 @@ export function DslDialog({
   const { t } = useI18n()
   const [text, setText] = useState('')
   const [errors, setErrors] = useState<DslDiagnostic[]>([])
+
+  // 实时预览:用户输入时即重新 parse,给出"待应用 N 条 / M 行无效"计数,
+  // 不必等点 Apply。只在有可说之事时渲染(ok 或 warn),其余不渲染。
+  const preview = useMemo(() => {
+    const { ops, errors: parseErrors } = parseDslWithDiagnostics(text)
+    return { opCount: ops.length, errCount: parseErrors.length }
+  }, [text])
 
   // 打开时填充当前画布文本(serializeCanvasReadable,card 附 title 注释)。
   // 同时清空诊断列表:刚序列化的文本恒为合法,无 parse 错误。
@@ -124,6 +131,19 @@ export function DslDialog({
         spellCheck={false}
         aria-label={t('canvas.dslTitle')}
       />
+      {text.trim() !== '' && preview.opCount > 0 && preview.errCount === 0 && (
+        <p className="dsl-preview dsl-preview--ok">
+          {t('canvas.dslPreviewOk', { n: String(preview.opCount) })}
+        </p>
+      )}
+      {text.trim() !== '' && preview.errCount > 0 && (
+        <p className="dsl-preview dsl-preview--warn">
+          {t('canvas.dslPreviewIssues', {
+            ok: String(preview.opCount),
+            bad: String(preview.errCount),
+          })}
+        </p>
+      )}
       {errors.length > 0 && (
         <div className="dsl-errors">
           <p className="dsl-errors__title">{t('canvas.dslErrorsTitle', { n: String(errors.length) })}</p>
@@ -168,6 +188,9 @@ const styles = `
   resize: vertical; line-height: 1.5;
 }
 .dsl-text:focus { border-color: var(--color-red); }
+.dsl-preview { margin: 0 0 var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-xs); }
+.dsl-preview--ok { color: var(--color-gray); }
+.dsl-preview--warn { color: var(--color-red); }
 .dsl-errors {
   margin-top: var(--space-2);
   padding: var(--space-2) var(--space-3);
