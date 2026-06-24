@@ -73,7 +73,7 @@ export default function SettingsPage() {
   return (
     <main className="page" role="main">
       <Toolbar region="system">
-        <span className="crumb">cy&rsquo;s stift</span>
+        <span className="crumb">{t('brand.name')}</span>
         <span className="crumb-sep">/</span>
         <span className="crumb crumb--here">{t('settings.crumb')}</span>
       </Toolbar>

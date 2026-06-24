@@ -81,7 +81,7 @@ export function CardDetailModal({
       <Modal
         open
         onClose={onClose}
-        title={mode === 'edit' ? t('card.detail.title') : card.title || '(untitled)'}
+        title={mode === 'edit' ? t('card.detail.title') : card.title || t('card.untitled')}
       >
         <div className="cd" ref={bodyRef}>
           {mode === 'view' ? (
@@ -100,7 +100,7 @@ export function CardDetailModal({
               <MarkdownBody source={card.body} />
               {card.links.length > 0 && (
                 <section className="cd__sec">
-                  <h3 className="cd__sec-h">Links</h3>
+                  <h3 className="cd__sec-h">{t('card.detail.links')}</h3>
                   <ul className="cd__links">
                     {card.links.map((l, i) => (
                       <li key={i}>
@@ -114,7 +114,7 @@ export function CardDetailModal({
               )}
               {card.codeSnippets.length > 0 && (
                 <section className="cd__sec">
-                  <h3 className="cd__sec-h">Code</h3>
+                  <h3 className="cd__sec-h">{t('card.detail.code')}</h3>
                   {card.codeSnippets.map((c, i) => (
                     <div key={i} className="cd__code">
                       <div className="cd__code-lang">{c.language}</div>
@@ -127,7 +127,7 @@ export function CardDetailModal({
               )}
               {card.quotes.length > 0 && (
                 <section className="cd__sec">
-                  <h3 className="cd__sec-h">Quotes</h3>
+                  <h3 className="cd__sec-h">{t('card.detail.quotes')}</h3>
                   {card.quotes.map((q, i) => (
                     <blockquote key={i} className="cd__quote">
                       <p>{q.text}</p>
@@ -141,7 +141,7 @@ export function CardDetailModal({
             <>
               <Input
                 name="cd-title"
-                label="Title"
+                label={t('card.detail.fieldTitle')}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 maxLength={200}

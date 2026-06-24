@@ -303,7 +303,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
   return (
     <main className="page">
       <Toolbar region="canvas">
-        <span className="crumb">cy&rsquo;s stift</span>
+        <span className="crumb">{t('brand.name')}</span>
         <span className="crumb-sep">/</span>
         <span className="crumb crumb--here">{t('canvas.crumb')}</span>
         <span className="crumb-sep">/</span>
@@ -323,7 +323,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         <span className="tb-divider" aria-hidden="true" />
         {aiEnabled && (
           <>
-            <Button variant="ghost" onClick={handleAILayout} disabled={!adapterReady} title="AI layout">AI</Button>
+            <Button variant="ghost" onClick={handleAILayout} disabled={!adapterReady} title={t('canvas.aiLayout')}>{t('canvas.aiLayout')}</Button>
             <Button variant="ghost" onClick={handleAICluster} disabled={!adapterReady} title={t('canvas.aiCluster')}>{t('canvas.aiCluster')}</Button>
           </>
         )}
@@ -341,7 +341,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
             aria-pressed={tool === tk}
             style={{ textTransform: 'none', letterSpacing: 0 }}
           >
-            {tk === 'select' ? 'Select' : tk === 'freedraw' ? 'Draw' : tk === 'text' ? 'Text' : 'Connect'}
+            {tk === 'select' ? t('canvas.tool.select') : tk === 'freedraw' ? t('canvas.tool.draw') : tk === 'text' ? t('canvas.tool.text') : t('canvas.tool.connect')}
           </button>
         ))}
         <span className="tb-divider" aria-hidden="true" />

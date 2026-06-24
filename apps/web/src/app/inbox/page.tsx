@@ -59,7 +59,7 @@ export default function InboxPage() {
   return (
     <main className="page">
       <Toolbar region="inbox">
-        <span className="crumb">cy&rsquo;s stift</span>
+        <span className="crumb">{t('brand.name')}</span>
         <span className="crumb-sep">/</span>
         <span className="crumb crumb--here">{t('inbox.crumb')}</span>
         <span className="crumb-spacer" />
@@ -247,7 +247,7 @@ function CardTile({
           {preview && <p className="tile__preview">{preview}</p>}
           <div className="tile__meta">
             <Tag color="red">{t(typeKeyOf(card.type))}</Tag>
-            {totalMedia > 0 && <Tag color="blue">{totalMedia} media</Tag>}
+            {totalMedia > 0 && <Tag color="blue">{t('card.mediaCount', { n: totalMedia })}</Tag>}
             <span className="tile__time">
               {card.capturedAt.toISOString().slice(0, 10)}
             </span>

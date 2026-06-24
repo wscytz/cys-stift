@@ -52,6 +52,7 @@ export const messages = {
   'card.detail.title': { zh: '编辑卡片', en: 'Edit card' },
   'card.detail.dateFormat': { zh: '显示日期', en: 'show date' },
   'card.detail.bodyLabel': { zh: '正文（Markdown）', en: 'Body (Markdown)' },
+  'card.detail.fieldTitle': { zh: '标题', en: 'Title' },
   'card.detail.links': { zh: '链接', en: 'Links' },
   'card.detail.code': { zh: '代码', en: 'Code' },
   'card.detail.quotes': { zh: '引用', en: 'Quotes' },
@@ -104,6 +105,7 @@ export const messages = {
   'canvas.tool.note': { zh: '便签', en: 'Note' },
   'canvas.tool.text': { zh: '文本', en: 'Text' },
   'canvas.tool.eraser': { zh: '橡皮', en: 'Eraser' },
+  'canvas.tool.connect': { zh: '连接', en: 'Connect' },
 
   /* ── Canvas export (P5) ── */
   'canvas.export': { zh: '导出画布', en: 'Export canvas' },
@@ -292,6 +294,7 @@ export const messages = {
   'card.typeCode': { zh: '代码', en: 'Code' },
   'card.typeQuote': { zh: '引用', en: 'Quote' },
   'card.untitled': { zh: '(无标题)', en: '(untitled)' },
+  'card.mediaCount': { zh: '{n} 个媒体', en: '{n} media' },
   'card.export': { zh: '导出 Markdown', en: 'Export Markdown' },
   'card.exportSuccess': { zh: '已导出 {n} 字节', en: 'Exported {n} bytes' },
   'card.exportFailed': { zh: '导出失败: {error}', en: 'Export failed: {error}' },
