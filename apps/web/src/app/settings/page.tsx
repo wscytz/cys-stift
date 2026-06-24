@@ -173,11 +173,12 @@ export default function SettingsPage() {
           <button
             type="button"
             className="set__export"
-            onClick={() => {
-              const bytes = downloadExport()
+            onClick={async () => {
+              const bytes = await downloadExport()
+              const payload = await buildExportPayload()
               console.info(
                 `[export] ${bytes} bytes · ` +
-                  `${buildExportPayload().cards.length} cards`,
+                  `${payload.cards.length} cards`,
               )
             }}
           >

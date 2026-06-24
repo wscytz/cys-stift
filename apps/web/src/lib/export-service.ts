@@ -1,6 +1,7 @@
 'use client'
 
-import type { Card } from '@cys-stift/domain'
+import type { Card, Canvas } from '@cys-stift/domain'
+import { canvasFreeformStore, type CanvasFreeformSnapshot } from './canvas-freeform-store'
 
 // ── Export (spec §1.2 信念4 "数据可迁移") ──────────────────────────────────
 // Serialise the user's local data to an open JSON format. The browser
@@ -16,6 +17,15 @@ import type { Card } from '@cys-stift/domain'
 
 export const EXPORT_FORMAT_VERSION = 1
 
+/**
+ * Canvas 列表信封:与 canvas-store 的 CanvasesSnapshot 同形(canvases + active)。
+ * 导出时直接读 localStorage 原始 key 取 .snapshot,避免触发 store hydrate 副作用。
+ */
+export type CanvasesEnvelope = {
+  canvases: Canvas[]
+  activeCanvasId: string
+}
+
 export interface ExportPayload {
   version: typeof EXPORT_FORMAT_VERSION
   exportedAt: string // ISO
@@ -24,6 +34,10 @@ export interface ExportPayload {
   mediaAssets: Record<string, unknown> // MediaAssetData map (Phase 6.5f)
   drafts?: Record<string, unknown>
   settings?: Record<string, unknown>
+  /** canvas 列表(多画布 + active)。旧版 JSON 无此字段(向后兼容)。 */
+  canvases?: CanvasesEnvelope
+  /** per-canvas freeform 几何,key=canvasId。复用 CanvasFreeformSnapshot(与 .cystift 同源 CanvasElement[])。 */
+  freeform?: Record<string, CanvasFreeformSnapshot>
 }
 
 function readJson(key: string): unknown {
@@ -39,8 +53,21 @@ function readJson(key: string): unknown {
 /**
  * Build the export payload from current browser storage. Pure function —
  * does not trigger a download; call `downloadExport()` for that.
+ *
+ * Async because per-canvas freeform geometry lives in OPFS (canvasFreeformStore.load);
+ * we await each canvas's snapshot in sequence. SSR returns an empty payload.
  */
-export function buildExportPayload(): ExportPayload {
+export async function buildExportPayload(): Promise<ExportPayload> {
+  if (typeof window === 'undefined') {
+    // SSR 早退:返回空 payload(与原 readJson-返回-null 兜底语义一致)。
+    return {
+      version: EXPORT_FORMAT_VERSION,
+      exportedAt: new Date().toISOString(),
+      app: "cy's Stift",
+      cards: [],
+      mediaAssets: {},
+    }
+  }
   const cardsPayload = readJson('cys-stift.cards.v1') as { cards?: Card[] } | null
   const mediaPayload = readJson('cys-stift.media.v1') as {
     assets?: Record<string, unknown>
@@ -52,6 +79,24 @@ export function buildExportPayload(): ExportPayload {
     settings?: Record<string, unknown>
   } | null
 
+  // canvas 列表(同步 localStorage,取 .snapshot 部分)。直接读原始 key,不触发
+  // canvasStore hydrate 副作用。
+  const canvasesPayload = readJson('cys-stift.canvases.v1') as {
+    snapshot?: CanvasesEnvelope
+  } | null
+  const canvasesEnvelope = canvasesPayload?.snapshot
+
+  // freeform 几何:遍历 canvas 列表,对每个 canvas 读 freeform(OPFS 异步)。
+  let freeform: Record<string, CanvasFreeformSnapshot> | undefined
+  if (canvasesEnvelope && canvasesEnvelope.canvases.length > 0) {
+    const entries: [string, CanvasFreeformSnapshot][] = []
+    for (const c of canvasesEnvelope.canvases) {
+      const snap = await canvasFreeformStore.load(c.id)
+      if (snap) entries.push([c.id, snap])
+    }
+    if (entries.length > 0) freeform = Object.fromEntries(entries)
+  }
+
   return {
     version: EXPORT_FORMAT_VERSION,
     exportedAt: new Date().toISOString(),
@@ -60,6 +105,8 @@ export function buildExportPayload(): ExportPayload {
     mediaAssets: mediaPayload?.assets ?? {},
     drafts: draftsPayload?.drafts,
     settings: settingsPayload?.settings,
+    ...(canvasesEnvelope ? { canvases: canvasesEnvelope } : {}),
+    ...(freeform ? { freeform } : {}),
   }
 }
 
@@ -67,9 +114,9 @@ export function buildExportPayload(): ExportPayload {
  * Serialise the payload and trigger a browser download. Returns the
  * approximate byte size so the caller can show a hint.
  */
-export function downloadExport(): number {
+export async function downloadExport(): Promise<number> {
   if (typeof window === 'undefined') return 0
-  const payload = buildExportPayload()
+  const payload = await buildExportPayload()
   const json = JSON.stringify(payload, null, 2)
   const blob = new Blob([json], { type: 'application/json' })
   const url = URL.createObjectURL(blob)

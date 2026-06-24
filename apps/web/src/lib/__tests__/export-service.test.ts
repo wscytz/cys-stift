@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import type { Card, CardId } from '@cys-stift/domain'
+import type { Card, CardId, Canvas, CanvasId } from '@cys-stift/domain'
+import type { CanvasElement } from '@cys-stift/canvas-engine'
+import { canvasFreeformStore } from '../canvas-freeform-store'
 
 // `buildExportPayload` reads localStorage keys directly and stamps
 // `exportedAt: new Date().toISOString()` at call time. We freeze the clock
@@ -24,6 +26,7 @@ const CARDS_KEY = 'cys-stift.cards.v1'
 const MEDIA_KEY = 'cys-stift.media.v1'
 const DRAFTS_KEY = 'cys-stift.drafts.v1'
 const SETTINGS_KEY = 'cys-stift.settings.v1'
+const CANVASES_KEY = 'cys-stift.canvases.v1'
 
 function makeCard(overrides: Partial<Card> = {}): Card {
   return {
@@ -66,6 +69,28 @@ function seedStores(opts: {
   }
 }
 
+/** Build a Canvas fixture. Dates as ISO strings (matches the JSON-on-disk shape:
+ *  canvas-store persists via JSON.stringify, so createdAt/updatedAt are strings). */
+function makeCanvas(overrides: Partial<Canvas> = {}): Canvas {
+  return {
+    id: 'canvas-1' as unknown as CanvasId,
+    workspaceId: 'default' as never,
+    name: 'test canvas',
+    view: { zoom: 1, pan: { x: 0, y: 0 }, gridMode: 'snap', gridSize: 8 },
+    createdAt: '2026-06-20T00:00:00.000Z' as unknown as Date,
+    updatedAt: '2026-06-21T00:00:00.000Z' as unknown as Date,
+    ...overrides,
+  }
+}
+
+/** Seed the canvas-list store envelope directly (matches canvas-store saveSnapshot). */
+function seedCanvases(canvases: Canvas[], activeCanvasId: string) {
+  window.localStorage.setItem(
+    CANVASES_KEY,
+    JSON.stringify({ snapshot: { canvases, activeCanvasId } }),
+  )
+}
+
 // ── buildExportPayload ────────────────────────────────────────────────────
 
 // buildExportPayload reads cards back through JSON.parse(localStorage), so
@@ -79,14 +104,14 @@ function asStored<T>(v: T): T {
 }
 
 describe('buildExportPayload', () => {
-  it('assembles cards + media + drafts + settings from localStorage', () => {
+  it('assembles cards + media + drafts + settings from localStorage', async () => {
     const card = makeCard({ title: 'exported' })
     const media = { 'ma-1': { id: 'ma-1', kind: 'image' } }
     const drafts = { 'draft-1': { title: 'wip' } }
     const settings = { theme: 'dark', locale: 'en' }
     seedStores({ cards: [card], mediaAssets: media, drafts, settings })
 
-    const payload = mod.buildExportPayload()
+    const payload = await mod.buildExportPayload()
 
     expect(payload.cards).toEqual([asStored(card)])
     expect(payload.mediaAssets).toEqual(media)
@@ -94,56 +119,131 @@ describe('buildExportPayload', () => {
     expect(payload.settings).toEqual(settings)
   })
 
-  it('stamps the versioned format version', () => {
-    const payload = mod.buildExportPayload()
+  it('stamps the versioned format version', async () => {
+    const payload = await mod.buildExportPayload()
     expect(payload.version).toBe(mod.EXPORT_FORMAT_VERSION)
     expect(payload.version).toBe(1)
   })
 
-  it('exportedAt is an ISO string at call time', () => {
-    const payload = mod.buildExportPayload()
+  it('exportedAt is an ISO string at call time', async () => {
+    const payload = await mod.buildExportPayload()
     expect(payload.exportedAt).toBe('2026-06-23T12:00:00.000Z')
     expect(new Date(payload.exportedAt).toISOString()).toBe(payload.exportedAt)
   })
 
-  it('app name is "cy\'s Stift"', () => {
-    expect(mod.buildExportPayload().app).toBe("cy's Stift")
+  it('app name is "cy\'s Stift"', async () => {
+    const payload = await mod.buildExportPayload()
+    expect(payload.app).toBe("cy's Stift")
   })
 
-  it('degrades to empty cards when the cards store is missing', () => {
+  it('degrades to empty cards when the cards store is missing', async () => {
     // Only seed media, not cards.
     seedStores({ mediaAssets: { 'ma-1': {} } })
-    const payload = mod.buildExportPayload()
+    const payload = await mod.buildExportPayload()
     expect(payload.cards).toEqual([])
     expect(payload.mediaAssets).toEqual({ 'ma-1': {} })
   })
 
-  it('degrades to empty mediaAssets when media store is missing', () => {
+  it('degrades to empty mediaAssets when media store is missing', async () => {
     seedStores({ cards: [makeCard()] })
-    expect(mod.buildExportPayload().mediaAssets).toEqual({})
+    const payload = await mod.buildExportPayload()
+    expect(payload.mediaAssets).toEqual({})
   })
 
-  it('omits drafts/settings (undefined) when those stores are absent', () => {
+  it('omits drafts/settings (undefined) when those stores are absent', async () => {
     seedStores({ cards: [makeCard()] })
-    const payload = mod.buildExportPayload()
+    const payload = await mod.buildExportPayload()
     expect(payload.drafts).toBeUndefined()
     expect(payload.settings).toBeUndefined()
   })
 
-  it('returns empty defaults on corrupt JSON instead of throwing', () => {
+  it('returns empty defaults on corrupt JSON instead of throwing', async () => {
     window.localStorage.setItem(CARDS_KEY, '{ not json')
     window.localStorage.setItem(MEDIA_KEY, '} also not json')
-    const payload = mod.buildExportPayload()
+    const payload = await mod.buildExportPayload()
     expect(payload.cards).toEqual([])
     expect(payload.mediaAssets).toEqual({})
     expect(payload.version).toBe(mod.EXPORT_FORMAT_VERSION)
   })
 })
 
+// ── buildExportPayload — canvases + freeform geometry ──────────────────────
+
+describe('buildExportPayload — canvases + freeform', () => {
+  it('includes the canvases envelope when the canvas store is seeded', async () => {
+    const c1 = makeCanvas({ id: 'canvas-a' as unknown as CanvasId, name: 'A' })
+    const c2 = makeCanvas({ id: 'canvas-b' as unknown as CanvasId, name: 'B' })
+    seedCanvases([c1, c2], 'canvas-b')
+
+    const payload = await mod.buildExportPayload()
+
+    expect(payload.canvases).toBeDefined()
+    expect(payload.canvases!.canvases).toHaveLength(2)
+    expect(payload.canvases!.canvases[0]!.id).toBe('canvas-a')
+    expect(payload.canvases!.canvases[1]!.name).toBe('B')
+    expect(payload.canvases!.activeCanvasId).toBe('canvas-b')
+  })
+
+  it('includes freeform geometry per canvas (read via canvasFreeformStore)', async () => {
+    const canvasId = 'canvas-free' as unknown as CanvasId
+    seedCanvases([makeCanvas({ id: canvasId })], String(canvasId))
+
+    const elements: CanvasElement[] = [
+      { id: 'r1', kind: 'rect', x: 10, y: 20, w: 300, h: 400, rotation: 0, color: 'red' },
+      {
+        id: 'f1',
+        kind: 'freedraw',
+        x: 0,
+        y: 0,
+        w: 50,
+        h: 50,
+        rotation: 0,
+        meta: { points: [[0, 0], [10, 10]] },
+      },
+      { id: 'a1', kind: 'arrow', x: 5, y: 5, w: 100, h: 0, rotation: 0, from: 'r1', to: 'f1' },
+    ]
+    await canvasFreeformStore.save(canvasId, elements)
+
+    const payload = await mod.buildExportPayload()
+
+    expect(payload.freeform).toBeDefined()
+    const snap = payload.freeform![String(canvasId)]!
+    expect(snap).toBeDefined()
+    expect(snap.v).toBe(1)
+    expect(snap.app).toBe('cys-stift')
+    // All three are non-card → all preserved.
+    expect(snap.elements).toHaveLength(3)
+    expect(snap.elements.map((e) => e.kind).sort()).toEqual(['arrow', 'freedraw', 'rect'])
+  })
+
+  it('omits canvases and freeform when the canvas store is absent (backward compat)', async () => {
+    // Seed only cards; no canvases key, no freeform.
+    seedStores({ cards: [makeCard()] })
+
+    const payload = await mod.buildExportPayload()
+
+    expect(payload.canvases).toBeUndefined()
+    expect(payload.freeform).toBeUndefined()
+  })
+
+  it('omits freeform (but keeps canvases) when a canvas has no freeform data', async () => {
+    const canvasId = 'canvas-empty' as unknown as CanvasId
+    // Seed canvases but never save freeform for it.
+    seedCanvases([makeCanvas({ id: canvasId })], String(canvasId))
+
+    const payload = await mod.buildExportPayload()
+
+    expect(payload.canvases).toBeDefined()
+    expect(payload.canvases!.canvases).toHaveLength(1)
+    // No freeform was saved → empty entries → field omitted.
+    expect(payload.freeform).toBeUndefined()
+  })
+})
+
 // ── Export → Import round-trip (the regression guard for 数据可迁移) ─────────
 
 describe('export → import round-trip (no data loss)', () => {
-  it('a full export re-imports byte-for-byte into the four stores', () => {
+  it('a full export re-imports byte-for-byte into the four stores', async () => {
     const cardA = makeCard({ id: 'card-a' as unknown as CardId, title: 'A' })
     const cardB = makeCard({
       id: 'card-b' as unknown as CardId,
@@ -160,7 +260,7 @@ describe('export → import round-trip (no data loss)', () => {
     seedStores({ cards: [cardA, cardB], mediaAssets: media, drafts, settings })
 
     // Export
-    const payload = mod.buildExportPayload()
+    const payload = await mod.buildExportPayload()
     const json = JSON.stringify(payload, null, 2)
 
     // Wipe storage to simulate a fresh device, then import.
@@ -178,7 +278,7 @@ describe('export → import round-trip (no data loss)', () => {
     expect(JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!)).toEqual({ settings })
 
     // And re-exporting reproduces the same payload (version + data).
-    const rePayload = mod.buildExportPayload()
+    const rePayload = await mod.buildExportPayload()
     expect(rePayload.version).toBe(payload.version)
     expect(rePayload.cards).toEqual([asStored(cardA), asStored(cardB)])
     expect(rePayload.mediaAssets).toEqual(media)
@@ -186,7 +286,7 @@ describe('export → import round-trip (no data loss)', () => {
     expect(rePayload.settings).toEqual(settings)
   })
 
-  it('round-trips cards with nested media/links/code/quotes/tags intact', () => {
+  it('round-trips cards with nested media/links/code/quotes/tags intact', async () => {
     const card = makeCard({
       id: 'card-rich' as unknown as CardId,
       media: [{ assetId: 'ma-1' as never, order: 0, caption: 'pic' }],
@@ -198,7 +298,7 @@ describe('export → import round-trip (no data loss)', () => {
     })
     seedStores({ cards: [card] })
 
-    const json = JSON.stringify(mod.buildExportPayload())
+    const json = JSON.stringify(await mod.buildExportPayload())
     window.localStorage.clear()
     const result = mod.importFromJson(json)
     expect(result.ok).toBe(true)
@@ -216,11 +316,11 @@ describe('export → import round-trip (no data loss)', () => {
     expect(restored.color).toBe(stored.color)
   })
 
-  it('round-trips a payload missing optional drafts/settings (skips those writes)', () => {
+  it('round-trips a payload missing optional drafts/settings (skips those writes)', async () => {
     const card = makeCard()
     // Seed cards only — drafts/settings stay absent from storage.
     seedStores({ cards: [card] })
-    const json = JSON.stringify(mod.buildExportPayload())
+    const json = JSON.stringify(await mod.buildExportPayload())
 
     window.localStorage.clear()
     const result = mod.importFromJson(json)
@@ -404,13 +504,13 @@ describe('SSR safety (window undefined)', () => {
 
       // buildExportPayload returns a payload with empty cards/media even with
       // no window (readJson returns null → ?? [] / ?? {}).
-      const payload = ssrMod.buildExportPayload()
+      const payload = await ssrMod.buildExportPayload()
       expect(payload.cards).toEqual([])
       expect(payload.mediaAssets).toEqual({})
       expect(payload.version).toBe(ssrMod.EXPORT_FORMAT_VERSION)
 
       // downloadExport is a no-op returning 0.
-      expect(ssrMod.downloadExport()).toBe(0)
+      expect(await ssrMod.downloadExport()).toBe(0)
 
       // importFromJson short-circuits with an error result.
       const result = ssrMod.importFromJson('{"version":1,"cards":[]}')
