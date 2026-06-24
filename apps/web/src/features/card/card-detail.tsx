@@ -229,6 +229,7 @@ export function CardDetailModal({
         setMedia((prev) => [...prev, ref])
       } catch (err) {
         console.error('[CardDetailModal] attach failed', err)
+        pushToast({ kind: 'error', message: t('card.mediaAttachFail', { name: file.name }) })
       }
     }
   }

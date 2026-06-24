@@ -155,8 +155,14 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         pushToast({ kind: 'info', message: t('canvas.aiLayoutEmpty') })
         return
       }
-      applyLayout(adapter, ops)
-      pushToast({ kind: 'success', message: t('canvas.aiLayoutDone') })
+      const { applied, skipped } = applyLayout(adapter, ops)
+      if (applied === 0) {
+        pushToast({ kind: 'info', message: t('canvas.aiLayoutNoneApplied') })
+      } else if (skipped > 0) {
+        pushToast({ kind: 'info', message: t('canvas.aiLayoutAppliedSkipped', { applied: String(applied), skipped: String(skipped) }) })
+      } else {
+        pushToast({ kind: 'success', message: t('canvas.aiLayoutDone') })
+      }
     } catch (e) {
       pushToast({ kind: 'error', message: t('ai.error', { error: (e as Error).message }) })
     }

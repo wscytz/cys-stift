@@ -6,6 +6,7 @@ import { Toolbar, Modal, Button } from '@cys-stift/ui'
 import { settingsStore, useSettings } from '@/lib/settings-store'
 import { rehydrateCards } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
+import { pushToast } from '@/lib/toast-store'
 import { StorageMeter } from '@/components/storage-meter'
 import { AISettingsPanel } from '@/features/settings/ai-settings-panel'
 import {
@@ -68,6 +69,12 @@ export default function SettingsPage() {
     if (code.startsWith('Key')) return code.slice(3)
     if (code.startsWith('Digit')) return code.slice(5)
     return code
+  }
+
+  const formatBytes = (b: number): string => {
+    if (b < 1024) return `${b} B`
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`
+    return `${(b / 1024 / 1024).toFixed(1)} MB`
   }
 
   return (
@@ -184,12 +191,23 @@ export default function SettingsPage() {
             type="button"
             className="btn-primary"
             onClick={async () => {
-              const bytes = await downloadExport()
-              const payload = await buildExportPayload()
-              console.info(
-                `[export] ${bytes} bytes · ` +
-                  `${payload.cards.length} cards`,
-              )
+              try {
+                const bytes = await downloadExport()
+                const payload = await buildExportPayload()
+                console.info(
+                  `[export] ${bytes} bytes · ` +
+                    `${payload.cards.length} cards`,
+                )
+                pushToast({
+                  kind: 'success',
+                  message: t('settings.exportOk', {
+                    cards: String(payload.cards.length),
+                    bytes: formatBytes(bytes),
+                  }),
+                })
+              } catch (e) {
+                pushToast({ kind: 'error', message: t('settings.exportFail', { error: (e as Error).message }) })
+              }
             }}
           >
             {t('settings.exportJson')}
