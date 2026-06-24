@@ -128,7 +128,7 @@ export default function CanvasPage() {
     const formatted = formatCanvasSnapshot(snap)
 
     const systemPrompt =
-      'You are a canvas editing assistant. Given the current canvas (cards, shapes, arrows with their relation signatures), output DSL directives to improve it. You may reposition/resize cards, change colors, and rewrite arrow relation signatures (dash line style + arrowhead shape). Reuse an existing element #id to UPDATE it (its endpoints are kept); omit the id to CREATE new. Output DSL directives only — no explanations.'
+      'You are a canvas editing assistant. Given the current canvas (cards, shapes, arrows with their relation signatures), output DSL directives to improve it. You may reposition/resize cards, change colors, create/update rect and text shapes, and rewrite arrow relation signatures (dash line style + arrowhead shape). Reuse an existing element #id to UPDATE it (relation arrow endpoints are kept; free arrow bbox is kept); omit the id to CREATE new. Cards can only be UPDATEd — never created (card content comes from the inbox, not the canvas). Free arrows (arrows with no from/to) encode their line as @pos + @size (w/h may be negative for direction). Output DSL directives only — no explanations.'
 
     const userPrompt = `Improve this canvas. Reorganize positions, adjust sizes/colors, and refine arrow relation signatures where appropriate. Do NOT change items that are already well-placed.
 
@@ -139,7 +139,8 @@ Output DSL (one directive per line):
 [rect #id] @pos(x, y) @size(w, h) @color(c)
 [text #id] @pos(x, y) @text("...") @color(c)
 [arrow #id] from #a to #b @label("...") @color(c) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none)
-Rules: reuse an existing #id to UPDATE it (from/to kept); colors limited to blue/red/black/grey/yellow.`
+[arrow #id] @pos(x, y) @size(w, h) @color(c) @dash(...) @arrowhead(...)   (free arrow: no from/to; w/h may be negative for direction)
+Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbox kept for free arrows); omit #id to CREATE new — except cards, which are update-only; colors limited to blue/red/black/grey/yellow.`
 
     try {
       const result = await streamText(cfg, { system: systemPrompt, user: userPrompt }, () => {})
