@@ -41,6 +41,7 @@
 
 | 想知道什么 | 看哪里 |
 |---|---|
+| 产品与引擎定位 / 优先级框架(方向迷茫先读) | `docs/product-and-engine.md` |
 | 整体设计 / 数据模型 / 路线图 | `docs/specs/2026-06-19-cys-stift-design.md` |
 | 当前 phase 的实现计划 | `docs/plans/` |
 | Ralph 任务指南 + compact/clear 规则 | `docs/archive/ralph/README.md`（已归档） |
