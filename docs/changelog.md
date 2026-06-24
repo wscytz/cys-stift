@@ -5,6 +5,42 @@
 
 ---
 
+## 2026-06-24 · audit-closure-ralph-3rounds · 审计闭环 + Ralph 三轮自我打磨
+
+先做审计 plan 的 4 个 HIGH/MED(Task 1-4),再启动 Ralph 式自我打磨 3 轮(subagent 系统扫缝→审→TDD 修→验证→commit)。
+
+### 审计闭环(plan `docs/superpowers/plans/2026-06-24-audit-closure.md`)
+- **H1 db-client saveSnapshot 吞 QuotaExceeded + 回滚内存**(`5dc4a47`):裸 setItem 无 try/catch,配额满时 _cards 内存已改但 localStorage 未写 → reload 丢。修:saveSnapshot 返回 boolean,insert/update/delete 回滚内存 + onQuotaExceeded 订阅(AppMenu toast)。防静默丢卡片。
+- **H3 DSL COLOR_RE 收窄到 Bauhaus 6 色**(`035f581`):正则 [a-z]+ 接受任意色,引擎 colorOf 只认 6 色 → 越界色静默变黑。修:正则收窄 (red|yellow|blue|black|white|gray|grey)。parser/引擎/prompt 三方一致。
+- **H4 存储计量接入 estimate().usage(含 OPFS)**(`b341d63`):used 只算 localStorage,OPFS 不可见 → 80% 警告(防 H1 丢数据的网)触发太晚。修:used 用 estimate().usage。
+- **M5+M9 AI 按钮 loading + AbortController**(`dd9fc86`):API 调用期间按钮无 disabled(重复点击并发请求)+ 无 abort(浪费 API 费/unmounted setState)。修:aiBusy state + AbortController + try/finally + 「思考中…」。
+
+### Ralph Round 1:引擎正确性(`9df859f` + `620be98`)
+3 BUG + 2 EDGE + 2 LATENT:
+- **R1.3 marqueeSelect 不归一化 bbox**(BUG):负 bbox rect 框选不中。
+- **R1.4 交互中途 undo/redo 漏清状态**(BUG → 数据损坏):拖拽中 Ctrl+Z,dragGroup 残留旧 offset → 恢复的元素被挪错位。修:clearInteractionState()。
+- **R1.5 setTool 只清 currentStroke**(BUG):切工具中途幽灵交互(connect 中切 select 仍创建箭头)。
+- **R1.7 elementCenter/borderPoint 负 w/h 错**(EDGE):负 bbox 卡连箭头端点落错边。
+- **R1.6 resizeGeometry 负 start dims 错**(EDGE):负 bbox 缩放出垃圾几何。
+- **R1.1 snapshot 浅拷贝 meta.points**(LATENT):undo 别名隐患,深拷贝。
+- **R1.2 commitFreedraw 存调用方数组引用**(LATENT):深拷贝 points。
+
+### Ralph Round 2:web 数据完整性 + 隐私审计(`a4d2a45` + `ab01491`)
+- **R2.5 rehydrateCards 签名太弱**(LATENT → 跨 tab 中间卡编辑丢失):只查 length+首尾 id。修:签名含所有卡 updatedAt 之和。
+- **R2.1 canvasViewStore 不进导出**(LATENT):per-canvas zoom/pan/grid 迁移丢失。修:ExportPayload 加 canvasView。
+- **R2.10 草稿自动保存配额失败静默**(DATA-LOSS):saveDrafts 吞 QuotaExceeded。修:返回 boolean + isDraftPersistOk + MiniInput/CreateCardForm 红色警告。
+- **隐私审计全 CLEAN**:deviceId/media.dataUrl/软删除卡/手绘点序列 全路径无泄漏;新加 shape/features 只含标量比例 + 整数 pointCount。
+
+### Ralph Round 3:UI/UX + i18n + 韧性(`69775fc` + `5899cac`)
+- **R3.1 全局 error boundary**(RESILIENCE,关键):无 Error Boundary,渲染崩溃白屏。加 app/error.tsx(崩溃展示「数据没丢+重试/回首页」)。
+- **R3.2+R3.3+R3.4 i18n 英文清零**(I18N):editors.tsx / card-detail.tsx / create-card-form.tsx 22 处硬编码英文(编辑器/卡片详情/创建表单)→ i18n key。zh 用户编辑不再看到英文碎片。
+- **R3.7 DSL/Export 对话框 Escape**(UX):Modal 只处理 backdrop,这两个漏 Escape。加 keydown listener。
+
+### 验证
+web 504 + 引擎 310 = **814 测试全绿**,build exit 0,tsc 零新增。R2 隐私反向审计确认 AI 路径无泄漏。3 轮共 13 个 finding 全修(3 BUG + 2 EDGE + 2 LATENT + 2 DATA-LOSS + 1 RESILIENCE + 3 I18N/UX)。
+
+---
+
 ## 2026-06-24 · mainline-b-plus-a · 主线推进:转义信任裂缝修复 + AI 介入手绘(增值)
 
 打磨已有功能(转义核心卖点的诚实性)+ 推进第三层增值主线(AI 介入手绘,守 R2 隐私)。同时收尾 UI 一致性(canvas 工具栏溢出)+ 交付闭环(Windows Tauri CI)。
