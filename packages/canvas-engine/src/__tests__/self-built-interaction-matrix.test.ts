@@ -95,6 +95,49 @@ describe('交互矩阵 — 每种 kind × resize(SE 角)', () => {
   }
 })
 
+// ── 多选 resize 一致性(保守方案:多选时禁用 handle) ─────────────────────────
+// 多选时旧逻辑只取 selectedIds 第一个元素检测 handle、只缩那一个 → 误导
+// (选 5 个 card 拖角,4 个不动)。保守方案:size>1 时不进入 resize handle 分支,
+// 只允许组移动(角命中落到 hitTest → 已选中 → 保留组 → 组移动)。组缩放留后。
+// 对照组:单选(size===1)时 SE 角 resize 仍正常,证明只禁了多选、没破坏单选。
+
+describe('多选 resize 一致性 — 多选时禁用 handle', () => {
+  // e1 bbox (100,100,100,100),SE 角 (200,200);e2 不与 e1 重叠。
+  const e1: CanvasElement = { id: 'e1', kind: 'rect', x: 100, y: 100, w: 100, h: 100, rotation: 0 }
+  const e2: CanvasElement = { id: 'e2', kind: 'rect', x: 300, y: 100, w: 100, h: 100, rotation: 0 }
+
+  it('多选拖 SE 角不触发 resize:e1 的 w/h 不变(只允许组移动)', () => {
+    const { host, canvas, setSel } = makeHost()
+    host.upsert(e1)
+    host.upsert(e2)
+    setSel(['e1', 'e2'])
+    // SE 角 (200,200) 单选时会触发 resize;多选时应跳过 resize 分支 → 落到组移动。
+    dispatch(canvas, 'pointerdown', 200, 200)
+    dispatch(canvas, 'pointermove', 300, 300)
+    dispatch(canvas, 'pointerup', 300, 300)
+    const el = host.getElement('e1')!
+    // 没 resize:w/h 保持原值(组移动只改 x/y,不改 w/h)
+    expect(el.w).toBe(100)
+    expect(el.h).toBe(100)
+    // 角命中落到组移动:e1 平移了(x 变大),证明拖动没被吞、只是没 resize
+    expect(el.x).toBeGreaterThan(100)
+  })
+
+  it('对照组:单选拖 SE 角仍触发 resize:e1 的 w/h 变大', () => {
+    const { host, canvas, setSel } = makeHost()
+    host.upsert(e1)
+    host.upsert(e2)
+    setSel(['e1']) // 单选
+    dispatch(canvas, 'pointerdown', 200, 200)
+    dispatch(canvas, 'pointermove', 300, 300)
+    dispatch(canvas, 'pointerup', 300, 300)
+    const el = host.getElement('e1')!
+    // resize 触发:SE 角外扩 → w/h 变大(证明改成 size===1 没破坏单选 resize)
+    expect(el.w).toBeGreaterThan(100)
+    expect(el.h).toBeGreaterThan(100)
+  })
+})
+
 describe('交互矩阵 — 每种 kind × hitTest(中心点命中自己)', () => {
   for (const kind of MOVABLE_KINDS) {
     it(`${kind}:bbox 中心点能命中自己`, () => {

@@ -365,8 +365,10 @@ export class SelfBuiltAdapter implements CanvasHost {
           return
         }
       }
-      // resize handle 优先:选中元素的四角(仅 select 模式)
-      if (this.activeTool === 'select' && this.selectedIds.size > 0) {
+      // resize handle 优先:选中元素的四角(仅 select 模式,单选)。
+      // 多选(size>1)时禁用 resize handle——只允许组移动,避免「拖角只缩一个」的
+      // 误导(组缩放需等比缩放 + freedraw 点序列组变换,是复杂功能,留后)。
+      if (this.activeTool === 'select' && this.selectedIds.size === 1) {
         const selId = [...this.selectedIds][0]!
         const sel = this.getElement(selId)
         if (sel) {
