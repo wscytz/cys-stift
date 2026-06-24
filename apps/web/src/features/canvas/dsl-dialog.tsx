@@ -98,7 +98,7 @@ export function DslDialog({
 [rect #id] @pos(x, y) @size(w, h) @color(c)
 [text #id] @pos(x, y) @text("...") @color(c)
 [arrow #id] from #a to #b @label("...") @color(c) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none)
-[arrow #id] @pos(x, y) @size(w, h) @color(c)   # 自由箭头(无 from/to;w/h 可负表方向)`}</pre>
+[arrow #id] @pos(x, y) @size(w, h) @color(c)   # ${t('canvas.dslSyntaxFreeArrow')}`}</pre>
       </details>
       <textarea
         className="dsl-text"

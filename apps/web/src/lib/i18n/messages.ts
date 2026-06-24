@@ -119,6 +119,9 @@ export const messages = {
   'canvas.exportScopeDiagram': { zh: '整张画布', en: 'Whole canvas' },
   'canvas.exportScopeSelection': { zh: '仅选中', en: 'Selection' },
   'canvas.exportScale': { zh: '分辨率', en: 'Resolution' },
+  'canvas.exportScale1x': { zh: '1×', en: '1×' },
+  'canvas.exportScale2x': { zh: '2×', en: '2×' },
+  'canvas.exportScale3x': { zh: '3×', en: '3×' },
   'canvas.exportBorder': { zh: '边距', en: 'Border' },
   'canvas.exportBackground': { zh: '背景', en: 'Background' },
   'canvas.exportTransparent': { zh: '透明', en: 'Transparent' },
@@ -138,6 +141,7 @@ export const messages = {
   'canvas.dslLede': { zh: '画布的文字形态。编辑或粘贴 DSL 指令,应用回画布。每行一个元素;# 开头的注释行会被忽略。', en: 'The canvas as text. Edit or paste DSL directives and apply them back. One element per line; lines starting with # are ignored.' },
   'canvas.dslSyntaxTitle': { zh: '语法速查', en: 'Syntax cheat sheet' },
   'canvas.dslSyntaxBody': { zh: '每行一个元素。带已有 #id 的更新该元素;省略 #id 新建(rect/text/自由箭头可新建,card 只能更新——内容来自收件箱)。', en: 'One element per line. With an existing #id it updates; omit #id to create (rect/text/free arrow create; cards are update-only — content comes from the inbox).' },
+  'canvas.dslSyntaxFreeArrow': { zh: '自由箭头(无 from/to; w/h 可负表方向)', en: 'Free arrow (no from/to; w/h can be negative to indicate direction)' },
   'canvas.dslApply': { zh: '应用', en: 'Apply' },
   'canvas.dslApplied': { zh: '已应用 {n} 条指令', en: 'Applied {n} directives' },
   'canvas.dslAppliedSkipped': { zh: '已应用 {applied} 条,{skipped} 条跳过(card/端点不存在等)', en: 'Applied {applied}, skipped {skipped} (missing card/endpoint etc.)' },
@@ -227,6 +231,7 @@ export const messages = {
   'settings.importConfirmBody': { zh: '导入将覆盖当前所有数据(卡片 / 画布 / 媒体 / 设置)。此操作不可撤销,建议先导出备份。确认继续?', en: 'Importing overwrites all current data (cards / canvases / media / settings). This cannot be undone — export a backup first. Continue?' },
   'settings.importOk': { zh: '已导入 {cards} 张卡片 · {mediaAssets} 个媒体 · {canvases} 个画布 · {freeform} 组画布几何。正在重新加载…', en: 'Imported {cards} cards · {mediaAssets} media · {canvases} canvases · {freeform} freeform sets. Reloading…' },
   'settings.importFail': { zh: '导入失败：{error}', en: 'Import failed: {error}' },
+  'settings.importReadFailed': { zh: '读取文件失败', en: 'Read failed' },
 
   /* ── AI (v0.29.0) ── */
   'settings.ai': { zh: 'AI', en: 'AI' },

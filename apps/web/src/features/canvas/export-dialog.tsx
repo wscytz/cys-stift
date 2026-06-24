@@ -153,9 +153,9 @@ export function ExportDialog({
             value={String(scale)}
             onChange={(v) => setScale(Number(v))}
             options={[
-              { value: '1', label: '1×' },
-              { value: '2', label: '2×' },
-              { value: '3', label: '3×' },
+              { value: '1', label: t('canvas.exportScale1x') },
+              { value: '2', label: t('canvas.exportScale2x') },
+              { value: '3', label: t('canvas.exportScale3x') },
             ]}
           />
         </Field>

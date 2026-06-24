@@ -57,7 +57,7 @@ export default function SettingsPage() {
       }
     }
     reader.onerror = () =>
-      setImportResult({ ok: false, cards: 0, mediaAssets: 0, error: 'read failed' })
+      setImportResult({ ok: false, cards: 0, mediaAssets: 0, error: t('settings.importReadFailed') })
     reader.readAsText(file)
   }
 
@@ -229,7 +229,7 @@ export default function SettingsPage() {
         <p className="footnote">
           <Link href="/" className="footnote__link">← {t('common.home')}</Link>
           {' · '}
-          <Link href="/inbox" className="footnote__link">inbox</Link>
+          <Link href="/inbox" className="footnote__link">{t('nav.inbox')}</Link>
         </p>
       </div>
 
