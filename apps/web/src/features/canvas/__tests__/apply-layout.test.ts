@@ -54,24 +54,6 @@ describe('applyLayout', () => {
     expect(rect).toMatchObject({ kind: 'rect', x: 100, y: 200, w: 300, h: 150, color: 'red' })
   })
 
-  it('creates free ellipse shapes (default size/color)', () => {
-    const host = new InMemoryCanvasHost()
-    applyLayout(host, [{ type: 'free', shape: 'ellipse', x: 50, y: 60 }])
-
-    const el = host.getElements().find((e) => e.kind === 'ellipse')
-    expect(el).toMatchObject({ kind: 'ellipse', x: 50, y: 60, w: 200, h: 150, color: 'black' })
-  })
-
-  it('creates free note shapes with text', () => {
-    const host = new InMemoryCanvasHost()
-    applyLayout(host, [
-      { type: 'free', shape: 'note', x: 10, y: 20, text: 'hello', color: 'yellow' },
-    ])
-
-    const note = host.getElements().find((e) => e.kind === 'note')
-    expect(note).toMatchObject({ kind: 'note', text: 'hello', color: 'yellow' })
-  })
-
   it('creates arrows between existing cards', () => {
     const host = new InMemoryCanvasHost()
     seedCard(host, 'src')
@@ -110,7 +92,7 @@ describe('applyLayout', () => {
     expect(() =>
       applyLayout(host, [
         { type: 'free', shape: 'rect', x: 0, y: 0 },
-        { type: 'free', shape: 'ellipse', x: 10, y: 10 },
+        { type: 'free', shape: 'rect', x: 10, y: 10 },
       ]),
     ).not.toThrow()
   })

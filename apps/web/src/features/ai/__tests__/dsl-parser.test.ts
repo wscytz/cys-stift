@@ -42,8 +42,8 @@ describe('parseDsl', () => {
     }
   })
 
-  it('parses a free rect shape', () => {
-    const result = parseDsl('[free: rect at (100, 200) size 300x400] @color(red)')
+  it('parses a rect shape via the unified grammar', () => {
+    const result = parseDsl('[rect #r1] @pos(100, 200) @size(300, 400) @color(red)')
     expect(result).toHaveLength(1)
     const op = result[0]!
     expect(op.type).toBe('free')
@@ -57,23 +57,11 @@ describe('parseDsl', () => {
     }
   })
 
-  it('parses a free note shape', () => {
-    const result = parseDsl('[free: note at (50, 60)]')
-    expect(result).toHaveLength(1)
-    const op = result[0]!
-    expect(op.type).toBe('free')
-    if (op.type === 'free') {
-      expect(op.shape).toBe('note')
-      expect(op.x).toBe(50)
-      expect(op.y).toBe(60)
-    }
-  })
-
   it('parses multiple directives from one block', () => {
     const dsl = `[card #a1] @pos(100, 200) @color(blue)
 [card #a2] @pos(300, 400) @color(red)
 [arrow #arr1] from #a1 to #a2 @label("blocks")
-[free: rect at (100, 200) size 300x400]`
+[rect #r1] @pos(100, 200) @size(300, 400)`
     const result = parseDsl(dsl)
     expect(result).toHaveLength(4)
     expect(result[0]?.type).toBe('card')
@@ -97,16 +85,10 @@ describe('parseDsl', () => {
     expect(parseDsl('')).toEqual([])
   })
 
-  it('parses free shape lines with "free shape:" prefix', () => {
-    const result = parseDsl('[free shape: rect at (10, 20) size 100x200]')
-    expect(result).toHaveLength(1)
-    const op = result[0]!
-    expect(op.type).toBe('free')
-    if (op.type === 'free') {
-      expect(op.shape).toBe('rect')
-      expect(op.x).toBe(10)
-      expect(op.y).toBe(20)
-    }
+  it('legacy [free: syntax is no longer parsed', () => {
+    expect(parseDsl('[free: rect at (100,200) size 300x400]')).toEqual([])
+    expect(parseDsl('[free shape: rect at (10, 20) size 100x200]')).toEqual([])
+    expect(parseDsl('[free: note at (50, 60)]')).toEqual([])
   })
 
   // ── arrow relation signature (dash + arrowhead + id) — DSL symmetry fix 1 ──

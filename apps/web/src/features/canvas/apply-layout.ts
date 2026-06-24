@@ -17,7 +17,7 @@
  */
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import type { CardId } from '@cys-stift/domain'
-import type { DslOp } from '../ai/dsl-parser'
+import type { DslOp, DslFreeOp } from '../ai/dsl-parser'
 
 /** AI-created free shapes / arrows need a unique id (tldraw used to auto-mint). */
 function uid(prefix: string): string {
@@ -84,19 +84,7 @@ function applyCardOp(
   })
 }
 
-function applyFreeOp(
-  host: CanvasHost,
-  op: {
-    type: 'free'
-    shape: 'rect' | 'ellipse' | 'line' | 'note' | 'text'
-    x: number
-    y: number
-    w?: number
-    h?: number
-    color?: string
-    text?: string
-  },
-) {
+function applyFreeOp(host: CanvasHost, op: DslFreeOp) {
   const w = op.w ?? 200
   const h = op.h ?? 150
   const x = Math.max(0, Math.round(op.x))
@@ -107,19 +95,6 @@ function applyFreeOp(
     case 'rect':
       host.upsert({ ...base, kind: 'rect', w, h, color: op.color ?? 'black' })
       break
-    case 'ellipse':
-      host.upsert({ ...base, kind: 'ellipse', w, h, color: op.color ?? 'black' })
-      break
-    case 'note':
-      host.upsert({
-        ...base,
-        kind: 'note',
-        w: 200,
-        h: 200,
-        color: op.color ?? 'yellow',
-        text: op.text ?? '',
-      })
-      break
     case 'text':
       host.upsert({
         ...base,
@@ -129,9 +104,6 @@ function applyFreeOp(
         text: op.text ?? '',
         ...(op.color ? { color: op.color } : {}),
       })
-      break
-    case 'line':
-      host.upsert({ ...base, kind: 'line', w, h: 0, color: op.color ?? 'black' })
       break
   }
 }

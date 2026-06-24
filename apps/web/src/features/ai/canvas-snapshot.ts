@@ -44,8 +44,7 @@ export interface SnapshotArrow {
 
 export type FreeShape =
   | { kind: 'rect'; x: number; y: number; w: number; h: number }
-  | { kind: 'ellipse'; x: number; y: number; w: number; h: number }
-  | { kind: 'note'; x: number; y: number; text: string }
+  | { kind: 'text'; x: number; y: number; text: string }
   | { kind: 'freedraw'; x: number; y: number }
 
 export interface CanvasSnapshotOutput {
@@ -105,12 +104,8 @@ export function snapshotCanvas(
       case 'rect':
         freeShapes.push({ kind: 'rect', x, y, w: Math.round(el.w), h: Math.round(el.h) })
         break
-      case 'ellipse':
-        freeShapes.push({ kind: 'ellipse', x, y, w: Math.round(el.w), h: Math.round(el.h) })
-        break
       case 'text':
-      case 'note':
-        freeShapes.push({ kind: 'note', x, y, text: el.text ?? '' })
+        freeShapes.push({ kind: 'text', x, y, text: el.text ?? '' })
         break
       case 'freedraw':
         // Position only — NEVER the point sequence (R2 + privacy).
@@ -160,10 +155,7 @@ export function formatCanvasSnapshot(snapshot: CanvasSnapshotOutput): string {
       case 'rect':
         parts.push(`[rect] @pos(${fs.x}, ${fs.y}) @size(${fs.w}x${fs.h})`)
         break
-      case 'ellipse':
-        parts.push(`[ellipse] @pos(${fs.x}, ${fs.y}) @size(${fs.w}x${fs.h})`)
-        break
-      case 'note':
+      case 'text':
         parts.push(`[text] @pos(${fs.x}, ${fs.y}) @text("${fs.text.slice(0, 200)}")`)
         break
       case 'freedraw':

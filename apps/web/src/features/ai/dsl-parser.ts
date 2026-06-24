@@ -6,7 +6,7 @@
  * The AI outputs a DSL block like:
  *
  *   [card #abc123] @pos(300, 400) @color(blue)
- *   [free: rect at (100, 200) size 300x400] @color(red)
+ *   [rect #r1] @pos(100, 200) @size(300, 400) @color(red)
  *   [arrow #arr1] @label("references")
  *
  * The parser extracts these directives into typed operations that
@@ -27,18 +27,30 @@ export type DslCardOp = {
   color?: string
 }
 
-export type DslFreeOp = {
-  type: 'free'
-  /** Element id (round-trip with serializeCanvas's `[rect #id]` / `[text #id]`). */
-  id?: string
-  shape: 'rect' | 'ellipse' | 'line' | 'note' | 'text'
-  x: number
-  y: number
-  w?: number
-  h?: number
-  color?: string
-  text?: string
-}
+export type DslFreeOp =
+  | {
+      type: 'free'
+      shape: 'rect'
+      /** Element id (round-trip with serializeCanvas's `[rect #id]`). */
+      id?: string
+      x: number
+      y: number
+      w?: number
+      h?: number
+      color?: string
+    }
+  | {
+      type: 'free'
+      shape: 'text'
+      /** Element id (round-trip with serializeCanvas's `[text #id]`). */
+      id?: string
+      x: number
+      y: number
+      w?: number
+      h?: number
+      text?: string
+      color?: string
+    }
 
 export type DslArrowOp = {
   type: 'arrow'
@@ -76,9 +88,8 @@ const LABEL_RE = /@label\("([^"]*)"\)/
 /** Text directive: `@text("...")` — escape-aware (serializeCanvas escapes quotes/backslashes). */
 const TEXT_RE = /@text\("((?:[^"\\]|\\.)*)"\)/
 
-/** Size directive: `@size\((\d+),\s*(\d+)\)` or inline `size 300x400` */
+/** Size directive: `@size\((\d+),\s*(\d+)\)` */
 const SIZE_RE = /@size\((\d+),\s*(\d+)\)/
-const SIZE_INLINE_RE = /size\s+(\d+)x(\d+)/
 
 /** Arrow relation signature — line style + terminal (semantics). */
 const DASH_RE = /@dash\((solid|dashed|dotted)\)/
@@ -115,9 +126,7 @@ function extractText(text: string): string | undefined {
 }
 
 function extractSize(text: string): { w: number; h: number } | null {
-  let m = text.match(SIZE_RE)
-  if (m) return { w: parseInt(m[1]!, 10), h: parseInt(m[2]!, 10) }
-  m = text.match(SIZE_INLINE_RE)
+  const m = text.match(SIZE_RE)
   if (m) return { w: parseInt(m[1]!, 10), h: parseInt(m[2]!, 10) }
   return null
 }
@@ -228,40 +237,6 @@ export function parseDsl(dslText: string): DslOp[] {
         text: extractText(line),
         color: extractColor(line),
       })
-      continue
-    }
-
-    // ── Free shape lines: `[free: rect at (100, 200) size 300x400]`
-    if (line.startsWith('[free: ') || line.startsWith('[free shape: ')) {
-      const shapeMatch = line.match(
-        /\[free(?:\s+shape)?:\s*(rect|ellipse|line|note|draw)/,
-      )
-      if (!shapeMatch) continue
-      const shapeKind = shapeMatch[1]!
-
-      const pos = extractPos(line)
-      const size = extractSize(line)
-
-      if (shapeKind === 'line') {
-        // Line doesn't need pos/size — just note it exists
-        ops.push({
-          type: 'free',
-          shape: 'line',
-          x: pos?.x ?? 0,
-          y: pos?.y ?? 0,
-          color: extractColor(line),
-        })
-      } else {
-        ops.push({
-          type: 'free',
-          shape: shapeKind as 'rect' | 'ellipse' | 'note',
-          x: pos?.x ?? 0,
-          y: pos?.y ?? 0,
-          w: size?.w,
-          h: size?.h,
-          color: extractColor(line),
-        })
-      }
       continue
     }
   }
