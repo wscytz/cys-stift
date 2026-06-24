@@ -57,20 +57,26 @@ jobs:
       - name: setup rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
       - run: pnpm install --frozen-lockfile
 
       - name: build tauri (windows)
         working-directory: apps/desktop
-        # --ci: 跳过交互式提示(NSIS 默认值等)
-        # --no-bundle=false 时正常 bundle NSIS installer
-        run: pnpm tauri build --ci
+        # --ci: 跳过交互式提示。
+        # --bundles nsis: 只生成 NSIS installer。tauri.conf.json 的
+        #   "targets":"all" 在 Windows 上会同时生成 NSIS + MSI,而 MSI
+        #   需要 WiX 工具链——这是 Windows CI 最常见的 bundling 失败点。
+        #   命令行覆盖只影响 CI,不改本地 macOS build(本地仍生成 .app/.dmg)。
+        run: pnpm tauri build --ci --bundles nsis
 
-      - name: upload windows exe
+      - name: upload windows installer
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: cy-s-stift-windows
           if-no-files-found: warn
-          path: |
-            apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
-            apps/desktop/src-tauri/target/release/bundle/msi/*.msi
+          path: apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
