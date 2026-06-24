@@ -99,7 +99,17 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
-        {title && <h2 className={styles.title}>{title}</h2>}
+        <div className={styles.titleRow}>
+          {title && <h2 className={styles.title}>{title}</h2>}
+          <button
+            type="button"
+            className={styles.closeBtn}
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
         <div className={styles.body}>{children}</div>
       </div>
     </div>

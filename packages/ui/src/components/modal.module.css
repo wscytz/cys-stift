@@ -6,6 +6,8 @@
   place-items: center;
   padding: var(--space-4);
   z-index: 100;
+  /* 兜底:frame max-height 后内部滚,但 backdrop padding 仍可能溢出小视口。 */
+  overflow: auto;
 }
 
 .frame {
@@ -15,6 +17,10 @@
   padding: var(--space-4);
   min-width: 320px;
   max-width: 640px;
+  /* 关键:max-height 钳制模态不超过视口,body 内部滚动 → 底部按钮永远可见。
+     此前 frame 无高度上限,内容多就撑出视口,底部操作看不到也无法滚
+     (审计:二级页面"看不完、没有可拉的条轴")。 */
+  max-height: calc(100vh - 2 * var(--space-4));
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -27,16 +33,55 @@
   outline: none;
 }
 
+.titleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  /* title 行不滚(始终可见,提供稳定关闭入口);body 滚。 */
+  flex-shrink: 0;
+}
+
 .title {
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--font-size-xl);
   font-weight: 500;
   color: var(--color-black);
+  min-width: 0;
+  word-break: break-word;
+}
+
+.closeBtn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-white);
+  color: var(--color-black);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  line-height: 1;
+  cursor: pointer;
+}
+.closeBtn:hover {
+  background: var(--color-black);
+  color: var(--color-white);
+}
+.closeBtn:focus-visible {
+  outline: 2px solid var(--color-red);
+  outline-offset: -2px;
 }
 
 .body {
   font-family: var(--font-body);
   font-size: var(--font-size-base);
   color: var(--color-black-soft);
+  /* body 滚动:frame max-height 钳总高,title 行固定,这里吸收超出部分。 */
+  overflow-y: auto;
+  min-height: 0;
 }
