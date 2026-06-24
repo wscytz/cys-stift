@@ -14,12 +14,15 @@
  */
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/lib/i18n'
+import type { MessageKey } from '@/lib/i18n/messages'
 import {
   classifyFreedraw,
   duplicateFreedraw,
   freedrawPoints,
   freedrawToArrow,
+  recognizeShape,
   type FreedrawKind,
+  type ShapeName,
 } from '@cys-stift/canvas-engine'
 import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
 
@@ -62,6 +65,15 @@ export function FreedrawPanel({
   if (!points) return null
   const { kind, confidence } = classifyFreedraw(points)
 
+  // 装饰类:在启发式之上再跑 $1 认具体形状(圈/方/三角/对勾)。箭头(1D 细长)不进
+  // $1(踩非均匀缩放坑),走启发式 arrow 分支。全程本地,点序列不外发。
+  const shape: ShapeName =
+    kind === 'decoration' || kind === 'unknown'
+      ? recognizeShape(points.map(([x, y]) => ({ x, y }))).shape
+      : 'unknown'
+  // 面板文案:认出具体形状 → 用形状文案;否则回退 arrow/decoration/unknown。
+  const guessKey = guessMessageKey(kind, shape)
+
   const position = computePanelPosition(el, host, canvasEl)
   const panelStyle = position
     ? {
@@ -103,7 +115,7 @@ export function FreedrawPanel({
       </span>
       <span className="cv-freedraw__sep" aria-hidden="true" />
       <span className="cv-freedraw__guess">
-        {t(guessKey(kind))}
+        {t(guessKey)}
         <span className="cv-freedraw__conf">{Math.round(confidence * 100)}%</span>
       </span>
       {canToArrow && (
@@ -129,8 +141,14 @@ export function FreedrawPanel({
   )
 }
 
-function guessKey(kind: FreedrawKind): 'freedraw.looksArrow' | 'freedraw.looksDecoration' | 'freedraw.looksUnknown' {
+/** 选面板文案 key:箭头 → looksArrow;装饰且认出具体形状 → looksCircle/Rect/Triangle/Check;
+ * 否则 looksDecoration / looksUnknown。 */
+function guessMessageKey(kind: FreedrawKind, shape: ShapeName): MessageKey {
   if (kind === 'arrow') return 'freedraw.looksArrow'
+  if (shape === 'circle') return 'freedraw.looksCircle'
+  if (shape === 'rect') return 'freedraw.looksRect'
+  if (shape === 'triangle') return 'freedraw.looksTriangle'
+  if (shape === 'check') return 'freedraw.looksCheck'
   if (kind === 'decoration') return 'freedraw.looksDecoration'
   return 'freedraw.looksUnknown'
 }

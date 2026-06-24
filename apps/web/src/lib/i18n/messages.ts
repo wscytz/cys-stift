@@ -306,6 +306,10 @@ export const messages = {
   'freedraw.looksArrow': { zh: '看起来像箭头', en: 'Looks like an arrow' },
   'freedraw.looksDecoration': { zh: '看起来像装饰', en: 'Looks like decoration' },
   'freedraw.looksUnknown': { zh: '说不准是什么', en: 'Not sure what this is' },
+  'freedraw.looksCircle': { zh: '看起来像圆圈', en: 'Looks like a circle' },
+  'freedraw.looksRect': { zh: '看起来像方框', en: 'Looks like a rectangle' },
+  'freedraw.looksTriangle': { zh: '看起来像三角', en: 'Looks like a triangle' },
+  'freedraw.looksCheck': { zh: '看起来像对勾', en: 'Looks like a check mark' },
   'freedraw.duplicate': { zh: '复制', en: 'Duplicate' },
   'freedraw.toArrow': { zh: '转为箭头', en: 'Convert to arrow' },
 } as const
