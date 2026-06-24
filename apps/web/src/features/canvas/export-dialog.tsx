@@ -31,10 +31,11 @@ import {
   downloadImage,
   type RasterFormat,
 } from './export-raster'
+import { exportCanvasMarkdown, downloadMarkdown } from './export-markdown'
 import type { ExportScope } from './export-bounds'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 
-type Format = 'svg' | RasterFormat
+type Format = 'svg' | RasterFormat | 'markdown'
 
 export function ExportDialog({
   open,
@@ -83,6 +84,19 @@ export function ExportDialog({
       const effectiveScope: ExportScope =
         scopeIsSelection && selectionDisabled ? 'diagram' : scope
       const baseName = canvasName || 'canvas'
+      if (format === 'markdown') {
+        const md = exportCanvasMarkdown(host, service, canvasId, canvasName, {
+          scope: effectiveScope,
+        })
+        if (!md) {
+          pushToast({ kind: 'error', message: t('canvas.exportEmpty') })
+          return
+        }
+        downloadMarkdown(md, baseName)
+        pushToast({ kind: 'success', message: t('canvas.exportDone', { name: baseName }) })
+        onClose()
+        return
+      }
       if (format === 'svg') {
         const result = await exportCanvasSvg(host, service, canvasId, canvasName, {
           scope: effectiveScope,
@@ -121,7 +135,7 @@ export function ExportDialog({
     }
   }
 
-  const transparentAvailable = format !== 'jpeg'
+  const transparentAvailable = format !== 'jpeg' && format !== 'markdown'
 
   return (
     <Modal open={open} onClose={onClose} title={t('canvas.exportTitle')}>
@@ -136,6 +150,7 @@ export function ExportDialog({
             { value: 'svg', label: t('canvas.exportFormatSvg') },
             { value: 'png', label: t('canvas.exportFormatPng') },
             { value: 'jpeg', label: t('canvas.exportFormatJpeg') },
+            { value: 'markdown', label: t('canvas.exportFormatMarkdown') },
           ]}
         />
       </Field>
@@ -157,7 +172,7 @@ export function ExportDialog({
       </Field>
 
       {/* Scale (raster only) */}
-      {format !== 'svg' && (
+      {format !== 'svg' && format !== 'markdown' && (
         <Field label={t('canvas.exportScale')}>
           <Segmented
             value={String(scale)}
@@ -200,7 +215,7 @@ export function ExportDialog({
       </Field>
 
       {/* .cystift roundtrip callout — the headline feature */}
-      {format !== 'jpeg' && (
+      {format !== 'jpeg' && format !== 'markdown' && (
         <div className="exp-cystift" role="note">
           <div className="exp-cystift__badge">{t('canvas.exportCystiftBadge')}</div>
           <div className="exp-cystift__hint">{t('canvas.exportCystiftHint')}</div>

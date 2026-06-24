@@ -138,6 +138,7 @@ export const messages = {
   'canvas.exportFormatSvg': { zh: 'SVG', en: 'SVG' },
   'canvas.exportFormatPng': { zh: 'PNG', en: 'PNG' },
   'canvas.exportFormatJpeg': { zh: 'JPEG', en: 'JPEG' },
+  'canvas.exportFormatMarkdown': { zh: 'Markdown', en: 'Markdown' },
   'canvas.exportScope': { zh: '范围', en: 'Scope' },
   'canvas.exportScopeDiagram': { zh: '整张画布', en: 'Whole canvas' },
   'canvas.exportScopeSelection': { zh: '仅选中', en: 'Selection' },
