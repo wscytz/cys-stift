@@ -1,6 +1,6 @@
 'use client'
 
-import type { Card, Canvas } from '@cys-stift/domain'
+import type { Card, Canvas, CanvasId } from '@cys-stift/domain'
 import { canvasFreeformStore, type CanvasFreeformSnapshot } from './canvas-freeform-store'
 
 // ── Export (spec §1.2 信念4 "数据可迁移") ──────────────────────────────────
@@ -142,10 +142,14 @@ export interface ImportResult {
   ok: boolean
   cards: number
   mediaAssets: number
+  /** 导入的 canvas 数(写入 canvases localStorage key 的条数)。 */
+  canvases?: number
+  /** 导入了 freeform 几何的 canvas 数(OPFS/localStorage)。 */
+  freeformCanvases?: number
   error?: string
 }
 
-export function importFromJson(jsonText: string): ImportResult {
+export async function importFromJson(jsonText: string): Promise<ImportResult> {
   if (typeof window === 'undefined') {
     return { ok: false, cards: 0, mediaAssets: 0, error: 'not in browser' }
   }
@@ -270,6 +274,15 @@ export function importFromJson(jsonText: string): ImportResult {
         value: JSON.stringify({ settings: payload.settings }),
       })
     }
+    // canvas 列表:与 cards/media 同走同步 localStorage 写,纳入现有 snapshot
+    // rollback 机制(snapshot 数组遍历 writes,自动包含此 key)。旧 JSON 无
+    // canvases 字段 → 跳过(向后兼容)。
+    if (payload.canvases) {
+      writes.push({
+        key: 'cys-stift.canvases.v1',
+        value: JSON.stringify({ snapshot: payload.canvases }),
+      })
+    }
   } catch (e) {
     return {
       ok: false,
@@ -307,9 +320,23 @@ export function importFromJson(jsonText: string): ImportResult {
     }
   }
 
+  // freeform 几何走 OPFS(异步),在 localStorage 原子写成功之后才写。不纳入
+  // localStorage rollback——若上面写入失败已 early return rollback,根本到不了这里。
+  // 全量 import 覆盖语义;canvasFreeformStore.save 内部 best-effort(OPFS 失败回退
+  // localStorage)。card 元素会被 store 自动过滤(DB 是单一可信源,见 spec §6.11)。
+  let freeformCanvases = 0
+  if (payload.freeform) {
+    for (const [canvasId, snap] of Object.entries(payload.freeform)) {
+      await canvasFreeformStore.save(canvasId as CanvasId, snap.elements)
+      freeformCanvases++
+    }
+  }
+
   return {
     ok: true,
     cards: payload.cards.length,
     mediaAssets: Object.keys(payload.mediaAssets ?? {}).length,
+    ...(payload.canvases ? { canvases: payload.canvases.canvases.length } : {}),
+    ...(freeformCanvases > 0 ? { freeformCanvases } : {}),
   }
 }

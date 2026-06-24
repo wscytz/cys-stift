@@ -32,8 +32,8 @@ export default function SettingsPage() {
     const file = files[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = () => {
-      const result = importFromJson(String(reader.result))
+    reader.onload = async () => {
+      const result = await importFromJson(String(reader.result))
       setImportResult(result)
       if (result.ok) {
         // Re-sync the in-memory card store from the freshly written

@@ -266,7 +266,7 @@ describe('export → import round-trip (no data loss)', () => {
     // Wipe storage to simulate a fresh device, then import.
     window.localStorage.clear()
 
-    const result = mod.importFromJson(json)
+    const result = await mod.importFromJson(json)
     expect(result.ok).toBe(true)
     expect(result.cards).toBe(2)
     expect(result.mediaAssets).toBe(1)
@@ -300,7 +300,7 @@ describe('export → import round-trip (no data loss)', () => {
 
     const json = JSON.stringify(await mod.buildExportPayload())
     window.localStorage.clear()
-    const result = mod.importFromJson(json)
+    const result = await mod.importFromJson(json)
     expect(result.ok).toBe(true)
 
     const restored = (JSON.parse(window.localStorage.getItem(CARDS_KEY)!) as { cards: Card[] }).cards[0]
@@ -323,7 +323,7 @@ describe('export → import round-trip (no data loss)', () => {
     const json = JSON.stringify(await mod.buildExportPayload())
 
     window.localStorage.clear()
-    const result = mod.importFromJson(json)
+    const result = await mod.importFromJson(json)
     expect(result.ok).toBe(true)
     expect(result.cards).toBe(1)
     // mediaAssets is {} (present), so the media key is written; drafts/settings are absent.
@@ -336,96 +336,96 @@ describe('export → import round-trip (no data loss)', () => {
 // ── importFromJson — validation / error paths ──────────────────────────────
 
 describe('importFromJson — validation', () => {
-  it('rejects invalid JSON with an error message (no throw)', () => {
-    const result = mod.importFromJson('{ this is not json')
+  it('rejects invalid JSON with an error message (no throw)', async () => {
+    const result = await mod.importFromJson('{ this is not json')
     expect(result.ok).toBe(false)
     expect(result.cards).toBe(0)
     expect(result.error).toMatch(/invalid JSON/i)
   })
 
-  it('rejects an unsupported version', () => {
+  it('rejects an unsupported version', async () => {
     const json = JSON.stringify({ version: 999, exportedAt: 'x', app: 'a', cards: [] })
-    const result = mod.importFromJson(json)
+    const result = await mod.importFromJson(json)
     expect(result.ok).toBe(false)
     expect(result.error).toMatch(/unsupported version/i)
   })
 
-  it('rejects a payload where cards is not an array', () => {
+  it('rejects a payload where cards is not an array', async () => {
     const json = JSON.stringify({
       version: mod.EXPORT_FORMAT_VERSION,
       exportedAt: 'x',
       app: 'a',
       cards: 'nope',
     })
-    const result = mod.importFromJson(json)
+    const result = await mod.importFromJson(json)
     expect(result.ok).toBe(false)
     expect(result.error).toMatch(/cards is not an array/i)
   })
 
-  it('rejects a card with a missing/empty id', () => {
+  it('rejects a card with a missing/empty id', async () => {
     const json = JSON.stringify({
       version: mod.EXPORT_FORMAT_VERSION,
       exportedAt: 'x',
       app: 'a',
       cards: [{ id: '', title: 't', body: 'b' }],
     })
-    const result = mod.importFromJson(json)
+    const result = await mod.importFromJson(json)
     expect(result.ok).toBe(false)
     expect(result.error).toMatch(/id missing/i)
   })
 
-  it('rejects a card with a non-string title', () => {
+  it('rejects a card with a non-string title', async () => {
     const json = JSON.stringify({
       version: mod.EXPORT_FORMAT_VERSION,
       exportedAt: 'x',
       app: 'a',
       cards: [{ id: 'c1', title: 42, body: 'b' }],
     })
-    const result = mod.importFromJson(json)
+    const result = await mod.importFromJson(json)
     expect(result.ok).toBe(false)
     expect(result.error).toMatch(/title must be a string/i)
   })
 
-  it('rejects a card with a non-string body', () => {
+  it('rejects a card with a non-string body', async () => {
     const json = JSON.stringify({
       version: mod.EXPORT_FORMAT_VERSION,
       exportedAt: 'x',
       app: 'a',
       cards: [{ id: 'c1', title: 't', body: null }],
     })
-    const result = mod.importFromJson(json)
+    const result = await mod.importFromJson(json)
     expect(result.ok).toBe(false)
     expect(result.error).toMatch(/body must be a string/i)
   })
 
-  it('rejects a card with a non-string createdAt (when present)', () => {
+  it('rejects a card with a non-string createdAt (when present)', async () => {
     const json = JSON.stringify({
       version: mod.EXPORT_FORMAT_VERSION,
       exportedAt: 'x',
       app: 'a',
       cards: [{ id: 'c1', title: 't', body: 'b', createdAt: 123 }],
     })
-    const result = mod.importFromJson(json)
+    const result = await mod.importFromJson(json)
     expect(result.ok).toBe(false)
     expect(result.error).toMatch(/createdAt/i)
   })
 
-  it('accepts a card that omits createdAt/updatedAt (optional in validation)', () => {
+  it('accepts a card that omits createdAt/updatedAt (optional in validation)', async () => {
     const json = JSON.stringify({
       version: mod.EXPORT_FORMAT_VERSION,
       exportedAt: 'x',
       app: 'a',
       cards: [{ id: 'c1', title: 't', body: 'b' }],
     })
-    const result = mod.importFromJson(json)
+    const result = await mod.importFromJson(json)
     expect(result.ok).toBe(true)
     expect(result.cards).toBe(1)
   })
 
-  it('does not write any store when validation fails (atomic: nothing touched)', () => {
+  it('does not write any store when validation fails (atomic: nothing touched)', async () => {
     seedStores({ cards: [makeCard()] }) // pre-existing data
     const originalCardsRaw = window.localStorage.getItem(CARDS_KEY)
-    const bad = mod.importFromJson('{ broken')
+    const bad = await mod.importFromJson('{ broken')
     expect(bad.ok).toBe(false)
     // Existing store untouched.
     expect(window.localStorage.getItem(CARDS_KEY)).toBe(originalCardsRaw)
@@ -435,7 +435,7 @@ describe('importFromJson — validation', () => {
 // ── importFromJson — quota rollback ────────────────────────────────────────
 
 describe('importFromJson — write failure rollback', () => {
-  it('rolls back all touched keys to pre-import values when a write throws', () => {
+  it('rolls back all touched keys to pre-import values when a write throws', async () => {
     // Pre-existing state we expect to be restored after rollback.
     const prevCards = JSON.stringify({ cards: [makeCard({ title: 'old' })] })
     const prevMedia = JSON.stringify({ assets: { 'ma-old': {} } })
@@ -477,7 +477,7 @@ describe('importFromJson — write failure rollback', () => {
       mediaAssets: { 'ma-new': {} },
     })
 
-    const result = mod.importFromJson(json)
+    const result = await mod.importFromJson(json)
     vi.unstubAllGlobals()
 
     expect(result.ok).toBe(false)
@@ -513,11 +513,139 @@ describe('SSR safety (window undefined)', () => {
       expect(await ssrMod.downloadExport()).toBe(0)
 
       // importFromJson short-circuits with an error result.
-      const result = ssrMod.importFromJson('{"version":1,"cards":[]}')
+      const result = await ssrMod.importFromJson('{"version":1,"cards":[]}')
       expect(result.ok).toBe(false)
       expect(result.error).toMatch(/not in browser/i)
     } finally {
       globalThis.window = originalWindow
     }
+  })
+})
+
+// ── importFromJson — canvases + freeform geometry round-trip ───────────────
+
+describe('importFromJson — canvases + freeform round-trip', () => {
+  it('restores canvases + freeform + cards on a full export→import (no data loss)', async () => {
+    // Seed all three geometry sources: a card, the canvas list, and freeform
+    // elements for that canvas. buildExportPayload reads them all back.
+    const canvasId = 'canvas-rt' as unknown as CanvasId
+    const canvas = makeCanvas({ id: canvasId, name: 'RT canvas' })
+    seedStores({
+      cards: [makeCard({ id: 'card-rt' as unknown as CardId, title: 'on canvas' })],
+    })
+    seedCanvases([canvas], String(canvasId))
+    const elements: CanvasElement[] = [
+      { id: 'r1', kind: 'rect', x: 10, y: 20, w: 300, h: 400, rotation: 0, color: 'red' },
+      {
+        id: 'f1',
+        kind: 'freedraw',
+        x: 0,
+        y: 0,
+        w: 50,
+        h: 50,
+        rotation: 0,
+        meta: { points: [[0, 0], [10, 10]] },
+      },
+    ]
+    await canvasFreeformStore.save(canvasId, elements)
+
+    // Export the full payload, wipe storage, re-import.
+    const json = JSON.stringify(await mod.buildExportPayload())
+    window.localStorage.clear()
+
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(true)
+    expect(result.cards).toBe(1)
+    expect(result.canvases).toBe(1)
+    expect(result.freeformCanvases).toBe(1)
+
+    // canvases list restored (read localStorage directly — the canvasStore
+    // singleton's hydrate-once flag would not re-read after a write).
+    const restoredCanvases = JSON.parse(window.localStorage.getItem(CANVASES_KEY)!) as {
+      snapshot: { canvases: Canvas[]; activeCanvasId: string }
+    }
+    expect(restoredCanvases.snapshot.canvases).toHaveLength(1)
+    expect(restoredCanvases.snapshot.canvases[0]!.id).toBe(String(canvasId))
+    expect(restoredCanvases.snapshot.activeCanvasId).toBe(String(canvasId))
+
+    // freeform restored (jsdom has no OPFS → save/load round-trips via the
+    // localStorage fallback, which clear()+import re-populated).
+    const restoredFreeform = await canvasFreeformStore.load(canvasId)
+    expect(restoredFreeform).not.toBeNull()
+    expect(restoredFreeform!.elements).toHaveLength(2)
+    expect(restoredFreeform!.elements.map((e) => e.kind).sort()).toEqual(['freedraw', 'rect'])
+
+    // cards restored.
+    const restoredCards = (
+      JSON.parse(window.localStorage.getItem(CARDS_KEY)!) as { cards: Card[] }
+    ).cards
+    expect(restoredCards).toHaveLength(1)
+    expect(restoredCards[0]!.title).toBe('on canvas')
+  })
+
+  it('keeps a card bound to its non-default canvas after round-trip (no orphan)', async () => {
+    // A card placed on canvas-X (via canvasPosition) must not become an
+    // orphan (drop to the inbox) after export→import: the canvas list is
+    // restored alongside the card, so the binding stays consistent.
+    const canvasX = 'canvas-x' as unknown as CanvasId
+    const defaultCanvas = makeCanvas({
+      id: 'canvas-default' as unknown as CanvasId,
+      name: 'Default',
+    })
+    const xCanvas = makeCanvas({ id: canvasX, name: 'X' })
+    const cardOnX = makeCard({
+      id: 'card-on-x' as unknown as CardId,
+      title: 'lives on X',
+      canvasPosition: { canvasId: canvasX, x: 5, y: 5, w: 120, h: 90, z: 2 },
+    })
+    seedStores({ cards: [cardOnX] })
+    seedCanvases([defaultCanvas, xCanvas], String(canvasX))
+
+    const json = JSON.stringify(await mod.buildExportPayload())
+    window.localStorage.clear()
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(true)
+    expect(result.canvases).toBe(2)
+
+    // canvas-X is present in the restored list → the card's binding resolves.
+    const restoredCanvases = JSON.parse(window.localStorage.getItem(CANVASES_KEY)!) as {
+      snapshot: { canvases: Canvas[]; activeCanvasId: string }
+    }
+    const ids = restoredCanvases.snapshot.canvases.map((c) => String(c.id))
+    expect(ids).toContain(String(canvasX))
+
+    // The card kept its canvasPosition → not orphaned to the inbox.
+    const restoredCard = (
+      JSON.parse(window.localStorage.getItem(CARDS_KEY)!) as { cards: Card[] }
+    ).cards[0]!
+    expect(restoredCard.canvasPosition?.canvasId).toBe(String(canvasX))
+  })
+
+  it('backward compat: imports a payload with no canvases/freeform fields (legacy JSON)', async () => {
+    // A pre-geometry JSON (version 1, cards + media only) must still import
+    // without error and must NOT write the canvases key or any freeform.
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      app: "cy's Stift",
+      cards: [{ id: 'legacy-1', title: 'old', body: 'b' }],
+      mediaAssets: { 'ma-1': { id: 'ma-1', kind: 'image' } },
+    })
+
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(true)
+    expect(result.cards).toBe(1)
+    expect(result.mediaAssets).toBe(1)
+    // No canvases/freeform in the payload → none written, none reported.
+    expect(result.canvases).toBeUndefined()
+    expect(result.freeformCanvases).toBeUndefined()
+    expect(window.localStorage.getItem(CANVASES_KEY)).toBeNull()
+
+    // cards still imported.
+    const restoredCards = (
+      JSON.parse(window.localStorage.getItem(CARDS_KEY)!) as { cards: Card[] }
+    ).cards
+    expect(restoredCards).toHaveLength(1)
+    expect(restoredCards[0]!.id).toBe('legacy-1')
   })
 })
