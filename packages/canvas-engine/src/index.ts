@@ -68,6 +68,17 @@ export {
 } from './freedraw-classify'
 export type { FreedrawKind, FreedrawClassification } from './freedraw-classify'
 
+// ── $1 手势识别器(Wobbrock UIST 2007;本地模板匹配,点序列不外发,守 R2 隐私) ───
+export {
+  resamplePath,
+  rotateToZero,
+  scaleToSquare,
+  translateToOrigin,
+  normalizeGesture,
+  recognizeGesture,
+} from './gesture-recognizer'
+export type { Point, GestureTemplate, RecognitionResult } from './gesture-recognizer'
+
 // ── resize handle ───────────────────────────────────────────────────────────
 export { handleAtPoint, resizeGeometry } from './self-built-resize'
 export type { Handle } from './self-built-resize'
