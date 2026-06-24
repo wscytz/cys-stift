@@ -28,6 +28,24 @@
 import type { CanvasId } from '@cys-stift/domain'
 import type { CanvasElement } from '@cys-stift/canvas-engine'
 
+// ── Quota 失败回调(镜像 db-client.ts 的配额订阅模式)─────────────────────────
+// 本 store 是非 React 模块(无 hook 上下文),不能直接 pushToast/i18n。
+// 暴露订阅点:React 层(如 AppMenu)订阅一次,收到配额失败时展示 toast。
+type QuotaCallback = () => void
+const _quotaSubscribers = new Set<QuotaCallback>()
+
+function notifyQuota(): void {
+  for (const cb of _quotaSubscribers) cb()
+}
+
+/** 订阅配额写入失败事件(freeform 元素无法持久化时触发)。返回取消订阅。 */
+export function onQuotaExceeded(cb: QuotaCallback): () => void {
+  _quotaSubscribers.add(cb)
+  return () => {
+    _quotaSubscribers.delete(cb)
+  }
+}
+
 const KEY_PREFIX = 'cys-stift.canvas-freeform.'
 const KEY_SUFFIX = '.v1'
 
@@ -87,15 +105,18 @@ function lsLoad(canvasId: CanvasId): CanvasFreeformSnapshot | null {
   }
 }
 
-function lsSave(canvasId: CanvasId, snapshot: CanvasFreeformSnapshot): void {
+function lsSave(canvasId: CanvasId, snapshot: CanvasFreeformSnapshot): boolean {
   try {
     window.localStorage.setItem(storageKey(canvasId), JSON.stringify(snapshot))
+    return true
   } catch (e) {
     console.warn(
       `[canvasFreeformStore] localStorage save failed for ${String(canvasId)}: ${
         e instanceof Error ? e.message : String(e)
       }. Freeform elements may not persist until storage is cleared.`,
     )
+    notifyQuota()
+    return false
   }
 }
 
@@ -197,13 +218,15 @@ export const canvasFreeformStore = {
 
   /**
    * 持久化非卡片元素。card 元素在此被过滤掉(DB 单一可信源)。
-   * OPFS 主;不可用时回退 localStorage。best-effort,配额错误被吞(记一次 warn)。
+   * OPFS 主;不可用时回退 localStorage。返回是否成功(配额失败时触发
+   * onQuotaExceeded 订阅者,返回 false)。
    */
-  async save(canvasId: CanvasId, elements: CanvasElement[]): Promise<void> {
-    if (typeof window === 'undefined') return
+  async save(canvasId: CanvasId, elements: CanvasElement[]): Promise<boolean> {
+    if (typeof window === 'undefined') return true
     const snapshot = makeSnapshot(elements)
     const ok = await opfsSave(canvasId, snapshot)
-    if (!ok) lsSave(canvasId, snapshot)
+    if (ok) return true
+    return lsSave(canvasId, snapshot)
   },
 
   /**

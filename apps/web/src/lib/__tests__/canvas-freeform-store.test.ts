@@ -84,12 +84,15 @@ function installNoOpfs() {
 // ── Module under test (re-imported per test for clean module state) ──────────
 
 let store: typeof import('../canvas-freeform-store').canvasFreeformStore
+let onQuotaExceeded: typeof import('../canvas-freeform-store').onQuotaExceeded
 
 beforeEach(async () => {
   vi.resetModules()
   vi.unstubAllGlobals()
   window.localStorage.clear()
-  store = (await import('../canvas-freeform-store')).canvasFreeformStore
+  const mod = await import('../canvas-freeform-store')
+  store = mod.canvasFreeformStore
+  onQuotaExceeded = mod.onQuotaExceeded
 })
 
 describe('canvasFreeformStore — OPFS primary path', () => {
@@ -206,5 +209,37 @@ describe('canvasFreeformStore — SSR safety', () => {
     } finally {
       globalThis.window = originalWindow
     }
+  })
+})
+
+describe('canvasFreeformStore.save — quota failure', () => {
+  beforeEach(() => {
+    // Force OPFS unavailable so save falls through to lsSave (which we mock).
+    installNoOpfs()
+  })
+
+  it('returns false and notifies subscribers when localStorage.setItem throws', async () => {
+    // jsdom 的 localStorage.setItem 是 Storage.prototype 上的不可写属性,
+    // vi.spyOn(window.localStorage, 'setItem') 无法拦截 —— 必须.spyOn
+    // Storage.prototype.setItem(镜像 db-client.test.ts 的配额测试)。
+    const quotaErr = new DOMException('quota exceeded', 'QuotaExceededError')
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw quotaErr
+    })
+    let fired = false
+    const unsub = onQuotaExceeded(() => {
+      fired = true
+    })
+
+    const ok = await store.save(CANVAS_A, [textEl('t1')])
+    expect(ok).toBe(false)
+    expect(fired).toBe(true)
+    unsub()
+    vi.restoreAllMocks()
+  })
+
+  it('returns true on success', async () => {
+    const ok = await store.save(CANVAS_B, [textEl('t2')])
+    expect(ok).toBe(true)
   })
 })
