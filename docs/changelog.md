@@ -38,6 +38,13 @@ P2 引擎抽包后的衔接打磨 + 增值功能。
 - **矩阵测试扩列**:hitTest(中心点命中自己)+ 键盘微移两列,先红后绿。键盘微移又照出 freedraw 只移 bbox 不移 points(同 drag),一并修。矩阵现全覆盖 card/rect/text/freedraw × drag/resize/hitTest/键盘微移——这类 kind×操作疏漏自动抓住。
 - `bounds.ts` 补直接单测(此前仅经 svg/contract 间接覆盖)。
 
+### 手绘形状识别升级 · \$1 recognizer(2026-06-23)
+- 基于 Wobbrock et al. UIST 2007《A \$1 Recognizer》:把识别从「猜类别」(启发式 arrow/decoration)升级到「认具体形状」(圈/方/三角/对勾)。
+- `gesture-recognizer.ts`:论文 Appendix A 4 步(resample / rotate-to-zero / scale-to-square+translate / GSS 搜角)→ {name, score[0..1]},~100 行纯几何零依赖。注:论文伪代码 atan2(c−p0) 配 −θ 落 180°,改 atan2(p0−c) 使指示角真归 0(GSS ±45° 才有效)。
+- `gesture-templates.ts`:内置 circle/rect/triangle/check 模板 + `recognizeShape`(score≥0.7 认,否则 unknown 不硬猜)。箭头不进 \$1(1D 细长踩非均匀缩放坑)。
+- **全程本地,点序列不外发**(选 \$1 的核心原因——守 R2 隐私,不做②AI 介入手绘)。FreedrawPanel 升级显示具体形状。
+- 诚实记论文限制:旋转/缩放/平移不变 → 无法区分朝向/比例。
+
 
 
 开发者反馈(2026-06-22)的 2 个交互 bug + 收尾整理 + 战略讨论档归档。
