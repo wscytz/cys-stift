@@ -309,4 +309,72 @@ describe('applyLayout', () => {
     expect(arrows).toHaveLength(1)
     expect(arrows[0]).toMatchObject({ kind: 'arrow', x: 5, y: 5, w: 40, h: 40 })
   })
+
+  // ── rect/text update-by-id — DSL symmetry fix 5 ──
+
+  it('updates an existing rect by id (not creating a duplicate)', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'r1', kind: 'rect', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+
+    applyLayout(host, [{ type: 'free', shape: 'rect', id: 'r1', x: 200, y: 300 }])
+
+    const rects = host.getElements().filter((e) => e.kind === 'rect')
+    expect(rects).toHaveLength(1)
+    // op omitted w/h → existing 100/100 preserved; x/y overridden.
+    expect(host.getElement('r1')).toMatchObject({ x: 200, y: 300, w: 100, h: 100 })
+  })
+
+  it('updates an existing text by id (not creating a duplicate)', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 't1', kind: 'text', x: 0, y: 0, w: 100, h: 40, rotation: 0, text: 'orig' })
+
+    applyLayout(host, [{ type: 'free', shape: 'text', id: 't1', x: 50, y: 60, text: 'updated' }])
+
+    const texts = host.getElements().filter((e) => e.kind === 'text')
+    expect(texts).toHaveLength(1)
+    expect(host.getElement('t1')).toMatchObject({ x: 50, text: 'updated' })
+  })
+
+  it('creates a new rect when id not found', () => {
+    const host = new InMemoryCanvasHost()
+
+    applyLayout(host, [{ type: 'free', shape: 'rect', id: 'ghost', x: 0, y: 0 }])
+
+    const rects = host.getElements().filter((e) => e.kind === 'rect')
+    expect(rects).toHaveLength(1)
+    // id is minted by uid('free'), not the op's unmatched 'ghost'.
+    expect(rects[0]!.id).not.toBe('ghost')
+  })
+
+  it('rect update preserves existing w/h when op omits them', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'r1', kind: 'rect', x: 0, y: 0, w: 300, h: 200, rotation: 0 })
+
+    applyLayout(host, [{ type: 'free', shape: 'rect', id: 'r1', x: 10, y: 20 }])
+
+    expect(host.getElement('r1')).toMatchObject({ x: 10, y: 20, w: 300, h: 200 })
+  })
+
+  it('text update preserves existing text when op omits it', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 't1', kind: 'text', x: 0, y: 0, w: 100, h: 40, rotation: 0, text: 'orig' })
+
+    // op has no text field → existing.text must be preserved (not blanked).
+    applyLayout(host, [{ type: 'free', shape: 'text', id: 't1', x: 5, y: 6 }])
+
+    expect(host.getElement('t1')).toMatchObject({ x: 5, y: 6, text: 'orig' })
+  })
+
+  it('rect update does not mutate a text element (kind mismatch)', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 't1', kind: 'text', x: 10, y: 20, w: 100, h: 40, rotation: 0, text: 'orig' })
+
+    // rect op targeting a text id → existing.kind !== 'rect' → create path; t1 untouched.
+    applyLayout(host, [{ type: 'free', shape: 'rect', id: 't1', x: 0, y: 0 }])
+
+    expect(host.getElement('t1')).toMatchObject({ kind: 'text', x: 10, y: 20, text: 'orig' })
+    const rects = host.getElements().filter((e) => e.kind === 'rect')
+    expect(rects).toHaveLength(1)
+    expect(rects[0]!.id).not.toBe('t1')
+  })
 })

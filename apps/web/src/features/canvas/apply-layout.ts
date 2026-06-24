@@ -85,22 +85,40 @@ function applyCardOp(
 }
 
 function applyFreeOp(host: CanvasHost, op: DslFreeOp) {
-  const w = op.w ?? 200
-  const h = op.h ?? 150
   const x = Math.max(0, Math.round(op.x))
   const y = Math.max(0, Math.round(op.y))
-  const base = { id: uid('free'), x, y, rotation: 0 } as const
 
+  // ── Update path: op.id 命中已有同 kind 元素 → 覆盖提供的字段,保留其余 ──
+  // rect op 只更新 rect,text op 只更新 text(防跨 kind 误更新)。
+  if (op.id) {
+    const existing = host.getElement(op.id)
+    if (existing && existing.kind === op.shape) {
+      host.upsert({
+        ...existing,
+        x,
+        y,
+        ...(op.w !== undefined ? { w: op.w } : {}),
+        ...(op.h !== undefined ? { h: op.h } : {}),
+        ...(op.color ? { color: op.color } : {}),
+        // text 变体才有 op.text;判别联合 narrow 后访问(undefined 时不覆盖)。
+        ...('text' in op && op.text !== undefined ? { text: op.text } : {}),
+      })
+      return
+    }
+  }
+
+  // ── Create path ──
+  const base = { id: uid('free'), x, y, rotation: 0 } as const
   switch (op.shape) {
     case 'rect':
-      host.upsert({ ...base, kind: 'rect', w, h, color: op.color ?? 'black' })
+      host.upsert({ ...base, kind: 'rect', w: op.w ?? 200, h: op.h ?? 150, color: op.color ?? 'black' })
       break
     case 'text':
       host.upsert({
         ...base,
         kind: 'text',
-        w: 100,
-        h: 40,
+        w: op.w ?? 100,
+        h: op.h ?? 40,
         text: op.text ?? '',
         ...(op.color ? { color: op.color } : {}),
       })
