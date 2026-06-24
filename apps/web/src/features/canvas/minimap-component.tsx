@@ -12,9 +12,10 @@
  * 只读 host(getElements/getView/setView/onViewChange/onUserChange),不碰引擎逻辑。
  * 颜色走 token(readToken 读 CSS 变量,fallback hex)。
  */
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
 import { readToken, colorOf } from '@cys-stift/canvas-engine'
+import { useI18n } from '@/lib/i18n'
 import {
   computeMinimapProjection,
   viewportRect,
@@ -34,6 +35,8 @@ export function Minimap({
 }) {
   const miniRef = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef<number | null>(null)
+  const [collapsed, setCollapsed] = useState(false)
+  const { t } = useI18n()
 
   /** 绘制一帧。 */
   const draw = useCallback(() => {
@@ -104,6 +107,11 @@ export function Minimap({
     }
   }, [host, scheduleDraw])
 
+  // 展开后画布是新挂载的空 canvas,host 事件不会自动触发重绘——这里补一帧。
+  useEffect(() => {
+    if (!collapsed) scheduleDraw()
+  }, [collapsed, scheduleDraw])
+
   // 点击 minimap → 该页坐标居中。
   const onClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!host || !canvasEl) return
@@ -134,26 +142,79 @@ export function Minimap({
 
   if (!host || !canvasEl) return null
 
+  const title = t('canvas.minimap')
+
   return (
-    <canvas
-      ref={miniRef}
-      width={MINIMAP_W}
-      height={MINIMAP_H}
-      onClick={onClick}
-      aria-label="canvas minimap"
+    <div
       style={{
         position: 'absolute',
         right: 12,
         bottom: 12,
         width: MINIMAP_W,
-        height: MINIMAP_H,
+        zIndex: 15,
         background: 'var(--color-white)',
         border: '2px solid var(--color-black)',
         boxShadow: '4px 4px 0 0 var(--color-black)',
-        cursor: 'pointer',
-        zIndex: 15,
+        borderRadius: 'var(--radius-sm)',
       }}
-    />
+    >
+      {/* 标题栏:mono small-caps 标题 + 折叠开关。 */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: 'var(--space-1)',
+          borderBottom: collapsed ? 'none' : 'var(--border-hairline)',
+        }}
+      >
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 'var(--font-size-xs)',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            color: 'var(--color-black)',
+          }}
+        >
+          {title}
+        </span>
+        <button
+          type="button"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-label={collapsed ? `${title} expand` : `${title} collapse`}
+          aria-expanded={!collapsed}
+          title={collapsed ? `${title} expand` : `${title} collapse`}
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 'var(--font-size-xs)',
+            lineHeight: 1,
+            padding: '0 4px',
+            background: 'transparent',
+            color: 'var(--color-black)',
+            border: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          {collapsed ? '▸' : '▾'}
+        </button>
+      </div>
+      {!collapsed && (
+        <canvas
+          ref={miniRef}
+          width={MINIMAP_W}
+          height={MINIMAP_H}
+          onClick={onClick}
+          aria-label={title}
+          style={{
+            display: 'block',
+            width: MINIMAP_W,
+            height: MINIMAP_H,
+            cursor: 'pointer',
+          }}
+        />
+      )}
+    </div>
   )
 }
 

@@ -226,6 +226,7 @@ export const messages = {
   'canvas.autoRelate': { zh: 'AI 自动关联', en: 'AI auto-relate' },
   'canvas.autoRelateDone': { zh: '已创建 {n} 条 AI 关系', en: 'Created {n} AI relations' },
   'canvas.autoRelateNone': { zh: '未找到可推断的关系', en: 'No inferable relations' },
+  'canvas.minimap': { zh: '鸟瞰', en: 'Overview' },
 
   /* ── Archive ── */
   'archive.crumb': { zh: '归档', en: 'archive' },
