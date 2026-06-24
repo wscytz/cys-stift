@@ -4,6 +4,9 @@ import {
   hitTest,
   sortByLayer,
   domTokenResolver,
+  intersectsBounds,
+  viewportBounds,
+  normalizeBox,
 } from '../index'
 import type { CanvasElement, CanvasView } from '../canvas-host'
 
@@ -112,5 +115,34 @@ describe('hitTest @ scale', () => {
   })
   bench('5000 elements', () => {
     hitTest(N5K, 130, 70)
+  })
+})
+
+/**
+ * 视锥剔除 filter 开销(renderNow 的生产路径新增成本)。
+ *
+ * 与上面的 renderElements bench 故意分开:renderElements 是纯函数 bench,测「全量渲染」
+ * 成本(防回归基准),不剔除——剔除逻辑在 adapter 层。这里单独测 cull filter 本身,
+ * 证明它相对渲染很便宜(一次 AABB 比较 vs 每元素的文本测量/路径绘制)。
+ * 用一个小视口(只盖左上 ~1/50 的元素),模拟 zoom/pan 后多数离屏的真实场景。
+ */
+const SMALL_VP_VIEW: CanvasView = { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }
+const SMALL_VP = viewportBounds(SMALL_VP_VIEW, 260, 140) // 只盖第 0 行第 0 列那一格
+
+describe('cull filter @ scale (adapter viewport culling)', () => {
+  bench('100 elements', () => {
+    N100.filter(
+      (el) => (el.kind === 'arrow' && el.from && el.to) || intersectsBounds(normalizeBox(el), SMALL_VP),
+    )
+  })
+  bench('1000 elements', () => {
+    N1K.filter(
+      (el) => (el.kind === 'arrow' && el.from && el.to) || intersectsBounds(normalizeBox(el), SMALL_VP),
+    )
+  })
+  bench('5000 elements', () => {
+    N5K.filter(
+      (el) => (el.kind === 'arrow' && el.from && el.to) || intersectsBounds(normalizeBox(el), SMALL_VP),
+    )
   })
 })

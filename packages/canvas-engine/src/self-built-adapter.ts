@@ -22,6 +22,7 @@ import { handleAtPoint, resizeGeometry, type Handle } from './self-built-resize'
 import { marqueeSelect } from './self-built-marquee'
 import { arrowPreviewEndpoints } from './self-built-arrow'
 import { arrowKeyDelta, selectAllIds, parseKeyboardAction } from './self-built-keyboard'
+import { intersectsBounds, viewportBounds, normalizeBox } from './bounds'
 
 export class SelfBuiltAdapter implements CanvasHost {
   private elements = new Map<string, CanvasElement>()
@@ -97,9 +98,21 @@ export class SelfBuiltAdapter implements CanvasHost {
       this.currentStroke && this.currentStroke.points.length > 0
         ? [commitFreedraw('__preview', this.currentStroke.points)]
         : []
+    // 视锥剔除(viewport culling):只渲染与可见页矩形相交的元素。大画布(5k 元素)
+    // zoom/pan 后多数离屏,这里一次 filter 省掉它们进 drawElement 的开销(文本测量/路径)。
+    //
+    // 例外:关系箭头(arrow 且 from/to 非空)的 bbox w=h=0——几何来自端点引用,不是 bbox。
+    // 零尺寸 box 永不与任何视口 AABB 相交 → 会被误剔除。但其两端点可能在屏上,故这类
+    // arrow 无条件保留(不过滤)。自由箭头(无 from/to、bbox 非零)走正常剔除。
+    // freedraw 预览(__preview,用户正画的)也无条件保留。
+    const vp = viewportBounds(this.view, w, h)
+    const all = this.getElements()
+    const visible = all.filter(
+      (el) => (el.kind === 'arrow' && el.from && el.to) || intersectsBounds(normalizeBox(el), vp),
+    )
     renderElements(
       ctx,
-      [...this.getElements(), ...preview],
+      [...visible, ...preview],
       this.view,
       w,
       h,

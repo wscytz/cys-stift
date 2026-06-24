@@ -93,6 +93,6 @@ export { marqueeSelect } from './self-built-marquee'
 // ── 键盘 ────────────────────────────────────────────────────────────────────
 export { arrowKeyDelta, selectAllIds, parseKeyboardAction } from './self-built-keyboard'
 
-// ── 通用 AABB 几何(供 SVG 导出 bbox 计算) ─────────────────────────────────────
-export { unionBounds, expandBounds, normalizeBox } from './bounds'
+// ── 通用 AABB 几何(供 SVG 导出 bbox 计算 + viewport 视锥剔除) ──────────────────
+export { unionBounds, expandBounds, normalizeBox, intersectsBounds, viewportBounds } from './bounds'
 export type { Bounds } from './bounds'
