@@ -3,7 +3,7 @@ import type { CanvasElement, CanvasView } from './canvas-host'
 import { sortByLayer } from './canvas-host'
 import { colorOf, domTokenResolver, type TokenResolver } from './self-built-render'
 import { arrowEndpoints, dashPattern, arrowheadPoints } from './self-built-arrow'
-import { unionBounds, expandBounds, type Bounds } from './bounds'
+import { unionBounds, expandBounds, normalizeBox, type Bounds } from './bounds'
 
 export interface ElementsToSvgOptions {
   background: boolean
@@ -27,7 +27,9 @@ export function elementsToSvg(
 ): { svg: string; width: number; height: number } {
   // 0. 确定性 z 序:与实时渲染完全一致(防御性——即使调用方传未排序数组,SVG 仍按
   //    KIND_LAYER 出,五视图视觉对齐)。bbox 用全部元素算,与顺序无关。
-  const boxes: Bounds[] = elements.map((e) => ({ x: e.x, y: e.y, w: e.w, h: e.h }))
+  // bbox 归一化:自由箭头反向画时 w/h<0,unionBounds 用 x+w 算 maxX 会算反 → 尺寸为负
+  // → 钳成 1×1px。归一化(负则翻转 x/y 到左上)与 hitTest/选中框/self-built-render 同源。
+  const boxes: Bounds[] = elements.map((e) => normalizeBox(e))
   const raw = unionBounds(boxes) ?? { x: 0, y: 0, w: 1, h: 1 }
   const expanded = expandBounds(raw, opts.border)
   const width = Math.max(1, Math.round(expanded.w))
