@@ -13,7 +13,7 @@ jobs:
 
       # 不指定 version:自动从 package.json 的 packageManager(pnpm@9.15.0)读,
       # 避免与 packageManager 字段冲突(ERR_PNPM_BAD_PM_VERSION)。
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
 
       - uses: actions/setup-node@v5
         with:
@@ -42,27 +42,35 @@ jobs:
 
       - name: web build (includes web typecheck)
         run: pnpm --filter web build
-
   build-tauri-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
 
       - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
 
+      - name: setup rust
+        uses: dtolnay/rust-toolchain@stable
+
       - run: pnpm install --frozen-lockfile
 
       - name: build tauri (windows)
         working-directory: apps/desktop
-        run: pnpm tauri build
+        # --ci: 跳过交互式提示(NSIS 默认值等)
+        # --no-bundle=false 时正常 bundle NSIS installer
+        run: pnpm tauri build --ci
 
       - name: upload windows exe
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cy's-stift-windows
-          path: apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
+          name: cy-s-stift-windows
+          if-no-files-found: warn
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
+            apps/desktop/src-tauri/target/release/bundle/msi/*.msi
