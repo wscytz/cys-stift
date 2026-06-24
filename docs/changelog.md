@@ -5,7 +5,18 @@
 
 ---
 
-## 2026-06-24 · audit-closure-ralph-3rounds · 审计闭环 + Ralph 三轮自我打磨
+## 2026-06-24 · quota-dual-failure · 存储配额双失败收口(R2.4 / R2.3 / R2.8)
+
+审计遗留的三类「静默吞 QuotaExceeded」同源问题,复刻 `db-client.ts` 已验证的配额契约模式(`saveXxx(): boolean` + `onQuotaExceeded` 订阅点)统一收口。计划 `docs/superpowers/plans/2026-06-24-quota-dual-failure.md`,5 步 TDD(subagent 编排,每步一 commit)。
+
+- **R2.4 `mediaStore.attach` 配额失败抛错不留悬空 ref**(`5335356`):`saveAssets` 返回 boolean,`attach` 内 `enqueueWrite` 读返回值,失败时 `throw` 先于构造 MediaRef —— 卡片不再引用不存在的 asset(此前配额满时 attach 仍返回 MediaRef → card.media 指向幽灵 asset)。加 `onQuotaExceeded` 订阅点(镜像 db-client)。
+- **R2.3 `canvasFreeformStore.save` 返回 boolean**(`8343e6d`):`lsSave`/`save` 返回 boolean,失败经 `onQuotaExceeded` 浮出(此前 fire-and-forget `void store.save(...)` 调用方无法读返回值,配额满只 `console.warn` 静默)。OPFS 成功即 true,否则回退 lsSave 返回其值。
+- **R2.8 capture 链路 attach 失败不造悬空卡片**(`ae95d9c`):R2.4 让 attach 抛错后,`FileCaptureSink.submit` 在 `service.create` 之前 reject → 无悬空卡;调用方 `file-drop-handler` 的 `captureAndToast` 已有 `.catch` + toast。回归测试断言 image/doc 两分支 attach 失败时 `service.create` 一次未调。
+- **AppMenu 订阅统一**(`3e0742f`):AppMenu 的配额 `useEffect` 从单订阅 db-client 扩为订阅三 store(db-client / media / freeform),任一失败均 toast `storage.quotaExceeded`。
+
+三个 store 现共享同一配额契约模式。510 web 测试(504 基线 + 6 新红→绿:2 media + 2 freeform + 2 capture)+ tsc 零新增错误(22 基线无关)+ build exit 0。
+
+
 
 先做审计 plan 的 4 个 HIGH/MED(Task 1-4),再启动 Ralph 式自我打磨 3 轮(subagent 系统扫缝→审→TDD 修→验证→commit)。
 
