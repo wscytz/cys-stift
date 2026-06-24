@@ -53,6 +53,9 @@
   flex-direction: column;
   gap: var(--space-4);
 }
+.page-content--wide {
+  max-width: 1120px;
+}
 
 /* ── 5. Section (heading + content group) ───────────────────────────────────── */
 .section {

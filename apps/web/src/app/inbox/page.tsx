@@ -82,7 +82,7 @@ export default function InboxPage() {
         </Tag>
       </Toolbar>
 
-      <div className="content">
+      <div className="page-content page-content--wide">
         {view === 'inbox' && (
           <CreateCardForm
             onCreate={(input) => {
@@ -201,6 +201,82 @@ export default function InboxPage() {
   )
 }
 
+const styles = `
+.page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
+.tab {
+  height: 32px;
+  padding: 0 var(--space-2);
+  background: transparent;
+  border: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-gray);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.tab--active { color: var(--color-black); border-bottom-color: var(--color-red); font-weight: 600; }
+
+.grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-3) var(--space-4);
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  text-align: left;
+  background: var(--color-white);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  min-height: 160px;
+  transition: transform 80ms ease-out, box-shadow 80ms ease-out, border-color 80ms ease-out;
+  box-shadow: var(--shadow-sm);
+  font-family: var(--font-body);
+  color: var(--color-black);
+}
+.tile:hover { box-shadow: var(--shadow-md); }
+.tile--pinned { outline: 2px solid var(--color-yellow); outline-offset: -1px; }
+.tile--pinned .tile__bar { background: var(--color-yellow); }
+.tile__pin {
+  position: absolute; top: var(--space-1); right: var(--space-1); z-index: 2;
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--color-white); border: var(--border-hairline); border-radius: var(--radius-sm);
+  font-size: var(--font-size-base); line-height: 1; color: var(--color-gray);
+  cursor: pointer; padding: 0;
+}
+.tile__pin:hover { color: var(--color-yellow); }
+.tile__main {
+  flex: 1; display: flex; width: 100%;
+  background: transparent; border: 0; padding: 0; text-align: left;
+  cursor: pointer; color: inherit; font: inherit;
+}
+.tile__main:active { transform: translate(2px, 2px); box-shadow: none; }
+.tile__bar { width: 8px; flex-shrink: 0; background: var(--color-red); }
+.tile__body { flex: 1; padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+.tile__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.tile__preview { margin: 0; color: var(--color-black-soft); font-size: var(--font-size-sm); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.tile__meta { display: flex; gap: var(--space-1); align-items: center; margin-top: auto; flex-wrap: wrap; }
+.tile__time { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); margin-left: auto; }
+
+.empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) 0; }
+.empty__bar { width: 64px; height: 8px; background: var(--color-red); }
+`
+
 // ── Subcomponents ──────────────────────────────────────────────────────────
 
 /** Phase A (v0.24.0): stable partition that lifts pinned cards to the
@@ -264,8 +340,8 @@ function EmptyState({ view }: { view: View }) {
     <UICard>
       <div className="empty">
         <div className="empty__bar" aria-hidden="true" />
-        <p className="empty__eyebrow">{t('inbox.crumb')}</p>
-        <h2 className="empty__h">
+        <p className="eyebrow">{t('inbox.crumb')}</p>
+        <h2 className="display-title display-title--lg">
           {view === 'inbox' ? t('inbox.empty.title') : t('inbox.empty.titleArchived')}
         </h2>
         <p className="empty__lede">
@@ -276,99 +352,4 @@ function EmptyState({ view }: { view: View }) {
   )
 }
 
-const styles = `
-.page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
-.crumb {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--color-gray);
-}
-.crumb--here { color: var(--color-black); }
-.crumb-sep { color: var(--color-gray); }
-.crumb-spacer { flex: 1; }
-.tab {
-  height: 32px;
-  padding: 0 var(--space-2);
-  background: transparent;
-  border: 0;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--color-gray);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-}
-.tab--active { color: var(--color-black); border-bottom-color: var(--color-red); font-weight: 600; }
-
-.content { max-width: 1120px; margin: 0 auto; padding: var(--space-5) var(--space-4); display: flex; flex-direction: column; gap: var(--space-4); }
-
-.grid {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: var(--space-3) var(--space-4);
-}
-
-.tile {
-  position: relative;
-  display: flex;
-  text-align: left;
-  background: var(--color-white);
-  border: var(--border-hairline);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  min-height: 160px;
-  transition: transform 80ms ease-out, box-shadow 80ms ease-out, border-color 80ms ease-out;
-  box-shadow: var(--shadow-sm);
-  font-family: var(--font-body);
-  color: var(--color-black);
-}
-.tile:hover { box-shadow: var(--shadow-md); }
-/* R4 (v0.25.1): outline (not border-width) so pinning doesn't reflow
-   the grid — the 2px outline overlays the default 1px hairline. */
-.tile--pinned { outline: 2px solid var(--color-yellow); outline-offset: -1px; }
-.tile--pinned .tile__bar { background: var(--color-yellow); }
-.tile__pin {
-  position: absolute; top: var(--space-1); right: var(--space-1); z-index: 2;
-  width: 28px; height: 28px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--color-white); border: var(--border-hairline); border-radius: var(--radius-sm);
-  font-size: var(--font-size-base); line-height: 1; color: var(--color-gray);
-  cursor: pointer; padding: 0;
-}
-.tile__pin:hover { color: var(--color-yellow); }
-.tile__main {
-  flex: 1; display: flex; width: 100%;
-  background: transparent; border: 0; padding: 0; text-align: left;
-  cursor: pointer; color: inherit; font: inherit;
-}
-.tile__main:active { transform: translate(2px, 2px); box-shadow: none; }
-.tile__bar { width: 8px; flex-shrink: 0; background: var(--color-red); }
-.tile__body { flex: 1; padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
-.tile__title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--font-size-lg);
-  font-weight: 500;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-}
-.tile__preview { margin: 0; color: var(--color-black-soft); font-size: var(--font-size-sm); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.tile__meta { display: flex; gap: var(--space-1); align-items: center; margin-top: auto; flex-wrap: wrap; }
-.tile__time { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); margin-left: auto; }
-
-.empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) 0; }
-.empty__bar { width: 64px; height: 8px; background: var(--color-red); }
-.empty__eyebrow { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.16em; color: var(--color-gray); }
-.empty__h { margin: 0; font-family: var(--font-display); font-size: var(--font-size-2xl); font-weight: 500; letter-spacing: -0.01em; }
-.empty__lede { margin: 0; color: var(--color-black-soft); font-size: var(--font-size-base); line-height: 1.6; max-width: 60ch; }
-
-.footnote { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); margin: 0; padding-top: var(--space-2); border-top: var(--border-hairline); }
-.footnote__link { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; }
-
-`
+<style>{styles}</style>
