@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { scanStorageUsage } from '../storage-usage'
 
 beforeEach(() => {
@@ -42,5 +42,41 @@ describe('scanStorageUsage — byte-accurate sizing (v0.37.0)', () => {
     const usage = await scanStorageUsage()
     const cats = usage.byKey.map((k) => k.category).sort()
     expect(cats).toEqual(['canvas', 'cards', 'media'])
+  })
+})
+
+// ── OPFS 占用计入 used(审计 H4)────────────────────────────────────────────
+// estimate().usage 包含 localStorage + OPFS + IndexedDB 总占用,应作 used;
+// estimate().quota 作 total。此前 used 只算 localStorage → 显示偏低,
+// 80% 警告(防静默丢数据的网)触发太晚。
+describe('scanStorageUsage OPFS 计入', () => {
+  it('used 反映 estimate().usage(localStorage + OPFS 总和)', async () => {
+    // localStorage = 1MB,OPFS 让 estimate().usage = 4MB(含 localStorage)
+    const oneMb = 'x'.repeat(1024 * 1024)
+    window.localStorage.setItem('cys-stift.cards.v1', oneMb)
+    vi.stubGlobal('navigator', {
+      storage: {
+        estimate: vi.fn().mockResolvedValue({ quota: 10 * 1024 * 1024, usage: 4 * 1024 * 1024 }),
+      },
+    })
+    const u = await scanStorageUsage()
+    expect(u.used).toBe(4 * 1024 * 1024) // estimate().usage,非仅 localStorage 1MB
+    expect(u.total).toBe(10 * 1024 * 1024)
+    expect(u.percent).toBe(40)
+    vi.unstubAllGlobals()
+  })
+
+  it('estimate 不可用时回退 lsBytes(降级路径)', async () => {
+    // 模拟 SSR 降级:navigator.storage.estimate 不存在 → used 回退 lsBytes
+    const oneMb = 'x'.repeat(1024 * 1024)
+    window.localStorage.setItem('cys-stift.cards.v1', oneMb)
+    vi.stubGlobal('navigator', {
+      storage: {} as StorageManager,
+    })
+    const u = await scanStorageUsage()
+    expect(u.used).toBe(1024 * 1024) // 回退 lsBytes
+    expect(u.total).toBe(0)
+    expect(u.percent).toBe(0)
+    vi.unstubAllGlobals()
   })
 })

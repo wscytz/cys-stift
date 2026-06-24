@@ -24,8 +24,6 @@ export interface StorageUsage {
   byKey: Array<{ key: string; bytes: number; category: string }>
 }
 
-const FALLBACK_QUOTA_BYTES = 5 * 1024 * 1024 // 5MB conservative for browsers
-                                    // that don't expose navigator.storage.estimate
 const CYS_PREFIX = 'cys-stift.'
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -48,15 +46,18 @@ function warnFor(percent: number): StorageWarning {
   return null
 }
 
-async function detectQuota(): Promise<number> {
+async function detectQuota(): Promise<{ quota: number; usage: number }> {
   if (typeof navigator === 'undefined' || !navigator.storage?.estimate) {
-    return FALLBACK_QUOTA_BYTES
+    return { quota: 0, usage: 0 }
   }
   try {
     const est = await navigator.storage.estimate()
-    return est.quota ?? FALLBACK_QUOTA_BYTES
+    return {
+      quota: est.quota ?? 0,
+      usage: est.usage ?? 0,
+    }
   } catch {
-    return FALLBACK_QUOTA_BYTES
+    return { quota: 0, usage: 0 }
   }
 }
 
@@ -64,9 +65,9 @@ export async function scanStorageUsage(): Promise<StorageUsage> {
   if (typeof window === 'undefined') {
     return { used: 0, total: 0, percent: 0, warning: null, byKey: [] }
   }
-  const total = await detectQuota()
+  const { quota: total, usage: estimateUsage } = await detectQuota()
   const byKey: StorageUsage['byKey'] = []
-  let used = 0
+  let lsBytes = 0
   for (let i = 0; i < window.localStorage.length; i++) {
     const key = window.localStorage.key(i)
     if (!key || !key.startsWith(CYS_PREFIX)) continue
@@ -76,10 +77,16 @@ export async function scanStorageUsage(): Promise<StorageUsage> {
     // media data URLs undercounts by ~2x, so the 80% quota warning (the
     // safety net against silent QuotaExceeded) fires too late.
     const bytes = new Blob([raw]).size
-    used += bytes
+    lsBytes += bytes
     byKey.push({ key, bytes, category: categorise(key) })
   }
   byKey.sort((a, b) => b.bytes - a.bytes)
+
+  // used 用 estimate().usage(含 OPFS + IndexedDB,浏览器汇总),它比 lsBytes
+  // 大或相等。此前 used 只算 localStorage → OPFS 几何不可见 → 计量偏低,
+  // 80% 警告(审计 H1 丢数据的网)触发太晚。estimate 不可用(SSR/降级)时
+  // 回退 lsBytes(localStorage 可见部分)。
+  const used = estimateUsage > 0 ? estimateUsage : lsBytes
   const percent = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
   return { used, total, percent, warning: warnFor(percent), byKey }
 }
