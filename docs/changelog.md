@@ -5,7 +5,18 @@
 
 ---
 
-## 2026-06-24 · quota-dual-failure · 存储配额双失败收口(R2.4 / R2.3 / R2.8)
+## 2026-06-24 · remaining-ux-ai · R3.8 水合闪烁 + R3.5 快捷键 + A 方向 cluster shape
+
+收口审计/主线三件可实现遗留。计划 `docs/superpowers/plans/2026-06-24-remaining-ux-ai.md`,subagent 编排串行(三者都触 canvas page.tsx 不同段,按序 commit 避冲突)。
+
+- **R3.8 DB 水合前 gate 空状态**(`d90327a`):`useDb()` 的 `ready` 字段此前解构了却没消费 → inbox/archive/trash/canvas 四页首帧渲染假空状态,水合后跳变(用户误以为「真的没数据」)。新增共享 `<PageLoading>`(极简 mono「读取中…」),四页 `!ready ? <PageLoading/> : 空状态? : 列表` 三元 gate;canvas 空提示叠加层 `!ready ? null`。
+- **R3.5 画布快捷键帮助对话框**(`94380aa`):画布有 13 组快捷键(放大 `+`/`=`、缩小 `-`、适配 `0`/`1`、吸附 `g`、`Esc` 取消选区、`Delete` 删除、`Ctrl/Cmd+Z` 撤销、`Shift+Z`/`Ctrl+Y` 重做、`Ctrl+A` 全选、方向键微移 1px、`Shift+方向` 10px)但 UI 全无提示。工具栏加 `?` 按钮 → `ShortcutHelpDialog`(复用 `@cys-stift/ui` Modal,三组:视图/编辑/微移,键→动作两列)。16 条 i18n。
+- **A 方向 cluster prompt 接画布快照**(`966cc87`):cluster 是 AI action 但只看 card 文本(`serializeCardsForAI`),看不到 freedraw 形状 → 无法按手绘空间提示分组。`buildClusterUserPrompt(cards, canvasSnapshot='')` 扩展签名(默认空 → 向后兼容,旧调用/单测不受影响),`handleAICluster` 照 `handleAILayout` 调 `snapshotCanvas`+`formatCanvasSnapshot` 喂入;system prompt 补一句说明 freedraw shape 行可作为空间提示(输出 ids 仍只能是 card ids)。snapshot 层早已有 freedraw 的 `shape: circle (85%)` 行(R2 安全:只发离散标签 + 标量比例,不发点坐标),只差 cluster 消费。**转义+AI 主线推进**:AI 现在能感知手绘形状。
+
+### 验证
+513 web 测试(510 基线 + 3 新 cluster)+ tsc 零新增(22 基线无关)+ build exit 0。auto-relate 是纯本地关键词启发式非 AI,不在本轮范围。
+
+
 
 审计遗留的三类「静默吞 QuotaExceeded」同源问题,复刻 `db-client.ts` 已验证的配额契约模式(`saveXxx(): boolean` + `onQuotaExceeded` 订阅点)统一收口。计划 `docs/superpowers/plans/2026-06-24-quota-dual-failure.md`,5 步 TDD(subagent 编排,每步一 commit)。
 
