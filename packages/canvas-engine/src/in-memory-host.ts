@@ -99,6 +99,11 @@ export class InMemoryCanvasHost implements CanvasHost {
     }
   }
 
+  /** 测试用 host 无 undo 历史;返回 [] 让 diff UI 走「无历史」分支。 */
+  getHistory(): CanvasElement[][] {
+    return []
+  }
+
   private emit(c: UserChange): void {
     for (const l of this.listeners) l(c)
   }

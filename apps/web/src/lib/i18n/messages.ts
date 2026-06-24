@@ -202,6 +202,17 @@ export const messages = {
   'canvas.scNudge1': { zh: '微移 1px', en: 'Nudge 1px' },
   'canvas.scNudge10': { zh: '微移 10px', en: 'Nudge 10px' },
 
+  /* ── Canvas version diff (转义独占) ── */
+  'canvas.diff': { zh: '版本对比', en: 'Diff' },
+  'canvas.diffTitle': { zh: '画布版本对比', en: 'Canvas version diff' },
+  'canvas.diffLede': { zh: '最近一次变更前后的元素差异(转义独占:画布=文字,可 diff)。', en: 'Element changes since the last edit (transliteration exclusive: canvas as text, diffable).' },
+  'canvas.diffUnavailable': { zh: '当前画布引擎不支持历史对比。', en: 'This canvas engine does not support history diff.' },
+  'canvas.diffNoHistory': { zh: '还没有编辑历史——改点什么再来看。', en: 'No edit history yet — make a change first.' },
+  'canvas.diffNoChange': { zh: '最近一次变更无差异。', en: 'No difference in the last change.' },
+  'canvas.diffAdded': { zh: '新增', en: 'Added' },
+  'canvas.diffRemoved': { zh: '删除', en: 'Removed' },
+  'canvas.diffChanged': { zh: '修改', en: 'Changed' },
+
   /* ── Canvas relations (M1) ── */
   'relation.title': { zh: '关系类型', en: 'Relation type' },
   'relation.blocks': { zh: '阻塞', en: 'Blocks' },

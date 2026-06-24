@@ -10,6 +10,7 @@ import { CardDetailModal } from '@/features/canvas/card-detail-modal'
 import { ExportDialog } from '@/features/canvas/export-dialog'
 import { DslDialog } from '@/features/canvas/dsl-dialog'
 import { ShortcutHelpDialog } from '@/features/canvas/shortcut-help-dialog'
+import { DiffDialog } from '@/features/canvas/diff-dialog'
 import { applyLayout } from '@/features/canvas/apply-layout'
 import { RelationPanel } from '@/features/canvas/relation-panel'
 import { FreedrawPanel } from '@/features/canvas/freedraw-panel'
@@ -76,6 +77,7 @@ export default function CanvasPage() {
   const [exportOpen, setExportOpen] = useState(false)
   const [dslOpen, setDslOpen] = useState(false)
   const [shortcutOpen, setShortcutOpen] = useState(false)
+  const [diffOpen, setDiffOpen] = useState(false)
 
   const onCanvas = service
     .listOnCanvas(activeCanvasId)
@@ -458,6 +460,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         <span className="tb-divider" aria-hidden="true" />
         <Button variant="ghost" onClick={() => setDslOpen(true)} disabled={!adapterReady} title={t('canvas.dslTitle')}>{t('canvas.dsl')}</Button>
         <Button variant="ghost" onClick={() => setExportOpen(true)} disabled={!adapterReady} title={t('canvas.export')}>{t('canvas.export')}</Button>
+        <Button variant="ghost" onClick={() => setDiffOpen(true)} disabled={!adapterReady} title={t('canvas.diffTitle')}>{t('canvas.diff')}</Button>
         <span className="tb-divider" aria-hidden="true" />
         <Button variant="ghost" onClick={() => setShortcutOpen(true)} title={t('canvas.shortcuts')} aria-label={t('canvas.shortcuts')}>?</Button>
       </Toolbar>
@@ -563,6 +566,8 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       />
 
       <ShortcutHelpDialog open={shortcutOpen} onClose={() => setShortcutOpen(false)} />
+
+      <DiffDialog open={diffOpen} onClose={() => setDiffOpen(false)} host={handle.current.adapter} />
 
       <style>{styles}</style>
     </main>

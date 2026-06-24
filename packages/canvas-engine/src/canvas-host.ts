@@ -152,4 +152,9 @@ export interface CanvasHost {
   setView(v: CanvasView): void
   /** 订阅视图(pan/zoom/grid)变更。返回取消订阅。 */
   onViewChange(cb: (v: CanvasView) => void): () => void
+  /**
+   * 返回 undo 历史(只读副本, oldest→newest;不含当前状态)。可选——
+   * 用于画布版本 diff。实现可不提供完整历史(InMemoryCanvasHost 返回 [])。
+   */
+  getHistory?(): CanvasElement[][]
 }

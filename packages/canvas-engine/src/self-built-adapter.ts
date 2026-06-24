@@ -314,6 +314,12 @@ export class SelfBuiltAdapter implements CanvasHost {
     return this.redoStack.length > 0
   }
 
+  /** 返回 undo 历史(只读副本,oldest→newest;不含当前状态)。供画布版本 diff。
+   *  深拷贝每个快照(含 freedraw points)防外部篡改引擎内部状态。 */
+  getHistory(): CanvasElement[][] {
+    return this.undoStack.map((snap) => snap.map((el) => ({ ...el })))
+  }
+
   undo(): void {
     const prev = this.undoStack.pop()
     if (!prev) return
