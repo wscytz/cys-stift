@@ -167,5 +167,70 @@ describe('交互矩阵 — 关系箭头可选中', () => {
   })
 })
 
+// ── undo/restore 选区同步(探照灯:undo 撤掉元素后,幽灵 id 残留 selectedIds) ──
+// restore()(undo/redo 调它)不刷新 selectedIds。undo 撤掉一个元素后,该 id 仍残留在
+// selectedIds,但 getElement(id) 已 undefined → 后续 Delete/方向键/resize handle 取到
+// 幽灵 id 静默失效,或选中框画空。restore 应过滤掉快照里不存在的 id 并 emit 选区变更。
+
+describe('undo 选区同步', () => {
+  it('undo 撤掉 c2 后,getSelectedIds 不含幽灵 c2(只留仍存在的 c1)', () => {
+    const { host } = makeHost()
+    const h = host as unknown as {
+      setSelectedIds: (ids: string[]) => void
+      getSelectedIds: () => string[]
+      undo: () => void
+      canUndo: () => boolean
+    }
+    // c1 upsert(echoing → 推 undo 快照=空),选 c1
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    h.setSelectedIds(['c1'])
+    // c2 upsert(再推一次 undo 快照=只有 c1),把 c2 累加进选区
+    host.upsert({ id: 'c2', kind: 'card', x: 20, y: 0, w: 10, h: 10, rotation: 0 })
+    h.setSelectedIds(['c1', 'c2'])
+    expect(h.canUndo()).toBe(true)
+    // undo:撤掉 c2 的 upsert → c2 消失,只留 c1
+    h.undo()
+    expect(host.getElements().map((e) => e.id)).toEqual(['c1'])
+    // 选区必须同步:幽灵 c2 被清掉,只剩仍存在的 c1
+    expect(h.getSelectedIds()).toEqual(['c1'])
+  })
+
+  it('undo 撤掉元素后,onSelectionChange 收到过滤后的选区', () => {
+    const { host } = makeHost()
+    const h = host as unknown as {
+      setSelectedIds: (ids: string[]) => void
+      undo: () => void
+      onSelectionChange: (cb: (ids: string[]) => void) => () => void
+    }
+    const events: string[][] = []
+    h.onSelectionChange((ids) => events.push([...ids]))
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    host.upsert({ id: 'c2', kind: 'card', x: 20, y: 0, w: 10, h: 10, rotation: 0 })
+    h.setSelectedIds(['c1', 'c2'])
+    events.length = 0 // 只看 undo 后的那次 emit
+    h.undo()
+    // restore 过滤掉 c2 → emit 一次,内容是 ['c1']
+    expect(events).toEqual([['c1']])
+  })
+
+  it('undo 后选区里全是仍存在的元素 → 不 emit(避免多余事件)', () => {
+    const { host } = makeHost()
+    const h = host as unknown as {
+      setSelectedIds: (ids: string[]) => void
+      undo: () => void
+      onSelectionChange: (cb: (ids: string[]) => void) => () => void
+    }
+    const events: string[][] = []
+    h.onSelectionChange((ids) => events.push([...ids]))
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    // 第二次 upsert 改 c1 位置(不撤元素,只撤属性),选区只有 c1 全程存在
+    host.upsert({ id: 'c1', kind: 'card', x: 5, y: 5, w: 10, h: 10, rotation: 0 })
+    h.setSelectedIds(['c1'])
+    events.length = 0
+    h.undo() // 撤回 c1 的位移,元素没消失,选区无需变
+    expect(events).toEqual([])
+  })
+})
+
 
 

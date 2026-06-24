@@ -295,6 +295,17 @@ export class SelfBuiltAdapter implements CanvasHost {
       this.elements.clear()
       for (const el of snapshot) this.elements.set(el.id, el)
     })
+    // 选区同步:undo/redo 可能让被选中的元素消失(撤掉 upsert),残留的幽灵 id 会让
+    // 后续 Delete/方向键/resize handle 取到 undefined → 静默失效、选中框画空。过滤掉
+    // 快照里不存在的 id;若选区实际变了才 emit(跟 setSelectedIds 一致,避免多余事件)。
+    const live = new Set(snapshot.map((e) => e.id))
+    const before = this.selectedIds
+    const filtered = new Set([...this.selectedIds].filter((id) => live.has(id)))
+    if (filtered.size !== before.size || [...filtered].some((id) => !before.has(id))) {
+      this.selectedIds = filtered
+      const selSnapshot = [...this.selectedIds]
+      for (const l of this.selectionListeners) l(selSnapshot)
+    }
     this.scheduleRender()
   }
 
