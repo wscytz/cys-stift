@@ -377,4 +377,41 @@ describe('applyLayout', () => {
     expect(rects).toHaveLength(1)
     expect(rects[0]!.id).not.toBe('t1')
   })
+
+  // ── applied/skipped counts (打磨主干 1+2:诚实反馈) ──
+
+  it('returns applied/skipped counts', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'c1', 0, 0)
+
+    const res = applyLayout(host, [
+      { type: 'card', cardId: 'c1' as CardId, x: 100, y: 200 }, // 生效:existing card
+      { type: 'card', cardId: 'ghost' as CardId, x: 0, y: 0 }, // 跳过:card 不存在
+      { type: 'free', shape: 'rect', x: 10, y: 20 }, // 生效:create
+      { type: 'arrow', from: 'c1', to: 'ghost', label: 'ref' }, // 跳过:to 端点不存在
+    ])
+
+    expect(res).toEqual({ applied: 2, skipped: 2 })
+  })
+
+  it('empty ops returns zeros', () => {
+    const host = new InMemoryCanvasHost()
+    expect(applyLayout(host, [])).toEqual({ applied: 0, skipped: 0 })
+  })
+
+  it('per-op throw counts as skipped', () => {
+    // A host whose upsert always throws — every op is swallowed by the
+    // per-op try/catch and counted as skipped (not applied).
+    class ThrowingHost extends InMemoryCanvasHost {
+      override upsert(): void {
+        throw new Error('boom')
+      }
+    }
+    const host = new ThrowingHost()
+    const res = applyLayout(host, [
+      { type: 'free', shape: 'rect', x: 0, y: 0 },
+      { type: 'free', shape: 'rect', x: 10, y: 10 },
+    ])
+    expect(res).toEqual({ applied: 0, skipped: 2 })
+  })
 })

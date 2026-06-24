@@ -30,31 +30,55 @@ function uid(prefix: string): string {
 }
 
 /**
+ * Result of applying a DSL batch: how many ops actually mutated the host vs
+ * how many were skipped (missing card / endpoint, or threw). Used by the DSL
+ * dialog to give honest feedback instead of always reporting ops.length.
+ */
+export interface ApplyResult {
+  applied: number
+  skipped: number
+}
+
+/**
  * Apply a list of DSL operations to the host. All operations are within
  * `host.batch()` for a single undo step.
+ *
+ * Returns `{ applied, skipped }`: each applyXxxOp returns `true` when it
+ * mutated the host, `false` when it was a deliberate no-op (card/endpoint
+ * missing). Per-op throws count as skipped so one bad op doesn't abort the
+ * rest — the caller can surface "N applied, M skipped" honestly.
  */
-export function applyLayout(host: CanvasHost, ops: DslOp[]): void {
-  if (ops.length === 0) return
+export function applyLayout(host: CanvasHost, ops: DslOp[]): ApplyResult {
+  if (ops.length === 0) return { applied: 0, skipped: 0 }
+
+  let applied = 0
+  let skipped = 0
 
   host.batch(() => {
     for (const op of ops) {
       try {
+        let ok = false
         switch (op.type) {
           case 'card':
-            applyCardOp(host, op)
+            ok = applyCardOp(host, op)
             break
           case 'free':
-            applyFreeOp(host, op)
+            ok = applyFreeOp(host, op)
             break
           case 'arrow':
-            applyArrowOp(host, op)
+            ok = applyArrowOp(host, op)
             break
         }
+        if (ok) applied++
+        else skipped++
       } catch {
         // Swallow per-op errors — the rest of the layout still applies.
+        skipped++
       }
     }
   })
+
+  return { applied, skipped }
 }
 
 function applyCardOp(
@@ -68,11 +92,11 @@ function applyCardOp(
     h?: number
     color?: string
   },
-) {
+): boolean {
   // Partial update: preserve the existing card's w/h/rotation, override x/y
   // (and optionally color/size). Equivalent to tldraw's partial updateShape.
   const existing = host.getElement(String(op.cardId))
-  if (!existing) return
+  if (!existing) return false
 
   host.upsert({
     ...existing,
@@ -82,9 +106,10 @@ function applyCardOp(
     ...(op.h !== undefined ? { h: op.h } : {}),
     ...(op.color ? { color: op.color } : {}),
   })
+  return true
 }
 
-function applyFreeOp(host: CanvasHost, op: DslFreeOp) {
+function applyFreeOp(host: CanvasHost, op: DslFreeOp): boolean {
   const x = Math.max(0, Math.round(op.x))
   const y = Math.max(0, Math.round(op.y))
 
@@ -103,7 +128,7 @@ function applyFreeOp(host: CanvasHost, op: DslFreeOp) {
         // text 变体才有 op.text;判别联合 narrow 后访问(undefined 时不覆盖)。
         ...('text' in op && op.text !== undefined ? { text: op.text } : {}),
       })
-      return
+      return true
     }
   }
 
@@ -124,9 +149,10 @@ function applyFreeOp(host: CanvasHost, op: DslFreeOp) {
       })
       break
   }
+  return true
 }
 
-function applyArrowOp(host: CanvasHost, op: DslArrowOp): void {
+function applyArrowOp(host: CanvasHost, op: DslArrowOp): boolean {
   // ── 自由箭头:无 from/to,bbox 编码线段(w/h 可负表方向)──
   // 既认显式 freeArrow 标记,也认 from/to 都空串的兜底(防御 parse 端漏标)。
   if (op.freeArrow || (!op.from && !op.to)) {
@@ -148,7 +174,7 @@ function applyArrowOp(host: CanvasHost, op: DslArrowOp): void {
           ...(op.color ? { color: op.color } : {}),
           ...(op.label !== undefined ? { text: op.label } : {}),
         })
-        return
+        return true
       }
     }
     // Create path:自由箭头无需端点存在(关系箭头 create 要求端点存在,自由箭头不要求)。
@@ -165,7 +191,7 @@ function applyArrowOp(host: CanvasHost, op: DslArrowOp): void {
       ...(op.dash ? { dash: op.dash } : {}),
       ...(op.arrowhead ? { arrowhead: op.arrowhead } : {}),
     })
-    return
+    return true
   }
 
   // ── 关系箭头:现有逻辑不变 ──
@@ -183,7 +209,7 @@ function applyArrowOp(host: CanvasHost, op: DslArrowOp): void {
         ...(op.color ? { color: op.color } : {}),
         ...(op.label !== undefined ? { text: op.label } : {}),
       })
-      return
+      return true
     }
   }
 
@@ -191,7 +217,7 @@ function applyArrowOp(host: CanvasHost, op: DslArrowOp): void {
   // Skip if either endpoint doesn't exist (was a no-op pre-refactor too).
   const fromEl = host.getElement(op.from)
   const toEl = host.getElement(op.to)
-  if (!fromEl || !toEl) return
+  if (!fromEl || !toEl) return false
 
   host.upsert({
     id: uid('arrow'),
@@ -208,4 +234,5 @@ function applyArrowOp(host: CanvasHost, op: DslArrowOp): void {
     ...(op.dash ? { dash: op.dash } : {}),
     ...(op.arrowhead ? { arrowhead: op.arrowhead } : {}),
   })
+  return true
 }

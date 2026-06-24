@@ -136,6 +136,7 @@ export const messages = {
   'canvas.dslLede': { zh: '画布的文字形态。编辑或粘贴 DSL 指令,应用回画布。每行一个元素;# 开头的注释行会被忽略。', en: 'The canvas as text. Edit or paste DSL directives and apply them back. One element per line; lines starting with # are ignored.' },
   'canvas.dslApply': { zh: '应用', en: 'Apply' },
   'canvas.dslApplied': { zh: '已应用 {n} 条指令', en: 'Applied {n} directives' },
+  'canvas.dslAppliedSkipped': { zh: '已应用 {applied} 条,{skipped} 条跳过(card/端点不存在等)', en: 'Applied {applied}, skipped {skipped} (missing card/endpoint etc.)' },
   'canvas.dslCopy': { zh: '复制', en: 'Copy' },
   'canvas.dslCopied': { zh: '已复制到剪贴板', en: 'Copied to clipboard' },
   'canvas.dslCopyFail': { zh: '复制失败', en: 'Copy failed' },

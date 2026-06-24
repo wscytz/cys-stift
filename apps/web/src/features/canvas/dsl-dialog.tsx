@@ -50,8 +50,19 @@ export function DslDialog({
       pushToast({ kind: 'info', message: t('canvas.dslEmpty') })
       return
     }
-    applyLayout(host, ops) // host.batch 已包单 undo 步
-    pushToast({ kind: 'success', message: t('canvas.dslApplied', { n: String(ops.length) }) })
+    const { applied, skipped } = applyLayout(host, ops)
+    // 重序列化:apply 后画布变了,文本同步,防重复 Apply 造副本(create 类 op 幂等失效)。
+    // host 是同引用 + host.batch 原地变更,上面填充 text 的 useEffect([open,host,service])
+    // 不会重跑,必须手动 setText。
+    setText(serializeCanvasReadable(host.getElements(), (id) => service.get(id as CardId)?.title))
+    if (skipped > 0) {
+      pushToast({
+        kind: 'info',
+        message: t('canvas.dslAppliedSkipped', { applied: String(applied), skipped: String(skipped) }),
+      })
+    } else {
+      pushToast({ kind: 'success', message: t('canvas.dslApplied', { n: String(applied) }) })
+    }
     // 不关闭模态:用户可继续编辑
   }
 
