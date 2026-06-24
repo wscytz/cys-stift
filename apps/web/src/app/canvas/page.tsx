@@ -426,20 +426,6 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         <Button variant="ghost" onClick={requestDelete} title={t('canvas.deleteTitle')} disabled={activeCanvasId === DEFAULT_CANVAS_ID}>{t('canvas.delete')}</Button>
         <span className="crumb-spacer" />
         <span className="tb-divider" aria-hidden="true" />
-        {aiEnabled && (
-          <>
-            <Button variant="ghost" onClick={handleAILayout} disabled={!adapterReady || aiBusy !== null} title={t('canvas.aiLayout')}>
-              {aiBusy === 'layout' ? t('canvas.aiThinking') : t('canvas.aiLayout')}
-            </Button>
-            <Button variant="ghost" onClick={handleAICluster} disabled={!adapterReady || aiBusy !== null} title={t('canvas.aiCluster')}>
-              {aiBusy === 'cluster' ? t('canvas.aiThinking') : t('canvas.aiCluster')}
-            </Button>
-          </>
-        )}
-        {showAutoRelate && (
-          <Button variant="ghost" onClick={handleAutoRelate} title={t('canvas.autoRelate')}>{t('canvas.autoRelate')}</Button>
-        )}
-        <span className="tb-divider" aria-hidden="true" />
         {(['select', 'freedraw', 'text', 'connect'] as const).map((tk) => (
           <button
             key={tk}
@@ -457,12 +443,6 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         <SnapToggle mode={snapMode} onToggle={toggleSnap} disabled={!adapterReady} />
         <span className="tb-divider" aria-hidden="true" />
         <ZoomGroup adapterReady={adapterReady} onZoom={zoomBy} />
-        <span className="tb-divider" aria-hidden="true" />
-        <Button variant="ghost" onClick={() => setDslOpen(true)} disabled={!adapterReady} title={t('canvas.dslTitle')}>{t('canvas.dsl')}</Button>
-        <Button variant="ghost" onClick={() => setExportOpen(true)} disabled={!adapterReady} title={t('canvas.export')}>{t('canvas.export')}</Button>
-        <Button variant="ghost" onClick={() => setDiffOpen(true)} disabled={!adapterReady} title={t('canvas.diffTitle')}>{t('canvas.diff')}</Button>
-        <span className="tb-divider" aria-hidden="true" />
-        <Button variant="ghost" onClick={() => setShortcutOpen(true)} title={t('canvas.shortcuts')} aria-label={t('canvas.shortcuts')}>?</Button>
       </Toolbar>
 
       <div className="cv-host">
@@ -483,6 +463,19 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         )}
         <RelationPanel host={handle.current.adapter} canvasEl={canvasElRef.current} />
         <FreedrawPanel host={handle.current.adapter} canvasEl={canvasElRef.current} />
+        <CanvasSideRail
+          aiEnabled={aiEnabled}
+          aiBusy={aiBusy}
+          showAutoRelate={showAutoRelate}
+          adapterReady={adapterReady}
+          onAILayout={handleAILayout}
+          onAICluster={handleAICluster}
+          onAutoRelate={handleAutoRelate}
+          onDsl={() => setDslOpen(true)}
+          onExport={() => setExportOpen(true)}
+          onDiff={() => setDiffOpen(true)}
+          onShortcuts={() => setShortcutOpen(true)}
+        />
         <Minimap host={handle.current.adapter} canvasEl={canvasElRef.current} />
       </div>
 
@@ -630,6 +623,64 @@ function ZoomGroup({ adapterReady, onZoom }: { adapterReady: boolean; onZoom: (o
   )
 }
 
+/** 画布右侧浮动工具条 — 低频操作(AI/导出/DSL/版本对比/快捷键)收纳于此,
+ *  顶栏只留高频(导航/画布管理/工具/吸附/缩放)。Figma/Excalidraw 风格,
+ *  避免顶栏 18 元素平铺溢出。 */
+function CanvasSideRail({
+  aiEnabled,
+  aiBusy,
+  showAutoRelate,
+  adapterReady,
+  onAILayout,
+  onAICluster,
+  onAutoRelate,
+  onDsl,
+  onExport,
+  onDiff,
+  onShortcuts,
+}: {
+  aiEnabled: boolean
+  aiBusy: null | 'layout' | 'cluster'
+  showAutoRelate: boolean
+  adapterReady: boolean
+  onAILayout: () => void
+  onAICluster: () => void
+  onAutoRelate: () => void
+  onDsl: () => void
+  onExport: () => void
+  onDiff: () => void
+  onShortcuts: () => void
+}) {
+  const { t } = useI18n()
+  return (
+    <nav className="cv-rail" aria-label={t('canvas.sideRail')}>
+      {aiEnabled && (
+        <>
+          <RailButton label={t('canvas.aiLayout')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'layout'} onClick={onAILayout} icon="AI" />
+          <RailButton label={t('canvas.aiCluster')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'cluster'} onClick={onAICluster} icon="AC" />
+        </>
+      )}
+      {showAutoRelate && (
+        <RailButton label={t('canvas.autoRelate')} onClick={onAutoRelate} icon="→" />
+      )}
+      {aiEnabled && <span className="cv-rail__sep" aria-hidden="true" />}
+      <RailButton label={t('canvas.dslTitle')} disabled={!adapterReady} onClick={onDsl} icon="DSL" />
+      <RailButton label={t('canvas.export')} disabled={!adapterReady} onClick={onExport} icon="⤓" />
+      <RailButton label={t('canvas.diffTitle')} disabled={!adapterReady} onClick={onDiff} icon="±" />
+      <span className="cv-rail__sep" aria-hidden="true" />
+      <RailButton label={t('canvas.shortcuts')} onClick={onShortcuts} icon="?" />
+    </nav>
+  )
+}
+
+function RailButton({ label, icon, onClick, disabled, busy }: { label: string; icon: string; onClick: () => void; disabled?: boolean; busy?: boolean }) {
+  return (
+    <button type="button" className="cv-rail__btn" onClick={onClick} disabled={disabled} title={label} aria-label={label}>
+      {busy ? '…' : icon}
+    </button>
+  )
+}
+
 const styles = `
 .page { height: calc(100vh - var(--app-menu-height)); display: flex; flex-direction: column; background: var(--color-white); color: var(--color-black); }
 .cv-host { position: relative; flex: 1; min-height: 0; }
@@ -650,4 +701,26 @@ const styles = `
 .cinput { display: block; width: 100%; height: 32px; margin-top: var(--space-2); padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-base); border: var(--border-hairline); border-radius: var(--radius-sm); outline: none; }
 .confirm__body { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
 .confirm__actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-2); }
+.cv-rail {
+  position: absolute; top: 72px; right: 12px; z-index: 5;
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--color-white);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  box-shadow: 2px 2px 0 0 var(--color-black);
+}
+.cv-rail__btn {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--color-white); color: var(--color-black);
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  letter-spacing: 0.04em;
+  border: 0; border-radius: var(--radius-sm); cursor: pointer;
+  transition: background 80ms ease-out, color 80ms ease-out;
+}
+.cv-rail__btn:hover:not(:disabled) { background: var(--color-black); color: var(--color-white); }
+.cv-rail__btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.cv-rail__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: -2px; }
+.cv-rail__sep { width: 24px; height: 1px; background: var(--color-gray-soft); margin: var(--space-1) 0; }
 `
