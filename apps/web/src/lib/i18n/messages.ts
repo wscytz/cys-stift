@@ -179,6 +179,23 @@ export const messages = {
   'canvas.dslPreviewOk': { zh: '{n} 条指令待应用', en: '{n} directive(s) ready to apply' },
   'canvas.dslPreviewIssues': { zh: '{ok} 条有效 · {bad} 条无效', en: '{ok} valid · {bad} invalid' },
 
+  /* ── Canvas shortcuts help (R3.5) ── */
+  'canvas.shortcuts': { zh: '快捷键', en: 'Shortcuts' },
+  'canvas.shortcutsView': { zh: '视图', en: 'View' },
+  'canvas.shortcutsEdit': { zh: '编辑', en: 'Edit' },
+  'canvas.shortcutsNudge': { zh: '微移', en: 'Nudge' },
+  'canvas.scZoomIn': { zh: '放大', en: 'Zoom in' },
+  'canvas.scZoomOut': { zh: '缩小', en: 'Zoom out' },
+  'canvas.scFit': { zh: '适配视图', en: 'Fit view' },
+  'canvas.scSnap': { zh: '切换吸附模式', en: 'Toggle snap mode' },
+  'canvas.scEscape': { zh: '取消选区', en: 'Clear selection' },
+  'canvas.scDelete': { zh: '删除选中', en: 'Delete selected' },
+  'canvas.scUndo': { zh: '撤销', en: 'Undo' },
+  'canvas.scRedo': { zh: '重做', en: 'Redo' },
+  'canvas.scSelectAll': { zh: '全选', en: 'Select all' },
+  'canvas.scNudge1': { zh: '微移 1px', en: 'Nudge 1px' },
+  'canvas.scNudge10': { zh: '微移 10px', en: 'Nudge 10px' },
+
   /* ── Canvas relations (M1) ── */
   'relation.title': { zh: '关系类型', en: 'Relation type' },
   'relation.blocks': { zh: '阻塞', en: 'Blocks' },
