@@ -49,6 +49,12 @@ P2 引擎抽包后的衔接打磨 + 增值功能。
 - **关系箭头可选中(修真 bug)**:关系箭头(connect 创建)bbox w=h=0 → hitTest/marquee 按 bbox 命不中 → 选不了/删不掉/改不了关系类型。矩阵探照灯照出(测试此前零覆盖「arrow 能选中」)。修:`hitTest` arrow 走线段距离命中(点到 from→to 线段距离<6px/zoom;+zoom 参数);`marqueeSelect` arrow 走线段-框相交(端点在内或线段穿框)。自由箭头统一走线段。
 - 矩阵扩「关系箭头选中」列(中点命中/偏离/框选)+ hittest/marquee 单测固化。线段几何:pointToSegmentDistance + segmentIntersectsRect(segSeg 跨立判定)。
 
+### 引擎交互鲁棒性 · 第四轮(2026-06-24,Explore subagent 扫描)
+- **undo/restore 同步选区**:restore()(undo/redo 调)不刷新 selectedIds → undo 撤元素后幽灵 id 残留,后续 Delete/方向键/handle 取到 undefined 静默失效。修:restore 末尾过滤 selectedIds∩快照 id + 条件 emit。
+- **删端点元素级联删悬空箭头**:删一个 card,连它的关系箭头端点解析失败→消失但残留(幽灵元素,占 id/进快照/reload 仍悬空)。修:remove() 级联删 from===id||to===id 的 arrow(1 步 undo,drawio/tldraw 惯例)。自由箭头不受影响。
+- **删 dragId/dragOffset 死代码**:dragOffset 从未赋值、dragId 分支永不可达(dragGroup 已覆盖)。纯减法。
+- 审后不修(YAGNI):connect 连 arrow、setTool 清 connecting、resize 多选/arrow、pan 上限。
+
 
 
 开发者反馈(2026-06-22)的 2 个交互 bug + 收尾整理 + 战略讨论档归档。
