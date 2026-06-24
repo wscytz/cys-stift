@@ -218,7 +218,7 @@ export function ExportDialog({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="exp-field">
-      <span className="exp-field__label">{label}</span>
+      <span className="mono-label mono-label--wide">{label}</span>
       <div className="exp-field__control">{children}</div>
     </div>
   )
@@ -258,7 +258,6 @@ function Segmented<T extends string>({
 const styles = `
 .exp-lede { margin: 0 0 var(--space-3); font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black-soft); line-height: 1.5; }
 .exp-field { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-2); }
-.exp-field__label { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.14em; color: var(--color-gray); }
 .exp-field__control { display: flex; align-items: center; }
 .exp-number {
   width: 88px; height: 32px; padding: 0 var(--space-2);

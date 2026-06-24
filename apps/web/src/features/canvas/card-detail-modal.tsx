@@ -100,7 +100,7 @@ export function CardDetailModal({
               <MarkdownBody source={card.body} />
               {card.links.length > 0 && (
                 <section className="cd__sec">
-                  <h3 className="cd__sec-h">{t('card.detail.links')}</h3>
+                  <h3 className="eyebrow">{t('card.detail.links')}</h3>
                   <ul className="cd__links">
                     {card.links.map((l, i) => (
                       <li key={i}>
@@ -114,7 +114,7 @@ export function CardDetailModal({
               )}
               {card.codeSnippets.length > 0 && (
                 <section className="cd__sec">
-                  <h3 className="cd__sec-h">{t('card.detail.code')}</h3>
+                  <h3 className="eyebrow">{t('card.detail.code')}</h3>
                   {card.codeSnippets.map((c, i) => (
                     <div key={i} className="cd__code">
                       <div className="cd__code-lang">{c.language}</div>
@@ -127,7 +127,7 @@ export function CardDetailModal({
               )}
               {card.quotes.length > 0 && (
                 <section className="cd__sec">
-                  <h3 className="cd__sec-h">{t('card.detail.quotes')}</h3>
+                  <h3 className="eyebrow">{t('card.detail.quotes')}</h3>
                   {card.quotes.map((q, i) => (
                     <blockquote key={i} className="cd__quote">
                       <p>{q.text}</p>
@@ -147,7 +147,7 @@ export function CardDetailModal({
                 maxLength={200}
               />
               <label className="cd__field">
-                <span className="cd__label">{t('card.detail.bodyLabel')}</span>
+                <span className="mono-label">{t('card.detail.bodyLabel')}</span>
                 <textarea
                   className="cd__textarea"
                   value={body}
@@ -265,7 +265,6 @@ const styles = `
    Input component's own padding made the label feel disconnected
    from its control. 4px keeps them as a tight pair. */
 .cd__field { display: flex; flex-direction: column; gap: var(--space-1); }
-.cd__label { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-gray); }
 .cd__textarea {
   appearance: none; background: transparent; border: 0; border-bottom: var(--border-hairline);
   padding: var(--space-1) 0; font-family: var(--font-body); font-size: var(--font-size-base);
@@ -277,7 +276,6 @@ const styles = `
 .cd__actions--end { justify-content: flex-end; margin-top: var(--space-2); }
 .cd__spacer { flex: 1; }
 .cd__sec { display: flex; flex-direction: column; gap: var(--space-2); }
-.cd__sec-h { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.16em; color: var(--color-gray); }
 .cd__links { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
 .cd__links a { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
 .cd__links a:hover { color: var(--color-black); }

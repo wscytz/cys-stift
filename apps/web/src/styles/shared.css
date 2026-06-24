@@ -18,6 +18,11 @@
   letter-spacing: 0.12em;
   color: var(--color-gray);
 }
+.mono-label--wide {
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  padding: var(--space-2);
+}
 .mono-label--dark {
   color: var(--color-black-soft);
 }
