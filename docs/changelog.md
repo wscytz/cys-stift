@@ -5,7 +5,21 @@
 
 ---
 
-## 2026-06-24 · remaining-ux-ai · R3.8 水合闪烁 + R3.5 快捷键 + A 方向 cluster shape
+## 2026-06-24 · translit-features · 转义特色三连(放大核心卖点)
+
+放大核心卖点「转义」(画布↔文字 DSL 双向,任何 AI 可驱动画布)。三个功能都是转义的直接产物,各自独立。计划 `docs/superpowers/plans/2026-06-24-translit-features.md`,subagent 串行执行(Markdown→双向桥→diff,逐个 commit)。
+
+- **Canvas→Markdown 导出**(`550622e`):数据可迁移信念。新纯函数 `exportCanvasMarkdown`——画布名→H1,card→H2 章节(title+body),语义关系箭头(blocks/references/derived-from/related-to)→ markdown 交叉引用链接;无关系 card 按画布 y 上→下排序。非 card 元素(rect/text/freedraw/自由箭头)无 markdown 语义,忽略。export-dialog 加 `markdown` 格式选项(与 svg/png/jpeg 并列),复用 resolveExportElements 选区。纯函数无新依赖。
+- **转义双向桥**(`d50f3d6`):让核心卖点变可摸到,**不依赖内置 AI**。① **粘贴 DSL→画布**:canvas 页加 `paste` 监听,剪贴板纯文本疑似 DSL(任一行 `[card/[arrow/...` 开头)→ `parseDslWithDiagnostics`+`applyLayout` 直接应用,无需开模态;诚实 toast(applied/skipped/none 三态)。② **复制为 AI 提示词**:dsl-dialog 加按钮,`buildCanvasPrompt` 把画布打包成「DSL 语法说明 + 当前画布快照 + 可执行指令」的提示词,粘进任意 ChatGPT/Claude 网页版即可驱动画布编辑。R2 安全:formatCanvasSnapshot 已守 freedraw 只发 shape 标签。完整闭环:复制→粘进 LLM→AI 返回 DSL→粘回画布。
+- **画布版本 diff**(`6d3bbb4`):**转义独占能力**——画布=文字 → 两个状态可 diff,Excalidraw/tldraw/Figma 做不了(它们画布是对象图/二进制)。CanvasHost 接口加**可选** `getHistory?()`(不破坏现有实现),SelfBuiltAdapter 暴露 undoStack 只读副本,InMemoryCanvasHost 返回 `[]`。新纯函数 `diffCanvasSnapshots(before, after)`(元素级:按 id 分类 added/removed/changed+变化字段,自研不引 diff 库)。DiffDialog 展示最近一次变更前后差异(新增蓝/删除红/修改黄)。工具栏「版本对比」按钮。
+
+### 验证
+522 web 测试(513 基线 + 9 新:4 markdown + 1 canvas-prompt + 4 canvas-diff)+ 310 引擎测试(接口扩展未破坏契约)+ tsc 零新增(22 基线无关)+ build exit 0。
+
+### 决策(deferred,需 ADR 挡 scope creep)
+日历待办 / 联网同步 — 偏移产品定位(local-first 灵感画布),建议写 ADR 挡住,不做。语义图分析(本地)、DSL 模板/派生 — 后续特色候选。
+
+
 
 收口审计/主线三件可实现遗留。计划 `docs/superpowers/plans/2026-06-24-remaining-ux-ai.md`,subagent 编排串行(三者都触 canvas page.tsx 不同段,按序 commit 避冲突)。
 
