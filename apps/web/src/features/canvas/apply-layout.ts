@@ -17,7 +17,7 @@
  */
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import type { CardId } from '@cys-stift/domain'
-import type { DslOp, DslFreeOp } from '../ai/dsl-parser'
+import type { DslOp, DslFreeOp, DslArrowOp } from '../ai/dsl-parser'
 
 /** AI-created free shapes / arrows need a unique id (tldraw used to auto-mint). */
 function uid(prefix: string): string {
@@ -108,19 +108,49 @@ function applyFreeOp(host: CanvasHost, op: DslFreeOp) {
   }
 }
 
-function applyArrowOp(
-  host: CanvasHost,
-  op: {
-    type: 'arrow'
-    id?: string
-    from: string
-    to: string
-    label?: string
-    color?: string
-    dash?: 'solid' | 'dashed' | 'dotted'
-    arrowhead?: 'arrow' | 'triangle' | 'none'
-  },
-) {
+function applyArrowOp(host: CanvasHost, op: DslArrowOp): void {
+  // ── 自由箭头:无 from/to,bbox 编码线段(w/h 可负表方向)──
+  // 既认显式 freeArrow 标记,也认 from/to 都空串的兜底(防御 parse 端漏标)。
+  if (op.freeArrow || (!op.from && !op.to)) {
+    // Update-in-place path: op.id 命中已有 arrow → 改 bbox + 关系签名,
+    // 显式清掉 from/to(自由箭头无端点)。
+    if (op.id) {
+      const existing = host.getElement(op.id)
+      if (existing && existing.kind === 'arrow') {
+        host.upsert({
+          ...existing,
+          from: undefined,
+          to: undefined,
+          ...(op.x !== undefined ? { x: op.x } : {}),
+          ...(op.y !== undefined ? { y: op.y } : {}),
+          ...(op.w !== undefined ? { w: op.w } : {}),
+          ...(op.h !== undefined ? { h: op.h } : {}),
+          ...(op.dash ? { dash: op.dash } : {}),
+          ...(op.arrowhead ? { arrowhead: op.arrowhead } : {}),
+          ...(op.color ? { color: op.color } : {}),
+          ...(op.label !== undefined ? { text: op.label } : {}),
+        })
+        return
+      }
+    }
+    // Create path:自由箭头无需端点存在(关系箭头 create 要求端点存在,自由箭头不要求)。
+    host.upsert({
+      id: uid('arrow'),
+      kind: 'arrow',
+      x: op.x ?? 0,
+      y: op.y ?? 0,
+      w: op.w ?? 0,
+      h: op.h ?? 0,
+      rotation: 0,
+      text: op.label ?? '',
+      ...(op.color ? { color: op.color } : {}),
+      ...(op.dash ? { dash: op.dash } : {}),
+      ...(op.arrowhead ? { arrowhead: op.arrowhead } : {}),
+    })
+    return
+  }
+
+  // ── 关系箭头:现有逻辑不变 ──
   // Update-in-place path: if the op carries an id and the host already has
   // that arrow, rewrite its relation signature (dash/arrowhead/color/label)
   // while keeping from/to — this lets the AI change an existing arrow's

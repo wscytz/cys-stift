@@ -193,4 +193,120 @@ describe('applyLayout', () => {
     const el = host.getElements().find((e) => e.kind === 'text')
     expect(el).toMatchObject({ kind: 'text', x: 10, y: 20, text: 'hi', color: 'red' })
   })
+
+  // ── free arrow — DSL symmetry fix 4 (自由箭头 apply) ──
+
+  it('creates a free arrow from bbox op (no from/to)', () => {
+    const host = new InMemoryCanvasHost()
+    applyLayout(host, [
+      {
+        type: 'arrow',
+        from: '',
+        to: '',
+        freeArrow: true,
+        x: 10,
+        y: 20,
+        w: 100,
+        h: 50,
+      },
+    ])
+
+    const arrows = host.getElements().filter((e) => e.kind === 'arrow')
+    expect(arrows).toHaveLength(1)
+    const el = arrows[0]
+    expect(el).toMatchObject({ kind: 'arrow', x: 10, y: 20, w: 100, h: 50, rotation: 0 })
+    // 自由箭头无端点。
+    expect(el?.from).toBeUndefined()
+    expect(el?.to).toBeUndefined()
+  })
+
+  it('creates a free arrow with negative size (direction)', () => {
+    const host = new InMemoryCanvasHost()
+    applyLayout(host, [
+      {
+        type: 'arrow',
+        from: '',
+        to: '',
+        freeArrow: true,
+        x: 200,
+        y: 200,
+        w: -80,
+        h: 30,
+      },
+    ])
+
+    const el = host.getElements().find((e) => e.kind === 'arrow')
+    // 负值保留(编码线段方向)。
+    expect(el).toMatchObject({ w: -80, h: 30 })
+  })
+
+  it('updates a free arrow by id (bbox + signature)', () => {
+    const host = new InMemoryCanvasHost()
+    // 预置一个自由箭头(无 from/to)。
+    host.upsert({
+      id: 'fa1',
+      kind: 'arrow',
+      x: 0,
+      y: 0,
+      w: 10,
+      h: 10,
+      rotation: 0,
+    })
+
+    applyLayout(host, [
+      {
+        type: 'arrow',
+        id: 'fa1',
+        from: '',
+        to: '',
+        freeArrow: true,
+        x: 100,
+        y: 50,
+        w: 200,
+        h: 100,
+        dash: 'dotted',
+      },
+    ])
+
+    // 仍只有 1 个 arrow(就地更新,非新建)。
+    const arrows = host.getElements().filter((e) => e.kind === 'arrow')
+    expect(arrows).toHaveLength(1)
+    const el = host.getElement('fa1')
+    expect(el).toMatchObject({
+      id: 'fa1',
+      kind: 'arrow',
+      x: 100,
+      y: 50,
+      w: 200,
+      h: 100,
+      dash: 'dotted',
+    })
+    // from/to 仍 undefined。
+    expect(el?.from).toBeUndefined()
+    expect(el?.to).toBeUndefined()
+  })
+
+  it('free arrow create does not require endpoints to exist', () => {
+    const host = new InMemoryCanvasHost()
+    // host 里没有任何 card/端点。
+    expect(host.getElements()).toHaveLength(0)
+
+    applyLayout(host, [
+      {
+        type: 'arrow',
+        from: '',
+        to: '',
+        freeArrow: true,
+        x: 5,
+        y: 5,
+        w: 40,
+        h: 40,
+      },
+    ])
+
+    // 自由箭头无需端点存在,直接 create。
+    const arrows = host.getElements().filter((e) => e.kind === 'arrow')
+    expect(arrows).toHaveLength(1)
+    expect(arrows[0]).toMatchObject({ kind: 'arrow', x: 5, y: 5, w: 40, h: 40 })
+  })
 })
