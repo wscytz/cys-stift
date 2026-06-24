@@ -166,7 +166,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
       />
 
       <label className="ccf__field">
-        <span className="ccf__label">{t('inbox.create.bodyPlaceholder')}</span>
+        <span className="mono-label">{t('inbox.create.bodyPlaceholder')}</span>
         <textarea
           className="ccf__textarea"
           name={`${formId}-body`}
@@ -261,13 +261,6 @@ const styles = `
   letter-spacing: -0.01em;
 }
 .ccf__field { display: flex; flex-direction: column; gap: var(--space-1); }
-.ccf__label {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--color-gray);
-}
 .ccf__textarea {
   appearance: none;
   background: transparent;
