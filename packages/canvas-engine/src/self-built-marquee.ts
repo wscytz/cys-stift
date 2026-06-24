@@ -1,6 +1,7 @@
 // apps/web/src/features/canvas/host/self-built-marquee.ts
 
 import type { CanvasElement } from './canvas-host'
+import { normalizeBox } from './bounds'
 import { arrowEndpoints } from './self-built-arrow'
 
 interface Rect {
@@ -44,7 +45,9 @@ export function marqueeSelect(rect: Rect, elements: CanvasElement[]): string[] {
       }
       continue
     }
-    if (rectsIntersect(rect, { x: el.x, y: el.y, w: el.w, h: el.h })) out.push(el.id)
+    // R1.3:归一化后再判相交——负 w/h(如 .cystift 导入用负 bbox 编码方向)必须先翻到
+    // 左上原点 + abs,否则 rectsIntersect 把负 w/h 当空范围 → 漏选。与 hitTest/视锥剔除一致。
+    if (rectsIntersect(rect, normalizeBox(el))) out.push(el.id)
   }
   return out
 }

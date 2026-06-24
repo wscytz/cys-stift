@@ -582,3 +582,47 @@ describe('SelfBuiltAdapter onViewChange', () => {
     expect(host.getView().zoom).toBe(1)
   })
 })
+
+describe('SelfBuiltAdapter interaction-state reset (R1.4 / R1.5)', () => {
+  function dispatch(canvas: HTMLCanvasElement, type: string, x: number, y: number) {
+    canvas.dispatchEvent(
+      new PointerEvent(type, { pointerId: 1, pointerType: 'mouse', bubbles: true, clientX: x, clientY: y }),
+    )
+  }
+
+  // R1.5:connect 进行中切工具必须清掉 connecting,否则切回 select 后一个无谓的
+  // pointermove + pointerup 会用陈旧的 fromId commit 出一条幽灵 arrow。
+  it('setTool clears in-progress connect state (no ghost arrow after switching tool)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'b', kind: 'card', x: 300, y: 0, w: 100, h: 100, rotation: 0 })
+    const h = host as unknown as { setTool: (t: string) => void }
+    h.setTool('connect')
+    dispatch(canvas, 'pointerdown', 50, 50) // 命中 a → 开 connecting
+    dispatch(canvas, 'pointermove', 350, 50) // 拖到 b 上(connecting 指针跟随)
+    // 此时切回 select(用户改主意)——应清掉 connecting
+    h.setTool('select')
+    // 之后无 pointerdown 的 move + up 不该用陈旧 connecting 造箭头
+    dispatch(canvas, 'pointermove', 350, 50)
+    dispatch(canvas, 'pointerup', 350, 50)
+    expect(host.getElements().filter((e) => e.kind === 'arrow')).toHaveLength(0)
+  })
+
+  // R1.4:drag 进行中 undo 必须清掉 dragGroup,否则下一次 pointermove 会用陈旧 offset
+  // 移动已恢复的元素(数据错乱)。测可观察后果:undo 后 pointermove 不动任何元素。
+  it('undo mid-drag clears drag state (subsequent pointermove does not move elements)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    dispatch(canvas, 'pointerdown', 50, 50) // 命中 → drag 开始(dragGroup 设 + coalescing)
+    const h = host as unknown as { undo: () => void }
+    h.undo() // 中途 undo:restore 替换 elements,但若不清 dragGroup → 下次 move 误移
+    // undo 后 c1 恢复到 drag 前的位置(0,0)
+    const afterUndo = host.getElement('c1')
+    expect(afterUndo).toMatchObject({ x: 0, y: 0 })
+    // undo 后若 dragGroup 仍残留,这条 move 会按陈旧 offset 把 c1 挪到错坐标
+    dispatch(canvas, 'pointermove', 80, 80)
+    expect(host.getElement('c1')).toMatchObject({ x: 0, y: 0 }) // 没动 = dragGroup 已清
+  })
+})

@@ -225,11 +225,11 @@ export class SelfBuiltAdapter implements CanvasHost {
   /** 切换工具(渲染器自身方法,不上 CanvasHost 接口)。 */
   setTool(t: 'select' | 'freedraw' | 'text' | 'connect'): void {
     this.activeTool = t
-    // 切工具时放弃进行中的笔画
-    if (t !== 'freedraw' && this.currentStroke) {
-      this.currentStroke = null
-      this.scheduleRender()
-    }
+    // R1.5:切工具时清掉一切进行中的交互状态,否则 connect/drag 中的 connecting/dragGroup
+    // 残留 → 切回 select 后一个无谓的 pointermove 会用陈旧状态造幽灵 arrow / 移动元素。
+    // 之前只清 currentStroke,不够。
+    this.clearInteractionState()
+    this.scheduleRender()
   }
 
   getTool(): 'select' | 'freedraw' | 'text' | 'connect' {
@@ -312,8 +312,31 @@ export class SelfBuiltAdapter implements CanvasHost {
     this.restore(next)
   }
 
+  /**
+   * 清空所有进行中的交互状态(drag/connect/resize/pan/marquee/freedraw 笔画)+ coalescing。
+   *
+   * R1.4/R1.5:undo/redo 的 restore() 和 setTool() 都调它。否则:
+   * - restore 替换 elements 后 dragGroup 仍持陈旧 offset → 下次 pointermove 移动已恢复
+   *   的元素到错坐标(数据错乱)。
+   * - setTool 后 connecting/dragGroup 残留 → 幽灵 arrow / 误移动。
+   * currentStroke 在切工具时放弃笔画(画到一半切工具 = 不该 commit 半截)。
+   */
+  private clearInteractionState(): void {
+    this.dragGroup = null
+    this.connecting = null
+    this.resizing = null
+    this.panning = null
+    this.marquee = null
+    this.currentStroke = null
+    this.coalescing = false
+  }
+
   /** 用快照替换所有元素(不进栈、不触发 onUserChange)。 */
   private restore(snapshot: CanvasElement[]): void {
+    // R1.4:恢复元素前先清交互状态——undo/redo 可能在 drag/connect 中途触发,残留的
+    // dragGroup/connecting 指向的 offset/fromId 会与恢复后的元素错配,导致下次 pointermove
+    // 用陈旧状态移动/造箭头。
+    this.clearInteractionState()
     this.applyWithoutEcho(() => {
       this.elements.clear()
       for (const el of snapshot) this.elements.set(el.id, el)

@@ -49,4 +49,14 @@ describe('marqueeSelect', () => {
   it('关系箭头:框完全偏离线段 → 不选中', () => {
     expect(marqueeSelect({ x: 500, y: 500, w: 20, h: 20 }, arrowEls)).not.toContain('ar')
   })
+
+  // R1.3:负 bbox(如 .cystift 导入用负 w/h 编码方向)必须先归一化再判相交,
+  // 否则 rectsIntersect 把负 w/h 当空范围 → 漏选。hitTest/视锥剔除已 normalize,
+  // marquee 应一致。
+  it('selects negative-bbox elements (normalizes before intersect)', () => {
+    // rect 视觉框 = 100..200 x 100..200,用负 w/h 编码(x=200,w=-100 → 视觉 100..200)
+    const el: CanvasElement = { id: 'r', kind: 'rect', x: 200, y: 200, w: -100, h: -100, rotation: 0 }
+    const selected = marqueeSelect({ x: 110, y: 110, w: 50, h: 50 }, [el])
+    expect(selected).toEqual(['r'])
+  })
 })
