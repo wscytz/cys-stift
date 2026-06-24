@@ -109,7 +109,7 @@ function elementToSvg(
       return `<path d="${d}" fill="none" stroke="${colorOf(el.color, tokenResolver)}" stroke-width="2"/>`
     }
     case 'text':
-      return `<text x="${x}" y="${y + 14}" fill="${c.textCol}" font-family="${c.fontBody}" font-size="14">${esc(el.text ?? '')}</text>`
+      return `<text x="${x}" y="${y + 14}" fill="${colorOf(el.color, tokenResolver)}" font-family="${c.fontBody}" font-size="14">${esc(el.text ?? '')}</text>`
     case 'arrow': {
       const { from, to } = arrowEndpoints(el, allElements)
       if (!from || !to) return ''

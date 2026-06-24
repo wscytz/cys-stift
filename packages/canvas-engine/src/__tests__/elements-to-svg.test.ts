@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { elementsToSvg } from '../elements-to-svg'
-import { domTokenResolver } from '../self-built-render'
+import { colorOf, domTokenResolver, type TokenResolver } from '../self-built-render'
 import type { CanvasElement } from '../canvas-host'
 
 describe('elementsToSvg', () => {
@@ -138,5 +138,42 @@ describe('elementsToSvg — 负 bbox 归一化(自由箭头反向)', () => {
     expect(r.height).toBe(220) // 200(并集 h) + 10*2
     expect(r.svg).toContain('<line')
     expect(r.svg).toContain('<rect')
+  })
+})
+
+describe('elementsToSvg — text 元素尊重 el.color(H2:导出不再恒黑)', () => {
+  const view = { panX: 0, panY: 0, zoom: 1, gridMode: 'free' as const }
+
+  // jsdom 无 CSS 变量上下文 → domTokenResolver 对所有 token 回退同一 fallback,
+  // 黑/蓝不可区分(都会是 #0f172a),无法验证「fill 真走了 colorOf(el.color)」。
+  // 故注入 stub resolver:给 --color-black / --color-blue 不同值,与实时渲染
+  // colorOf 同源(el.color → token → resolver)。引擎核心本就支持注入式 resolver。
+  const stubResolver: TokenResolver = (name, fallback) => {
+    const distinct: Record<string, string> = {
+      '--color-black': '#000000',
+      '--color-blue': '#0000ff',
+    }
+    return distinct[name] ?? fallback
+  }
+
+  it('text { color:"blue" } → <text fill> = colorOf(blue),不再恒黑(textCol)', () => {
+    // 实时渲染 self-built-render.ts:172 用 ctx.fillStyle = colorOf(el.color, …);
+    // rect/freedraw/arrow 的 SVG 导出也都用 colorOf(el.color, …)。
+    // 唯独 text 分支漏了,fill 用恒定 c.textCol(= --color-black)→ 导出恒黑。
+    const el: CanvasElement = {
+      id: 't1', kind: 'text', x: 10, y: 10, w: 0, h: 0, rotation: 0,
+      text: 'hi', color: 'blue',
+    }
+    const r = elementsToSvg(
+      [el], view, () => null,
+      { background: true, border: 10 }, stubResolver,
+    )
+    // 取 <text …> 标签的 fill(背景是 <rect>,不会撞)。
+    const fill = r.svg.match(/<text[^>]*fill="([^"]+)"/)?.[1]
+    expect(fill).toBeDefined()
+    const blackVal = stubResolver('--color-black', '#0f172a')
+    const blueVal = colorOf('blue', stubResolver)
+    expect(fill).not.toBe(blackVal) // H2:不再恒黑
+    expect(fill).toBe(blueVal)      // 尊重 el.color = blue(与实时渲染同源)
   })
 })
