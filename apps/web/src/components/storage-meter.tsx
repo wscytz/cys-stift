@@ -66,7 +66,7 @@ export function StorageMeter() {
       )}
       <button
         type="button"
-        className="sm__toggle"
+        className="mono-label"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
       >
@@ -134,19 +134,6 @@ const styles = `
   color: var(--color-white);
   border-radius: var(--radius-sm);
 }
-.sm__toggle {
-  align-self: flex-start;
-  background: transparent;
-  border: 0;
-  padding: 0;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--color-gray);
-  cursor: pointer;
-}
-.sm__toggle:hover { color: var(--color-black); }
 .sm__list {
   list-style: none;
   margin: 0;
