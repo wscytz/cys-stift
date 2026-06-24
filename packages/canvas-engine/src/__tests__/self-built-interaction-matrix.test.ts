@@ -232,5 +232,98 @@ describe('undo 选区同步', () => {
   })
 })
 
+// ── 删端点元素级联删悬空箭头(探照灯:remove(id) 不清理引用它的关系箭头) ──────
+// 关系箭头(connect 工具创建)bbox w=h=0,端点由 from/to 引用 card id 算出。删掉一个被
+// 引用的 card 后,arrowEndpoints 找不到端点 → 箭头从画布消失(render/hitTest/marquee 全
+// 跳过),但元素仍留在 this.elements → 占 id、进 SVG/DSL/快照、reload 仍悬空。用户看不见、
+// 选不中、删不掉 = 幽灵元素。期望(drawio/tldraw 惯例):删 id 时,所有 from===id 或
+// to===id 的 arrow 一并删(级联删);自由箭头(无 from/to,bbox 非零)不受影响。
+
+describe('删端点元素级联删悬空箭头', () => {
+  const cardA: CanvasElement = { id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 }
+  const cardB: CanvasElement = { id: 'b', kind: 'card', x: 200, y: 0, w: 100, h: 100, rotation: 0 }
+  const relArrow: CanvasElement = {
+    id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b',
+  }
+  // 自由箭头:无 from/to,bbox 非零(真实线段几何)——不应被级联删。
+  const freeArrow: CanvasElement = {
+    id: 'fa', kind: 'arrow', x: 0, y: 300, w: 100, h: 0, rotation: 0,
+  }
+
+  it('remove 端点 b 后,引用它的关系箭头 ar 也被级联删(不留幽灵)', () => {
+    const { host } = makeHost()
+    host.upsert(cardA)
+    host.upsert(cardB)
+    host.upsert(relArrow)
+    host.remove('b')
+    // b 本来就被删
+    expect(host.getElement('b')).toBeUndefined()
+    // ar 引用 b → 应级联删(当前 FAIL:arrow 悬空残留)
+    expect(host.getElement('ar')).toBeUndefined()
+  })
+
+  it('remove 端点 a 后(from 侧),引用它的关系箭头 ar 也被级联删', () => {
+    const { host } = makeHost()
+    host.upsert(cardA)
+    host.upsert(cardB)
+    host.upsert(relArrow)
+    host.remove('a')
+    expect(host.getElement('a')).toBeUndefined()
+    expect(host.getElement('ar')).toBeUndefined()
+  })
+
+  it('remove 端点 b:级联删的 ar 进入 onUserChange 的 removed(持久化层要知道它没了)', () => {
+    const { host } = makeHost()
+    host.upsert(cardA)
+    host.upsert(cardB)
+    host.upsert(relArrow)
+    const removed: string[] = []
+    host.onUserChange((c) => removed.push(...c.removed))
+    host.remove('b')
+    expect(removed).toContain('b')
+    expect(removed).toContain('ar') // 级联删的 arrow 也要广播
+  })
+
+  it('remove 不存在的 id → 不级联(现状 early return 保持)', () => {
+    const { host } = makeHost()
+    host.upsert(cardA)
+    host.upsert(cardB)
+    host.upsert(relArrow)
+    const removed: string[] = []
+    host.onUserChange((c) => removed.push(...c.removed))
+    host.remove('nope')
+    // 什么都没动
+    expect(removed).toEqual([])
+    expect(host.getElement('ar')).toBeDefined()
+    expect(host.getElement('a')).toBeDefined()
+  })
+
+  it('自由箭头(无 from/to,bbox 非零)不级联删:删某 card 后仍在', () => {
+    const { host } = makeHost()
+    host.upsert(cardA)
+    host.upsert(cardB)
+    host.upsert(freeArrow)
+    host.remove('a')
+    expect(host.getElement('a')).toBeUndefined()
+    // 自由箭头不引用 a → 不应被删(防过度)
+    expect(host.getElement('fa')).toBeDefined()
+  })
+
+  it('级联删是 1 步 undo:undo 能把 card + 悬空 arrow 一起恢复', () => {
+    const { host } = makeHost()
+    const h = host as unknown as { undo: () => void; canUndo: () => boolean }
+    host.upsert(cardA)
+    host.upsert(cardB)
+    host.upsert(relArrow)
+    host.remove('b') // 级联删 b + ar
+    expect(host.getElement('b')).toBeUndefined()
+    expect(host.getElement('ar')).toBeUndefined()
+    // undo 一步:两者都恢复(不是多步)
+    h.undo()
+    expect(host.getElement('b')).toBeDefined()
+    expect(host.getElement('ar')).toBeDefined()
+  })
+})
+
 
 

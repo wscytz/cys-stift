@@ -158,7 +158,19 @@ export class SelfBuiltAdapter implements CanvasHost {
     if (!this.elements.has(id)) return
     if (this.echoing && !this.coalescing) this.pushUndo() // 变更前快照;coalescing 期间不推
     this.elements.delete(id)
-    if (this.echoing) this.emitUser({ updated: [], removed: [id] })
+    // 级联删:所有 from===id 或 to===id 的关系箭头一并删(drawio/tldraw 惯例)。
+    // 关系箭头 bbox w=h=0、端点靠 from/to 引用;删端点后箭头变悬空 → 从画布消失但
+    // 残留 this.elements(占 id、进 SVG/DSL/快照、reload 仍悬空)= 幽灵元素。
+    // 级联删发生在同一 remove 调用内,与 id 共享上面那一次 pushUndo → 1 步 undo,
+    // undo 能把 card + 悬空 arrow 一起恢复。自由箭头(无 from/to,bbox 非零)不引用 id → 不受影响。
+    const cascade: string[] = []
+    for (const [aid, el] of this.elements) {
+      if (el.kind === 'arrow' && (el.from === id || el.to === id)) {
+        cascade.push(aid)
+        this.elements.delete(aid)
+      }
+    }
+    if (this.echoing) this.emitUser({ updated: [], removed: [id, ...cascade] })
     this.scheduleRender()
   }
 
