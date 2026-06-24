@@ -130,6 +130,18 @@ export const messages = {
   'canvas.cystiftRestored': { zh: '已从文件恢复画布「{name}」', en: 'Restored canvas "{name}" from file' },
   'canvas.cystiftNotFound': { zh: '此文件不是 .cystift 导出,按普通文件创建卡片。', en: 'Not a .cystift export — created a card from the file instead.' },
 
+  /* ── Canvas DSL (转义产品化 Step 2) ── */
+  'canvas.dsl': { zh: 'DSL', en: 'DSL' },
+  'canvas.dslTitle': { zh: '画布转义', en: 'Canvas DSL' },
+  'canvas.dslLede': { zh: '画布的文字形态。编辑或粘贴 DSL 指令,应用回画布。每行一个元素;# 开头的注释行会被忽略。', en: 'The canvas as text. Edit or paste DSL directives and apply them back. One element per line; lines starting with # are ignored.' },
+  'canvas.dslApply': { zh: '应用', en: 'Apply' },
+  'canvas.dslApplied': { zh: '已应用 {n} 条指令', en: 'Applied {n} directives' },
+  'canvas.dslCopy': { zh: '复制', en: 'Copy' },
+  'canvas.dslCopied': { zh: '已复制到剪贴板', en: 'Copied to clipboard' },
+  'canvas.dslCopyFail': { zh: '复制失败', en: 'Copy failed' },
+  'canvas.dslDownload': { zh: '下载', en: 'Download' },
+  'canvas.dslEmpty': { zh: '没有可应用的指令', en: 'No directives to apply' },
+
   /* ── Canvas relations (M1) ── */
   'relation.title': { zh: '关系类型', en: 'Relation type' },
   'relation.blocks': { zh: '阻塞', en: 'Blocks' },

@@ -8,6 +8,7 @@ import { useI18n } from '@/lib/i18n'
 import { SelfCanvas, type SelfCanvasHandle } from '@/features/canvas/self-canvas'
 import { CardDetailModal } from '@/features/canvas/card-detail-modal'
 import { ExportDialog } from '@/features/canvas/export-dialog'
+import { DslDialog } from '@/features/canvas/dsl-dialog'
 import { applyLayout } from '@/features/canvas/apply-layout'
 import { RelationPanel } from '@/features/canvas/relation-panel'
 import { FreedrawPanel } from '@/features/canvas/freedraw-panel'
@@ -67,6 +68,7 @@ export default function CanvasPage() {
   const [renamingId, setRenamingId] = useState<CanvasId | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<CanvasId | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
+  const [dslOpen, setDslOpen] = useState(false)
 
   const onCanvas = service
     .listOnCanvas(activeCanvasId)
@@ -347,6 +349,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         <span className="tb-divider" aria-hidden="true" />
         <ZoomGroup adapterReady={adapterReady} onZoom={zoomBy} />
         <span className="tb-divider" aria-hidden="true" />
+        <Button variant="ghost" onClick={() => setDslOpen(true)} disabled={!adapterReady} title={t('canvas.dslTitle')}>{t('canvas.dsl')}</Button>
         <Button variant="ghost" onClick={() => setExportOpen(true)} disabled={!adapterReady} title={t('canvas.export')}>{t('canvas.export')}</Button>
       </Toolbar>
 
@@ -439,6 +442,14 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         host={handle.current.adapter}
         service={service}
         canvasId={activeCanvasId}
+        canvasName={activeCanvas?.name ?? ''}
+      />
+
+      <DslDialog
+        open={dslOpen}
+        onClose={() => setDslOpen(false)}
+        host={handle.current.adapter}
+        service={service}
         canvasName={activeCanvas?.name ?? ''}
       />
 
