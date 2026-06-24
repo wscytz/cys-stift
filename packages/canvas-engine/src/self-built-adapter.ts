@@ -287,7 +287,23 @@ export class SelfBuiltAdapter implements CanvasHost {
   }
 
   private snapshot(): CanvasElement[] {
-    return this.getElements().map((e) => ({ ...e, meta: e.meta ? { ...e.meta } : undefined }))
+    // meta 深拷贝 points:freedraw 的 points 是 [number,number][] 嵌套数组,
+    // 浅拷贝({ ...e.meta })会让快照与 live 元素共享同一内层数组 ——
+    // 之后 live 元素的原地改动会污染快照,undo 回滚恢复的是被改过的点序列。
+    return this.getElements().map((e) => {
+      if (!e.meta) return { ...e, meta: undefined }
+      const m = e.meta as { points?: unknown }
+      if (Array.isArray(m.points)) {
+        return {
+          ...e,
+          meta: {
+            ...e.meta,
+            points: (m.points as [number, number][]).map((p) => [...p] as [number, number]),
+          },
+        }
+      }
+      return { ...e, meta: { ...e.meta } }
+    })
   }
 
   canUndo(): boolean {

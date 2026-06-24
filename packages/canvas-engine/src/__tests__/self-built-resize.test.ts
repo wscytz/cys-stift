@@ -44,3 +44,20 @@ describe('resizeGeometry', () => {
     expect(resizeGeometry('nw', start, { x: 195, y: 195 })).toEqual({ x: 190, y: 190, w: 10, h: 10 })
   })
 })
+
+describe('resizeGeometry — 负起始维度(R1.6)', () => {
+  it('负 w/h 起始:se 拖到 (250,250) → 输出正 box 覆盖 100..250', () => {
+    // 起始 {x:200,y:200,w:-100,h:-100} 可视 100..200;se 固定 nw。
+    // 正确语义:nw 角固定在可视左上 (100,100),拖 se 到 (250,250) → 150x150 box @ (100,100)。
+    const neg = { x: 200, y: 200, w: -100, h: -100 }
+    const r = resizeGeometry('se', neg, { x: 250, y: 250 })
+    // 输出必须覆盖可视 100..250:左上 (100,100),尺寸 150
+    expect(r).toEqual({ x: 100, y: 100, w: 150, h: 150 })
+  })
+  it('负 w/h 起始:nw 拖到 (120,120) → se 固定在可视右下 (200,200)', () => {
+    const neg = { x: 200, y: 200, w: -100, h: -100 } // 可视 100..200
+    const r = resizeGeometry('nw', neg, { x: 120, y: 120 })
+    // se 固定 (200,200),nw 跟指针 (120,120) → 80x80 @ (120,120)
+    expect(r).toEqual({ x: 120, y: 120, w: 80, h: 80 })
+  })
+})

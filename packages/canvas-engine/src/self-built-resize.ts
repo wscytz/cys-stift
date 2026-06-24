@@ -37,12 +37,15 @@ export function resizeGeometry(
   start: { x: number; y: number; w: number; h: number },
   point: { x: number; y: number },
 ): { x: number; y: number; w: number; h: number } {
-  const right = start.x + start.w
-  const bottom = start.y + start.h
-  let x = start.x
-  let y = start.y
-  let w = start.w
-  let h = start.h
+  // 归一化起始 box(负 w/h → 翻到左上角,尺寸取正)。否则 right=x+w 会因负 w 变小,
+  // bottom 同理,resize 输出尺寸 / clamp 全错。输出恒为正 box(resize 目标就是可视 box)。
+  const ns = normalizeBox(start)
+  const right = ns.x + ns.w
+  const bottom = ns.y + ns.h
+  let x = ns.x
+  let y = ns.y
+  let w = ns.w
+  let h = ns.h
   switch (handle) {
     case 'se':
       w = point.x - x

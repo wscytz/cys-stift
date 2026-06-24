@@ -43,7 +43,9 @@ export function commitFreedraw(
     w,
     h,
     rotation: 0,
-    meta: { points },
+    // 深拷贝点序列(每点成对也拷):否则元素持调用方数组引用,调用方原地改 / push
+    // 会污染元素(undo 快照 + 渲染都会读到错数据)。
+    meta: { points: points.map((p) => [...p] as [number, number]) },
   }
   if (color !== undefined) el.color = color
   return el

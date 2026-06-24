@@ -500,6 +500,27 @@ describe('SelfBuiltAdapter undo/redo', () => {
     while (h.canUndo()) { h.undo(); count++ }
     expect(count).toBe(50)
   })
+
+  it('R1.1:snapshot 深拷贝 points(undo 回滚能恢复原点序列,不被原地改动污染)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const h = host as unknown as { undo: () => void; canUndo: () => boolean }
+    // upsert freedraw F(此时 pushUndo 存的是「空」快照)
+    host.upsert({
+      id: 'F', kind: 'freedraw', x: 0, y: 0, w: 10, h: 10, rotation: 0,
+      meta: { points: [[1, 1], [2, 2]] },
+    })
+    // upsert G(此时 pushUndo 存的快照含 F 的原始 points — 若是浅拷贝,F 的 points 数组会被下面改动污染)
+    host.upsert({ id: 'G', kind: 'card', x: 0, y: 0, w: 1, h: 1, rotation: 0 })
+    // 模拟未来 bug / 外部原地改动 F 的 live points 数组
+    const liveF = host.getElement('F')!
+    const pts = (liveF.meta as { points: [number, number][] }).points
+    pts[0]![0] = 9999
+    pts.push([100, 100])
+    // undo → 撤掉 G,恢复快照里的 F;若深拷贝正确,F 的 points 应是原始值 [[1,1],[2,2]]
+    h.undo()
+    const restored = host.getElement('F')
+    expect((restored!.meta as { points: [number, number][] }).points).toEqual([[1, 1], [2, 2]])
+  })
 })
 
 describe('SelfBuiltAdapter keyboard actions', () => {

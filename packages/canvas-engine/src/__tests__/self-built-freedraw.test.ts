@@ -31,6 +31,19 @@ describe('commitFreedraw', () => {
     const el = commitFreedraw('f2', [[0, 0]])
     expect(el.color).toBeUndefined()
   })
+  it('R1.2:拷贝调用方点数组(不持引用 — 改原数组不影响元素)', () => {
+    const pts: [number, number][] = [[0, 0]]
+    const el = commitFreedraw('f3', pts)
+    pts[0]![0] = 999
+    expect((el.meta as { points: [number, number][] }).points[0]![0]).toBe(0) // 不是 999
+  })
+  it('R1.2:外层数组也不持引用(push 不污染元素)', () => {
+    const pts: [number, number][] = [[1, 1]]
+    const el = commitFreedraw('f4', pts)
+    pts.push([5, 5])
+    expect((el.meta as { points: [number, number][] }).points).toHaveLength(1)
+    expect((el.meta as { points: [number, number][] }).points).toEqual([[1, 1]])
+  })
 })
 
 describe('translateFreedraw', () => {

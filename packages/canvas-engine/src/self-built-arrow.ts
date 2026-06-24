@@ -1,21 +1,27 @@
 
 import type { CanvasElement } from './canvas-host'
+import { normalizeBox } from './bounds'
 
 interface Point {
   x: number
   y: number
 }
 
-/** 元素中心点。 */
+/**
+ * 元素中心点。用 normalizeBox 先归一化(负 w/h 时左上角会翻到正确位置),
+ * 否则 `el.x + el.w/2` 对负 w 给出可视 box 外的中心 —— 箭头端点 / 旋转中心全偏。
+ */
 export function elementCenter(el: CanvasElement): Point {
-  return { x: el.x + el.w / 2, y: el.y + el.h / 2 }
+  const b = normalizeBox(el)
+  return { x: b.x + b.w / 2, y: b.y + b.h / 2 }
 }
 
 /**
  * 从 rect 的中心朝 target 方向,求线段交到 rect 边框的出口点。
  * rect 由 center + 半宽半高(hw,hh)描述;target 是外部点。
  * 数学:沿 (target-center) 方向,param t = min(hw/|dx|, hh/|dy|),出口 = center + t·(dx,dy)。
- * 退化(目标=中心)→ 中心。
+ * 退化(目标=中心)→ 中心。hw/hh 取绝对值:调用方(arrowEndpoints)传 el.w/2,
+ * 负 w 时为负,会让 t 反号、出口跑到错侧 —— abs 保证半宽半高恒为正。
  */
 export function borderPoint(
   center: Point,
@@ -23,11 +29,13 @@ export function borderPoint(
   hh: number,
   target: Point,
 ): Point {
+  const aw = Math.abs(hw)
+  const ah = Math.abs(hh)
   const dx = target.x - center.x
   const dy = target.y - center.y
   if (dx === 0 && dy === 0) return { x: center.x, y: center.y }
-  const tX = dx !== 0 ? hw / Math.abs(dx) : Infinity
-  const tY = dy !== 0 ? hh / Math.abs(dy) : Infinity
+  const tX = dx !== 0 ? aw / Math.abs(dx) : Infinity
+  const tY = dy !== 0 ? ah / Math.abs(dy) : Infinity
   const t = Math.min(tX, tY)
   return { x: center.x + t * dx, y: center.y + t * dy }
 }

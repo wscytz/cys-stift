@@ -13,6 +13,11 @@ describe('elementCenter', () => {
     const el = { id: 'a', kind: 'card', x: 100, y: 50, w: 240, h: 120, rotation: 0 } as CanvasElement
     expect(elementCenter(el)).toEqual({ x: 220, y: 110 })
   })
+  it('R1.7:负 w/h → 中心落在可视 box 的中心(非 x+w/2)', () => {
+    // 可视 box:x 100..200(因 w=-100 → 右上角在 x=100),中心 x=150
+    const el = { id: 'a', kind: 'card', x: 200, y: 0, w: -100, h: 100, rotation: 0 } as CanvasElement
+    expect(elementCenter(el)).toEqual({ x: 150, y: 50 })
+  })
 })
 
 describe('borderPoint', () => {
@@ -62,6 +67,19 @@ describe('arrowEndpoints', () => {
   it('无 from/to 且 bbox 零 → null(不画)', () => {
     const empty = { id: 'fa', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0 } as CanvasElement
     expect(arrowEndpoints(empty, [])).toEqual({ from: null, to: null })
+  })
+  it('R1.7:to 元素负 w(可视 100..200)→ 箭头出口落在正确边框(非 x=200)', () => {
+    // A 可视 0..100,中心 (50,50);B {x:200,w:-100} 可视 100..200,中心 (150,50)。
+    // from = A 朝 B:dx=100 → tX=0.5 → from=(100,50)。
+    // to = B 朝 A:中心(150,50) 朝 (50,50):dx=-100 → tX=0.5 → to=(100,50)。
+    // 旧 bug:elementCenter 用 x+w/2=200/2+200=150 旧值实际 x+w/2=200+(-50)=150(碰巧对中心),
+    // 但 borderPoint 的 hw = w/2 = -50 会让出口偏移。正确 to 应在 x=100(B 左边框)。
+    const cardA = { id: 'ca', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 } as CanvasElement
+    const cardB = { id: 'cb', kind: 'card', x: 200, y: 0, w: -100, h: 100, rotation: 0 } as CanvasElement
+    const arrow = { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'cb' } as CanvasElement
+    const { from, to } = arrowEndpoints(arrow, [cardA, cardB])
+    expect(from).toEqual({ x: 100, y: 50 })
+    expect(to).toEqual({ x: 100, y: 50 })
   })
 })
 
