@@ -5,7 +5,18 @@
 
 ---
 
-## 2026-06-24 · translit-features · 转义特色三连(放大核心卖点)
+## 2026-06-24 · canvas-usability · 画布可用性修复(pan + 工具栏重构 + minimap)
+
+用户实测打包版反馈「画布完全不能用」三问题,逐个修。计划 `docs/superpowers/plans/2026-06-24-canvas-usability.md`。
+
+- **触摸板 pan 规范化**(`69b0b0d`):引擎 `onWheel` 此前把所有 wheel 事件当缩放 → macOS 触摸板双指滑动(pan,无 ctrlKey)变成缩放,画布移不动。改:`ctrlKey`(pinch / ctrl+滚轮)→ zoom-to-cursor;无 `ctrlKey`(双指滑动 / 鼠标滚轮)→ pan(`panX -= deltaX, panY -= deltaY`)。签名 `(sx,sy,delta)` → `(sx,sy,deltaX,deltaY,ctrlKey)`。对齐 Figma/tldraw/Excalidraw 主流:滚轮 pan,ctrl+滚轮 zoom。
+- **工具栏重构**(`2f374d2`):顶栏 18 元素平铺溢出嘈杂。走 Figma/Excalidraw 风格——顶栏精简(面包屑/画布切换/新建重命名删除 + 工具切换 + 吸附 + 缩放),低频操作(AI 排版/AI 找相似/AI 自动关联/导出/DSL/版本对比/快捷键)移到画布右侧浮动竖条 `CanvasSideRail`(`position:absolute; top:72; right:12`,Bauhaus 白底黑边硬阴影,icon 按钮)。主次分明,顶栏不再溢出。
+- **minimap 可发现性**(`08338e8`):右下角鸟瞰地图被用户当「不明物体」。加标题条(「鸟瞰」mono 小字)+ 可收起 toggle(▾/▸),collapsed 时只留标题条。
+
+### 验证
+313 引擎测试(310 基线 + 3 新 pan/zoom)+ 522 web 测试 + tsc 零新增(22 基线无关)+ build exit 0。
+
+
 
 放大核心卖点「转义」(画布↔文字 DSL 双向,任何 AI 可驱动画布)。三个功能都是转义的直接产物,各自独立。计划 `docs/superpowers/plans/2026-06-24-translit-features.md`,subagent 串行执行(Markdown→双向桥→diff,逐个 commit)。
 
