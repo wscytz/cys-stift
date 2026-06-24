@@ -1,9 +1,12 @@
 # E1: auto-generated platform icons from `cargo tauri icon`. These are build
-# artifacts — tauri generates them every build from the source icon.png. We
-# commit only the source (icon.png/icon.icns) + the 4 paths in bundle.icon.
+# artifacts — tauri generates them every build from the source icon.png.
+# We commit the source (icon.png/icon.icns) + the 4 paths in bundle.icon,
+# AND icon.ico — tauri-build's Windows resource step requires it to exist
+# at build time (it does NOT auto-generate it; only `cargo tauri icon` does),
+# so CI checkouts without a committed icon.ico fail:
+#   `icons/icon.ico` not found; required for generating a Windows Resource file
 Square*.png
 64x64.png
 StoreLogo.png
 android/
 ios/
-icon.ico
