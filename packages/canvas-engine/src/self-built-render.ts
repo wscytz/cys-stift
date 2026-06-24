@@ -114,6 +114,15 @@ function drawElement(
     case 'freedraw': {
       const pts = (el.meta?.points as [number, number][] | undefined) ?? []
       if (pts.length === 0) break
+      if (pts.length === 1) {
+        // 单点 freedraw:只 moveTo 无 lineTo → stroke() 画不出东西 = 不可见幽灵。
+        // 画一个小圆点(fill,与 SVG 导出 <circle> 两视图一致)。点坐标是绝对页坐标。
+        ctx.beginPath()
+        ctx.arc(pts[0]![0], pts[0]![1], 2, 0, Math.PI * 2)
+        ctx.fillStyle = colorOf(el.color, tokenResolver)
+        ctx.fill()
+        break
+      }
       ctx.beginPath()
       ctx.moveTo(pts[0]![0], pts[0]![1])
       for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i]![0], pts[i]![1])

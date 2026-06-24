@@ -240,3 +240,28 @@ describe('elementsToSvg — text 多行 + rect 负 bbox(M1+M3:导出对齐实时
     expect(h).toBe(80)
   })
 })
+
+describe('elementsToSvg — freedraw 单点画 <circle>(L1:导出与渲染一致)', () => {
+  const view = { panX: 0, panY: 0, zoom: 1, gridMode: 'free' as const }
+
+  it('单点 freedraw → SVG 含 <circle r="2">,不再空 M path(L1)', () => {
+    // 实时渲染 self-built-render.ts freedraw 分支:单点(pts.length===1)只 moveTo 无
+    // lineTo → stroke() 画不出东西 = 不可见幽灵。导出同理 d="M x y" 空 path 也不画。
+    // 修法:单点画小圆点(render arc+fill / SVG <circle r="2">),两视图一致。
+    // 真实单点 freedraw(commitFreedraw 一点):bbox 退化 w=0,h=0,points=[[x,y]]。
+    const el: CanvasElement = {
+      id: 'f1', kind: 'freedraw', x: 50, y: 50, w: 0, h: 0, rotation: 0,
+      meta: { points: [[50, 50]] },
+    }
+    const r = elementsToSvg(
+      [el], view, () => null,
+      { background: false, border: 10 }, domTokenResolver,
+    )
+    // 单点 → <circle r="2">(半径>0),不再是无 L 的空 <path d="M …">。
+    expect(r.svg).toMatch(/<circle[^>]*\sr="2"/)
+    // fill 不能是 none(否则又是不可见幽灵);颜色走 colorOf(el.color, tokenResolver)。
+    const circleFill = r.svg.match(/<circle[^>]*\sfill="([^"]+)"/)?.[1]
+    expect(circleFill).toBeDefined()
+    expect(circleFill).not.toBe('none')
+  })
+})

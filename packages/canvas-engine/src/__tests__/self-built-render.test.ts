@@ -16,6 +16,7 @@ function mockCtx() {
     rect: (x: number, y: number, w: number, h: number) => calls.push(`rect(${x},${y},${w},${h})`),
     moveTo: (x: number, y: number) => calls.push(`moveTo(${x},${y})`),
     lineTo: (x: number, y: number) => calls.push(`lineTo(${x},${y})`),
+    arc: (x: number, y: number, r: number, start: number, end: number) => calls.push(`arc(${x},${y},${r},${start},${end})`),
     setLineDash: (arr: number[]) => calls.push(`setLineDash(${arr.join(',')})`),
     strokeRect: (x: number, y: number, w: number, h: number) => calls.push(`strokeRect(${x},${y},${w},${h})`),
     roundRect: (x: number, y: number, w: number, h: number, r?: number) => calls.push(`roundRect(${x},${y},${w},${h})`),
@@ -92,6 +93,23 @@ describe('renderElements', () => {
     const els = [{ id: 'f2', kind: 'freedraw', x: 0, y: 0, w: 0, h: 0, rotation: 0, meta: {} }] as unknown as CanvasElement[]
     expect(() => renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => null, '#ffffff')).not.toThrow()
     expect(ctx._calls.some((c) => c.startsWith('moveTo'))).toBe(false)
+  })
+
+  it('freedraw 单点 → 画小圆点(arc + fill),不再不可见幽灵(L1)', () => {
+    // 单点 freedraw(commitFreedraw 一点:bbox 退化 w=0,h=0)此前只 moveTo 无 lineTo
+    // → stroke() 画不出任何东西 = 不可见幽灵。修法:单点画 arc 圆点 + fill。
+    // 与 SVG 导出(单点 → <circle>)两视图一致。
+    const ctx = mockCtx()
+    const els = [
+      {
+        id: 'f3', kind: 'freedraw', x: 50, y: 50, w: 0, h: 0, rotation: 0,
+        meta: { points: [[50, 50]] },
+      },
+    ] as unknown as CanvasElement[]
+    renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => null, '#ffffff')
+    // 单点用 arc 画圆点 + fill(不是 stroke)
+    expect(ctx._calls.some((c) => c.startsWith('arc(50,50,'))).toBe(true)
+    expect(ctx._calls).toContain('fill')
   })
 
   it('renders an arrow as a line + arrowhead between two cards (border endpoints)', () => {

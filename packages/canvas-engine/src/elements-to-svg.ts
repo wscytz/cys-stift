@@ -110,6 +110,11 @@ function elementToSvg(
     case 'freedraw': {
       const pts = (el.meta?.points as [number, number][] | undefined) ?? []
       if (pts.length === 0) return ''
+      if (pts.length === 1) {
+        // 单点 freedraw:d="M x y" 空 path 不画 = 不可见幽灵。画 <circle>(与实时渲染
+        // arc 圆点两视图一致)。点坐标是绝对页坐标,SVG 加 dx/dy 偏移。
+        return `<circle cx="${pts[0]![0] + dx}" cy="${pts[0]![1] + dy}" r="2" fill="${colorOf(el.color, tokenResolver)}"/>`
+      }
       const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]! + dx} ${p[1]! + dy}`).join(' ')
       return `<path d="${d}" fill="none" stroke="${colorOf(el.color, tokenResolver)}" stroke-width="2"/>`
     }
