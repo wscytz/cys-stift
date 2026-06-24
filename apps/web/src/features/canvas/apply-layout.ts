@@ -31,8 +31,13 @@ function uid(prefix: string): string {
 
 /**
  * Result of applying a DSL batch: how many ops actually mutated the host vs
- * how many were skipped (missing card / endpoint, or threw). Used by the DSL
- * dialog to give honest feedback instead of always reporting ops.length.
+ * how many were skipped at the apply stage. Used by the DSL dialog to give
+ * honest feedback instead of always reporting ops.length.
+ *
+ * `skipped` here ONLY counts apply-stage no-ops: a missing card/endpoint
+ * (deliberate no-op), or an op that threw and was swallowed. Lines that
+ * failed to *parse* never reach `applyLayout` — they are dropped by the
+ * parser and reported separately via `parseDslWithDiagnostics` diagnostics.
  */
 export interface ApplyResult {
   applied: number
@@ -47,6 +52,10 @@ export interface ApplyResult {
  * mutated the host, `false` when it was a deliberate no-op (card/endpoint
  * missing). Per-op throws count as skipped so one bad op doesn't abort the
  * rest — the caller can surface "N applied, M skipped" honestly.
+ *
+ * Note: `skipped` covers apply-stage no-ops only. Parse-stage drops (malformed
+ * lines) are not counted here — the caller (DSL dialog) pre-filters via
+ * `parseDslWithDiagnostics` and surfaces those as a separate diagnostic list.
  */
 export function applyLayout(host: CanvasHost, ops: DslOp[]): ApplyResult {
   if (ops.length === 0) return { applied: 0, skipped: 0 }
