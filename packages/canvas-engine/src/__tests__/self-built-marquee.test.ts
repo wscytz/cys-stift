@@ -31,4 +31,22 @@ describe('marqueeSelect', () => {
   it('空框(0 尺寸)→ 空', () => {
     expect(marqueeSelect({ x: 5, y: 5, w: 0, h: 0 }, els)).toEqual([])
   })
+
+  // 关系箭头:bbox w=h=0,按端点框选(任一端点在框内)。
+  const arrowEls = [
+    { id: 'ca', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+    { id: 'cb', kind: 'card', x: 200, y: 0, w: 100, h: 100, rotation: 0 },
+    { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'cb' },
+  ] as unknown as CanvasElement[]
+  it('关系箭头:框覆盖任一端点 → 选中', () => {
+    // 端点 from≈(100,50);框 (95,45,20,20) 覆盖 from。
+    expect(marqueeSelect({ x: 95, y: 45, w: 20, h: 20 }, arrowEls)).toContain('ar')
+  })
+  it('关系箭头:框覆盖线段中点(不含端点)→ 选中(线段穿过框)', () => {
+    // 中点 (150,50),框 (145,45,10,10) 覆盖线段一段但不含两端点 → 线段相交仍选中。
+    expect(marqueeSelect({ x: 145, y: 45, w: 10, h: 10 }, arrowEls)).toContain('ar')
+  })
+  it('关系箭头:框完全偏离线段 → 不选中', () => {
+    expect(marqueeSelect({ x: 500, y: 500, w: 20, h: 20 }, arrowEls)).not.toContain('ar')
+  })
 })
