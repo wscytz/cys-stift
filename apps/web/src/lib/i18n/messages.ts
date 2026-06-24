@@ -338,6 +338,8 @@ export const messages = {
   'canvas.aiClusterNone': { zh: '未找到相似卡片', en: 'No similar cards found' },
   'canvas.aiClusterEmpty': { zh: 'AI 未返回有效分组', en: 'AI returned no valid clusters' },
   'canvas.aiClusterTooFew': { zh: '卡片太少,无需分组', en: 'Too few cards to cluster' },
+  'canvas.aiThinking': { zh: '思考中…', en: 'Thinking…' },
+  'canvas.aiCancelled': { zh: '已取消', en: 'Cancelled' },
   'freedraw.title': { zh: '手绘', en: 'Sketch' },
   'freedraw.looksArrow': { zh: '看起来像箭头', en: 'Looks like an arrow' },
   'freedraw.looksDecoration': { zh: '看起来像装饰', en: 'Looks like decoration' },

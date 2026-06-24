@@ -49,6 +49,10 @@ export default function CanvasPage() {
   const [detail, setDetail] = useState<{ card: Card } | null>(null)
   const [snapMode, setSnapMode] = useState<'snap' | 'free'>('snap')
   const [tool, setTool] = useState<'select' | 'freedraw' | 'text' | 'connect'>('select')
+  // AI loading + abort(审计 M5+M9):async 调用期间禁用按钮防重复点击,
+  // AbortController 在卸载/取消时 abort,省 API 费 + 防 unmounted setState。
+  const [aiBusy, setAiBusy] = useState<null | 'layout' | 'cluster'>(null)
+  const aiAbortRef = useRef<AbortController | null>(null)
 
   const { snapshot: canvasesSnap } = useCanvases()
   const activeCanvasId = canvasesSnap.activeCanvasId
@@ -121,18 +125,24 @@ export default function CanvasPage() {
   }, [service, t])
 
   const handleAILayout = useCallback(async () => {
-    const adapter = handle.current.adapter
-    if (!adapter) return
-    const cfg = getCurrentAI()
-    if (!cfg) return
+    // 防重复点击:已在跑则忽略(审计 M5)。
+    if (aiBusy) return
+    setAiBusy('layout')
+    const ac = new AbortController()
+    aiAbortRef.current = ac
+    try {
+      const adapter = handle.current.adapter
+      if (!adapter) return
+      const cfg = getCurrentAI()
+      if (!cfg) return
 
-    const snap = snapshotCanvas(adapter, service, activeCanvasId)
-    const formatted = formatCanvasSnapshot(snap)
+      const snap = snapshotCanvas(adapter, service, activeCanvasId)
+      const formatted = formatCanvasSnapshot(snap)
 
-    const systemPrompt =
-      'You are a canvas editing assistant. Given the current canvas (cards, shapes, arrows with their relation signatures), output DSL directives to improve it. You may reposition/resize cards, change colors, create/update rect and text shapes, and rewrite arrow relation signatures (dash line style + arrowhead shape). Reuse an existing element #id to UPDATE it (relation arrow endpoints are kept; free arrow bbox is kept); omit the id to CREATE new. Cards can only be UPDATEd — never created (card content comes from the inbox, not the canvas). Free arrows (arrows with no from/to) encode their line as @pos + @size (w/h may be negative for direction). Output DSL directives only — no explanations.'
+      const systemPrompt =
+        'You are a canvas editing assistant. Given the current canvas (cards, shapes, arrows with their relation signatures), output DSL directives to improve it. You may reposition/resize cards, change colors, create/update rect and text shapes, and rewrite arrow relation signatures (dash line style + arrowhead shape). Reuse an existing element #id to UPDATE it (relation arrow endpoints are kept; free arrow bbox is kept); omit the id to CREATE new. Cards can only be UPDATEd — never created (card content comes from the inbox, not the canvas). Free arrows (arrows with no from/to) encode their line as @pos + @size (w/h may be negative for direction). Output DSL directives only — no explanations.'
 
-    const userPrompt = `Improve this canvas. Reorganize positions, adjust sizes/colors, and refine arrow relation signatures where appropriate. Do NOT change items that are already well-placed.
+      const userPrompt = `Improve this canvas. Reorganize positions, adjust sizes/colors, and refine arrow relation signatures where appropriate. Do NOT change items that are already well-placed.
 
 ${formatted}
 
@@ -144,8 +154,7 @@ Output DSL (one directive per line):
 [arrow #id] @pos(x, y) @size(w, h) @color(c) @dash(...) @arrowhead(...)   (free arrow: no from/to; w/h may be negative for direction)
 Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbox kept for free arrows); omit #id to CREATE new — except cards, which are update-only; colors limited to blue/red/black/grey/yellow.`
 
-    try {
-      const result = await streamText(cfg, { system: systemPrompt, user: userPrompt }, () => {})
+      const result = await streamText(cfg, { system: systemPrompt, user: userPrompt }, () => {}, ac.signal)
       if (!result?.content) {
         pushToast({ kind: 'info', message: t('canvas.aiLayoutEmpty') })
         return
@@ -156,6 +165,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         return
       }
       const { applied, skipped } = applyLayout(adapter, ops)
+      // 诚实 toast(保留此前修复):applied=0 / skipped>0 / 全成功三分支。
       if (applied === 0) {
         pushToast({ kind: 'info', message: t('canvas.aiLayoutNoneApplied') })
       } else if (skipped > 0) {
@@ -164,39 +174,52 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         pushToast({ kind: 'success', message: t('canvas.aiLayoutDone') })
       }
     } catch (e) {
-      pushToast({ kind: 'error', message: t('ai.error', { error: (e as Error).message }) })
+      if ((e as Error).name === 'AbortError') {
+        pushToast({ kind: 'info', message: t('canvas.aiCancelled') })
+      } else {
+        pushToast({ kind: 'error', message: t('ai.error', { error: (e as Error).message }) })
+      }
+    } finally {
+      setAiBusy(null)
+      aiAbortRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCanvasId, service, t])
+  }, [activeCanvasId, service, t, aiBusy])
 
   // AI cluster(找重复 / 找相似):读画布上的卡 → AI 分组 → 落 related-to 关系箭头
   // 连组内成员(非破坏性:只加关系,不合并不删卡)。走 serializeCardsForAI(allowlist
   // + 软删除过滤,无 deviceId / 无 media.dataUrl),遵守 AI 隐私铁律(无 vision)。
   const handleAICluster = useCallback(async () => {
-    const adapter = handle.current.adapter
-    if (!adapter) return
-    const cfg = getCurrentAI()
-    if (!cfg) return
-
-    const cards = service
-      .listOnCanvas(activeCanvasId)
-      .filter((c) => !c.archived && !c.deletedAt)
-    if (cards.length < 2) {
-      pushToast({ kind: 'info', message: t('canvas.aiClusterTooFew') })
-      return
-    }
-    const knownIds = new Set(cards.map((c) => String(c.id)))
-    const userPrompt = buildClusterUserPrompt(cards)
-    if (!userPrompt) {
-      pushToast({ kind: 'info', message: t('canvas.aiClusterTooFew') })
-      return
-    }
-
+    // 防重复点击:已在跑则忽略(审计 M5)。
+    if (aiBusy) return
+    setAiBusy('cluster')
+    const ac = new AbortController()
+    aiAbortRef.current = ac
     try {
+      const adapter = handle.current.adapter
+      if (!adapter) return
+      const cfg = getCurrentAI()
+      if (!cfg) return
+
+      const cards = service
+        .listOnCanvas(activeCanvasId)
+        .filter((c) => !c.archived && !c.deletedAt)
+      if (cards.length < 2) {
+        pushToast({ kind: 'info', message: t('canvas.aiClusterTooFew') })
+        return
+      }
+      const knownIds = new Set(cards.map((c) => String(c.id)))
+      const userPrompt = buildClusterUserPrompt(cards)
+      if (!userPrompt) {
+        pushToast({ kind: 'info', message: t('canvas.aiClusterTooFew') })
+        return
+      }
+
       const result = await streamText(
         cfg,
         { system: CLUSTER_SYSTEM_PROMPT, user: userPrompt, maxTokens: 1024, temperature: 0.2 },
         () => {},
+        ac.signal,
       )
       if (!result?.content) {
         pushToast({ kind: 'info', message: t('canvas.aiClusterEmpty') })
@@ -216,10 +239,17 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
             : t('canvas.aiClusterNone'),
       })
     } catch (e) {
-      pushToast({ kind: 'error', message: t('ai.error', { error: (e as Error).message }) })
+      if ((e as Error).name === 'AbortError') {
+        pushToast({ kind: 'info', message: t('canvas.aiCancelled') })
+      } else {
+        pushToast({ kind: 'error', message: t('ai.error', { error: (e as Error).message }) })
+      }
+    } finally {
+      setAiBusy(null)
+      aiAbortRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCanvasId, service, t])
+  }, [activeCanvasId, service, t, aiBusy])
 
   // 键盘:+ - 0 1 g(同 tldraw 版,改用 adapter)。input/textarea 时跳过。
   useEffect(() => {
@@ -306,6 +336,14 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool, adapterReady])
 
+  // 卸载时 abort 进行中的 AI 请求(审计 M9:防切走后请求继续跑浪费
+  // API 费 + 可能 unmounted setState)。
+  useEffect(() => {
+    return () => {
+      aiAbortRef.current?.abort()
+    }
+  }, [])
+
   return (
     <main className="page">
       <Toolbar region="canvas">
@@ -329,8 +367,12 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         <span className="tb-divider" aria-hidden="true" />
         {aiEnabled && (
           <>
-            <Button variant="ghost" onClick={handleAILayout} disabled={!adapterReady} title={t('canvas.aiLayout')}>{t('canvas.aiLayout')}</Button>
-            <Button variant="ghost" onClick={handleAICluster} disabled={!adapterReady} title={t('canvas.aiCluster')}>{t('canvas.aiCluster')}</Button>
+            <Button variant="ghost" onClick={handleAILayout} disabled={!adapterReady || aiBusy !== null} title={t('canvas.aiLayout')}>
+              {aiBusy === 'layout' ? t('canvas.aiThinking') : t('canvas.aiLayout')}
+            </Button>
+            <Button variant="ghost" onClick={handleAICluster} disabled={!adapterReady || aiBusy !== null} title={t('canvas.aiCluster')}>
+              {aiBusy === 'cluster' ? t('canvas.aiThinking') : t('canvas.aiCluster')}
+            </Button>
           </>
         )}
         {showAutoRelate && (
