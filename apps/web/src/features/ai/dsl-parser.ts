@@ -92,9 +92,12 @@ export type DslDiagnostic = {
 /** Card reference: `#id` or `shape:cardId` */
 const ID_RE = /#([a-zA-Z0-9_-]+:[a-zA-Z0-9_-]+|[a-zA-Z0-9_-]+)/
 
-/** Position directive: `@pos(300, 400)` or inline `at (300, 400)` */
-const POS_RE = /@pos\((\d+),\s*(\d+)\)/
-const AT_RE = /at\s+\((\d+),\s*(\d+)\)/
+/** Position directive: `@pos(300, 400)` or inline `at (300, 400)`. Supports
+ *  negatives — elements dragged above/left of origin serialize as @pos(-x,-y)
+ *  (canvas pan lets coords go negative), so the regex must round-trip them
+ *  (else negative-coord cards fail to reparse → "missing @pos"). */
+const POS_RE = /@pos\((-?\d+),\s*(-?\d+)\)/
+const AT_RE = /at\s+\((-?\d+),\s*(-?\d+)\)/
 
 /** Color directive: Bauhaus 6 原色 + grey 别名。引擎 colorOf 只认这 7 个
  *  名字(red/yellow/blue/black/white/gray/grey)。其他写法(green/teal/pink/

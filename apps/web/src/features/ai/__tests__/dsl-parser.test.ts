@@ -15,6 +15,19 @@ describe('parseDsl', () => {
     }
   })
 
+  it('parses negative @pos coords (elements dragged above/left of origin)', () => {
+    // Canvas pan lets coords go negative; serialize outputs @pos(-54,150) and
+    // the parser MUST round-trip it (regression: POS_RE was \d+ only → "missing @pos").
+    const result = parseDsl('[card #abc123] @pos(-54, -150) @size(202, 144)')
+    expect(result).toHaveLength(1)
+    const op = result[0]!
+    expect(op.type).toBe('card')
+    if (op.type === 'card') {
+      expect(op.x).toBe(-54)
+      expect(op.y).toBe(-150)
+    }
+  })
+
   it('parses a card without color', () => {
     const result = parseDsl('[card #xyz] @pos(100, 200)')
     expect(result).toHaveLength(1)
