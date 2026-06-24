@@ -365,8 +365,8 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         />
         {onCanvas === 0 && (
           <div className="cv-empty" aria-hidden="true">
-            <span className="cv-empty__eyebrow">{t('canvas.emptyTitle')}</span>
-            <span className="cv-empty__hint">{t('canvas.emptyHint')}</span>
+            <span className="eyebrow">{t('canvas.emptyTitle')}</span>
+            <span className="mono">{t('canvas.emptyHint')}</span>
           </div>
         )}
         <RelationPanel host={handle.current.adapter} canvasEl={canvasElRef.current} />
@@ -516,14 +516,8 @@ function ZoomGroup({ adapterReady, onZoom }: { adapterReady: boolean; onZoom: (o
 
 const styles = `
 .page { height: calc(100vh - var(--app-menu-height)); display: flex; flex-direction: column; background: var(--color-white); color: var(--color-black); }
-.crumb { font-family: var(--font-mono); font-size: var(--font-size-sm); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-gray); }
-.crumb--here { color: var(--color-black); }
-.crumb-sep { color: var(--color-gray); }
-.crumb-spacer { flex: 1; }
 .cv-host { position: relative; flex: 1; min-height: 0; }
 .cv-empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: var(--space-2); pointer-events: none; user-select: none; padding-bottom: 80px; }
-.cv-empty__eyebrow { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.16em; color: var(--color-gray); }
-.cv-empty__hint { font-family: var(--font-mono); font-size: var(--font-size-sm); color: var(--color-black-soft); }
 .tb-divider { width: 1px; height: 24px; background: var(--color-gray); margin: 0 var(--space-2); flex: 0 0 auto; }
 .tb-snap { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.16em; text-transform: uppercase; background: var(--color-white); color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
 .tb-snap--snap { background: var(--color-black); color: var(--color-white); }
