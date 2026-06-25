@@ -408,10 +408,6 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
   return (
     <main className="page">
       <Toolbar region="canvas">
-        <span className="crumb">{t('brand.name')}</span>
-        <span className="crumb-sep">/</span>
-        <span className="crumb crumb--here">{t('canvas.crumb')}</span>
-        <span className="crumb-sep">/</span>
         <CanvasSwitcher
           canvases={canvases}
           activeId={activeCanvasId}
@@ -421,10 +417,6 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           onCancelRename={() => setRenamingId(null)}
           onSwitch={switchCanvas}
         />
-        <Button variant="ghost" onClick={() => setCreatingName('')} title={t('canvas.newTitle')}>{t('canvas.new')}</Button>
-        <Button variant="ghost" onClick={startRename} title={t('canvas.renameTitle')} disabled={!activeCanvas}>{t('canvas.rename')}</Button>
-        <Button variant="ghost" onClick={requestDelete} title={t('canvas.deleteTitle')} disabled={activeCanvasId === DEFAULT_CANVAS_ID}>{t('canvas.delete')}</Button>
-        <span className="crumb-spacer" />
         <span className="tb-divider" aria-hidden="true" />
         {(['select', 'freedraw', 'text', 'connect'] as const).map((tk) => (
           <button
@@ -468,6 +460,11 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           aiBusy={aiBusy}
           showAutoRelate={showAutoRelate}
           adapterReady={adapterReady}
+          canRename={!!activeCanvas}
+          canDelete={activeCanvasId !== DEFAULT_CANVAS_ID}
+          onNewCanvas={() => setCreatingName('')}
+          onRename={startRename}
+          onDelete={requestDelete}
           onAILayout={handleAILayout}
           onAICluster={handleAICluster}
           onAutoRelate={handleAutoRelate}
@@ -631,6 +628,11 @@ function CanvasSideRail({
   aiBusy,
   showAutoRelate,
   adapterReady,
+  canRename,
+  canDelete,
+  onNewCanvas,
+  onRename,
+  onDelete,
   onAILayout,
   onAICluster,
   onAutoRelate,
@@ -643,6 +645,11 @@ function CanvasSideRail({
   aiBusy: null | 'layout' | 'cluster'
   showAutoRelate: boolean
   adapterReady: boolean
+  canRename: boolean
+  canDelete: boolean
+  onNewCanvas: () => void
+  onRename: () => void
+  onDelete: () => void
   onAILayout: () => void
   onAICluster: () => void
   onAutoRelate: () => void
@@ -654,6 +661,10 @@ function CanvasSideRail({
   const { t } = useI18n()
   return (
     <nav className="cv-rail" aria-label={t('canvas.sideRail')}>
+      <RailButton label={t('canvas.newTitle')} onClick={onNewCanvas} icon="+" />
+      <RailButton label={t('canvas.renameTitle')} onClick={onRename} disabled={!canRename} icon="✎" />
+      <RailButton label={t('canvas.deleteTitle')} onClick={onDelete} disabled={!canDelete} icon="🗑" />
+      <span className="cv-rail__sep" aria-hidden="true" />
       {aiEnabled && (
         <>
           <RailButton label={t('canvas.aiLayout')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'layout'} onClick={onAILayout} icon="AI" />
