@@ -151,15 +151,16 @@ export function bindCardWriteback(
     for (const el of updated) {
       if (el.kind === 'card') pending.set(el.id, el)
     }
-    // Eraser-on-card interaction (v0.37.0 dev-feedback fix): a user-source
-    // removal of a card element soft-deletes the underlying card (→ /trash,
-    // recoverable) — matching the card-detail modal's delete semantics.
-    // Programmatic removals (load/sync) run under applyWithoutEcho so they're
-    // NOT 'user'-source and won't trigger this.
+    // 画布 Delete/橡皮 擦掉卡元素 = 把卡「送回 inbox」(清 canvasPosition),
+    // 不是删卡。原因:引擎 undo 只恢复 host 元素,不会回滚 DB 的 deletedAt ——
+    // 如果这里 softDelete,Undo 后画布上看似恢复了,但 DB 已标记 deletedAt,
+    // 切画布/reload 卡就永久丢失(静默数据丢失)。removeFromCanvas 让卡回 inbox
+    // 可找回,且与 CardDetailModal 的「送回 inbox」语义一致。
+    // 真正的删卡(softDelete)只走 CardDetailModal 的显式「删除」(带 confirm)。
     for (const id of removed) {
       const card = service.get(id as CardId)
       if (card && !card.deletedAt && card.canvasPosition?.canvasId === canvasId) {
-        service.softDelete(id as CardId)
+        service.removeFromCanvas(id as CardId)
       }
     }
     if (pending.size > 0) scheduleFlush()

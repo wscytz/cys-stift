@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { CanvasId, Card } from '@cys-stift/domain'
+import { SelfBuiltAdapter } from '@cys-stift/canvas-engine'
 import { Button, Modal, Toolbar } from '@cys-stift/ui'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
@@ -48,7 +49,11 @@ export default function CanvasPage() {
   const { snap, service, ready } = useDb()
   void snap
   const handle = useRef<SelfCanvasHandle>({ adapter: null })
-  const adapterReady = !!handle.current.adapter
+  // adapter 就绪态抬进 state(ref 赋值不触发 re-render,否则冷启动/切画布后
+  // toolbar disabled、RelationPanel/FreedrawPanel/Minimap host=null 不挂载,
+  // 直到某次无关 re-render 才救活)。SelfCanvas 经 onAdapterReady 回调写它。
+  const [adapter, setAdapter] = useState<SelfBuiltAdapter | null>(null)
+  const adapterReady = !!adapter
   const canvasElRef = useRef<HTMLCanvasElement | null>(null)
   const [detail, setDetail] = useState<{ card: Card } | null>(null)
   const [snapMode, setSnapMode] = useState<'snap' | 'free'>('snap')
@@ -90,7 +95,8 @@ export default function CanvasPage() {
     const next = snapMode === 'snap' ? 'free' : 'snap'
     const v = adapter.getView()
     adapter.setView({ ...v, gridMode: next })
-    setSnapMode(next)
+    // snapMode 不在这里 setView —— 下方 onViewChange 订阅会回推,单一可信源。
+    // (setView 总会触发 onViewChange,即便值没变。)
   }, [snapMode])
 
   const zoomBy = useCallback(
@@ -131,15 +137,15 @@ export default function CanvasPage() {
   }, [service, t])
 
   // undo/redo 按钮 disabled 态:onHistoryChange(upsert/undo/redo)刷新。
-  // 依赖 activeCanvasId:切画布时 SelfCanvas 重建新 adapter,需重订阅。
+  // 依赖 adapter state(Bug A 修复后):adapter 就绪/切画布重建后重订阅,
+  // 避免旧 [activeCanvasId] ref 读到 null/旧 adapter 导致订阅不挂。
   const [, histTick] = useState(0)
   useEffect(() => {
-    const adapter = handle.current.adapter
     if (!adapter) return
     return adapter.onHistoryChange(() => histTick((n) => n + 1))
-  }, [activeCanvasId])
-  const canUndo = !!handle.current.adapter?.canUndo()
-  const canRedo = !!handle.current.adapter?.canRedo()
+  }, [adapter])
+  const canUndo = !!adapter?.canUndo()
+  const canRedo = !!adapter?.canRedo()
   const handleUndo = useCallback(() => {
     handle.current.adapter?.undo()
   }, [])
@@ -391,7 +397,6 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
   // host's onSelectionChange event (debt 收口 2026-06-23, 替原 300ms 轮询)。
   const [selectedCardCount, setSelectedCardCount] = useState(0)
   useEffect(() => {
-    const adapter = handle.current.adapter
     if (!adapter) {
       setSelectedCardCount(0)
       return
@@ -405,8 +410,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     recount(adapter.getSelectedIds()) // 初始同步(adapter 刚就绪/切画布重建)
     const unsub = adapter.onSelectionChange(recount)
     return () => unsub()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adapterReady, activeCanvasId])
+  }, [adapter])
   const showAutoRelate = aiEnabled && selectedCardCount >= 2
 
   // adapter ready 时同步工具(切 canvas 重建 adapter 后恢复当前 tool)。
@@ -414,6 +418,18 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     handle.current.adapter?.setTool(tool)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool, adapterReady])
+
+  // snapMode 单一可信源:从 adapter 的 live view 派生(Bug C 修复)。
+  // 切画布时 SelfCanvas 重建并把持久化的 per-canvas gridMode setView 进来 ——
+  // 这里的 onAdapterReady 让我们拿到新 adapter,读它的当前 gridMode 重置按钮态,
+  // 再订阅 onViewChange 保证后续任何 setView(toggleSnap / keyboard 'g' / fit)
+  // 都让 SnapToggle 如实反映。否则切画布后 snapMode 仍是上一画布的值,按钮撒谎。
+  useEffect(() => {
+    if (!adapter) return
+    setSnapMode(adapter.getView().gridMode)
+    const unsub = adapter.onViewChange((v) => setSnapMode(v.gridMode))
+    return () => unsub()
+  }, [adapter])
 
   // 卸载时 abort 进行中的 AI 请求(审计 M9:防切走后请求继续跑浪费
   // API 费 + 可能 unmounted setState)。
@@ -465,6 +481,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           onOpenCard={(card) => setDetail({ card })}
           adapterRef={handle}
           canvasElRef={canvasElRef}
+          onAdapterReady={setAdapter}
         />
         {!ready ? null : onCanvas === 0 && (
           <div className="cv-empty">
@@ -475,8 +492,8 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
             </Link>
           </div>
         )}
-        <RelationPanel host={handle.current.adapter} canvasEl={canvasElRef.current} />
-        <FreedrawPanel host={handle.current.adapter} canvasEl={canvasElRef.current} />
+        <RelationPanel host={adapter} canvasEl={canvasElRef.current} />
+        <FreedrawPanel host={adapter} canvasEl={canvasElRef.current} />
         <CanvasSideRail
           aiEnabled={aiEnabled}
           aiBusy={aiBusy}
@@ -499,7 +516,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           onDiff={() => setDiffOpen(true)}
           onShortcuts={() => setShortcutOpen(true)}
         />
-        <Minimap host={handle.current.adapter} canvasEl={canvasElRef.current} />
+        <Minimap host={adapter} canvasEl={canvasElRef.current} />
       </div>
 
       <Modal open={creatingName !== null} onClose={() => setCreatingName(null)} title={t('canvas.newModalTitle')}>
@@ -567,7 +584,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       <ExportDialog
         open={exportOpen}
         onClose={() => setExportOpen(false)}
-        host={handle.current.adapter}
+        host={adapter}
         service={service}
         canvasId={activeCanvasId}
         canvasName={activeCanvas?.name ?? ''}
@@ -576,14 +593,14 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       <DslDialog
         open={dslOpen}
         onClose={() => setDslOpen(false)}
-        host={handle.current.adapter}
+        host={adapter}
         service={service}
         canvasName={activeCanvas?.name ?? ''}
       />
 
       <ShortcutHelpDialog open={shortcutOpen} onClose={() => setShortcutOpen(false)} />
 
-      <DiffDialog open={diffOpen} onClose={() => setDiffOpen(false)} host={handle.current.adapter} />
+      <DiffDialog open={diffOpen} onClose={() => setDiffOpen(false)} host={adapter} />
 
       <style>{styles}</style>
     </main>

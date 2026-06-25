@@ -46,6 +46,7 @@ export function SelfCanvas({
   onOpenCard,
   adapterRef,
   canvasElRef,
+  onAdapterReady,
 }: {
   canvasId: CanvasId
   service: CardService
@@ -56,6 +57,13 @@ export function SelfCanvas({
   /** Page-supplied ref so the RelationPanel can read the canvas rect for
    *  positioning (子4: panel floats above selected arrow, needs screen coords). */
   canvasElRef?: React.MutableRefObject<HTMLCanvasElement | null>
+  /**
+   * 通知 page adapter 已就绪 / 已卸载。ref 赋值不会触发 re-render,所以
+   *  page 必须靠这个回调把 adapter 抬进 state,渲染输出才能反映就绪态
+   *  (toolbar 启用 / RelationPanel·FreedrawPanel·Minimap 挂载)。冷启动和
+   *  每次切画布(key=canvasId 重建)都会经过 null → adapter 的转换。
+   */
+  onAdapterReady?: (adapter: SelfBuiltAdapter | null) => void
 }) {
   const innerCanvasRef = useRef<HTMLCanvasElement>(null)
   const adapterInner = useRef<SelfBuiltAdapter | null>(null)
@@ -80,6 +88,7 @@ export function SelfCanvas({
     })
     adapterInner.current = adapter
     adapterRef.current = { adapter }
+    onAdapterReady?.(adapter)
 
     // 视图持久化:先应用存的 view,再订阅变更写回。
     const view = canvasViewStore.get(canvasId)
@@ -124,6 +133,7 @@ export function SelfCanvas({
       adapter.detach()
       adapterInner.current = null
       adapterRef.current = { adapter: null }
+      onAdapterReady?.(null)
       if (canvasElRef) canvasElRef.current = null
     }
   }, [canvasId, service, adapterRef])
