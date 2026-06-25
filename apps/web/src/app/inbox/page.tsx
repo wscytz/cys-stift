@@ -388,6 +388,7 @@ const styles = `
   border-bottom: 2px solid transparent;
 }
 .tab--active { color: var(--color-black); border-bottom-color: var(--color-red); font-weight: 600; }
+.tab:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 
 .grid {
   list-style: none;
@@ -425,6 +426,7 @@ const styles = `
   cursor: pointer; padding: 0;
 }
 .tile__pin:hover { color: var(--color-yellow); }
+.tile__pin:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tile__select {
   position: absolute; top: var(--space-1); left: var(--space-1); z-index: 2;
   width: 28px; height: 28px;
@@ -435,6 +437,7 @@ const styles = `
 }
 .tile__select[aria-pressed="true"] { background: var(--color-blue); border-color: var(--color-blue); color: var(--color-white); }
 .tile__select:hover:not([aria-pressed="true"]) { border-color: var(--color-blue); color: var(--color-blue); }
+.tile__select:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .batch-bar {
   position: fixed; left: 50%; bottom: var(--space-4); transform: translateX(-50%);
   z-index: 30;
@@ -466,6 +469,7 @@ const styles = `
   cursor: pointer; color: inherit; font: inherit;
 }
 .tile__main:active { transform: translate(2px, 2px); box-shadow: none; }
+.tile__main:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tile__bar { width: 8px; flex-shrink: 0; background: var(--color-red); }
 .tile__body { flex: 1; padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
 .tile__title {

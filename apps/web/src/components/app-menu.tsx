@@ -120,6 +120,7 @@ const styles = `
   border-radius: var(--radius-sm);
 }
 .app-menu__link:hover { color: var(--color-black); background: var(--color-gray-soft); }
+.app-menu__link:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .app-menu__link--active { color: var(--color-black); border-bottom: 2px solid var(--color-black); }
 .app-menu__spacer { flex: 1; }
 .app-menu__capture {
@@ -137,4 +138,5 @@ const styles = `
 }
 .app-menu__capture:hover { box-shadow: 2px 2px 0 0 var(--color-black); }
 .app-menu__capture:active { transform: translate(1px, 1px); box-shadow: none; }
+.app-menu__capture:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 `

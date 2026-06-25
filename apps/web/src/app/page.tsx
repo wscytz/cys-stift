@@ -173,6 +173,7 @@ export default function HomePage() {
           transition: color 80ms ease-out;
         }
         .home__secondary-link:hover { color: var(--color-black); }
+.home__secondary-link:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
         .home__secondary-sep { color: var(--color-gray); opacity: 0.6; }
         .home__nav { margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
         .home__nav-link--canvas .home__nav-arrow { background: var(--color-black); }
@@ -238,6 +239,7 @@ export default function HomePage() {
           transition: transform 80ms ease-out, box-shadow 80ms ease-out;
         }
         .home__nav-link:hover { box-shadow: 4px 4px 0 0 var(--color-red); }
+        .home__nav-link:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
         .home__nav-link:active { transform: translate(2px, 2px); box-shadow: var(--shadow-sm); }
         .home__nav-arrow {
           display: inline-flex;

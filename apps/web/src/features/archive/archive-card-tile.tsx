@@ -181,6 +181,7 @@ const styles = `
   cursor: pointer; padding: 0;
 }
 .tile__pin:hover { color: var(--color-yellow); }
+.tile__pin:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tile:hover, .row:hover { box-shadow: var(--shadow-md); }
 .tile:active, .row:active { transform: translate(2px, 2px); box-shadow: none; }
 
@@ -197,6 +198,7 @@ const styles = `
 }
 .tile__select[aria-pressed="true"] { background: var(--color-blue); border-color: var(--color-blue); color: var(--color-white); }
 .tile__select:hover:not([aria-pressed="true"]) { border-color: var(--color-blue); color: var(--color-blue); }
+.tile__select:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 
 .tile__main {
   flex: 1;
@@ -209,6 +211,7 @@ const styles = `
   color: inherit;
   font: inherit;
 }
+.tile__main:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tile__bar {
   width: 8px;
   flex-shrink: 0;

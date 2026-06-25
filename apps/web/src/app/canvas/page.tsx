@@ -751,18 +751,23 @@ const styles = `
   border-radius: var(--radius-sm);
 }
 .cv-empty__cta:hover { box-shadow: 2px 2px 0 0 var(--color-black); }
+.cv-empty__cta:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tb-divider { width: 1px; height: 24px; background: var(--color-gray); margin: 0 var(--space-2); flex: 0 0 auto; }
 .tb-snap { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.16em; text-transform: uppercase; background: var(--color-white); color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
 .tb-snap--snap { background: var(--color-black); color: var(--color-white); }
 .tb-snap--free { background: var(--color-white); color: var(--color-black); }
 .tb-snap:disabled { opacity: 0.55; cursor: not-allowed; }
+.tb-snap:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tb-zoom { display: inline-flex; align-items: center; gap: 0; }
 .tb-icon-btn { display: inline-flex; align-items: center; justify-content: center; height: 32px; min-width: 32px; padding: 0 var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.12em; text-transform: uppercase; background: transparent; color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
 .tb-icon-btn--fit { padding: 0 var(--space-3); }
 .tb-icon-btn:hover { background: var(--color-black); color: var(--color-white); }
 .tb-icon-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.tb-icon-btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cselect { height: 32px; padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-sm); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
+.cselect:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cselect-edit { height: 32px; width: 32px; background: transparent; color: var(--color-gray); border: 0; cursor: pointer; font-size: var(--font-size-base); }
+.cselect-edit:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .crename { height: 32px; padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-sm); border: var(--border-hairline); border-radius: var(--radius-sm); outline: none; min-width: 200px; }
 .cinput { display: block; width: 100%; height: 32px; margin-top: var(--space-2); padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-base); border: var(--border-hairline); border-radius: var(--radius-sm); outline: none; }
 .confirm__body { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
