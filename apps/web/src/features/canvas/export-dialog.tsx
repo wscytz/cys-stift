@@ -60,10 +60,15 @@ export function ExportDialog({
   const [opaque, setOpaque] = useState(true)
 
   // Escape 关闭模态(与 CardDetailModal 一致;Modal 只处理 backdrop 点击)。
+  // Stacked-modal guard: defaultPrevented check + only mark consumed when we
+  // actually close, so a confirm stacked on top doesn't close both at once.
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key !== 'Escape') return
+      if (e.defaultPrevented) return
+      e.preventDefault()
+      onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

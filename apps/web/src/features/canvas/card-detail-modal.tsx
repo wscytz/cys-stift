@@ -62,11 +62,19 @@ export function CardDetailModal({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key !== 'Escape') return
+      // Stacked-modal guard: if a confirm-delete sub-modal is open, leave
+      // Escape to that inner overlay (it has its own handler/backdrop) and
+      // don't clobber the whole CardDetailModal on a single keypress.
+      if (confirmDelete) return
+      // defaultPrevented guard: another dialog already consumed this Escape.
+      if (e.defaultPrevented) return
+      e.preventDefault()
+      onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, confirmDelete])
 
   const save = () => {
     if (!title.trim()) return
@@ -159,17 +167,18 @@ export function CardDetailModal({
                 <span className="cd__label">{t('tag.add')}</span>
                 <div className="cd__tags">
                   {tags.map((tag) => (
-                    <span
+                    <button
                       key={tag.value}
+                      type="button"
                       className="cd__tag-chip"
                       style={{ background: tag.color }}
-                      title={t('tag.remove')}
+                      aria-label={t('tag.remove') + ': ' + tag.value}
                       onClick={() =>
                         setTags((prev) => prev.filter((x) => x.value !== tag.value))
                       }
                     >
                       {tag.value} ×
-                    </span>
+                    </button>
                   ))}
                   <input
                     className="cd__tag-input"
@@ -294,6 +303,17 @@ const styles = `
   color: var(--color-black); border: 2px solid var(--color-black);
   cursor: pointer; user-select: none; line-height: 1.3;
 }
+/* Reset native <button> defaults so the removable tag chip renders
+   identically to the old <span> (edit-mode chip is now a button for
+   keyboard operability + remove announcement). Inline tag-color
+   background wins over the UA button background; neutralize appearance,
+   font, and text-align so only .cd__tag-chip rules apply. */
+button.cd__tag-chip {
+  appearance: none; -webkit-appearance: none;
+  font: inherit; text-align: center;
+  background: var(--color-gray-soft);
+}
+button.cd__tag-chip:focus-visible { outline: 2px solid var(--color-red); outline-offset: 1px; }
 .cd__tag-chip:hover { opacity: 0.8; }
 .cd__tag-input {
   appearance: none; border: var(--border-hairline); background: transparent;

@@ -52,7 +52,13 @@ export function DslDialog({
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key !== 'Escape') return
+      // Stacked-modal guard: if another dialog already consumed this Escape
+      // (e.g. a confirm stacked on top), bail so we don't close two on one
+      // keypress. We mark it consumed only when we actually close ourselves.
+      if (e.defaultPrevented) return
+      e.preventDefault()
+      onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

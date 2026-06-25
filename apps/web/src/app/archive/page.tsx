@@ -122,20 +122,54 @@ export default function ArchivePage() {
         <span className="crumb-sep">/</span>
         <h1 className="crumb crumb--here">{t('archive.crumb')}</h1>
         <span className="crumb-spacer" />
-        <button
-          type="button"
-          className={`tab ${view === 'grid' ? 'tab--active' : ''}`}
-          onClick={() => setView('grid')}
+        <div
+          role="tablist"
+          aria-label={t('archive.crumb')}
+          className="tablist"
         >
-          {t('archive.viewGrid')}
-        </button>
-        <button
-          type="button"
-          className={`tab ${view === 'timeline' ? 'tab--active' : ''}`}
-          onClick={() => setView('timeline')}
-        >
-          {t('archive.viewTimeline')}
-        </button>
+          <button
+            type="button"
+            role="tab"
+            id="tab-grid"
+            aria-selected={view === 'grid'}
+            tabIndex={view === 'grid' ? 0 : -1}
+            className={`tab ${view === 'grid' ? 'tab--active' : ''}`}
+            onClick={() => setView('grid')}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                e.preventDefault()
+                const next: View = view === 'grid' ? 'timeline' : 'grid'
+                setView(next)
+                requestAnimationFrame(() => {
+                  document.getElementById(`tab-${next}`)?.focus()
+                })
+              }
+            }}
+          >
+            {t('archive.viewGrid')}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="tab-timeline"
+            aria-selected={view === 'timeline'}
+            tabIndex={view === 'timeline' ? 0 : -1}
+            className={`tab ${view === 'timeline' ? 'tab--active' : ''}`}
+            onClick={() => setView('timeline')}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                e.preventDefault()
+                const next: View = view === 'grid' ? 'timeline' : 'grid'
+                setView(next)
+                requestAnimationFrame(() => {
+                  document.getElementById(`tab-${next}`)?.focus()
+                })
+              }
+            }}
+          >
+            {t('archive.viewTimeline')}
+          </button>
+        </div>
         <Tag color="blue">{cards.length}</Tag>
         <span className="tab-sep" />
         {selectMode ? (
@@ -149,7 +183,12 @@ export default function ArchivePage() {
         )}
       </Toolbar>
 
-      <div className="page-content page-content--wide">
+      <div
+        className="page-content page-content--wide"
+        role="tabpanel"
+        id={`tabpanel-${view}`}
+        aria-labelledby={`tab-${view}`}
+      >
         {!ready ? (
           <PageLoading />
         ) : cards.length === 0 ? (
@@ -300,6 +339,7 @@ function EmptyState() {
 
 const styles = `
 .page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
+.tablist { display: inline-flex; }
 .tab {
   height: 32px;
   padding: 0 var(--space-2);

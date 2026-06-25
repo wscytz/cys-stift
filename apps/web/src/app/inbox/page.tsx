@@ -150,20 +150,55 @@ export default function InboxPage() {
         <span className="crumb-sep">/</span>
         <h1 className="crumb crumb--here">{t('inbox.crumb')}</h1>
         <span className="crumb-spacer" />
-        <button
-          type="button"
-          className={`tab ${view === 'inbox' ? 'tab--active' : ''}`}
-          onClick={() => setView('inbox')}
+        <div
+          role="tablist"
+          aria-label={t('inbox.crumb')}
+          className="tablist"
         >
-          {t('inbox.tab.inbox')}
-        </button>
-        <button
-          type="button"
-          className={`tab ${view === 'archived' ? 'tab--active' : ''}`}
-          onClick={() => setView('archived')}
-        >
-          {t('inbox.tab.archived')}
-        </button>
+          <button
+            type="button"
+            role="tab"
+            id="tab-inbox"
+            aria-selected={view === 'inbox'}
+            tabIndex={view === 'inbox' ? 0 : -1}
+            className={`tab ${view === 'inbox' ? 'tab--active' : ''}`}
+            onClick={() => setView('inbox')}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                e.preventDefault()
+                const next = view === 'inbox' ? 'archived' : 'inbox'
+                setView(next)
+                // Move focus to the newly active tab (roving tabindex).
+                requestAnimationFrame(() => {
+                  document.getElementById(`tab-${next}`)?.focus()
+                })
+              }
+            }}
+          >
+            {t('inbox.tab.inbox')}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="tab-archived"
+            aria-selected={view === 'archived'}
+            tabIndex={view === 'archived' ? 0 : -1}
+            className={`tab ${view === 'archived' ? 'tab--active' : ''}`}
+            onClick={() => setView('archived')}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                e.preventDefault()
+                const next = view === 'inbox' ? 'archived' : 'inbox'
+                setView(next)
+                requestAnimationFrame(() => {
+                  document.getElementById(`tab-${next}`)?.focus()
+                })
+              }
+            }}
+          >
+            {t('inbox.tab.archived')}
+          </button>
+        </div>
         <Tag color={view === 'inbox' ? 'red' : 'blue'}>
           {view === 'inbox' ? inbox.length : archived.length}
         </Tag>
@@ -182,7 +217,12 @@ export default function InboxPage() {
         </button>
       </Toolbar>
 
-      <div className="page-content page-content--wide">
+      <div
+        className="page-content page-content--wide"
+        role="tabpanel"
+        id={`tabpanel-${view}`}
+        aria-labelledby={`tab-${view}`}
+      >
         {view === 'inbox' && (
           <CreateCardForm
             onCreate={(input) => {
@@ -333,6 +373,7 @@ export default function InboxPage() {
 
 const styles = `
 .page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
+.tablist { display: inline-flex; }
 .tab {
   height: 32px;
   padding: 0 var(--space-2);
