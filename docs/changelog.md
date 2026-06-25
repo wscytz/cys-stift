@@ -5,6 +5,28 @@
 
 ---
 
+## 2026-06-25 · robustness-web-layer · web/React 层边界鲁棒性(真 bug 修复)
+
+引擎过了 5 轮边界加固,web/React 层从没做过。3 个 Explore subagent 并行猎真 bug(捕获+store+数据 / canvas 交互 / 模态+表单+路由),出 ~35 条,核实后修 ~20 个真 bug(含数据丢失 + 2 个上两轮引入的回归)。subagent TDD 执行,跨包零回归。
+
+**数据丢失类(最重)**:
+- **FileCaptureSink 从未注册** → 拖文件/粘贴全走 fallback 变空卡,内容丢失 + 成功 toast 撒谎(生产里文件捕获彻底坏)。注册 drag-drop/paste。
+- **capture 火忘 quota** → 失败时草稿清+modal 关,文字不可恢复。cardRepo.insert 改抛 StorageQuotaError,registry 转 rejected,CaptureHost 失败时留 modal+保草稿+错误 toast(成功仍即时)。
+- **canvas Delete 走 softDelete 但撤销不恢复 DB** → 卡永久丢失。改 removeFromCanvas(送回收件箱,**行为变更**:canvas 删除=移出画布,卡真正删除只在 modal 显式确认)。
+- **AI Replace body 用陈旧 card prop** → 未存编辑丢失;**inbox/archive/timeline/canvas detail 不同步 store** → 卡他处删除时显幽灵卡;**canvas 存盘丢 tags**。
+- **canvas-store/settings-store/canvas-view-store 静默吞 quota** → 内存更新 UI 显成功,reload 静默回退。全加 rollback + onQuotaExceeded pubsub(app-menu 统一 toast)。
+
+**核心 reactivity(根因)**:
+- **adapterReady 非响应 ref 读** → 冷启动/切画布工具栏禁用、RelationPanel/FreedrawPanel/Minimap 拿 null host、订阅挂不上。SelfCanvas 加 onAdapterReady 回调,page 用 state 接,render 期 ref 读全改 state(连带多个 MED 一起好)。
+
+**校验/竞态**:import 不校验 capturedAt(Invalid Date 乱序);submit 后 debounced 草稿重存(重现);file-drop deviceId 格式不统一;card-detail resync 冲掉在编编辑;relation appliedKey 不随 arrow 重置;inbox/archive 批量 selected 不对账 store;CreateCardForm !ready 可提交崩路由;多选 Delete = N 步 undo(包 batch→1 步);文本编辑切画布丢半截。
+
+**2 个回归(上两轮引入,必修)**:RouteFocus 抢 modal 焦点(改:有 dialog 开着时跳过);浮 panel 不响应 window resize(加 resize 监听重钳制)。
+
+domain 68 / 引擎 354(+1)/ web 589(+~38 测试)/ build exit 0。
+
+---
+
 ## 2026-06-25 · a11y-systematic · 无障碍系统化(键盘/ARIA/对比度/地标)
 
 3 个 Explore subagent 并行审 a11y(键盘导航+焦点 / ARIA+语义+标题 / 对比度+动效+SR),出 ~45 条清单,HIGH/MED 全做 + 选择性 LOW,subagent 顺序 TDD 执行,跨包零回归。
