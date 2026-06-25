@@ -25,6 +25,7 @@ import { canvasViewStore } from '@/lib/canvas-view-store'
 import { screenToPage } from '@cys-stift/canvas-engine'
 import { measureText, textEditKeyAction } from '@cys-stift/canvas-engine'
 import { readToken } from '@cys-stift/canvas-engine'
+import { useI18n } from '@/lib/i18n'
 
 /** 浮动 textarea 编辑会话:屏幕锚点(textarea 定位)+ 页锚点(text 元素落点)。 */
 interface EditSession {
@@ -63,6 +64,7 @@ export function SelfCanvas({
   const committedRef = useRef(false)
   const [edit, setEdit] = useState<EditSession | null>(null)
   const [textValue, setTextValue] = useState('')
+  const { t } = useI18n()
 
   useEffect(() => {
     const canvas = innerCanvasRef.current
@@ -216,6 +218,8 @@ export function SelfCanvas({
         ref={innerCanvasRef}
         onClick={onCanvasClick}
         onDoubleClick={onDoubleClick}
+        role="img"
+        aria-label={t('canvas.srLabel')}
         style={{ width: '100%', height: '100%', display: 'block', touchAction: 'none' }}
       />
       {edit && (

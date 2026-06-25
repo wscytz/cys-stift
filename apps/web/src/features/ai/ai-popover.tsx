@@ -74,7 +74,7 @@ export function AIPopover({
   }, [card.id, action, targetLang, t])
 
   return (
-    <div className="ai-popover" role="dialog" aria-label="AI suggestion">
+    <div className="ai-popover" id="ai-popover" role="dialog" aria-label="AI suggestion">
       <div className="ai-popover__hd">
         <span className="ai-popover__title"><span className="ai-popover__mark" aria-hidden="true">»</span> {action}</span>
         {running && (

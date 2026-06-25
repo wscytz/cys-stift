@@ -187,6 +187,7 @@ export function Minimap({
   if (!host || !canvasEl) return null
 
   const title = t('canvas.minimap')
+  const collapseLabel = collapsed ? t('canvas.minimapExpand') : t('canvas.minimapCollapse')
 
   return (
     <div
@@ -202,8 +203,11 @@ export function Minimap({
         borderRadius: 'var(--radius-sm)',
       }}
     >
-      {/* 标题栏:mono small-caps 标题 + 折叠开关。 */}
+      {/* 标题栏:mono small-caps 标题 + 折叠开关。group landmark 让 SR 把
+          标题和折叠按钮视为一个整体区域(标题文字作为 group 的 accessible name)。 */}
       <div
+        role="group"
+        aria-label={title}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -226,9 +230,9 @@ export function Minimap({
         <button
           type="button"
           onClick={() => setCollapsed((c) => !c)}
-          aria-label={collapsed ? `${title} expand` : `${title} collapse`}
+          aria-label={collapseLabel}
           aria-expanded={!collapsed}
-          title={collapsed ? `${title} expand` : `${title} collapse`}
+          title={collapseLabel}
           style={{
             fontFamily: 'var(--font-mono)',
             fontSize: 'var(--font-size-xs)',

@@ -522,6 +522,8 @@ export function CardDetailModal({
                   <Button
                     variant="secondary"
                     onClick={() => setAiAction('summarize')}
+                    aria-expanded={!!aiAction}
+                    aria-controls={aiAction ? 'ai-popover' : undefined}
                   >
                     <span className="cd__ai-mark" aria-hidden="true">»</span> {t('card.summarize')}
                   </Button>
@@ -530,6 +532,8 @@ export function CardDetailModal({
                   <Button
                     variant="secondary"
                     onClick={() => setAiAction('rewrite')}
+                    aria-expanded={!!aiAction}
+                    aria-controls={aiAction ? 'ai-popover' : undefined}
                   >
                     <span className="cd__ai-mark" aria-hidden="true">»</span> {t('card.rewrite')}
                   </Button>
@@ -551,6 +555,8 @@ export function CardDetailModal({
                     <Button
                       variant="secondary"
                       onClick={() => setAiAction('translate')}
+                      aria-expanded={!!aiAction}
+                      aria-controls={aiAction ? 'ai-popover' : undefined}
                     >
                       <span className="cd__ai-mark" aria-hidden="true">»</span> {t('card.translate')}
                     </Button>

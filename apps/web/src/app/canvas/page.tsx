@@ -467,10 +467,10 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           canvasElRef={canvasElRef}
         />
         {!ready ? null : onCanvas === 0 && (
-          <div className="cv-empty" aria-hidden="true">
+          <div className="cv-empty">
             <span className="eyebrow">{t('canvas.emptyTitle')}</span>
             <span className="mono">{t('canvas.emptyHint')}</span>
-            <Link href="/inbox" className="cv-empty__cta" aria-hidden="false">
+            <Link href="/inbox" className="cv-empty__cta">
               {t('canvas.emptyCta')} →
             </Link>
           </div>

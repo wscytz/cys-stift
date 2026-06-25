@@ -251,6 +251,10 @@ export const messages = {
   'canvas.autoRelateDone': { zh: '已创建 {n} 条 AI 关系', en: 'Created {n} AI relations' },
   'canvas.autoRelateNone': { zh: '未找到可推断的关系', en: 'No inferable relations' },
   'canvas.minimap': { zh: '鸟瞰', en: 'Overview' },
+  'canvas.minimapExpand': { zh: '展开小地图', en: 'Expand minimap' },
+  'canvas.minimapCollapse': { zh: '折叠小地图', en: 'Collapse minimap' },
+  'canvas.srLabel': { zh: '灵感画布', en: 'Inspiration canvas' },
+  'canvas.srLabelNamed': { zh: '灵感画布:{name}', en: 'Inspiration canvas: {name}' },
   'canvas.sideRail': { zh: '画布工具', en: 'Canvas tools' },
 
   /* ── Archive ── */
