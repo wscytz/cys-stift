@@ -73,12 +73,41 @@ function loadViewMap(): ViewMap {
   }
 }
 
-function saveViewMap(views: ViewMap) {
-  if (typeof window === 'undefined') return
+/**
+ * 写视图 map 到 localStorage。返回 true=成功,false=配额满(QuotaExceeded)
+ * 或其他写入异常——吞错而非抛,让调用方(update/reset/resetAll)决定回滚。
+ *
+ * 镜像 db-client.ts(审计 H1 / quota-silence fix):配额满时回滚内存 _views,
+ * 保证「内存 = localStorage」一致性,避免「用户改了 zoom/pan/gridMode,reload
+ * 后却消失」的静默数据丢失。同时 notifyQuota,让 AppMenu 订阅的 toast 提示。
+ */
+function saveViewMap(views: ViewMap): boolean {
+  if (typeof window === 'undefined') return true
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ views }))
-  } catch {
-    // quota / private mode — best-effort.
+    return true
+  } catch (e) {
+    // QuotaExceededError / SecurityError(隐私模式)——吞,返回 false。
+    console.warn('[canvas-view-store] persist failed (quota?)', e)
+    return false
+  }
+}
+
+// ── Quota 失败回调(镜像 db-client / media-store / canvas-freeform-store)──────
+// canvas-view-store 是非 React 模块(无 hook 上下文),不能直接 pushToast/i18n。
+// 暴露订阅点:React 层(AppMenu)订阅一次,收到配额失败时展示 toast。
+type QuotaCallback = () => void
+const _quotaSubscribers = new Set<QuotaCallback>()
+
+function notifyQuota(): void {
+  for (const cb of _quotaSubscribers) cb()
+}
+
+/** 订阅配额写入失败事件(画布视图无法持久化时触发)。返回取消订阅。 */
+export function onQuotaExceeded(cb: QuotaCallback): () => void {
+  _quotaSubscribers.add(cb)
+  return () => {
+    _quotaSubscribers.delete(cb)
   }
 }
 
@@ -99,9 +128,15 @@ function hydrateOnce() {
   notify()
 }
 
-function persist() {
-  saveViewMap(_views)
+/**
+ * 持久化当前 _views 并 notify 订阅者。返回 true=写入成功,false=配额满。
+ * 调用方负责在失败时回滚 _views 到写入前的值(否则内存与 localStorage
+ * 不一致——UI 显示了改动,reload 后消失)。
+ */
+function persist(): boolean {
+  const ok = saveViewMap(_views)
   notify()
+  return ok
 }
 
 // Stable snapshot cache — only reallocate when _views changes.
@@ -144,24 +179,36 @@ export const canvasViewStore = {
         next.gridSize === current.gridSize) {
       return
     }
+    const prev = _views
     _views = { ..._views, [id]: next }
-    persist()
+    if (!persist()) {
+      _views = prev // 回滚:内存与 localStorage 一致
+      notifyQuota()
+    }
   },
   /** Reset a single canvas's view to defaults. */
   reset(id: CanvasId): void {
     hydrateOnce()
     if (!(id in _views)) return
+    const prev = _views
     const next = { ..._views }
     delete next[id]
     _views = next
-    persist()
+    if (!persist()) {
+      _views = prev
+      notifyQuota()
+    }
   },
   /** Reset every canvas's view (used by "Reset view" UI in the future). */
   resetAll(): void {
     hydrateOnce()
     if (Object.keys(_views).length === 0) return
+    const prev = _views
     _views = {}
-    persist()
+    if (!persist()) {
+      _views = prev
+      notifyQuota()
+    }
   },
 }
 

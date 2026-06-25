@@ -280,7 +280,7 @@ describe('buildExportPayload + import — canvasView (R2.1)', () => {
       version: mod.EXPORT_FORMAT_VERSION,
       exportedAt: 'x',
       app: 'a',
-      cards: [{ id: 'c1', title: 't', body: 'b' }],
+      cards: [{ id: 'c1', title: 't', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
       canvasView: knownViews,
     })
     expect(window.localStorage.getItem(CANVAS_VIEW_KEY)).toBeNull()
@@ -312,7 +312,7 @@ describe('buildExportPayload + import — canvasView (R2.1)', () => {
       version: mod.EXPORT_FORMAT_VERSION,
       exportedAt: 'x',
       app: 'a',
-      cards: [{ id: 'c1', title: 't', body: 'b' }],
+      cards: [{ id: 'c1', title: 't', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
       // no canvasView field
     })
     const result = await mod.importFromJson(json)
@@ -491,12 +491,82 @@ describe('importFromJson — validation', () => {
     expect(result.error).toMatch(/createdAt/i)
   })
 
-  it('accepts a card that omits createdAt/updatedAt (optional in validation)', async () => {
+  // ── capturedAt validation (quota-silence / import-validation fix) ──────────
+  // capturedAt is the inbox sort key (listInbox: `b.capturedAt.getTime() - a...`).
+  // A missing or unparseable capturedAt → `new Date(undefined|garbage)` = Invalid
+  // Date → getTime() = NaN → Array.sort with a NaN comparator scrambles inbox
+  // order. Unlike createdAt/updatedAt (optional), capturedAt MUST be present and
+  // parse to a real date.
+  it('rejects a card with a missing capturedAt (required, unlike createdAt/updatedAt)', async () => {
     const json = JSON.stringify({
       version: mod.EXPORT_FORMAT_VERSION,
       exportedAt: 'x',
       app: 'a',
-      cards: [{ id: 'c1', title: 't', body: 'b' }],
+      cards: [{ id: 'c1', title: 't', body: 'b' }], // no capturedAt
+    })
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/capturedAt missing/i)
+  })
+
+  it('rejects a card with a null capturedAt', async () => {
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      cards: [{ id: 'c1', title: 't', body: 'b', capturedAt: null }],
+    })
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/capturedAt missing/i)
+  })
+
+  it('rejects a card with a non-date capturedAt type (number)', async () => {
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      cards: [{ id: 'c1', title: 't', body: 'b', capturedAt: 12345 }],
+    })
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/capturedAt missing/i)
+  })
+
+  it('rejects a card with an unparseable capturedAt string (Invalid Date → NaN sort)', async () => {
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      // 'garbage' is a string (passes the type check) but new Date('garbage')
+      // = Invalid Date → getTime() = NaN. This is the exact bug that scrambled
+      // inbox sort before the fix.
+      cards: [{ id: 'c1', title: 't', body: 'b', capturedAt: 'not-a-real-date' }],
+    })
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/capturedAt is not a valid date/i)
+  })
+
+  it('accepts a card with a valid ISO capturedAt string', async () => {
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      cards: [{ id: 'c1', title: 't', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
+    })
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(true)
+    expect(result.cards).toBe(1)
+  })
+
+  it('accepts a card that omits createdAt/updatedAt (optional) but requires capturedAt', async () => {
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      // createdAt/updatedAt optional; capturedAt is the required inbox sort key.
+      cards: [{ id: 'c1', title: 't', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
     })
     const result = await mod.importFromJson(json)
     expect(result.ok).toBe(true)
@@ -554,7 +624,7 @@ describe('importFromJson — write failure rollback', () => {
       version: mod.EXPORT_FORMAT_VERSION,
       exportedAt: 'x',
       app: 'a',
-      cards: [{ id: 'c-new', title: 'new', body: 'b' }],
+      cards: [{ id: 'c-new', title: 'new', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
       mediaAssets: { 'ma-new': {} },
     })
 
@@ -709,7 +779,7 @@ describe('importFromJson — canvases + freeform round-trip', () => {
       version: mod.EXPORT_FORMAT_VERSION,
       exportedAt: '2026-01-01T00:00:00.000Z',
       app: "cy's Stift",
-      cards: [{ id: 'legacy-1', title: 'old', body: 'b' }],
+      cards: [{ id: 'legacy-1', title: 'old', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
       mediaAssets: { 'ma-1': { id: 'ma-1', kind: 'image' } },
     })
 
@@ -756,7 +826,7 @@ describe('importFromJson — freeform save 失败诚实回报', () => {
       version: mod.EXPORT_FORMAT_VERSION,
       exportedAt: '2026-01-01T00:00:00.000Z',
       app: "cy's Stift",
-      cards: [{ id: 'c1', title: 't', body: 'b' }],
+      cards: [{ id: 'c1', title: 't', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
       canvases: {
         canvases: [makeCanvas({ id: cv1 }), makeCanvas({ id: cv2 })],
         activeCanvasId: 'cv1',

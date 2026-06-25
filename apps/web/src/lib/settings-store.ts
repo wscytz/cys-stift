@@ -116,12 +116,41 @@ function loadSettings(): Settings {
   }
 }
 
-function saveSettings(s: Settings) {
-  if (typeof window === 'undefined') return
+/**
+ * 写设置到 localStorage。返回 true=成功,false=配额满(QuotaExceeded)
+ * 或其他写入异常——吞错而非抛,让调用方(update*)决定回滚。
+ *
+ * 镜像 db-client.ts(审计 H1 / quota-silence fix):配额满时回滚内存 _settings,
+ * 保证「内存 = localStorage」一致性,避免「用户改了主题/快捷键/AI 配置,reload
+ * 后却消失」的静默数据丢失。同时 notifyQuota,让 AppMenu 订阅的 toast 提示。
+ */
+function saveSettings(s: Settings): boolean {
+  if (typeof window === 'undefined') return true
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings: s }))
-  } catch {
-    // best-effort
+    return true
+  } catch (e) {
+    // QuotaExceededError / SecurityError(隐私模式)——吞,返回 false。
+    console.warn('[settings-store] persist failed (quota?)', e)
+    return false
+  }
+}
+
+// ── Quota 失败回调(镜像 db-client / media-store / canvas-freeform-store)──────
+// settings-store 是非 React 模块(无 hook 上下文),不能直接 pushToast/i18n。
+// 暴露订阅点:React 层(AppMenu)订阅一次,收到配额失败时展示 toast。
+type QuotaCallback = () => void
+const _quotaSubscribers = new Set<QuotaCallback>()
+
+function notifyQuota(): void {
+  for (const cb of _quotaSubscribers) cb()
+}
+
+/** 订阅配额写入失败事件(设置无法持久化时触发)。返回取消订阅。 */
+export function onQuotaExceeded(cb: QuotaCallback): () => void {
+  _quotaSubscribers.add(cb)
+  return () => {
+    _quotaSubscribers.delete(cb)
   }
 }
 
@@ -168,31 +197,47 @@ export const settingsStore = {
   },
   update(patch: Partial<Settings>): void {
     hydrateOnce()
+    const prev = _settings
     _settings = { ..._settings, ...patch }
-    saveSettings(_settings)
+    if (!saveSettings(_settings)) {
+      _settings = prev // 回滚:内存与 localStorage 一致
+      notifyQuota()
+    }
     notify()
   },
   updateCaptureShortcut(patch: Partial<CaptureShortcut>): void {
     hydrateOnce()
+    const prev = _settings
     _settings = {
       ..._settings,
       captureShortcut: { ..._settings.captureShortcut, ...patch },
     }
-    saveSettings(_settings)
+    if (!saveSettings(_settings)) {
+      _settings = prev
+      notifyQuota()
+    }
     notify()
   },
   updateLocale(l: 'zh' | 'en'): void {
     hydrateOnce()
     if (_settings.locale === l) return
+    const prev = _settings
     _settings = { ..._settings, locale: l }
-    saveSettings(_settings)
+    if (!saveSettings(_settings)) {
+      _settings = prev
+      notifyQuota()
+    }
     notify()
   },
   updateTheme(theme: ThemePreference): void {
     hydrateOnce()
     if (_settings.theme === theme) return
+    const prev = _settings
     _settings = { ..._settings, theme }
-    saveSettings(_settings)
+    if (!saveSettings(_settings)) {
+      _settings = prev
+      notifyQuota()
+    }
     notify()
   },
   /**
@@ -211,11 +256,15 @@ export const settingsStore = {
       model: 'gpt-4o-mini',
       enabled: false,
     }
+    const prev = _settings
     const merged: AIConfig = _settings.ai
       ? { ..._settings.ai, ...patch }
       : { ...defaults, ...patch }
     _settings = { ..._settings, ai: merged }
-    saveSettings(_settings)
+    if (!saveSettings(_settings)) {
+      _settings = prev
+      notifyQuota()
+    }
     notify()
   },
 }

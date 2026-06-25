@@ -261,6 +261,40 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
         error: `cards[${i}].updatedAt must be a string ISO date`,
       }
     }
+    // capturedAt is a required Date on Card (domain types.ts) and is the
+    // sort key for listInbox (db-client: `b.capturedAt.getTime() - a...`).
+    // A missing or unparseable capturedAt → `new Date(undefined|garbage)` =
+    // Invalid Date → getTime() = NaN → Array.sort with a NaN comparator
+    // scrambles the inbox order (audit: import-validation). So unlike
+    // createdAt/updatedAt (which are optional in this validation), capturedAt
+    // MUST be present AND parse to a real date. Match the existing "reject the
+    // whole import" style used for bad createdAt/updatedAt.
+    if (
+      card.capturedAt === undefined ||
+      card.capturedAt === null ||
+      (typeof card.capturedAt !== 'string' && !(card.capturedAt instanceof Date))
+    ) {
+      return {
+        ok: false,
+        cards: 0,
+        mediaAssets: 0,
+        error: `cards[${i}].capturedAt missing or not a date`,
+      }
+    }
+    // Type-checked above; now confirm it parses to a real date (not Invalid Date).
+    // `new Date('not-a-date')` yields a Date object whose getTime() is NaN.
+    const capturedDate =
+      card.capturedAt instanceof Date
+        ? card.capturedAt
+        : new Date(card.capturedAt as string)
+    if (isNaN(capturedDate.getTime())) {
+      return {
+        ok: false,
+        cards: 0,
+        mediaAssets: 0,
+        error: `cards[${i}].capturedAt is not a valid date`,
+      }
+    }
   }
   // Overwrite the four stores atomically. Missing optional keys are
   // skipped. We (1) serialise everything first — a serialise error must

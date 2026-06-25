@@ -229,3 +229,126 @@ describe('settingsStore — SSR safety', () => {
     }
   })
 })
+
+// 镜像 db-client 的配额回滚测试。quota-silence fix:配额满时必须回滚内存
+// _settings(让 UI 不撒谎:改了主题/快捷键/AI 配置,reload 后消失)+ notifyQuota
+// (让 AppMenu toast 提示)。此前 saveSettings 裸 catch {} → 静默丢设置。
+describe('settingsStore — quota exceeded (rollback + notify)', () => {
+  let store: typeof import('../settings-store').settingsStore
+  let onQuotaExceeded: typeof import('../settings-store').onQuotaExceeded
+
+  beforeEach(async () => {
+    vi.resetModules()
+    window.localStorage.clear()
+    store = (await import('../settings-store')).settingsStore
+    onQuotaExceeded = (await import('../settings-store')).onQuotaExceeded
+  })
+
+  /** Force localStorage.setItem to throw. jsdom puts setItem on Storage.prototype
+   *  (non-writable on the instance), so a direct `window.localStorage.setItem = fn`
+   *  silently no-ops. Override the prototype method and restore it after. */
+  function simulateQuota() {
+    const orig = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem')
+    Object.defineProperty(Storage.prototype, 'setItem', {
+      configurable: true,
+      value: () => {
+        throw new DOMException('quota', 'QuotaExceededError')
+      },
+    })
+    return () => {
+      if (orig) Object.defineProperty(Storage.prototype, 'setItem', orig)
+    }
+  }
+
+  it('rolls back update + fires quota when persist fails', () => {
+    const restore = simulateQuota()
+    try {
+      let quotaFired = false
+      const unsub = onQuotaExceeded(() => {
+        quotaFired = true
+      })
+      store.update({ theme: 'dark' })
+      unsub()
+      // Rollback: theme did not stick in memory.
+      expect(store.get().theme).toBe('system')
+      expect(quotaFired).toBe(true)
+    } finally {
+      restore()
+    }
+  })
+
+  it('rolls back updateTheme + fires quota when persist fails', () => {
+    const restore = simulateQuota()
+    try {
+      let quotaFired = false
+      const unsub = onQuotaExceeded(() => {
+        quotaFired = true
+      })
+      store.updateTheme('dark')
+      unsub()
+      expect(store.get().theme).toBe('system')
+      expect(quotaFired).toBe(true)
+    } finally {
+      restore()
+    }
+  })
+
+  it('rolls back updateLocale + fires quota when persist fails', () => {
+    const restore = simulateQuota()
+    try {
+      let quotaFired = false
+      const unsub = onQuotaExceeded(() => {
+        quotaFired = true
+      })
+      store.updateLocale('en')
+      unsub()
+      expect(store.get().locale).toBe('zh')
+      expect(quotaFired).toBe(true)
+    } finally {
+      restore()
+    }
+  })
+
+  it('rolls back updateCaptureShortcut + fires quota when persist fails', () => {
+    const restore = simulateQuota()
+    try {
+      let quotaFired = false
+      const unsub = onQuotaExceeded(() => {
+        quotaFired = true
+      })
+      store.updateCaptureShortcut({ code: 'KeyC' })
+      unsub()
+      expect(store.get().captureShortcut.code).toBe('Space')
+      expect(quotaFired).toBe(true)
+    } finally {
+      restore()
+    }
+  })
+
+  it('rolls back updateAISettings + fires quota when persist fails', () => {
+    const restore = simulateQuota()
+    try {
+      let quotaFired = false
+      const unsub = onQuotaExceeded(() => {
+        quotaFired = true
+      })
+      store.updateAISettings({ apiKey: 'sk-test' })
+      unsub()
+      expect(store.get().ai).toBeNull()
+      expect(quotaFired).toBe(true)
+    } finally {
+      restore()
+    }
+  })
+
+  it('normal write still works + does not fire quota', () => {
+    let quotaFired = false
+    const unsub = onQuotaExceeded(() => {
+      quotaFired = true
+    })
+    store.update({ theme: 'dark' })
+    unsub()
+    expect(store.get().theme).toBe('dark')
+    expect(quotaFired).toBe(false)
+  })
+})

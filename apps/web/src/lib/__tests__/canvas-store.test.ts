@@ -130,22 +130,121 @@ describe('canvasStore — corrupt localStorage', () => {
 })
 
 describe('canvasStore — quota exceeded', () => {
-  it('persists without throwing under quota simulation', () => {
+  // 镜像 db-client 的配额回滚测试。quota-silence fix:配额满时必须回滚内存
+  // _snap(让 UI 不撒谎:创建/改名/删除看似成功,reload 后消失)+ notifyQuota
+  // (让 AppMenu toast 提示)。此前 saveSnapshot 裸 catch {} → 静默丢画布。
+  let onQuotaExceeded: typeof import('../canvas-store').onQuotaExceeded
+
+  beforeEach(async () => {
+    onQuotaExceeded = (await import('../canvas-store')).onQuotaExceeded
+  })
+
+  /** Force localStorage.setItem to throw. jsdom puts setItem on Storage.prototype
+   *  (non-writable on the instance), so a direct `window.localStorage.setItem = fn`
+   *  silently no-ops — override the prototype method and restore it after. */
+  function throwOnSetItem() {
+    const orig = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem')
+    Object.defineProperty(Storage.prototype, 'setItem', {
+      configurable: true,
+      value: () => {
+        throw new DOMException('quota', 'QuotaExceededError')
+      },
+    })
+    return () => {
+      if (orig) Object.defineProperty(Storage.prototype, 'setItem', orig)
+    }
+  }
+
+  it('rolls back create + fires quota when persist fails (no orphan canvas)', () => {
     const cs = canvasStore
-    // Stub setItem after first hydration to simulate quota.
-    const orig = window.localStorage.setItem
-    let calls = 0
-    window.localStorage.setItem = function (...args: Parameters<typeof orig>) {
-      if (calls++ < 2) return orig.apply(this, args) // let initial hydrations pass
-      throw new Error('QuotaExceededError') // simulate quota for a persist
-    }
+    const restore = throwOnSetItem()
     try {
-      // This persist will be swallowed — no throw.
-      expect(() => cs.create('x')).not.toThrow()
-      // The canvas still exists in-memory.
-      expect(cs.get().canvases.some((c) => c.name === 'x')).toBe(true)
+      let quotaFired = false
+      const unsub = onQuotaExceeded(() => {
+        quotaFired = true
+      })
+      const id = cs.create('doomed')
+      unsub()
+      // create returned empty string (rollback path signals failure).
+      expect(id).toBe('')
+      // Rollback: the canvas is NOT in memory (UI does not lie).
+      expect(cs.get().canvases.some((c) => c.name === 'doomed')).toBe(false)
+      // Quota pub-sub fired so the toast can warn the user.
+      expect(quotaFired).toBe(true)
     } finally {
-      window.localStorage.setItem = orig
+      restore()
     }
+  })
+
+  it('rolls back rename + fires quota when persist fails', () => {
+    const cs = canvasStore
+    const id = cs.create('original') // succeeds (quota not yet simulated)
+    const restore = throwOnSetItem()
+    try {
+      let quotaFired = false
+      const unsub = onQuotaExceeded(() => {
+        quotaFired = true
+      })
+      cs.rename(id, 'renamed')
+      unsub()
+      // Rollback: rename did not stick in memory.
+      expect(cs.get().canvases.find((c) => c.id === id)?.name).toBe('original')
+      expect(quotaFired).toBe(true)
+    } finally {
+      restore()
+    }
+  })
+
+  it('rolls back delete + fires quota when persist fails (no silent data loss)', () => {
+    const cs = canvasStore
+    const id = cs.create('temp') // succeeds
+    const restore = throwOnSetItem()
+    try {
+      let quotaFired = false
+      const unsub = onQuotaExceeded(() => {
+        quotaFired = true
+      })
+      const result = cs.delete(id)
+      unsub()
+      // delete reported failure (rolled back).
+      expect(result).toBe(false)
+      // Rollback: the canvas is still in memory.
+      expect(cs.get().canvases.some((c) => c.id === id)).toBe(true)
+      expect(quotaFired).toBe(true)
+    } finally {
+      restore()
+    }
+  })
+
+  it('rolls back setActive + fires quota when persist fails', () => {
+    const cs = canvasStore
+    const defaultId = cs.get().activeCanvasId
+    const b = cs.create('second') // succeeds; now active is b
+    const restore = throwOnSetItem()
+    try {
+      let quotaFired = false
+      const unsub = onQuotaExceeded(() => {
+        quotaFired = true
+      })
+      cs.setActive(defaultId) // would switch back, but persist fails
+      unsub()
+      // Rollback: active is still b (the failed switch did not stick).
+      expect(cs.get().activeCanvasId).toBe(b)
+      expect(quotaFired).toBe(true)
+    } finally {
+      restore()
+    }
+  })
+
+  it('normal write still works + notifies subscribers (no false quota)', () => {
+    const cs = canvasStore
+    let quotaFired = false
+    const unsub = onQuotaExceeded(() => {
+      quotaFired = true
+    })
+    cs.create('happy-path')
+    unsub()
+    expect(cs.get().canvases.some((c) => c.name === 'happy-path')).toBe(true)
+    expect(quotaFired).toBe(false)
   })
 })

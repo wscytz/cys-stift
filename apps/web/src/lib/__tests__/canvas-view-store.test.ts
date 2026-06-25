@@ -234,3 +234,99 @@ describe('canvasViewStore — SSR safety', () => {
     }
   })
 })
+
+// 镜像 db-client 的配额回滚测试。quota-silence fix:配额满时必须回滚内存
+// _views(让 UI 不撒谎:改了 zoom/pan/gridMode,reload 后消失)+ notifyQuota
+// (让 AppMenu toast 提示)。此前 saveViewMap 裸 catch {} → 静默丢画布视图。
+describe('canvasViewStore — quota exceeded (rollback + notify)', () => {
+  let store: typeof import('../canvas-view-store').canvasViewStore
+  let onQuotaExceeded: typeof import('../canvas-view-store').onQuotaExceeded
+
+  beforeEach(async () => {
+    vi.resetModules()
+    window.localStorage.clear()
+    store = (await import('../canvas-view-store')).canvasViewStore
+    onQuotaExceeded = (await import('../canvas-view-store')).onQuotaExceeded
+  })
+
+  /** Force localStorage.setItem to throw. jsdom puts setItem on Storage.prototype
+   *  (non-writable on the instance), so a direct `window.localStorage.setItem = fn`
+   *  silently no-ops. Override the prototype method and restore it after. */
+  function simulateQuota() {
+    const orig = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem')
+    Object.defineProperty(Storage.prototype, 'setItem', {
+      configurable: true,
+      value: () => {
+        throw new DOMException('quota', 'QuotaExceededError')
+      },
+    })
+    return () => {
+      if (orig) Object.defineProperty(Storage.prototype, 'setItem', orig)
+    }
+  }
+
+  it('rolls back update + fires quota when persist fails', () => {
+    const restore = simulateQuota()
+    try {
+      let quotaFired = false
+      const unsub = onQuotaExceeded(() => {
+        quotaFired = true
+      })
+      store.update(CANVAS_A, { zoom: 2 })
+      unsub()
+      // Rollback: zoom did not stick in memory.
+      expect(store.get(CANVAS_A).zoom).toBe(1)
+      expect(quotaFired).toBe(true)
+    } finally {
+      restore()
+    }
+  })
+
+  it('rolls back reset + fires quota when persist fails', () => {
+    // Seed a view first (before simulating quota).
+    store.update(CANVAS_A, { zoom: 3 })
+    const restore = simulateQuota()
+    try {
+      let quotaFired = false
+      const unsub = onQuotaExceeded(() => {
+        quotaFired = true
+      })
+      store.reset(CANVAS_A)
+      unsub()
+      // Rollback: the view is still zoom=3 (reset did not stick).
+      expect(store.get(CANVAS_A).zoom).toBe(3)
+      expect(quotaFired).toBe(true)
+    } finally {
+      restore()
+    }
+  })
+
+  it('rolls back resetAll + fires quota when persist fails', () => {
+    store.update(CANVAS_A, { zoom: 3 })
+    const restore = simulateQuota()
+    try {
+      let quotaFired = false
+      const unsub = onQuotaExceeded(() => {
+        quotaFired = true
+      })
+      store.resetAll()
+      unsub()
+      // Rollback: the view survives (resetAll did not stick).
+      expect(store.get(CANVAS_A).zoom).toBe(3)
+      expect(quotaFired).toBe(true)
+    } finally {
+      restore()
+    }
+  })
+
+  it('normal write still works + does not fire quota', () => {
+    let quotaFired = false
+    const unsub = onQuotaExceeded(() => {
+      quotaFired = true
+    })
+    store.update(CANVAS_A, { zoom: 2 })
+    unsub()
+    expect(store.get(CANVAS_A).zoom).toBe(2)
+    expect(quotaFired).toBe(false)
+  })
+})

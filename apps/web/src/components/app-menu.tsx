@@ -9,6 +9,9 @@ import type { MessageKey } from '@/lib/i18n/messages'
 import { onQuotaExceeded } from '@/lib/db-client'
 import { onQuotaExceeded as onMediaQuota } from '@/lib/media-store'
 import { onQuotaExceeded as onFreeformQuota } from '@/lib/canvas-freeform-store'
+import { onQuotaExceeded as onCanvasListQuota } from '@/lib/canvas-store'
+import { onQuotaExceeded as onSettingsQuota } from '@/lib/settings-store'
+import { onQuotaExceeded as onCanvasViewQuota } from '@/lib/canvas-view-store'
 import { pushToast } from '@/lib/toast-store'
 
 /**
@@ -20,9 +23,11 @@ export function AppMenu() {
   const pathname = usePathname() ?? '/'
   const { t } = useI18n()
 
-  // 审计 H1 + R2.3/2.4:db-client / media-store / canvas-freeform-store 都是非
-  // React 模块,无法直接 pushToast。AppMenu 全局挂载且是 'use client',这里订阅
-  // 三个 store 的配额写入失败事件并提示用户(防静默丢卡片/媒体/画布几何)。
+  // 审计 H1 + R2.3/2.4 + quota-silence fix:所有非 React store(db-client /
+  // media-store / canvas-freeform-store / canvas-store / settings-store /
+  // canvas-view-store)都是非 React 模块,无法直接 pushToast。AppMenu 全局挂载
+  // 且是 'use client',这里订阅各 store 的配额写入失败事件并提示用户(防静默丢
+  // 卡片/媒体/画布几何/画布列表/设置/画布视图)。
   useEffect(() => {
     const message = t('storage.quotaExceeded')
     const toast = () => pushToast({ kind: 'error', message })
@@ -30,6 +35,9 @@ export function AppMenu() {
       onQuotaExceeded(toast),
       onMediaQuota(toast),
       onFreeformQuota(toast),
+      onCanvasListQuota(toast),
+      onSettingsQuota(toast),
+      onCanvasViewQuota(toast),
     ]
     return () => {
       unsubs.forEach((u) => u())

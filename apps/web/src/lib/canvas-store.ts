@@ -107,12 +107,42 @@ function reviveDates(c: Canvas): Canvas {
   }
 }
 
-function saveSnapshot(snap: CanvasesSnapshot) {
-  if (typeof window === 'undefined') return
+/**
+ * 写快照到 localStorage。返回 true=成功,false=配额满(QuotaExceeded)
+ * 或其他写入异常——吞错而非抛,让调用方(create/rename/delete)决定回滚。
+ *
+ * 镜像 db-client.ts 的模式(审计 H1 / quota-silence fix):配额满时回滚
+ * 内存 _snap + _cached,保证「内存 = localStorage」一致性,避免「用户看到
+ * 画布创建/改名/删除成功,reload 后却消失」的静默数据丢失。同时 notifyQuota,
+ * 让 AppMenu 订阅的 toast 提示用户。
+ */
+function saveSnapshot(snap: CanvasesSnapshot): boolean {
+  if (typeof window === 'undefined') return true
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ snapshot: snap }))
-  } catch {
-    // quota / private mode — best effort.
+    return true
+  } catch (e) {
+    // QuotaExceededError / SecurityError(隐私模式)——吞,返回 false。
+    console.warn('[canvas-store] persist failed (quota?)', e)
+    return false
+  }
+}
+
+// ── Quota 失败回调(镜像 db-client / media-store / canvas-freeform-store)──────
+// canvas-store 是非 React 模块(无 hook 上下文),不能直接 pushToast/i18n。
+// 暴露订阅点:React 层(AppMenu)订阅一次,收到配额失败时展示 toast。
+type QuotaCallback = () => void
+const _quotaSubscribers = new Set<QuotaCallback>()
+
+function notifyQuota(): void {
+  for (const cb of _quotaSubscribers) cb()
+}
+
+/** 订阅配额写入失败事件(画布列表无法持久化时触发)。返回取消订阅。 */
+export function onQuotaExceeded(cb: QuotaCallback): () => void {
+  _quotaSubscribers.add(cb)
+  return () => {
+    _quotaSubscribers.delete(cb)
   }
 }
 
@@ -133,9 +163,18 @@ function hydrateOnce() {
   notify()
 }
 
-function persist() {
-  saveSnapshot(_snap)
+/**
+ * 持久化当前 _snap 并 notify 订阅者。返回 true=写入成功,false=配额满
+ * (此时调用方负责回滚 _snap 到写入前的值,否则内存与 localStorage
+ * 不一致——UI 显示了改动,reload 后消失)。
+ *
+ * 不在这里回滚:persist 不知道「写入前」的快照(它只看到当前的 _snap)。
+ * 调用方(create/rename/delete)在改 _snap 前先存 prev,失败时恢复 prev。
+ */
+function persist(): boolean {
+  const ok = saveSnapshot(_snap)
   notify()
+  return ok
 }
 
 let _cached: CanvasesSnapshot = _snap
@@ -183,8 +222,12 @@ export const canvasStore = {
     hydrateOnce()
     if (!_snap.canvases.some((c) => c.id === id)) return
     if (_snap.activeCanvasId === id) return
+    const prev = _snap
     _snap = { ..._snap, activeCanvasId: id }
-    persist()
+    if (!persist()) {
+      _snap = prev // 回滚:内存与 localStorage 一致
+      notifyQuota()
+    }
   },
   /**
    * Create a new canvas and make it active. Trims the name, dedupes
@@ -207,11 +250,18 @@ export const canvasStore = {
       createdAt: now,
       updatedAt: now,
     }
+    const prev = _snap
     _snap = {
       canvases: [..._snap.canvases, canvas],
       activeCanvasId: canvas.id,
     }
-    persist()
+    if (!persist()) {
+      // 回滚:创建的画布未持久化。恢复 prev,不返回新 id(返回空串让调用方
+      // 知道失败——实际调用方只用于 setActive,空串在 setActive 里 no-op)。
+      _snap = prev
+      notifyQuota()
+      return '' as CanvasId
+    }
     return canvas.id
   },
   /** Rename a canvas. No-op if id is unknown or name is empty. */
@@ -219,13 +269,17 @@ export const canvasStore = {
     hydrateOnce()
     const trimmed = trimName(name)
     if (!trimmed) return
+    const prev = _snap
     _snap = {
       ..._snap,
       canvases: _snap.canvases.map((c) =>
         c.id === id ? { ...c, name: trimmed, updatedAt: new Date() } : c,
       ),
     }
-    persist()
+    if (!persist()) {
+      _snap = prev // 回滚:改名未持久化
+      notifyQuota()
+    }
   },
   /**
    * Delete a canvas. Refuses the default canvas (it's the seed).
@@ -236,12 +290,18 @@ export const canvasStore = {
     hydrateOnce()
     if (id === DEFAULT_CANVAS_ID) return false
     if (!_snap.canvases.some((c) => c.id === id)) return false
+    const prev = _snap
     const wasActive = _snap.activeCanvasId === id
     _snap = {
       canvases: _snap.canvases.filter((c) => c.id !== id),
       activeCanvasId: wasActive ? DEFAULT_CANVAS_ID : _snap.activeCanvasId,
     }
-    persist()
+    if (!persist()) {
+      // 回滚:删除未持久化。报告失败(返回 false),不清理 freeform 数据。
+      _snap = prev
+      notifyQuota()
+      return false
+    }
     // B4 (v0.26.4): free the persisted freeform data — otherwise a canvas
     // deletion leaves its non-card elements (text / freedraw / arrows / rects)
     // stranded forever. Callers should have already moved cards back to inbox
