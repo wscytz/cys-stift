@@ -17,7 +17,7 @@ export default function HomePage() {
   const [isMac, setIsMac] = useState(true)
   useEffect(() => { setIsMac(navigator.platform?.includes('Mac') ?? true) }, [])
   return (
-    <main className="home">
+    <main id="main" tabIndex={-1} className="home">
       <header className="home__bar" aria-hidden="true" />
       <section className="home__content">
         <p className="home__eyebrow">{t('home.eyebrow')}</p>

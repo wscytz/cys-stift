@@ -10,6 +10,8 @@ import { I18nProvider } from '@/lib/i18n'
 import { SearchShortcut } from '@/components/search-shortcut'
 import { ErrorTrace } from '@/components/error-trace'
 import { AIProviderSync } from '@/features/ai/ai-settings-provider'
+import { SkipLink } from '@/components/skip-link'
+import { RouteFocus } from '@/components/route-focus'
 
 const display = Space_Grotesk({
   subsets: ['latin'],
@@ -54,6 +56,8 @@ export default function RootLayout({
       <body>
         <ErrorTrace />
         <I18nProvider>
+          <SkipLink />
+          <RouteFocus />
           <AppMenu />
           {children}
           <AIProviderSync />

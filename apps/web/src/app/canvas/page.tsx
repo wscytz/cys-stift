@@ -424,7 +424,8 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
   }, [])
 
   return (
-    <main className="page">
+    <main id="main" tabIndex={-1} className="page">
+      <h1 className="sr-only">{t('canvas.crumb')}</h1>
       <Toolbar region="canvas">
         <CanvasSwitcher
           canvases={canvases}

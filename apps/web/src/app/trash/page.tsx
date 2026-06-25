@@ -46,11 +46,11 @@ export default function TrashPage() {
     : null
 
   return (
-    <main className="page">
+    <main id="main" tabIndex={-1} className="page">
       <Toolbar region="trash">
         <span className="crumb">{t('brand.name')}</span>
         <span className="crumb-sep">/</span>
-        <span className="crumb crumb--here">{t('trash.crumb')}</span>
+        <h1 className="crumb crumb--here">{t('trash.crumb')}</h1>
         <span className="crumb-spacer" />
         <Tag color="gray">{trashed.length}</Tag>
       </Toolbar>

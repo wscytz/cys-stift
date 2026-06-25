@@ -14,14 +14,14 @@ export interface ToolbarProps {
 export function Toolbar({ region = 'system', children }: ToolbarProps) {
   const stripeColor = `var(--color-${regionColorForStripe(region)})`
   return (
-    <div className={styles.toolbar}>
+    <header className={styles.toolbar}>
       <div
         className={styles.stripe}
         style={{ background: stripeColor }}
         aria-hidden="true"
       />
       <div className={styles.content}>{children}</div>
-    </div>
+    </header>
   )
 }
 

@@ -13,7 +13,8 @@ export const metadata: Metadata = {
 
 export default function DesignPage() {
   return (
-    <main className="design">
+    <main id="main" tabIndex={-1} className="design">
+      <h1 className="sr-only">cy&rsquo;s stift / design</h1>
       <Toolbar region="system">
         <span className="design__crumb">cy&rsquo;s stift / design</span>
         <span className="design__crumb-spacer" />

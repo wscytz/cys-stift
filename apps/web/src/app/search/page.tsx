@@ -38,11 +38,11 @@ export default function SearchPage() {
   }, [allCards, query])
 
   return (
-    <main className="page">
+    <main id="main" tabIndex={-1} className="page">
       <Toolbar region="system">
         <span className="crumb">{t('brand.name')}</span>
         <span className="crumb-sep">/</span>
-        <span className="crumb crumb--here">{t('search.crumb')}</span>
+        <h1 className="crumb crumb--here">{t('search.crumb')}</h1>
       </Toolbar>
 
       <div className="page-content page-content--wide">

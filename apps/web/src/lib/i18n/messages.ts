@@ -380,6 +380,7 @@ export const messages = {
   'common.ok': { zh: '确定', en: 'OK' },
   'common.loading': { zh: '读取中…', en: 'Loading…' },
   'common.dismiss': { zh: '关闭', en: 'Dismiss' },
+  'common.skipToContent': { zh: '跳到主内容', en: 'Skip to content' },
 
   /* ── tldraw ── */
   'tldraw.loading': { zh: '画布加载中…', en: 'Loading canvas…' },

@@ -74,11 +74,11 @@ export default function TimelinePage() {
   }
 
   return (
-    <main className="page">
+    <main id="main" tabIndex={-1} className="page">
       <Toolbar region="timeline">
         <span className="crumb">{t('brand.name')}</span>
         <span className="crumb-sep">/</span>
-        <span className="crumb crumb--here">{t('timeline.crumb')}</span>
+        <h1 className="crumb crumb--here">{t('timeline.crumb')}</h1>
         <span className="crumb-spacer" />
         <Tag color="red">{sorted.length}</Tag>
       </Toolbar>

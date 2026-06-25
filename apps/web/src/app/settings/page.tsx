@@ -78,11 +78,11 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="page" role="main">
+    <main id="main" tabIndex={-1} className="page">
       <Toolbar region="system">
         <span className="crumb">{t('brand.name')}</span>
         <span className="crumb-sep">/</span>
-        <span className="crumb crumb--here">{t('settings.crumb')}</span>
+        <h1 className="crumb crumb--here">{t('settings.crumb')}</h1>
         <span className="crumb-spacer" />
       </Toolbar>
 
