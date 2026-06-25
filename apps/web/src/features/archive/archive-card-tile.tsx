@@ -100,14 +100,18 @@ export function ArchiveCardTile({
   return (
     <div className={cls}>
       {selectMode && (
-        <label className="tile__check" onClick={(e) => e.stopPropagation()}>
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={onToggleSelect}
-            aria-label={titleText}
-          />
-        </label>
+        <button
+          type="button"
+          className="tile__select"
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleSelect()
+          }}
+          aria-label={titleText}
+          aria-pressed={selected}
+        >
+          {selected ? '✓' : ''}
+        </button>
       )}
       {onTogglePin && !disabled && (
         <button
@@ -180,17 +184,19 @@ const styles = `
 .tile:hover, .row:hover { box-shadow: var(--shadow-md); }
 .tile:active, .row:active { transform: translate(2px, 2px); box-shadow: none; }
 
-.tile__check {
-  position: absolute;
-  top: var(--space-1);
-  left: var(--space-1);
-  z-index: 2;
-  background: var(--color-white);
-  padding: 2px 4px;
-  border-radius: 2px;
-  cursor: pointer;
+/* Select affordance — mirrors inbox's .tile__select (square, outline-only
+   when unselected; fills BLUE with ✓ when selected). Keeps visual parity
+   with the inbox grid's batch-select indicator. */
+.tile__select {
+  position: absolute; top: var(--space-1); left: var(--space-1); z-index: 2;
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--color-white); border: var(--border-hairline); border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: var(--font-size-base); line-height: 1;
+  color: var(--color-white); cursor: pointer; padding: 0;
 }
-.tile__check input { cursor: pointer; }
+.tile__select[aria-pressed="true"] { background: var(--color-blue); border-color: var(--color-blue); color: var(--color-white); }
+.tile__select:hover:not([aria-pressed="true"]) { border-color: var(--color-blue); color: var(--color-blue); }
 
 .tile__main {
   flex: 1;

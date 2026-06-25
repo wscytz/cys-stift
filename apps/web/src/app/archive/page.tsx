@@ -192,18 +192,20 @@ export default function ArchivePage() {
       </div>
 
       {selectMode && selected.size > 0 && (
-        <div className="floater" role="region" aria-label={t('archive.batchDelete')}>
-          <span className="floater__label">{t('archive.floater.selected', { n: selected.size })}</span>
-          <span className="floater__sep" aria-hidden="true" />
-          <Button variant="primary" onClick={handleUnarchiveSelected}>
+        <div className="batch-bar" role="region" aria-label={t('archive.batchDelete')}>
+          <span className="batch-bar__count">
+            {t('archive.floater.selected', { n: selected.size })}
+          </span>
+          <button type="button" className="batch-bar__btn" onClick={handleUnarchiveSelected}>
             {t('archive.floater.unarchive')}
-          </Button>
-          <Button variant="danger" onClick={handleSoftDeleteSelected}>
+          </button>
+          <button type="button" className="batch-bar__btn batch-bar__btn--danger" onClick={handleSoftDeleteSelected}>
             {t('archive.floater.softDelete')}
-          </Button>
-          <Button variant="ghost" onClick={clearSelected}>
+          </button>
+          <span className="batch-bar__spacer" />
+          <button type="button" className="batch-bar__btn" onClick={clearSelected}>
             {t('archive.floater.clear')}
-          </Button>
+          </button>
         </div>
       )}
 
@@ -326,25 +328,34 @@ const styles = `
 .empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) 0; }
 .empty__bar { width: 64px; height: 8px; background: var(--color-blue); }
 
-.floater {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  background: var(--color-black);
-  color: var(--color-white);
+/* Batch bar — mirrors inbox's .batch-bar (white card + 2px black border +
+   hard 4px black offset shadow + uppercase mono buttons). Keeps the
+   archive floater's existing fixed bottom-center positioning. */
+.batch-bar {
+  position: fixed; left: 50%; bottom: var(--space-4); transform: translateX(-50%);
+  z-index: 30;
+  display: inline-flex; align-items: center; gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  background: var(--color-white); border: 2px solid var(--color-black); border-radius: var(--radius-sm);
+  box-shadow: 4px 4px 0 0 var(--color-black);
+  font-family: var(--font-mono); white-space: nowrap;
 }
-.floater__label { text-transform: uppercase; letter-spacing: 0.12em; }
-.floater__sep { width: 1px; height: 24px; background: var(--color-gray-soft); margin: 0 var(--space-1); }
+.batch-bar__count {
+  font-size: var(--font-size-xs); letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--color-black); padding: 0 var(--space-1);
+}
+.batch-bar__btn {
+  height: 30px; padding: 0 var(--space-2);
+  display: inline-flex; align-items: center;
+  background: transparent; border: 1px solid var(--color-black); border-radius: var(--radius-sm);
+  color: var(--color-black); font-family: var(--font-mono);
+  font-size: var(--font-size-xs); letter-spacing: 0.1em; text-transform: uppercase;
+  cursor: pointer; transition: background 80ms ease-out, color 80ms ease-out;
+}
+.batch-bar__btn:hover { background: var(--color-black); color: var(--color-white); }
+.batch-bar__btn--danger:hover { background: var(--color-red); border-color: var(--color-red); }
+.batch-bar__spacer { width: var(--space-3); }
+.batch-bar__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 
 .confirm__body { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
 .confirm__link { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; }

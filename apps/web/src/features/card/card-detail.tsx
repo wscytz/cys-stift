@@ -579,11 +579,11 @@ export function CardDetailModal({
               </>
             ) : (
               <>
-                <Button onClick={handleSave} disabled={pending || !title.trim()}>
-                  {pending ? t('card.detail.saving') : t('card.detail.save')}
-                </Button>
                 <Button variant="ghost" onClick={() => setMode('view')}>
                   {t('card.detail.cancel')}
+                </Button>
+                <Button variant="primary" onClick={handleSave} disabled={pending || !title.trim()}>
+                  {pending ? t('card.detail.saving') : t('card.detail.save')}
                 </Button>
               </>
             )}
