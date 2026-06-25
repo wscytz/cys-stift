@@ -182,7 +182,7 @@ const styles = `
   background: var(--color-white);
   cursor: pointer;
 }
-.ai-popover__btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.ai-popover__btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .ai-popover__btn--primary { background: var(--color-black); color: var(--color-white); }
 .ai-popover__btn--primary:hover:not(:disabled) { box-shadow: 2px 2px 0 0 var(--color-red); }
 `

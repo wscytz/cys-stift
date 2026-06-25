@@ -305,7 +305,7 @@ const styles = `
 .exp-seg__btn:last-child { border-right: 0; }
 .exp-seg__btn:hover:not(:disabled):not(.exp-seg__btn--active) { background: var(--color-gray-soft); }
 .exp-seg__btn--active { background: var(--color-black); color: var(--color-white); }
-.exp-seg__btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.exp-seg__btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .exp-seg__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: -2px; }
 
 /* .cystift roundtrip callout — inverted Bauhaus block, the feature highlight. */

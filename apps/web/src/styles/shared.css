@@ -185,7 +185,7 @@
   cursor: pointer;
 }
 .btn-ghost:hover:not(:disabled) { box-shadow: 2px 2px 0 0 var(--color-black); }
-.btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-ghost:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .btn-primary {
   font-family: var(--font-mono);
@@ -201,7 +201,7 @@
 }
 .btn-primary:hover:not(:disabled) { box-shadow: 2px 2px 0 0 var(--color-red); }
 .btn-primary:active { transform: translate(1px, 1px); box-shadow: none; }
-.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .btn-danger {
   font-family: var(--font-mono);

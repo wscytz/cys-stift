@@ -24,3 +24,9 @@
 .wrap:focus-within .tip {
   opacity: 1;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .tip {
+    transition: none;
+  }
+}
