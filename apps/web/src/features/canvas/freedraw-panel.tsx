@@ -182,7 +182,7 @@ const styles = `
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 8px;
+  padding: 6px var(--space-1);
   background: var(--color-white);
   border: 2px solid var(--color-black);
   border-radius: 2px;

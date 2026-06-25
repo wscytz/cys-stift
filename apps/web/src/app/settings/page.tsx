@@ -92,8 +92,9 @@ export default function SettingsPage() {
           <h2 className="section__h">{t('settings.language')}</h2>
           <p className="section__lede">{t('settings.languageLede')}</p>
           <div className="field-row">
-            <label className="mono-label">{t('settings.language')}</label>
+            <label className="mono-label" htmlFor="set-lang">{t('settings.language')}</label>
             <select
+              id="set-lang"
               className="set__select"
               value={locale}
               onChange={(e) => setLocale(e.target.value as 'zh' | 'en')}
@@ -108,8 +109,9 @@ export default function SettingsPage() {
           <h2 className="section__h">{t('settings.appearance')}</h2>
           <p className="section__lede">{t('settings.appearanceLede')}</p>
           <div className="field-row">
-            <label className="mono-label">{t('settings.theme')}</label>
+            <label className="mono-label" htmlFor="set-theme">{t('settings.theme')}</label>
             <select
+              id="set-theme"
               className="set__select"
               value={settings.theme}
               onChange={(e) =>
@@ -129,8 +131,9 @@ export default function SettingsPage() {
           <h2 className="section__h">{t('settings.captureShortcut')}</h2>
           <p className="section__lede">{t('settings.captureShortcutLede')}</p>
           <div className="field-row">
-            <label className="mono-label">{t('settings.modifier')}</label>
+            <label className="mono-label" htmlFor="set-mod">{t('settings.modifier')}</label>
             <select
+              id="set-mod"
               className="set__select"
               value={sc.modKey}
               onChange={(e) =>
@@ -144,8 +147,9 @@ export default function SettingsPage() {
             </select>
           </div>
           <div className="field-row">
-            <label className="mono-label">{t('settings.shift')}</label>
+            <label className="mono-label" htmlFor="set-shift">{t('settings.shift')}</label>
             <input
+              id="set-shift"
               type="checkbox"
               checked={sc.shift}
               onChange={(e) =>
@@ -154,8 +158,9 @@ export default function SettingsPage() {
             />
           </div>
           <div className="field-row">
-            <label className="mono-label">{t('settings.key')}</label>
+            <label className="mono-label" htmlFor="set-key">{t('settings.key')}</label>
             <select
+              id="set-key"
               className="set__select"
               value={sc.code}
               onChange={(e) =>

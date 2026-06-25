@@ -745,7 +745,7 @@ const styles = `
 .confirm__body { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
 .confirm__actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-2); }
 .cv-rail {
-  position: absolute; top: 72px; right: 12px; z-index: 5;
+  position: absolute; top: 72px; right: var(--space-1); z-index: 5;
   display: flex; flex-direction: column; align-items: center; gap: var(--space-1);
   padding: var(--space-1);
   background: var(--color-white);

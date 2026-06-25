@@ -88,7 +88,7 @@ export function ArchiveCardTile({
         <div className="tile__meta">
           <Tag color="blue">{t(typeKeyOf(card.type) as MessageKey)}</Tag>
           {badge}
-          {totalMedia > 0 && <Tag color="red">{totalMedia} media</Tag>}
+          {totalMedia > 0 && <Tag color="red">{t('card.mediaCount', { n: totalMedia })}</Tag>}
           <span className="tile__time">
             {card.updatedAt.toISOString().slice(0, 10)}
           </span>

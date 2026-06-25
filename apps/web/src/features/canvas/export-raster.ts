@@ -24,6 +24,7 @@ import {
 import { getSafeFileName } from './export-bounds'
 import type { ExportScope } from './export-bounds'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
+import { readToken } from '@cys-stift/canvas-engine'
 
 export type RasterFormat = 'png' | 'jpeg'
 
@@ -120,8 +121,10 @@ async function rasterizeSvg(
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
     // jpeg has no alpha — fill white so transparent regions don't go black.
+    // Color tracked via token so dark mode (where --color-white inverts)
+    // would still produce a legible background; fallback '#ffffff'.
     if (background && format === 'jpeg') {
-      ctx.fillStyle = '#ffffff'
+      ctx.fillStyle = readToken('--color-white', '#ffffff')
       ctx.fillRect(0, 0, canvas.width, canvas.height)
     }
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height)

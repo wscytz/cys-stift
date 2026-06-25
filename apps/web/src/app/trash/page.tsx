@@ -48,7 +48,7 @@ export default function TrashPage() {
   return (
     <main className="page">
       <Toolbar region="trash">
-        <span className="crumb">cy&rsquo;s stift</span>
+        <span className="crumb">{t('brand.name')}</span>
         <span className="crumb-sep">/</span>
         <span className="crumb crumb--here">{t('trash.crumb')}</span>
         <span className="crumb-spacer" />

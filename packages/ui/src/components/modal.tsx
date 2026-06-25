@@ -8,6 +8,12 @@ export interface ModalProps {
   onClose: () => void
   title?: ReactNode
   children: ReactNode
+  /**
+   * Accessible label for the close (×) button. `@cys-stift/ui` is i18n-
+   * agnostic, so this defaults to the English "Close"; web-app consumers
+   * should pass a localized label (e.g. `t('common.close')`).
+   */
+  closeLabel?: string
 }
 
 const FOCUSABLE =
@@ -25,7 +31,7 @@ const FOCUSABLE =
  * own frame, so a modal stack (card-detail → confirm-delete) lets only the
  * top trap handle the key. Escape stays the caller's responsibility.
  */
-export function Modal({ open, onClose, title, children }: ModalProps) {
+export function Modal({ open, onClose, title, children, closeLabel = 'Close' }: ModalProps) {
   const frameRef = useRef<HTMLDivElement | null>(null)
   const previouslyFocused = useRef<HTMLElement | null>(null)
 
@@ -105,7 +111,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
             type="button"
             className={styles.closeBtn}
             onClick={onClose}
-            aria-label="Close"
+            aria-label={closeLabel}
           >
             ×
           </button>

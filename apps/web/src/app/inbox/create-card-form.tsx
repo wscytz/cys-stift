@@ -160,7 +160,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
       </h2>
 
       <Input
-        label={t('card.detail.bodyLabel')}
+        label={t('card.detail.fieldTitle')}
         name={`${formId}-title`}
         placeholder={t('inbox.create.placeholder')}
         value={title}

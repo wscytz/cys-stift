@@ -107,7 +107,7 @@ export default function ArchivePage() {
   return (
     <main className="page">
       <Toolbar region="archive">
-        <span className="crumb">cy&rsquo;s stift</span>
+        <span className="crumb">{t('brand.name')}</span>
         <span className="crumb-sep">/</span>
         <span className="crumb crumb--here">{t('archive.crumb')}</span>
         <span className="crumb-spacer" />
