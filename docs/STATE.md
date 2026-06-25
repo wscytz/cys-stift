@@ -123,7 +123,9 @@
 - **打磨六主干**(2026-06-24,已落地功能完成度/体验/鲁棒性提升):① **DSL Apply 文本同步**(必修 bug:apply 后不重序列化 textarea,host 同引用 useEffect 不重跑→重复 Apply 对 create 类 op 造副本;修 setText 重序列化)+ **生效计数诚实反馈**(applyLayout 返回 {applied,skipped},toast 改"应用 N 条 M 条跳过",card update-only/箭头端点缺失不再静默);② **DSL 语法速查内嵌**(可折叠 details,5 kind 示例 + card 只更新约束,i18n 双语);③ **Escape 取消选区**(keyHandler 加 Escape,通用画布习惯);④ **多选 resize 一致性**(多选时禁用 resize handle 只允许组移动,避免拖角只缩一个误导;组缩放留后);⑤ **JSON 导入确认门**(选文件先弹 Modal 警告覆盖不可撤销,确认才导入)+ 导入明细加 canvases/freeform 组数。474 web + 285 引擎 + build exit 0。
 - **主线推进 · B 转义打磨 + A AI 介入手绘**(2026-06-24,主线推进):**B 核心卖点信任裂缝修复**——parseDsl 静默丢坏行(用户写 10 行 7 对 3 错→toast 应用 7 条→以为全生效,3 行静默消失)。`parseDslWithDiagnostics` 返回 `{ops, errors: DslDiagnostic[]}`(line 1-based + text + message,每 continue 丢弃前记);`parseDsl` 改薄 wrapper 返回 `.ops`(AI 路径零变化)。dsl-dialog textarea 下渲染诊断列表(行号+原因,Bauhaus red 样式);全错/空区分;混合诚实报 applied+skipped。commit 64153b6/4d0599c。**A 第三层增值**——此前 AI 只看到 `[freedraw #id] @pos`,不知手绘是什么形状。现在 freedraw 带 R2 安全形状描述:shape(circle/rect/triangle/check/arrow/unknown 离散标签)+ shapeConfidence + features{straightness,closure,elongation,pointCount}(4 标量比例);snapshotCanvas 本地跑 classifyFreedraw+recognizeShape(失败退化仅位置不抛);formatCanvasSnapshot 输出 `shape: circle (85%)` 注释行(parser 跳过注释,round-trip 安全)。**R2 隐私**:点序列绝不进 snapshot 文本(反向断言测试多点 freedraw 不含内部点坐标)。commit a0b891f。privacy.md 更新。485 web + 280 引擎 + build exit 0。**UI 收尾**:canvas 工具栏溢出修复(@cys-stift/ui Toolbar min-width:0,commit b2b611e)。**交付闭环**:Windows Tauri CI(加 build-tauri-windows job,macOS 无法 cross-compile Windows 缺 llvm-rc;commit d0f7fcf/8569193,待 CI 验证)。
 - Tauri **签名公证**(P9 — 需 Apple 证书,用户提供)
-- AI 找重复 / cluster / 时间线(P10)
+- AI 找重复 / cluster / 时间线(P10):
+  - **cluster**(canvas,已上线)——LLM 找相似画关系箭头(`cluster.ts`,AC 按钮)
+  - **找重复**(inbox,2026-06-25)——本地精确去重(URL/代码片段/标题归一化等值,零 AI/零隐私/离线可用),`findDuplicateGroups` domain 纯函数 + inbox 工具栏「找重复」按钮循环预选重复组到批量栏处理。互补 cluster(精确 vs 语义)。
 - UX 打磨(P12,四项全完成):inbox 批量多选(Gmail 式 checkbox + 底部 BatchBar 归档/移到画布/删除)/ Card markdown 双向(inbox MarkdownBody + ReactMarkdown+sanitize)/ minimap / undo-redo(键盘 + 画布 side rail 按钮 + onHistoryChange 事件)
 
 ## 已知 debt(有意 defer,非 bug)

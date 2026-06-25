@@ -16,4 +16,12 @@ export {
   type WorkspaceRepository,
 } from './services/workspace-service'
 export { searchCards, normalise, tokenise, bodySnippet, type SearchResult } from './services/search'
+export {
+  findDuplicateGroups,
+  normaliseUrl,
+  normaliseCode,
+  normaliseTitle,
+  type DuplicateDimension,
+  type DuplicateGroup,
+} from './services/duplicate-detect'
 export { TAG_COLORS } from './types'

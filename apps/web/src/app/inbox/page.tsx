@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { Button, Card as UICard, Tag, Toolbar } from '@cys-stift/ui'
 import type { Card, CardId } from '@cys-stift/domain'
+import { findDuplicateGroups, type DuplicateGroup } from '@cys-stift/domain'
 import { CreateCardForm } from './create-card-form'
 import { CardDetailModal } from '@/features/card/card-detail'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
@@ -102,6 +103,33 @@ export default function InboxPage() {
   }
   const selectAll = () => setSelected(new Set(visible.map((c) => c.id)))
 
+  // 找重复(本地精确去重,零 AI):URL/代码片段/标题归一化等值。
+  // 非破坏性:点按钮预选第一组重复卡到 selected,用户在底部 batch-bar 处理(归档/删除)。
+  // 循环点依次看每组;toast 报进度。重复组随 visible 重算(view 切换/数据变)。
+  const dupGroups = useMemo(() => findDuplicateGroups(visible), [visible])
+  const [dupIndex, setDupIndex] = useState(0)
+  useEffect(() => {
+    setDupIndex(0)
+  }, [dupGroups.length])
+  const findDuplicates = () => {
+    if (dupGroups.length === 0) {
+      pushToast({ kind: 'info', message: t('inbox.dup.none') })
+      return
+    }
+    const next = (dupIndex + 1) % dupGroups.length
+    setDupIndex(next)
+    const group = dupGroups[next]!
+    setSelected(new Set(group.cardIds))
+    pushToast({
+      kind: 'info',
+      message: t('inbox.dup.found', {
+        i: String(next + 1),
+        n: String(dupGroups.length),
+        dim: t(`inbox.dup.dim.${group.dimension}`),
+      }),
+    })
+  }
+
   return (
     <main className="page">
       <Toolbar region="inbox">
@@ -126,6 +154,19 @@ export default function InboxPage() {
         <Tag color={view === 'inbox' ? 'red' : 'blue'}>
           {view === 'inbox' ? inbox.length : archived.length}
         </Tag>
+        <span className="crumb-spacer" />
+        <button
+          type="button"
+          className="tb-snap"
+          onClick={findDuplicates}
+          disabled={visible.length < 2}
+          title={t('inbox.dup.title')}
+        >
+          {t('inbox.dup.title')}
+          {dupGroups.length > 0 && (
+            <Tag color="yellow">{dupGroups.length}</Tag>
+          )}
+        </button>
       </Toolbar>
 
       <div className="page-content page-content--wide">

@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-06-25 · inbox-find-duplicates · inbox 本地精确找重复
+
+P10 AI 方向第一层:本地精确去重(零 AI/零隐私/离线可用),互补已上线的 cluster(LLM 找相似画箭头)。用户选「本地精确去重 + inbox 入口」。
+
+- **domain 纯函数** `findDuplicateGroups(cards)`(`packages/domain/src/services/duplicate-detect.ts`):三维度归一化等值——URL(去 fragment/utm/末尾斜杠、小写 scheme+host)、代码片段(去全部空白+小写)、标题(小写+折叠空白)。返回 `DuplicateGroup[]`(≥2 卡成组,含 dimension/cardIds/reason)。一张卡可多维度重复出现在多个组(正确,分别处理)。
+- **inbox 入口**:工具栏「找重复」按钮(有重复时附黄色计数 Tag),循环点击依次预选每组重复卡到 `selected` Set → 用户在已有底部 batch-bar 归档/删除。非破坏性,零 AI 调用。toast 报「第 i/n 组(同链接/同代码/同标题),已预选」。
+- 复用刚做的 inbox 批量基础设施(batch-bar/batchArchive/batchDelete)——找重复只是预选,处理走既有路径。
+- 产品克制:精确重复 100% 该去重直接给用户操作;语义重复(不同措辞讲同一事)留给 LLM cluster,是另一个功能。两者互补不重叠。
+- domain +17 测试(归一化各维度 + findDuplicateGroups 各场景);domain 68 绿 / web 546 绿 / build exit 0。
+
+---
+
 ## 2026-06-25 · import-freeform-atomicity · JSON 导入 freeform 失败诚实回报
 
 修 debt(M2 JSON 导入 freeform 原子性)。`importFromJson` 此前忽略 `canvasFreeformStore.save` 返回值——OPFS+localStorage 双失败时部分画布几何静默丢失(返回 ok:true 不报错),reload 后用户看到部分画布几何缺失且无提示。
