@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-06-25 · import-freeform-atomicity · JSON 导入 freeform 失败诚实回报
+
+修 debt(M2 JSON 导入 freeform 原子性)。`importFromJson` 此前忽略 `canvasFreeformStore.save` 返回值——OPFS+localStorage 双失败时部分画布几何静默丢失(返回 ok:true 不报错),reload 后用户看到部分画布几何缺失且无提示。
+
+- `ImportResult` 加 `freeformSkipped?: number`;freeform 循环检查 `save` 返回值,成功 `freeformCanvases++` / 失败 `freeformSkipped++`。
+- 不整体失败(卡片/canvas 列表已成功落地且有 localStorage rollback 保障,freeform 失败不该回滚已成功的核心数据),但诚实回报供 UI 提示。
+- settings 导入 toast 体现「· N 个画布几何因存储满跳过」。
+- +2 测试(save 返回 false 计 skipped / 全成功 freeformSkipped undefined 向后兼容);此前 `canvasFreeformStore.save` 失败路径零覆盖。
+- 测试坑:`vi.resetModules` 后 `mod` 拿到新 `canvasFreeformStore` 实例,顶部静态 import 的 `vi.spyOn` 拦截不到 → 用动态导入挂 spy,红绿才真实。
+- export-service 36 测试绿;build exit 0。
+
+---
+
 ## 2026-06-25 · inbox-batch-undo · inbox 批量多选 + 画布 undo/redo 按钮
 
 P12 UX 打磨收尾:补两个明确缺失(键盘有 UI 无 / 批量操作空白)。
