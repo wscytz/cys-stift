@@ -232,7 +232,7 @@ export default function ArchivePage() {
 
       {selectMode && selected.size > 0 && (
         <div className="batch-bar" role="region" aria-label={t('archive.batchDelete')}>
-          <span className="batch-bar__count">
+          <span className="batch-bar__count" aria-live="polite">
             {t('archive.floater.selected', { n: selected.size })}
           </span>
           <button type="button" className="batch-bar__btn" onClick={handleUnarchiveSelected}>

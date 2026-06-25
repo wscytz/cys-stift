@@ -21,6 +21,7 @@ export const messages = {
   'nav.trash': { zh: '回收站', en: 'Trash' },
   'nav.settings': { zh: '设置', en: 'Settings' },
   'nav.capture': { zh: '捕获', en: 'Capture' },
+  'nav.homeNav': { zh: '主页导航', en: 'Home navigation' },
 
   /* ── Home page ── */
   'home.eyebrow': { zh: 'phase 0 · scaffold', en: 'phase 0 · scaffold' },
@@ -107,6 +108,7 @@ export const messages = {
   'card.detail.editHint': { zh: '这里有意不暴露链接/代码/引用的编辑（Phase 4 MVP），详情视图会显示已持久化的内容。', en: 'Editing links / code / quotes is intentionally not exposed here (Phase 4 MVP). The detail view shows persisted media.' },
   'card.detail.media': { zh: '媒体', en: 'Media' },
   'card.detail.mediaFiles': { zh: '媒体(图片 / 文件)', en: 'Media (images / files)' },
+  'card.detail.mediaAlt': { zh: '媒体 {n}', en: 'Media {n}' },
   'card.detail.removeMediaAria': { zh: '移除媒体', en: 'Remove media' },
   'card.detail.linkLabel': { zh: '链接', en: 'Link' },
   'card.detail.translateToEn': { zh: '→ 英文', en: '→ English' },
@@ -422,6 +424,8 @@ export const messages = {
   'ai.appendedAsNew': { zh: '已存为新卡', en: 'Saved as new card' },
   'ai.notConfigured': { zh: 'AI 未配置 — 在 /settings 启用', en: 'AI not configured — enable in /settings' },
   'ai.error': { zh: 'AI 失败:{error}', en: 'AI failed: {error}' },
+  'ai.suggestion': { zh: 'AI 建议', en: 'AI suggestion' },
+  'ai.streaming': { zh: '生成中…', en: 'Streaming…' },
   /* ── Tags (P4) ── */
   'tag.add': { zh: '添加标签', en: 'Add tag' },
   'tag.placeholder': { zh: '输入标签名...', en: 'Type tag name...' },

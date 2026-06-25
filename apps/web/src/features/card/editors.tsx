@@ -104,7 +104,7 @@ export function CodeEditor({
               <button
                 type="button"
                 className="le__remove"
-                aria-label={`Remove code ${i + 1}`}
+                aria-label={t('editor.removeAria', { label: t('card.typeCode'), n: i + 1 })}
                 onClick={() => onChange(items.filter((_, j) => j !== i))}
               >
                 ×
@@ -177,7 +177,7 @@ export function QuoteEditor({
             <button
               type="button"
               className="le__remove"
-              aria-label={`Remove quote ${i + 1}`}
+              aria-label={t('editor.removeAria', { label: t('card.typeQuote'), n: i + 1 })}
               onClick={() => onChange(items.filter((_, j) => j !== i))}
             >
               ×

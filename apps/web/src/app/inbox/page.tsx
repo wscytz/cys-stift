@@ -275,7 +275,7 @@ export default function InboxPage() {
 
       {selected.size > 0 && (
         <div className="batch-bar" role="toolbar" aria-label={t('inbox.batch.title')}>
-          <span className="batch-bar__count">
+          <span className="batch-bar__count" aria-live="polite">
             {t('inbox.batch.count', { n: String(selected.size) })}
           </span>
           <button type="button" className="batch-bar__btn" onClick={batchArchive}>

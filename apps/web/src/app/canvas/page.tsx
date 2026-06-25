@@ -618,7 +618,7 @@ function CanvasSwitcher({
   }
   return (
     <>
-      <select className="cselect" value={activeId} onChange={(e) => onSwitch(e.target.value as CanvasId)} title={t('canvas.switchTitle')}>
+      <select className="cselect" value={activeId} onChange={(e) => onSwitch(e.target.value as CanvasId)} title={t('canvas.switchTitle')} aria-label={t('canvas.switchTitle')}>
         {canvases.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
       </select>
       <button type="button" className="cselect-edit" onClick={onStartRename} title={t('canvas.renameTitle')} aria-label={t('canvas.renameTitle')}>✎</button>

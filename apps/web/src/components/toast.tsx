@@ -41,12 +41,12 @@ export function ToastHost() {
           role={tst.kind === 'error' ? 'alert' : 'status'}
           className={`${styles.toast} ${styles[`toast--${tst.kind}`] ?? ''}`}
         >
-          <span className={styles.toast__msg}>{tst.message}</span>
+          <span id={`toast-${tst.id}-msg`} className={styles.toast__msg}>{tst.message}</span>
           <button
             type="button"
             className={styles.toast__close}
             onClick={() => dismissToast(tst.id)}
-            aria-label={t('common.dismiss')}
+            aria-label={`${t('common.dismiss')}: ${tst.message}`}
           >
             ×
           </button>

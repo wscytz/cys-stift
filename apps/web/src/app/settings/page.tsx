@@ -236,6 +236,7 @@ export default function SettingsPage() {
                 className={`mono mono--xs ${
                   importResult.ok ? '' : 'set__import-result--error'
                 }`}
+                role={importResult.ok === false ? 'alert' : 'status'}
               >
                 {importResult.ok
                   ? t('settings.importOk', {

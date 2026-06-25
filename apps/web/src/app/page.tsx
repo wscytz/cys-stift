@@ -43,7 +43,7 @@ export default function HomePage() {
             <dd>{t('home.feature.archive.desc')}</dd>
           </div>
         </dl>
-        <nav className="home__nav" aria-label="Primary">
+        <nav className="home__nav" aria-label={t('nav.homeNav')}>
           <div className="home__capture" aria-label="Quick capture">
             <div className="home__capture-arrow" aria-hidden="true">{isMac ? '⌘' : '^'}</div>
             <div className="home__capture-label">{t('home.feature.capture.title')}</div>

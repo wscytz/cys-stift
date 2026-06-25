@@ -294,7 +294,7 @@ export function CardDetailModal({
                           >
                             <img
                               src={asset.dataUrl}
-                              alt={asset.id}
+                              alt={t('card.detail.mediaAlt', { n: i + 1 })}
                               className="cd__media-img"
                             />
                           </li>
@@ -405,7 +405,7 @@ export function CardDetailModal({
                 />
                 {media.length > 0 && (
                   <ul className="cd__media-list cd__media-list--edit">
-                    {media.map((m) => {
+                    {media.map((m, i) => {
                       const asset = mediaStore.getAsset(m.assetId)
                       if (!asset) return null
                       return (
@@ -416,7 +416,7 @@ export function CardDetailModal({
                           {asset.kind === 'image' && (
                             <img
                               src={asset.dataUrl}
-                              alt={asset.id}
+                              alt={t('card.detail.mediaAlt', { n: i + 1 })}
                               className="cd__media-img cd__media-img--thumb"
                             />
                           )}

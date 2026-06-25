@@ -103,8 +103,9 @@ export function AISettingsPanel() {
       </div>
 
       <div className="set__row">
-        <label className="set__label">{t('settings.aiEnabled')}</label>
+        <label className="set__label" htmlFor="ai-enabled">{t('settings.aiEnabled')}</label>
         <input
+          id="ai-enabled"
           type="checkbox"
           checked={draft.enabled}
           onChange={(e) => update({ enabled: e.target.checked })}
@@ -113,8 +114,9 @@ export function AISettingsPanel() {
       </div>
 
       <div className="set__row">
-        <label className="set__label">{t('settings.aiProvider')}</label>
+        <label className="set__label" htmlFor="ai-provider">{t('settings.aiProvider')}</label>
         <select
+          id="ai-provider"
           className="set__select"
           value={draft.provider}
           onChange={(e) => onProviderChange(e.target.value as ProviderId)}
@@ -127,8 +129,9 @@ export function AISettingsPanel() {
       </div>
 
       <div className="set__row">
-        <label className="set__label">{t('settings.aiBaseUrl')}</label>
+        <label className="set__label" htmlFor="ai-baseurl">{t('settings.aiBaseUrl')}</label>
         <input
+          id="ai-baseurl"
           type="url"
           className="set__input"
           value={draft.baseUrl}
@@ -141,8 +144,9 @@ export function AISettingsPanel() {
       </div>
 
       <div className="set__row">
-        <label className="set__label">{t('settings.aiModel')}</label>
+        <label className="set__label" htmlFor="ai-model">{t('settings.aiModel')}</label>
         <input
+          id="ai-model"
           type="text"
           className="set__input"
           value={draft.model}
@@ -156,9 +160,10 @@ export function AISettingsPanel() {
 
       {def.needsKey && (
         <div className="set__row">
-          <label className="set__label">{t('settings.aiApiKey')}</label>
+          <label className="set__label" htmlFor="ai-apikey">{t('settings.aiApiKey')}</label>
           <div className="set__keyWrap">
             <input
+              id="ai-apikey"
               type={showKey ? 'text' : 'password'}
               className="set__input"
               value={draft.apiKey}
