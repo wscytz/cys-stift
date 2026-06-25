@@ -12,6 +12,7 @@ import { Timeline } from '@/features/archive/timeline'
 import { CardDetailModal } from '@/features/card/card-detail'
 import { captureSinkRegistry } from '@/features/capture/capture-sink'
 import { getDeviceId } from '@/lib/device-id'
+import { pushToast } from '@/lib/toast-store'
 
 type View = 'grid' | 'timeline'
 
@@ -67,10 +68,15 @@ export default function ArchivePage() {
   }
 
   const handleUnarchiveSelected = () => {
+    const n = selected.size
     for (const id of selected) {
       service.unarchive(id)
     }
     clearSelected()
+    pushToast({
+      kind: 'success',
+      message: t('inbox.batch.unarchivedN', { n: String(n) }),
+    })
   }
 
   const handleSoftDeleteSelected = () => {
@@ -82,11 +88,16 @@ export default function ArchivePage() {
 
   const handleConfirmBatchSoftDelete = () => {
     if (!confirmBatchDelete) return
+    const n = confirmBatchDelete.length
     for (const id of confirmBatchDelete) {
       service.softDelete(id)
     }
     setConfirmBatchDelete(null)
     clearSelected()
+    pushToast({
+      kind: 'success',
+      message: t('inbox.batch.deletedN', { n: String(n) }),
+    })
   }
 
   const handleCancelBatchSoftDelete = () => {

@@ -77,17 +77,31 @@ export default function InboxPage() {
   // 批量动作(循环调单卡 service;同步,一次 re-render)。
   const selectedArr = [...selected]
   const batchArchive = () => {
+    const n = selectedArr.length
     for (const id of selectedArr) {
       if (view === 'inbox') service.archive(id as CardId)
       else service.unarchive(id as CardId)
     }
     clearSelection()
+    pushToast({
+      kind: 'success',
+      message: t(
+        view === 'inbox' ? 'inbox.batch.archivedN' : 'inbox.batch.unarchivedN',
+        { n: String(n) },
+      ),
+    })
   }
   const batchDelete = () => {
+    const n = selectedArr.length
     for (const id of selectedArr) service.softDelete(id as CardId)
     clearSelection()
+    pushToast({
+      kind: 'success',
+      message: t('inbox.batch.deletedN', { n: String(n) }),
+    })
   }
   const batchSendToCanvas = () => {
+    const n = selectedArr.length
     const targetCanvasId = canvasesSnap.activeCanvasId ?? DEFAULT_CANVAS_ID
     selectedArr.forEach((id, i) => {
       service.moveToCanvas(id as CardId, {
@@ -100,6 +114,10 @@ export default function InboxPage() {
       })
     })
     clearSelection()
+    pushToast({
+      kind: 'success',
+      message: t('inbox.batch.sentToCanvasN', { n: String(n) }),
+    })
   }
   const selectAll = () => setSelected(new Set(visible.map((c) => c.id)))
 
