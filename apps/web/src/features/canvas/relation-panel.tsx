@@ -63,31 +63,34 @@ export function RelationPanel({
 
   if (!host) return null
   const sel = host.getSelectedIds()
-  if (sel.length !== 1) return null
-  const arrowId = sel[0]!
-  const arrow = host.getElement(arrowId)
-  if (!arrow || arrow.kind !== 'arrow') return null
+  const arrowId = sel.length === 1 ? sel[0]! : null
+  const arrow = arrowId ? host.getElement(arrowId) : null
+  const isArrowSelected = !!arrow && arrow.kind === 'arrow'
 
-  const activeType = inferRelationType(arrow)
+  // Hooks 必须在 early return 之前调用(React hooks 顺序规则;此前 useRef/useEffect
+  // 放在 early return 后 → 选中箭头时 hooks 数量变化 → React error #310 崩溃)。
+  const activeType = isArrowSelected ? inferRelationType(arrow!) : null
 
   // Keyword inference when the arrow has no type yet.
   let inferred: RelationType | null = null
-  if (!activeType && arrow.from && arrow.to) {
-    const a = cardService?.get(arrow.from as CardId)
-    const b = cardService?.get(arrow.to as CardId)
+  if (isArrowSelected && !activeType && arrow!.from && arrow!.to) {
+    const a = cardService?.get(arrow!.from as CardId)
+    const b = cardService?.get(arrow!.to as CardId)
     if (a && b) inferred = inferRelationTypeFromContext(a as Card, b as Card)
   }
 
   // Auto-apply inferred type once per (arrowId, inferredType) pair.
   const appliedKey = useRef<string | null>(null)
   useEffect(() => {
-    if (!inferred || activeType) return
+    if (!isArrowSelected || !arrow || !inferred || activeType) return
     const key = `${arrow.id}:${inferred.id}`
     if (appliedKey.current === key) return
     appliedKey.current = key
     applyRelationType(host, arrow.id, inferred, inferred.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [arrow.id, inferred?.id, activeType?.id, host])
+  }, [isArrowSelected, arrow, inferred?.id, activeType?.id, host])
+
+  if (!isArrowSelected || !arrow) return null
 
   const displayType: RelationType | null = activeType ?? inferred
 
