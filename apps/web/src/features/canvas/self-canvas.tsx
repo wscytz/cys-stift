@@ -148,6 +148,8 @@ export function SelfCanvas({
         return
       }
     }
+    // 未命中卡片:选中箭头时双击 → 加折点(elbow 未满)/ 重置直线(否则)。
+    adapter.doubleClickArrowAt(p)
   }
 
   // edit 会话出现时 focus textarea。

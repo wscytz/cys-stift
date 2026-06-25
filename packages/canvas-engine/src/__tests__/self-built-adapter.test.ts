@@ -687,3 +687,64 @@ describe('SelfBuiltAdapter onWheel — pan vs zoom', () => {
     expect(after.zoom).toBe(before.zoom)
   })
 })
+
+// ── doubleClickArrowAt — 双击加折点 / 双击重置 ─────────────────────────────
+describe('SelfBuiltAdapter doubleClickArrowAt', () => {
+  function setup() {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'ca', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'cb', kind: 'card', x: 300, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'cb', route: 'elbow', elbow: [{ x: 200, y: 50 }] })
+    const sel = (ids: string[]) => (host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(ids)
+    const get = (id: string) => host.getElement(id)!
+    return { host, sel, get }
+  }
+
+  it('选中 elbow(1 折点)双击线段 → 加第 2 折点(≤2)', () => {
+    const { host, sel, get } = setup()
+    sel(['ar'])
+    // 命中线段:from=(100,50)→elbow(200,50)→to=(300,50);点 (250,50) 在第二段
+    const handled = host.doubleClickArrowAt({ x: 250, y: 52 })
+    expect(handled).toBe(true)
+    const el = get('ar')
+    expect(el.route).toBe('elbow')
+    expect(el.elbow).toHaveLength(2)
+  })
+
+  it('选中 elbow(2 折点)双击 → 重置 straight(不再加折点)', () => {
+    const { host, sel, get } = setup()
+    // 先加到 2 折点
+    sel(['ar'])
+    host.doubleClickArrowAt({ x: 250, y: 52 })
+    expect(get('ar').elbow).toHaveLength(2)
+    // 再双击 → 重置 straight
+    const handled = host.doubleClickArrowAt({ x: 250, y: 52 })
+    expect(handled).toBe(true)
+    expect(get('ar').route).toBe('straight')
+  })
+
+  it('选中 curve 双击 → 重置 straight(保留 curve 数据)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'ca', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'cb', kind: 'card', x: 300, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'cb', route: 'curve', curve: { cx: 200, cy: -50 } })
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['ar'])
+    // 命中曲线(贝塞尔 t=0.5 点附近)
+    const handled = host.doubleClickArrowAt({ x: 200, y: 0 })
+    expect(handled).toBe(true)
+    const el = host.getElement('ar')!
+    expect(el.route).toBe('straight')
+    expect(el.curve).toEqual({ cx: 200, cy: -50 }) // 数据保留
+  })
+
+  it('未选中箭头双击 → false(no-op)', () => {
+    const { host } = setup()
+    expect(host.doubleClickArrowAt({ x: 250, y: 50 })).toBe(false)
+  })
+
+  it('双击点未命中箭头 → false', () => {
+    const { host, sel } = setup()
+    sel(['ar'])
+    expect(host.doubleClickArrowAt({ x: 500, y: 500 })).toBe(false)
+  })
+})

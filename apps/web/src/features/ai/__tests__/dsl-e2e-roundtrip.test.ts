@@ -107,6 +107,37 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
     expect(roundtripped).toBe(original)
   })
 
+  it('relation arrow route=curve e2e round-trip (route + @curve byte-equal through apply)', () => {
+    const host = new InMemoryCanvasHost()
+    const { original, roundtripped } = roundTrip(host, [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 },
+      { id: 'c2', kind: 'card', x: 100, y: 0, w: 10, h: 10, rotation: 0 },
+      { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2', route: 'curve', curve: { cx: 55, cy: -30 } },
+    ])
+    expect(original).toContain('[arrow #a1] from #c1 to #c2 @curve(55,-30) @route(curve)')
+    expect(roundtripped).toBe(original)
+  })
+
+  it('relation arrow route=elbow e2e round-trip (2 corners, negatives, byte-equal)', () => {
+    const host = new InMemoryCanvasHost()
+    const { original, roundtripped } = roundTrip(host, [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 },
+      { id: 'c2', kind: 'card', x: 200, y: 200, w: 10, h: 10, rotation: 0 },
+      { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2', route: 'elbow', elbow: [{ x: 100, y: 0 }, { x: 100, y: -50 }] },
+    ])
+    expect(original).toContain('[arrow #a1] from #c1 to #c2 @route(elbow) @elbow(100,0;100,-50)')
+    expect(roundtripped).toBe(original)
+  })
+
+  it('free arrow route=elbow e2e round-trip (bbox + route + elbow byte-equal)', () => {
+    const host = new InMemoryCanvasHost()
+    const { original, roundtripped } = roundTrip(host, [
+      { id: 'fa1', kind: 'arrow', x: 10, y: 20, w: 100, h: 50, rotation: 0, route: 'elbow', elbow: [{ x: 60, y: 20 }] },
+    ])
+    expect(original).toBe('[arrow #fa1] @pos(10,20) @size(100,50) @route(elbow) @elbow(60,20)')
+    expect(roundtripped).toBe(original)
+  })
+
   it('freedraw is NOT round-tripped by parse/apply (guard — host retains it untouched)', () => {
     const host = new InMemoryCanvasHost()
     const { original, roundtripped, ops } = roundTrip(host, [

@@ -240,6 +240,44 @@ export class SelfBuiltAdapter implements CanvasHost {
     return this.activeTool
   }
 
+  /**
+   * 双击箭头交互(选中箭头 + 双击点命中该箭头时):
+   *  - route=elbow 且折点 < 2:在双击点加折点(按沿 from→to 投影排序,保持路径顺序)。
+   *  - 否则(curve/straight,或 elbow 已满):重置 route=straight(保留 curve/elbow 数据)。
+   * 非 arrow / 未命中 / 多选 → false(no-op)。单步 undo。命中用 hitTest(线段/曲线/折线)。
+   */
+  doubleClickArrowAt(p: { x: number; y: number }): boolean {
+    if (this.selectedIds.size !== 1) return false
+    const selId = [...this.selectedIds][0]!
+    const el = this.getElement(selId)
+    if (!el || el.kind !== 'arrow') return false
+    if (hitTest(this.getElements(), p.x, p.y, this.view.zoom) !== selId) return false
+    const { from, to } = arrowEndpoints(el, this.getElements())
+    if (!from || !to) return false
+    const route = arrowRoute(el)
+    this.pushUndo()
+    this.coalescing = true
+    try {
+      if (route === 'elbow' && (!el.elbow || el.elbow.length < 2)) {
+        // 加折点:按沿 from→to 方向的投影排序(保持路径顺序,避免交叉)。
+        const dir = { x: to.x - from.x, y: to.y - from.y }
+        const len2 = dir.x * dir.x + dir.y * dir.y || 1
+        const proj = (pt: { x: number; y: number }) =>
+          (pt.x - from.x) * dir.x + (pt.y - from.y) * dir.y
+        const elbows = [...(el.elbow ?? []), { x: Math.round(p.x), y: Math.round(p.y) }]
+          .sort((a, b) => proj(a) - proj(b))
+          .slice(0, 2)
+        this.upsert({ ...el, route: 'elbow', elbow: elbows })
+      } else {
+        // 重置:route=straight(保留 curve/elbow 数据,便于切回)。
+        this.upsert({ ...el, route: 'straight' })
+      }
+    } finally {
+      this.coalescing = false
+    }
+    return true
+  }
+
   /** 当前选中元素 id(渲染器自身状态,不上 CanvasHost)。 */
   getSelectedIds(): string[] {
     return [...this.selectedIds]
