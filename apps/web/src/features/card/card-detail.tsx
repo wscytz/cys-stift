@@ -182,17 +182,27 @@ export function CardDetailModal({
     initialMode,
   ])
 
-  // Escape closes — works whether in main modal or in confirm-delete modal
+  // Escape closes — works whether in main modal or in confirm-delete modal.
+  // Guard: when a nested Escape-consuming overlay is open, dismiss THAT inner
+  // UI instead of clobbering the whole CardDetailModal.
+  // Nested consumers: AI popover, confirm-delete sub-modal, tag input focus.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (confirmDelete) setConfirmDelete(false)
-        else onClose()
+      if (e.key !== 'Escape') return
+      // AI popover 在前面:Escape 关掉 popover(而不是整个 CardDetail)。
+      if (aiAction) {
+        setAiAction(null)
+        return
       }
+      // 标签输入框正聚焦时:Escape 留给输入框(清空/失焦),不关模态。
+      const active = typeof document !== 'undefined' ? document.activeElement : null
+      if (active instanceof HTMLElement && active.classList.contains('cd__tag-input')) return
+      if (confirmDelete) setConfirmDelete(false)
+      else onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, confirmDelete])
+  }, [onClose, confirmDelete, aiAction])
 
   // Focus the title input on entering edit mode
   useEffect(() => {

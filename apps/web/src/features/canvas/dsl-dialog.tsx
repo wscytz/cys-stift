@@ -208,7 +208,7 @@ const styles = `
   border-radius: var(--radius-sm); line-height: 1.6; overflow-x: auto;
 }
 .dsl-text {
-  width: 100%; min-height: 320px; box-sizing: border-box;
+  width: 100%; min-height: 240px; box-sizing: border-box;
   padding: var(--space-2);
   background: var(--color-white); color: var(--color-black);
   font-family: var(--font-mono); font-size: var(--font-size-sm);
@@ -242,6 +242,6 @@ const styles = `
 }
 .dsl-errors__line { color: var(--color-red); flex-shrink: 0; }
 .dsl-errors__msg { word-break: break-word; }
-.dsl-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); align-items: center; }
-.dsl-spacer { flex: 1; }
+.dsl-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); align-items: center; }
+.dsl-spacer { flex: 1; min-width: 0; }
 `

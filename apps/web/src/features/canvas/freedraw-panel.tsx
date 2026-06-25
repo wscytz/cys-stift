@@ -12,9 +12,10 @@
  * 非破坏性:不自动改 / 不自动转箭头,只提示 + 让用户点。仿 RelationPanel:选中单个
  * freedraw 才显示,host 事件驱动重渲染,位置由 bbox→屏幕坐标算。
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n/messages'
+import { useClampedPanelPosition } from './panel-position'
 import {
   classifyFreedraw,
   duplicateFreedraw,
@@ -44,6 +45,7 @@ export function FreedrawPanel({
   canvasEl: HTMLCanvasElement | null
 }) {
   const { t } = useI18n()
+  const panelRef = useRef<HTMLDivElement>(null)
   const [, force] = useState(0)
   useEffect(() => {
     if (!host) return
@@ -75,7 +77,11 @@ export function FreedrawPanel({
   // 面板文案:认出具体形状 → 用形状文案;否则回退 arrow/decoration/unknown。
   const guessKey = guessMessageKey(kind, shape)
 
-  const position = computePanelPosition(el, host, canvasEl)
+  const position = useClampedPanelPosition(
+    panelRef,
+    computePanelPosition(el, host, canvasEl),
+    { width: 360, height: 44 },
+  )
   const panelStyle = position
     ? {
         position: 'fixed' as const,
@@ -112,6 +118,7 @@ export function FreedrawPanel({
 
   return (
     <div
+      ref={panelRef}
       className="cv-freedraw"
       role="group"
       aria-label={t('freedraw.title')}

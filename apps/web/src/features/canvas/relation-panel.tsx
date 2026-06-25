@@ -35,6 +35,7 @@ import {
 } from './relation-types'
 import { inferRelationTypeFromContext } from './relation-inference'
 import { useCardService } from './card-service-context'
+import { useClampedPanelPosition } from './panel-position'
 import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
 import { arrowRoute, arrowEndpoints } from '@cys-stift/canvas-engine'
 
@@ -54,6 +55,7 @@ export function RelationPanel({
 }) {
   const { t } = useI18n()
   const cardService = useCardService()
+  const panelRef = useRef<HTMLDivElement>(null)
   // Re-render on host events instead of polling (替原 200ms 轮询):
   // selection change(显隐/换 arrow)+ view change(pan/zoom 改位置)+
   // user change(applyRelationType 改 arrow 颜色/label 后刷新高亮)。
@@ -120,7 +122,9 @@ export function RelationPanel({
     })
   }
 
-  const position = computePanelPosition(arrow, host, canvasEl)
+  const ideal = computePanelPosition(arrow, host, canvasEl)
+  // 视口夹紧(避免贴边裁切)。fallback 尺寸用 RelationPanel 内容宽度估算。
+  const position = useClampedPanelPosition(panelRef, ideal, { width: 520, height: 44 })
   const panelStyle = position
     ? {
         position: 'fixed' as const,
@@ -132,6 +136,7 @@ export function RelationPanel({
 
   return (
     <div
+      ref={panelRef}
       className="cv-relation"
       role="group"
       aria-label={t('relation.title')}
