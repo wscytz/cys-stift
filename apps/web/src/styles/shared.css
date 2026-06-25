@@ -81,7 +81,9 @@
   font-size: var(--font-size-base);
   line-height: 1.6;
   max-width: 60ch;
-  overflow: hidden;
+  /* 不加 overflow:hidden:max-width 已限宽,文字该换行换行;
+     overflow:hidden 会把超宽的尾部像素裁掉(中文 + ch 单位下 scrollW 微超 clientW),
+     也防止极端长词垂直裁剪。 */
 }
 
 /* ── 6. Field row (label + control) ─────────────────────────────────────────── */
