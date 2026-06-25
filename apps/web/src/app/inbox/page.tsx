@@ -75,7 +75,14 @@ export default function InboxPage() {
   }, [view, clearSelection])
 
   // 批量动作(循环调单卡 service;同步,一次 re-render)。
-  const selectedArr = [...selected]
+  // Reconcile against the live/visible card ids first: a selected card may
+  // have been soft-deleted / archived-out elsewhere (e.g. via the detail
+  // modal opened from the same page) leaving a stale id in `selected`. We
+  // drop ids that no longer exist on this view so the count and batch ops
+  // only act on cards that are still here.
+  const visibleIds = new Set<string>(visible.map((c) => c.id))
+  const liveSelected = new Set<string>([...selected].filter((id) => visibleIds.has(id)))
+  const selectedArr = [...liveSelected]
   const batchArchive = () => {
     const n = selectedArr.length
     for (const id of selectedArr) {
@@ -238,6 +245,7 @@ export default function InboxPage() {
       >
         {view === 'inbox' && (
           <CreateCardForm
+            ready={ready}
             onCreate={(input) => {
               // Unified capture entry (Phase 6.5e + 6.5g): all capture
               // entry-points route through captureSinkRegistry →
@@ -286,10 +294,10 @@ export default function InboxPage() {
         )}
       </div>
 
-      {selected.size > 0 && (
+      {liveSelected.size > 0 && (
         <div className="batch-bar" role="toolbar" aria-label={t('inbox.batch.title')}>
           <span className="batch-bar__count" aria-live="polite">
-            {t('inbox.batch.count', { n: String(selected.size) })}
+            {t('inbox.batch.count', { n: String(liveSelected.size) })}
           </span>
           <button type="button" className="batch-bar__btn" onClick={batchArchive}>
             {view === 'inbox' ? t('inbox.batch.archive') : t('inbox.batch.unarchive')}

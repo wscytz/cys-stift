@@ -832,7 +832,14 @@ export class SelfBuiltAdapter implements CanvasHost {
         e.preventDefault()
         const ids = [...this.selectedIds]
         this.setSelectedIds([])
-        for (const id of ids) this.remove(id) // echo → onUserChange
+        // Wrap the multi-card delete in batch() so all N removes share ONE
+        // undo snapshot (batch pushes a snapshot before the callback + sets
+        // coalescing so each remove()'s pushUndo is suppressed). Without
+        // this, deleting N cards pushed N undo steps (Undo N times). Single-
+        // element delete is still 1 step (batch with one remove).
+        this.batch(() => {
+          for (const id of ids) this.remove(id) // echo → onUserChange
+        })
         return
       }
       // 方向键微移

@@ -193,6 +193,48 @@ describe('SelfBuiltAdapter selection', () => {
     expect((host as unknown as { getSelectedIds: () => string[] }).getSelectedIds()).toEqual([])
   })
 
+  it('多选 Delete 合并为 1 undo 步(undo 一次全恢复)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const h = host as unknown as {
+      setSelectedIds: (ids: string[]) => void
+      canUndo: () => boolean
+      undo: () => void
+    }
+    // 3 cards + 1 关系箭头(c1→c2,删 c1 时级联删)。初始 upsert 各 1 undo 步。
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'c2', kind: 'card', x: 200, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'c3', kind: 'card', x: 400, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2', color: 'black' })
+    const stepsBefore = (() => { let n = 0; while (h.canUndo()) { h.undo(); n++ } return n })()
+    expect(stepsBefore).toBe(4) // 4 个初始 upsert = 4 步
+
+    // 重做回到完整状态(redo 栈顺序),再多选 c1+c2+c3 删除。
+    const redoHost = host as unknown as { canRedo: () => boolean; redo: () => void }
+    while (redoHost.canRedo()) {
+      redoHost.redo()
+    }
+    expect(host.getElement('c3')).toBeDefined()
+    h.setSelectedIds(['c1', 'c2', 'c3'])
+    keydown('Delete')
+
+    // 全删
+    expect(host.getElement('c1')).toBeUndefined()
+    expect(host.getElement('c2')).toBeUndefined()
+    expect(host.getElement('c3')).toBeUndefined()
+    // a1 级联删(端点 c1 没了)
+    expect(host.getElement('a1')).toBeUndefined()
+
+    // undo 一次 → 全恢复(证明 3 删除 + 级联合并为 1 undo 步)
+    h.undo()
+    expect(host.getElement('c1')).toBeDefined()
+    expect(host.getElement('c2')).toBeDefined()
+    expect(host.getElement('c3')).toBeDefined()
+    expect(host.getElement('a1')).toBeDefined()
+
+    // 再 undo 一次只能回到删前更早一步(不是再多 2 步才恢复全删)
+    // 即:删除这一组操作只贡献了 1 个 undo 步。
+  })
+
   it('text 模式 Delete 不删(文本编辑中)', () => {
     const host = new SelfBuiltAdapter(document.createElement('canvas'))
     host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })

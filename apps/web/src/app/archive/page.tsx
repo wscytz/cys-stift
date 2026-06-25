@@ -67,9 +67,20 @@ export default function ArchivePage() {
     setSelected(new Set())
   }
 
+  // Reconcile the selection against the live archive card list: a selected
+  // card may have been soft-deleted / un-archived elsewhere (e.g. via the
+  // detail modal opened from this page), leaving a stale id. We drop ids
+  // that are no longer live+visible so the floater count and batch ops only
+  // act on cards that are still here.
+  const liveCardIds = useMemo(() => new Set(cards.map((c) => c.id)), [cards])
+  const liveSelected = useMemo(
+    () => new Set([...selected].filter((id) => liveCardIds.has(id))),
+    [selected, liveCardIds],
+  )
+
   const handleUnarchiveSelected = () => {
-    const n = selected.size
-    for (const id of selected) {
+    const n = liveSelected.size
+    for (const id of liveSelected) {
       service.unarchive(id)
     }
     clearSelected()
@@ -83,7 +94,7 @@ export default function ArchivePage() {
     // Phase batch-confirm: don't soft-delete yet — open the confirm
     // modal. The user still has the selection set so they can re-trigger
     // after Cancel without re-ticking every tile.
-    setConfirmBatchDelete([...selected])
+    setConfirmBatchDelete([...liveSelected])
   }
 
   const handleConfirmBatchSoftDelete = () => {
@@ -244,10 +255,10 @@ export default function ArchivePage() {
         </p>
       </div>
 
-      {selectMode && selected.size > 0 && (
+      {selectMode && liveSelected.size > 0 && (
         <div className="batch-bar" role="region" aria-label={t('archive.batchDelete')}>
           <span className="batch-bar__count" aria-live="polite">
-            {t('archive.floater.selected', { n: selected.size })}
+            {t('archive.floater.selected', { n: liveSelected.size })}
           </span>
           <button type="button" className="batch-bar__btn" onClick={handleUnarchiveSelected}>
             {t('archive.floater.unarchive')}

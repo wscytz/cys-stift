@@ -34,10 +34,28 @@ export function useClampedPanelPosition(
   fallback: { width: number; height: number },
 ): PanelAnchor | null {
   const [size, setSize] = useState<{ w: number; h: number } | null>(null)
+  // Track the viewport so a re-clamp fires when the window shrinks (a panel
+  // clamped inside a wide window would otherwise overflow / sit off-screen
+  // after the window is made smaller — the regression from the J/K/L round).
+  const [viewport, setViewport] = useState<{ vw: number; vh: number } | null>(null)
 
   useLayoutEffect(() => {
     const el = ref.current
-    if (!el) return
+    // Read + track viewport size (also feeds the initial value).
+    if (typeof window !== 'undefined') {
+      setViewport({ vw: window.innerWidth, vh: window.innerHeight })
+    }
+    const onResize = () => {
+      if (typeof window === 'undefined') return
+      setViewport((prev) => {
+        const vw = window.innerWidth
+        const vh = window.innerHeight
+        if (prev && prev.vw === vw && prev.vh === vh) return prev
+        return { vw, vh }
+      })
+    }
+    window.addEventListener('resize', onResize)
+    if (!el) return () => window.removeEventListener('resize', onResize)
     const measure = () => {
       const w = el.offsetWidth
       const h = el.offsetHeight
@@ -51,6 +69,7 @@ export function useClampedPanelPosition(
       ro.observe(el)
     }
     return () => {
+      window.removeEventListener('resize', onResize)
       ro?.disconnect()
     }
   }, [ref])
@@ -58,15 +77,16 @@ export function useClampedPanelPosition(
   if (!ideal) return null
   const w = size?.w ?? fallback.width
   const h = size?.h ?? fallback.height
-  const vw = typeof window !== 'undefined' ? window.innerWidth : 1280
-  const vh = typeof window !== 'undefined' ? window.innerHeight : 720
+  const vw = viewport?.vw ?? (typeof window !== 'undefined' ? window.innerWidth : 1280)
+  const vh = viewport?.vh ?? (typeof window !== 'undefined' ? window.innerHeight : 720)
 
   // left(中心 x):左/右半宽 + margin 都要在屏内。
   const minLeft = w / 2 + MARGIN
   const maxLeft = Math.max(minLeft, vw - w / 2 - MARGIN)
   const left = Math.min(Math.max(ideal.left, minLeft), maxLeft)
 
-  // top(面板顶边):不压工具栏,不溢出底部。
+  // top(面板顶边):不压工具栏,不溢出底部。面板比可用区高时(矮视口),
+  // maxTop 会回落到 minTop,面板从 TOOLBAR_OFFSET 起(顶部对齐,底部溢出可接受)。
   const minTop = TOOLBAR_OFFSET
   const maxTop = Math.max(minTop, vh - h - MARGIN)
   const top = Math.min(Math.max(ideal.top, minTop), maxTop)

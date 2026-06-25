@@ -89,11 +89,16 @@ export function RelationPanel({
     if (a && b) inferred = inferRelationTypeFromContext(a as Card, b as Card)
   }
 
-  // Auto-apply inferred type once per (arrowId, inferredType) pair.
+  // Auto-apply inferred type once per (arrowId, arrow text, inferredType) pair.
+  // Keying on `${id}:${text}` (not just `${id}:${inferred.id}`) means: after the
+  // user undoes the auto-apply OR clears the label, re-selecting the arrow (or
+  // the text becoming empty) changes the key → inference is allowed to re-fire.
+  // Without this, the appliedKey ref would match forever and the undone type
+  // would never re-infer.
   const appliedKey = useRef<string | null>(null)
   useEffect(() => {
     if (!isArrowSelected || !arrow || !inferred || activeType) return
-    const key = `${arrow.id}:${inferred.id}`
+    const key = `${arrow.id}:${arrow.text ?? ''}:${inferred.id}`
     if (appliedKey.current === key) return
     appliedKey.current = key
     applyRelationType(host, arrow.id, inferred, inferred.id)

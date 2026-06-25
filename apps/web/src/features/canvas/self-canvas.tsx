@@ -72,6 +72,14 @@ export function SelfCanvas({
   const committedRef = useRef(false)
   const [edit, setEdit] = useState<EditSession | null>(null)
   const [textValue, setTextValue] = useState('')
+  // Bug 7: mirror the in-progress edit state into refs so an unmount cleanup
+  // (canvas switch) can commit the latest typed text. `commitEdit` reads
+  // component state, but on unmount React captures the last-render values —
+  // these refs always hold the freshest edit + value for the cleanup path.
+  const editRef = useRef<EditSession | null>(null)
+  const textValueRef = useRef('')
+  editRef.current = edit
+  textValueRef.current = textValue
   const { t } = useI18n()
 
   useEffect(() => {
@@ -202,10 +210,13 @@ export function SelfCanvas({
   const commitEdit = () => {
     if (committedRef.current) return // 已 commit/cancel(防 onBlur + Ctrl+Enter 双触发)
     committedRef.current = true
-    const v = textValue.trim()
+    // Read from refs (not state) so this stays safe when called from an
+    // unmount cleanup, where the closure would otherwise capture stale state.
+    const v = textValueRef.current.trim()
+    const curEdit = editRef.current
     const adapter = adapterInner.current
     const canvas = innerCanvasRef.current
-    if (v && edit && adapter && canvas) {
+    if (v && curEdit && adapter && canvas) {
       const ctx = canvas.getContext('2d')
       if (ctx) {
         const font = `14px ${readToken('--font-body', 'Inter, sans-serif')}`
@@ -215,12 +226,24 @@ export function SelfCanvas({
           (typeof crypto !== 'undefined' && 'randomUUID' in crypto
             ? crypto.randomUUID()
             : Math.random().toString(36).slice(2))
-        adapter.upsert({ id, kind: 'text', x: edit.pageX, y: edit.pageY, w, h, rotation: 0, text: v, color: 'black' })
+        adapter.upsert({ id, kind: 'text', x: curEdit.pageX, y: curEdit.pageY, w, h, rotation: 0, text: v, color: 'black' })
       }
     }
     setEdit(null)
     setTextValue('')
   }
+
+  // Bug 7: if the component unmounts mid-edit (canvas switch), commitEdit is
+  // never called → in-progress typed text is silently dropped. Commit any
+  // pending text in the cleanup. committedRef prevents double-commit if the
+  // textarea's onBlur also fires during teardown.
+  useEffect(() => {
+    return () => {
+      if (editRef.current && !committedRef.current) {
+        commitEdit()
+      }
+    }
+  }, [])
 
   return (
     <>

@@ -27,6 +27,15 @@ export interface CreateCardFormProps {
     codeSnippets: CodeBlock[]
     quotes: Quote[]
   }) => void
+  /**
+   * Whether the backing DB/service is hydrated and ready to accept writes.
+   * The form renders outside the page's `!ready` loading gate so the user
+   * can type their draft before hydration; but submitting before the repo
+   * is hydrated would call into an unhydrated service and throw with no
+   * error boundary → route crash. When false the submit button is disabled
+   * and handleSubmit early-returns. Defaults to true (other callers).
+   */
+  ready?: boolean
 }
 
 type Section = 'links' | 'code' | 'quotes' | null
@@ -50,10 +59,10 @@ interface ManualDraftPayload {
  * persisted to draftStore; the latest draft is restored on mount. A
  * successful submit (or Clear) clears the draft.
  */
-export function CreateCardForm({ onCreate }: CreateCardFormProps) {
+export function CreateCardForm({ onCreate, ready = true }: CreateCardFormProps) {
   const { t } = useI18n()
-  const { draft, ready } = useDraft<ManualDraftPayload>('manual')
-  const restored = ready && draft ? draft.payload : null
+  const { draft, ready: draftReady } = useDraft<ManualDraftPayload>('manual')
+  const restored = draftReady && draft ? draft.payload : null
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [openSection, setOpenSection] = useState<Section>(null)
@@ -68,7 +77,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
 
   // Restore the latest persisted manual draft once (after hydration).
   useEffect(() => {
-    if (ready && restored) {
+    if (draftReady && restored) {
       setTitle(restored.title ?? '')
       setBody(restored.body ?? '')
       setLinks(restored.links ?? [])
@@ -76,7 +85,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
       setQuotes(restored.quotes ?? [])
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready])
+  }, [draftReady])
 
   // Debounced autosave of the full form state.
   const persistDraft = useDebouncedCallback(
@@ -124,7 +133,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
     // a real auto-focus would require a ref-forwarded Input (not in MVP).
   }, [])
 
-  const canSubmit = title.trim().length > 0 && !pending
+  const canSubmit = title.trim().length > 0 && !pending && ready
 
   const reset = () => {
     setTitle('')
@@ -138,6 +147,7 @@ export function CreateCardForm({ onCreate }: CreateCardFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!ready) return // DB not hydrated yet — guard against crash into unhydrated service
     if (!canSubmit) return
     const cleanTitle = title.trim()
     const cleanBody = body.trim()
