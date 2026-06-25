@@ -20,7 +20,7 @@ import { hitTest, screenToPage } from './self-built-hittest'
 import { commitFreedraw, translateFreedraw, scaleFreedrawToBox } from './self-built-freedraw'
 import { handleAtPoint, resizeGeometry, type Handle } from './self-built-resize'
 import { marqueeSelect } from './self-built-marquee'
-import { arrowPreviewEndpoints, arrowEndpoints } from './self-built-arrow'
+import { arrowPreviewEndpoints, arrowEndpoints, arrowRoute } from './self-built-arrow'
 import { arrowKeyDelta, selectAllIds, parseKeyboardAction } from './self-built-keyboard'
 import { intersectsBounds, viewportBounds, normalizeBox } from './bounds'
 
@@ -56,6 +56,8 @@ export class SelfBuiltAdapter implements CanvasHost {
   private connecting: { fromId: string; pointer: { x: number; y: number } } | null = null
   /** 拖动箭头弯曲手柄(设 curve 控制点)。null=未在拖。 */
   private curveDragging: { id: string } | null = null
+  /** 拖动折线箭头折点手柄(改 elbow[index] 位置)。null=未在拖。 */
+  private elbowDragging: { id: string; index: number } | null = null
   private keyHandler: ((e: KeyboardEvent) => void) | null = null
   private undoStack: CanvasElement[][] = []
   private redoStack: CanvasElement[][] = []
@@ -353,6 +355,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     this.marquee = null
     this.currentStroke = null
     this.curveDragging = null
+    this.elbowDragging = null
     this.coalescing = false
   }
 
@@ -432,24 +435,43 @@ export class SelfBuiltAdapter implements CanvasHost {
       if (this.activeTool === 'select' && this.selectedIds.size === 1) {
         const selId = [...this.selectedIds][0]!
         const sel = this.getElement(selId)
-        // 箭头弯曲手柄:选中箭头时,点中点附近 → 拖动设 curve(弯曲箭头)。
+        // 箭头手柄:按 route 分支命中。
+        //  - elbow:每个折点方块手柄,点中 → 拖动改折点位置。
+        //  - straight/curve:中点圆点,点中 → 拖动设/改 curve(弯曲箭头)。
+        //    straight 拖出后会变 curve(route + curve 一起设)。
         if (sel && sel.kind === 'arrow') {
-          const { from, to } = arrowEndpoints(sel, this.getElements())
-          if (from && to) {
-            let mx: number, my: number
-            if (sel.curve) {
-              mx = 0.25 * from.x + 0.5 * sel.curve.cx + 0.25 * to.x
-              my = 0.25 * from.y + 0.5 * sel.curve.cy + 0.25 * to.y
-            } else {
-              mx = (from.x + to.x) / 2
-              my = (from.y + to.y) / 2
-            }
-            if (Math.hypot(p.x - mx, p.y - my) <= 8 / this.view.zoom) {
-              this.curveDragging = { id: selId }
+          const route = arrowRoute(sel)
+          if (route === 'elbow' && sel.elbow && sel.elbow.length > 0) {
+            // 折点手柄命中(方块,6px 容差)
+            const idx = sel.elbow.findIndex(
+              (ep) => Math.hypot(p.x - ep.x, p.y - ep.y) <= 8 / this.view.zoom,
+            )
+            if (idx >= 0) {
+              this.elbowDragging = { id: selId, index: idx }
               this.pushUndo()
               this.coalescing = true
               try { this.canvas.setPointerCapture(e.pointerId) } catch { /* jsdom */ }
               return
+            }
+          } else {
+            // 中点手柄命中(圆点,8px 容差)
+            const { from, to } = arrowEndpoints(sel, this.getElements())
+            if (from && to) {
+              let mx: number, my: number
+              if (route === 'curve' && sel.curve) {
+                mx = 0.25 * from.x + 0.5 * sel.curve.cx + 0.25 * to.x
+                my = 0.25 * from.y + 0.5 * sel.curve.cy + 0.25 * to.y
+              } else {
+                mx = (from.x + to.x) / 2
+                my = (from.y + to.y) / 2
+              }
+              if (Math.hypot(p.x - mx, p.y - my) <= 8 / this.view.zoom) {
+                this.curveDragging = { id: selId }
+                this.pushUndo()
+                this.coalescing = true
+                try { this.canvas.setPointerCapture(e.pointerId) } catch { /* jsdom */ }
+                return
+              }
             }
           }
         }
@@ -566,6 +588,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       }
       if (this.curveDragging) {
         // 拖动弯曲手柄:指针 = 想要的曲线中点。反算控制点 C = 2*M - (P0+P1)/2。
+        // 从 straight 拉出曲线时一并设 route='curve'(否则渲染仍看 route=straight 不画曲线)。
         const p = screenToPage(this.view, sx, sy)
         const el = this.getElement(this.curveDragging.id)
         if (el && el.kind === 'arrow') {
@@ -573,8 +596,23 @@ export class SelfBuiltAdapter implements CanvasHost {
           if (from && to) {
             const cx = 2 * p.x - (from.x + to.x) / 2
             const cy = 2 * p.y - (from.y + to.y) / 2
-            this.upsert({ ...el, curve: { cx: Math.round(cx), cy: Math.round(cy) } })
+            this.upsert({
+              ...el,
+              route: el.route ?? 'curve',
+              curve: { cx: Math.round(cx), cy: Math.round(cy) },
+            })
           }
+        }
+        return
+      }
+      if (this.elbowDragging) {
+        // 拖动折点手柄:指针位置 = 折点新位置(改 elbow[index])。
+        const p = screenToPage(this.view, sx, sy)
+        const el = this.getElement(this.elbowDragging.id)
+        if (el && el.kind === 'arrow' && el.elbow) {
+          const elbows = el.elbow.slice()
+          elbows[this.elbowDragging.index] = { x: Math.round(p.x), y: Math.round(p.y) }
+          this.upsert({ ...el, elbow: elbows })
         }
         return
       }

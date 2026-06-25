@@ -36,6 +36,14 @@ import {
 import { inferRelationTypeFromContext } from './relation-inference'
 import { useCardService } from './card-service-context'
 import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
+import { arrowRoute, arrowEndpoints } from '@cys-stift/canvas-engine'
+
+/** 形态切换器图标:直线/曲线/折线(用最简单的 ASCII 形态示意,mono 字体)。 */
+const ROUTE_GLYPH: Record<'straight' | 'curve' | 'elbow', string> = {
+  straight: '—',
+  curve: '⌒',
+  elbow: '⌐',
+}
 
 export function RelationPanel({
   host,
@@ -94,6 +102,24 @@ export function RelationPanel({
 
   const displayType: RelationType | null = activeType ?? inferred
 
+  // 形态切换器:当前 route(straight/curve/elbow)。切到 curve/elbow 时若无数据设默认中点。
+  const currentRoute = arrowRoute(arrow)
+  const setRoute = (route: 'straight' | 'curve' | 'elbow') => {
+    if (route === currentRoute) return
+    host.batch(() => {
+      const { from, to } = arrowEndpoints(arrow, host.getElements())
+      const patch: Partial<CanvasElement> = { route }
+      if (from && to) {
+        const midX = Math.round((from.x + to.x) / 2)
+        const midY = Math.round((from.y + to.y) / 2)
+        if (route === 'curve' && !arrow.curve) patch.curve = { cx: midX, cy: midY }
+        else if (route === 'elbow' && (!arrow.elbow || arrow.elbow.length === 0))
+          patch.elbow = [{ x: midX, y: midY }]
+      }
+      host.upsert({ ...arrow, ...patch })
+    })
+  }
+
   const position = computePanelPosition(arrow, host, canvasEl)
   const panelStyle = position
     ? {
@@ -114,6 +140,23 @@ export function RelationPanel({
       <span className="eyebrow" aria-hidden="true">
         {t('relation.title')}
       </span>
+      <span className="cv-relation__sep" aria-hidden="true" />
+      {(['straight', 'curve', 'elbow'] as const).map((rt) => {
+        const isActive = currentRoute === rt
+        return (
+          <button
+            key={rt}
+            type="button"
+            className={`cv-relation__btn cv-relation__route ${isActive ? 'cv-relation__btn--active' : ''}`}
+            onClick={() => setRoute(rt)}
+            aria-pressed={isActive}
+            title={t(`relation.route.${rt}`)}
+            aria-label={t(`relation.route.${rt}`)}
+          >
+            <span className="cv-relation__route-glyph" aria-hidden="true">{ROUTE_GLYPH[rt]}</span>
+          </button>
+        )
+      })}
       <span className="cv-relation__sep" aria-hidden="true" />
       {RELATION_TYPES.map((rt) => {
         const isActive = displayType?.id === rt.id
@@ -222,6 +265,16 @@ const styles = `
 }
 .cv-relation__label {
   line-height: 1;
+}
+.cv-relation__route {
+  width: 30px;
+  justify-content: center;
+  padding: 0;
+}
+.cv-relation__route-glyph {
+  font-size: 15px;
+  line-height: 1;
+  font-family: var(--font-mono);
 }
 .cv-relation__btn:hover:not(.cv-relation__btn--active) {
   background: var(--color-gray-soft);

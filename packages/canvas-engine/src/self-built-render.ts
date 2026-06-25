@@ -2,7 +2,6 @@
 import type { CanvasElement, CanvasView } from './canvas-host'
 import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments, arrowHeadAngle } from './self-built-arrow'
 import { normalizeBox } from './bounds'
-
 /**
  * 纯渲染函数:把元素画到 ctx 上,带相机(pan/zoom)变换。
  * - 先 clearRect 整个画布(背景色)。
@@ -261,28 +260,41 @@ export function drawSelectionOutlines(
   for (const el of elements) {
     if (!sel.has(el.id)) continue
     if (el.kind === 'arrow') {
-      // 箭头:不画 bbox 框(w=h=0 的关系箭头框是点),改画线段/曲线高亮 + 中点弯曲手柄。
+      // 箭头:不画 bbox 框(w=h=0 的关系箭头框是点),改按 route 画手柄。
+      //  - straight/curve:中点圆点(拖动设 curve 弯曲)
+      //  - elbow:每个折点方块手柄(拖动改折点位置)
       const { from, to } = arrowEndpoints(el, elements)
       if (from && to) {
-        // 曲线中点(有 curve 取贝塞尔 t=0.5,否则线段中点)
-        let mx: number, my: number
-        if (el.curve) {
-          const u = 0.5
-          mx = 0.25 * from.x + 0.5 * el.curve.cx + 0.25 * to.x
-          my = 0.25 * from.y + 0.5 * el.curve.cy + 0.25 * to.y
-        } else {
-          mx = (from.x + to.x) / 2
-          my = (from.y + to.y) / 2
-        }
-        // 中点手柄(蓝圆点,可拖动设 curve)
+        const route = arrowRoute(el)
         ctx.setLineDash([])
-        ctx.fillStyle = tokenResolver('--color-blue', '#1d4ed8')
-        ctx.beginPath()
-        ctx.arc(mx, my, 4 / view.zoom, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.strokeStyle = tokenResolver('--color-white', '#ffffff')
-        ctx.lineWidth = 1.5 / view.zoom
-        ctx.stroke()
+        if (route === 'elbow') {
+          // 折点手柄:方块(白填 + 蓝描),每个 elbow 一个。无折点时不画(退化直线段)。
+          for (const ep of el.elbow ?? []) {
+            ctx.fillStyle = tokenResolver('--color-white', '#ffffff')
+            ctx.fillRect(ep.x - hs, ep.y - hs, hs * 2, hs * 2)
+            ctx.strokeStyle = tokenResolver('--color-blue', '#1d4ed8')
+            ctx.lineWidth = 1.5 / view.zoom
+            ctx.strokeRect(ep.x - hs, ep.y - hs, hs * 2, hs * 2)
+          }
+        } else {
+          // 中点手柄(蓝圆点):curve = 贝塞尔 t=0.5,straight = 线段中点。
+          // straight 时也画——提示用户可拖出 curve(拖后 route 变 curve)。
+          let mx: number, my: number
+          if (route === 'curve' && el.curve) {
+            mx = 0.25 * from.x + 0.5 * el.curve.cx + 0.25 * to.x
+            my = 0.25 * from.y + 0.5 * el.curve.cy + 0.25 * to.y
+          } else {
+            mx = (from.x + to.x) / 2
+            my = (from.y + to.y) / 2
+          }
+          ctx.fillStyle = tokenResolver('--color-blue', '#1d4ed8')
+          ctx.beginPath()
+          ctx.arc(mx, my, 4 / view.zoom, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.strokeStyle = tokenResolver('--color-white', '#ffffff')
+          ctx.lineWidth = 1.5 / view.zoom
+          ctx.stroke()
+        }
       }
       continue
     }
