@@ -3,7 +3,7 @@ import styles from './toolbar.module.css'
 
 export interface ToolbarProps {
   /** Region identifier — controls the 8px colour stripe on the left. */
-  region?: 'capture' | 'inbox' | 'canvas' | 'archive' | 'trash' | 'system'
+  region?: 'capture' | 'inbox' | 'canvas' | 'archive' | 'timeline' | 'trash' | 'system'
   children: ReactNode
 }
 
@@ -30,5 +30,7 @@ function regionColorForStripe(region: ToolbarProps['region']): string {
   if (region === 'capture' || region === 'inbox') return 'red'
   if (region === 'canvas') return 'black'
   if (region === 'archive') return 'blue'
+  // timeline is a cross-cutting view (spans inbox/canvas/archive), neutral grey.
+  if (region === 'timeline') return 'gray'
   return 'gray'
 }

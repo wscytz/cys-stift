@@ -2,6 +2,7 @@
 
 import type { Card, CardId } from '@cys-stift/domain'
 import { ArchiveCardTile } from './archive-card-tile'
+import { groupCardsByDay } from '@/lib/group-by-day'
 
 interface TimelineProps {
   cards: Card[]
@@ -27,13 +28,9 @@ export function Timeline({
 }: TimelineProps) {
   // Group by ISO date (UTC). Cards are already sorted by updatedAt desc,
   // so insertion order in the Map is the desired day-desc order.
-  const groups = new Map<string, Card[]>()
-  for (const c of cards) {
-    const day = c.updatedAt.toISOString().slice(0, 10)
-    const bucket = groups.get(day)
-    if (bucket) bucket.push(c)
-    else groups.set(day, [c])
-  }
+  // (2026-06-25: extracted to shared groupCardsByDay helper; behavior
+  // unchanged — same UTC slice(0,10), same Map insertion order.)
+  const groups = groupCardsByDay(cards, (c) => c.updatedAt)
 
   if (groups.size === 0) {
     return null

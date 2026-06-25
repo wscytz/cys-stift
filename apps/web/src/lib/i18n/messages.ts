@@ -16,6 +16,7 @@ export const messages = {
   'nav.inbox': { zh: '收件箱', en: 'Inbox' },
   'nav.canvas': { zh: '画布', en: 'Canvas' },
   'nav.archive': { zh: '归档', en: 'Archive' },
+  'nav.timeline': { zh: '时间线', en: 'Timeline' },
   'nav.search': { zh: '搜索', en: 'Search' },
   'nav.trash': { zh: '回收站', en: 'Trash' },
   'nav.settings': { zh: '设置', en: 'Settings' },
@@ -266,6 +267,16 @@ export const messages = {
   'archive.batchDeleteConfirmAction': { zh: '软删除 {n} 张', en: 'Soft-delete {n}' },
   'archive.confirmDelete': { zh: '删除', en: 'Delete' },
   'archive.empty': { zh: '没有归档卡片。已归档的卡片会在这里出现。', en: 'No archived cards. Archived cards show up here.' },
+
+  /* ── Timeline (全局时间线视图,P10) ── */
+  'timeline.crumb': { zh: '时间线', en: 'timeline' },
+  'timeline.title': { zh: '想法的时间脉络', en: 'A timeline of your ideas' },
+  'timeline.lede': { zh: '全部非删除卡片按捕获时刻倒序,跨收件箱 / 画布 / 归档——一眼看到每个想法现在落到了哪。', en: 'Every non-deleted card in capture order, across inbox / canvas / archive — see where each idea landed.' },
+  'timeline.empty.title': { zh: '还没有想法。', en: 'No ideas yet.' },
+  'timeline.empty.lede': { zh: '捕获的第一张卡片会出现在这里,按诞生时刻倒序排列。', en: 'Your first captured card shows up here, newest first.' },
+  'timeline.state.inbox': { zh: '收件箱', en: 'Inbox' },
+  'timeline.state.canvas': { zh: '画布「{name}」', en: 'Canvas: {name}' },
+  'timeline.state.archived': { zh: '已归档', en: 'Archived' },
 
   /* ── Trash ── */
   'trash.crumb': { zh: '回收站', en: 'trash' },

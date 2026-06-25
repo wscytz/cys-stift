@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { Tag } from '@cys-stift/ui'
 import type { Card } from '@cys-stift/domain'
 import { useI18n } from '@/lib/i18n'
@@ -9,10 +10,24 @@ import type { MessageKey } from '@/lib/i18n/messages'
 interface ArchiveCardTileProps {
   card: Card
   variant?: 'tile' | 'row'
-  selected: boolean
-  selectMode: boolean
+  /**
+   * Select props are OPTIONAL (2026-06-25 timeline view reuses this tile
+   * for read-only rows with no batch-select). Archive / trash / search
+   * callers pass all three; timeline omits them. The select checkbox only
+   * renders when `selectMode` is truthy, so callers that omit it see no
+   * checkbox UI. Defaults: selectMode=false, selected=false, noop.
+   */
+  selected?: boolean
+  selectMode?: boolean
   onClick: () => void
-  onToggleSelect: () => void
+  onToggleSelect?: () => void
+  /**
+   * 2026-06-25 (timeline): optional badge slot rendered in the meta row
+   * next to the type tag (e.g. the timeline "now in: inbox / canvas X /
+   * archived" state Tag). Both tile + row variants render it. Omit on
+   * archive / trash / search (no badge there).
+   */
+  badge?: ReactNode
   /**
    * L3 (v0.23.3): when true the tile renders as a non-interactive
    * container instead of a <button>. Used by /trash where tiles are
@@ -36,10 +51,11 @@ interface ArchiveCardTileProps {
 export function ArchiveCardTile({
   card,
   variant = 'tile',
-  selected,
-  selectMode,
+  selected = false,
+  selectMode = false,
   onClick,
-  onToggleSelect,
+  onToggleSelect = () => {},
+  badge,
   disabled = false,
   onTogglePin,
 }: ArchiveCardTileProps) {
@@ -71,6 +87,7 @@ export function ArchiveCardTile({
         )}
         <div className="tile__meta">
           <Tag color="blue">{t(typeKeyOf(card.type) as MessageKey)}</Tag>
+          {badge}
           {totalMedia > 0 && <Tag color="red">{totalMedia} media</Tag>}
           <span className="tile__time">
             {card.updatedAt.toISOString().slice(0, 10)}
