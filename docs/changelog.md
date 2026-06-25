@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-06-25 · a11y-systematic · 无障碍系统化(键盘/ARIA/对比度/地标)
+
+3 个 Explore subagent 并行审 a11y(键盘导航+焦点 / ARIA+语义+标题 / 对比度+动效+SR),出 ~45 条清单,HIGH/MED 全做 + 选择性 LOW,subagent 顺序 TDD 执行,跨包零回归。
+
+- **地标 + 标题导航(HIGH)**:8/9 生产页无 `<h1>`(SR 无法按标题导航)→ crumb 改 h1(视觉不变)+ canvas/design sr-only h1;无 skip-link + 路由切换不聚焦(键盘用户每页 Tab 穿过整个 AppMenu)→ skip-link + RouteFocus 客户端组件(usePathname → focus #main);Toolbar div → `<header>`(banner 地标);每页 `<main id="main" tabIndex={-1}>` + sr-only 工具类。
+- **对比度(HIGH)**:disabled 透明度 0.35-0.4 → 黑文字塌到 ~1.4:1 → 全扫 8 处 → 0.55(~3:1);黄 Tag 1.34:1 不可读 → 文字改 --color-black;灰 Tag 4.14:1 → --color-black-soft(token 值不动,修在组件层);tooltip 加 reduced-motion。
+- **键盘可操作(HIGH)**:视图 tab(inbox/archived, grid/timeline)→ 完整 tab 模式(role=tablist/tab/tabpanel + aria-selected + roving tabindex + 方向键);tag chips span onClick 鼠标专用 → button[aria-label](视觉对齐);堆叠 modal Escape 双触发 → defaultPrevented 守卫(canvas card-detail-modal 嵌套 confirmDelete 先让位)。
+- **focus-visible 焦点环(MED 大扫除)**:AppMenu / tile(tile__main/pin/select)/ canvas toolbar / tabs / home nav 统一补 2px 红描边(只键盘触发);已有不重复。
+- **canvas/panel(SR/MED)**:主画布 `<canvas>` 加 role=img + aria-label(此前 SR 遇无标签 void);minimap 折叠英文 → i18n + role=group;**修上轮回归**——canvas 空态 .cv-empty 的 aria-hidden 遮掉了刚加的 /inbox CTA → 移除;AI 触发按钮加 aria-expanded/aria-controls → popover(id=ai-popover)。
+- **LOW 杂项**:editors/ai-popover EN aria-label → t();img alt UUID → 媒体 {n};home nav 与 AppMenu 重名 Primary → 改;toast × 含消息片段;ai-settings 5 label htmlFor;batch bar aria-live;settings 导入结果 role=alert/status;canvas 切换 select aria-label。
+- domain 68 / 引擎 353 / web 551 + build exit 0。
+
+---
+
 ## 2026-06-25 · ui-polish-batch · minimap 优化 + UI 审计打磨(转义产品化主线收口后进入打磨)
 
 主线三步(JSON 备份 / 转义产品化 / AI 介入手绘)全完成后,进入打磨轮。开 3 个 Explore subagent 并行扫画布 / 列表视图 / 模态+全局壳,出 42 条带优先级清单;用户定"全做"。subagent 顺序执行(TDD),主模型审 diff + 跨包验证 + commit。
