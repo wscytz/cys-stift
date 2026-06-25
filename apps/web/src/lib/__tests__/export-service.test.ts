@@ -730,3 +730,73 @@ describe('importFromJson — canvases + freeform round-trip', () => {
     expect(restoredCards[0]!.id).toBe('legacy-1')
   })
 })
+
+// ── importFromJson — freeform save 失败诚实回报 (import-freeform-atomicity) ──
+//
+// canvasFreeformStore.save 返回 Promise<boolean>(true=OPFS/localStorage 持久化成功,
+// false=双失败)。此前 importFromJson 忽略该返回值,无条件 freeformCanvases++ ——
+// 部分画布几何静默丢失却返回 ok:true 不报错。这里覆盖 save 失败路径:检查返回值,
+// 累计 freeformSkipped,不整体失败(卡片/canvas 列表已落地有 rollback)。
+describe('importFromJson — freeform save 失败诚实回报', () => {
+  /** Build a payload with 2 freeform canvases (cv1 + cv2) carrying rect elements. */
+  function buildTwoFreeformPayload() {
+    const cv1 = 'cv1' as unknown as CanvasId
+    const cv2 = 'cv2' as unknown as CanvasId
+    const rect = (id: string): CanvasElement => ({
+      id,
+      kind: 'rect',
+      x: 0,
+      y: 0,
+      w: 10,
+      h: 10,
+      rotation: 0,
+      color: 'red',
+    })
+    return JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      app: "cy's Stift",
+      cards: [{ id: 'c1', title: 't', body: 'b' }],
+      canvases: {
+        canvases: [makeCanvas({ id: cv1 }), makeCanvas({ id: cv2 })],
+        activeCanvasId: 'cv1',
+      },
+      freeform: {
+        cv1: { v: 1, app: 'cys-stift', elements: [rect('r1')] },
+        cv2: { v: 1, app: 'cys-stift', elements: [rect('r2')] },
+      },
+    })
+  }
+
+  it('canvasFreeformStore.save 返回 false → freeformSkipped 计数,不整体失败', async () => {
+    const json = buildTwoFreeformPayload()
+    // 必须用 mod 同一模块实例的 canvasFreeformStore(beforeEach 的
+    // vi.resetModules 会让 mod 拿到新实例,与顶部静态 import 不是同一个)。
+    const { canvasFreeformStore: store } = await import('../canvas-freeform-store')
+    // cv1 save 成功(true),cv2 save 失败(false —— OPFS+localStorage 双失败模拟)。
+    const spy = vi
+      .spyOn(store, 'save')
+      .mockImplementation(async (id) => id === 'cv1')
+
+    const result = await mod.importFromJson(json)
+
+    expect(result.ok).toBe(true) // 核心数据成功,不整体失败
+    expect(result.freeformCanvases).toBe(1) // 只计成功的
+    expect(result.freeformSkipped).toBe(1) // 失败的诚实计
+    spy.mockRestore()
+  })
+
+  it('全部 freeform save 成功 → freeformSkipped 不出现(向后兼容)', async () => {
+    const json = buildTwoFreeformPayload()
+    const { canvasFreeformStore: store } = await import('../canvas-freeform-store')
+    const spy = vi.spyOn(store, 'save').mockResolvedValue(true)
+
+    const result = await mod.importFromJson(json)
+
+    expect(result.ok).toBe(true)
+    expect(result.freeformCanvases).toBe(2)
+    // 全成功 → freeformSkipped 不出现(向后兼容:全成功不报 skipped)
+    expect(result.freeformSkipped).toBeUndefined()
+    spy.mockRestore()
+  })
+})

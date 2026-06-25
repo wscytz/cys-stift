@@ -158,8 +158,12 @@ export interface ImportResult {
   mediaAssets: number
   /** 导入的 canvas 数(写入 canvases localStorage key 的条数)。 */
   canvases?: number
-  /** 导入了 freeform 几何的 canvas 数(OPFS/localStorage)。 */
+  /** 导入成功 freeform 几何的 canvas 数(OPFS/localStorage)。 */
   freeformCanvases?: number
+  /** freeform 持久化失败的 canvas 数(OPFS+localStorage 双失败)。
+   *  不整体失败(卡片/canvas 列表已成功落地且有 rollback),但诚实回报供 UI 提示。
+   *  全成功时为 undefined(向后兼容)。 */
+  freeformSkipped?: number
   error?: string
 }
 
@@ -347,11 +351,15 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
   // localStorage rollback——若上面写入失败已 early return rollback,根本到不了这里。
   // 全量 import 覆盖语义;canvasFreeformStore.save 内部 best-effort(OPFS 失败回退
   // localStorage)。card 元素会被 store 自动过滤(DB 是单一可信源,见 spec §6.11)。
+  // save 返回 false = OPFS+localStorage 双失败:不整体失败(卡片/canvas 列表已落地),
+  // 但累计 freeformSkipped 诚实回报供 UI 提示(此前忽略返回值 → 静默丢失)。
   let freeformCanvases = 0
+  let freeformSkipped = 0
   if (payload.freeform) {
     for (const [canvasId, snap] of Object.entries(payload.freeform)) {
-      await canvasFreeformStore.save(canvasId as CanvasId, snap.elements)
-      freeformCanvases++
+      const saved = await canvasFreeformStore.save(canvasId as CanvasId, snap.elements)
+      if (saved) freeformCanvases++
+      else freeformSkipped++
     }
   }
 
@@ -361,5 +369,6 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
     mediaAssets: Object.keys(payload.mediaAssets ?? {}).length,
     ...(payload.canvases ? { canvases: payload.canvases.canvases.length } : {}),
     ...(freeformCanvases > 0 ? { freeformCanvases } : {}),
+    ...(freeformSkipped > 0 ? { freeformSkipped } : {}),
   }
 }

@@ -310,6 +310,7 @@ export const messages = {
   'settings.importConfirmTitle': { zh: '确认导入', en: 'Confirm import' },
   'settings.importConfirmBody': { zh: '导入将覆盖当前所有数据(卡片 / 画布 / 媒体 / 设置)。此操作不可撤销,建议先导出备份。确认继续?', en: 'Importing overwrites all current data (cards / canvases / media / settings). This cannot be undone — export a backup first. Continue?' },
   'settings.importOk': { zh: '已导入 {cards} 张卡片 · {mediaAssets} 个媒体 · {canvases} 个画布 · {freeform} 组画布几何。正在重新加载…', en: 'Imported {cards} cards · {mediaAssets} media · {canvases} canvases · {freeform} freeform sets. Reloading…' },
+  'settings.importFreeformSkipped': { zh: '· {n} 个画布几何因存储满跳过', en: '· {n} canvas geometries skipped (storage full)' },
   'settings.importFail': { zh: '导入失败：{error}', en: 'Import failed: {error}' },
   'settings.importReadFailed': { zh: '读取文件失败', en: 'Read failed' },
 
