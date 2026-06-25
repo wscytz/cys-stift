@@ -75,6 +75,12 @@ export type DslArrowOp = {
   h?: number
   /** 弯曲控制点(二次贝塞尔,绝对页坐标)。关系/自由箭头均可。 */
   curve?: { cx: number; cy: number }
+  /** 箭头路由形态:straight(直线)/curve(弯曲)/elbow(折线)。缺省 straight。
+   *  向后兼容:无 route 但有 curve → 当 curve(serialize 不为 straight 主动输出 route,
+   *  除非显式切过)。 */
+  route?: 'straight' | 'curve' | 'elbow'
+  /** 折线折点(1-2 个,绝对页坐标)。route='elbow' 时用。 */
+  elbow?: { x: number; y: number }[]
 }
 
 export type DslOp = DslCardOp | DslFreeOp | DslArrowOp
@@ -122,6 +128,10 @@ const DASH_RE = /@dash\((solid|dashed|dotted)\)/
 const ARROWHEAD_RE = /@arrowhead\((arrow|triangle|none)\)/
 /** 弯曲控制点:@curve(cx, cy)(支持负坐标)。 */
 const CURVE_RE = /@curve\((-?\d+),\s*(-?\d+)\)/
+/** 路由形态:@route(straight|curve|elbow)。 */
+const ROUTE_RE = /@route\((straight|curve|elbow)\)/
+/** 折点:@elbow(x,y;x,y) — 分号分隔 1-2 个折点(均支持负坐标)。 */
+const ELBOW_RE = /@elbow\(([^)]+)\)/
 
 function extractId(text: string): string | null {
   const m = text.match(ID_RE)
@@ -179,6 +189,23 @@ function extractCurve(text: string): { cx: number; cy: number } | undefined {
   const m = text.match(CURVE_RE)
   if (!m) return undefined
   return { cx: Number(m[1]), cy: Number(m[2]) }
+}
+
+function extractRoute(text: string): 'straight' | 'curve' | 'elbow' | undefined {
+  const m = text.match(ROUTE_RE)
+  return m?.[1] as 'straight' | 'curve' | 'elbow' | undefined
+}
+
+/** 解析 @elbow(x,y;x,y):分号分隔,每个折点 x,y(支持负)。返回 1-2 个折点;解析失败 → undefined。 */
+function extractElbow(text: string): { x: number; y: number }[] | undefined {
+  const m = text.match(ELBOW_RE)
+  if (!m) return undefined
+  const pts = m[1]!
+    .split(';')
+    .map((pair) => pair.trim().match(/^(-?\d+)\s*,\s*(-?\d+)$/))
+    .filter(Boolean)
+    .map((pm) => ({ x: Number(pm![1]), y: Number(pm![2]) }))
+  return pts.length >= 1 ? pts.slice(0, 2) : undefined
 }
 
 /**
@@ -260,6 +287,8 @@ export function parseDslWithDiagnostics(dslText: string): {
           dash: extractDash(line),
           arrowhead: extractArrowhead(line),
           curve: extractCurve(line),
+          route: extractRoute(line),
+          elbow: extractElbow(line),
         })
       } else {
         // 自由箭头:无 from/to,需 pos + size(w/h 可负,编码线段方向)
@@ -288,6 +317,8 @@ export function parseDslWithDiagnostics(dslText: string): {
           dash: extractDash(line),
           arrowhead: extractArrowhead(line),
           curve: extractCurve(line),
+          route: extractRoute(line),
+          elbow: extractElbow(line),
         })
       }
       continue

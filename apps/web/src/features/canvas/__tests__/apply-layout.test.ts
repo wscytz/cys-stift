@@ -414,4 +414,39 @@ describe('applyLayout', () => {
     ])
     expect(res).toEqual({ applied: 0, skipped: 2 })
   })
+
+  // ── arrow route (curve/elbow) apply ──────────────────────────────────────
+
+  it('creates a relation arrow with route=curve + curve', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    host.upsert({ id: 'c2', kind: 'card', x: 50, y: 0, w: 10, h: 10, rotation: 0 })
+    applyLayout(host, [
+      { type: 'arrow', from: 'c1', to: 'c2', route: 'curve', curve: { cx: 30, cy: 40 } },
+    ])
+    const el = host.getElements().find((e) => e.kind === 'arrow')!
+    expect(el).toMatchObject({ route: 'curve', curve: { cx: 30, cy: 40 } })
+  })
+
+  it('creates a relation arrow with route=elbow + elbow', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    host.upsert({ id: 'c2', kind: 'card', x: 50, y: 50, w: 10, h: 10, rotation: 0 })
+    applyLayout(host, [
+      { type: 'arrow', from: 'c1', to: 'c2', route: 'elbow', elbow: [{ x: 40, y: 10 }, { x: 40, y: 40 }] },
+    ])
+    const el = host.getElements().find((e) => e.kind === 'arrow')!
+    expect(el).toMatchObject({ route: 'elbow', elbow: [{ x: 40, y: 10 }, { x: 40, y: 40 }] })
+  })
+
+  it('updates an existing arrow route by id (curve → elbow)', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    host.upsert({ id: 'c2', kind: 'card', x: 50, y: 0, w: 10, h: 10, rotation: 0 })
+    host.upsert({ id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2', route: 'curve', curve: { cx: 30, cy: 40 } })
+    applyLayout(host, [{ type: 'arrow', id: 'a1', from: 'c1', to: 'c2', route: 'elbow', elbow: [{ x: 30, y: 5 }] }])
+    const el = host.getElement('a1')!
+    expect(el.route).toBe('elbow')
+    expect(el.elbow).toEqual([{ x: 30, y: 5 }])
+  })
 })

@@ -228,6 +228,54 @@ describe('parseDsl', () => {
     expect(op.curve).toEqual({ cx: 50, cy: 80 })
   })
 
+  // ── @route / @elbow(箭头路由形态:弯曲/折线)──
+
+  it('parses @route(curve) on a relation arrow', () => {
+    const result = parseDsl('[arrow #a1] from #c1 to #c2 @route(curve) @curve(150, -30)')
+    const op = result[0]!
+    if (op.type !== 'arrow') throw new Error('expected arrow op')
+    expect(op.route).toBe('curve')
+    expect(op.curve).toEqual({ cx: 150, cy: -30 })
+  })
+
+  it('parses @route(elbow) with 1 corner', () => {
+    const result = parseDsl('[arrow #a1] from #c1 to #c2 @route(elbow) @elbow(100,50)')
+    const op = result[0]!
+    if (op.type !== 'arrow') throw new Error('expected arrow op')
+    expect(op.route).toBe('elbow')
+    expect(op.elbow).toEqual([{ x: 100, y: 50 }])
+  })
+
+  it('parses @elbow with 2 corners (semicolon-separated, negatives ok)', () => {
+    const result = parseDsl('[arrow #a1] from #c1 to #c2 @route(elbow) @elbow(100,50;-20,200)')
+    const op = result[0]!
+    if (op.type !== 'arrow') throw new Error('expected arrow op')
+    expect(op.elbow).toEqual([{ x: 100, y: 50 }, { x: -20, y: 200 }])
+  })
+
+  it('parses @route(straight) explicitly', () => {
+    const result = parseDsl('[arrow #a1] from #c1 to #c2 @route(straight)')
+    const op = result[0]!
+    if (op.type !== 'arrow') throw new Error('expected arrow op')
+    expect(op.route).toBe('straight')
+  })
+
+  it('elbow on a free arrow (pos+size+route+elbow)', () => {
+    const result = parseDsl('[arrow #fa] @pos(0,0) @size(100,100) @route(elbow) @elbow(50,0;50,100)')
+    const op = result[0]!
+    if (op.type !== 'arrow') throw new Error('expected arrow op')
+    expect(op.freeArrow).toBe(true)
+    expect(op.route).toBe('elbow')
+    expect(op.elbow).toEqual([{ x: 50, y: 0 }, { x: 50, y: 100 }])
+  })
+
+  it('arrow without @route → route undefined (backward compat: straight)', () => {
+    const result = parseDsl('[arrow #a1] from #c1 to #c2')
+    const op = result[0]!
+    if (op.type !== 'arrow') throw new Error('expected arrow op')
+    expect(op.route).toBeUndefined()
+  })
+
   it('free arrow without pos+size is skipped', () => {
     const result = parseDsl('[arrow #fa3] @color(red)')
     expect(result).toHaveLength(0)

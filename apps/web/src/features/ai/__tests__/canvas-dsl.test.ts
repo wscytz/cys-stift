@@ -192,6 +192,66 @@ describe('canvas DSL round-trip (serialize → parse)', () => {
   })
 })
 
+// ── 箭头路由形态 route/curve/elbow:序列化 + round-trip ──────────────────────
+describe('serializeCanvas — arrow route (curve/elbow)', () => {
+  it('route=curve 序列化 @route(curve) + @curve', () => {
+    const out = serializeCanvas([
+      { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2', route: 'curve', curve: { cx: 150, cy: -30 } },
+    ])
+    expect(out).toContain('@route(curve)')
+    expect(out).toContain('@curve(150,-30)')
+  })
+  it('route=elbow 序列化 @route(elbow) + @elbow(分号分隔)', () => {
+    const out = serializeCanvas([
+      { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2', route: 'elbow', elbow: [{ x: 100, y: 50 }, { x: -20, y: 200 }] },
+    ])
+    expect(out).toContain('@route(elbow)')
+    expect(out).toContain('@elbow(100,50;-20,200)')
+  })
+  it('route=straight 序列化 @route(straight)(显式,即便无 curve/elbow)', () => {
+    const out = serializeCanvas([
+      { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2', route: 'straight' },
+    ])
+    expect(out).toContain('@route(straight)')
+  })
+  it('无 route 的旧箭头不输出 @route(向后兼容,不污染直线)', () => {
+    const out = serializeCanvas([
+      { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2' },
+    ])
+    expect(out).not.toContain('@route')
+  })
+})
+
+describe('canvas DSL round-trip — arrow route', () => {
+  it('route=curve + @curve round-trips', () => {
+    const els: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'c2', kind: 'card', x: 300, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2', route: 'curve', curve: { cx: 200, cy: 80 } },
+    ]
+    const arrow = parseDsl(serializeCanvas(els)).find((o) => o.type === 'arrow')!
+    expect(arrow).toMatchObject({ route: 'curve', curve: { cx: 200, cy: 80 } })
+  })
+  it('route=elbow + @elbow(2 点)round-trips', () => {
+    const els: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'c2', kind: 'card', x: 300, y: 300, w: 100, h: 100, rotation: 0 },
+      { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2', route: 'elbow', elbow: [{ x: 250, y: 50 }, { x: 250, y: 250 }] },
+    ]
+    const arrow = parseDsl(serializeCanvas(els)).find((o) => o.type === 'arrow')!
+    expect(arrow).toMatchObject({ route: 'elbow', elbow: [{ x: 250, y: 50 }, { x: 250, y: 250 }] })
+  })
+  it('route=straight round-trips', () => {
+    const els: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'c2', kind: 'card', x: 300, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2', route: 'straight' },
+    ]
+    const arrow = parseDsl(serializeCanvas(els)).find((o) => o.type === 'arrow')!
+    expect(arrow).toMatchObject({ route: 'straight' })
+  })
+})
+
 describe('serializeCanvasReadable — card 行后附 title 注释', () => {
   it('card 行后附 # title 注释', () => {
     const elements: CanvasElement[] = [

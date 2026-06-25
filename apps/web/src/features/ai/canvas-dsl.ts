@@ -81,13 +81,25 @@ export function serializeElement(e: CanvasElement): string {
         `[text #${e.id}] ${pos} @text("${escapeQuoted(e.text ?? '')}")` + color
       )
     case 'arrow': {
-      // Shared relation signature (label/color/dash/arrowhead).
+      // Shared relation signature (label/color/dash/arrowhead/route).
+      // route 只在非 straight(或显式设过)时输出,保向后兼容(旧直线箭头无 @route)。
+      // route + 对应数据(curve / elbow)按 route 输出,三者同源见 arrowRoute。
+      const routeAttr =
+        e.route === 'curve' || e.route === 'elbow' || e.route === 'straight'
+          ? ` @route(${e.route})`
+          : ''
+      const elbowAttr =
+        e.elbow && e.elbow.length > 0
+          ? ` @elbow(${e.elbow.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(';')})`
+          : ''
       const sig =
         (e.text ? ` @label("${escapeQuoted(e.text)}")` : '') +
         color +
         (e.dash ? ` @dash(${e.dash})` : '') +
         (e.arrowhead ? ` @arrowhead(${e.arrowhead})` : '') +
-        (e.curve ? ` @curve(${Math.round(e.curve.cx)},${Math.round(e.curve.cy)})` : '')
+        (e.curve ? ` @curve(${Math.round(e.curve.cx)},${Math.round(e.curve.cy)})` : '') +
+        routeAttr +
+        elbowAttr
       if (e.from && e.to) {
         // Relation arrow: endpoint references.
         return `[arrow #${e.id}] from #${e.from} to #${e.to}${sig}`

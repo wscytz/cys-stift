@@ -183,6 +183,8 @@ function applyArrowOp(host: CanvasHost, op: DslArrowOp): boolean {
           ...(op.color ? { color: op.color } : {}),
           ...(op.label !== undefined ? { text: op.label } : {}),
           ...(op.curve ? { curve: op.curve } : {}),
+          ...(op.route ? { route: op.route } : {}),
+          ...(op.elbow ? { elbow: op.elbow } : {}),
         })
         return true
       }
@@ -201,6 +203,8 @@ function applyArrowOp(host: CanvasHost, op: DslArrowOp): boolean {
       ...(op.dash ? { dash: op.dash } : {}),
       ...(op.arrowhead ? { arrowhead: op.arrowhead } : {}),
       ...(op.curve ? { curve: op.curve } : {}),
+      ...(op.route ? { route: op.route } : {}),
+      ...(op.elbow ? { elbow: op.elbow } : {}),
     })
     return true
   }
@@ -220,6 +224,8 @@ function applyArrowOp(host: CanvasHost, op: DslArrowOp): boolean {
         ...(op.color ? { color: op.color } : {}),
         ...(op.label !== undefined ? { text: op.label } : {}),
         ...(op.curve ? { curve: op.curve } : {}),
+        ...(op.route ? { route: op.route } : {}),
+        ...(op.elbow ? { elbow: op.elbow } : {}),
       })
       return true
     }
@@ -246,6 +252,8 @@ function applyArrowOp(host: CanvasHost, op: DslArrowOp): boolean {
     ...(op.dash ? { dash: op.dash } : {}),
     ...(op.arrowhead ? { arrowhead: op.arrowhead } : {}),
     ...(op.curve ? { curve: op.curve } : {}),
+    ...(op.route ? { route: op.route } : {}),
+    ...(op.elbow ? { elbow: op.elbow } : {}),
   })
   return true
 }

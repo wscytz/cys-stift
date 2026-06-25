@@ -16,6 +16,10 @@ const GRAMMAR = `Canvas DSL grammar (one element per line):
   [text #id] @pos(x, y) @text("...") @color(c)
   [arrow #id] from #a to #b @label("...") @color(c) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none)
   [arrow #id] @pos(x, y) @size(w, h) @color(c)   # free arrow (no from/to)
+  # arrow route (optional, to bend or elbow around obstacles):
+  #   @route(curve) @curve(cx,cy)                 # smooth quadratic curve via one control point
+  #   @route(elbow) @elbow(x,y;x,y)               # 1-2 corner points (semicolon-separated)
+  #   (omit @route for a straight line)
 Rules: card is update-only (content comes from elsewhere, you may reposition but not create orphan cards);
   lines starting with # are comments and ignored; colors are the 6 Bauhaus tokens only.`
 
