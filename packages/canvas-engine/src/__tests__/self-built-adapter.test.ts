@@ -748,3 +748,37 @@ describe('SelfBuiltAdapter doubleClickArrowAt', () => {
     expect(host.doubleClickArrowAt({ x: 500, y: 500 })).toBe(false)
   })
 })
+
+// ── onHistoryChange — undo/redo 按钮 disabled 态刷新信号 ───────────────────
+describe('SelfBuiltAdapter onHistoryChange', () => {
+  it('upsert(新变更)→ 触发(pushUndo 后 canUndo 变 true)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'), { getCardInfo: () => null })
+    let fired = 0
+    host.onHistoryChange(() => fired++)
+    expect(host.canUndo()).toBe(false)
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    expect(fired).toBeGreaterThanOrEqual(1)
+    expect(host.canUndo()).toBe(true)
+  })
+
+  it('undo / redo 触发(按钮 disabled 态刷新)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'), { getCardInfo: () => null })
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    let fired = 0
+    host.onHistoryChange(() => fired++)
+    host.undo()
+    expect(fired).toBe(1)
+    expect(host.canRedo()).toBe(true)
+    host.redo()
+    expect(fired).toBe(2)
+  })
+
+  it('取消订阅后不再触发', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'), { getCardInfo: () => null })
+    let fired = 0
+    const unsub = host.onHistoryChange(() => fired++)
+    unsub()
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    expect(fired).toBe(0)
+  })
+})

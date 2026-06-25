@@ -129,6 +129,23 @@ export default function CanvasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [service, t])
 
+  // undo/redo 按钮 disabled 态:onHistoryChange(upsert/undo/redo)刷新。
+  // 依赖 activeCanvasId:切画布时 SelfCanvas 重建新 adapter,需重订阅。
+  const [, histTick] = useState(0)
+  useEffect(() => {
+    const adapter = handle.current.adapter
+    if (!adapter) return
+    return adapter.onHistoryChange(() => histTick((n) => n + 1))
+  }, [activeCanvasId])
+  const canUndo = !!handle.current.adapter?.canUndo()
+  const canRedo = !!handle.current.adapter?.canRedo()
+  const handleUndo = useCallback(() => {
+    handle.current.adapter?.undo()
+  }, [])
+  const handleRedo = useCallback(() => {
+    handle.current.adapter?.redo()
+  }, [])
+
   const handleAILayout = useCallback(async () => {
     // 防重复点击:已在跑则忽略(审计 M5)。
     if (aiBusy) return
@@ -460,8 +477,12 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           aiBusy={aiBusy}
           showAutoRelate={showAutoRelate}
           adapterReady={adapterReady}
+          canUndo={canUndo}
+          canRedo={canRedo}
           canRename={!!activeCanvas}
           canDelete={activeCanvasId !== DEFAULT_CANVAS_ID}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
           onNewCanvas={() => setCreatingName('')}
           onRename={startRename}
           onDelete={requestDelete}
@@ -628,8 +649,12 @@ function CanvasSideRail({
   aiBusy,
   showAutoRelate,
   adapterReady,
+  canUndo,
+  canRedo,
   canRename,
   canDelete,
+  onUndo,
+  onRedo,
   onNewCanvas,
   onRename,
   onDelete,
@@ -645,8 +670,12 @@ function CanvasSideRail({
   aiBusy: null | 'layout' | 'cluster'
   showAutoRelate: boolean
   adapterReady: boolean
+  canUndo: boolean
+  canRedo: boolean
   canRename: boolean
   canDelete: boolean
+  onUndo: () => void
+  onRedo: () => void
   onNewCanvas: () => void
   onRename: () => void
   onDelete: () => void
@@ -661,6 +690,9 @@ function CanvasSideRail({
   const { t } = useI18n()
   return (
     <nav className="cv-rail" aria-label={t('canvas.sideRail')}>
+      <RailButton label={t('canvas.undo')} onClick={onUndo} disabled={!adapterReady || !canUndo} icon="↶" />
+      <RailButton label={t('canvas.redo')} onClick={onRedo} disabled={!adapterReady || !canRedo} icon="↷" />
+      <span className="cv-rail__sep" aria-hidden="true" />
       <RailButton label={t('canvas.newTitle')} onClick={onNewCanvas} icon="+" />
       <RailButton label={t('canvas.renameTitle')} onClick={onRename} disabled={!canRename} icon="✎" />
       <RailButton label={t('canvas.deleteTitle')} onClick={onDelete} disabled={!canDelete} icon="🗑" />

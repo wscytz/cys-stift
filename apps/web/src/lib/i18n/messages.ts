@@ -117,6 +117,8 @@ export const messages = {
   'canvas.zoomOut': { zh: '缩小', en: 'Zoom out' },
   'canvas.zoomIn': { zh: '放大', en: 'Zoom in' },
   'canvas.zoomFit': { zh: '适配', en: 'Fit' },
+  'canvas.undo': { zh: '撤销', en: 'Undo' },
+  'canvas.redo': { zh: '重做', en: 'Redo' },
   'canvas.emptyTitle': { zh: '空白画布', en: 'Empty canvas' },
   'canvas.emptyHint': { zh: '双击创建 · 拖动摆放', en: 'double-click to create · drag to place' },
   'canvas.tools': { zh: '绘图工具', en: 'Drawing tools' },
