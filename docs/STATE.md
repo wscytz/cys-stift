@@ -124,7 +124,7 @@
 - **主线推进 · B 转义打磨 + A AI 介入手绘**(2026-06-24,主线推进):**B 核心卖点信任裂缝修复**——parseDsl 静默丢坏行(用户写 10 行 7 对 3 错→toast 应用 7 条→以为全生效,3 行静默消失)。`parseDslWithDiagnostics` 返回 `{ops, errors: DslDiagnostic[]}`(line 1-based + text + message,每 continue 丢弃前记);`parseDsl` 改薄 wrapper 返回 `.ops`(AI 路径零变化)。dsl-dialog textarea 下渲染诊断列表(行号+原因,Bauhaus red 样式);全错/空区分;混合诚实报 applied+skipped。commit 64153b6/4d0599c。**A 第三层增值**——此前 AI 只看到 `[freedraw #id] @pos`,不知手绘是什么形状。现在 freedraw 带 R2 安全形状描述:shape(circle/rect/triangle/check/arrow/unknown 离散标签)+ shapeConfidence + features{straightness,closure,elongation,pointCount}(4 标量比例);snapshotCanvas 本地跑 classifyFreedraw+recognizeShape(失败退化仅位置不抛);formatCanvasSnapshot 输出 `shape: circle (85%)` 注释行(parser 跳过注释,round-trip 安全)。**R2 隐私**:点序列绝不进 snapshot 文本(反向断言测试多点 freedraw 不含内部点坐标)。commit a0b891f。privacy.md 更新。485 web + 280 引擎 + build exit 0。**UI 收尾**:canvas 工具栏溢出修复(@cys-stift/ui Toolbar min-width:0,commit b2b611e)。**交付闭环**:Windows Tauri CI(加 build-tauri-windows job,macOS 无法 cross-compile Windows 缺 llvm-rc;commit d0f7fcf/8569193,待 CI 验证)。
 - Tauri **签名公证**(P9 — 需 Apple 证书,用户提供)
 - AI 找重复 / cluster / 时间线(P10)
-- UX 打磨:inbox 批量 / Card markdown 双向 / minimap / undo-redo(P12)
+- UX 打磨(P12,四项全完成):inbox 批量多选(Gmail 式 checkbox + 底部 BatchBar 归档/移到画布/删除)/ Card markdown 双向(inbox MarkdownBody + ReactMarkdown+sanitize)/ minimap / undo-redo(键盘 + 画布 side rail 按钮 + onHistoryChange 事件)
 
 ## 已知 debt(有意 defer,非 bug)
 

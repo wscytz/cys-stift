@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { Button, Card as UICard, Tag, Toolbar } from '@cys-stift/ui'
-import type { Card } from '@cys-stift/domain'
+import type { Card, CardId } from '@cys-stift/domain'
 import { CreateCardForm } from './create-card-form'
 import { CardDetailModal } from '@/features/card/card-detail'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
@@ -28,6 +28,17 @@ export default function InboxPage() {
   // Phase archive-detail: detail state simplified — modal owns view/edit
   // toggle now (was DetailState { card, mode } + page-level confirm).
   const [detail, setDetail] = useState<Card | null>(null)
+  // 批量多选(P12 UX 打磨):checkbox 选中卡片,底部动作栏批量归档/移到画布/删除。
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const toggleSelect = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+  const clearSelection = useCallback(() => setSelected(new Set()), [])
   // v0.15 follow-up: "Send to canvas" routes to the user's currently
   // active canvas (read from canvasStore), not the hardcoded default.
   const { snapshot: canvasesSnap } = useCanvases()
@@ -56,6 +67,40 @@ export default function InboxPage() {
       .filter((c) => c.archived && !c.deletedAt),
   )
   const visible = view === 'inbox' ? inbox : archived
+
+  // 切 view 时丢弃跨 view 的选中(避免选中当前不可见的卡)。
+  useEffect(() => {
+    clearSelection()
+  }, [view, clearSelection])
+
+  // 批量动作(循环调单卡 service;同步,一次 re-render)。
+  const selectedArr = [...selected]
+  const batchArchive = () => {
+    for (const id of selectedArr) {
+      if (view === 'inbox') service.archive(id as CardId)
+      else service.unarchive(id as CardId)
+    }
+    clearSelection()
+  }
+  const batchDelete = () => {
+    for (const id of selectedArr) service.softDelete(id as CardId)
+    clearSelection()
+  }
+  const batchSendToCanvas = () => {
+    const targetCanvasId = canvasesSnap.activeCanvasId ?? DEFAULT_CANVAS_ID
+    selectedArr.forEach((id, i) => {
+      service.moveToCanvas(id as CardId, {
+        canvasId: targetCanvasId,
+        x: 100 + (i % 5) * 40,
+        y: 100 + (i % 5) * 40,
+        w: 200,
+        h: 80,
+        z: i,
+      })
+    })
+    clearSelection()
+  }
+  const selectAll = () => setSelected(new Set(visible.map((c) => c.id)))
 
   return (
     <main className="page">
@@ -115,6 +160,8 @@ export default function InboxPage() {
               <li key={card.id}>
                 <CardTile
                   card={card}
+                  selected={selected.has(card.id)}
+                  onToggleSelect={() => toggleSelect(card.id)}
                   onOpen={() => setDetail(card)}
                   onTogglePin={() =>
                     service.update(card.id, { pinned: !card.pinned })
@@ -131,6 +178,32 @@ export default function InboxPage() {
           </p>
         )}
       </div>
+
+      {selected.size > 0 && (
+        <div className="batch-bar" role="toolbar" aria-label={t('inbox.batch.title')}>
+          <span className="batch-bar__count">
+            {t('inbox.batch.count', { n: String(selected.size) })}
+          </span>
+          <button type="button" className="batch-bar__btn" onClick={batchArchive}>
+            {view === 'inbox' ? t('inbox.batch.archive') : t('inbox.batch.unarchive')}
+          </button>
+          {view === 'inbox' && (
+            <button type="button" className="batch-bar__btn" onClick={batchSendToCanvas}>
+              {t('inbox.batch.sendToCanvas')}
+            </button>
+          )}
+          <button type="button" className="batch-bar__btn batch-bar__btn--danger" onClick={batchDelete}>
+            {t('inbox.batch.delete')}
+          </button>
+          <span className="batch-bar__spacer" />
+          <button type="button" className="batch-bar__btn" onClick={selectAll}>
+            {t('inbox.batch.selectAll')}
+          </button>
+          <button type="button" className="batch-bar__btn" onClick={clearSelection}>
+            {t('inbox.batch.cancel')}
+          </button>
+        </div>
+      )}
 
       {detail && (
         <CardDetailModal
@@ -247,6 +320,7 @@ const styles = `
 .tile:hover { box-shadow: var(--shadow-md); }
 .tile--pinned { outline: 2px solid var(--color-yellow); outline-offset: -1px; }
 .tile--pinned .tile__bar { background: var(--color-yellow); }
+.tile--selected { outline: 2px solid var(--color-blue); outline-offset: -1px; }
 .tile__pin {
   position: absolute; top: var(--space-1); right: var(--space-1); z-index: 2;
   width: 28px; height: 28px;
@@ -256,6 +330,41 @@ const styles = `
   cursor: pointer; padding: 0;
 }
 .tile__pin:hover { color: var(--color-yellow); }
+.tile__select {
+  position: absolute; top: var(--space-1); left: var(--space-1); z-index: 2;
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--color-white); border: var(--border-hairline); border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: var(--font-size-base); line-height: 1;
+  color: var(--color-white); cursor: pointer; padding: 0;
+}
+.tile__select[aria-pressed="true"] { background: var(--color-blue); border-color: var(--color-blue); color: var(--color-white); }
+.tile__select:hover:not([aria-pressed="true"]) { border-color: var(--color-blue); color: var(--color-blue); }
+.batch-bar {
+  position: fixed; left: 50%; bottom: var(--space-4); transform: translateX(-50%);
+  z-index: 30;
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-white); border: 2px solid var(--color-black); border-radius: var(--radius-sm);
+  box-shadow: 4px 4px 0 0 var(--color-black);
+  font-family: var(--font-mono); white-space: nowrap;
+}
+.batch-bar__count {
+  font-size: var(--font-size-xs); letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--color-black); padding: 0 var(--space-1);
+}
+.batch-bar__btn {
+  height: 30px; padding: 0 var(--space-2);
+  display: inline-flex; align-items: center;
+  background: transparent; border: 1px solid var(--color-black); border-radius: var(--radius-sm);
+  color: var(--color-black); font-family: var(--font-mono);
+  font-size: var(--font-size-xs); letter-spacing: 0.1em; text-transform: uppercase;
+  cursor: pointer; transition: background 80ms ease-out, color 80ms ease-out;
+}
+.batch-bar__btn:hover { background: var(--color-black); color: var(--color-white); }
+.batch-bar__btn--danger:hover { background: var(--color-red); border-color: var(--color-red); }
+.batch-bar__spacer { width: var(--space-3); }
+.batch-bar__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tile__main {
   flex: 1; display: flex; width: 100%;
   background: transparent; border: 0; padding: 0; text-align: left;
@@ -294,10 +403,14 @@ function pinFirst<T extends { pinned: boolean }>(cards: T[]): T[] {
 
 function CardTile({
   card,
+  selected,
+  onToggleSelect,
   onOpen,
   onTogglePin,
 }: {
   card: Card
+  selected: boolean
+  onToggleSelect: () => void
   onOpen: () => void
   onTogglePin: () => void
 }) {
@@ -306,7 +419,7 @@ function CardTile({
   const totalMedia =
     card.links.length + card.codeSnippets.length + card.quotes.length
   return (
-    <div className={`tile ${card.pinned ? 'tile--pinned' : ''}`}>
+    <div className={`tile ${card.pinned ? 'tile--pinned' : ''} ${selected ? 'tile--selected' : ''}`}>
       <button
         type="button"
         className="tile__pin"
@@ -318,6 +431,18 @@ function CardTile({
         aria-pressed={card.pinned}
       >
         {card.pinned ? '★' : '☆'}
+      </button>
+      <button
+        type="button"
+        className="tile__select"
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleSelect()
+        }}
+        aria-label={t('inbox.batch.select')}
+        aria-pressed={selected}
+      >
+        {selected ? '✓' : ''}
       </button>
       <button type="button" className="tile__main" onClick={onOpen}>
         <div className="tile__bar" aria-hidden="true" />

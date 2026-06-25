@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-06-25 · inbox-batch-undo · inbox 批量多选 + 画布 undo/redo 按钮
+
+P12 UX 打磨收尾:补两个明确缺失(键盘有 UI 无 / 批量操作空白)。
+
+- **画布 undo/redo 按钮**:此前画布只有键盘 undo/redo(Ctrl+Z/Y),无 UI 按钮——新用户不可发现。SelfBuiltAdapter 加 `onHistoryChange` 事件(pushUndo/undo/redo 触发;restore 不触发 onUserChange 是防 DB 回写循环,故需独立事件给 UI 刷新 disabled)。CanvasSideRail 顶部加 ↶↷ 按钮,disabled 由 canUndo/canRedo 驱动,page 订阅 onHistoryChange(依赖 activeCanvasId,切画布重订阅)刷新。i18n canvas.undo/redo。
+- **inbox 批量多选**:此前 inbox 只能单卡操作,管理大量灵感卡片时无法批量归档/删除/移到画布。Gmail 式:每张 CardTile 左上角加 checkbox(常驻,stopPropagation 不触发详情),选中任意卡 → 底部固定 BatchBar(计数 + 归档/取消归档/移到画布/删除/全选/取消)。批量动作循环调 service.archive/unarchive/moveToCanvas/softDelete。切 view 自动清空选中。i18n inbox.batch.*。
+- 引擎 +3 测试(onHistoryChange);web 544 绿;build exit 0。
+
+P12 UX 打磨四项(inbox 批量 / Card markdown 双向 / minimap / undo-redo)现已全部完成。
+
+---
+
 ## 2026-06-25 · arrow-routes · 箭头形态系统(弯曲 + 折线 + 识别 + DSL)
 
 用户需求:箭头要能弯曲(单控制点光滑曲线)和折线(单/双折点),手绘转箭头要识别形态,AI 能生成弯曲/折线。弯曲箭头 base(commit a708eb1)此前已落地但缺形态切换 UI / 折线 / 识别 / AI 生成。本轮补全箭头形态系统。spec `docs/superpowers/specs/2026-06-25-arrow-routes-design.md`。
