@@ -2,7 +2,7 @@
 import type { CanvasElement, CanvasView } from './canvas-host'
 import { sortByLayer } from './canvas-host'
 import { colorOf, domTokenResolver, type TokenResolver } from './self-built-render'
-import { arrowEndpoints, dashPattern, arrowheadPoints } from './self-built-arrow'
+import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments, arrowHeadAngle } from './self-built-arrow'
 import { unionBounds, expandBounds, normalizeBox, type Bounds } from './bounds'
 
 export interface ElementsToSvgOptions {
@@ -136,17 +136,23 @@ function elementToSvg(
       const tx = to.x + dx, ty = to.y + dy
       const dashArr = dashPattern(el.dash)
       const dashAttr = dashArr.length ? ` stroke-dasharray="${dashArr.join(' ')}"` : ''
-      const ctrl = el.curve ? { x: el.curve.cx + dx, y: el.curve.cy + dy } : null
+      const route = arrowRoute(el)
+      const ctrl = route === 'curve' && el.curve ? { x: el.curve.cx + dx, y: el.curve.cy + dy } : null
       const segs: string[] = []
       if (ctrl) {
         segs.push(`<path d="M ${fx} ${fy} Q ${ctrl.x} ${ctrl.y} ${tx} ${ty}" fill="none" stroke="${stroke}" stroke-width="2"${dashAttr}/>`)
+      } else if (route === 'elbow') {
+        // 折线:<polyline> from→elbows→to。点序列含端点 + 折点。
+        const pts = elbowSegments(el, from, to)
+        if (pts && pts.length >= 2) {
+          const coords = pts.map((p) => `${p.x + dx},${p.y + dy}`).join(' ')
+          segs.push(`<polyline points="${coords}" fill="none" stroke="${stroke}" stroke-width="2"${dashAttr}/>`)
+        }
       } else {
         segs.push(`<line x1="${fx}" y1="${fy}" x2="${tx}" y2="${ty}" stroke="${stroke}" stroke-width="2"${dashAttr}/>`)
       }
-      // 箭头头(与实时渲染同源几何;dash 不应用到箭头头)。曲线终点切线 = to-ctrl。
-      const angle = ctrl
-        ? Math.atan2(ty - ctrl.y, tx - ctrl.x)
-        : Math.atan2(ty - fy, tx - fx)
+      // 箭头头(与实时渲染同源几何;dash 不应用到箭头头;角度按 route = 终点切线)。
+      const angle = arrowHeadAngle(el, from, to)
       const headKind = el.arrowhead ?? 'arrow'
       const pts = arrowheadPoints(headKind, { x: tx, y: ty }, angle)
       if (pts.length === 3) {
@@ -158,11 +164,15 @@ function elementToSvg(
         }
       }
       if (el.text) {
-        // 曲线 label 放贝塞尔 t=0.5 点(曲线中点),直线放线段中点。
+        // label 放路径中点:直线/折线 = 折点序列中点;曲线 = 贝塞尔 t=0.5。
         let mx: number, my: number
         if (ctrl) {
           mx = 0.25 * fx + 0.5 * ctrl.x + 0.25 * tx
           my = 0.25 * fy + 0.5 * ctrl.y + 0.25 * ty
+        } else if (route === 'elbow') {
+          const ep = elbowSegments(el, from, to)
+          const mid = ep ? ep[Math.floor(ep.length / 2)]! : { x: from.x, y: from.y }
+          mx = mid.x + dx; my = mid.y + dy
         } else {
           mx = (fx + tx) / 2; my = (fy + ty) / 2
         }

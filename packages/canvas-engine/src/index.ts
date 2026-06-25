@@ -42,7 +42,7 @@ export { measureText, textEditKeyAction } from './self-built-text'
 // ── 命中测试 ──────────────────────────────────────────────────────────────────
 export { screenToPage, hitTest } from './self-built-hittest'
 
-// ── 箭头几何(端点 / dash 线型 / arrowhead 箭头形) ──────────────────────────────
+// ── 箭头几何(端点 / dash 线型 / arrowhead 箭头形 / route 路由形态) ────────────────
 export {
   dashPattern,
   arrowheadPoints,
@@ -50,6 +50,9 @@ export {
   arrowPreviewEndpoints,
   elementCenter,
   borderPoint,
+  arrowRoute,
+  elbowSegments,
+  arrowHeadAngle,
 } from './self-built-arrow'
 
 // ── SVG 导出(对齐渲染视觉) ───────────────────────────────────────────────────

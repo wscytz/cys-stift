@@ -5,6 +5,9 @@ import {
   arrowEndpoints,
   dashPattern,
   arrowheadPoints,
+  arrowRoute,
+  elbowSegments,
+  arrowHeadAngle,
 } from '../self-built-arrow'
 import type { CanvasElement } from '../canvas-host'
 
@@ -115,5 +118,86 @@ describe('arrowheadPoints — 语义箭头形', () => {
     const [left, , right] = arrowheadPoints('arrow', tip, 0, 10)
     expect(left!.x).toBeLessThan(tip.x)
     expect(right!.x).toBeLessThan(tip.x)
+  })
+})
+
+// ── 箭头路由形态(straight / curve / elbow)共享几何 ──────────────────────────
+describe('arrowRoute — 路由形态解析(含向后兼容)', () => {
+  it('显式 route=straight → straight', () => {
+    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, route: 'straight' } as CanvasElement
+    expect(arrowRoute(a)).toBe('straight')
+  })
+  it('显式 route=curve → curve', () => {
+    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, route: 'curve', curve: { cx: 50, cy: 50 } } as CanvasElement
+    expect(arrowRoute(a)).toBe('curve')
+  })
+  it('显式 route=elbow → elbow', () => {
+    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, route: 'elbow', elbow: [{ x: 50, y: 0 }] } as CanvasElement
+    expect(arrowRoute(a)).toBe('elbow')
+  })
+  it('向后兼容:无 route 但有 curve 数据 → curve(旧箭头)', () => {
+    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, curve: { cx: 50, cy: 50 } } as CanvasElement
+    expect(arrowRoute(a)).toBe('curve')
+  })
+  it('无 route 无 curve 无 elbow → straight(默认)', () => {
+    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0 } as CanvasElement
+    expect(arrowRoute(a)).toBe('straight')
+  })
+  it('route=straight 但残留 curve 数据 → straight(route 优先,切回直线)', () => {
+    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, route: 'straight', curve: { cx: 50, cy: 50 } } as CanvasElement
+    expect(arrowRoute(a)).toBe('straight')
+  })
+})
+
+describe('elbowSegments — 折线路径折点', () => {
+  const from = { x: 0, y: 0 }
+  const to = { x: 100, y: 100 }
+  it('route=elbow 1 折点 → [from, elbow, to]', () => {
+    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, route: 'elbow', elbow: [{ x: 50, y: 0 }] } as CanvasElement
+    expect(elbowSegments(a, from, to)).toEqual([{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 100, y: 100 }])
+  })
+  it('route=elbow 2 折点 → [from, e0, e1, to]', () => {
+    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, route: 'elbow', elbow: [{ x: 50, y: 0 }, { x: 50, y: 100 }] } as CanvasElement
+    expect(elbowSegments(a, from, to)).toEqual([{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 50, y: 100 }, { x: 100, y: 100 }])
+  })
+  it('route=elbow 0 折点(退化)→ [from, to](直线段)', () => {
+    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, route: 'elbow' } as CanvasElement
+    expect(elbowSegments(a, from, to)).toEqual([{ x: 0, y: 0 }, { x: 100, y: 100 }])
+  })
+  it('route=straight → null(不走折线分支)', () => {
+    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, route: 'straight' } as CanvasElement
+    expect(elbowSegments(a, from, to)).toBeNull()
+  })
+  it('route=curve → null', () => {
+    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, route: 'curve', curve: { cx: 50, cy: 50 } } as CanvasElement
+    expect(elbowSegments(a, from, to)).toBeNull()
+  })
+})
+
+describe('arrowHeadAngle — 终点切线角(按 route)', () => {
+  const from = { x: 0, y: 0 }
+  const to = { x: 100, y: 0 }
+  it('straight → atan2(to - from):水平向右 = 0', () => {
+    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0 } as CanvasElement
+    expect(arrowHeadAngle(a, from, to)).toBeCloseTo(0)
+  })
+  it('curve → atan2(to - ctrl):ctrl 在 to 上方 → 角朝下(正)', () => {
+    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, route: 'curve', curve: { cx: 50, cy: -50 } } as CanvasElement
+    // to=(100,0), ctrl=(50,-50):atan2(0-(-50), 100-50) = atan2(50,50) = π/4
+    expect(arrowHeadAngle(a, from, to)).toBeCloseTo(Math.PI / 4)
+  })
+  it('elbow 1 折点 → 最后一段 = to - lastElbow', () => {
+    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, route: 'elbow', elbow: [{ x: 100, y: 0 }] } as CanvasElement
+    // elbow=(100,0), to=(100,0) → 同点退化 → atan2(0,0)=0
+    expect(arrowHeadAngle(a, from, to)).toBeCloseTo(0)
+  })
+  it('elbow 折点在 to 正左方 → 最后一段水平向右', () => {
+    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, route: 'elbow', elbow: [{ x: 0, y: 0 }] } as CanvasElement
+    // lastElbow=(0,0), to=(100,0) → atan2(0,100)=0
+    expect(arrowHeadAngle(a, from, to)).toBeCloseTo(0)
+  })
+  it('elbow 无折点(退化)→ atan2(to - from)', () => {
+    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, route: 'elbow' } as CanvasElement
+    expect(arrowHeadAngle(a, from, to)).toBeCloseTo(0)
   })
 })

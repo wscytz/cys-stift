@@ -163,6 +163,35 @@ describe('renderElements', () => {
     expect(ctx._calls.some((c) => c === 'moveTo(100,50)')).toBe(false)
   })
 
+  it('route=elbow 折线:moveTo from → lineTo 折点 → lineTo to(每段)', () => {
+    const ctx = mockCtx()
+    const els = [
+      { id: 'ca', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'cb', kind: 'card', x: 200, y: 200, w: 100, h: 100, rotation: 0 },
+      { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'cb', route: 'elbow', elbow: [{ x: 150, y: 100 }] },
+    ] as unknown as CanvasElement[]
+    renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => null, '#ffffff')
+    // A 中心(50,50) 朝 B 中心(250,250):dx=dy=200 → tX=tY=0.25 → from=(100,100)
+    expect(ctx._calls).toContain('moveTo(100,100)')
+    // 折点(150,100)被 lineTo(核心:折线不是直线)
+    expect(ctx._calls).toContain('lineTo(150,100)')
+    // 最后段:to = B 朝 A 边框交点;borderPoint((250,250),50,50,(50,50))= (200,200)
+    expect(ctx._calls).toContain('lineTo(200,200)')
+  })
+
+  it('route=straight 但有残留 curve 数据 → 画直线(不画贝塞尔)', () => {
+    const ctx = mockCtx()
+    const els = [
+      { id: 'ca', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'cb', kind: 'card', x: 200, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'cb', route: 'straight', curve: { cx: 150, cy: -50 } },
+    ] as unknown as CanvasElement[]
+    renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => null, '#ffffff')
+    // 直线:lineTo(200,50),没有 quadraticCurveTo(route=straight 优先)
+    expect(ctx._calls).toContain('lineTo(200,50)')
+    expect(ctx._calls.some((c) => c.startsWith('quadraticCurveTo'))).toBe(false)
+  })
+
   it('renders text (multi-line, top baseline)', () => {
     const ctx = mockCtx()
     const els = [

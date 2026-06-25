@@ -1,6 +1,6 @@
 
 import type { CanvasElement, CanvasView } from './canvas-host'
-import { arrowEndpoints, dashPattern, arrowheadPoints } from './self-built-arrow'
+import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments, arrowHeadAngle } from './self-built-arrow'
 import { normalizeBox } from './bounds'
 
 /**
@@ -135,21 +135,23 @@ function drawElement(
       const { from, to } = arrowEndpoints(el, allElements)
       if (!from || !to) break
       const stroke = colorOf(el.color, tokenResolver)
-      const ctrl = el.curve ? { x: el.curve.cx, y: el.curve.cy } : null
-      // 线段(语义线型:dash)。有 curve → 二次贝塞尔(弯曲箭头)。
+      const route = arrowRoute(el)
+      const ctrl = route === 'curve' && el.curve ? { x: el.curve.cx, y: el.curve.cy } : null
+      const segs = route === 'elbow' ? elbowSegments(el, from, to) : null
+      // 线段(语义线型:dash)。route 决定路径形状:
+      //  straight: from→to 直线 / curve: 二次贝塞尔 / elbow: 折线 polyline。
       ctx.beginPath()
       ctx.moveTo(from.x, from.y)
       if (ctrl) ctx.quadraticCurveTo(ctrl.x, ctrl.y, to.x, to.y)
+      else if (segs) for (let i = 1; i < segs.length; i++) ctx.lineTo(segs[i]!.x, segs[i]!.y)
       else ctx.lineTo(to.x, to.y)
       ctx.strokeStyle = stroke
       ctx.lineWidth = 2
       ctx.setLineDash(dashPattern(el.dash))
       ctx.stroke()
       ctx.setLineDash([]) // 复位,免污染后续绘制
-      // 箭头头:角度取终点切线。直线 = to-from;曲线 = to-ctrl(贝塞尔终点切线方向)。
-      const angle = ctrl
-        ? Math.atan2(to.y - ctrl.y, to.x - ctrl.x)
-        : Math.atan2(to.y - from.y, to.x - from.x)
+      // 箭头头:角度取终点切线(按 route,见 arrowHeadAngle)。
+      const angle = arrowHeadAngle(el, from, to)
       const headKind = el.arrowhead ?? 'arrow'
       const pts = arrowheadPoints(headKind, to, angle)
       if (pts.length === 3) {
@@ -171,8 +173,18 @@ function drawElement(
         }
       }
       if (el.text) {
-        const mx = (from.x + to.x) / 2
-        const my = (from.y + to.y) / 2
+        // label 放路径中点:直线/折线 = 折点序列中点;曲线 = 贝塞尔 t=0.5。
+        let mx: number, my: number
+        if (ctrl) {
+          mx = 0.25 * from.x + 0.5 * ctrl.x + 0.25 * to.x
+          my = 0.25 * from.y + 0.5 * ctrl.y + 0.25 * to.y
+        } else if (segs) {
+          const mid = segs[Math.floor(segs.length / 2)]!
+          mx = mid.x; my = mid.y
+        } else {
+          mx = (from.x + to.x) / 2
+          my = (from.y + to.y) / 2
+        }
         ctx.fillStyle = stroke
         ctx.font = `12px ${tokenResolver('--font-body', 'Inter, sans-serif')}`
         ctx.fillText(el.text, mx, my)

@@ -87,8 +87,18 @@ export interface CanvasElement {
   from?: string
   to?: string
   /** arrow 弯曲控制点(二次贝塞尔,绝对页坐标)。无则直线。
-   *  选中箭头时拖中点手柄设置;DSL/AI/导入可携带。让箭头可弯曲(用户需求)。 */
+   *  选中箭头时拖中点手柄设置;DSL/AI/导入可携带。让箭头可弯曲(用户需求)。
+   *
+   *  **注意**:route='straight' 时虽然 curve 数据保留(便于切回),但渲染/hitTest 看 route 决定用不用。 */
   curve?: { cx: number; cy: number }
+  /** 箭头路由形态。缺省 straight(直线,向后兼容)。
+   *  - straight:直线 from→to(默认,无 curve/elbow)
+   *  - curve:单控制点二次贝塞尔(用 curve 字段)
+   *  - elbow:折线 1-2 折点(用 elbow 字段) */
+  route?: 'straight' | 'curve' | 'elbow'
+  /** 折线折点(1-2 个,绝对页坐标)。route='elbow' 时用。
+   *  路径 = from → elbow[0] → [elbow[1]] → to。最多 2 个(YAGNI,覆盖大部分场景)。 */
+  elbow?: { x: number; y: number }[]
   /** freedraw/image 只在此层带 metadata;原始点序列/二进制留在 adapter 的引擎存储,不进 DSL。 */
   meta?: Record<string, unknown>
 }

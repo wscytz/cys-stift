@@ -50,4 +50,22 @@ describe('hitTest', () => {
     // zoom=2 → 页容差 3px;(150,62) 距线段 12px > 3 → 不命中。
     expect(hitTest(arrowEls, 150, 62, 2)).not.toBe('ar')
   })
+
+  // ── route=elbow 折线命中:点到任一段折线 < 容差即命中 ──
+  const elbowEls: CanvasElement[] = [
+    { id: 'ca', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+    { id: 'cb', kind: 'card', x: 300, y: 100, w: 100, h: 100, rotation: 0 },
+    // from=A 朝 B 边框交点;elbow=(250,50);to=B 朝 A 边框交点
+    { id: 'eb', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'cb', route: 'elbow', elbow: [{ x: 250, y: 50 }] },
+  ]
+  it('折线箭头:点在第一段上(from→elbow)→ 命中', () => {
+    // from=(100,50) → elbow=(250,50):水平线 y=50。(200,50) 在线上
+    expect(hitTest(elbowEls, 200, 50)).toBe('eb')
+  })
+  it('折线箭头:点偏离所有段 → 不命中', () => {
+    expect(hitTest(elbowEls, 400, 400)).not.toBe('eb')
+  })
+  it('折线箭头:点在折角(elbow)附近 → 命中', () => {
+    expect(hitTest(elbowEls, 252, 52)).toBe('eb')
+  })
 })

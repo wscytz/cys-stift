@@ -1,7 +1,7 @@
 
 import type { CanvasElement, CanvasView } from './canvas-host'
 import { normalizeBox } from './bounds'
-import { arrowEndpoints } from './self-built-arrow'
+import { arrowEndpoints, arrowRoute, elbowSegments } from './self-built-arrow'
 
 /** 命中容差:屏幕 6px,页坐标里 /zoom(由调用方传入)。 */
 const HIT_TOLERANCE_PX = 6
@@ -38,7 +38,20 @@ export function hitTest(
     if (el.kind === 'arrow') {
       const { from, to } = arrowEndpoints(el, elements)
       if (from && to) {
-        if (el.curve) {
+        const route = arrowRoute(el)
+        if (route === 'elbow') {
+          // 折线箭头:点到每段折线距离取 min。elbowSegments = [from, ...elbows, to]。
+          const segs = elbowSegments(el, from, to)
+          if (segs && segs.length >= 2) {
+            for (let i = 1; i < segs.length; i++) {
+              if (pointToSegmentDistance(pageX, pageY, segs[i - 1]!.x, segs[i - 1]!.y, segs[i]!.x, segs[i]!.y) <= tol) {
+                return el.id
+              }
+            }
+          }
+          continue
+        }
+        if (route === 'curve' && el.curve) {
           // 弯曲箭头:沿二次贝塞尔采样,点到每段距离取 min。
           const ctrl = { x: el.curve.cx, y: el.curve.cy }
           const N = 16

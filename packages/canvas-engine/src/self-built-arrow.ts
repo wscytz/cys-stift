@@ -132,3 +132,62 @@ export function arrowheadPoints(
   }
   return [left, tip, right]
 }
+
+// ── 箭头路由形态(straight / curve / elbow)共享几何 ──────────────────────────
+// 三种 route 的几何统一收口在这里,让 render / hitTest / SVG / 手柄交互全走同一份。
+// route 决定路径形状;curve/elbow 数据保留但 route='straight' 时不渲染(切回方便)。
+
+/**
+ * 解析箭头当前 route:无 route 字段 → 看 curve/elbow 数据反推(向后兼容旧箭头:
+ * commit a708eb1 落地 curve 时还没 route 字段,渲染只看 curve 存不存在)。有 route
+ * 字段 → 直接用。
+ */
+export function arrowRoute(arrow: CanvasElement): 'straight' | 'curve' | 'elbow' {
+  // 显式 route 总是优先(切回 straight 时 curve 数据仍在但 route 指明走直线)。
+  if (arrow.route === 'curve' || arrow.route === 'elbow' || arrow.route === 'straight') {
+    return arrow.route
+  }
+  // 向后兼容:无 route 字段(旧箭头),但有 curve 数据 → 当 curve。
+  if (arrow.curve) return 'curve'
+  return 'straight'
+}
+
+/**
+ * 箭头路径的折点序列(页坐标),用于 elbow 渲染(moveTo→lineTo×)与 hitTest(逐段距离)。
+ * route='elbow':from → elbow[] → to。无折点时退化为 [from, to](直线段)。
+ * route≠'elbow' 返 null(调用方走直线/曲线分支)。
+ */
+export function elbowSegments(
+  arrow: CanvasElement,
+  from: Point,
+  to: Point,
+): Point[] | null {
+  if (arrowRoute(arrow) !== 'elbow') return null
+  const elbows = arrow.elbow ?? []
+  return [from, ...elbows, to]
+}
+
+/**
+ * 箭头头角度:终点处的切线方向(to 的来向角)。route 决定取哪段方向。
+ * - straight: to - from
+ * - curve: to - ctrl(贝塞尔终点切线)
+ * - elbow: 最后一段方向 = to - lastElbow(无折点则 to - from)
+ */
+export function arrowHeadAngle(
+  arrow: CanvasElement,
+  from: Point,
+  to: Point,
+): number {
+  const route = arrowRoute(arrow)
+  if (route === 'curve' && arrow.curve) {
+    return Math.atan2(to.y - arrow.curve.cy, to.x - arrow.curve.cx)
+  }
+  if (route === 'elbow') {
+    const segs = elbowSegments(arrow, from, to)
+    if (segs && segs.length >= 2) {
+      const prev = segs[segs.length - 2]!
+      return Math.atan2(to.y - prev.y, to.x - prev.x)
+    }
+  }
+  return Math.atan2(to.y - from.y, to.x - from.x)
+}

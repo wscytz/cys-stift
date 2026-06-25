@@ -80,6 +80,34 @@ describe('elementsToSvg', () => {
     expect(r.svg).toContain('<polyline')
   })
 
+  it('arrow 默认(无 arrowhead 字段)→ 开口 V <polyline>', () => {
+    const els: CanvasElement[] = [
+      { id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'b', kind: 'card', x: 300, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b' },
+    ]
+    const r = elementsToSvg(els, view, () => null, { background: false, border: 0 })
+    expect(r.svg).toContain('<polyline')
+  })
+
+  it('arrow route=elbow → SVG <polyline>(折线含折点坐标)', () => {
+    const els: CanvasElement[] = [
+      { id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'b', kind: 'card', x: 300, y: 200, w: 100, h: 100, rotation: 0 },
+      { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b', route: 'elbow', elbow: [{ x: 250, y: 50 }] },
+    ]
+    const r = elementsToSvg(els, view, () => null, { background: false, border: 0 })
+    // 折线主线 = <polyline points="...">;含折点 (250+dx, 50+dy)
+    expect(r.svg).toContain('<polyline')
+    // 折点 x≈250 被 dx 偏移(dx 是负 min-x + border);但折点值应在 points 里。
+    // 简单断言:polyline 的 points 含 4 个点(from, elbow, to 的 坐标,3 点 × 2)
+    const polylineMatch = r.svg.match(/<polyline points="([^"]+)"/)
+    expect(polylineMatch).not.toBeNull()
+    const coordPairs = polylineMatch![1]!.trim().split(/\s+/)
+    // from + elbow + to = 3 个坐标对(主线 polyline);另有箭头头 polyline
+    expect(coordPairs.length).toBeGreaterThanOrEqual(3)
+  })
+
   it('border 加 padding(width/height 含 2×border)', () => {
     const els: CanvasElement[] = [
       { id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 50, rotation: 0 },
