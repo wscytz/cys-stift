@@ -21,3 +21,11 @@
   min-width: 0;
   overflow-x: auto;
 }
+
+/* flex 子元素(按钮/切换器)不收缩:空间不够时走 overflow-x:auto 横向滚,
+   而不是把按钮压扁导致文字("新建"/"重命名")显示不全。
+   min-width:0 让 flex 算法允许容器收缩,但子元素自身 flex-shrink:0 保宽度。 */
+.content > * {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
