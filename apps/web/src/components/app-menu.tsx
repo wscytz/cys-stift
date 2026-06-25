@@ -13,8 +13,8 @@ import { pushToast } from '@/lib/toast-store'
 
 /**
  * AppMenu — global top menu bar (v0.22.3-i18n-restore).
- * i18n bilingual + ZH/EN switcher + 4px grey stripe restored
- * (Part B1/B2 of i18n-bugfixes decision).
+ * i18n bilingual + ZH/EN switcher + 4px red brand stripe
+ * (Part B1/B2 of i18n-bugfixes decision; unified to red 2026-06-25).
  */
 export function AppMenu() {
   const pathname = usePathname() ?? '/'
@@ -99,7 +99,7 @@ const styles = `
   left: 0;
   right: 0;
   height: 4px;
-  background: var(--color-gray);
+  background: var(--color-red);
 }
 .app-menu__brand {
   font-family: var(--font-display);

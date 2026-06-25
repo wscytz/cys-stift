@@ -522,7 +522,7 @@ export function CardDetailModal({
                     variant="secondary"
                     onClick={() => setAiAction('summarize')}
                   >
-                    ✨ {t('card.summarize')}
+                    <span className="cd__ai-mark" aria-hidden="true">»</span> {t('card.summarize')}
                   </Button>
                 )}
                 {aiEnabled && has('rewrite') && (
@@ -530,7 +530,7 @@ export function CardDetailModal({
                     variant="secondary"
                     onClick={() => setAiAction('rewrite')}
                   >
-                    ✨ {t('card.rewrite')}
+                    <span className="cd__ai-mark" aria-hidden="true">»</span> {t('card.rewrite')}
                   </Button>
                 )}
                 {aiEnabled && has('translate') && (
@@ -551,7 +551,7 @@ export function CardDetailModal({
                       variant="secondary"
                       onClick={() => setAiAction('translate')}
                     >
-                      ✨ {t('card.translate')}
+                      <span className="cd__ai-mark" aria-hidden="true">»</span> {t('card.translate')}
                     </Button>
                   </span>
                 )}
@@ -694,6 +694,9 @@ const styles = `
 .cd__file { font-family: var(--font-mono); font-size: var(--font-size-sm); margin-top: var(--space-1); }
 .cd__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
 .cd__spacer { flex: 1; }
+/* AI action marker: mono » glyph replacing the ✨ emoji (Bauhaus type
+   system has no emoji; the » renders consistently across OSes). */
+.cd__ai-mark { font-family: var(--font-mono); }
 .cd__translate { display: inline-flex; gap: var(--space-1); align-items: center; }
 .cd__translate-select {
   font-family: var(--font-mono);

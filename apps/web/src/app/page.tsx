@@ -65,9 +65,20 @@ export default function HomePage() {
             <span className="home__nav-note">{t('home.feature.archive.desc')}</span>
           </Link>
         </nav>
+        <nav className="home__secondary" aria-label="Secondary">
+          <Link href="/search" className="home__secondary-link">{t('nav.search')}</Link>
+          <span className="home__secondary-sep" aria-hidden="true">/</span>
+          <Link href="/trash" className="home__secondary-link">{t('nav.trash')}</Link>
+          <span className="home__secondary-sep" aria-hidden="true">/</span>
+          <Link href="/settings" className="home__secondary-link">{t('nav.settings')}</Link>
+        </nav>
         <footer className="home__foot">
           <span>{t('home.eyebrow')}</span>
-          <span>v0.22.4</span>
+          {/* Version: canonical source is the repo git tags (see docs/STATE.md)
+              and root package.json "version". Kept in sync manually here —
+              a static export has no build-time version injection without a
+              new dependency. Update when bumping the tag. */}
+          <span>v0.37.0</span>
         </footer>
       </section>
       <style>{`
@@ -141,6 +152,28 @@ export default function HomePage() {
           color: var(--color-gray);
           border-top: var(--border-hairline);
         }
+        /* Secondary text-link row: low-emphasis mono links to Search /
+           Trash / Settings so a user landing on / can reach them without
+           opening the AppMenu. Bauhaus-restrained: gray, hairline, mono. */
+        .home__secondary {
+          display: flex;
+          align-items: center;
+          gap: var(--space-2);
+          font-family: var(--font-mono);
+          font-size: var(--font-size-xs);
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          color: var(--color-gray);
+        }
+        .home__secondary-link {
+          color: var(--color-gray);
+          text-decoration: none;
+          border-bottom: var(--border-hairline);
+          padding-bottom: 1px;
+          transition: color 80ms ease-out;
+        }
+        .home__secondary-link:hover { color: var(--color-black); }
+        .home__secondary-sep { color: var(--color-gray); opacity: 0.6; }
         .home__nav { margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
         .home__nav-link--canvas .home__nav-arrow { background: var(--color-black); }
         .home__nav-link--canvas:hover { box-shadow: 4px 4px 0 0 var(--color-black); }

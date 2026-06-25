@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import type { CanvasId, Card } from '@cys-stift/domain'
 import { Button, Modal, Toolbar } from '@cys-stift/ui'
 import { useDb } from '@/lib/db-client'
@@ -468,6 +469,9 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           <div className="cv-empty" aria-hidden="true">
             <span className="eyebrow">{t('canvas.emptyTitle')}</span>
             <span className="mono">{t('canvas.emptyHint')}</span>
+            <Link href="/inbox" className="cv-empty__cta" aria-hidden="false">
+              {t('canvas.emptyCta')} →
+            </Link>
           </div>
         )}
         <RelationPanel host={handle.current.adapter} canvasEl={canvasElRef.current} />
@@ -728,6 +732,24 @@ const styles = `
 .page { height: calc(100vh - var(--app-menu-height)); display: flex; flex-direction: column; background: var(--color-white); color: var(--color-black); }
 .cv-host { position: relative; flex: 1; min-height: 0; }
 .cv-empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: var(--space-2); pointer-events: none; user-select: none; padding-bottom: 80px; }
+/* CTA link re-enables pointer events on itself only (parent overlay is
+   pointer-events:none) so the user can act on the empty state. */
+.cv-empty__cta {
+  pointer-events: auto;
+  margin-top: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  text-decoration: none;
+  color: var(--color-white);
+  background: var(--color-red);
+  border: var(--border-hairline);
+  border-color: var(--color-black);
+  border-radius: var(--radius-sm);
+}
+.cv-empty__cta:hover { box-shadow: 2px 2px 0 0 var(--color-black); }
 .tb-divider { width: 1px; height: 24px; background: var(--color-gray); margin: 0 var(--space-2); flex: 0 0 auto; }
 .tb-snap { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.16em; text-transform: uppercase; background: var(--color-white); color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
 .tb-snap--snap { background: var(--color-black); color: var(--color-white); }

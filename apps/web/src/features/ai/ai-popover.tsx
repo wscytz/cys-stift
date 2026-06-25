@@ -76,7 +76,7 @@ export function AIPopover({
   return (
     <div className="ai-popover" role="dialog" aria-label="AI suggestion">
       <div className="ai-popover__hd">
-        <span className="ai-popover__title">✨ {action}</span>
+        <span className="ai-popover__title"><span className="ai-popover__mark" aria-hidden="true">»</span> {action}</span>
         {running && (
           <span className="ai-popover__dot" aria-label="streaming">
             ●
@@ -145,6 +145,7 @@ const styles = `
   animation: ai-blink 1s infinite;
   color: var(--color-red);
 }
+.ai-popover__mark { font-family: var(--font-mono); }
 @keyframes ai-blink {
   50% { opacity: 0.3; }
 }
