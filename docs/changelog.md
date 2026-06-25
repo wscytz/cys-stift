@@ -5,6 +5,23 @@
 
 ---
 
+## 2026-06-25 · arrow-routes · 箭头形态系统(弯曲 + 折线 + 识别 + DSL)
+
+用户需求:箭头要能弯曲(单控制点光滑曲线)和折线(单/双折点),手绘转箭头要识别形态,AI 能生成弯曲/折线。弯曲箭头 base(commit a708eb1)此前已落地但缺形态切换 UI / 折线 / 识别 / AI 生成。本轮补全箭头形态系统。spec `docs/superpowers/specs/2026-06-25-arrow-routes-design.md`。
+
+五阶段 TDD(每阶段一 commit):
+
+- **① 引擎模型 + 纯函数**:`CanvasElement` 加 `route?: 'straight'|'curve'|'elbow'` + `elbow?: {x,y}[]`(≤2)。`arrowRoute`(显式 route 优先;无 route 旧箭头有 curve→curve,向后兼容)/`elbowSegments`(折点序列)/`arrowHeadAngle`(终点切线按 route)三纯函数收口,render/hitTest/SVG/手柄全走同一份。
+- **② 三视图渲染/命中**:render 按 route 分支(straight 直线 / curve 贝塞尔 / elbow 折线 polyline)+ 箭头头角度按 route + label 中点;hitTest elbow 逐段点距;SVG `<polyline>` 折线。
+- **③ 交互**:drawSelectionOutlines 按 route 画手柄(elbow 折点方块 / straight·curve 中点圆点);adapter onDown/onMove 按 route 分支(折点拖动 + 从 straight 拉出 curve 一并设 route);RelationPanel 形态切换器(直/曲/折 glyph 按钮,切换时初始化默认 curve/elbow 数据,切回 straight 保留数据)。
+- **④ 转义 DSL**:`@route(straight|curve|elbow)` + `@elbow(x,y;x,y)` parse/serialize/apply 四路径全通;AI GRAMMAR 加说明 → 任何 AI 能生成弯曲/折线箭头(绕开遮挡)。**转义核心卖点对箭头形态双向无损**。
+- **⑤ 手绘识别**:`detectArrowRoute` 本地几何启发式(折角检测 = 方向角突变 >45° 1-2 个 → elbow;平滑弯曲偏离 >15% → curve;否则 straight)。`freedrawToArrow` 转出的箭头带识别到的 route;FreedrawPanel 按钮文案随形态变(转为曲线/折线/箭头)。点序列 R2 隐私全程本地。
+
+### 验证
+引擎 313→343 测试(+30:route helper 12 + render/hitTest/svg elbow + freedraw detect 7);web 525→541 测试(+16:parse route/elbow + serialize + round-trip + apply)。tsc 0 新增(pre-existing 测试类型无关)。build exit 0(静态导出)。
+
+---
+
 ## 2026-06-24 · dsl-pos-modal · DSL 负坐标 bug + Modal 滚动/关闭入口
 
 用户实测「复制为 AI 提示词」粘回画布全失败 + 二级页面看不完。两个修复。
