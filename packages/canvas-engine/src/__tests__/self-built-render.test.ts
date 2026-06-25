@@ -268,6 +268,34 @@ describe('drawSelectionOutlines', () => {
     drawSelectionOutlines(ctx, [], [], { panX: 0, panY: 0, zoom: 1, gridMode: 'free' })
     expect(ctx._calls.some((c) => c.startsWith('strokeRect'))).toBe(false)
   })
+
+  it('选中 straight 箭头 → 画中点圆点手柄(提示可拖出 curve)', () => {
+    const ctx = mockCtx()
+    const els = [
+      { id: 'ca', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'cb', kind: 'card', x: 200, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'cb' },
+    ] as unknown as CanvasElement[]
+    drawSelectionOutlines(ctx, ['ar'], els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' })
+    // from=(100,50)→to=(200,50),中点 (150,50):arc 圆点手柄
+    expect(ctx._calls.some((c) => c.startsWith('arc(150,50'))).toBe(true)
+  })
+
+  it('选中 elbow 箭头 → 每个折点画方块手柄', () => {
+    const ctx = mockCtx()
+    const els = [
+      { id: 'ca', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'cb', kind: 'card', x: 300, y: 200, w: 100, h: 100, rotation: 0 },
+      { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'cb', route: 'elbow', elbow: [{ x: 250, y: 50 }, { x: 250, y: 200 }] },
+    ] as unknown as CanvasElement[]
+    drawSelectionOutlines(ctx, ['ar'], els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' })
+    // 折点 (250,50) 方块手柄:hs=3 → fillRect(247,47,6,6)
+    expect(ctx._calls).toContain('fillRect(247,47,6,6)')
+    // 折点 (250,200) → fillRect(247,197,6,6)
+    expect(ctx._calls).toContain('fillRect(247,197,6,6)')
+    // elbow 不画中点圆点(走折点手柄分支)
+    expect(ctx._calls.some((c) => c.startsWith('arc'))).toBe(false)
+  })
 })
 
 describe('drawMarquee', () => {
