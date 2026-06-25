@@ -160,7 +160,20 @@ export function CardDetailModal({
 
   // Re-sync when the consumer hands us a different card (modal re-opened
   // on a sibling without unmounting, or external update).
+  //
+  // Bug D fix: this used to fire on every field-array identity change
+  // (card.media / links / codeSnippets / quotes / tags) and reset mode to
+  // 'view' + overwrite all draft fields — which THREW AWAY in-progress
+  // edits whenever the parent re-rendered with a freshly-built Card (e.g.
+  // right after a save returned a new object, or an external update landed
+  // while the user was typing). We now skip the resync entirely while the
+  // user is in edit mode: their draft is the source of truth and will be
+  // written by save. In view mode the resync still runs (covers the
+  // intended post-save reset — handleSave flips mode to 'view' inside the
+  // transition before the new prop arrives — and external updates the user
+  // isn't actively editing through).
   useEffect(() => {
+    if (mode === 'edit') return
     setTitle(card.title)
     setBody(card.body)
     setMedia(card.media)
@@ -172,6 +185,7 @@ export function CardDetailModal({
     setMode(initialMode)
     setConfirmDelete(false)
   }, [
+    mode,
     card.id,
     card.title,
     card.body,
@@ -613,15 +627,24 @@ export function CardDetailModal({
               targetLang={aiAction === 'translate' ? translateTo : undefined}
               onClose={() => setAiAction(null)}
               onReplace={(body) => {
+                // Bug A fix: the AI replaces only the BODY. Every other
+                // field passed to onSave must come from the COMPONENT's
+                // current edit state (title/tags/media/links/codes/quotes),
+                // NOT from the `card` prop snapshot — otherwise unsaved
+                // edits the user made before triggering the AI action are
+                // silently lost. (Pre-fix this used card.title etc.)
                 onSave({
-                  title: card.title,
+                  title: title.trim() || card.title,
                   body,
-                  media: card.media,
-                  links: card.links,
-                  codeSnippets: card.codeSnippets,
-                  quotes: card.quotes,
-                  tags: card.tags,
+                  media,
+                  links: draftLinksToPayload(links),
+                  codeSnippets: draftCodesToPayload(codes),
+                  quotes: draftQuotesToPayload(quotes),
+                  tags,
                 })
+                // Reflect the AI-replaced body in the local draft so a
+                // subsequent edit/save starts from the new body.
+                setBody(body)
                 setAiAction(null)
               }}
               onAppendNew={(c) => {

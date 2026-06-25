@@ -143,6 +143,19 @@ export default function InboxPage() {
     })
   }
 
+  // Bug B fix: derive the LIVE card from the store by id during render.
+  // The page re-renders on any store change (useDb subscription), but the
+  // modal used to keep showing the STALE `detail` object captured when the
+  // card was opened — including a ghost card that was since soft-deleted /
+  // archived / edited elsewhere (another tab, a batch action, an AI append).
+  // service.get returns soft-deleted cards too, so we filter on !deletedAt:
+  // when the card is gone (or soft-deleted) effectiveDetail becomes null and
+  // the modal unmounts. Edited-elsewhere cards show fresh data. Action
+  // callbacks still read detail.id (stable across the open lifecycle).
+  const liveDetail = detail ? (service.get(detail.id) ?? null) : null
+  const effectiveDetail =
+    liveDetail && !liveDetail.deletedAt ? liveDetail : null
+
   return (
     <main id="main" tabIndex={-1} className="page">
       <Toolbar region="inbox">
@@ -299,25 +312,25 @@ export default function InboxPage() {
         </div>
       )}
 
-      {detail && (
+      {effectiveDetail && (
         <CardDetailModal
-          card={detail}
+          card={effectiveDetail}
           actions={['archive', 'unarchive', 'sendToCanvas', 'softDelete', 'pin', 'export', 'rewrite', 'summarize', 'translate']}
           onClose={() => setDetail(null)}
           onSave={(patch) => {
-            const updated = service.update(detail.id, patch)
+            const updated = service.update(effectiveDetail.id, patch)
             if (updated) setDetail(updated)
           }}
           onTogglePin={() => {
-            const updated = service.update(detail.id, { pinned: !detail.pinned })
+            const updated = service.update(effectiveDetail.id, { pinned: !effectiveDetail.pinned })
             if (updated) setDetail(updated)
           }}
           onArchive={() => {
-            service.archive(detail.id)
+            service.archive(effectiveDetail.id)
             setDetail(null)
           }}
           onUnarchive={() => {
-            service.unarchive(detail.id)
+            service.unarchive(effectiveDetail.id)
             setDetail(null)
           }}
           onSendToCanvas={() => {
@@ -330,7 +343,7 @@ export default function InboxPage() {
             const nextZ = existing.length === 0
               ? 0
               : Math.max(...existing.map((c) => c.canvasPosition?.z ?? 0)) + 1
-            service.moveToCanvas(detail.id, {
+            service.moveToCanvas(effectiveDetail.id, {
               canvasId: targetCanvasId,
               x: 100 + (nextZ % 5) * 40,
               y: 100 + (nextZ % 5) * 40,
@@ -338,11 +351,11 @@ export default function InboxPage() {
               h: 80,
               z: nextZ,
             })
-            const updated = service.get(detail.id)
+            const updated = service.get(effectiveDetail.id)
             if (updated) setDetail(updated)
           }}
           onConfirmDelete={() => {
-            service.softDelete(detail.id)
+            service.softDelete(effectiveDetail.id)
             setDetail(null)
           }}
           onAIAppendNew={(c) => {

@@ -439,6 +439,21 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     }
   }, [])
 
+  // Bug B fix: derive the LIVE card from the store by id during render.
+  // The page re-renders on any store change (useDb subscription), but the
+  // modal used to keep showing the STALE `detail.card` captured at open
+  // time — including a ghost card since soft-deleted / archived-elsewhere
+  // (another tab, the side-rail delete, a batch action). service.get returns
+  // soft-deleted cards too, so we filter on !deletedAt: when the card is
+  // gone (or soft-deleted) effectiveDetail becomes null and the modal
+  // unmounts. Edited-elsewhere cards show fresh data. Action callbacks read
+  // effectiveDetail.card.id (guaranteed non-null while modal is open).
+  const liveDetailCard = detail ? (service.get(detail.card.id) ?? null) : null
+  const effectiveDetail =
+    liveDetailCard && !liveDetailCard.deletedAt
+      ? { card: liveDetailCard }
+      : null
+
   return (
     <main id="main" tabIndex={-1} className="page">
       <h1 className="sr-only">{t('canvas.crumb')}</h1>
@@ -548,34 +563,38 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         </div>
       </Modal>
 
-      {detail && (
+      {effectiveDetail && (
         <CardDetailModal
-          card={detail.card}
+          card={effectiveDetail.card}
           onClose={() => setDetail(null)}
           onSave={(patch) => {
-            const updated = service.update(detail.card.id, { title: patch.title, body: patch.body })
+            // Bug C fix: previously only title + body were persisted, which
+            // silently dropped tag edits (and would drop any other field the
+            // modal collects if it grows). Spread the full patch through so
+            // title/body/tags all reach service.update (mirrors inbox's onSave).
+            const updated = service.update(effectiveDetail.card.id, patch)
             if (updated && handle.current.adapter) updateCardShape(handle.current.adapter, updated)
             if (updated) setDetail({ card: updated })
           }}
           onArchive={() => {
-            service.archive(detail.card.id)
-            if (handle.current.adapter) removeCardShape(handle.current.adapter, detail.card.id)
+            service.archive(effectiveDetail.card.id)
+            if (handle.current.adapter) removeCardShape(handle.current.adapter, effectiveDetail.card.id)
             setDetail(null)
           }}
           onUnarchive={() => {
-            service.unarchive(detail.card.id)
-            const c = service.get(detail.card.id)
+            service.unarchive(effectiveDetail.card.id)
+            const c = service.get(effectiveDetail.card.id)
             if (c && handle.current.adapter) addCardShape(handle.current.adapter, c)
             setDetail(c ? { card: c } : null)
           }}
           onDelete={() => {
-            service.softDelete(detail.card.id)
-            if (handle.current.adapter) removeCardShape(handle.current.adapter, detail.card.id)
+            service.softDelete(effectiveDetail.card.id)
+            if (handle.current.adapter) removeCardShape(handle.current.adapter, effectiveDetail.card.id)
             setDetail(null)
           }}
           onSendToInbox={() => {
-            service.removeFromCanvas(detail.card.id)
-            if (handle.current.adapter) removeCardShape(handle.current.adapter, detail.card.id)
+            service.removeFromCanvas(effectiveDetail.card.id)
+            if (handle.current.adapter) removeCardShape(handle.current.adapter, effectiveDetail.card.id)
             setDetail(null)
           }}
         />

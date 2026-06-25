@@ -115,6 +115,20 @@ export default function ArchivePage() {
     if (c) setDetail({ card: c })
   }
 
+  // Bug B fix: derive the LIVE card from the store by id during render.
+  // The page re-renders on any store change (useDb subscription), but the
+  // modal used to keep showing the STALE `detail.card` captured at open
+  // time — including a ghost card that was since soft-deleted / edited
+  // elsewhere (another tab, a batch action). service.get returns soft-deleted
+  // cards too, so we filter on !deletedAt: when the card is gone (or
+  // soft-deleted) effectiveDetail becomes null and the modal unmounts.
+  // Edited-elsewhere cards show fresh data.
+  const liveDetailCard = detail ? (service.get(detail.card.id) ?? null) : null
+  const effectiveDetail =
+    liveDetailCard && !liveDetailCard.deletedAt
+      ? { card: liveDetailCard }
+      : null
+
   return (
     <main id="main" tabIndex={-1} className="page">
       <Toolbar region="archive">
@@ -283,27 +297,27 @@ export default function ArchivePage() {
         </Modal>
       )}
 
-      {detail && (
+      {effectiveDetail && (
         <CardDetailModal
-          card={detail.card}
+          card={effectiveDetail.card}
           actions={['unarchive', 'softDelete', 'pin', 'export', 'rewrite', 'summarize', 'translate']}
           onClose={() => setDetail(null)}
           onSave={(patch) => {
-            const updated = service.update(detail.card.id, patch)
+            const updated = service.update(effectiveDetail.card.id, patch)
             if (updated) setDetail({ card: updated })
           }}
           onTogglePin={() => {
-            const updated = service.update(detail.card.id, {
-              pinned: !detail.card.pinned,
+            const updated = service.update(effectiveDetail.card.id, {
+              pinned: !effectiveDetail.card.pinned,
             })
             if (updated) setDetail({ card: updated })
           }}
           onUnarchive={() => {
-            service.unarchive(detail.card.id)
+            service.unarchive(effectiveDetail.card.id)
             setDetail(null)
           }}
           onConfirmDelete={() => {
-            service.softDelete(detail.card.id)
+            service.softDelete(effectiveDetail.card.id)
             setDetail(null)
           }}
           onAIAppendNew={(c) => {
