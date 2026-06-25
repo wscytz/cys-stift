@@ -20,6 +20,7 @@ import {
   duplicateFreedraw,
   freedrawPoints,
   freedrawToArrow,
+  detectArrowRoute,
   recognizeShape,
   type FreedrawKind,
   type ShapeName,
@@ -92,7 +93,13 @@ export function FreedrawPanel({
   }
 
   // ③ 特殊互动:本地猜是箭头且够自信 → 一键转真 arrow(替换手绘,单步可 undo)。
+  // 按钮文案随形态识别结果变:弯→「转为曲线箭头」/ 折→「转为折线箭头」/ 直→「转为箭头」。
   const canToArrow = kind === 'arrow' && confidence >= TO_ARROW_CONFIDENCE
+  const detectedRoute = canToArrow ? detectArrowRoute(points) : null
+  const toArrowKey: MessageKey =
+    detectedRoute?.kind === 'curve' ? 'freedraw.toCurveArrow'
+      : detectedRoute?.kind === 'elbow' ? 'freedraw.toElbowArrow'
+        : 'freedraw.toArrow'
   const toArrow = () => {
     const arrow = freedrawToArrow(el, `arrow-${shortId()}`)
     if (!arrow) return
@@ -123,9 +130,9 @@ export function FreedrawPanel({
           type="button"
           className="cv-freedraw__btn"
           onClick={toArrow}
-          title={t('freedraw.toArrow')}
+          title={t(toArrowKey)}
         >
-          {t('freedraw.toArrow')}
+          {t(toArrowKey)}
         </button>
       )}
       <button

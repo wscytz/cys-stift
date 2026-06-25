@@ -4,6 +4,7 @@ import {
   duplicateFreedraw,
   freedrawPoints,
   freedrawToArrow,
+  detectArrowRoute,
 } from '../freedraw-classify'
 import type { CanvasElement } from '../canvas-host'
 
@@ -158,5 +159,80 @@ describe('freedrawToArrow', () => {
   it('非 freedraw → null', () => {
     const card: CanvasElement = { id: 'c', kind: 'card', x: 0, y: 0, w: 1, h: 1, rotation: 0 }
     expect(freedrawToArrow(card, 'a')).toBeNull()
+  })
+})
+
+// ── detectArrowRoute — 手绘形态识别(straight/curve/elbow)──────────────────
+
+describe('detectArrowRoute', () => {
+  it('近似直线笔画 → straight', () => {
+    // (0,0) → (100,0) 均匀采样,几乎不偏
+    expect(detectArrowRoute(line(0, 0, 100, 0))).toEqual({ kind: 'straight' })
+  })
+
+  it('明确 L 形折角笔画 → elbow(1 折点)', () => {
+    // (0,0) → (50,0) 水平,再 → (50,80) 垂直:90° 折角
+    const pts: [number, number][] = []
+    for (let i = 0; i <= 10; i++) pts.push([i * 5, 0]) // 水平段
+    for (let i = 1; i <= 8; i++) pts.push([50, i * 10]) // 垂直段
+    const r = detectArrowRoute(pts)
+    expect(r.kind).toBe('elbow')
+    expect(r.elbow).toHaveLength(1)
+    // 折角在拐弯处附近 (≈50, 附近)
+    expect(r.elbow![0]!.x).toBeCloseTo(50, 0)
+  })
+
+  it('Z 形两折角笔画 → elbow(2 折点)', () => {
+    // (0,0)→(40,0) →(40,40) →(80,40):两个折角
+    const pts: [number, number][] = []
+    for (let i = 0; i <= 8; i++) pts.push([i * 5, 0])
+    for (let i = 1; i <= 8; i++) pts.push([40, i * 5])
+    for (let i = 1; i <= 8; i++) pts.push([40 + i * 5, 40])
+    const r = detectArrowRoute(pts)
+    expect(r.kind).toBe('elbow')
+    expect(r.elbow).toHaveLength(2)
+  })
+
+  it('平滑弯曲笔画 → curve(控制点在笔画弧的凸侧)', () => {
+    // 弧形:(0,0) 沿上凸弧到 (100,0),中点 (50,-40)。采样平滑无急折。
+    const pts: [number, number][] = []
+    for (let i = 0; i <= 20; i++) {
+      const t = i / 20
+      const x = 100 * t
+      const y = -40 * Math.sin(Math.PI * t) // 平滑正弦弧,中点 y=-40
+      pts.push([x, y])
+    }
+    const r = detectArrowRoute(pts)
+    expect(r.kind).toBe('curve')
+    expect(r.curve).toBeDefined()
+    // 控制点 y 应在中点上方(让曲线凸向上):反算 C=2M-0.5(from+to),M≈(50,-40)
+    // C = 2*(50,-40) - 0.5*((0,0)+(100,0)) = (100,-80) - (50,0) = (50,-80)
+    expect(r.curve!.cy).toBe(-80)
+  })
+
+  it('点序列 <3 → straight(退化)', () => {
+    expect(detectArrowRoute([[0, 0], [10, 10]])).toEqual({ kind: 'straight' })
+  })
+})
+
+// ── freedrawToArrow 形态:转出的箭头带 route ────────────────────────────────
+
+describe('freedrawToArrow — 形态识别', () => {
+  it('直线笔画 → straight 箭头(无 route 字段,默认直线)', () => {
+    const el = freedrawEl(line(0, 0, 100, 0), 'f')
+    const arrow = freedrawToArrow(el, 'a1')!
+    expect(arrow.route).toBeUndefined()
+    expect(arrow.curve).toBeUndefined()
+    expect(arrow.elbow).toBeUndefined()
+  })
+
+  it('L 形笔画 → elbow 箭头(带折点)', () => {
+    const pts: [number, number][] = []
+    for (let i = 0; i <= 10; i++) pts.push([i * 5, 0])
+    for (let i = 1; i <= 8; i++) pts.push([50, i * 10])
+    const arrow = freedrawToArrow(freedrawEl(pts, 'f'), 'a1')!
+    expect(arrow.route).toBe('elbow')
+    expect(arrow.elbow).toBeDefined()
+    expect(arrow.elbow!.length).toBeGreaterThanOrEqual(1)
   })
 })

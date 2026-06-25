@@ -164,25 +164,110 @@ export function duplicateFreedraw(
  * 端点取点序列的首尾点(用户画箭头通常一笔从尾扫到头)。arrow 用 bbox 编码线段:
  * x,y = 起点(首点),w,h = 终点-起点(可负表方向)——见 arrowEndpoints 的自由箭头分支。
  *
+ * **形态识别**:跑 {@link detectArrowRoute} 判笔画是直/弯/折,给箭头设对应 route。
+ *  - 直线 → straight(默认)
+ *  - 平滑弯曲 → curve(控制点 = 笔画最大偏移点,让曲线贴合笔画)
+ *  - 明确折角(1-2 个)→ elbow(折点 = 折角位置)
+ *
  * 这是「自由箭头」:无 from/to(不连卡片),与卡片间的**语义关系箭头**不同(后者有
  * from/to + 关系签名)。默认签名 solid + 开口V(中性箭头);不带 color(走默认描边)。
  *
- * 非 freedraw / 点序列 <2 → null。纯函数,不改原元素。
+ * 非 freedraw / 点序列 <2 → null。纯函数,不改原元素。点序列是 R2 隐私,全程本地。
  */
 export function freedrawToArrow(el: CanvasElement, newId: string): CanvasElement | null {
   const pts = freedrawPoints(el)
   if (!pts || pts.length < 2) return null
   const start = pts[0]!
   const end = pts[pts.length - 1]!
-  return {
+  const base = {
     id: newId,
-    kind: 'arrow',
+    kind: 'arrow' as const,
     x: start[0],
     y: start[1],
     w: end[0] - start[0],
     h: end[1] - start[1],
     rotation: 0,
-    dash: 'solid',
-    arrowhead: 'arrow',
+    dash: 'solid' as const,
+    arrowhead: 'arrow' as const,
   }
+  const route = detectArrowRoute(pts)
+  if (route.kind === 'curve' && route.curve) return { ...base, route: 'curve', curve: route.curve }
+  if (route.kind === 'elbow' && route.elbow && route.elbow.length > 0)
+    return { ...base, route: 'elbow', elbow: route.elbow }
+  return base
+}
+
+/**
+ * 手绘笔画形态识别:判一条笔画该转成 straight / curve / elbow 箭头。
+ *
+ * 本地几何启发式(点序列是 R2 隐私,不外发;确定性、可单测):
+ *  - **折角检测**:沿笔画走,相邻段方向角突变 > CORNER_ANGLE 的点 = 折角。
+ *    检出 1-2 个折角 → elbow(折点 = 折角位置;超过 2 个当没检出,笔画太抖)。
+ *  - **弯曲检测**:无明确折角,但笔画明显偏离首尾直线(最大垂距 / 线长 > CURVE_DEVIATION)
+ *    → curve(控制点 = 最大偏移点的镜像反算,让二次贝塞尔贴合笔画)。
+ *  - 其余(近似直线)→ straight。
+ *
+ * 返回 kind + 对应数据(curve/elbow)。straight 时数据为空。
+ */
+export function detectArrowRoute(
+  points: [number, number][],
+): {
+  kind: 'straight' | 'curve' | 'elbow'
+  curve?: { cx: number; cy: number }
+  elbow?: { x: number; y: number }[]
+} {
+  if (points.length < 3) return { kind: 'straight' }
+  const first = points[0]!
+  const last = points[points.length - 1]!
+
+  // 1. 折角检测:相邻点构成的方向角突变。
+  const CORNER_ANGLE = Math.PI / 4 // 45°:方向急转算折角
+  const MIN_SEGMENT = 4 // 段长 < 此值视为抖动,跳过(避免密集点造成假折角)
+  const dirs: { idx: number; angle: number }[] = []
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i]![0] - points[i - 1]![0]
+    const dy = points[i]![1] - points[i - 1]![1]
+    if (Math.hypot(dx, dy) < MIN_SEGMENT) continue
+    dirs.push({ idx: i, angle: Math.atan2(dy, dx) })
+  }
+  const corners: { x: number; y: number }[] = []
+  for (let i = 1; i < dirs.length; i++) {
+    let delta = Math.abs(dirs[i]!.angle - dirs[i - 1]!.angle)
+    if (delta > Math.PI) delta = 2 * Math.PI - delta // 折到 [0,π]
+    if (delta > CORNER_ANGLE) {
+      const cp = points[dirs[i]!.idx]!
+      // 合并相邻折角(< 8px 视为同一个)
+      if (corners.length === 0 || Math.hypot(corners[corners.length - 1]!.x - cp[0], corners[corners.length - 1]!.y - cp[1]) > 8) {
+        corners.push({ x: cp[0], y: cp[1] })
+      }
+    }
+  }
+  // 1-2 个明确折角 → elbow(超过 2 个 = 笔画太抖,不认折线)。
+  if (corners.length >= 1 && corners.length <= 2) {
+    return { kind: 'elbow', elbow: corners }
+  }
+
+  // 2. 弯曲检测:无折角时,看笔画偏离首尾直线的最大垂距。
+  const lineLen = Math.hypot(last[0] - first[0], last[1] - first[1])
+  if (lineLen < 1) return { kind: 'straight' }
+  let maxDev = 0
+  let maxDevPt = first
+  for (const p of points) {
+    // 点到首尾直线的距离(叉积 / 线长)
+    const dev = Math.abs((last[0] - first[0]) * (first[1] - p[1]) - (first[0] - p[0]) * (last[1] - first[1])) / lineLen
+    if (dev > maxDev) {
+      maxDev = dev
+      maxDevPt = p
+    }
+  }
+  const CURVE_DEVIATION = 0.15 // 最大垂距 > 线长 15% → 视为弯曲
+  if (maxDev / lineLen > CURVE_DEVIATION) {
+    // 控制点反算:让二次贝塞尔在 t=0.5 经过最大偏移点。
+    // B(0.5) = 0.25·from + 0.5·C + 0.25·to = M → C = 2M - 0.5(from+to)
+    const cx = 2 * maxDevPt[0] - 0.5 * (first[0] + last[0])
+    const cy = 2 * maxDevPt[1] - 0.5 * (first[1] + last[1])
+    return { kind: 'curve', curve: { cx: Math.round(cx), cy: Math.round(cy) } }
+  }
+
+  return { kind: 'straight' }
 }

@@ -414,6 +414,8 @@ export const messages = {
   'freedraw.looksCheck': { zh: '看起来像对勾', en: 'Looks like a check mark' },
   'freedraw.duplicate': { zh: '复制', en: 'Duplicate' },
   'freedraw.toArrow': { zh: '转为箭头', en: 'Convert to arrow' },
+  'freedraw.toCurveArrow': { zh: '转为曲线箭头', en: 'Convert to curved arrow' },
+  'freedraw.toElbowArrow': { zh: '转为折线箭头', en: 'Convert to elbow arrow' },
 } as const
 
 export type MessageKey = keyof typeof messages
