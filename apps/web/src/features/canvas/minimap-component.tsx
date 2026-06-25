@@ -5,9 +5,9 @@
  *
  * 浮在画布右下角(Bauhaus 白底 + 黑边 + 硬阴影,与 RelationPanel 一致)。每帧重绘:
  *   1. 算 projection(全部元素 bbox fit 进 minimap)+ viewportRect(当前可见页矩形)
- *   2. 画元素:card=矩形、arrow=线、其他(freedraw/rect/text)= 小点
+ *   2. 画元素:card=填色矩形、arrow=线、rect=描边方框、text=横条、freedraw=点折线、其他=小点
  *   3. 画视口框(dashed)
- * 点击 minimap → 把对应页坐标居中(setView 调 pan)。
+ * 点击 minimap → 把对应页坐标居中;按住拖拽 → 连续平移跟随光标。
  *
  * 只读 host(getElements/getView/setView/onViewChange/onUserChange),不碰引擎逻辑。
  * 颜色走 token(readToken 读 CSS 变量,fallback hex)。
@@ -35,7 +35,9 @@ export function Minimap({
 }) {
   const miniRef = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef<number | null>(null)
+  // 拖拽态:pointer down 后挂 window move/up 监听,使拖拽不离开 minimap 也连续。
   const [collapsed, setCollapsed] = useState(false)
+  const draggingRef = useRef(false)
   const { t } = useI18n()
 
   /** 绘制一帧。 */
@@ -112,32 +114,74 @@ export function Minimap({
     if (!collapsed) scheduleDraw()
   }, [collapsed, scheduleDraw])
 
-  // 点击 minimap → 该页坐标居中。
-  const onClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!host || !canvasEl) return
+  // 把点击/光标所在的 minimap 坐标 → 居中视口(click & drag-mousemove 共用)。
+  // 屏幕 中心 = pan + pageP*zoom → pan = screenCenter - pageP*zoom。
+  const centerOnMiniPoint = useCallback(
+    (clickMini: { x: number; y: number }) => {
+      if (!host || !canvasEl) return
+      const elements = host.getElements()
+      const proj = computeMinimapProjection(elements, { w: MINIMAP_W, h: MINIMAP_H })
+      const pageP = minimapClickToPage(clickMini, proj)
+      const view = host.getView()
+      const zoom = view.zoom || 1
+      const cx = canvasEl.clientWidth / 2
+      const cy = canvasEl.clientHeight / 2
+      host.setView({
+        ...view,
+        panX: cx - pageP.x * zoom,
+        panY: cy - pageP.y * zoom,
+      })
+    },
+    [host, canvasEl],
+  )
+
+  // 把鼠标事件 client 坐标 → minimap 内坐标(canvas 物理尺寸 = CSS 尺寸,不 DPR 放大)。
+  const miniCoordsFromEvent = (clientX: number, clientY: number) => {
     const mini = miniRef.current
-    if (!mini) return
-    const rect = mini.getBoundingClientRect()
-    const sx = e.clientX - rect.left
-    const sy = e.clientY - rect.top
-    // minimap 内坐标(canvas 物理尺寸 = CSS 尺寸,不 DPR 放大,简化)。
-    const clickMini = {
+    const rect = mini?.getBoundingClientRect()
+    if (!rect) return null
+    const sx = clientX - rect.left
+    const sy = clientY - rect.top
+    return {
       x: (sx / rect.width) * MINIMAP_W,
       y: (sy / rect.height) * MINIMAP_H,
     }
-    const elements = host.getElements()
-    const proj = computeMinimapProjection(elements, { w: MINIMAP_W, h: MINIMAP_H })
-    const pageP = minimapClickToPage(clickMini, proj)
-    // 算 pan 使 pageP 居中:屏幕中心 = pan + pageP*zoom → pan = screenCenter - pageP*zoom。
-    const view = host.getView()
-    const zoom = view.zoom || 1
-    const cx = canvasEl.clientWidth / 2
-    const cy = canvasEl.clientHeight / 2
-    host.setView({
-      ...view,
-      panX: cx - pageP.x * zoom,
-      panY: cy - pageP.y * zoom,
-    })
+  }
+
+  // 点击 minimap → 该页坐标居中(单次点击仍生效;拖拽走 onPointerDown)。
+  const onClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (draggingRef.current) return // 拖拽刚结束,不重复 center
+    if (!host || !canvasEl) return
+    const click = miniCoordsFromEvent(e.clientX, e.clientY)
+    if (!click) return
+    centerOnMiniPoint(click)
+  }
+
+  // 拖拽到平移:down → 连续 move center → up 结束。用 window 级监听,拖出 minimap 也跟随。
+  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!host || !canvasEl) return
+    const mini = miniRef.current
+    if (!mini) return
+    const click = miniCoordsFromEvent(e.clientX, e.clientY)
+    if (!click) return
+    // 立即居中一次(给用户即时反馈),进入拖拽态。
+    centerOnMiniPoint(click)
+    draggingRef.current = true
+    mini.setPointerCapture?.(e.pointerId)
+    const onMove = (ev: PointerEvent) => {
+      const p = miniCoordsFromEvent(ev.clientX, ev.clientY)
+      if (p) centerOnMiniPoint(p)
+    }
+    const onUp = (ev: PointerEvent) => {
+      draggingRef.current = false
+      mini.releasePointerCapture?.(e.pointerId)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
   }
 
   if (!host || !canvasEl) return null
@@ -148,8 +192,8 @@ export function Minimap({
     <div
       style={{
         position: 'absolute',
-        right: 12,
-        bottom: 12,
+        right: 'var(--space-1)',
+        bottom: 'var(--space-1)',
         width: MINIMAP_W,
         zIndex: 15,
         background: 'var(--color-white)',
@@ -189,7 +233,7 @@ export function Minimap({
             fontFamily: 'var(--font-mono)',
             fontSize: 'var(--font-size-xs)',
             lineHeight: 1,
-            padding: '0 4px',
+            padding: '0 var(--space-1)',
             background: 'transparent',
             color: 'var(--color-black)',
             border: 'none',
@@ -205,12 +249,14 @@ export function Minimap({
           width={MINIMAP_W}
           height={MINIMAP_H}
           onClick={onClick}
+          onPointerDown={onPointerDown}
           aria-label={title}
           style={{
             display: 'block',
             width: MINIMAP_W,
             height: MINIMAP_H,
             cursor: 'pointer',
+            touchAction: 'none',
           }}
         />
       )}
@@ -219,17 +265,21 @@ export function Minimap({
 }
 
 /** 画单个元素的简化标记(不画内容,只占位/形状)。
- *  card=填色矩形、arrow=连线、其他=小圆点。颜色走 token(colorOf)。 */
+ *  card=填色矩形、arrow=连线、rect=描边方框、text=横条、
+ *  freedraw=点序列折线、legacy/其他=小圆点。颜色走 token(colorOf)。 */
 function drawElementMark(
   ctx: CanvasRenderingContext2D,
   el: CanvasElement,
   proj: { scale: number; offsetX: number; offsetY: number },
 ) {
+  // 通用 bbox 投影(arrow / card / rect / text 复用)。
+  const px = (pageX: number) => pageX * proj.scale + proj.offsetX
+
   if (el.kind === 'arrow') {
     // arrow 几何:from/to 端点未解析时用 bbox 对角线端点。
-    const x1 = el.x * proj.scale + proj.offsetX
+    const x1 = px(el.x)
     const y1 = el.y * proj.scale + proj.offsetY
-    const x2 = (el.x + el.w) * proj.scale + proj.offsetX
+    const x2 = px(el.x + el.w)
     const y2 = (el.y + el.h) * proj.scale + proj.offsetY
     ctx.save()
     ctx.strokeStyle = colorOf(el.color)
@@ -241,8 +291,9 @@ function drawElementMark(
     ctx.restore()
     return
   }
+
   if (el.kind === 'card') {
-    const x = el.x * proj.scale + proj.offsetX
+    const x = px(el.x)
     const y = el.y * proj.scale + proj.offsetY
     const w = el.w * proj.scale
     const h = el.h * proj.scale
@@ -255,8 +306,71 @@ function drawElementMark(
     ctx.restore()
     return
   }
-  // freedraw / rect / text / legacy:小圆点(中心)。
-  const cx = (el.x + el.w / 2) * proj.scale + proj.offsetX
+
+  // rect(自由矩形):描边方框,与填色 card 区分。
+  if (el.kind === 'rect') {
+    const x = px(el.x)
+    const y = el.y * proj.scale + proj.offsetY
+    const w = el.w * proj.scale
+    const h = el.h * proj.scale
+    ctx.save()
+    ctx.strokeStyle = colorOf(el.color)
+    ctx.lineWidth = 1
+    ctx.strokeRect(x, y, Math.max(w, 2), Math.max(h, 2))
+    ctx.restore()
+    return
+  }
+
+  // text:又宽又矮 → 短宽横条描边(高度补足到 ≥2px 才看得见)。
+  if (el.kind === 'text') {
+    const x = px(el.x)
+    const y = el.y * proj.scale + proj.offsetY
+    const w = el.w * proj.scale
+    const h = Math.max(el.h * proj.scale, 2)
+    ctx.save()
+    ctx.strokeStyle = colorOf(el.color)
+    ctx.lineWidth = 1
+    ctx.strokeRect(x, y, Math.max(w, 4), h)
+    ctx.restore()
+    return
+  }
+
+  // freedraw:真实点序列(绝对页坐标)→ 折线(与 elements-to-svg.ts:111 同源访问)。
+  // 纯本地渲染(画用户自己的点在自己的小地图),不进任何 AI/snapshot 路径。
+  if (el.kind === 'freedraw') {
+    const pts = (el.meta?.points as [number, number][] | undefined) ?? []
+    if (pts.length >= 2) {
+      ctx.save()
+      ctx.strokeStyle = colorOf(el.color)
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      for (let i = 0; i < pts.length; i++) {
+        const X = px(pts[i]![0])
+        const Y = pts[i]![1] * proj.scale + proj.offsetY
+        if (i === 0) ctx.moveTo(X, Y)
+        else ctx.lineTo(X, Y)
+      }
+      ctx.stroke()
+      ctx.restore()
+      return
+    }
+    if (pts.length === 1) {
+      // 单点 freedraw:小圆点(与实时渲染/elements-to-svg 单点一致)。
+      const X = px(pts[0]![0])
+      const Y = pts[0]![1] * proj.scale + proj.offsetY
+      ctx.save()
+      ctx.fillStyle = colorOf(el.color)
+      ctx.beginPath()
+      ctx.arc(X, Y, 1.5, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+      return
+    }
+    // 无点 → 落回中心点(下方 fallback)。
+  }
+
+  // legacy / 无点 freedraw / 其他:小圆点(bbox 中心)。
+  const cx = px(el.x + el.w / 2)
   const cy = (el.y + el.h / 2) * proj.scale + proj.offsetY
   ctx.save()
   ctx.fillStyle = colorOf(el.color)
