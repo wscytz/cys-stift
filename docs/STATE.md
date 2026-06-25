@@ -130,7 +130,7 @@
 
 - **颜色类型双轨制**:`ColorToken`(6 色 Bauhaus)vs `TagColor`(10 个 CSS var)未统一 — 稳定版内不做重构(风险大)。详见 v0.37.0 review D 段。
 - **Tauri 未签名**:DMG 可本地构建(36MB,Apple Silicon),分发需签名公证。
-- **存储配额估算**:localStorage 用 `Blob().size` 精确计字节;OPFS/IndexedDB 真实配额用 `navigator.storage.estimate()`,但 UI 仍按 5MB fallback 显示(未接 estimate)。
+- **JSON 导入 freeform 原子性**:`importFromJson` 忽略 `canvasFreeformStore.save` 返回值——OPFS + localStorage 双失败时部分画布几何静默丢失(返回 ok:true),卡片/canvas 列表有 rollback 保障不受影响。低-中风险(需双重存储失败)。
 
 ## 约束(不可遗忘,详见根 `CLAUDE.md`)
 
