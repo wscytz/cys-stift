@@ -104,28 +104,23 @@ export default function InboxPage() {
   const selectAll = () => setSelected(new Set(visible.map((c) => c.id)))
 
   // 找重复(本地精确去重,零 AI):URL/代码片段/标题归一化等值。
-  // 非破坏性:点按钮预选第一组重复卡到 selected,用户在底部 batch-bar 处理(归档/删除)。
-  // 循环点依次看每组;toast 报进度。重复组随 visible 重算(view 切换/数据变)。
+  // **纯提示,不替用户决定**:只报有几组重复 + 各组维度,不自动选中、不跳选。
+  // 用户自己决定要不要去翻找处理(精确重复一眼能看出,工具只负责提醒"存在")。
   const dupGroups = useMemo(() => findDuplicateGroups(visible), [visible])
-  const [dupIndex, setDupIndex] = useState(0)
-  useEffect(() => {
-    setDupIndex(0)
-  }, [dupGroups.length])
   const findDuplicates = () => {
     if (dupGroups.length === 0) {
       pushToast({ kind: 'info', message: t('inbox.dup.none') })
       return
     }
-    const next = (dupIndex + 1) % dupGroups.length
-    setDupIndex(next)
-    const group = dupGroups[next]!
-    setSelected(new Set(group.cardIds))
+    const byDim = (dim: DuplicateGroup['dimension']) =>
+      dupGroups.filter((g) => g.dimension === dim).length
     pushToast({
       kind: 'info',
-      message: t('inbox.dup.found', {
-        i: String(next + 1),
+      message: t('inbox.dup.summary', {
         n: String(dupGroups.length),
-        dim: t(`inbox.dup.dim.${group.dimension}`),
+        url: String(byDim('url')),
+        code: String(byDim('code')),
+        title: String(byDim('title')),
       }),
     })
   }
