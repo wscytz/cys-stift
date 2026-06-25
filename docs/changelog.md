@@ -5,6 +5,34 @@
 
 ---
 
+## 2026-06-25 · ui-polish-batch · minimap 优化 + UI 审计打磨(转义产品化主线收口后进入打磨)
+
+主线三步(JSON 备份 / 转义产品化 / AI 介入手绘)全完成后,进入打磨轮。开 3 个 Explore subagent 并行扫画布 / 列表视图 / 模态+全局壳,出 42 条带优先级清单;用户定"全做"。subagent 顺序执行(TDD),主模型审 diff + 跨包验证 + commit。
+
+- **minimap(用户反馈"手绘图案显示不佳")**:① 拖拽平移(pointer capture + window 监听,拖出 minimap 也跟随;单次 click 仍居中);② **手绘真身显示**——freedraw `meta.points` → mini 折线(本地渲染,不进 AI/snapshot,守 R2);③ 元素标记区分(rect=描边方框 / text=横条 / freedraw=折线,此前全是中心点);④ token 清理(12/4px → var(--space-1))。
+- **i18n 清零**:archive 卡 "media" 硬编码 → t('card.mediaCount')(CJK 用户此前看英文)/ archive+trash 面包屑品牌名 / create-form title 误用 body label / settings label htmlFor 关联 / Modal 加 closeLabel prop。
+- **token 清零**:export-raster JPEG `#ffffff` → readToken / modal 背景板 rgba → color-mix(跟 --color-black,暗色自适)/ 浮 panel + rail px → space token。
+- **一致性统一(F/G/I)**:archive 选择控件原生 checkbox → button[aria-pressed] 方块✓(对齐 inbox)/ archive 黑底 floater → 白卡 batch-bar(镜像 inbox)/ card-detail 编辑态按钮顺序 [Save][Cancel] → [Cancel][Save](primary 靠右)。
+- **真 UX bug(J/K/L)**:浮 panel 视口钳制(relation/freedraw 拖到边缘出屏 → 新 useClampedPanelPosition hook 测真实尺寸+钳制)/ DSL dialog 动作行 flex-wrap 防溢出 / card-detail 全局 Escape 守卫(不再吞掉嵌套 AI popover/标签输入/确认删除的 Escape)。
+- **toast 错误处理(M)**:错误不再自动消失(数据级错误不该 5s 蒸发)+ per-toast role(error=alert)/ 每条 × 关闭 + 队列上限 5(溢出丢最旧非错误,错误永不静默丢)。
+- **z-index 分级(N)**:文档化 canvas 0 / minimap 10 / rail 20(升,不再被遮)/ 浮 panel 30 / modal+toast 100。
+- **skeleton(O)+ 杂项**:PageLoading 纯文字 → 4 灰块骨架(opacity 脉冲,reduced-motion 关)/ ✨ emoji → » mono / search 加 PageLoading / trash grid 对齐 / 批量操作 toast 反馈 / DSL 下载 toast / AI busy aria-busy / home 二级 nav(search/trash/settings)/ brand 条纹统一红 / canvas 空态 CTA / version 同步 v0.37.0 / inbox 删死代码 `<style>`。
+- 全程 subagent 编排省主模型上下文;domain 68 / 引擎 353 / web 551 测试 + build exit 0,跨包零回归。
+
+---
+
+## 2026-06-25 · timeline-view · 全局时间线视图 /timeline (P10 时间线收口)
+
+P10 三件(cluster / 找重复 / 时间线)最后一件。brainstorm 定形态:**全局本地视图**(非 AI、非画布能力),跨 inbox/canvas/archive 全部非删除卡,按 `capturedAt`(想法诞生时刻)倒序 + 按捕获日分组。核心增值:每张卡显示**「现在在哪」**徽标(inbox/在画布X/已归档)——全局视图的卡是混合状态,这是它区别于 archive timeline(单一已归档)的点。
+
+- `groupCardsByDay<T>` 纯函数 + 5 单测(apps/web/lib,保 domain 零依赖);archive timeline 改用它(DRY,传 updatedAt)。
+- 新路由 `/timeline`:Toolbar + 日分组列表 + 空态;复用 `ArchiveCardTile`(扩 badge slot + select props 改可选)+ `CardDetailModal`(动作全套);AppMenu 加条目(横切视图,不做 home 第四阶段卡);Toolbar region 加 timeline(gray)。
+- 状态徽标优先级:archived(blue) > 在画布(gray,带名,孤儿退化) > inbox(red)。
+- 纯本地、无 AI、无 R2 隐私面。
+- i18n 9 条;web +5 测试(551);build exit 0。
+
+---
+
 ## 2026-06-25 · inbox-find-duplicates · inbox 本地精确找重复(纯提示)
 
 P10 AI 方向第一层:本地精确去重(零 AI/零隐私/离线可用),互补已上线的 cluster(LLM 找相似画箭头)。用户定形态:本地精确 + inbox 入口;后反馈"功能价值有限,放着但不要替用户决定",改为**纯提示**。

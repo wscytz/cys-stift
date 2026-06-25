@@ -126,6 +126,8 @@
 - AI 找重复 / cluster / 时间线(P10):
   - **cluster**(canvas,已上线)——LLM 找相似画关系箭头(`cluster.ts`,AC 按钮)
   - **找重复**(inbox,2026-06-25)——本地精确去重(URL/代码片段/标题归一化等值,零 AI/零隐私/离线可用),`findDuplicateGroups` domain 纯函数 + inbox 工具栏「找重复」按钮。**纯提示态**(用户反馈:功能价值有限,放着但不替用户决定):按钮附黄色计数 + toast 报各维度分布,**不选中不跳选**,用户自行翻找处理。互补 cluster(精确提示 vs 语义相似)。
+  - **时间线**(2026-06-25,P10 收口)——全局本地视图 `/timeline`,跨 inbox/canvas/archive 全部非删除卡按 `capturedAt`(想法诞生)倒序 + 按捕获日分组。核心增值:每张卡**「现在在哪」**徽标(inbox/在画布X/已归档)——全局视图卡是混合状态,区别于 archive timeline(单一已归档)。`groupCardsByDay` 纯函数(timeline + archive DRY 共用);复用 `ArchiveCardTile`(badge slot)+ `CardDetailModal`;AppMenu 条目(横切视图,非 home 第四阶段卡)。纯本地无 AI 无 R2。**P10 三件(cluster/找重复/时间线)全部完成。**
+- **UI 打磨批**(2026-06-25,主线收口后进入打磨):3 个 Explore subagent 并行审计画布/列表/模态出 42 条清单,用户定"全做",subagent 顺序 TDD 执行。**minimap**(用户反馈"手绘显示不佳"):拖拽平移 + freedraw `meta.points` mini 折线(本地,守 R2)+ 元素标记区分 + token 清理。**i18n/token 清零**:archive "media" 硬编码、面包屑品牌名、modal rgba、export-raster hex 等。**一致性(F/G/I)**:archive 选择控件/批栏/按钮顺序对齐 inbox。**真 UX bug(J/K/L)**:浮 panel 视口钳制(新 useClampedPanelPosition hook)/ DSL 防溢出 / card-detail Escape 守卫。**toast(M)**:错误持久+role=alert+×关闭+队列上限。**z-index 分级(N)**:canvas0/minimap10/rail20/panel30/modal100 文档化。**skeleton(O)+ 杂项**:PageLoading 骨架 / ✨→» / search loading / 批量 toast / home 二级 nav / brand 条纹 / canvas 空 CTA / version v0.37.0。domain 68 / 引擎 353 / web 551 + build exit 0,跨包零回归。
 - UX 打磨(P12,四项全完成):inbox 批量多选(Gmail 式 checkbox + 底部 BatchBar 归档/移到画布/删除)/ Card markdown 双向(inbox MarkdownBody + ReactMarkdown+sanitize)/ minimap / undo-redo(键盘 + 画布 side rail 按钮 + onHistoryChange 事件)
 
 ## 已知 debt(有意 defer,非 bug)
