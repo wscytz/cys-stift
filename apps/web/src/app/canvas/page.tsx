@@ -745,7 +745,13 @@ const styles = `
 .confirm__body { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
 .confirm__actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-2); }
 .cv-rail {
-  position: absolute; top: 72px; right: var(--space-1); z-index: 5;
+  /* z-index scale (canvas chrome):
+     0  canvas content
+     10 minimap
+     20 side rail (this)  — above minimap so rail buttons stay clickable
+     30 floating panels (relation/freedraw) — above rail
+     100 modals / toasts  — above all canvas chrome */
+  position: absolute; top: 72px; right: var(--space-1); z-index: 20;
   display: flex; flex-direction: column; align-items: center; gap: var(--space-1);
   padding: var(--space-1);
   background: var(--color-white);

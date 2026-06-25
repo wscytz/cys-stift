@@ -378,6 +378,7 @@ export const messages = {
   'common.cancel': { zh: '取消', en: 'Cancel' },
   'common.ok': { zh: '确定', en: 'OK' },
   'common.loading': { zh: '读取中…', en: 'Loading…' },
+  'common.dismiss': { zh: '关闭', en: 'Dismiss' },
 
   /* ── tldraw ── */
   'tldraw.loading': { zh: '画布加载中…', en: 'Loading canvas…' },

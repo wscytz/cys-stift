@@ -21,6 +21,36 @@
   font-size: var(--font-size-sm);
   line-height: 1.4;
   pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.toast__msg {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.toast__close {
+  flex: 0 0 auto;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin-left: var(--space-1);
+  line-height: 1;
+  font-size: var(--font-size-base);
+  color: var(--color-gray);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.toast__close:hover {
+  color: var(--color-black);
+}
+
+.toast__close:focus-visible {
+  outline: 2px solid var(--color-red);
+  outline-offset: 1px;
 }
 
 .toast--info {

@@ -225,7 +225,7 @@ function computePanelPosition(
 
 const styles = `
 .cv-relation {
-  z-index: 25;
+  z-index: 30;
   display: inline-flex;
   align-items: center;
   gap: 4px;

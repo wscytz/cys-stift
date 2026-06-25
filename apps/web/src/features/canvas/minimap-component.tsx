@@ -195,7 +195,7 @@ export function Minimap({
         right: 'var(--space-1)',
         bottom: 'var(--space-1)',
         width: MINIMAP_W,
-        zIndex: 15,
+        zIndex: 10,
         background: 'var(--color-white)',
         border: '2px solid var(--color-black)',
         boxShadow: '4px 4px 0 0 var(--color-black)',
