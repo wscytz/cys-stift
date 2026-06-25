@@ -7,6 +7,7 @@ import type { Card, SearchResult } from '@cys-stift/domain'
 import { searchCards, bodySnippet } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
+import { PageLoading } from '@/components/page-loading'
 import { CardDetailModal } from '@/features/card/card-detail'
 import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
 
@@ -18,7 +19,7 @@ import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
  */
 export default function SearchPage() {
   const { t } = useI18n()
-  const { snap, service } = useDb()
+  const { snap, service, ready } = useDb()
   const [query, setQuery] = useState('')
   const [detail, setDetail] = useState<{ card: Card } | null>(null)
 
@@ -54,7 +55,9 @@ export default function SearchPage() {
           onChange={(e) => setQuery(e.target.value)}
         />
 
-        {query.trim() === '' ? (
+        {!ready ? (
+          <PageLoading />
+        ) : query.trim() === '' ? (
           <p className="search-hint">{t('search.empty')}</p>
         ) : results.length === 0 ? (
           <p className="search-hint">{t('search.noMatch', { q: query })}</p>

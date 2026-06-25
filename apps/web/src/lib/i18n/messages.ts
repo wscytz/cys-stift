@@ -188,6 +188,7 @@ export const messages = {
   'canvas.dslCopied': { zh: '已复制到剪贴板', en: 'Copied to clipboard' },
   'canvas.dslCopyFail': { zh: '复制失败', en: 'Copy failed' },
   'canvas.dslDownload': { zh: '下载', en: 'Download' },
+  'canvas.dslDownloaded': { zh: '已下载 DSL 文本', en: 'DSL text downloaded' },
   'canvas.dslEmpty': { zh: '没有可应用的指令', en: 'No directives to apply' },
   'canvas.dslErrorsTitle': { zh: '{n} 行无法识别', en: '{n} line(s) could not be parsed' },
   'canvas.dslErrorLine': { zh: '第 {line} 行:', en: 'Line {line}:' },
@@ -419,6 +420,7 @@ export const messages = {
   'tag.noTags': { zh: '暂无标签', en: 'No tags yet' },
   /* ── AI Layout (P7) ── */
   'canvas.aiLayout': { zh: 'AI 排版', en: 'AI layout' },
+  'canvas.aiRunning': { zh: '运行中…', en: 'Running…' },
   'canvas.aiLayoutDone': { zh: 'AI 排版已应用', en: 'AI layout applied' },
   'canvas.aiLayoutAppliedSkipped': { zh: 'AI 排版:应用 {applied} 条 · 跳过 {skipped} 条', en: 'AI layout: applied {applied} · skipped {skipped}' },
   'canvas.aiLayoutNoneApplied': { zh: 'AI 排版未生效(卡片/端点缺失)', en: 'AI layout had no effect (missing card/endpoint)' },

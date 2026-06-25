@@ -136,6 +136,7 @@ export function DslDialog({
     a.click()
     document.body.removeChild(a)
     setTimeout(() => URL.revokeObjectURL(url), 1000)
+    pushToast({ kind: 'success', message: t('canvas.dslDownloaded') })
   }
 
   return (

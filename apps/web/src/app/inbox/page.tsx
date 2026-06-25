@@ -515,5 +515,3 @@ function EmptyState({ view }: { view: View }) {
     </UICard>
   )
 }
-
-<style>{styles}</style>

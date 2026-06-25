@@ -699,7 +699,7 @@ function CanvasSideRail({
       <span className="cv-rail__sep" aria-hidden="true" />
       {aiEnabled && (
         <>
-          <RailButton label={t('canvas.aiLayout')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'layout'} onClick={onAILayout} icon="AI" />
+          <RailButton label={t('canvas.aiLayout')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'layout'} ariaBusy={aiBusy === 'layout'} busyTitle={t('canvas.aiRunning')} onClick={onAILayout} icon="AI" />
           <RailButton label={t('canvas.aiCluster')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'cluster'} onClick={onAICluster} icon="AC" />
         </>
       )}
@@ -716,9 +716,9 @@ function CanvasSideRail({
   )
 }
 
-function RailButton({ label, icon, onClick, disabled, busy }: { label: string; icon: string; onClick: () => void; disabled?: boolean; busy?: boolean }) {
+function RailButton({ label, icon, onClick, disabled, busy, busyTitle, ariaBusy }: { label: string; icon: string; onClick: () => void; disabled?: boolean; busy?: boolean; busyTitle?: string; ariaBusy?: boolean }) {
   return (
-    <button type="button" className="cv-rail__btn" onClick={onClick} disabled={disabled} title={label} aria-label={label}>
+    <button type="button" className="cv-rail__btn" onClick={onClick} disabled={disabled} title={busy && busyTitle ? busyTitle : label} aria-label={label} aria-busy={ariaBusy ? true : undefined}>
       {busy ? '…' : icon}
     </button>
   )
