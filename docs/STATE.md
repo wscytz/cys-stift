@@ -125,7 +125,7 @@
 - Tauri **签名公证**(P9 — 需 Apple 证书,用户提供)
 - AI 找重复 / cluster / 时间线(P10):
   - **cluster**(canvas,已上线)——LLM 找相似画关系箭头(`cluster.ts`,AC 按钮)
-  - **找重复**(inbox,2026-06-25)——本地精确去重(URL/代码片段/标题归一化等值,零 AI/零隐私/离线可用),`findDuplicateGroups` domain 纯函数 + inbox 工具栏「找重复」按钮循环预选重复组到批量栏处理。互补 cluster(精确 vs 语义)。
+  - **找重复**(inbox,2026-06-25)——本地精确去重(URL/代码片段/标题归一化等值,零 AI/零隐私/离线可用),`findDuplicateGroups` domain 纯函数 + inbox 工具栏「找重复」按钮。**纯提示态**(用户反馈:功能价值有限,放着但不替用户决定):按钮附黄色计数 + toast 报各维度分布,**不选中不跳选**,用户自行翻找处理。互补 cluster(精确提示 vs 语义相似)。
 - UX 打磨(P12,四项全完成):inbox 批量多选(Gmail 式 checkbox + 底部 BatchBar 归档/移到画布/删除)/ Card markdown 双向(inbox MarkdownBody + ReactMarkdown+sanitize)/ minimap / undo-redo(键盘 + 画布 side rail 按钮 + onHistoryChange 事件)
 
 ## 已知 debt(有意 defer,非 bug)
