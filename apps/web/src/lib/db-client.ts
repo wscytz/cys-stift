@@ -76,6 +76,20 @@ function notifyQuota(): void {
   for (const cb of _quotaSubscribers) cb()
 }
 
+/**
+ * StorageQuotaError — insert 抛这个错时表示卡片未持久化(配额满 / 隐私模式)。
+ * 调用方(CardService.create → CaptureSink.submit)据此 reject promise,让
+ * capture 链路把"保存失败"暴露给用户(而非静默吞掉导致数据丢失)。H2 fix:
+ * 之前 insert 只回滚内存 + notifyQuota,不抛错 → fromCapture 照常返回卡片
+ * → sink resolve 成功 → MiniInput 清空草稿 → 用户文字彻底丢失。
+ */
+export class StorageQuotaError extends Error {
+  constructor(message = 'storage quota exceeded — card not persisted') {
+    super(message)
+    this.name = 'StorageQuotaError'
+  }
+}
+
 /** 订阅配额写入失败事件(卡片操作无法持久化时触发)。返回取消订阅。 */
 export function onQuotaExceeded(cb: QuotaCallback): () => void {
   _quotaSubscribers.add(cb)
@@ -155,6 +169,10 @@ const cardRepo = {
     if (!persist()) {
       _cards = prev // 回滚:内存与 localStorage 一致,不留孤儿
       notifyQuota()
+      // H2 fix: 配额满时必须 throw,否则 CardService.create 照常返回卡片,
+      // CaptureSink.submit resolve 成功,MiniInput 清空草稿 → 用户输入静默丢失。
+      // 抛 StorageQuotaError 让 promise 链路 reject,上层据此保留草稿 + 报错。
+      throw new StorageQuotaError()
     }
   },
   update(card: Card) {

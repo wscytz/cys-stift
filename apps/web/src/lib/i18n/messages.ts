@@ -403,6 +403,7 @@ export const messages = {
   'capture.quotaExceeded': { zh: '{name} 超过 5MB,已跳过', en: '{name} exceeds 5MB, skipped' },
   'capture.error': { zh: '{name}: {error}', en: '{name}: {error}' },
   'capture.success': { zh: '已创建 {name}', en: 'Created {name}' },
+  'capture.persistFailed': { zh: '保存失败(存储已满?)，草稿已保留：{error}', en: 'Save failed (storage full?), draft kept: {error}' },
 
   /* ── Card types ── */
   'card.typeNote': { zh: '笔记', en: 'Note' },

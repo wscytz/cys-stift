@@ -93,20 +93,28 @@ export async function restoreCystiftPayload(
   const idMap = new Map<string, string>()
   for (const card of payload.cards) {
     const oldId = String(card.id)
-    const created = service.create({
-      title: card.title,
-      body: card.body,
-      type: card.type,
-      media: card.media,
-      links: card.links,
-      codeSnippets: card.codeSnippets,
-      quotes: card.quotes,
-      source: card.source,
-      color: card.color,
-      canvasPosition: card.canvasPosition
-        ? { ...card.canvasPosition, canvasId: newCanvasId }
-        : undefined,
-    })
+    // H2: cardRepo.insert 现在在配额满时抛 StorageQuotaError。restore 是
+    // best-effort 批量恢复——单卡持久化失败不应让整批恢复崩掉(已恢复的卡
+    // 留下,其余跳过)。捕获后 break,用已建好的 idMap 继续恢复几何元素。
+    let created: { id: string } | null = null
+    try {
+      created = service.create({
+        title: card.title,
+        body: card.body,
+        type: card.type,
+        media: card.media,
+        links: card.links,
+        codeSnippets: card.codeSnippets,
+        quotes: card.quotes,
+        source: card.source,
+        color: card.color,
+        canvasPosition: card.canvasPosition
+          ? { ...card.canvasPosition, canvasId: newCanvasId }
+          : undefined,
+      })
+    } catch {
+      break // 配额满:停止恢复后续卡片,保留已恢复的部分
+    }
     idMap.set(oldId, String(created.id))
   }
 

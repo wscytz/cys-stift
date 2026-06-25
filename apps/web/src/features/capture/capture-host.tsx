@@ -26,11 +26,14 @@ import { useSettings } from '@/lib/settings-store'
 import { MiniInput } from './mini-input'
 import { captureSinkRegistry } from './capture-sink'
 import { getDeviceId } from '@/lib/device-id'
+import { pushToast } from '@/lib/toast-store'
+import { useI18n } from '@/lib/i18n'
 
 export const CAPTURE_OPEN_EVENT = 'cys-stift:open-capture'
 
 export function CaptureHost() {
   const { service } = useDb()
+  const { t } = useI18n()
   const { settings } = useSettings()
   const sc = settings.captureShortcut
   const [open, setOpen] = useState(false)
@@ -38,8 +41,13 @@ export function CaptureHost() {
   // source.kind reflects it (shortcut vs menubar). Reset on submit/close.
   const [openKind, setOpenKind] = useState<'shortcut' | 'menubar'>('shortcut')
 
+  // H2 fix: capture submit 现在是 await 的——配额失败时 sink 会 reject
+  // (cardRepo.insert 在配额满时抛 StorageQuotaError)。失败时推 error toast
+  // 并返回 false,让 MiniInput 据此保持 modal 打开 + 保留草稿 + 重置 submitting
+  // latch(可重试);成功时关闭 modal,返回 true(MiniInput 清草稿)。happy path
+  // 仍是单 microtask(WebCaptureSink.submit 同步 resolve),不阻塞 UI。
   const onSubmit = useCallback(
-    ({ title, body }: { title: string; body?: string }) => {
+    ({ title, body }: { title: string; body?: string }): Promise<boolean> => {
       const did = getDeviceId()
       const source =
         openKind === 'menubar'
@@ -49,10 +57,22 @@ export function CaptureHost() {
               shortcutId: 'cmd-shift-space',
               deviceId: did,
             }
-      void captureSinkRegistry.submit({ title, body, source })
-      setOpen(false)
+      return captureSinkRegistry
+        .submit({ title, body, source })
+        .then(() => {
+          setOpen(false)
+          return true
+        })
+        .catch((e: unknown) => {
+          const msg = e instanceof Error ? e.message : String(e)
+          pushToast({
+            kind: 'error',
+            message: t('capture.persistFailed', { error: msg }),
+          })
+          return false
+        })
     },
-    [openKind],
+    [openKind, t],
   )
 
   useEffect(() => {

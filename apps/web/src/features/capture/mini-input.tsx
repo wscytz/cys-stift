@@ -32,7 +32,10 @@ interface CaptureDraftPayload {
 export interface MiniInputProps {
   open: boolean
   onClose: () => void
-  onSubmit: (input: { title: string; body?: string }) => void
+  /** Returns true on success (card persisted), false on failure (e.g. quota).
+   *  On false the modal stays open and the draft is preserved so the user
+   *  can retry (H2 fix — silent data loss on capture quota failure). */
+  onSubmit: (input: { title: string; body?: string }) => Promise<boolean>
 }
 
 export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
@@ -90,14 +93,29 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
     persistDraft(title, b)
   }
 
-  const submit = () => {
+  const submit = async () => {
     if (submitting) return
     const t = title.trim()
     if (t.length === 0) return
     setSubmitting(true)
-    onSubmit({ title: t, body: body.trim() || undefined })
-    // Successful submit clears the draft (a saved card is no longer a draft).
-    draftStore.clear('capture')
+    // H3 fix: 取消挂起的 debounced 草稿持久化。否则用户在 Cmd+Enter 前最后
+    // ~500ms 内的按键会排一个 persistDraft,在下面 clear('capture') 之后才
+    // 触发,把刚提交的文字重新存成草稿,下次打开 capture 又冒出来。
+    persistDraft.cancel()
+    let ok = false
+    try {
+      ok = await onSubmit({ title: t, body: body.trim() || undefined })
+    } finally {
+      if (!ok) {
+        // H2 fix: 保存失败(配额满)。保持 modal 打开 + 保留草稿(不清),
+        // 重置 submitting latch 让用户可以重试。CaptureHost 已推 error toast。
+        setSubmitting(false)
+      }
+    }
+    if (ok) {
+      // 成功:已保存的卡片不再是草稿,清掉。
+      draftStore.clear('capture')
+    }
   }
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {

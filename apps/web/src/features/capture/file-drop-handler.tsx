@@ -19,14 +19,8 @@ import type { CardService } from '@cys-stift/domain'
 import { pushToast } from '@/lib/toast-store'
 import { useI18n } from '@/lib/i18n'
 import { useDb } from '@/lib/db-client'
+import { getDeviceId } from '@/lib/device-id'
 import type { MessageKey } from '@/lib/i18n/messages'
-
-function getDeviceId(): string {
-  if (typeof window === 'undefined') return 'ssr'
-  // Stable per-browser id (UA length + lang) — distinct per machine, no PII.
-  // M3 can swap for a proper UUID stored in localStorage.
-  return `web:${navigator.userAgent.length}:${navigator.language}`
-}
 
 function isEditableTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false
@@ -128,6 +122,28 @@ function captureAndToast(
 export function FileDropHandler() {
   const { t } = useI18n()
   const { service } = useDb()
+  useEffect(() => {
+    // H1 fix: 注册 FileCaptureSink 处理 'drag-drop' 和 'paste' 两种 source.kind。
+    // 否则 captureSinkRegistry.submit 落到 fallback(service.fromCapture),
+    // 它读 input.title(undefined)而忽略 input.file → 每个拖入/粘贴的文件变成
+    // 空白卡,文件内容静默丢失。FileCaptureSink 正确地为每个文件创建带 media/body
+    // 的卡。FileDropHandler 全局挂在 layout.tsx,在这里注册覆盖整个 app 生命周期。
+    // cancelled-flag 模式跟 inbox/page.tsx + capture-host.tsx 一致:动态 import
+    // 解析前若已 unmount,跳过注册,避免泄漏无人清理的 sink。
+    let cancelled = false
+    void import('./file-capture-sink').then(({ FileCaptureSink }) => {
+      if (cancelled) return
+      const sink = new FileCaptureSink(service)
+      captureSinkRegistry.register('drag-drop', sink)
+      captureSinkRegistry.register('paste', sink)
+    })
+    return () => {
+      cancelled = true
+      captureSinkRegistry.unregister('drag-drop')
+      captureSinkRegistry.unregister('paste')
+    }
+  }, [service])
+
   useEffect(() => {
     const onDragOver = (e: DragEvent) => {
       if (!e.dataTransfer) return

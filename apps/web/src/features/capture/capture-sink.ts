@@ -63,10 +63,31 @@ export const captureSinkRegistry = {
   submit(input: CaptureInput): Promise<{ cardId: CardId }> {
     const kind = input.source.kind
     const sink = _sinks.get(kind)
-    if (sink) return sink.submit(input)
+    // H2: sinks (WebCaptureSink / MenuCaptureSink) and the fallback call
+    // service.fromCapture() SYNCHRONOUSLY inside their submit(); a sync throw
+    // (e.g. StorageQuotaError from cardRepo.insert) would escape submit() as a
+    // synchronous exception, NOT a rejected promise — so the caller's
+    // .then().catch() chain in CaptureHost would never see it. Wrap each path
+    // so any sync throw becomes a rejection. This is what makes quota failure
+    // observable end-to-end.
+    if (sink) {
+      // sink.submit() may throw synchronously (WebCaptureSink calls
+      // service.fromCapture inline) OR return a rejected promise (FileCaptureSink
+      // is async). Catch the sync throw and convert; Promise.resolve flattens
+      // any thenable so a returned rejected promise also rejects the result.
+      try {
+        return Promise.resolve(sink.submit(input))
+      } catch (e) {
+        return Promise.reject(e)
+      }
+    }
     if (_fallbackService) {
-      const card = _fallbackService.fromCapture(input)
-      return Promise.resolve({ cardId: card.id })
+      try {
+        const card = _fallbackService.fromCapture(input)
+        return Promise.resolve({ cardId: card.id })
+      } catch (e) {
+        return Promise.reject(e)
+      }
     }
     return Promise.reject(
       new Error(

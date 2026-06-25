@@ -366,20 +366,32 @@ describe('saveSnapshot QuotaExceeded 防护', () => {
     expect(ok).toBe(true)
   })
 
-  it('insert 在配额满时回滚内存数组(不残留未持久化的卡)', async () => {
+  it('insert 在配额满时回滚内存数组并抛 StorageQuotaError(H2:让失败可观察)', async () => {
     const { __test__, rehydrateCards } = await import('../db-client')
     const { cardRepo } = __test__
     // 先正常插一张基线卡
     const base = makeCard({ id: toCardId('base-1') })
     cardRepo.insert(base)
     rehydrateCards()
-    // 现在 mock 配额失败,再插一张 —— 应回滚,内存里只剩 base
+    // 现在 mock 配额失败,再插一张 —— 应回滚(内存里只剩 base)并抛 StorageQuotaError,
+    // 这样 CaptureSink.submit 会 reject,上层(MiniInput)据此保留草稿 + 报错,
+    // 而不是静默吞掉配额失败导致用户输入丢失。
     const quotaErr = new DOMException('quota exceeded', 'QuotaExceededError')
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw quotaErr
     })
     const doomed = makeCard({ id: toCardId('doomed-1') })
-    expect(() => cardRepo.insert(doomed)).not.toThrow()
+    await expect(async () => cardRepo.insert(doomed)).rejects.toThrow(
+      /quota/i,
+    )
+    // 同步抛错也要覆盖(insert 不返回 promise,但 throw 会被同步调用栈捕获):
+    expect(() => {
+      try {
+        cardRepo.insert(doomed)
+      } catch {
+        /* expected */
+      }
+    }).not.toThrow()
     rehydrateCards()
     const all = cardRepo.listAll()
     expect(all.map((c) => c.id)).toEqual(['base-1'])
