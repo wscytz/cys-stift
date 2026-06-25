@@ -37,8 +37,31 @@ export function hitTest(
     const el = elements[i]!
     if (el.kind === 'arrow') {
       const { from, to } = arrowEndpoints(el, elements)
-      if (from && to && pointToSegmentDistance(pageX, pageY, from.x, from.y, to.x, to.y) <= tol) {
-        return el.id
+      if (from && to) {
+        if (el.curve) {
+          // 弯曲箭头:沿二次贝塞尔采样,点到每段距离取 min。
+          const ctrl = { x: el.curve.cx, y: el.curve.cy }
+          const N = 16
+          let prev = from
+          let hit = false
+          for (let s = 1; s <= N; s++) {
+            const t = s / N
+            // 二次贝塞尔点:B(t) = (1-t)²P0 + 2(1-t)t·C + t²·P1
+            const u = 1 - t
+            const pt = {
+              x: u * u * from.x + 2 * u * t * ctrl.x + t * t * to.x,
+              y: u * u * from.y + 2 * u * t * ctrl.y + t * t * to.y,
+            }
+            if (pointToSegmentDistance(pageX, pageY, prev.x, prev.y, pt.x, pt.y) <= tol) {
+              hit = true
+              break
+            }
+            prev = pt
+          }
+          if (hit) return el.id
+        } else if (pointToSegmentDistance(pageX, pageY, from.x, from.y, to.x, to.y) <= tol) {
+          return el.id
+        }
       }
       continue
     }

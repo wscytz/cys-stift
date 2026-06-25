@@ -182,6 +182,7 @@ function applyArrowOp(host: CanvasHost, op: DslArrowOp): boolean {
           ...(op.arrowhead ? { arrowhead: op.arrowhead } : {}),
           ...(op.color ? { color: op.color } : {}),
           ...(op.label !== undefined ? { text: op.label } : {}),
+          ...(op.curve ? { curve: op.curve } : {}),
         })
         return true
       }
@@ -199,6 +200,7 @@ function applyArrowOp(host: CanvasHost, op: DslArrowOp): boolean {
       ...(op.color ? { color: op.color } : {}),
       ...(op.dash ? { dash: op.dash } : {}),
       ...(op.arrowhead ? { arrowhead: op.arrowhead } : {}),
+      ...(op.curve ? { curve: op.curve } : {}),
     })
     return true
   }
@@ -217,6 +219,7 @@ function applyArrowOp(host: CanvasHost, op: DslArrowOp): boolean {
         ...(op.arrowhead ? { arrowhead: op.arrowhead } : {}),
         ...(op.color ? { color: op.color } : {}),
         ...(op.label !== undefined ? { text: op.label } : {}),
+        ...(op.curve ? { curve: op.curve } : {}),
       })
       return true
     }
@@ -242,6 +245,7 @@ function applyArrowOp(host: CanvasHost, op: DslArrowOp): boolean {
     color: op.color ?? 'black',
     ...(op.dash ? { dash: op.dash } : {}),
     ...(op.arrowhead ? { arrowhead: op.arrowhead } : {}),
+    ...(op.curve ? { curve: op.curve } : {}),
   })
   return true
 }

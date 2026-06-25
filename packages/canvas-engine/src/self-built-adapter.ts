@@ -20,7 +20,7 @@ import { hitTest, screenToPage } from './self-built-hittest'
 import { commitFreedraw, translateFreedraw, scaleFreedrawToBox } from './self-built-freedraw'
 import { handleAtPoint, resizeGeometry, type Handle } from './self-built-resize'
 import { marqueeSelect } from './self-built-marquee'
-import { arrowPreviewEndpoints } from './self-built-arrow'
+import { arrowPreviewEndpoints, arrowEndpoints } from './self-built-arrow'
 import { arrowKeyDelta, selectAllIds, parseKeyboardAction } from './self-built-keyboard'
 import { intersectsBounds, viewportBounds, normalizeBox } from './bounds'
 
@@ -54,6 +54,8 @@ export class SelfBuiltAdapter implements CanvasHost {
   private dragGroup: { ids: string[]; offsets: Map<string, { x: number; y: number }> } | null = null
   private marquee: { startX: number; startY: number; curX: number; curY: number } | null = null
   private connecting: { fromId: string; pointer: { x: number; y: number } } | null = null
+  /** 拖动箭头弯曲手柄(设 curve 控制点)。null=未在拖。 */
+  private curveDragging: { id: string } | null = null
   private keyHandler: ((e: KeyboardEvent) => void) | null = null
   private undoStack: CanvasElement[][] = []
   private redoStack: CanvasElement[][] = []
@@ -350,6 +352,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     this.panning = null
     this.marquee = null
     this.currentStroke = null
+    this.curveDragging = null
     this.coalescing = false
   }
 
@@ -429,6 +432,27 @@ export class SelfBuiltAdapter implements CanvasHost {
       if (this.activeTool === 'select' && this.selectedIds.size === 1) {
         const selId = [...this.selectedIds][0]!
         const sel = this.getElement(selId)
+        // 箭头弯曲手柄:选中箭头时,点中点附近 → 拖动设 curve(弯曲箭头)。
+        if (sel && sel.kind === 'arrow') {
+          const { from, to } = arrowEndpoints(sel, this.getElements())
+          if (from && to) {
+            let mx: number, my: number
+            if (sel.curve) {
+              mx = 0.25 * from.x + 0.5 * sel.curve.cx + 0.25 * to.x
+              my = 0.25 * from.y + 0.5 * sel.curve.cy + 0.25 * to.y
+            } else {
+              mx = (from.x + to.x) / 2
+              my = (from.y + to.y) / 2
+            }
+            if (Math.hypot(p.x - mx, p.y - my) <= 8 / this.view.zoom) {
+              this.curveDragging = { id: selId }
+              this.pushUndo()
+              this.coalescing = true
+              try { this.canvas.setPointerCapture(e.pointerId) } catch { /* jsdom */ }
+              return
+            }
+          }
+        }
         if (sel) {
           const handle = handleAtPoint(sel, p, this.view.zoom)
           if (handle) {
@@ -536,6 +560,20 @@ export class SelfBuiltAdapter implements CanvasHost {
             if (moved) this.upsert(moved)
           } else {
             this.upsert({ ...el, x: nx, y: ny })
+          }
+        }
+        return
+      }
+      if (this.curveDragging) {
+        // 拖动弯曲手柄:指针 = 想要的曲线中点。反算控制点 C = 2*M - (P0+P1)/2。
+        const p = screenToPage(this.view, sx, sy)
+        const el = this.getElement(this.curveDragging.id)
+        if (el && el.kind === 'arrow') {
+          const { from, to } = arrowEndpoints(el, this.getElements())
+          if (from && to) {
+            const cx = 2 * p.x - (from.x + to.x) / 2
+            const cy = 2 * p.y - (from.y + to.y) / 2
+            this.upsert({ ...el, curve: { cx: Math.round(cx), cy: Math.round(cy) } })
           }
         }
         return

@@ -86,7 +86,8 @@ export function serializeElement(e: CanvasElement): string {
         (e.text ? ` @label("${escapeQuoted(e.text)}")` : '') +
         color +
         (e.dash ? ` @dash(${e.dash})` : '') +
-        (e.arrowhead ? ` @arrowhead(${e.arrowhead})` : '')
+        (e.arrowhead ? ` @arrowhead(${e.arrowhead})` : '') +
+        (e.curve ? ` @curve(${Math.round(e.curve.cx)},${Math.round(e.curve.cy)})` : '')
       if (e.from && e.to) {
         // Relation arrow: endpoint references.
         return `[arrow #${e.id}] from #${e.from} to #${e.to}${sig}`

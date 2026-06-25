@@ -135,17 +135,21 @@ function drawElement(
       const { from, to } = arrowEndpoints(el, allElements)
       if (!from || !to) break
       const stroke = colorOf(el.color, tokenResolver)
-      // 线段(语义线型:dash)
+      const ctrl = el.curve ? { x: el.curve.cx, y: el.curve.cy } : null
+      // 线段(语义线型:dash)。有 curve → 二次贝塞尔(弯曲箭头)。
       ctx.beginPath()
       ctx.moveTo(from.x, from.y)
-      ctx.lineTo(to.x, to.y)
+      if (ctrl) ctx.quadraticCurveTo(ctrl.x, ctrl.y, to.x, to.y)
+      else ctx.lineTo(to.x, to.y)
       ctx.strokeStyle = stroke
       ctx.lineWidth = 2
       ctx.setLineDash(dashPattern(el.dash))
       ctx.stroke()
       ctx.setLineDash([]) // 复位,免污染后续绘制
-      // 箭头头(语义箭头形:arrow=开口V / triangle=实心 / none=无)
-      const angle = Math.atan2(to.y - from.y, to.x - from.x)
+      // 箭头头:角度取终点切线。直线 = to-from;曲线 = to-ctrl(贝塞尔终点切线方向)。
+      const angle = ctrl
+        ? Math.atan2(to.y - ctrl.y, to.x - ctrl.x)
+        : Math.atan2(to.y - from.y, to.x - from.x)
       const headKind = el.arrowhead ?? 'arrow'
       const pts = arrowheadPoints(headKind, to, angle)
       if (pts.length === 3) {
@@ -244,6 +248,32 @@ export function drawSelectionOutlines(
   const hs = 3 / view.zoom // handle 半边长 → 6px 方块
   for (const el of elements) {
     if (!sel.has(el.id)) continue
+    if (el.kind === 'arrow') {
+      // 箭头:不画 bbox 框(w=h=0 的关系箭头框是点),改画线段/曲线高亮 + 中点弯曲手柄。
+      const { from, to } = arrowEndpoints(el, elements)
+      if (from && to) {
+        // 曲线中点(有 curve 取贝塞尔 t=0.5,否则线段中点)
+        let mx: number, my: number
+        if (el.curve) {
+          const u = 0.5
+          mx = 0.25 * from.x + 0.5 * el.curve.cx + 0.25 * to.x
+          my = 0.25 * from.y + 0.5 * el.curve.cy + 0.25 * to.y
+        } else {
+          mx = (from.x + to.x) / 2
+          my = (from.y + to.y) / 2
+        }
+        // 中点手柄(蓝圆点,可拖动设 curve)
+        ctx.setLineDash([])
+        ctx.fillStyle = tokenResolver('--color-blue', '#1d4ed8')
+        ctx.beginPath()
+        ctx.arc(mx, my, 4 / view.zoom, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.strokeStyle = tokenResolver('--color-white', '#ffffff')
+        ctx.lineWidth = 1.5 / view.zoom
+        ctx.stroke()
+      }
+      continue
+    }
     const b = normalizeBox(el) // 负 bbox(自由箭头)归一化,选中框/handle 才画对
     // dashed 选中框(外扩 2px)
     ctx.strokeRect(b.x - 2, b.y - 2, b.w + 4, b.h + 4)

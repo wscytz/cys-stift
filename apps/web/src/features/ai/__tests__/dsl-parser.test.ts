@@ -211,6 +211,23 @@ describe('parseDsl', () => {
     expect(op.label).toBe('ref')
   })
 
+  it('parses curved arrow (@curve cx, cy)', () => {
+    const result = parseDsl('[arrow #a1] from #c1 to #c2 @curve(150, -30)')
+    expect(result).toHaveLength(1)
+    const op = result[0]!
+    if (op.type !== 'arrow') throw new Error('expected arrow op')
+    expect(op.curve).toEqual({ cx: 150, cy: -30 })
+  })
+
+  it('parses curved free arrow (pos+size+curve)', () => {
+    const result = parseDsl('[arrow #fa] @pos(0,0) @size(100,100) @curve(50,80)')
+    expect(result).toHaveLength(1)
+    const op = result[0]!
+    if (op.type !== 'arrow') throw new Error('expected arrow op')
+    expect(op.freeArrow).toBe(true)
+    expect(op.curve).toEqual({ cx: 50, cy: 80 })
+  })
+
   it('free arrow without pos+size is skipped', () => {
     const result = parseDsl('[arrow #fa3] @color(red)')
     expect(result).toHaveLength(0)

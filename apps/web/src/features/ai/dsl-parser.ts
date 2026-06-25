@@ -73,6 +73,8 @@ export type DslArrowOp = {
   y?: number
   w?: number
   h?: number
+  /** 弯曲控制点(二次贝塞尔,绝对页坐标)。关系/自由箭头均可。 */
+  curve?: { cx: number; cy: number }
 }
 
 export type DslOp = DslCardOp | DslFreeOp | DslArrowOp
@@ -118,6 +120,8 @@ const SIZE_RE = /@size\((-?\d+),\s*(-?\d+)\)/
 /** Arrow relation signature — line style + terminal (semantics). */
 const DASH_RE = /@dash\((solid|dashed|dotted)\)/
 const ARROWHEAD_RE = /@arrowhead\((arrow|triangle|none)\)/
+/** 弯曲控制点:@curve(cx, cy)(支持负坐标)。 */
+const CURVE_RE = /@curve\((-?\d+),\s*(-?\d+)\)/
 
 function extractId(text: string): string | null {
   const m = text.match(ID_RE)
@@ -169,6 +173,12 @@ function extractArrowhead(
     | 'triangle'
     | 'none'
     | undefined
+}
+
+function extractCurve(text: string): { cx: number; cy: number } | undefined {
+  const m = text.match(CURVE_RE)
+  if (!m) return undefined
+  return { cx: Number(m[1]), cy: Number(m[2]) }
 }
 
 /**
@@ -249,6 +259,7 @@ export function parseDslWithDiagnostics(dslText: string): {
           color: extractColor(line),
           dash: extractDash(line),
           arrowhead: extractArrowhead(line),
+          curve: extractCurve(line),
         })
       } else {
         // 自由箭头:无 from/to,需 pos + size(w/h 可负,编码线段方向)
@@ -276,6 +287,7 @@ export function parseDslWithDiagnostics(dslText: string): {
           color: extractColor(line),
           dash: extractDash(line),
           arrowhead: extractArrowhead(line),
+          curve: extractCurve(line),
         })
       }
       continue

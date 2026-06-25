@@ -110,7 +110,7 @@ function loadSettings(): Settings {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return DEFAULT_SETTINGS
     const parsed = JSON.parse(raw) as { settings?: unknown }
-    return isValid(parsed.settings) ? parsed.settings : DEFAULT_SETTINGS
+    return isValid(parsed.settings) ? (parsed.settings as Settings) : DEFAULT_SETTINGS
   } catch {
     return DEFAULT_SETTINGS
   }

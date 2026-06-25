@@ -136,11 +136,17 @@ function elementToSvg(
       const tx = to.x + dx, ty = to.y + dy
       const dashArr = dashPattern(el.dash)
       const dashAttr = dashArr.length ? ` stroke-dasharray="${dashArr.join(' ')}"` : ''
-      const segs: string[] = [
-        `<line x1="${fx}" y1="${fy}" x2="${tx}" y2="${ty}" stroke="${stroke}" stroke-width="2"${dashAttr}/>`,
-      ]
-      // 箭头头(与实时渲染同源几何;dash 不应用到箭头头)
-      const angle = Math.atan2(ty - fy, tx - fx)
+      const ctrl = el.curve ? { x: el.curve.cx + dx, y: el.curve.cy + dy } : null
+      const segs: string[] = []
+      if (ctrl) {
+        segs.push(`<path d="M ${fx} ${fy} Q ${ctrl.x} ${ctrl.y} ${tx} ${ty}" fill="none" stroke="${stroke}" stroke-width="2"${dashAttr}/>`)
+      } else {
+        segs.push(`<line x1="${fx}" y1="${fy}" x2="${tx}" y2="${ty}" stroke="${stroke}" stroke-width="2"${dashAttr}/>`)
+      }
+      // 箭头头(与实时渲染同源几何;dash 不应用到箭头头)。曲线终点切线 = to-ctrl。
+      const angle = ctrl
+        ? Math.atan2(ty - ctrl.y, tx - ctrl.x)
+        : Math.atan2(ty - fy, tx - fx)
       const headKind = el.arrowhead ?? 'arrow'
       const pts = arrowheadPoints(headKind, { x: tx, y: ty }, angle)
       if (pts.length === 3) {
@@ -152,7 +158,14 @@ function elementToSvg(
         }
       }
       if (el.text) {
-        const mx = (fx + tx) / 2, my = (fy + ty) / 2
+        // 曲线 label 放贝塞尔 t=0.5 点(曲线中点),直线放线段中点。
+        let mx: number, my: number
+        if (ctrl) {
+          mx = 0.25 * fx + 0.5 * ctrl.x + 0.25 * tx
+          my = 0.25 * fy + 0.5 * ctrl.y + 0.25 * ty
+        } else {
+          mx = (fx + tx) / 2; my = (fy + ty) / 2
+        }
         segs.push(`<text x="${mx}" y="${my}" fill="${stroke}" font-family="${c.fontBody}" font-size="12">${esc(el.text)}</text>`)
       }
       return segs.join('')

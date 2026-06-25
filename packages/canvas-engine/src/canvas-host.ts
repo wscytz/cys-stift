@@ -86,6 +86,9 @@ export interface CanvasElement {
   /** arrow 端点(id 引用,无 '#' 前缀)。 */
   from?: string
   to?: string
+  /** arrow 弯曲控制点(二次贝塞尔,绝对页坐标)。无则直线。
+   *  选中箭头时拖中点手柄设置;DSL/AI/导入可携带。让箭头可弯曲(用户需求)。 */
+  curve?: { cx: number; cy: number }
   /** freedraw/image 只在此层带 metadata;原始点序列/二进制留在 adapter 的引擎存储,不进 DSL。 */
   meta?: Record<string, unknown>
 }

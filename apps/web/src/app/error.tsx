@@ -34,6 +34,11 @@ export default function GlobalError({
       {error.digest && (
         <p className="err-boundary__digest">错误码:{error.digest}</p>
       )}
+      {/* 调试:显示真实错误信息 + stack(生产也留,便于用户反馈定位) */}
+      <details className="err-boundary__details">
+        <summary className="err-boundary__digest">技术详情(可复制反馈)</summary>
+        <pre className="err-boundary__stack">{error.message}\n{error.stack ?? ''}</pre>
+      </details>
       <div className="err-boundary__actions">
         <button type="button" className="err-boundary__btn" onClick={reset}>
           重试
@@ -60,6 +65,15 @@ export default function GlobalError({
 .err-boundary__h { margin: 0; font-family: var(--font-display); font-size: var(--font-size-2xl); font-weight: 500; letter-spacing: -0.01em; }
 .err-boundary__msg { margin: 0; font-family: var(--font-body); font-size: var(--font-size-base); color: var(--color-black-soft); line-height: 1.6; }
 .err-boundary__digest { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
+.err-boundary__details { margin-top: var(--space-2); width: 100%; }
+.err-boundary__details summary { cursor: pointer; }
+.err-boundary__stack {
+  margin-top: var(--space-1); padding: var(--space-2);
+  background: var(--color-gray-soft); border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  color: var(--color-red); white-space: pre-wrap; word-break: break-word;
+  max-height: 200px; overflow: auto;
+}
 .err-boundary__actions { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
 .err-boundary__btn {
   font-family: var(--font-mono); font-size: var(--font-size-sm);

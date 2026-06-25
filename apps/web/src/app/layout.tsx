@@ -8,6 +8,7 @@ import { ThemeBoot } from '@/components/theme-boot'
 import { ToastHost } from '@/components/toast'
 import { I18nProvider } from '@/lib/i18n'
 import { SearchShortcut } from '@/components/search-shortcut'
+import { ErrorTrace } from '@/components/error-trace'
 import { AIProviderSync } from '@/features/ai/ai-settings-provider'
 
 const display = Space_Grotesk({
@@ -51,6 +52,7 @@ export default function RootLayout({
         />
       </head>
       <body>
+        <ErrorTrace />
         <I18nProvider>
           <AppMenu />
           {children}
