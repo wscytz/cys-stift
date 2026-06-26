@@ -330,3 +330,97 @@ describe('canvasViewStore — quota exceeded (rollback + notify)', () => {
     expect(quotaFired).toBe(false)
   })
 })
+
+// Bug 1 回归(2026-06-26):配额失败后 persist() 内部的 notify 让订阅者先看到
+// 失败的 newViews,随后 _views 被恢复成 prev,但若不再 notify,useSyncExternalStore
+// 订阅者就永远不会重新读取 → UI 卡在失败的改动上(改了 zoom/pan,reload 后消失,
+// 但当前会话里 UI 还显示着改动)。修复:回滚决策之后无条件再 notify 一次,使最后一次
+// 订阅者可见的快照 = prev。这里注册真实订阅者,断言最后一次捕获的快照就是回滚后的 prev。
+describe('canvasViewStore — quota rollback is subscriber-visible (Bug 1)', () => {
+  let store: typeof import('../canvas-view-store').canvasViewStore
+  let subscribe: typeof import('../canvas-view-store').subscribe
+  let getSnapshot: typeof import('../canvas-view-store').getSnapshot
+
+  beforeEach(async () => {
+    vi.resetModules()
+    window.localStorage.clear()
+    store = (await import('../canvas-view-store')).canvasViewStore
+    subscribe = (await import('../canvas-view-store')).subscribe
+    getSnapshot = (await import('../canvas-view-store')).getSnapshot
+  })
+
+  function simulateQuota() {
+    const orig = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem')
+    Object.defineProperty(Storage.prototype, 'setItem', {
+      configurable: true,
+      value: () => {
+        throw new DOMException('quota', 'QuotaExceededError')
+      },
+    })
+    return () => {
+      if (orig) Object.defineProperty(Storage.prototype, 'setItem', orig)
+    }
+  }
+
+  function recordSeen() {
+    const seen: ReturnType<typeof getSnapshot>[] = []
+    const unsub = subscribe(() => seen.push(getSnapshot()))
+    return { seen, unsub }
+  }
+
+  it('update rollback: last snapshot seen by subscribers is the pre-mutation map', () => {
+    store.get(CANVAS_A) // force hydration so the snapshot ref is stable from here on
+    const beforeMutation = getSnapshot()
+    const { seen, unsub } = recordSeen()
+    const restore = simulateQuota()
+    try {
+      store.update(CANVAS_A, { zoom: 2 })
+      unsub()
+      expect(seen.length).toBeGreaterThanOrEqual(1)
+      const last = seen[seen.length - 1]!
+      // The subscriber's last observed snapshot equals the pre-mutation map
+      // (the failed zoom=2 is NOT stuck on screen).
+      expect(last).toBe(beforeMutation)
+      expect(last[CANVAS_A as unknown as string]).toBeUndefined()
+    } finally {
+      restore()
+    }
+  })
+
+  it('reset rollback: last snapshot seen by subscribers still has the canvas view', () => {
+    store.update(CANVAS_A, { zoom: 3 }) // seed (succeeds)
+    const { seen, unsub } = recordSeen()
+    const restore = simulateQuota()
+    try {
+      store.reset(CANVAS_A)
+      unsub()
+      const last = seen[seen.length - 1]!
+      expect(last[CANVAS_A as unknown as string]?.zoom).toBe(3)
+    } finally {
+      restore()
+    }
+  })
+
+  it('resetAll rollback: last snapshot seen by subscribers still has all views', () => {
+    store.update(CANVAS_A, { zoom: 3 }) // seed (succeeds)
+    const { seen, unsub } = recordSeen()
+    const restore = simulateQuota()
+    try {
+      store.resetAll()
+      unsub()
+      const last = seen[seen.length - 1]!
+      expect(last[CANVAS_A as unknown as string]?.zoom).toBe(3)
+    } finally {
+      restore()
+    }
+  })
+
+  it('successful mutation notifies subscribers exactly once (no render loop)', () => {
+    store.get(CANVAS_A) // force hydration first
+    const { seen, unsub } = recordSeen()
+    store.update(CANVAS_A, { zoom: 2 })
+    unsub()
+    expect(seen.length).toBe(1)
+    expect(seen[0]![CANVAS_A as unknown as string]?.zoom).toBe(2)
+  })
+})

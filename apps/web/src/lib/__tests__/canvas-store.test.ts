@@ -248,3 +248,118 @@ describe('canvasStore — quota exceeded', () => {
     expect(quotaFired).toBe(false)
   })
 })
+
+// Bug 1 回归(2026-06-26):配额失败后,persist() 内部的 notify 让订阅者先看到
+// 失败的 newSnap,随后 _snap 被恢复成 prev,但若不再 notify,useSyncExternalStore
+// 订阅者就永远不会重新读取 → UI 卡在失败的改动上(画布「看似创建/改名/删除成功」
+// 直到下一次无关改动才纠正)。修复:回滚决策之后无条件再 notify 一次,使最后一次
+// 订阅者可见的快照 = prev。这里注册真实订阅者,捕获每次 notify 时的 getSnapshot(),
+// 断言最后一次捕获的快照就是回滚后的 prev。
+describe('canvasStore — quota rollback is subscriber-visible (Bug 1)', () => {
+  let cs: typeof import('../canvas-store').canvasStore
+  let subscribe: typeof import('../canvas-store').subscribe
+  let getSnapshot: typeof import('../canvas-store').getSnapshot
+
+  beforeEach(async () => {
+    vi.resetModules()
+    window.localStorage.clear()
+    cs = (await import('../canvas-store')).canvasStore
+    subscribe = (await import('../canvas-store')).subscribe
+    getSnapshot = (await import('../canvas-store')).getSnapshot
+  })
+
+  function throwOnSetItem() {
+    const orig = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem')
+    Object.defineProperty(Storage.prototype, 'setItem', {
+      configurable: true,
+      value: () => {
+        throw new DOMException('quota', 'QuotaExceededError')
+      },
+    })
+    return () => {
+      if (orig) Object.defineProperty(Storage.prototype, 'setItem', orig)
+    }
+  }
+
+  /** Register a subscriber that records the snapshot it sees on each notify. */
+  function recordSeen() {
+    const seen: ReturnType<typeof getSnapshot>[] = []
+    const unsub = subscribe(() => seen.push(getSnapshot()))
+    return { seen, unsub }
+  }
+
+  it('create rollback: last snapshot seen by subscribers is the pre-mutation state', () => {
+    cs.get() // force hydration so the snapshot ref is stable from here on
+    const beforeMutation = getSnapshot()
+    const { seen, unsub } = recordSeen()
+    const restore = throwOnSetItem()
+    try {
+      const id = cs.create('doomed')
+      unsub()
+      expect(id).toBe('')
+      // The subscriber MUST have been notified after the rollback, and the
+      // last snapshot it observed must equal the pre-mutation state (no
+      // orphan "doomed" canvas visible to the UI).
+      expect(seen.length).toBeGreaterThanOrEqual(1)
+      const last = seen[seen.length - 1]!
+      expect(last).toBe(beforeMutation)
+      expect(last.canvases.some((c) => c.name === 'doomed')).toBe(false)
+    } finally {
+      restore()
+    }
+  })
+
+  it('rename rollback: last snapshot seen by subscribers has the original name', () => {
+    const id = cs.create('original')
+    const { seen, unsub } = recordSeen()
+    const restore = throwOnSetItem()
+    try {
+      cs.rename(id, 'renamed')
+      unsub()
+      const last = seen[seen.length - 1]!
+      expect(last.canvases.find((c) => c.id === id)?.name).toBe('original')
+    } finally {
+      restore()
+    }
+  })
+
+  it('delete rollback: last snapshot seen by subscribers still contains the canvas', () => {
+    const id = cs.create('temp')
+    const { seen, unsub } = recordSeen()
+    const restore = throwOnSetItem()
+    try {
+      const result = cs.delete(id)
+      unsub()
+      expect(result).toBe(false)
+      const last = seen[seen.length - 1]!
+      expect(last.canvases.some((c) => c.id === id)).toBe(true)
+    } finally {
+      restore()
+    }
+  })
+
+  it('setActive rollback: last snapshot seen by subscribers keeps the pre-switch active id', () => {
+    const defaultId = cs.get().activeCanvasId
+    const b = cs.create('second') // succeeds; active is now b
+    const { seen, unsub } = recordSeen()
+    const restore = throwOnSetItem()
+    try {
+      cs.setActive(defaultId) // persist fails → rollback to b
+      unsub()
+      const last = seen[seen.length - 1]!
+      expect(last.activeCanvasId).toBe(b)
+    } finally {
+      restore()
+    }
+  })
+
+  it('successful mutation notifies subscribers exactly once (no render loop)', () => {
+    cs.get() // force hydration first (hydrate's own notify must not count here)
+    const { seen, unsub } = recordSeen()
+    cs.create('happy')
+    unsub()
+    // Exactly one notify for one successful create.
+    expect(seen.length).toBe(1)
+    expect(seen[0]!.canvases.some((c) => c.name === 'happy')).toBe(true)
+  })
+})

@@ -164,21 +164,26 @@ function hydrateOnce() {
 }
 
 /**
- * 持久化当前 _snap 并 notify 订阅者。返回 true=写入成功,false=配额满
+ * 持久化当前 _snap 到 localStorage。返回 true=写入成功,false=配额满
  * (此时调用方负责回滚 _snap 到写入前的值,否则内存与 localStorage
  * 不一致——UI 显示了改动,reload 后消失)。
  *
  * 不在这里回滚:persist 不知道「写入前」的快照(它只看到当前的 _snap)。
- * 调用方(create/rename/delete)在改 _snap 前先存 prev,失败时恢复 prev。
+ * 调用方(create/rename/delete/setActive)在改 _snap 前先存 prev,失败时恢复 prev。
+ *
+ * 不在这里 notify:notify 必须在回滚决策 *之后* 才能触发,否则失败路径下
+ * persist() 会先以 newSnap notify 一次,调用方回滚到 prev 后又得再 notify 一次
+ * 来让订阅者看到回滚后的状态——既冗余(两次渲染)又易漏(早期 return 路径
+ * 漏掉第二次 notify 就会让 useSyncExternalStore 订阅者卡在失败的改动上)。
+ * 因此每个 mutator 在 if (!persist()) { 回滚 } 之后,无条件 notify() 一次:
+ * 成功→notify(newSnap),失败→notify(prev)。每个 mutation 恰好一次 notify。
  */
 function persist(): boolean {
-  const ok = saveSnapshot(_snap)
-  notify()
-  return ok
+  return saveSnapshot(_snap)
 }
 
 let _cached: CanvasesSnapshot = _snap
-function getSnapshot(): CanvasesSnapshot {
+export function getSnapshot(): CanvasesSnapshot {
   if (_cached !== _snap) _cached = _snap
   return _cached
 }
@@ -187,7 +192,15 @@ function getServerSnapshot(): CanvasesSnapshot {
   return _cached
 }
 
-function subscribe(cb: () => void): () => void {
+/**
+ * Subscribe to canvas-store changes (mirrors settingsStore.subscribe /
+ * canvasViewStore.subscribe). Exported both for non-React consumers and
+ * so tests can assert the subscriber-visible state after a rollback —
+ * useSyncExternalStore only re-reads getSnapshot() when notify() fires,
+ * so a rollback that skips notify() leaves subscribers stuck on the
+ * failed mutation (the Bug 1 regression we guard against in tests).
+ */
+export function subscribe(cb: () => void): () => void {
   _subscribers.add(cb)
   return () => {
     _subscribers.delete(cb)
@@ -228,6 +241,7 @@ export const canvasStore = {
       _snap = prev // 回滚:内存与 localStorage 一致
       notifyQuota()
     }
+    notify() // 回滚后必须 notify,订阅者才能看到回退后的 activeCanvasId
   },
   /**
    * Create a new canvas and make it active. Trims the name, dedupes
@@ -260,8 +274,10 @@ export const canvasStore = {
       // 知道失败——实际调用方只用于 setActive,空串在 setActive 里 no-op)。
       _snap = prev
       notifyQuota()
+      notify() // 回滚后 notify,订阅者看到「画布并未新增」
       return '' as CanvasId
     }
+    notify()
     return canvas.id
   },
   /** Rename a canvas. No-op if id is unknown or name is empty. */
@@ -280,6 +296,7 @@ export const canvasStore = {
       _snap = prev // 回滚:改名未持久化
       notifyQuota()
     }
+    notify() // 回滚后必须 notify,订阅者才能看到回退后的名字
   },
   /**
    * Delete a canvas. Refuses the default canvas (it's the seed).
@@ -300,6 +317,7 @@ export const canvasStore = {
       // 回滚:删除未持久化。报告失败(返回 false),不清理 freeform 数据。
       _snap = prev
       notifyQuota()
+      notify() // 回滚后 notify,订阅者看到「画布并未删除」
       return false
     }
     // B4 (v0.26.4): free the persisted freeform data — otherwise a canvas
@@ -308,6 +326,7 @@ export const canvasStore = {
     // before delete. canvasFreeformStore.remove also cleans up any leftover
     // pre-self-built tldraw snapshot for this canvas.
     canvasFreeformStore.remove(id).catch(() => {})
+    notify() // 删除成功:通知订阅者画布列表已变
     return true
   },
 }

@@ -7,8 +7,30 @@ import {
 import type { CystiftPayload } from '../cystift-payload'
 import type { CanvasElement } from '@cys-stift/canvas-engine'
 
+// We mock ONLY @/lib/canvas-store so we can drive canvasStore.create's return
+// value (the Bug 2 contract: '' on quota failure). The freeform store is left
+// real — the drag-drop regression tests below need the actual localStorage
+// fallback path, and the Bug 2 path returns before the freeform store is
+// ever touched.
+const canvasCreate = vi.fn(() => 'canvas-new-1' as never)
+const canvasSetActive = vi.fn(() => {})
+vi.mock('@/lib/canvas-store', () => ({
+  canvasStore: {
+    create: (...args: unknown[]) => canvasCreate(...(args as [])),
+    setActive: (...args: unknown[]) => canvasSetActive(...(args as [])),
+  },
+}))
+
 const SAMPLE_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"><rect width="100" height="50"/></svg>'
+
+// Reset the canvas-store mock between top-level describe blocks so call counts
+// don't leak. (The drag-drop block below adds its own beforeEach on top of this.)
+beforeEach(() => {
+  canvasCreate.mockReset()
+  canvasCreate.mockReturnValue('canvas-new-1' as never)
+  canvasSetActive.mockReset()
+})
 
 const PAYLOAD: CystiftPayload = {
   v: 1,
@@ -148,5 +170,50 @@ describe('.cystift restore — drag-drop (no host) persists freeform geometry', 
     const snap = await canvasFreeformStore.load(newId as never)
     // Nothing written (and cards still restored to DB via service.create).
     expect(snap?.elements ?? []).toEqual([])
+  })
+})
+
+// Bug 2 回归(2026-06-26):canvasStore.create 在配额满时返回空串(回滚后)。
+// restoreCystiftPayload 必须立即 bail out 返回 null——否则会拿着空串 canvasId
+// 给每张卡 service.create({ canvasPosition: { canvasId: '' } }),卡片被挂到
+// 幻影 canvas id '' 上(任何真实画布都看不见,又不在 inbox 因为有 canvasPosition),
+// 而且 canvasStore.setActive('') 是 no-op。结果:卡片永久孤立。
+describe('.cystift restore — canvas creation failure (Bug 2)', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.unstubAllGlobals()
+    noOpfs()
+    window.localStorage.clear()
+  })
+
+  it('returns null and creates NO cards when canvasStore.create fails (returns empty id)', async () => {
+    // Drive the mocked canvasStore.create to return '' (the rollback signal).
+    canvasCreate.mockReturnValue('' as never)
+
+    const service = makeService()
+    const result = await restoreCystiftPayload(PAYLOAD, service, undefined)
+
+    // Restore bailed out: null to the caller (same contract as a bad payload).
+    expect(result).toBeNull()
+    // No cards were created — service.create never ran (no orphan cards under
+    // a phantom canvas id '').
+    // makeService's create is internal; we assert via the canvas mock instead:
+    // setActive was never called with '' (the post-restore switch is skipped).
+    expect(canvasSetActive).not.toHaveBeenCalled()
+    // And create was called exactly once (the failing attempt), not more.
+    expect(canvasCreate).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns null and skips geometry when create fails even with a host', async () => {
+    canvasCreate.mockReturnValue('' as never)
+    const host = {
+      upsert: vi.fn(),
+      applyWithoutEcho: vi.fn((fn: () => void) => fn()),
+      getElements: vi.fn(() => []),
+    } as never
+    const result = await restoreCystiftPayload(PAYLOAD, makeService(), host)
+    expect(result).toBeNull()
+    // Host.upsert never called — geometry restore never started.
+    expect((host as { upsert: ReturnType<typeof vi.fn> }).upsert).not.toHaveBeenCalled()
   })
 })

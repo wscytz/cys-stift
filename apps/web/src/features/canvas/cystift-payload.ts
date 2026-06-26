@@ -88,6 +88,12 @@ export async function restoreCystiftPayload(
   }
   const name = (payload.canvas?.name || 'restored canvas') + ' · ' + 'restored'
   const newCanvasId = canvasStore.create(name)
+  // canvasStore.create returns '' on quota failure (rolled back). Without a
+  // valid canvas id we cannot attach cards or geometry — every card would be
+  // orphaned under canvasPosition.canvasId = '' (invisible on any real canvas,
+  // not in the inbox since it has a canvasPosition). Bail out so the caller
+  // surfaces the failure (returns null, same contract as a bad payload).
+  if (!newCanvasId) return null
 
   // card id 重映射:旧 cardId → 新 cardId(service.create 生成)。
   const idMap = new Map<string, string>()

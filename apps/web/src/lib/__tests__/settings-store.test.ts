@@ -351,4 +351,36 @@ describe('settingsStore — quota exceeded (rollback + notify)', () => {
     expect(store.get().theme).toBe('dark')
     expect(quotaFired).toBe(false)
   })
+
+  // Bug 1 回归守护(2026-06-26):settings-store 的 5 个 updater 已经在末尾
+  // 无条件 notify(),所以本文件不受 Bug 1 影响。这里加一个订阅者可见性断言,
+  // 把「回滚后订阅者最后一次看到的快照 = prev」锁死,防止未来重构把 notify()
+  // 挪进 saveSettings 的成功分支而漏掉回滚路径的 notify。
+  it('rollback is subscriber-visible: last snapshot seen == pre-mutation state', () => {
+    store.get() // force hydration so the snapshot ref is stable from here on
+    const before = store.get()
+    const seen: ReturnType<typeof store.get>[] = []
+    const unsub = store.subscribe(() => seen.push(store.get()))
+    const restore = simulateQuota()
+    try {
+      store.update({ theme: 'dark' })
+      unsub()
+      expect(seen.length).toBeGreaterThanOrEqual(1)
+      const last = seen[seen.length - 1]!
+      expect(last).toBe(before) // subscriber's final view is the rolled-back state (same ref)
+      expect(last.theme).toBe('system')
+    } finally {
+      restore()
+    }
+  })
+
+  it('successful mutation notifies subscribers exactly once (no render loop)', () => {
+    store.get() // force hydration first (hydrate's own notify must not count here)
+    const seen: ReturnType<typeof store.get>[] = []
+    const unsub = store.subscribe(() => seen.push(store.get()))
+    store.update({ theme: 'dark' })
+    unsub()
+    expect(seen.length).toBe(1)
+    expect(seen[0]!.theme).toBe('dark')
+  })
 })

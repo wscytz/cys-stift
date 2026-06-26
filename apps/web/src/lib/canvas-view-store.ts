@@ -129,19 +129,21 @@ function hydrateOnce() {
 }
 
 /**
- * 持久化当前 _views 并 notify 订阅者。返回 true=写入成功,false=配额满。
+ * 持久化当前 _views 到 localStorage。返回 true=写入成功,false=配额满。
  * 调用方负责在失败时回滚 _views 到写入前的值(否则内存与 localStorage
  * 不一致——UI 显示了改动,reload 后消失)。
+ *
+ * 不在这里 notify:notify 必须在回滚决策 *之后* 触发(见 canvas-store
+ * persist() 的同一处说明)。每个 mutator 在 if (!persist()) { 回滚 } 之后
+ * 无条件 notify() 一次:成功→notify(newViews),失败→notify(prev)。
  */
 function persist(): boolean {
-  const ok = saveViewMap(_views)
-  notify()
-  return ok
+  return saveViewMap(_views)
 }
 
 // Stable snapshot cache — only reallocate when _views changes.
 let _cachedSnapshot: ViewMap = _views
-function getSnapshot(): ViewMap {
+export function getSnapshot(): ViewMap {
   if (_cachedSnapshot !== _views) {
     _cachedSnapshot = _views
   }
@@ -152,7 +154,13 @@ function getServerSnapshot(): ViewMap {
   return _cachedSnapshot
 }
 
-function subscribe(cb: () => void) {
+/**
+ * Subscribe to canvas-view-store changes. Exported for non-React consumers
+ * and so tests can assert the subscriber-visible state after a rollback —
+ * a rollback that skips notify() leaves useSyncExternalStore subscribers
+ * stuck on the failed mutation (Bug 1 regression guarded in tests).
+ */
+export function subscribe(cb: () => void) {
   _subscribers.add(cb)
   return () => {
     _subscribers.delete(cb)
@@ -185,6 +193,7 @@ export const canvasViewStore = {
       _views = prev // 回滚:内存与 localStorage 一致
       notifyQuota()
     }
+    notify() // 回滚后必须 notify,订阅者才能看到回退后的视图
   },
   /** Reset a single canvas's view to defaults. */
   reset(id: CanvasId): void {
@@ -198,6 +207,7 @@ export const canvasViewStore = {
       _views = prev
       notifyQuota()
     }
+    notify() // 回滚后必须 notify,订阅者才能看到回退后的视图
   },
   /** Reset every canvas's view (used by "Reset view" UI in the future). */
   resetAll(): void {
@@ -209,6 +219,7 @@ export const canvasViewStore = {
       _views = prev
       notifyQuota()
     }
+    notify() // 回滚后必须 notify,订阅者才能看到回退后的视图
   },
 }
 
