@@ -22,10 +22,37 @@ export type CardInfo = { title: string; body: string; type: string; pinned: bool
  */
 export type TokenResolver = (name: string, fallback: string) => string
 
+/**
+ * Token 值缓存(模块级)。getComputedStyle 是强制同步 reflow 的昂贵 DOM 操作;
+ * 渲染每帧对每个可见元素查多次 token,50 元素 ≈ 600 次/帧 = 36000 次/秒 →
+ * 长会话布局抖动 + GC 压力(真 bug,长会话卡顿主因)。token 集合固定(~15 key),
+ * 值只在主题切换时变,缓存命中率 ≈ 100%。
+ *
+ * 失效:监听 <html> 的 data-theme 属性变化(主题切换的唯一入口,见 theme.ts)。
+ * MutationObserver 是 DOM API,但 domTokenResolver 本身就是 DOM 实现(代表"引擎
+ * 在 DOM 环境的默认 resolver"),在此耦合 DOM 不破坏引擎的框架无关性——纯
+ * TokenResolver 接口仍可注入无 DOM 版。
+ */
+const _tokenCache = new Map<string, string>()
+let _tokenCacheWired = false
+
+function wireTokenCacheInvalidation(): void {
+  if (_tokenCacheWired || typeof window === 'undefined') return
+  _tokenCacheWired = true
+  // 首次懒查时填充;主题变 → 清空,下次查重填。
+  const ob = new MutationObserver(() => _tokenCache.clear())
+  ob.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+}
+
 export const domTokenResolver: TokenResolver = (name, fallback) => {
   if (typeof window === 'undefined') return fallback
+  const cached = _tokenCache.get(name)
+  if (cached !== undefined) return cached
+  wireTokenCacheInvalidation()
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-  return v || fallback
+  const resolved = v || fallback
+  _tokenCache.set(name, resolved)
+  return resolved
 }
 
 export function renderElements(

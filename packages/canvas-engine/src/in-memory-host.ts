@@ -90,6 +90,9 @@ export class InMemoryCanvasHost implements CanvasHost {
 
   private pushUndo(): void {
     this.undoStack.push(this.snapshot())
+    // 与 SelfBuiltAdapter 同契约:undo 栈有上限,防止长会话内存线性增长
+    // (每个快照深拷贝全部元素)。SelfBuiltAdapter UNDO_LIMIT=50,此处对齐。
+    if (this.undoStack.length > 50) this.undoStack.shift()
     this.redoStack = []
     // 与 SelfBuiltAdapter 同契约:pushUndo / undo / redo 都广播 onHistoryChange
     // (真实 adapter 上每个 echoed 编辑都会 pushUndo → 广播,故此处也广播,

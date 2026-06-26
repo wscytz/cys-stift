@@ -31,6 +31,38 @@ import { useI18n } from '@/lib/i18n'
 
 export const CAPTURE_OPEN_EVENT = 'cys-stift:open-capture'
 
+/**
+ * 把 web 端 CaptureShortcut(modKey + shift + KeyboardEvent.code)转成 Tauri
+ * accelerator 字符串(如 "CmdOrCtrl+Shift+Space")。modKey meta→CmdOrCtrl 跨平台
+ * (Tauri 自动 Cmd on macOS / Ctrl on Win+Linux);code 归一化(KeyC→C、Digit1→1)。
+ * 用于桌面壳跟随用户改的快捷键(修补轮:此前 Rust 写死,web 可改但不联动)。
+ */
+export function captureShortcutToAccelerator(sc: {
+  modKey: 'meta' | 'ctrl'
+  shift: boolean
+  code: string
+}): string {
+  const parts: string[] = [sc.modKey === 'meta' ? 'CmdOrCtrl' : 'Ctrl']
+  if (sc.shift) parts.push('Shift')
+  // KeyC → C, Digit1 → 1, Space/Comma/... 原样。
+  let key = sc.code
+  if (key.startsWith('Key')) key = key.slice(3)
+  else if (key.startsWith('Digit')) key = key.slice(5)
+  parts.push(key)
+  return parts.join('+')
+}
+
+/** 在桌面壳里调 update_shortcut。非桌面(无 __TAURI__)静默 no-op。 */
+function invokeUpdateShortcut(accelerator: string): void {
+  type TauriCoreAPI = { invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> }
+  type TauriGlobal = { core?: TauriCoreAPI }
+  const tauri = (window as unknown as { __TAURI__?: TauriGlobal }).__TAURI__
+  if (!tauri?.core?.invoke) return
+  tauri.core.invoke('update_shortcut', { accelerator }).catch(() => {
+    // Rust 端已 emit global-shortcut-error 事件,这里不重复 toast。
+  })
+}
+
 export function CaptureHost() {
   const { service } = useDb()
   const { t } = useI18n()
@@ -151,6 +183,43 @@ export function CaptureHost() {
       unlisten?.()
     }
   }, [])
+
+  // 桌面壳快捷键注册失败 → toast(修补轮:此前 Rust 仅 eprintln,桌面用户看不到
+  // stderr,被别的应用占用快捷键时静默失效)。非桌面 no-op。
+  useEffect(() => {
+    type TauriEventAPI = { listen: (e: string, h: (e: unknown) => void) => Promise<() => void> }
+    type TauriGlobal = { event?: TauriEventAPI }
+    const tauri = (window as unknown as { __TAURI__?: TauriGlobal }).__TAURI__
+    if (!tauri?.event?.listen) return
+    let cancelled = false
+    let unlisten: (() => void) | undefined
+    tauri.event
+      .listen('global-shortcut-error', (e) => {
+        const detail = (e as { payload?: string })?.payload ?? ''
+        pushToast({
+          kind: 'error',
+          message: t('capture.globalShortcutFailed', { error: detail }),
+        })
+      })
+      .then((fn) => {
+        if (cancelled) {
+          fn()
+          return
+        }
+        unlisten = fn
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+      unlisten?.()
+    }
+  }, [t])
+
+  // 用户改快捷键 → 推给桌面壳重新注册(修补轮:此前 Rust 写死,web 可改但不联动,
+  // 全局热键永远还是默认键)。非桌面 no-op(浏览器走 keydown 监听,不依赖此)。
+  useEffect(() => {
+    invokeUpdateShortcut(captureShortcutToAccelerator(sc))
+  }, [sc.modKey, sc.shift, sc.code])
 
   // Register the web sink on mount. Other sinks (Phase 6.5g MenuCaptureSink,
   // Phase 8 TauriCaptureSink) can also register against the same registry.
