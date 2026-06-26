@@ -16,7 +16,7 @@
  */
 import type { CanvasElement } from '@cys-stift/canvas-engine'
 
-export type OutlineKind = 'card' | 'text' | 'arrow' | 'rect' | 'freedraw' | 'legacy'
+export type OutlineKind = 'card' | 'text' | 'arrow' | 'rect' | 'frame' | 'freedraw' | 'legacy'
 
 export interface OutlineItem {
   id: string
@@ -80,6 +80,12 @@ function toItem(
 
     case 'rect':
       return { id: el.id, kind: 'rect', label: '(rect)' }
+
+    case 'frame': {
+      // 主题分区:标题优先,无标题回退 '(frame)'。
+      const raw = (el.text ?? '').trim()
+      return { id: el.id, kind: 'frame', label: raw ? truncate(raw, TEXT_LABEL_MAX) : '(frame)' }
+    }
 
     case 'freedraw':
       // R2: never surface the point sequence — only a static label.

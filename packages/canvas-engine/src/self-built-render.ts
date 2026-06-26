@@ -130,6 +130,36 @@ function drawElement(
       }
       break
     }
+    case 'frame': {
+      // 主题分区容器:半透明填充 + 虚线边框 + 左上角标题(mono)。
+      // 最底层(z=-1),作背景分区,卡片/箭头等压在其上。几何包含语义——
+      // 卡片 bbox 在 frame 内即"属于"该分区(不存 children id,动态算)。
+      ctx.save()
+      ctx.fillStyle = colorOf(el.color, tokenResolver)
+      ctx.globalAlpha = 0.06
+      ctx.fillRect(el.x, el.y, el.w, el.h)
+      ctx.globalAlpha = 1
+      ctx.strokeStyle = colorOf(el.color, tokenResolver)
+      ctx.lineWidth = 1.5
+      ctx.setLineDash([8, 4])
+      ctx.strokeRect(el.x, el.y, el.w, el.h)
+      ctx.setLineDash([])
+      // 标题(左上角,mono 小号,带半透明底条保证可读)。
+      const title = el.text || ''
+      if (title) {
+        ctx.font = `11px ${tokenResolver('--font-mono', 'monospace')}`
+        ctx.textBaseline = 'top'
+        const tw = ctx.measureText(title).width
+        ctx.fillStyle = tokenResolver('--color-white', '#ffffff')
+        ctx.globalAlpha = 0.85
+        ctx.fillRect(el.x, el.y, tw + 12, 18)
+        ctx.globalAlpha = 1
+        ctx.fillStyle = colorOf(el.color, tokenResolver)
+        ctx.fillText(title, el.x + 6, el.y + 3)
+      }
+      ctx.restore()
+      break
+    }
     case 'rect': {
       ctx.beginPath()
       ctx.rect(el.x, el.y, el.w, el.h)

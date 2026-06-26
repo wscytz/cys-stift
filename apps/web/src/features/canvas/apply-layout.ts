@@ -157,6 +157,16 @@ function applyFreeOp(host: CanvasHost, op: DslFreeOp): boolean {
         ...(op.color ? { color: op.color } : {}),
       })
       break
+    case 'frame':
+      host.upsert({
+        ...base,
+        kind: 'frame',
+        w: op.w ?? 400,
+        h: op.h ?? 300,
+        text: op.text ?? '',
+        color: op.color ?? 'blue',
+      })
+      break
   }
   return true
 }

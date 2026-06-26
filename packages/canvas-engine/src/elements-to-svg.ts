@@ -105,6 +105,15 @@ function elementToSvg(
       const b = normalizeBox(el)
       return `<rect x="${b.x + dx}" y="${b.y + dy}" width="${b.w}" height="${b.h}" fill="none" stroke="${colorOf(el.color, tokenResolver)}"/>`
     }
+    case 'frame': {
+      // 对齐实时渲染:半透明填充 + 虚线边框 + 左上角标题。SVG 用 fill-opacity + stroke-dasharray。
+      const b = normalizeBox(el)
+      const stroke = colorOf(el.color, tokenResolver)
+      const title = el.text
+        ? `<rect x="${b.x + dx}" y="${b.y + dy}" width="${Math.min(el.text.length * 7 + 12, b.w)}" height="18" fill="white" fill-opacity="0.85"/><text x="${b.x + dx + 6}" y="${b.y + dy + 14}" font-family="monospace" font-size="11" fill="${stroke}">${esc(el.text)}</text>`
+        : ''
+      return `<rect x="${b.x + dx}" y="${b.y + dy}" width="${b.w}" height="${b.h}" fill="${stroke}" fill-opacity="0.06" stroke="${stroke}" stroke-width="1.5" stroke-dasharray="8,4"/>${title}`
+    }
     case 'ellipse':
       return `<ellipse cx="${x + el.w / 2}" cy="${y + el.h / 2}" rx="${el.w / 2}" ry="${el.h / 2}" fill="none" stroke="${colorOf(el.color, tokenResolver)}"/>`
     case 'freedraw': {

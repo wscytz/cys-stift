@@ -60,6 +60,15 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
     expect(roundtripped).toBe(original)
   })
 
+  it('frame e2e round-trip (id + pos + size + title + color preserved through apply)', () => {
+    const host = new InMemoryCanvasHost()
+    const { original, roundtripped } = roundTrip(host, [
+      { id: 'f1', kind: 'frame', x: 10, y: 20, w: 400, h: 300, rotation: 0, text: '主题区', color: 'blue' },
+    ])
+    expect(original).toBe('[frame #f1] @pos(10,20) @size(400,300) @text("主题区") @color(blue)')
+    expect(roundtripped).toBe(original)
+  })
+
   it('text e2e round-trip (id + pos + escaped text + color; @size not serialized)', () => {
     const host = new InMemoryCanvasHost()
     const { original, roundtripped } = roundTrip(host, [

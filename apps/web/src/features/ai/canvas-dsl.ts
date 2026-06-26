@@ -24,6 +24,7 @@ import type { CanvasElement } from '@cys-stift/canvas-engine'
 const DSL_KINDS: ReadonlySet<string> = new Set([
   'card',
   'rect',
+  'frame',
   'text',
   'arrow',
   'freedraw',
@@ -76,6 +77,12 @@ export function serializeElement(e: CanvasElement): string {
       return `[card #${e.id}] ${pos} @size(${Math.round(e.w)},${Math.round(e.h)})${color}`
     case 'rect':
       return `[rect #${e.id}] ${pos} @size(${Math.round(e.w)},${Math.round(e.h)})${color}`
+    case 'frame':
+      return (
+        `[frame #${e.id}] ${pos} @size(${Math.round(e.w)},${Math.round(e.h)})` +
+        ` @text("${escapeQuoted(e.text ?? '')}")` +
+        color
+      )
     case 'text':
       return (
         `[text #${e.id}] ${pos} @text("${escapeQuoted(e.text ?? '')}")` + color

@@ -15,10 +15,10 @@
  */
 
 /**
- * 主动支持的元素种类(用户 6/22 定:5 种)。工具栏只创建这些;DSL 只序列化这些。
- *   card=卡片 / arrow=关系箭头 / freedraw=手绘 / text=浮动文本 / rect=分组框
+ * 主动支持的元素种类(用户 6/22 定:5 种 + frame 主题分区)。工具栏只创建这些;DSL 只序列化这些。
+ *   card=卡片 / arrow=关系箭头 / freedraw=手绘 / text=浮动文本 / rect=分组框 / frame=主题分区容器
  */
-export type ActiveCanvasKind = 'card' | 'arrow' | 'freedraw' | 'text' | 'rect'
+export type ActiveCanvasKind = 'card' | 'arrow' | 'freedraw' | 'text' | 'rect' | 'frame'
 
 /**
  * Legacy 种类——接口仍能表示(读旧画布 / `.cystift` 导入),但自研画布不创建、
@@ -26,6 +26,7 @@ export type ActiveCanvasKind = 'card' | 'arrow' | 'freedraw' | 'text' | 'rect'
  * Phase 2 迁移时旧画布的 legacy 形状走转换/只读路径(届时定)。
  */
 export type LegacyCanvasKind = 'ellipse' | 'line' | 'note' | 'image'
+
 
 export type CanvasElementKind = ActiveCanvasKind | LegacyCanvasKind
 
@@ -35,6 +36,7 @@ export const ACTIVE_CANVAS_KINDS: readonly ActiveCanvasKind[] = [
   'freedraw',
   'text',
   'rect',
+  'frame',
 ]
 
 /**
@@ -51,6 +53,7 @@ export const ACTIVE_CANVAS_KINDS: readonly ActiveCanvasKind[] = [
  * 想调层级:改下面这张表即可,所有视图自动跟上。
  */
 export const KIND_LAYER: Record<CanvasElementKind, number> = {
+  frame: -1, // 主题分区容器:最底层,作背景分区,所有元素压在其上
   rect: 0,
   freedraw: 1,
   card: 2,

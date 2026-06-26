@@ -51,6 +51,18 @@ export type DslFreeOp =
       text?: string
       color?: string
     }
+  | {
+      type: 'free'
+      shape: 'frame'
+      /** Element id (round-trip with serializeCanvas's `[frame #id]`). */
+      id?: string
+      x: number
+      y: number
+      w?: number
+      h?: number
+      text?: string
+      color?: string
+    }
 
 export type DslArrowOp = {
   type: 'arrow'
@@ -368,6 +380,33 @@ export function parseDslWithDiagnostics(dslText: string): {
         shape: 'text',
         x: pos.x,
         y: pos.y,
+        text: extractText(line),
+        color: extractColor(line),
+      })
+      continue
+    }
+
+    // ── Frame line (主题分区): `[frame #id] @pos(x,y) @size(w,h) @text("title") @color(c)`
+    if (line.startsWith('[frame ')) {
+      const id = extractId(line)
+      if (!id) {
+        errors.push({ line: lineNo, text: line, message: 'missing #id' })
+        continue
+      }
+      const pos = extractPos(line)
+      if (!pos) {
+        errors.push({ line: lineNo, text: line, message: 'missing @pos' })
+        continue
+      }
+      const size = extractSize(line)
+      ops.push({
+        type: 'free',
+        id,
+        shape: 'frame',
+        x: pos.x,
+        y: pos.y,
+        w: size?.w,
+        h: size?.h,
         text: extractText(line),
         color: extractColor(line),
       })

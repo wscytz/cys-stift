@@ -138,6 +138,47 @@ export default function CanvasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [service, t])
 
+  // Frame 主题分区:选中 1+ 卡 → 算 bbox + padding 创建 frame 容器。
+  // 不门控 AI(转义/结构化是核心卖点,所有用户可用)。frame 走 host.batch 单 undo 步。
+  const handleFrame = useCallback(() => {
+    const adapter = handle.current.adapter
+    if (!adapter) return
+    const cards = adapter
+      .getSelectedIds()
+      .map((id) => adapter.getElement(id))
+      .filter((el) => !!el && el.kind === 'card')
+    if (cards.length === 0) {
+      pushToast({ kind: 'info', message: t('canvas.frameNeedSelection') })
+      return
+    }
+    const minX = Math.min(...cards.map((c) => c!.x))
+    const minY = Math.min(...cards.map((c) => c!.y))
+    const maxX = Math.max(...cards.map((c) => c!.x + c!.w))
+    const maxY = Math.max(...cards.map((c) => c!.y + c!.h))
+    const pad = 40
+    const id =
+      'frame-' +
+      (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2))
+    adapter.batch(() => {
+      adapter.upsert({
+        id,
+        kind: 'frame',
+        x: Math.round(minX - pad),
+        y: Math.round(minY - pad),
+        w: Math.round(maxX - minX + pad * 2),
+        h: Math.round(maxY - minY + pad * 2),
+        rotation: 0,
+        text: t('canvas.frameDefaultTitle'),
+        color: 'blue',
+      })
+    })
+    adapter.setSelectedIds([id])
+    pushToast({ kind: 'success', message: t('canvas.frameCreated') })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t])
+
   // undo/redo 按钮 disabled 态:onHistoryChange(upsert/undo/redo)刷新。
   // 依赖 adapter state(Bug A 修复后):adapter 就绪/切画布重建后重订阅,
   // 避免旧 [activeCanvasId] ref 读到 null/旧 adapter 导致订阅不挂。
@@ -535,6 +576,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           onAILayout={handleAILayout}
           onAICluster={handleAICluster}
           onAutoRelate={handleAutoRelate}
+          onFrame={handleFrame}
           onOutline={() => setOutlineOpen((o) => !o)}
           onDsl={() => setDslOpen(true)}
           onExport={() => setExportOpen(true)}
@@ -740,6 +782,7 @@ function CanvasSideRail({
   onAILayout,
   onAICluster,
   onAutoRelate,
+  onFrame,
   onOutline,
   onDsl,
   onExport,
@@ -763,6 +806,7 @@ function CanvasSideRail({
   onAILayout: () => void
   onAICluster: () => void
   onAutoRelate: () => void
+  onFrame: () => void
   onOutline: () => void
   onDsl: () => void
   onExport: () => void
@@ -788,6 +832,7 @@ function CanvasSideRail({
       {showAutoRelate && (
         <RailButton label={t('canvas.autoRelate')} onClick={onAutoRelate} icon="→" />
       )}
+      <RailButton label={t('canvas.frameSelection')} disabled={!adapterReady} onClick={onFrame} icon="▭" />
       {aiEnabled && <span className="cv-rail__sep" aria-hidden="true" />}
       <RailButton label={t('canvas.outline')} disabled={!adapterReady} onClick={onOutline} pressed={outlineOpen} icon="☰" />
       <RailButton label={t('canvas.dslTitle')} disabled={!adapterReady} onClick={onDsl} icon="DSL" />
