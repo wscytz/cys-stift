@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-06-26 · feature-phase-2 · Markdown 导出 + 双链 [[]](subagent,非 AI)
+
+用户反馈「不要基于 AI 的功能」后,选两个非 AI、围绕核心卖点的功能,各 subagent TDD 实现:
+
+- **F5 画布→Markdown 导出**(commit 8a5987c,数据可迁移信念4):`canvasToMarkdown` 纯函数——按 frame 主题分区(几何包含,与渲染层同源)+ 散卡顶层 + 每张卡 ### title + meta + body + 相关关系列表。转义 MD 特殊字符防注入。CanvasSideRail「导出 Markdown」按钮 + Blob 下载 .md try/catch。开放格式,拿走发博客/存 Obsidian。12 测试绿。
+- **F7 双链 [[]] 自动建箭头**(commit 8a5987c,关系网深化):`extractWikiLinks` + `syncWikiLinkArrows` 纯函数——解析 body `[[标题]]` 精确匹配(大小写不敏感),diff 同步建/删 references arrow(标 meta.wikilink=true)。**手动 references arrow 绝不被删**。Obsidian/wiki 风格,让语义关系从「手画」变「写出来就成」。CardDetailModal onSave 触发。23 测试绿。
+
+**不修(v1 边界,记 STATE):** 标题重命名追踪、跨画布双链、模糊匹配、初次 load 批量同步、DSL wikilink 显式标记、inbox 编辑触发。
+
+验证:canvas-engine 372 + canvas feature 177(含 markdown 12 + wiki 23)全绿;web build exit 0;tsc 零非测试错误;render-sweep 4 路由 0 error。
+
+---
+
 ## 2026-06-26 · feature-phase-1 · 功能期批 1-4:Backlink + Frame + 全局缩略图 + 智能 elbow
 
 用户反馈"软件可以做到 50mb 至少,还有好多东西可以加"——升级进功能期。基于灵感库(`docs/decisions/2026-06-26-peer-inspiration.md`)+ 产品定位筛选,全做 4 个围绕核心卖点(转义/语义关系/本地优先画布)的功能,按成本/价值分批:
