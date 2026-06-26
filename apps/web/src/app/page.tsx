@@ -11,6 +11,7 @@
 import Link from 'next/link'
 import { useI18n } from '@/lib/i18n'
 import { useEffect, useState } from 'react'
+import { CaptureHint } from '@/features/capture/capture-hint'
 
 export default function HomePage() {
   const { t } = useI18n()
@@ -18,6 +19,7 @@ export default function HomePage() {
   useEffect(() => { setIsMac(navigator.platform?.includes('Mac') ?? true) }, [])
   return (
     <main id="main" tabIndex={-1} className="home">
+      <CaptureHint />
       <header className="home__bar" aria-hidden="true" />
       <section className="home__content">
         <p className="home__eyebrow">{t('home.eyebrow')}</p>

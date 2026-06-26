@@ -631,6 +631,9 @@ function EmptyState({ view }: { view: View }) {
         <p className="empty__lede">
           {view === 'inbox' ? t('inbox.empty.lede') : t('inbox.empty.ledeArchived')}
         </p>
+        {view === 'inbox' && (
+          <p className="empty__lede">{t('inbox.empty.hint')}</p>
+        )}
       </div>
     </UICard>
   )

@@ -72,6 +72,7 @@ export const messages = {
   'inbox.dup.summary': { zh: '发现 {n} 组重复:同链接 {url} · 同代码 {code} · 同标题 {title}。请自行翻找处理。', en: 'Found {n} duplicate groups: same URL {url} · same code {code} · same title {title}. Find and handle them yourself.' },
   'inbox.empty.lede': { zh: '在上方创建第一张卡片。可添加链接、代码块和引用，它们会保持在同一条笔记上。', en: 'Create the first card above. Add links, code blocks, and quotes — they all stay attached to the same note.' },
   'inbox.empty.ledeArchived': { zh: '从活跃标签页归档卡片到此处。归档的卡片会保留，直到你取消归档或软删除。', en: 'Archive from the active tab to move cards here. They stay archived until you unarchive them or soft-delete from here.' },
+  'inbox.empty.hint': { zh: '按 ⌘⇧Space 记下一个', en: 'Press ⌘⇧Space to capture one' },
   'inbox.create.placeholder': { zh: '灵感标题…', en: 'Idea title…' },
   'inbox.create.bodyPlaceholder': { zh: 'Markdown 笔记（可选）', en: 'Markdown body (optional)' },
   'inbox.create.submit': { zh: '加入收件箱', en: 'Add to inbox' },
@@ -439,6 +440,9 @@ export const messages = {
   'capture.toArchive': { zh: '→ 归档', en: '→ archive' },
   'capture.open': { zh: '打开', en: 'open' },
   'capture.redirectFailed': { zh: '操作失败:{error}', en: 'Action failed: {error}' },
+  'capture.hint': { zh: '⌘⇧Space 随时记灵感', en: '⌘⇧Space to capture anywhere' },
+  'capture.hintDismiss': { zh: '知道了', en: 'Got it' },
+  'capture.shortcutHelp': { zh: '⌘⇧Space 唤起记录栏(全局)', en: '⌘⇧Space open capture (global)' },
 
   /* ── Card types ── */
   'card.typeNote': { zh: '笔记', en: 'Note' },

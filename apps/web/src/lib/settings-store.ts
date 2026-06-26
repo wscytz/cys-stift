@@ -53,6 +53,9 @@ export interface Settings {
   theme: ThemePreference
   locale: 'zh' | 'en'
   ai: AIConfig | null
+  /** One-time first-run capture-shortcut hint (plan Task 9). false until the
+   *  user dismisses it. Backward-compat: missing field loads as false. */
+  seenCaptureHint: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -60,6 +63,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   locale: 'zh',
   ai: null,
+  seenCaptureHint: false,
 }
 
 /** Validate a parsed AI config. null is valid (no AI configured).
@@ -100,8 +104,16 @@ function isValid(v: unknown): v is Settings {
     return false
   }
   // ai field is optional (backwards compat) — accept missing or null or valid
-  if (!('ai' in o) || o.ai === null) return true
-  return isValidAIConfig(o.ai)
+  if (!('ai' in o) || o.ai === null) {
+    // seenCaptureHint, if present, must be boolean; missing is fine (back-fill).
+    if ('seenCaptureHint' in o && typeof o.seenCaptureHint !== 'boolean')
+      return false
+    return true
+  }
+  if (!isValidAIConfig(o.ai)) return false
+  if ('seenCaptureHint' in o && typeof o.seenCaptureHint !== 'boolean')
+    return false
+  return true
 }
 
 function loadSettings(): Settings {
@@ -110,7 +122,14 @@ function loadSettings(): Settings {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return DEFAULT_SETTINGS
     const parsed = JSON.parse(raw) as { settings?: unknown }
-    return isValid(parsed.settings) ? (parsed.settings as Settings) : DEFAULT_SETTINGS
+    if (!isValid(parsed.settings)) return DEFAULT_SETTINGS
+    const loaded = parsed.settings as Settings
+    // Backward-compat: an OLD payload (pre-Task-9) has no seenCaptureHint.
+    // Back-fill false so the rest of the app can assume the field exists.
+    if (typeof loaded.seenCaptureHint !== 'boolean') {
+      loaded.seenCaptureHint = false
+    }
+    return loaded
   } catch {
     return DEFAULT_SETTINGS
   }
@@ -234,6 +253,19 @@ export const settingsStore = {
     if (_settings.theme === theme) return
     const prev = _settings
     _settings = { ..._settings, theme }
+    if (!saveSettings(_settings)) {
+      _settings = prev
+      notifyQuota()
+    }
+    notify()
+  },
+  /** Mark the one-time capture hint as seen (plan Task 9). Idempotent: a no-op
+   *  if already seen, so re-calling after a failed persist doesn't flip state. */
+  markCaptureHintSeen(): void {
+    hydrateOnce()
+    if (_settings.seenCaptureHint) return
+    const prev = _settings
+    _settings = { ..._settings, seenCaptureHint: true }
     if (!saveSettings(_settings)) {
       _settings = prev
       notifyQuota()

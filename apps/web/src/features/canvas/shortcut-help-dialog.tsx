@@ -54,6 +54,10 @@ export function ShortcutHelpDialog({
         ['Shift + 方向', t('canvas.scNudge10')],
       ],
     },
+    {
+      title: t('canvas.shortcutsView'),
+      rows: [['⌘⇧Space / Ctrl+⇧+Space', t('capture.shortcutHelp')]],
+    },
   ]
 
   return (
