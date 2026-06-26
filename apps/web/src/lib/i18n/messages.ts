@@ -425,6 +425,7 @@ export const messages = {
   /* ── Capture ── */
   'capture.miniTitle': { zh: '灵感标题…', en: 'Idea title…' },
   'capture.miniBody': { zh: 'Markdown 笔记（可选）', en: 'Markdown body (optional)' },
+  'capture.miniEnterHint': { zh: 'Enter 展开正文 · 或 + 添加', en: 'Enter expands body · or + to add' },
   'draft.persistFailed': { zh: '草稿可能因存储已满未保存', en: 'Draft may not be saved (storage full)' },
   'capture.addNote': { zh: '加入收件箱', en: 'Add to inbox' },
   'capture.drop': { zh: '拖入文件以创建卡片', en: 'Drop files to create cards' },

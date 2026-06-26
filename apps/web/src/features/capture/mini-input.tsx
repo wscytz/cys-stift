@@ -173,6 +173,11 @@ if (
             autoFocus
           />
           {!bodyOpen && (
+            <span className="mi-enter-hint" data-testid="mini-enter-hint">
+              {t('capture.miniEnterHint')}
+            </span>
+          )}
+          {!bodyOpen && (
             <button
               type="button"
               className="mi-add-note"
@@ -196,7 +201,9 @@ if (
           )}
         </div>
         <div className="mi-actions">
-          <span className="mi-hint">{navigator.platform?.includes('Mac') ? '⌘↩' : 'Ctrl+Enter'} {t('card.detail.save')} · esc {t('card.detail.cancel')}</span>
+          <strong className="mi-hint mi-hint--primary" data-testid="mini-submit-hint">
+            {navigator.platform?.includes('Mac') ? '⌘↩' : 'Ctrl+Enter'} {t('card.detail.save')} · esc {t('card.detail.cancel')}
+          </strong>
           {persistFailed && (
             <span className="mi-warn" role="alert">{t('draft.persistFailed')}</span>
           )}
@@ -270,6 +277,12 @@ const styles = `
   font-family: var(--font-mono); font-size: var(--font-size-xs);
   color: var(--color-red); text-transform: lowercase;
 }
+.mi-enter-hint {
+  display: block; margin-top: var(--space-1);
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  color: var(--color-red); text-transform: lowercase; letter-spacing: 0.04em;
+}
+.mi-hint--primary { color: var(--color-red); font-weight: 700; }
 @media (max-width: 720px) {
   .mi-backdrop { padding-top: 12vh; }
   .mi-frame { width: calc(100vw - var(--space-4)); }
