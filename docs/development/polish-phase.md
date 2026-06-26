@@ -104,6 +104,9 @@
 
 ## 六、执行纪律(不可遗忘)
 
+> **验证门 + 提交纪律的完整 checklist**(改了什么跑什么、web lint 基线、产品门、commit 格式)见
+> [`docs/development/definition-of-done.md`](definition-of-done.md)。本节是约束速查。
+
 - spec `docs/specs/2026-06-19-cys-stift-design.md` 冻结不改
 - 不重新选型(换框架/ORM/数据库)—— 要改先写 ADR
 - 颜色/像素走 token(Bauhaus 6 色无绿),不写裸 hex

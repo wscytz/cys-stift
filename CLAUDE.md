@@ -13,7 +13,7 @@
 > 新会话 / `/clear` 后先读 `docs/STATE.md`(版本里程碑 + 当前能力 + 下一步 + 已知 debt)。
 > 历史变更见 `docs/changelog.md`(newest-first)。
 
-- 完整进度：`docs/STATE.md`(当前状态) + `docs/changelog.md`(历史) + `docs/development/roadmap.md`（30 轮路线图）+ `docs/user/README.md`（用户指南）+ `docs/user/privacy.md`（**AI 隐私必读**）
+- 完整进度：`docs/STATE.md`(当前状态) + `docs/changelog.md`(历史) + `docs/development/polish-phase.md`(打磨判据/流程) + `docs/user/README.md`（用户指南）+ `docs/user/privacy.md`（**AI 隐私必读**）；`docs/development/roadmap.md` 是 Phase 7-9 **已完成**的历史档
 - 任务流程参考：`docs/archive/ralph/README.md`（已归档，见下）
 
 ## 技术栈（不可重新选型）
@@ -25,7 +25,7 @@
 | 桌面 | Tauri v2 + Rust |
 | 数据 | better-sqlite3 + Drizzle（Node 路径）；浏览器侧 in-memory + localStorage（Phase 2.5 换 wa-sqlite + OPFS） |
 | 设计 | 6 原色 + 8px 网格 + Space Grotesk / Inter / JetBrains Mono |
-| 测试 | vitest（domain + db）+ puppeteer-core（e2e） |
+| 测试 | vitest（domain + db + canvas-engine + web）+ puppeteer-core（e2e / render-sweep） |
 
 ## 硬性禁止（任何模型、任何场景都适用）
 
@@ -50,13 +50,18 @@
 | 跨模型记忆 | `docs/decisions/INDEX.md` |
 | 阶段变更历史 | `docs/changelog.md` |
 | 开发环境搭建 | `docs/development/setup.md` |
+| 依赖清单（装了什么） | `docs/development/dependencies.md` |
+| 验证门 + 提交纪律（改完代码照这跑） | `docs/development/definition-of-done.md` |
 
 ## 验证命令（改完代码就跑）
 
+> **完整验证门 + 判据**（web lint 基线、产品门、提交纪律）见
+> [`docs/development/definition-of-done.md`](docs/development/definition-of-done.md)。简版：
+
 ```bash
-pnpm --filter domain test     # domain 单元测试（必须全绿）
-pnpm --filter db test         # db 集成测试（必须全绿）
-pnpm --filter web build       # Next.js 静态导出（必须 exit 0）
+pnpm -r test                  # 全包 vitest（domain / db / canvas-engine / web）
+pnpm -r lint                  # 全包 tsc --noEmit（web 有 ~25 fixture 基线，零新增即可）
+pnpm --filter web build       # Next.js 静态导出（产品门，必须 exit 0）
 ```
 
 ## Ralph 状态（已停用）

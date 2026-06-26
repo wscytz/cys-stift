@@ -27,6 +27,8 @@ roadmap.md(Phase 7-9 已完成,指向 STATE)、reference.md + reference-patterns
 
 **教训(记入记忆)**:tldraw 移除 + 引擎独立化是大变更,但过程文档没同步,导致 4 份规范 + 2 个 package.json 脚本漂移。大迁移后该有一轮"准则对齐现实"。硬编码版本/test 数的文档最易漂移——改指向真相源(package.json/命令输出)。
 
+**续 · Definition of Done 固化(同轮)**:把"改完代码 → 能 commit"的标准门固化成 [`docs/development/definition-of-done.md`](development/definition-of-done.md) —— ① 验证门(改了哪个包跑哪个包的 test+lint;web ~25-error `__tests__/` fixture 基线,判据**零新增**非零错误;web build 是产品门必须 exit 0;不假装通过);② 提交纪律(一个逻辑一个 commit、`git -c user.name=cy -c user.email=cy@stift.local` 无 footer、SSH push、conventional 前缀、过程文档 gitignored);③ 文档收尾触发清单(加 Card 字段→ai-context+privacy;加依赖→ADR+dependencies.md 指向 package.json;加 CanvasElement kind→五视图对齐;加 i18n→zh+en);④ subagent 编排。根 CLAUDE.md 同步修测试栈(vitest 现 4 包)+ 验证命令(补 `pnpm -r test`/`lint`)+ 关键文件表(挂 DoD/dependencies 指针);polish-phase §六 指向 DoD 作权威门,避免两边漂移。
+
 ---
 
 ## 2026-06-26 · feature-phase-2 · Markdown 导出 + 双链 [[]](subagent,非 AI)
