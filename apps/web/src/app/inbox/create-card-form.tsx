@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useEffect, useId } from 'react'
+import { useState, useEffect, useId } from 'react'
 import { Button, Input, Tag } from '@cys-stift/ui'
 import type { CodeBlock, LinkPreview, Quote } from '@cys-stift/domain'
 import { draftStore, useDraft, isDraftPersistOk } from '@/lib/draft-store'
@@ -20,13 +20,20 @@ import {
 import { useI18n } from '@/lib/i18n'
 
 export interface CreateCardFormProps {
+  /**
+   * Persist the captured input. Resolves true on success, false on failure
+   * (e.g. quota exceeded — the consumer surfaces an error toast). Mirrors
+   * MiniInput's onSubmit contract: the form awaits this and only resets
+   * itself + clears the manual draft on success, so a failed save leaves
+   * the user's typed input in place for retry (H2/H3 fix).
+   */
   onCreate: (input: {
     title: string
     body: string
     links: LinkPreview[]
     codeSnippets: CodeBlock[]
     quotes: Quote[]
-  }) => void
+  }) => Promise<boolean>
   /**
    * Whether the backing DB/service is hydrated and ready to accept writes.
    * The form renders outside the page's `!ready` loading gate so the user
@@ -69,7 +76,11 @@ export function CreateCardForm({ onCreate, ready = true }: CreateCardFormProps) 
   const [links, setLinks] = useState<DraftLink[]>([])
   const [codes, setCodes] = useState<DraftCode[]>([])
   const [quotes, setQuotes] = useState<DraftQuote[]>([])
-  const [pending, startTransition] = useTransition()
+  // Submit latch: while awaiting onCreate's promise we disable the button
+  // to prevent double-submit (onCreate is now async — see handleSubmit).
+  // Replaces the former useTransition `pending` latch, which only covered
+  // sync state updates and can't span the await.
+  const [submitting, setSubmitting] = useState(false)
   // R2.10: surface silent autosave failures (quota exceeded).
   const [persistFailed, setPersistFailed] = useState(false)
 
@@ -133,7 +144,7 @@ export function CreateCardForm({ onCreate, ready = true }: CreateCardFormProps) 
     // a real auto-focus would require a ref-forwarded Input (not in MVP).
   }, [])
 
-  const canSubmit = title.trim().length > 0 && !pending && ready
+  const canSubmit = title.trim().length > 0 && !submitting && ready
 
   const reset = () => {
     setTitle('')
@@ -145,22 +156,46 @@ export function CreateCardForm({ onCreate, ready = true }: CreateCardFormProps) 
     draftStore.clear('manual')
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!ready) return // DB not hydrated yet — guard against crash into unhydrated service
     if (!canSubmit) return
     const cleanTitle = title.trim()
     const cleanBody = body.trim()
-    startTransition(() => {
-      onCreate({
+    // H3 fix (mirror MiniInput): cancel any pending debounced draft
+    // persist BEFORE we clear the draft on success. Otherwise a keystroke
+    // in the last ~500ms before submit queues a persistDraft that fires
+    // AFTER reset() → draftStore.clear('manual'), re-persisting the just-
+    // submitted text as a draft so it reappears next mount.
+    persistDraft.cancel()
+    setSubmitting(true)
+    // H2 fix: await the submit result and ONLY reset the form + clear the
+    // draft on SUCCESS. On failure (quota) keep the form contents so the
+    // user can retry — the consumer (inbox/page onCreate) already pushed
+    // an error toast. Happy path is still a single microtask
+    // (WebCaptureSink.submit resolves synchronously) so the form clears
+    // without a perceptible delay.
+    let ok = false
+    try {
+      ok = await onCreate({
         title: cleanTitle,
         body: cleanBody,
         links: draftLinksToPayload(links),
         codeSnippets: draftCodesToPayload(codes),
         quotes: draftQuotesToPayload(quotes),
       })
+    } catch {
+      // Defensive: onCreate is specced to never throw (it .catches
+      // internally and returns false), but guard anyway so a bug in the
+      // consumer can't crash the form / lose input.
+      ok = false
+    } finally {
+      setSubmitting(false)
+    }
+    if (ok) {
       reset()
-    })
+    }
+    // On failure: form contents + manual draft are preserved for retry.
   }
 
   return (
@@ -243,7 +278,7 @@ export function CreateCardForm({ onCreate, ready = true }: CreateCardFormProps) 
 
       <div className="ccf__actions">
         <Button type="submit" disabled={!canSubmit}>
-          {pending ? t('card.detail.saving') : t('inbox.create.submit')}
+          {submitting ? t('card.detail.saving') : t('inbox.create.submit')}
         </Button>
         <span className="ccf__actions-spacer" />
         <Button type="button" variant="ghost" onClick={reset}>

@@ -253,14 +253,33 @@ export default function InboxPage() {
               // shape regardless of source.kind.
               // CaptureInput.links is `string[]`; ConvertCardForm gives
               // us LinkPreview[]; extract URL string array for the sink.
-              void captureSinkRegistry.submit({
-                source: { kind: 'manual', deviceId: DEVICE_ID },
-                title: input.title,
-                body: input.body,
-                links: input.links.map((l) => l.url),
-                codeSnippets: input.codeSnippets,
-                quotes: input.quotes,
-              })
+              //
+              // H2/H3 fix: RETURN the promise (was `void`) so
+              // CreateCardForm.handleSubmit can await it and only reset
+              // the form + clear the draft on SUCCESS — on quota failure
+              // the user's typed input stays put (the exact silent-loss
+              // the MiniInput fix prevents). Mirrors MiniInput's
+              // onSubmit contract (Promise<boolean>: true=saved,
+              // false=kept-for-retry). We surface the error toast here
+              // (the form has no toast wiring of its own for this path).
+              return captureSinkRegistry
+                .submit({
+                  source: { kind: 'manual', deviceId: DEVICE_ID },
+                  title: input.title,
+                  body: input.body,
+                  links: input.links.map((l) => l.url),
+                  codeSnippets: input.codeSnippets,
+                  quotes: input.quotes,
+                })
+                .then(() => true)
+                .catch((e: unknown) => {
+                  const msg = e instanceof Error ? e.message : String(e)
+                  pushToast({
+                    kind: 'error',
+                    message: t('capture.persistFailed', { error: msg }),
+                  })
+                  return false
+                })
             }}
           />
         )}
@@ -368,21 +387,25 @@ export default function InboxPage() {
           }}
           onAIAppendNew={(c) => {
             // M3 — AI "Append as new card". Goes through captureSinkRegistry
-            // for consistency with the inbox CreateCardForm path. Toast
-            // (success / fail) is surfaced by the consumer (we don't push
-            // here — the popover already showed an optimistic toast).
-            try {
-              captureSinkRegistry.submit({
+            // for consistency with the inbox CreateCardForm path. The popover
+            // already showed an optimistic success toast, so on failure we
+            // surface an error toast here. submit() ALWAYS returns a Promise
+            // (converts sync throws → rejections), so a try/catch is dead —
+            // we .catch the rejection instead (H2 fix: was an unhandled
+            // rejection + silent loss on quota failure).
+            void captureSinkRegistry
+              .submit({
                 source: { kind: 'manual', deviceId: DEVICE_ID },
                 title: c.title,
                 body: c.body,
               })
-            } catch (e) {
-              pushToast({
-                kind: 'error',
-                message: 'AI append failed: ' + (e as Error).message,
+              .catch((e: unknown) => {
+                const msg = e instanceof Error ? e.message : String(e)
+                pushToast({
+                  kind: 'error',
+                  message: t('capture.persistFailed', { error: msg }),
+                })
               })
-            }
           }}
         />
       )}

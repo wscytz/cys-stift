@@ -185,18 +185,23 @@ export default function TimelinePage() {
             setDetail(null)
           }}
           onAIAppendNew={(c) => {
-            try {
-              captureSinkRegistry.submit({
+            // submit() ALWAYS returns a Promise (converts sync throws →
+            // rejections), so a try/catch is dead — we .catch the rejection
+            // instead (H2 fix: was an unhandled rejection + silent loss on
+            // quota failure). The popover already showed an optimistic toast.
+            void captureSinkRegistry
+              .submit({
                 source: { kind: 'manual', deviceId: DEVICE_ID },
                 title: c.title,
                 body: c.body,
               })
-            } catch (e) {
-              pushToast({
-                kind: 'error',
-                message: 'AI append failed: ' + (e as Error).message,
+              .catch((e: unknown) => {
+                const msg = e instanceof Error ? e.message : String(e)
+                pushToast({
+                  kind: 'error',
+                  message: t('capture.persistFailed', { error: msg }),
+                })
               })
-            }
           }}
         />
       )}

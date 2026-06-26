@@ -335,11 +335,22 @@ export default function ArchivePage() {
             // M3 — AI append on archive page. The new card lands in
             // inbox (captureSinkRegistry 'manual' sink target) so the
             // user can find it alongside their other active notes.
-            void captureSinkRegistry.submit({
-              source: { kind: 'manual', deviceId: DEVICE_ID },
-              title: c.title,
-              body: c.body,
-            })
+            // H2 fix: submit() returns a Promise that rejects on quota
+            // failure — without .catch this was an unhandled rejection +
+            // silent loss. The popover already showed an optimistic toast.
+            void captureSinkRegistry
+              .submit({
+                source: { kind: 'manual', deviceId: DEVICE_ID },
+                title: c.title,
+                body: c.body,
+              })
+              .catch((e: unknown) => {
+                const msg = e instanceof Error ? e.message : String(e)
+                pushToast({
+                  kind: 'error',
+                  message: t('capture.persistFailed', { error: msg }),
+                })
+              })
           }}
         />
       )}
