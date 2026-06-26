@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import type { CanvasId, Card } from '@cys-stift/domain'
+import type { CanvasId, Card, CardId } from '@cys-stift/domain'
 import { SelfBuiltAdapter } from '@cys-stift/canvas-engine'
 import { Button, Modal, Toolbar } from '@cys-stift/ui'
 import { useDb } from '@/lib/db-client'
@@ -17,6 +17,7 @@ import { applyLayout } from '@/features/canvas/apply-layout'
 import { RelationPanel } from '@/features/canvas/relation-panel'
 import { FreedrawPanel } from '@/features/canvas/freedraw-panel'
 import { Minimap } from '@/features/canvas/minimap-component'
+import { OutlinePanel } from '@/features/canvas/outline-panel'
 import { autoRelate } from '@/features/canvas/auto-relate'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { parseDsl, parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
@@ -81,6 +82,7 @@ export default function CanvasPage() {
   const [renamingId, setRenamingId] = useState<CanvasId | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<CanvasId | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
+  const [outlineOpen, setOutlineOpen] = useState(false)
   const [dslOpen, setDslOpen] = useState(false)
   const [shortcutOpen, setShortcutOpen] = useState(false)
   const [diffOpen, setDiffOpen] = useState(false)
@@ -514,6 +516,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           aiBusy={aiBusy}
           showAutoRelate={showAutoRelate}
           adapterReady={adapterReady}
+          outlineOpen={outlineOpen}
           canUndo={canUndo}
           canRedo={canRedo}
           canRename={!!activeCanvas}
@@ -526,11 +529,20 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           onAILayout={handleAILayout}
           onAICluster={handleAICluster}
           onAutoRelate={handleAutoRelate}
+          onOutline={() => setOutlineOpen((o) => !o)}
           onDsl={() => setDslOpen(true)}
           onExport={() => setExportOpen(true)}
           onDiff={() => setDiffOpen(true)}
           onShortcuts={() => setShortcutOpen(true)}
         />
+        {outlineOpen && (
+          <OutlinePanel
+            host={adapter}
+            canvasEl={canvasElRef.current}
+            getCardTitle={(id) => service.get(id as CardId)?.title}
+            getEndpointTitle={(id) => service.get(id as CardId)?.title}
+          />
+        )}
         <Minimap host={adapter} canvasEl={canvasElRef.current} />
       </div>
 
@@ -690,6 +702,7 @@ function CanvasSideRail({
   aiBusy,
   showAutoRelate,
   adapterReady,
+  outlineOpen,
   canUndo,
   canRedo,
   canRename,
@@ -702,6 +715,7 @@ function CanvasSideRail({
   onAILayout,
   onAICluster,
   onAutoRelate,
+  onOutline,
   onDsl,
   onExport,
   onDiff,
@@ -711,6 +725,7 @@ function CanvasSideRail({
   aiBusy: null | 'layout' | 'cluster'
   showAutoRelate: boolean
   adapterReady: boolean
+  outlineOpen: boolean
   canUndo: boolean
   canRedo: boolean
   canRename: boolean
@@ -723,6 +738,7 @@ function CanvasSideRail({
   onAILayout: () => void
   onAICluster: () => void
   onAutoRelate: () => void
+  onOutline: () => void
   onDsl: () => void
   onExport: () => void
   onDiff: () => void
@@ -748,6 +764,7 @@ function CanvasSideRail({
         <RailButton label={t('canvas.autoRelate')} onClick={onAutoRelate} icon="→" />
       )}
       {aiEnabled && <span className="cv-rail__sep" aria-hidden="true" />}
+      <RailButton label={t('canvas.outline')} disabled={!adapterReady} onClick={onOutline} pressed={outlineOpen} icon="☰" />
       <RailButton label={t('canvas.dslTitle')} disabled={!adapterReady} onClick={onDsl} icon="DSL" />
       <RailButton label={t('canvas.export')} disabled={!adapterReady} onClick={onExport} icon="⤓" />
       <RailButton label={t('canvas.diffTitle')} disabled={!adapterReady} onClick={onDiff} icon="±" />
@@ -757,9 +774,18 @@ function CanvasSideRail({
   )
 }
 
-function RailButton({ label, icon, onClick, disabled, busy, busyTitle, ariaBusy }: { label: string; icon: string; onClick: () => void; disabled?: boolean; busy?: boolean; busyTitle?: string; ariaBusy?: boolean }) {
+function RailButton({ label, icon, onClick, disabled, busy, busyTitle, ariaBusy, pressed }: { label: string; icon: string; onClick: () => void; disabled?: boolean; busy?: boolean; busyTitle?: string; ariaBusy?: boolean; pressed?: boolean }) {
   return (
-    <button type="button" className="cv-rail__btn" onClick={onClick} disabled={disabled} title={busy && busyTitle ? busyTitle : label} aria-label={label} aria-busy={ariaBusy ? true : undefined}>
+    <button
+      type="button"
+      className={`cv-rail__btn${pressed ? ' cv-rail__btn--pressed' : ''}`}
+      onClick={onClick}
+      disabled={disabled}
+      title={busy && busyTitle ? busyTitle : label}
+      aria-label={label}
+      aria-busy={ariaBusy ? true : undefined}
+      aria-pressed={pressed ? true : undefined}
+    >
       {busy ? '…' : icon}
     </button>
   )
@@ -833,6 +859,7 @@ const styles = `
   transition: background 80ms ease-out, color 80ms ease-out;
 }
 .cv-rail__btn:hover:not(:disabled) { background: var(--color-black); color: var(--color-white); }
+.cv-rail__btn--pressed { background: var(--color-black); color: var(--color-white); }
 .cv-rail__btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .cv-rail__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: -2px; }
 .cv-rail__sep { width: 24px; height: 1px; background: var(--color-gray-soft); margin: var(--space-1) 0; }
