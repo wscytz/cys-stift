@@ -434,6 +434,11 @@ export const messages = {
   'capture.success': { zh: '已创建 {name}', en: 'Created {name}' },
   'capture.persistFailed': { zh: '保存失败(存储已满?)，草稿已保留：{error}', en: 'Save failed (storage full?), draft kept: {error}' },
   'capture.globalShortcutFailed': { zh: '全局快捷键注册失败(可能被其他应用占用)：{error}', en: 'Global shortcut registration failed (may be taken by another app): {error}' },
+  'capture.saved': { zh: '已存入收件箱', en: 'Saved to inbox' },
+  'capture.toCanvas': { zh: '→ 当前画布', en: '→ canvas' },
+  'capture.toArchive': { zh: '→ 归档', en: '→ archive' },
+  'capture.open': { zh: '打开', en: 'open' },
+  'capture.redirectFailed': { zh: '操作失败:{error}', en: 'Action failed: {error}' },
 
   /* ── Card types ── */
   'card.typeNote': { zh: '笔记', en: 'Note' },

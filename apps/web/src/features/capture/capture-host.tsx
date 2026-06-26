@@ -28,6 +28,8 @@ import { captureSinkRegistry } from './capture-sink'
 import { getDeviceId } from '@/lib/device-id'
 import { pushToast } from '@/lib/toast-store'
 import { useI18n } from '@/lib/i18n'
+import { useCanvases } from '@/lib/canvas-store'
+import { buildCaptureRedirectActions } from './capture-redirect'
 
 export const CAPTURE_OPEN_EVENT = 'cys-stift:open-capture'
 
@@ -67,6 +69,7 @@ export function CaptureHost() {
   const { service } = useDb()
   const { t } = useI18n()
   const { settings } = useSettings()
+  const { snapshot } = useCanvases()
   const sc = settings.captureShortcut
   const [open, setOpen] = useState(false)
   // Tracks which entry-point opened the Mini Input so the saved card's
@@ -91,8 +94,30 @@ export function CaptureHost() {
             }
       return captureSinkRegistry
         .submit({ title, body, source })
-        .then(() => {
+        .then(({ cardId }) => {
           setOpen(false)
+          const actions = buildCaptureRedirectActions({
+            cardId,
+            service,
+            activeCanvasId: snapshot.activeCanvasId,
+            openCard: (id) => {
+              window.dispatchEvent(
+                new CustomEvent('cys-stift:open-card', { detail: { id } }),
+              )
+            },
+            onError: (msg) =>
+              pushToast({ kind: 'error', message: t('capture.redirectFailed', { error: msg }) }),
+          }).map((a, i) => ({
+            // Localize the label for display (machine label → i18n).
+            label:
+              i === 0
+                ? t('capture.toCanvas')
+                : i === 1
+                  ? t('capture.toArchive')
+                  : t('capture.open'),
+            onClick: a.onClick,
+          }))
+          pushToast({ kind: 'success', message: t('capture.saved'), actions })
           return true
         })
         .catch((e: unknown) => {
@@ -104,7 +129,7 @@ export function CaptureHost() {
           return false
         })
     },
-    [openKind, t],
+    [openKind, t, service, snapshot.activeCanvasId],
   )
 
   useEffect(() => {

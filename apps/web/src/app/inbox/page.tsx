@@ -74,6 +74,20 @@ export default function InboxPage() {
     clearSelection()
   }, [view, clearSelection])
 
+  // CaptureHost dispatches cys-stift:open-card when the user taps "打开" on the
+  // capture success toast (plan Task 8). Resolve the id to a live card and
+  // open the detail modal.
+  useEffect(() => {
+    const onOpenCard = (e: Event) => {
+      const id = (e as CustomEvent<{ id: string }>).detail?.id
+      if (!id) return
+      const card = snap.cards.find((c) => c.id === id)
+      if (card) setDetail(card)
+    }
+    window.addEventListener('cys-stift:open-card', onOpenCard as EventListener)
+    return () => window.removeEventListener('cys-stift:open-card', onOpenCard as EventListener)
+  }, [snap])
+
   // 批量动作(循环调单卡 service;同步,一次 re-render)。
   // Reconcile against the live/visible card ids first: a selected card may
   // have been soft-deleted / archived-out elsewhere (e.g. via the detail
