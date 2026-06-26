@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-06-26 · ai-barrier-capture-ux · 降低 AI 门槛 + 记录栏体验优化(产品定位落地)
+
+用户「定产品定位重要吧」→ 联网竞品研究坐实楔子(**本地 + 画布 + 开放文本 DSL 转义** 无竞品),两根支柱(转义已产品化为 `DslDialog`、BYOM 含 Ollama 本地免费)在代码里都是真的。短板在**可见性与门槛**:AI 对未配置用户完全隐形(`aiEnabled` 隐藏所有 AI 按钮)、点了裸报错;配置面板朴素;捕获栏新人不知快捷键、捕获后静默进 inbox 无去向。brainstorming → spec(`docs/specs/2026-06-26-ai-barrier-and-capture-ux-design.md`)→ writing-plans → **subagent 逐任务执行**(10 TDD 任务,2 phase,主模型审 diff + 跑门 + 提交,`git -c user.name=cy …` 无 footer)。
+
+**#2 降低 AI 门槛**
+- **统一 ✨ AI 入口 + 优雅路由**(核心):card-detail 3 个分散 AI 按钮收敛成**一个永远可见**的 ✨ AI(不再被 `aiEnabled` 隐藏——没配的人也能发现 AI);点击经 `isAIReady(cfg)` 单闸门:未就绪 → `AiSetupCard` 引导卡(高亮 Ollama 零成本路径 + 「去设置」),就绪 → `AiActionMenu`(摘要/改写/翻译)走现有 `AIPopover`。canvas AI-layout 同路由。这是"降门槛"关键:AI 从隐形 → 可发现 + 可引导。
+- **设置面板重做**:provider 做成 3 张可选卡片(OpenAI / Anthropic / **Ollama·本地免费**,原色点 black/blue/yellow,无 green)+ 明文警告 callout + 高级折叠(temperature/maxTokens)。样式 scoped 到 `aip__*` 避免与 settings 页 `.set__*` 冲突。
+- **prompt + 参数外围**:system prompt 调优(去 "Here is" 套话、输出语言跟随 locale);per-action temperature(summarize/translate 0.3 / rewrite 0.7)+ maxTokens 默认,cfg 可覆盖。
+
+**#3 记录栏**
+- **秒存 + 重定向**(方案 A,保"3 秒"):捕获永远秒存 inbox;成功 toast 带 `actions[]`(`→当前画布` / `→归档` / `打开`),复用 `service.moveToCanvas`/`archive`;toast-store 加可选 actions + 6s 寿命。`capture-redirect.ts` 纯 helper(z 计算 + 错误吞到 onError)。
+- **发现**:首屏一次性 `CaptureHint` 黄条(`seenCaptureHint` flag,backward-compat)+ shortcut-help 补捕获键 + inbox 空状态提示。
+- **MiniInput 打磨**:Enter 展开正文从隐藏变可见 hint;⌘↩ 提示加粗 capture-red;语义不变(Enter/⌘↩/Esc)。
+
+**纪律**:全包零新依赖;计划里的 RTL 测试全部改 `react-dom/client` + `act`(codebase policy,无 `@testing-library/react`);R2 不变(不动 `AI_CARD_FIELDS` 白名单,locale 行附在 `serializeCardForAI` 之后);静态导出;6 色无 green;vitest 加 `esbuild.jsx:'automatic'` 让无 `import React` 的组件可在测试渲染。
+
+验证:web **753**(+60);tsc 25→**23** 基线零新增(净 -2);`pnpm --filter web build` exit 0。
+
+---
+
 ## 2026-06-26 · transliteration-validation · 转义赌注验证 + 引擎独立化第一步(3 轮自主,验收批)
 
 用户「不手测,你先跑 3 轮,40min 后验收」。按推荐主线"先证赌注再投资",3 轮一弧线(de-risk → 演示 → 北极星):
