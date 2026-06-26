@@ -2,7 +2,7 @@
 import type { CanvasElement, CanvasView } from './canvas-host'
 import { sortByLayer } from './canvas-host'
 import { colorOf, domTokenResolver, type TokenResolver } from './self-built-render'
-import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments, arrowHeadAngle } from './self-built-arrow'
+import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments, arrowHeadAngle, autoElbowPath, cardObstacles } from './self-built-arrow'
 import { unionBounds, expandBounds, normalizeBox, type Bounds } from './bounds'
 
 export interface ElementsToSvgOptions {
@@ -152,7 +152,17 @@ function elementToSvg(
         segs.push(`<path d="M ${fx} ${fy} Q ${ctrl.x} ${ctrl.y} ${tx} ${ty}" fill="none" stroke="${stroke}" stroke-width="2"${dashAttr}/>`)
       } else if (route === 'elbow') {
         // 折线:<polyline> from→elbows→to。点序列含端点 + 折点。
-        const pts = elbowSegments(el, from, to)
+        // 手设 elbow → elbowSegments;空 → autoElbowPath 自动绕障(obstacles 排除 from/to 卡),
+        // 与实时渲染 / hitTest 同源(三视图视觉一致)。
+        const hasManual = !!(el.elbow && el.elbow.length > 0)
+        const pts = hasManual
+          ? elbowSegments(el, from, to)
+          : autoElbowPath(
+              el,
+              from,
+              to,
+              cardObstacles(allElements, new Set([el.from, el.to].filter((v): v is string => !!v))),
+            )
         if (pts && pts.length >= 2) {
           const coords = pts.map((p) => `${p.x + dx},${p.y + dy}`).join(' ')
           segs.push(`<polyline points="${coords}" fill="none" stroke="${stroke}" stroke-width="2"${dashAttr}/>`)
@@ -179,7 +189,16 @@ function elementToSvg(
           mx = 0.25 * fx + 0.5 * ctrl.x + 0.25 * tx
           my = 0.25 * fy + 0.5 * ctrl.y + 0.25 * ty
         } else if (route === 'elbow') {
-          const ep = elbowSegments(el, from, to)
+          // 与折线绘制同源取路径中点(手设/自动绕障一致),让 label 落在路径上。
+          const hasManual = !!(el.elbow && el.elbow.length > 0)
+          const ep = hasManual
+            ? elbowSegments(el, from, to)
+            : autoElbowPath(
+                el,
+                from,
+                to,
+                cardObstacles(allElements, new Set([el.from, el.to].filter((v): v is string => !!v))),
+              )
           const mid = ep ? ep[Math.floor(ep.length / 2)]! : { x: from.x, y: from.y }
           mx = mid.x + dx; my = mid.y + dy
         } else {

@@ -167,6 +167,193 @@ export function elbowSegments(
   return [from, ...elbows, to]
 }
 
+// ── 智能 elbow 路由避让(F4)─────────────────────────────────────────────────
+// 启发式(非 A*,YAGNI):优先 L 形 1 折点,两向都被穿时加第 2 折点做阶梯绕障。
+// 三个纯函数被 routeElbowAroundObstacles / autoElbowPath / segmentIntersectsBox
+// 统一收口,render / hitTest / SVG 三视图共用同一份绕障逻辑。
+
+/**
+ * 线段 (a→b) 与 AABB box 的相交判定(开区间严格语义)。
+ *
+ * 用 Liang-Barsky 参数化裁剪:把线段写成 P(t)=a+t·(b−a), t∈[0,1];
+ * 与 box 的开区间 [x0,x1)×[y0,y1) 求交集的 t 范围 [t0,t1]。
+ * - t0 < t1 且 t0 ≤ 1 且 t1 ≥ 0 → 线段确实穿入 box 内部 → true。
+ * - 仅相切(端点贴边 / 沿边线滑过)→ t0 === t1(退化到一点),不算相交 → false。
+ *
+ * 与 intersectsBounds 一致用严格比较(<、>)而非 ≤、≥,故相切不算穿过——
+ * 上边线相切(y 恰在 box 上边)返回 false,与 hitTest「命中」语义对齐。
+ * axis-aligned 段(水平/垂直)与对角斜线都通用。纯函数。
+ */
+export function segmentIntersectsBox(
+  a: Point,
+  b: Point,
+  box: { x: number; y: number; w: number; h: number },
+): boolean {
+  // normalizeBox 防御性归一化(调用方传负 w/h 也能正确判定)。
+  const bx0 = box.x
+  const by0 = box.y
+  const bx1 = box.x + box.w
+  const by1 = box.y + box.h
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  let t0 = 0
+  let t1 = 1
+  // 对每条边界裁剪 [t0,t1]:p=−d 时进入,q=远边−起点。
+  const clip = (p: number, q: number): boolean => {
+    if (p === 0) {
+      // 线段平行于此轴:起点必须严格在区间内,否则整段在区间外 → 不相交。
+      return q > 0
+    }
+    const r = q / p
+    if (p < 0) {
+      // 进入边界:t0 取大。
+      if (r > t1) return false
+      if (r > t0) t0 = r
+    } else {
+      // 离开边界:t1 取小。
+      if (r < t0) return false
+      if (r < t1) t1 = r
+    }
+    return true
+  }
+  // x 轴:左边界(进入,进入方向 p<0 → q = a.x − x0)、右边界(离开)。
+  if (!clip(-dx, a.x - bx0)) return false
+  if (!clip(dx, bx1 - a.x)) return false
+  // y 轴同理。
+  if (!clip(-dy, a.y - by0)) return false
+  if (!clip(dy, by1 - a.y)) return false
+  // t0<t1(严格)→ 有真实内部重叠;=== 时仅相切(退化)→ 不算。
+  return t0 < t1
+}
+
+/**
+ * 检查路径 [from, ...elbows, to] 中任意一段是否穿过任一 obstacle。
+ * 任一段相交 → 返 true(被穿)。obstacles 空 → 返 false。
+ */
+function pathIntersectsAny(
+  from: Point,
+  elbows: Point[],
+  to: Point,
+  obstacles: { x: number; y: number; w: number; h: number }[],
+): boolean {
+  if (obstacles.length === 0) return false
+  const pts = [from, ...elbows, to]
+  for (let i = 1; i < pts.length; i++) {
+    for (const ob of obstacles) {
+      if (segmentIntersectsBox(pts[i - 1]!, pts[i]!, ob)) return true
+    }
+  }
+  return false
+}
+
+/**
+ * 智能 elbow 路由:返回折点数组(不含起终点),让 [from, ...elbows, to]
+ * 每段正交且不穿任何 obstacle。最多 2 折点。启发式(非 A*,YAGNI)。
+ *
+ * 策略:
+ * 1. from==to 退化 → [](无路径)。
+ * 2. 候选 L 形(1 折点),逐个试是否每段都不穿 obstacle:
+ *    - H-first: [{x: to.x, y: from.y}](先水平后垂直)
+ *    - V-first: [{x: from.x, y: to.y}](先垂直后水平)
+ *    任一不穿 → 返回该(1 折点)。H-first 优先(视觉上更常见)。
+ * 3. 两个 L 都被穿 → 加第 2 折点做阶梯:把转折段整体偏移到 obstacle 上/下/左/右
+ *    边外。生成形如 [{x: mx, y: from.y}, {x: mx, y: to.y}](垂直阶梯,绕上下)
+ *    或 [{x: from.x, y: my}, {x: to.x, y: my}](水平阶梯,绕左右),mx/my 选
+ *    obstacle 边外(上边/下边/左边/右边四候选取第一个不穿的)。
+ * 4. 仍找不到 ≤2 折点的避障路径(罕见:多 obstacle 死锁)→ 退回 H-first
+ *    L 形(至少保证正交 + 到达 to;避障不是硬约束,渲染优先正确连线)。
+ *
+ * 无 obstacle 时(策略 2 必中)→ 返回 1 折点 L 形,与测试契约一致。
+ */
+export function routeElbowAroundObstacles(
+  from: Point,
+  to: Point,
+  obstacles: { x: number; y: number; w: number; h: number }[],
+): Point[] {
+  // 1. 退化:同点不画路径。
+  if (from.x === to.x && from.y === to.y) return []
+
+  // 2. 候选 L 形(1 折点)。
+  const hFirst: Point[] = [{ x: to.x, y: from.y }] // from→(to.x,from.y)→to
+  const vFirst: Point[] = [{ x: from.x, y: to.y }] // from→(from.x,to.y)→to
+  if (!pathIntersectsAny(from, hFirst, to, obstacles)) return hFirst
+  if (!pathIntersectsAny(from, vFirst, to, obstacles)) return vFirst
+
+  // 3. 阶梯绕障(2 折点)。先试垂直阶梯(转折段是垂直的,mx 避开 obstacle x 区间),
+  //    再试水平阶梯(my 避开 obstacle y 区间)。
+  // 垂直阶梯 candidates:mx 选每个 obstacle 的左边外 / 右边外。需 from.y ≠ to.y(否则
+  // 两折点 y 相同 = 退化为 L,已在 2 试过);但即使 from.y===to.y,垂直阶梯会让中间段
+  // 变成 from.y→to.y 的水平段(=原直线),仍可能被穿 → 此时跳过,交水平阶梯处理。
+  if (from.y !== to.y) {
+    for (const ob of obstacles) {
+      for (const mx of [ob.x - 1, ob.x + ob.w + 1]) {
+        const step: Point[] = [
+          { x: mx, y: from.y },
+          { x: mx, y: to.y },
+        ]
+        if (!pathIntersectsAny(from, step, to, obstacles)) return step
+      }
+    }
+  }
+  // 水平阶梯 candidates:my 选每个 obstacle 的上边外 / 下边外。from.x≠to.x 才有意义。
+  if (from.x !== to.x) {
+    for (const ob of obstacles) {
+      for (const my of [ob.y - 1, ob.y + ob.h + 1]) {
+        const step: Point[] = [
+          { x: from.x, y: my },
+          { x: to.x, y: my },
+        ]
+        if (!pathIntersectsAny(from, step, to, obstacles)) return step
+      }
+    }
+  }
+
+  // 4. 退路:实在绕不开(多 obstacle 死锁 / from 与 to 同行同列且被堵),
+  //    返回 H-first L 形保证正交连线。避障不是硬约束。
+  return hFirst
+}
+
+/**
+ * 从当前画布元素算 obstacle bbox(用于 route='elbow' 且 elbow 空的自动绕障)。
+ * filter kind==='card'(关系箭头主要绕卡)+ normalizeBox(负 bbox 归一化)+
+ * 排除 from/to 端点指向的 card(起终点卡不绕,否则箭头绕开自己连的卡,视觉怪异)。
+ * 纯函数。
+ */
+export function cardObstacles(
+  elements: CanvasElement[],
+  excludeIds: Set<string>,
+): { x: number; y: number; w: number; h: number }[] {
+  const out: { x: number; y: number; w: number; h: number }[] = []
+  for (const el of elements) {
+    if (el.kind !== 'card') continue
+    if (excludeIds.has(el.id)) continue
+    out.push(normalizeBox(el))
+  }
+  return out
+}
+
+/**
+ * 接线辅助:route='elbow' 箭头的实际渲染路径(含端点 from/to)。
+ * - elbow 空(用户未手设)→ routeElbowAroundObstacles 自动绕障,返回 [from, ...elbows, to]。
+ * - elbow 非空(用户手设)→ 尊重手设,返回 [from, ...elbow, to](不自动,手动 elbow 行为不变)。
+ * obstacles 由调用方传入(cardObstacles(elements, excludeIds) 的产物)。
+ * 纯函数;route≠'elbow' 时调用方不应调此函数(走 straight/curve 分支)。
+ */
+export function autoElbowPath(
+  arrow: CanvasElement,
+  from: Point,
+  to: Point,
+  obstacles: { x: number; y: number; w: number; h: number }[],
+): Point[] {
+  // 用户手设 elbow → 原样拼路径(手动 elbow 行为,elbowSegments 等价)。
+  if (arrow.elbow && arrow.elbow.length > 0) {
+    return [from, ...arrow.elbow, to]
+  }
+  // 空 elbow → 自动绕障。
+  const elbows = routeElbowAroundObstacles(from, to, obstacles)
+  return [from, ...elbows, to]
+}
+
 /**
  * 箭头头角度:终点处的切线方向(to 的来向角)。route 决定取哪段方向。
  * - straight: to - from

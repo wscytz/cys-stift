@@ -1,6 +1,6 @@
 
 import type { CanvasElement, CanvasView } from './canvas-host'
-import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments, arrowHeadAngle } from './self-built-arrow'
+import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments, arrowHeadAngle, autoElbowPath, cardObstacles } from './self-built-arrow'
 import { normalizeBox } from './bounds'
 /**
  * 纯渲染函数:把元素画到 ctx 上,带相机(pan/zoom)变换。
@@ -193,7 +193,18 @@ function drawElement(
       const stroke = colorOf(el.color, tokenResolver)
       const route = arrowRoute(el)
       const ctrl = route === 'curve' && el.curve ? { x: el.curve.cx, y: el.curve.cy } : null
-      const segs = route === 'elbow' ? elbowSegments(el, from, to) : null
+      // elbow:用户手设(elbow 非空)→ elbowSegments 原路径;空 → autoElbowPath 自动绕障
+      // (obstacles = 除 from/to 端点卡外的所有 card bbox)。避障是渲染层启发式,手动优先。
+      const obstacles =
+        route === 'elbow' && !(el.elbow && el.elbow.length > 0)
+          ? cardObstacles(allElements, new Set([el.from, el.to].filter((v): v is string => !!v)))
+          : []
+      const segs =
+        route === 'elbow'
+          ? el.elbow && el.elbow.length > 0
+            ? elbowSegments(el, from, to)
+            : autoElbowPath(el, from, to, obstacles)
+          : null
       // 线段(语义线型:dash)。route 决定路径形状:
       //  straight: from→to 直线 / curve: 二次贝塞尔 / elbow: 折线 polyline。
       ctx.beginPath()

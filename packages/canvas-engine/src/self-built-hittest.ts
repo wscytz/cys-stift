@@ -1,7 +1,7 @@
 
 import type { CanvasElement, CanvasView } from './canvas-host'
 import { normalizeBox } from './bounds'
-import { arrowEndpoints, arrowRoute, elbowSegments } from './self-built-arrow'
+import { arrowEndpoints, arrowRoute, elbowSegments, autoElbowPath, cardObstacles } from './self-built-arrow'
 
 /** 命中容差:屏幕 6px,页坐标里 /zoom(由调用方传入)。 */
 const HIT_TOLERANCE_PX = 6
@@ -40,8 +40,18 @@ export function hitTest(
       if (from && to) {
         const route = arrowRoute(el)
         if (route === 'elbow') {
-          // 折线箭头:点到每段折线距离取 min。elbowSegments = [from, ...elbows, to]。
-          const segs = elbowSegments(el, from, to)
+          // 折线箭头:点到每段折线距离取 min。
+          // 手设 elbow → elbowSegments [from, ...elbow, to];
+          // 空 elbow → autoElbowPath 自动绕障(obstacles 排除 from/to 卡),路径与渲染一致。
+          const hasManual = !!(el.elbow && el.elbow.length > 0)
+          const segs = hasManual
+            ? elbowSegments(el, from, to)
+            : autoElbowPath(
+                el,
+                from,
+                to,
+                cardObstacles(elements, new Set([el.from, el.to].filter((v): v is string => !!v))),
+              )
           if (segs && segs.length >= 2) {
             for (let i = 1; i < segs.length; i++) {
               if (pointToSegmentDistance(pageX, pageY, segs[i - 1]!.x, segs[i - 1]!.y, segs[i]!.x, segs[i]!.y) <= tol) {
