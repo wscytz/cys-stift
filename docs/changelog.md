@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-06-26 · polish-bugfix-3 · 周围检查:Tauri 桌面壳 + 性能/资源泄漏 4 真 bug
+
+打磨期"周围检查"轮,扫此前从未系统审过的两个维度:两 Explore 并行审 Tauri 桌面壳 + 性能/资源泄漏,核实后修 4 个真 bug(GREEN),7 条 YELLOW 不修。
+
+**Tauri 桌面壳(首次系统扫):**
+- **BUG 1 全局快捷键写死不跟随用户配置**(`lib.rs` + `capture-host.tsx`):Rust 注册 `CmdOrCtrl+Shift+Space` 写死,web `settings.updateCaptureShortcut` 允许改但桌面壳不联动 → 改快捷键后窗口失焦时全局热键失效(功能断裂,非边缘)。修:Rust 加 `update_shortcut` 命令(注销旧/注册新/失败回退保命 + emit 错误),`CURRENT_SHORTCUT: Mutex<Option<String>>` 记当前注册键;前端 `captureShortcutToAccelerator`(modKey→CmdOrCtrl、shift→Shift、code 归一化 KeyC→C/Digit1→1)+ sc 变化 effect invoke。注册成功后写入 CURRENT_SHORTCUT。
+- **BUG 2 注册失败静默**(`lib.rs` + `capture-host.tsx`):此前 plugin load/register 失败仅 `eprintln`,桌面用户看不到 stderr,快捷键被别的应用占用时静默失效。修:三处失败均 `emit("global-shortcut-error", ...)`,前端监听 → toast「全局快捷键注册失败(可能被占用)」。
+
+**性能/资源泄漏(长会话才暴露):**
+- **Perf #1 domTokenResolver 每帧 getComputedStyle 爆炸**(`self-built-render.ts`):渲染每帧每元素查多次 token,50 元素 ≈ 600 次/帧 = 36000 次/秒 → 布局抖动 + GC 压力(**长会话卡顿主因**)。修:模块级 `_tokenCache` + `MutationObserver` 监听 `<html> data-theme` 变化失效(主题切换唯一入口)。token 集合固定,缓存命中率 ≈100%。`domTokenResolver` 本就是 DOM 实现,加缓存不破坏引擎框架无关性(纯 `TokenResolver` 接口仍可注入无 DOM 版)。
+- **Perf #2 InMemoryCanvasHost undo 栈无上限**(`in-memory-host.ts`):对比 `SelfBuiltAdapter UNDO_LIMIT=50`,InMemoryHost 无截断(每快照深拷贝全部元素,契约不对称)。修:对齐 `UNDO_LIMIT=50` + `shift()`。
+
+**不修(YELLOW):** Tauri BUG 3 退出不注销(OS 回收 + 边缘)/ BUG 4 CSP null(安全债,当前低危,AI 返回未直接渲染 DOM);Perf #4/#5 渲染热路径数组重建 GC(元素多才显现)/ #6 toast timer(自清)/ #7 storage 5s 轮询(周期微弱)。
+
+**可拓展点(记入 STATE):** ① CSP 策略 + `withGlobalTauri` 暴露面收窄(随 AI 功能增长需做);② 渲染热路径 `getElements()` 缓存(仅 upsert/remove 失效)+ freedraw preview 免深拷贝(元素 100+ 时优化);③ storage-usage Blob 测量改 `raw.length*2` 或 store notify 驱动(去 5s 轮询 GC spike);④ Tauri 退出显式 `unregister_all`(防御性)。
+
+验证:canvas-engine 354 + web build exit 0 + tsc 零新增 + `cargo check` 通过 + render-sweep 9 路由 0 error。commit 8b99106。
+
+---
+
 ## 2026-06-26 · polish-bugfix-2 · 修补轮:数据丢失/误导反馈 6 真 bug
 
 打磨期"修补真 bug + 保证可拓展性 + 记录可拓展点"轮。两 Explore subagent 并行审计(数据往返一致性 / 错误反馈完整性)出 ~20 条,核实后修 6 个真 bug(GREEN),4 条 YELLOW 不修。
