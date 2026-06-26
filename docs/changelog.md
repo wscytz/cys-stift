@@ -5,6 +5,30 @@
 
 ---
 
+## 2026-06-26 · polish-bugfix-4 · 坏输入防御轮:XSS + 崩溃 + 数据损坏 6 真 bug
+
+坏输入防御轮:Explore 审恶意/损坏输入健壮性(区别于 polish-bugfix-2 的"数据往返一致性"看路径间丢失,这轮专看**输入侧**崩溃/注入/损坏)。核实后修 6 个真 bug,根因都是**两导入路径校验不对称**(JSON 全量导入严,`.cystift`/freeform 不校验)+ **已修漏洞在平行代码路径遗漏**。
+
+**注入:**
+- **#1 card-detail-modal 链接 href 未过 safeHref**(`card-detail-modal.tsx`):`card-detail.tsx` 用了 `safeHref`(`safe-href.ts` 注释明说修复过 card-detail 的 XSS),但画布版 `card-detail-modal` 是独立文件从未接入 → 导入含 `javascript:` 链接的卡片,画布双击打开点链接执行 JS。修:接入 `safeHref`。
+
+**崩溃:**
+- **#2 importFromJson freeform 无校验**(`export-service.ts`):`snap=null` 时 `snap.elements` 抛 TypeError → 异步 unhandled rejection(localStorage 已写但 freeform 静默全丢 = 半损坏)。修:`snap` 非对象/`elements` 非数组 → `continue` 计入 `freeformSkipped`。
+- **#3 `.cystift` elements 无 null 校验**(`cystift-payload.ts`):元素是 null/数字 → `el.kind` 抛 → catch 回退当普通附件建卡(数据混淆)。修:循环开头 `!el||typeof!=='object'` continue。
+- **#9 `.cystift` card 字段透传不校验**(`cystift-payload.ts`):`title=42`/`links="x"` 进 DB → 后续 `links.map`/`title.trim` 崩到错误边界。修:逐字段类型守卫,坏字段用默认值替代(best-effort 恢复,不跳整张卡)。
+
+**数据损坏:**
+- **#5 createdAt/updatedAt 无有效日期校验**(`export-service.ts`):只校验类型不校验可解析 → `"garbage"` → Invalid Date → rehydrate 签名 `"N:NaN"` 跨 tab 同步断裂 + sort 比较器 NaN 行为未定义。修:复用 capturedAt 的 `isNaN(getTime())` 校验。
+- **#6 canvas-freeform-store parseSnapshot 无逐元素校验**(`canvas-freeform-store.ts`):坏元素(缺 kind/id)进 host → 几何/渲染函数假设字段类型正确而崩。修:filter 非对象/缺 kind/缺 id。
+
+**不修(YELLOW):** #7 MarkdownBody `{...rest}` 覆盖 safeHref(误报——`({href,...rest})` 解构后 rest 已排除 href)/ #4 大文件 DoS + #8 DSL 超长 DoS(需刻意构造,记入可拓展点)。
+
+**可拓展点(记入 STATE):** ① `restoreFromFile` 复用 `MAX_FILE_BYTES` 上限(FileCaptureSink 有,`.cystift` 恢复路径无);② DSL `@text`/`@label` 值加长度上限(AI 返回不可信)。
+
+验证:canvas-engine 354 + db 7 + domain 68 全绿;web build exit 0;tsc 零新增;render-sweep 9 路由 0 error。commit 23c6172。
+
+---
+
 ## 2026-06-26 · polish-bugfix-3 · 周围检查:Tauri 桌面壳 + 性能/资源泄漏 4 真 bug
 
 打磨期"周围检查"轮,扫此前从未系统审过的两个维度:两 Explore 并行审 Tauri 桌面壳 + 性能/资源泄漏,核实后修 4 个真 bug(GREEN),7 条 YELLOW 不修。
