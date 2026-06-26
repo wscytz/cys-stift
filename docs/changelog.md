@@ -5,6 +5,21 @@
 
 ---
 
+## 2026-06-26 · feature-phase-1 · 功能期批 1-4:Backlink + Frame + 全局缩略图 + 智能 elbow
+
+用户反馈"软件可以做到 50mb 至少,还有好多东西可以加"——升级进功能期。基于灵感库(`docs/decisions/2026-06-26-peer-inspiration.md`)+ 产品定位筛选,全做 4 个围绕核心卖点(转义/语义关系/本地优先画布)的功能,按成本/价值分批:
+
+- **批 1 Backlink 相关的卡**(commit b1e535d):关系网可消费侧。关系箭头此前只能画不能查,Backlink 让语义关系从单向绘制变双向可查,放大关系箭头价值。`findBacklinks` 纯函数(遍历 host arrows 找 from/to 命中,分 incoming/outgoing,复用 inferRelationType)+ CardDetailModal 加 host/getCardTitle/onJumpToCard prop 渲染 Backlink 段(画布版,host=null 不显)。点击跳转选中对方卡 + 居中。
+- **批 2 Frame 主题分区**(commit 4b4667e):新 CanvasElement kind='frame' 全链路。把「一群卡的分组」变可见可命名容器,契合语义关系身份。引擎(KIND_LAYER frame=-1 最底层 + 渲染半透明填充+虚线边框+标题 + SVG)+ DSL(`[frame #id] @pos @size @text @color`,serialize/parse/apply 全通,e2e round-trip 测试)+ 交互(CanvasSideRail「框住选中为分区」按钮,选中 1+ 卡算 bbox+padding 创建,不门控 AI)+ Outline 标签。几何包含语义(不存 children,bbox 在 frame 内即属)。
+- **批 3 画布全局缩略图视图**(commit c90d4d8):空间鸟瞰第三态,互补 Minimap(角落局部)与 Outline(文字结构)。`CanvasOverviewModal` 大尺寸 640×440 canvas,复用 minimap 纯函数(computeMinimapProjection/viewportRect/minimapClickToPage)+ drawElementMark(导出复用),点击居中视口。
+- **批 4 智能 elbow 路由避让**(commit 16519af,TDD subagent):折线箭头自动绕开卡片不压线(drawio 功能)。新增 segmentIntersectsBox(Liang-Barsky)+ routeElbowAroundObstacles(启发式 L 形+阶梯偏移,非 A*,YAGNI)+ cardObstacles + autoElbowPath。route='elbow' 且 elbow 空时自动绕障;手设 elbow 非空尊重用户。渲染/hitTest/SVG 三视图接线。18 新测试 TDD 红→绿。
+
+**可拓展点(本轮记入 STATE):** Frame 画布上双击重命名(现走 DSL/Outline)+ frame 工具栏拖框创建(现走「框住选中」按钮 + DSL);Backlink 跨画布查询(现仅当前画布);全局缩略图可滚动/缩放(现固定 fit);智能 elbow 真 A* 路由(多 obstacle 死锁)+ >2 折点 + 自动路径箭头头方向。
+
+验证:canvas-engine 372(原 354 + 新 18)+ ai 192 全绿;web build exit 0;tsc 零新增;cargo check 通过;render-sweep + canvas 交互探针 0 error。
+
+---
+
 ## 2026-06-26 · polish-bugfix-4 · 坏输入防御轮:XSS + 崩溃 + 数据损坏 6 真 bug
 
 坏输入防御轮:Explore 审恶意/损坏输入健壮性(区别于 polish-bugfix-2 的"数据往返一致性"看路径间丢失,这轮专看**输入侧**崩溃/注入/损坏)。核实后修 6 个真 bug,根因都是**两导入路径校验不对称**(JSON 全量导入严,`.cystift`/freeform 不校验)+ **已修漏洞在平行代码路径遗漏**。
