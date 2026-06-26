@@ -378,6 +378,14 @@ export const messages = {
   'settings.aiTestFail': { zh: '连接失败:{error}', en: 'Connection failed: {error}' },
   'settings.aiSave': { zh: '保存', en: 'Save' },
   'settings.aiSaved': { zh: '已保存 AI 设置', en: 'AI settings saved' },
+  'settings.aiAdvanced': { zh: '高级', en: 'Advanced' },
+  'settings.aiTemperature': { zh: 'Temperature（采样温度，留空=默认）', en: 'Temperature (blank = default)' },
+  'settings.aiMaxTokens': { zh: 'Max tokens（输出上限，留空=默认）', en: 'Max tokens (blank = default)' },
+  'settings.aiProviderDesc.openai': { zh: '托管 GPT-4o 系列，需付费 API key。', en: 'Hosted GPT-4o family. Needs a paid API key.' },
+  'settings.aiProviderDesc.anthropic': { zh: '托管 Claude 系列，需付费 API key。', en: 'Hosted Claude family. Needs a paid API key.' },
+  'settings.aiProviderDesc.ollama': { zh: '完全在本机运行。免费、私密、无需 API key。', en: 'Runs fully on your machine. Free, private, no API key.' },
+  'settings.aiOllamaNoKey': { zh: '无需 API key', en: 'No API key needed' },
+  'settings.aiRegionLabel': { zh: 'AI · 可选', en: 'AI · optional' },
 
   /* ── Storage meter (v0.26.3) ── */
   'storage.title': { zh: '本地存储', en: 'Local storage' },

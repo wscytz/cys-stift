@@ -17,4 +17,11 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'),
     },
   },
+  // React 19 automatic JSX runtime. App components (built by Next.js) get
+  // this via the Next SWC; under vitest we must opt esbuild into the same
+  // `react-jsx` transform so components that use JSX without an explicit
+  // `import React` (the Next.js convention) render correctly in tests.
+  esbuild: {
+    jsx: 'automatic',
+  },
 })
