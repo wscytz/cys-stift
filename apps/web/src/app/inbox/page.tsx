@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { Button, Card as UICard, Tag, Toolbar } from '@cys-stift/ui'
+import { BauhausMotif, Button, Card as UICard, Tag, Toolbar } from '@cys-stift/ui'
 import type { Card, CardId } from '@cys-stift/domain'
 import { findDuplicateGroups, type DuplicateGroup } from '@cys-stift/domain'
 import { CreateCardForm } from './create-card-form'
@@ -529,7 +529,6 @@ const styles = `
 .tile__time { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); margin-left: auto; }
 
 .empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) 0; }
-.empty__bar { width: 64px; height: 8px; background: var(--color-red); }
 `
 
 // ── Subcomponents ──────────────────────────────────────────────────────────
@@ -610,7 +609,7 @@ function EmptyState({ view }: { view: View }) {
   return (
     <UICard>
       <div className="empty">
-        <div className="empty__bar" aria-hidden="true" />
+        <BauhausMotif />
         <p className="eyebrow">{t('inbox.crumb')}</p>
         <h2 className="display-title display-title--lg">
           {view === 'inbox' ? t('inbox.empty.title') : t('inbox.empty.titleArchived')}

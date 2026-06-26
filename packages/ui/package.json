@@ -16,7 +16,8 @@
     "./tag": "./src/components/tag.tsx",
     "./toolbar": "./src/components/toolbar.tsx",
     "./modal": "./src/components/modal.tsx",
-    "./tooltip": "./src/components/tooltip.tsx"
+    "./tooltip": "./src/components/tooltip.tsx",
+    "./bauhaus-motif": "./src/components/bauhaus-motif.tsx"
   },
   "scripts": {
     "build": "tsc -b",

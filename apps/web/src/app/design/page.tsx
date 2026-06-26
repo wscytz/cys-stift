@@ -5,6 +5,7 @@ import { Card } from '@cys-stift/ui/card'
 import { Tag } from '@cys-stift/ui/tag'
 import { Toolbar } from '@cys-stift/ui/toolbar'
 import { Tooltip } from '@cys-stift/ui/tooltip'
+import { BauhausMotif } from '@cys-stift/ui/bauhaus-motif'
 import { tokens, defaultRegionColor } from '@cys-stift/ui/tokens'
 
 export const metadata: Metadata = {
@@ -38,6 +39,7 @@ export default function DesignPage() {
             <li><a href="#toolbar">Toolbar</a></li>
             <li><a href="#modal">Modal</a></li>
             <li><a href="#tooltip">Tooltip</a></li>
+            <li><a href="#motif">Motif</a></li>
           </ul>
         </aside>
 
@@ -254,6 +256,19 @@ export default function DesignPage() {
                 <Tooltip label="删除这张卡"><Button variant="danger">Delete</Button></Tooltip>
               </div>
               <p className="hint">Hover or focus the button.</p>
+            </Card>
+          </section>
+
+          <section id="motif" className="section">
+            <p className="section__eyebrow">component · motif</p>
+            <h2 className="section__h2">Bauhaus motif</h2>
+            <Card>
+              <div className="row" style={{ gap: 'var(--space-4)', alignItems: 'center', flexWrap: 'wrap' }}>
+                <BauhausMotif />
+                <BauhausMotif variant="pulse" size={96} />
+                <BauhausMotif size={64} />
+              </div>
+              <p className="hint">基础形 ↔ 原色(Itten):黄三角 · 红圆 · 蓝方。<code>still</code>(默认)用于空状态,<code>pulse</code> 三形错峰呼吸可当轻量 loader;尊重 prefers-reduced-motion(降级静态)。</p>
             </Card>
           </section>
         </article>

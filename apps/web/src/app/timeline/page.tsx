@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Card as UICard, Tag, Toolbar } from '@cys-stift/ui'
+import { BauhausMotif, Card as UICard, Tag, Toolbar } from '@cys-stift/ui'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
 import { useCanvases } from '@/lib/canvas-store'
@@ -102,7 +102,7 @@ export default function TimelinePage() {
         ) : sorted.length === 0 ? (
           <UICard>
             <div className="empty">
-              <div className="empty__bar" aria-hidden="true" />
+              <BauhausMotif />
               <p className="eyebrow">{t('timeline.crumb')}</p>
               <h2 className="display-title display-title--lg">
                 {t('timeline.empty.title')}
@@ -228,7 +228,6 @@ const styles = `
 .tl__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 
 .empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) 0; }
-.empty__bar { width: 64px; height: 8px; background: var(--color-red); }
 `
 
 /** 日内 pinned 稳定分区置顶(保捕获序,和 inbox pinFirst / archive G2 一致)。 */

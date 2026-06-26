@@ -1,0 +1,52 @@
+.motif {
+  display: block;
+}
+
+/* Bauhaus primary forms ↔ primary colors (Itten): triangle=yellow, circle=red, square=blue.
+   主题感知:走 CSS 变量,深浅色自动适配(无裸 hex)。 */
+.tri {
+  fill: var(--color-yellow);
+}
+.cir {
+  fill: var(--color-red);
+}
+.sqr {
+  fill: var(--color-blue);
+}
+
+/* pulse:三形各自绕中心错峰呼吸(transform-box:fill-box 让 SVG 形状绕自身中心缩放)。 */
+.pulse .tri,
+.pulse .cir,
+.pulse .sqr {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bauhaus-pulse 1.4s ease-in-out infinite;
+}
+.pulse .cir {
+  animation-delay: 0.18s;
+}
+.pulse .sqr {
+  animation-delay: 0.36s;
+}
+
+@keyframes bauhaus-pulse {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+/* 尊重「减少动效」系统设置 → 静态。 */
+@media (prefers-reduced-motion: reduce) {
+  .pulse .tri,
+  .pulse .cir,
+  .pulse .sqr {
+    animation: none;
+    opacity: 1;
+  }
+}

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Button, Card as UICard, Modal, Tag, Toolbar } from '@cys-stift/ui'
+import { BauhausMotif, Button, Card as UICard, Modal, Tag, Toolbar } from '@cys-stift/ui'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
@@ -173,7 +173,7 @@ function EmptyState() {
   return (
     <UICard>
       <div className="empty">
-        <div className="empty__bar" aria-hidden="true" />
+        <BauhausMotif />
         <p className="eyebrow">{t('trash.crumb')}</p>
         <h2 className="display-title display-title--lg">{t('trash.empty')}</h2>
       </div>
@@ -205,7 +205,6 @@ const styles = `
 }
 
 .empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) 0; }
-.empty__bar { width: 64px; height: 8px; background: var(--color-gray); }
 
 .confirm__body { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
 .confirm__body + .confirm__body { margin-top: var(--space-1); }
