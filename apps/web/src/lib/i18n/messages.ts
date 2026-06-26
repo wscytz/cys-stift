@@ -480,6 +480,7 @@ export const messages = {
   'canvas.aiLayoutAppliedSkipped': { zh: 'AI 排版:应用 {applied} 条 · 跳过 {skipped} 条', en: 'AI layout: applied {applied} · skipped {skipped}' },
   'canvas.aiLayoutNoneApplied': { zh: 'AI 排版未生效(卡片/端点缺失)', en: 'AI layout had no effect (missing card/endpoint)' },
   'canvas.aiLayoutEmpty': { zh: 'AI 未返回有效排版', en: 'AI returned no valid layout' },
+  'canvas.aiSetupTitle': { zh: '启用 AI 自动排版', en: 'Enable AI auto-layout' },
   'canvas.aiCluster': { zh: 'AI 找相似', en: 'AI cluster' },
   'canvas.aiClusterDone': { zh: '已连 {n} 条相似关系', en: 'Created {n} similarity links' },
   'canvas.aiClusterNone': { zh: '未找到相似卡片', en: 'No similar cards found' },

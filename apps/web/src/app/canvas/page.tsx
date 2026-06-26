@@ -32,6 +32,9 @@ import {
   CLUSTER_SYSTEM_PROMPT,
 } from '@/features/ai/cluster'
 import { useAIEnabled, getCurrentAI } from '@/features/ai/ai-settings-provider'
+import { AiSetupCard } from '@/features/ai/ai-setup-card'
+import { shouldShowAiSetupForLayout } from './ai-layout-gate'
+import type { AIConfig } from '@/features/ai/types'
 import { pushToast } from '@/lib/toast-store'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import {
@@ -66,6 +69,9 @@ export default function CanvasPage() {
   // AbortController 在卸载/取消时 abort,省 API 费 + 防 unmounted setState。
   const [aiBusy, setAiBusy] = useState<null | 'layout' | 'cluster'>(null)
   const aiAbortRef = useRef<AbortController | null>(null)
+  // Task 6: when AI isn't ready, the AI-layout entry shows the AiSetupCard
+  // guide overlay instead of silently no-oping. Toggled by handleAILayout.
+  const [showAiSetup, setShowAiSetup] = useState(false)
 
   const { snapshot: canvasesSnap } = useCanvases()
   const activeCanvasId = canvasesSnap.activeCanvasId
@@ -203,14 +209,22 @@ export default function CanvasPage() {
   const handleAILayout = useCallback(async () => {
     // 防重复点击:已在跑则忽略(审计 M5)。
     if (aiBusy) return
+    // Task 6: AI 未就绪(未配置 / 禁用 / 缺 key)→ 弹 AiSetupCard 引导,
+    // 不再静默 no-op。就绪检查提到 setAiBusy 之前,避免空转 busy 态。
+    const cfg = getCurrentAI()
+    if (shouldShowAiSetupForLayout(cfg)) {
+      setShowAiSetup(true)
+      return
+    }
+    // shouldShowAiSetupForLayout 返回 false ⟺ isAIReady(cfg) ⟺ cfg 非空;
+    // 此处显式断言给 TS,使其后 streamText(cfg) 不报 AIConfig|null。
+    const ready = cfg as AIConfig
     setAiBusy('layout')
     const ac = new AbortController()
     aiAbortRef.current = ac
     try {
       const adapter = handle.current.adapter
       if (!adapter) return
-      const cfg = getCurrentAI()
-      if (!cfg) return
 
       const snap = snapshotCanvas(adapter, service, activeCanvasId)
       const formatted = formatCanvasSnapshot(snap)
@@ -230,7 +244,7 @@ Output DSL (one directive per line):
 [arrow #id] @pos(x, y) @size(w, h) @color(c) @dash(...) @arrowhead(...)   (free arrow: no from/to; w/h may be negative for direction)
 Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbox kept for free arrows); omit #id to CREATE new — except cards, which are update-only; colors limited to blue/red/black/grey/yellow.`
 
-      const result = await streamText(cfg, { system: systemPrompt, user: userPrompt }, () => {}, ac.signal)
+      const result = await streamText(ready, { system: systemPrompt, user: userPrompt }, () => {}, ac.signal)
       if (!result?.content) {
         pushToast({ kind: 'info', message: t('canvas.aiLayoutEmpty') })
         return
@@ -758,6 +772,36 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         host={adapter}
         canvasEl={canvasElRef.current}
       />
+
+      {showAiSetup && (
+        <div
+          className="ai-setup-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('canvas.aiSetupTitle')}
+          onClick={() => setShowAiSetup(false)}
+        >
+          <div onClick={(e) => e.stopPropagation()}>
+            <AiSetupCard
+              onGoToSettings={() => {
+                setShowAiSetup(false)
+                window.location.href = '/settings'
+              }}
+            />
+            <Button variant="ghost" onClick={() => setShowAiSetup(false)}>
+              {t('card.detail.cancel')}
+            </Button>
+          </div>
+          <style>{`
+.ai-setup-overlay {
+  position: fixed; inset: 0; z-index: 150;
+  background: rgba(10,10,10,0.5);
+  display: grid; place-items: center; padding: var(--space-4);
+}
+.ai-setup-overlay > div { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }
+`}</style>
+        </div>
+      )}
 
       <style>{styles}</style>
     </main>
