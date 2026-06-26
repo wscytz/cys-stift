@@ -98,6 +98,19 @@ export async function restoreCystiftPayload(
   // card id 重映射:旧 cardId → 新 cardId(service.create 生成)。
   const idMap = new Map<string, string>()
   for (const card of payload.cards) {
+    // 坏值防御(恶意/损坏 .cystift):.cystift card 字段无运行时校验,坏类型
+    // (title=42 / links="x")直接进 DB → 后续 card.links.map / title.trim 崩到
+    // 错误边界。逐字段守卫:非预期类型用默认值替代(best-effort 恢复,不跳整张卡)。
+    const safeCard = {
+      ...card,
+      title: typeof card.title === 'string' ? card.title : '',
+      body: typeof card.body === 'string' ? card.body : '',
+      type: typeof card.type === 'string' ? card.type : 'note',
+      media: Array.isArray(card.media) ? card.media : [],
+      links: Array.isArray(card.links) ? card.links : [],
+      codeSnippets: Array.isArray(card.codeSnippets) ? card.codeSnippets : [],
+      quotes: Array.isArray(card.quotes) ? card.quotes : [],
+    }
     const oldId = String(card.id)
     // H2: cardRepo.insert 现在在配额满时抛 StorageQuotaError。restore 是
     // best-effort 批量恢复——单卡持久化失败不应让整批恢复崩掉(已恢复的卡
@@ -105,13 +118,13 @@ export async function restoreCystiftPayload(
     let created: { id: string } | null = null
     try {
       created = service.create({
-        title: card.title,
-        body: card.body,
-        type: card.type,
-        media: card.media,
-        links: card.links,
-        codeSnippets: card.codeSnippets,
-        quotes: card.quotes,
+        title: safeCard.title,
+        body: safeCard.body,
+        type: safeCard.type,
+        media: safeCard.media,
+        links: safeCard.links,
+        codeSnippets: safeCard.codeSnippets,
+        quotes: safeCard.quotes,
         source: card.source,
         color: card.color,
         canvasPosition: card.canvasPosition
@@ -136,6 +149,9 @@ export async function restoreCystiftPayload(
   // 自由箭头(无 from/to,bbox 编码端点)不依赖 idMap,正常保留。
   const remapped: CanvasElement[] = []
   for (const el of elements) {
+    // 坏值防御(恶意/损坏 .cystift):元素非对象直接跳过,不访问 el.kind 崩
+    // (此前 null/数字元素 → el.kind 抛 TypeError → catch 回退当普通附件建卡 = 数据混淆)。
+    if (!el || typeof el !== 'object') continue
     if (el.kind === 'card') {
       if (!idMap.has(el.id)) continue // 配额中断:该卡未创建,跳过孤儿几何
       const newEl: CanvasElement = { ...el, id: idMap.get(el.id)! }

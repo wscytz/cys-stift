@@ -249,6 +249,16 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
         error: `cards[${i}].createdAt must be a string ISO date`,
       }
     }
+    // createdAt/updatedAt 虽可选,但若提供必须是可解析的有效日期(与 capturedAt
+    // 同标准)。坏值如 "garbage" → Invalid Date → getTime()=NaN → rehydrate 签名
+    // 变 "N:NaN" 跨 tab 同步断裂 + sort 比较器返回 NaN 行为未定义(数据损坏真 bug)。
+    if (card.createdAt !== undefined) {
+      const d =
+        card.createdAt instanceof Date ? card.createdAt : new Date(card.createdAt as string)
+      if (isNaN(d.getTime())) {
+        return { ok: false, cards: 0, mediaAssets: 0, error: `cards[${i}].createdAt is not a valid date` }
+      }
+    }
     if (
       card.updatedAt !== undefined &&
       typeof card.updatedAt !== 'string' &&
@@ -259,6 +269,13 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
         cards: 0,
         mediaAssets: 0,
         error: `cards[${i}].updatedAt must be a string ISO date`,
+      }
+    }
+    if (card.updatedAt !== undefined) {
+      const d =
+        card.updatedAt instanceof Date ? card.updatedAt : new Date(card.updatedAt as string)
+      if (isNaN(d.getTime())) {
+        return { ok: false, cards: 0, mediaAssets: 0, error: `cards[${i}].updatedAt is not a valid date` }
       }
     }
     // capturedAt is a required Date on Card (domain types.ts) and is the
@@ -407,8 +424,15 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
   // 但累计 freeformSkipped 诚实回报供 UI 提示(此前忽略返回值 → 静默丢失)。
   let freeformCanvases = 0
   let freeformSkipped = 0
-  if (payload.freeform) {
+  if (payload.freeform && typeof payload.freeform === 'object') {
     for (const [canvasId, snap] of Object.entries(payload.freeform)) {
+      // 坏值防御(恶意/损坏 JSON):snap 非对象或 elements 非数组 → 跳过,不抛
+      // (此前 snap=null 时 snap.elements 抛 TypeError → 异步 unhandled rejection,
+      // localStorage 已写但 freeform 静默全丢 = 半损坏状态)。
+      if (!snap || typeof snap !== 'object' || !Array.isArray(snap.elements)) {
+        freeformSkipped++
+        continue
+      }
       const saved = await canvasFreeformStore.save(canvasId as CanvasId, snap.elements)
       if (saved) freeformCanvases++
       else freeformSkipped++

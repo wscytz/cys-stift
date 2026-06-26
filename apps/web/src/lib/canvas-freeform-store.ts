@@ -79,7 +79,16 @@ function parseSnapshot(raw: string): CanvasFreeformSnapshot | null {
   try {
     const parsed = JSON.parse(raw) as { elements?: unknown }
     if (!Array.isArray(parsed.elements)) return null
-    return makeSnapshot(parsed.elements as CanvasElement[])
+    // 逐元素校验(恶意/损坏数据):非对象 / 缺 kind / 缺 id 的元素直接丢弃,
+    // 不让它们进 host 后被几何/渲染函数假设字段类型正确而崩。
+    const clean = (parsed.elements as unknown[]).filter(
+      (el): el is CanvasElement =>
+        !!el &&
+        typeof el === 'object' &&
+        typeof (el as CanvasElement).kind === 'string' &&
+        typeof (el as CanvasElement).id === 'string',
+    )
+    return makeSnapshot(clean)
   } catch {
     return null
   }

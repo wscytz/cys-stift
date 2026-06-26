@@ -15,6 +15,7 @@ import type { Card, TagRef } from '@cys-stift/domain'
 import { TAG_COLORS } from '@cys-stift/domain'
 import { MarkdownBody } from '@/app/inbox/markdown'
 import { useI18n } from '@/lib/i18n'
+import { safeHref } from '@/lib/safe-href'
 import { typeKeyOf } from '@/lib/type-label'
 
 export function CardDetailModal({
@@ -112,7 +113,7 @@ export function CardDetailModal({
                   <ul className="cd__links">
                     {card.links.map((l, i) => (
                       <li key={i}>
-                        <a href={l.url} target="_blank" rel="noopener noreferrer">
+                        <a href={safeHref(l.url)} target="_blank" rel="noopener noreferrer">
                           {l.url}
                         </a>
                       </li>
