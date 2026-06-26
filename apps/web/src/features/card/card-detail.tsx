@@ -67,8 +67,10 @@ import { useI18n } from '@/lib/i18n'
 import { typeKeyOf } from '@/lib/type-label'
 import { downloadCardMarkdown } from '@/lib/export-card'
 import { pushToast } from '@/lib/toast-store'
-import { useAIEnabled } from '@/features/ai/ai-settings-provider'
+import { useAIEnabled, isAIReady, getCurrentAI } from '@/features/ai/ai-settings-provider'
 import { AIPopover } from '@/features/ai/ai-popover'
+import { AiSetupCard } from '@/features/ai/ai-setup-card'
+import { AiActionMenu } from '@/features/ai/ai-action-menu'
 
 export type CardDetailAction =
   | 'archive'
@@ -149,11 +151,18 @@ export function CardDetailModal({
   const [tagInput, setTagInput] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [pending, startTransition] = useTransition()
-  // M3 — AI action state. We track which action (if any) is in flight
-  // along with the translate target lang. Closing sets it back to null.
-  const [aiAction, setAiAction] = useState<'rewrite' | 'summarize' | 'translate' | null>(null)
+  // M3 — AI entry state. The single ✨ AI button toggles:
+  //   null           → entry closed
+  //   'setup'        → AI not ready, show AiSetupCard
+  //   'menu'         → AI ready, show AiActionMenu
+  //   'summarize' | 'rewrite' | 'translate' → action chosen, AIPopover open
+  const [aiView, setAiView] = useState<
+    null | 'setup' | 'menu' | 'summarize' | 'rewrite' | 'translate'
+  >(null)
   const [translateTo, setTranslateTo] = useState<'zh' | 'en'>('en')
   const aiEnabled = useAIEnabled()
+  void aiEnabled // kept for future "configured but disabled" affordances; the
+  // ✨ AI entry is ALWAYS visible per spec §3.2 (the barrier fix).
   const dialogRef = useRef<HTMLDivElement>(null)
 
   const has = (a: CardDetailAction) => actions.includes(a)
@@ -204,8 +213,8 @@ export function CardDetailModal({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       // AI popover 在前面:Escape 关掉 popover(而不是整个 CardDetail)。
-      if (aiAction) {
-        setAiAction(null)
+      if (aiView) {
+        setAiView(null)
         return
       }
       // 标签输入框正聚焦时:Escape 留给输入框(清空/失焦),不关模态。
@@ -216,7 +225,7 @@ export function CardDetailModal({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, confirmDelete, aiAction])
+  }, [onClose, confirmDelete, aiView])
 
   // Focus the title input on entering edit mode
   useEffect(() => {
@@ -532,49 +541,18 @@ export function CardDetailModal({
                   </Button>
                 ) : null}
                 <span className="cd__spacer" />
-                {aiEnabled && has('summarize') && (
+                {has('summarize') && (
                   <Button
                     variant="secondary"
-                    onClick={() => setAiAction('summarize')}
-                    aria-expanded={!!aiAction}
-                    aria-controls={aiAction ? 'ai-popover' : undefined}
+                    data-testid="card-ai-entry"
+                    onClick={() =>
+                      setAiView(isAIReady(getCurrentAI()) ? 'menu' : 'setup')
+                    }
+                    aria-expanded={aiView !== null}
+                    aria-controls={aiView ? 'ai-entry-panel' : undefined}
                   >
-                    <span className="cd__ai-mark" aria-hidden="true">»</span> {t('card.summarize')}
+                    <span className="cd__ai-mark" aria-hidden="true">»</span> {t('card.ai')}
                   </Button>
-                )}
-                {aiEnabled && has('rewrite') && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => setAiAction('rewrite')}
-                    aria-expanded={!!aiAction}
-                    aria-controls={aiAction ? 'ai-popover' : undefined}
-                  >
-                    <span className="cd__ai-mark" aria-hidden="true">»</span> {t('card.rewrite')}
-                  </Button>
-                )}
-                {aiEnabled && has('translate') && (
-                  <span className="cd__translate">
-                    <select
-                      className="cd__translate-select"
-                      value={translateTo}
-                      onChange={(e) =>
-                        setTranslateTo(e.target.value as 'zh' | 'en')
-                      }
-                      disabled={aiAction === 'translate'}
-                      aria-label={t('card.translate')}
-                    >
-                      <option value="en">{t('card.detail.translateToEn')}</option>
-                      <option value="zh">{t('card.detail.translateToZh')}</option>
-                    </select>
-                    <Button
-                      variant="secondary"
-                      onClick={() => setAiAction('translate')}
-                      aria-expanded={!!aiAction}
-                      aria-controls={aiAction ? 'ai-popover' : undefined}
-                    >
-                      <span className="cd__ai-mark" aria-hidden="true">»</span> {t('card.translate')}
-                    </Button>
-                  </span>
                 )}
                 {has('export') && (
                   <Button
@@ -620,19 +598,38 @@ export function CardDetailModal({
             )}
           </div>
 
-          {aiAction && (
+          {aiView === 'setup' && (
+            <div id="ai-entry-panel">
+              <AiSetupCard onGoToSettings={() => { window.location.href = '/settings' }} />
+              <Button variant="ghost" onClick={() => setAiView(null)}>{t('card.detail.cancel')}</Button>
+            </div>
+          )}
+          {aiView === 'menu' && (
+            <div id="ai-entry-panel">
+              <AiActionMenu
+                onPick={(action, targetLang) => {
+                  if (action === 'translate' && targetLang) setTranslateTo(targetLang)
+                  // AiActionMenu emits the canonical AIAction ('improveWriting'),
+                  // but aiView tracks the local 'rewrite' alias (kept for
+                  // parity with the original card-detail action names). Map
+                  // back so the popover mount + action prop line up.
+                  setAiView(action === 'improveWriting' ? 'rewrite' : action)
+                }}
+              />
+              <Button variant="ghost" onClick={() => setAiView(null)}>{t('card.detail.cancel')}</Button>
+            </div>
+          )}
+          {(aiView === 'summarize' || aiView === 'rewrite' || aiView === 'translate') && (
             <AIPopover
               card={card}
-              action={aiAction === 'rewrite' ? 'improveWriting' : aiAction}
-              targetLang={aiAction === 'translate' ? translateTo : undefined}
-              onClose={() => setAiAction(null)}
+              action={aiView === 'rewrite' ? 'improveWriting' : aiView}
+              targetLang={aiView === 'translate' ? translateTo : undefined}
+              onClose={() => setAiView(null)}
               onReplace={(body) => {
-                // Bug A fix: the AI replaces only the BODY. Every other
-                // field passed to onSave must come from the COMPONENT's
-                // current edit state (title/tags/media/links/codes/quotes),
-                // NOT from the `card` prop snapshot — otherwise unsaved
-                // edits the user made before triggering the AI action are
-                // silently lost. (Pre-fix this used card.title etc.)
+                // Bug A fix (preserved): AI replaces only the BODY. Every
+                // other field comes from the COMPONENT's current edit state,
+                // NOT the card prop snapshot. Payload converters
+                // (draftLinksToPayload etc.) are existing helpers in this file.
                 onSave({
                   title: title.trim() || card.title,
                   body,
@@ -642,17 +639,15 @@ export function CardDetailModal({
                   quotes: draftQuotesToPayload(quotes),
                   tags,
                 })
-                // Reflect the AI-replaced body in the local draft so a
-                // subsequent edit/save starts from the new body.
                 setBody(body)
-                setAiAction(null)
+                setAiView(null)
               }}
               onAppendNew={(c) => {
                 if (onAIAppendNew) {
                   onAIAppendNew(c)
                   pushToast({ kind: 'success', message: t('ai.appendedAsNew') })
                 }
-                setAiAction(null)
+                setAiView(null)
               }}
             />
           )}

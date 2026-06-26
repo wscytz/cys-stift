@@ -450,6 +450,7 @@ export const messages = {
   'card.summarize': { zh: 'AI 总结', en: 'AI summarize' },
   'card.rewrite': { zh: 'AI 改写', en: 'AI rewrite' },
   'card.translate': { zh: 'AI 翻译', en: 'AI translate' },
+  'card.ai': { zh: '✨ AI', en: '✨ AI' },
   'ai.appendNew': { zh: '存为新卡', en: 'Save as new card' },
   'ai.replace': { zh: '替换正文', en: 'Replace body' },
   'ai.appendedAsNew': { zh: '已存为新卡', en: 'Saved as new card' },
