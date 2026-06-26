@@ -5,6 +5,28 @@
 
 ---
 
+## 2026-06-26 · polish-bugfix-2 · 修补轮:数据丢失/误导反馈 6 真 bug
+
+打磨期"修补真 bug + 保证可拓展性 + 记录可拓展点"轮。两 Explore subagent 并行审计(数据往返一致性 / 错误反馈完整性)出 ~20 条,核实后修 6 个真 bug(GREEN),4 条 YELLOW 不修。
+
+**数据丢失类(系统性):**
+- **A1 导入孤儿卡片**(`export-service.ts`):`importFromJson` 校验 card 结构但没校验 `canvasPosition.canvasId` 引用一致性。旧 JSON(无 canvases 字段)/手工编辑/损坏 JSON 里指向不存在画布的 `canvasPosition` 让卡既不在 inbox(`!canvasPosition` 要求)也不在任何画布(`listOnCanvas` 按 canvasId 过滤)→ **永久不可见不可找回**。修:payload 带 canvases 时,清掉指向不存在画布的 `canvasPosition`(回 inbox,可见可找回),而非 reject 整体导入。
+- **A2 `.cystift` 配额中断悬空箭头**(`cystift-payload.ts`):`restoreCystiftPayload` 卡片创建循环配额失败 break 后,idMap 只含已创建卡。重映射 arrow 时 `idMap.has(from/to)` 为 false 保留旧 id → **悬空 arrow 指向不存在的卡,渲染成连着虚无,选不中删不掉**;card 几何带旧 id 成孤儿。修:重映射时 card 不在 idMap 跳过;arrow from/to 任一不在 idMap 跳过(自由箭头无 from/to 不受影响)。
+- **A3 freeform hydrate 前切画布丢绘制**(`canvas-freeform-binding.ts`):cleanup `if(timer)` 才 flush;hydrate 前用户绘制只标 `dirtyDuringHydrate` 不 scheduleSave(timer=null);cleanup 不 flush;load .then `if(disposed) return` 短路 → **OPFS 慢 + 画一笔立刻切画布 → 笔画永久丢**。修:unbind 时若 `!hydrated && dirtyDuringHydrate`,捕获当前 freeform 元素(`pendingAtDisposal`),迟到的 load .then 合并「持久化 ∪ 新建」做一次 save(纯写,disposed 后安全)。新增 `mergeNewIntoSnapshot` 纯函数。
+
+**误导反馈类(系统性):**
+- **B2 AI 设置保存配额失败误导 toast**(`settings-store.ts` + `ai-settings-panel.tsx`):`updateAISettings` 配额失败回滚内存 + notifyQuota 但不返回失败信号;`save()` 无条件 success toast → 用户看到「已保存」+「配额超限」矛盾 toast,reload 后配置消失。修:5 个 settings mutator(`update`/`updateCaptureShortcut`/`updateLocale`/`updateTheme`/`updateAISettings`)返回 boolean,`save()` 据此决定 toast。
+- **B3 删画布配额失败部分操作无反馈**(`canvas/page.tsx`):`confirmDelete` 先 removeFromCanvas(移卡回 inbox,DB 成功)+ canvasStore.delete(配额失败回滚返回 false,被忽略)+ 无条件关模态 → 配额失败时画布还在(空壳)但卡已离开,用户以为删成功。修:原子化——先 `canvasStore.delete`,成功才移卡片 + 关模态;失败不关模态(画布保留可重试)。
+- **B4 DSL 下载缺 try/catch**(`dsl-dialog.tsx`):`new Blob([text])` text 极大时可抛(配额/内存)冒泡到错误边界。修:try/catch + toast error(对齐 export-dialog)。新增 `canvas.dslDownloadFail` i18n。
+
+**不修(YELLOW,核实后非活跃 bug/边缘):** B1 AI Append-as-new 乐观 toast(三调用方注释一致确认为有意设计,配额失败 .catch 已弹错误 toast 补偿)/ A4 zombie freeform(不可达)/ A5 rehydrate 400ms 窗口(极低概率)/ A6 导入孤儿 freeform(不可见)。
+
+**可拓展点(记入 STATE):** ① 配额中断是 best-effort break,各路径恢复策略不统一(.cystift break / freeform hydrate 合并 / store rollback)—— 未来可统一"部分失败"反馈契约;② settings mutator 返回 boolean 模式可推广到 canvas-store/canvas-view-store 调用方;③ 导入引用一致性校验目前只覆盖 canvasPosition→canvas,可扩 card.media/links 引用的 mediaAsset 存在性;④ 配额中断/hydrate 竞态/导入孤儿等边缘路径缺测试固化(核心路径已覆盖)。
+
+验证:canvas-engine 354 + db 7 + domain 全绿;web build exit 0;tsc 零新增;render-sweep 12 路由 + canvas 交互探针 0 error。commit 9f33633。
+
+---
+
 ## 2026-06-26 · outline-view · 画布大纲视图(转义第二次产品化)
 
 灵感:同行 drawio/Excalidraw 的 Outline/Layers 视图(见 `docs/decisions/2026-06-26-peer-inspiration.md`,⭐ 首选候选,用户授权开干)。核心卖点「转义」此前只对**编辑**可见(DSL 模态=交换格式给 AI);Outline 是转义的**第二次产品化**——把画布表达成给人**扫览**的结构化文字大纲(可点跳导航),让「画布能用文字描述」对浏览也有用。
