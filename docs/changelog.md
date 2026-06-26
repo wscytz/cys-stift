@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-06-26 · outline-view · 画布大纲视图(转义第二次产品化)
+
+灵感:同行 drawio/Excalidraw 的 Outline/Layers 视图(见 `docs/decisions/2026-06-26-peer-inspiration.md`,⭐ 首选候选,用户授权开干)。核心卖点「转义」此前只对**编辑**可见(DSL 模态=交换格式给 AI);Outline 是转义的**第二次产品化**——把画布表达成给人**扫览**的结构化文字大纲(可点跳导航),让「画布能用文字描述」对浏览也有用。
+
+- `buildOutline` 纯函数(`features/canvas/outline.ts`):按 z 序(getElements 已分层排序)映射每元素——card→标题 / text→片段 / arrow→关系标签+「A→B」(端点解析)/ rect→(rect) / freedraw→(sketch)(点序列绝不进,R2)/ legacy→(legacy)。
+- `OutlinePanel`:左侧浮动面板(避开右侧 rail + 右下 minimap;z-index 30 同 relation/freedraw;collapse;点项→`elementCenter`+`setView` 居中+`setSelectedIds` 选中,复用 minimap 同款 centering);订阅 `onUserChange`/`onSelectionChange` 刷新(非轮询)。
+- CanvasSideRail 加 ☰ toggle(pressed 态);只读 v1,纯本地无 AI。
+- 与 minimap 互补(结构 vs 空间);与 DSL 模态不同(浏览 vs 编辑)。
+- +14 测试(各 kind 标签 + R2 反向断言 freedraw 无 points);web 603 + build exit 0。
+
+---
+
 ## 2026-06-25 · robustness-web-layer · web/React 层边界鲁棒性(真 bug 修复)
 
 引擎过了 5 轮边界加固,web/React 层从没做过。3 个 Explore subagent 并行猎真 bug(捕获+store+数据 / canvas 交互 / 模态+表单+路由),出 ~35 条,核实后修 ~20 个真 bug(含数据丢失 + 2 个上两轮引入的回归)。subagent TDD 执行,跨包零回归。
