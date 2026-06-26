@@ -166,6 +166,40 @@ export function bindCardWriteback(
     if (pending.size > 0) scheduleFlush()
   })
 
+  // undo/redo desync 修复(v0.38.0):
+  // 引擎 undo 恢复 host 元素走 applyWithoutEcho(设计上抑制 onUserChange 以避免
+  // 回写 echo 循环),所以上面那段 onUserChange(removed) → removeFromCanvas 的
+  // 逆操作不会被触发:Delete 清了 DB canvasPosition,Undo 把卡元素放回 host,
+  // 但 DB 仍无 canvasPosition → 下一次 syncCardsToEditor(任何 snap 改动 / 切回
+  // 画布)算 wantedIds 时不含此卡 → 再次把卡从 host 移除。用户「Undo 找回卡」
+  // 视觉回弹一瞬又消失,心智被打破(卡可从 inbox 找回,非数据丢失,但体验回退)。
+  //
+  // 解法:监听 onHistoryChange(pushUndo / undo / redo 都触发),对每个仍在 host
+  // 里的 *card* 元素,若 DB canvasPosition 缺失或指向别处,用 host 元素几何把它
+  // move 回本画布。全程包在 applyWithoutEcho 内(repo.update → notify →
+  // syncCardsToEditor 的 host 写不再触发 onUserChange,避免 echo 循环)。
+  // 仅 card:freeform(text/freedraw/arrow/rect)有自己的持久化(freeform store),
+  // 不走 DB canvasPosition。幂等:DB 已在本画布则跳过,正常编辑(pushUndo 也触发
+  // onHistoryChange)只是一次廉价 no-op 扫描。
+  const reconcileHistory = () => {
+    host.applyWithoutEcho(() => {
+      for (const el of host.getElements()) {
+        if (el.kind !== 'card') continue
+        const cardId = el.id as CardId
+        const card = service.get(cardId)
+        // 卡不在 DB(新建未落库 / 已真正删除)→ 跳过;软删 / 归档的卡不应回到画布。
+        if (!card || card.deletedAt || card.archived) continue
+        const pos = card.canvasPosition
+        if (pos?.canvasId === canvasId) continue // 已一致:幂等 no-op
+        // DB 无 canvasPosition(被 Delete 清掉,undo 刚恢复 host 元素)或指向别画布
+        // (跨画布 undo 边界,理论少见)→ 用 host 元素几何落回本画布。
+        const z = pos?.z ?? 0
+        service.moveToCanvas(cardId, elementToCardPosition(el, canvasId, z))
+      }
+    })
+  }
+  const unsubHistory = host.onHistoryChange?.(reconcileHistory) ?? (() => {})
+
   // Review fix (v0.37.0): flush synchronously before unsubscribing so a card
   // dragged then immediately followed by a canvas switch / route change / tab
   // close doesn't lose its last position.
@@ -174,6 +208,7 @@ export function bindCardWriteback(
       clearTimeout(timer)
       flush()
     }
+    unsubHistory()
     unsub()
   }
 }

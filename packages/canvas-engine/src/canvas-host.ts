@@ -170,4 +170,16 @@ export interface CanvasHost {
    * 用于画布版本 diff。实现可不提供完整历史(InMemoryCanvasHost 返回 [])。
    */
   getHistory?(): CanvasElement[][]
+  /**
+   * 订阅 undo/redo 栈变化(pushUndo / undo / redo 都广播)。可选——
+   * SelfBuiltAdapter 提供;不实现历史的最小 host 可省略。
+   *
+   * canvas-binding 用它 reconcile:undo 恢复了被 Delete 掉的卡元素,
+   * 但 host 的 undo 走 echo-suppressed 路径(applyWithoutEcho),不会触发
+   * onUserChange → 绑定无从得知卡回来了 → DB canvasPosition 仍被清空
+   * → 下一次 syncCardsToEditor 会再次把卡从 host 移除(undo 视觉回弹后消失,
+   * 用户「Undo 找回卡」心智被打破)。监听 onHistoryChange 在 undo/redo 后
+   * 把 DB canvasPosition 拉回与 host 一致,堵这个 desync。
+   */
+  onHistoryChange?(cb: () => void): () => void
 }

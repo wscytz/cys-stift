@@ -14,7 +14,11 @@ export class InMemoryCanvasHost implements CanvasHost {
   private listeners = new Set<(c: UserChange) => void>()
   private selectionListeners = new Set<(ids: string[]) => void>()
   private viewListeners = new Set<(v: CanvasView) => void>()
+  private historyListeners = new Set<() => void>()
   private echoing = true
+  /** 最小 undo 栈:每个 echoed upsert/remove 前推一份快照(供测试 host.undo)。 */
+  private undoStack: CanvasElement[][] = []
+  private redoStack: CanvasElement[][] = []
 
   getElements(): CanvasElement[] {
     // 确定性 z 序:按 KIND_LAYER 稳定排序(见 canvas-host),与 SelfBuiltAdapter 一致。
@@ -50,14 +54,62 @@ export class InMemoryCanvasHost implements CanvasHost {
   }
 
   upsert(el: CanvasElement): void {
+    if (this.echoing) this.pushUndo()
     this.elements.set(el.id, el)
     if (this.echoing) this.emit({ updated: [el], removed: [] })
   }
 
   remove(id: string): void {
     if (!this.elements.has(id)) return
+    if (this.echoing) this.pushUndo()
     this.elements.delete(id)
     if (this.echoing) this.emit({ updated: [], removed: [id] })
+  }
+
+  /** 测试用最小 undo:恢复栈顶快照,清 redo,广播 onHistoryChange。 */
+  undo(): void {
+    const prev = this.undoStack.pop()
+    if (!prev) return
+    this.redoStack.push(this.snapshot())
+    this.restore(prev)
+    this.emitHistory()
+  }
+
+  /** 测试用最小 redo:对称的 undo 反操作。 */
+  redo(): void {
+    const next = this.redoStack.pop()
+    if (!next) return
+    this.undoStack.push(this.snapshot())
+    this.restore(next)
+    this.emitHistory()
+  }
+
+  private snapshot(): CanvasElement[] {
+    return [...this.elements.values()].map((el) => ({ ...el }))
+  }
+
+  private pushUndo(): void {
+    this.undoStack.push(this.snapshot())
+    this.redoStack = []
+    // 与 SelfBuiltAdapter 同契约:pushUndo / undo / redo 都广播 onHistoryChange
+    // (真实 adapter 上每个 echoed 编辑都会 pushUndo → 广播,故此处也广播,
+    //  让 InMemoryCanvasHost 能测到「正常编辑触发 reconcile 但幂等 no-op」)。
+    this.emitHistory()
+  }
+
+  private restore(snap: CanvasElement[]): void {
+    this.elements = new Map(snap.map((el) => [el.id, { ...el }]))
+  }
+
+  private emitHistory(): void {
+    for (const l of this.historyListeners) l()
+  }
+
+  onHistoryChange(cb: () => void): () => void {
+    this.historyListeners.add(cb)
+    return () => {
+      this.historyListeners.delete(cb)
+    }
   }
 
   batch(fn: () => void): void {
