@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-06-26 · transliteration-validation · 转义赌注验证 + 引擎独立化第一步(3 轮自主,验收批)
+
+用户「不手测,你先跑 3 轮,40min 后验收」。按推荐主线"先证赌注再投资",3 轮一弧线(de-risk → 演示 → 北极星):
+
+- **轮1 转义健壮性锁定**(commit 36d667b):审计 `parseDsl` + `applyLayout` 抗不完美 AI 输入——确认管线已健壮(per-line diagnostic + per-op try/catch + kind 守卫 + parseInt 必为有限整数 + 颜色白名单 H3),但只靠手写样例验证。`dsl-robustness.test.ts`(**36 测试**):28 对抗输入(截断/未闭合/非数字/超大/负数/越界色/未知 kind/控制字符/unicode/混合折点)+ 解析坐标恒有限整数 + diagnostics 结构合法 + applyLayout 混合有效/垃圾不崩 + 超大/空/纯垃圾不崩 + **500× 确定性 fuzz**(mulberry32,零新依赖:parse + apply 永不抛错)。把"相信规则接得住"变成"有测试证明"。互补 `dsl-e2e-roundtrip`(干净无损)。
+- **轮2 转义手册 + 价值演示**(commit 496f34d):`docs/user/transliteration.md`——是什么 / 为什么是卖点(对比表)/ DSL 语法速查(6 active kind)/ 双向闭环价值演示(乱画布 4 散卡 → AI 重排分框+连关系 → 结构化,完整 before/after DSL)/ 三种用法(DSL 模态 / AI 排版按钮 / 复制跨实例)/ 边界诚实(card update-only / freedraw R2 单向点序列不外发 / 6+1 色 / 无 vision)。`transliteration-walkthrough.test.ts`(2 测试)端到端断言价值闭环。user README 加「进阶:转义」小节链手册。
+- **轮3 引擎独立化第一步**(commit 1f27416):审计 `packages/canvas-engine/src/index.ts`——公开 API 已就绪(契约+模型+实现+渲染+几何+SVG+手绘+手势+交互,分组清晰,无内部泄漏),不改(改断 apps/web import)。README 抛光三处:① standalone quick-start(`InMemoryCanvasHost` 零参/无 DOM/无 React 完整跑 host 契约——脱离 cys-stift 仍工作的最强证据);② 转义分层澄清(引擎 = 透明 CanvasElement 模型 + 纯几何;DSL 文本层 serialize/parse/apply 在 apps/web,因 card 内容需 CardService——修正 README 此前略过度归因);③ 状态(已抽为零业务依赖 workspace 包,未上 npm)。
+
+**结论**:转义赌注的承重声明("不完美 AI 输入被规则接住,不崩不腐")经审计 + fuzz 证明**成立**;核心卖点的价值闭环有手册 + 可复跑演示;引擎独立化的下一步(npm 发布 / demo 站)待真实使用验证后再推进(避免为未验证市场建基础设施)。
+
+验证:web **693**(+38) + canvas-engine **372** 全绿;tsc 25 基线零新增。
+
+---
+
 ## 2026-06-26 · normalization · 准则规范化(文档对齐现实 + 修两个失效命令)
 
 用户「先做规范化开发,准则全部读一下,或许要更新」。读完 6 个 CLAUDE.md + development/ 全部规范后,核实 ground truth(package.json/Cargo.toml/实跑命令),发现准则整体框架好,但**几处和现状脱节,两条会咬人**:
