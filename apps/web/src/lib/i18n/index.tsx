@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { settingsStore, useSettings } from '@/lib/settings-store'
 import type { MessageKey, Locale } from './messages'
 import { messages } from './messages'
@@ -56,8 +56,6 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   // <head> already set <html lang> correctly for the first paint, and
   // React suppresses the re-render warning for the RTL attribute.
   const [locale, setLocale] = useState<Locale>('zh')
-  const ref = useRef(locale)
-  ref.current = locale
 
   const doSetLocale = useCallback((l: Locale) => {
     setLocale(l)
