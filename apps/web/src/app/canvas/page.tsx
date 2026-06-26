@@ -15,11 +15,13 @@ import { CanvasOverviewModal } from '@/features/canvas/canvas-overview-modal'
 import { ShortcutHelpDialog } from '@/features/canvas/shortcut-help-dialog'
 import { DiffDialog } from '@/features/canvas/diff-dialog'
 import { applyLayout } from '@/features/canvas/apply-layout'
+import { canvasToMarkdown, markdownFileName } from '@/features/canvas/canvas-to-markdown'
 import { RelationPanel } from '@/features/canvas/relation-panel'
 import { FreedrawPanel } from '@/features/canvas/freedraw-panel'
 import { Minimap } from '@/features/canvas/minimap-component'
 import { OutlinePanel } from '@/features/canvas/outline-panel'
 import { autoRelate } from '@/features/canvas/auto-relate'
+import { syncWikiLinkArrows } from '@/features/canvas/wiki-links'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { parseDsl, parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
 import { streamText } from '@/features/ai/stream-text'
@@ -440,6 +442,39 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     }
   }
 
+  // 画布 → Markdown 导出(信念4「本地数据随时可导出开放格式」)。
+  // canvasToMarkdown 是纯函数;这里只做:取 elements + 映射 card 信息 + Blob 下载。
+  // try/catch:text 极大时 new Blob / createObjectURL 可抛(对齐 dsl-dialog download)。
+  const handleMarkdown = () => {
+    const adapter = handle.current.adapter
+    if (!adapter) return
+    try {
+      const elements = adapter.getElements()
+      const name = activeCanvas?.name ?? ''
+      const md = canvasToMarkdown(elements, {
+        getCardInfo: (id) => {
+          const c = service.get(id as CardId)
+          if (!c) return null
+          return { title: c.title, body: c.body, type: c.type, pinned: c.pinned }
+        },
+        canvasName: name,
+      })
+      const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = markdownFileName(name)
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      pushToast({ kind: 'success', message: t('canvas.markdownDownloaded') })
+    } catch {
+      pushToast({ kind: 'error', message: t('canvas.markdownDownloadFail') })
+    }
+  }
+
+
   const activeCanvas = canvases.find((c) => c.id === activeCanvasId)
   const cardCountOnTarget = confirmDeleteId
     ? service.listOnCanvas(confirmDeleteId).filter((c) => !c.deletedAt).length
@@ -583,6 +618,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           onOverview={() => setOverviewOpen(true)}
           onDsl={() => setDslOpen(true)}
           onExport={() => setExportOpen(true)}
+          onMarkdown={handleMarkdown}
           onDiff={() => setDiffOpen(true)}
           onShortcuts={() => setShortcutOpen(true)}
         />
@@ -638,6 +674,19 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
             const updated = service.update(effectiveDetail.card.id, patch)
             if (updated && handle.current.adapter) updateCardShape(handle.current.adapter, updated)
             if (updated) setDetail({ card: updated })
+            // F7 双链同步:画布上编辑卡 body 保存后,解析 [[标题]] 自动建/删 references
+            // wikilink 箭头。只在画布上触发(inbox 卡可能没上画布,arrow 无意义)。
+            if (updated && handle.current.adapter && patch.body !== undefined) {
+              const { created, removed } = syncWikiLinkArrows({
+                host: handle.current.adapter,
+                getCardTitle: (id) => service.get(id as CardId)?.title,
+                sourceCardId: effectiveDetail.card.id,
+                body: patch.body,
+              })
+              if (created > 0 || removed > 0) {
+                pushToast({ kind: 'info', message: t('canvas.wikiLinked', { created: String(created), removed: String(removed) }) })
+              }
+            }
           }}
           onArchive={() => {
             service.archive(effectiveDetail.card.id)
@@ -797,6 +846,7 @@ function CanvasSideRail({
   onDsl,
   onOverview,
   onExport,
+  onMarkdown,
   onDiff,
   onShortcuts,
 }: {
@@ -822,6 +872,7 @@ function CanvasSideRail({
   onOverview: () => void
   onDsl: () => void
   onExport: () => void
+  onMarkdown: () => void
   onDiff: () => void
   onShortcuts: () => void
 }) {
@@ -849,6 +900,7 @@ function CanvasSideRail({
       <RailButton label={t('canvas.outline')} disabled={!adapterReady} onClick={onOutline} pressed={outlineOpen} icon="☰" />
       <RailButton label={t('canvas.overview')} disabled={!adapterReady} onClick={onOverview} icon="▤" />
       <RailButton label={t('canvas.dslTitle')} disabled={!adapterReady} onClick={onDsl} icon="DSL" />
+      <RailButton label={t('canvas.markdown')} disabled={!adapterReady} onClick={onMarkdown} icon="MD" />
       <RailButton label={t('canvas.export')} disabled={!adapterReady} onClick={onExport} icon="⤓" />
       <RailButton label={t('canvas.diffTitle')} disabled={!adapterReady} onClick={onDiff} icon="±" />
       <span className="cv-rail__sep" aria-hidden="true" />
