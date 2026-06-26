@@ -17,6 +17,8 @@ import { MarkdownBody } from '@/app/inbox/markdown'
 import { useI18n } from '@/lib/i18n'
 import { safeHref } from '@/lib/safe-href'
 import { typeKeyOf } from '@/lib/type-label'
+import { findBacklinks } from './backlinks'
+import type { CanvasHost } from '@cys-stift/canvas-engine'
 
 export function CardDetailModal({
   card,
@@ -26,6 +28,9 @@ export function CardDetailModal({
   onUnarchive,
   onDelete,
   onSendToInbox,
+  host,
+  getCardTitle,
+  onJumpToCard,
 }: {
   card: Card
   onClose: () => void
@@ -34,6 +39,12 @@ export function CardDetailModal({
   onUnarchive: () => void
   onDelete: () => void
   onSendToInbox?: () => void
+  /** 画布 host:有则查 backlinks(相关的卡)。画布外打开为 null → 不显示 backlink 段。 */
+  host?: CanvasHost | null
+  /** 查对方卡 title(从 CardService)。host 非空时必传。 */
+  getCardTitle?: (id: string) => string | undefined
+  /** 点 backlink 跳转到对方卡:选中 + 居中(由 page 接 host.setView + setSelectedIds)。 */
+  onJumpToCard?: (cardId: string) => void
 }) {
   const { t } = useI18n()
   // A card opened with no title (freshly created via double-click) opens in edit.
@@ -121,6 +132,38 @@ export function CardDetailModal({
                   </ul>
                 </section>
               )}
+              {host && getCardTitle && (() => {
+                const bl = findBacklinks(host, card.id)
+                const total = bl.incoming.length + bl.outgoing.length
+                if (total === 0) return null
+                const renderRow = (b: { otherCardId: string; relation: { labelKey: import('@/lib/i18n/messages').MessageKey } | null; arrowId: string }, dir: 'in' | 'out') => {
+                  const title = getCardTitle(b.otherCardId) ?? t('card.detail.untitledCard')
+                  const relLabel = b.relation ? t(b.relation.labelKey) : t('card.detail.relatedUntyped')
+                  return (
+                    <li key={b.arrowId} className="cd__backlink">
+                      <button
+                        type="button"
+                        className="cd__backlink-btn"
+                        onClick={() => onJumpToCard?.(b.otherCardId)}
+                        title={t(dir === 'in' ? 'card.detail.backlinkJumpIn' : 'card.detail.backlinkJumpOut')}
+                      >
+                        <span className="cd__backlink-dir" aria-hidden="true">{dir === 'in' ? '←' : '→'}</span>
+                        <span className="cd__backlink-title">{title}</span>
+                        <span className="cd__backlink-rel">{relLabel}</span>
+                      </button>
+                    </li>
+                  )
+                }
+                return (
+                  <section className="cd__sec">
+                    <h3 className="eyebrow">{t('card.detail.backlinks')}</h3>
+                    <ul className="cd__backlinks">
+                      {bl.incoming.map((b) => renderRow(b, 'in'))}
+                      {bl.outgoing.map((b) => renderRow(b, 'out'))}
+                    </ul>
+                  </section>
+                )
+              })()}
               {card.codeSnippets.length > 0 && (
                 <section className="cd__sec">
                   <h3 className="eyebrow">{t('card.detail.code')}</h3>
@@ -289,6 +332,13 @@ const styles = `
 .cd__links { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
 .cd__links a { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
 .cd__links a:hover { color: var(--color-black); }
+.cd__backlinks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.cd__backlink-btn { display: flex; align-items: center; gap: var(--space-1); width: 100%; text-align: left; padding: 4px var(--space-1); background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black); transition: background 80ms ease-out, border-color 80ms ease-out; }
+.cd__backlink-btn:hover { background: var(--color-gray-soft); border-color: var(--color-gray-soft); }
+.cd__backlink-btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.cd__backlink-dir { color: var(--color-gray); font-family: var(--font-mono); flex: 0 0 auto; }
+.cd__backlink-title { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd__backlink-rel { flex: 0 0 auto; font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-gray); }
 .cd__code { border: var(--border-hairline); }
 .cd__code-lang { background: var(--color-gray-soft); padding: 2px var(--space-1); font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); border-bottom: var(--border-hairline); }
 .cd__code-pre { margin: 0; padding: var(--space-2); background: var(--color-black); color: var(--color-white); font-family: var(--font-mono); font-size: var(--font-size-sm); overflow-x: auto; line-height: 1.5; }

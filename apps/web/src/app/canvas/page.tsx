@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { CanvasId, Card, CardId } from '@cys-stift/domain'
-import { SelfBuiltAdapter } from '@cys-stift/canvas-engine'
+import { SelfBuiltAdapter, elementCenter } from '@cys-stift/canvas-engine'
 import { Button, Modal, Toolbar } from '@cys-stift/ui'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
@@ -613,6 +613,25 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           onSendToInbox={() => {
             service.removeFromCanvas(effectiveDetail.card.id)
             if (handle.current.adapter) removeCardShape(handle.current.adapter, effectiveDetail.card.id)
+            setDetail(null)
+          }}
+          host={adapter}
+          getCardTitle={(id) => service.get(id as CardId)?.title}
+          onJumpToCard={(cardId) => {
+            // Backlink 跳转:选中对方卡元素 + 居中视口 + 关闭本 modal。
+            // 复用 OutlinePanel/Minimap 同款 centering(pan = screenCenter - pageCenter*zoom)。
+            const a = adapter
+            const el = a?.getElement(cardId)
+            if (a && el) {
+              const v = a.getView()
+              const hostEl = document.querySelector('.cv-host canvas') as HTMLCanvasElement | null
+              const cx = (hostEl?.clientWidth ?? 800) / 2
+              const cy = (hostEl?.clientHeight ?? 600) / 2
+              const c = elementCenter(el)
+              const zoom = v.zoom || 1
+              a.setView({ ...v, panX: cx - c.x * zoom, panY: cy - c.y * zoom })
+              a.setSelectedIds([cardId])
+            }
             setDetail(null)
           }}
         />
