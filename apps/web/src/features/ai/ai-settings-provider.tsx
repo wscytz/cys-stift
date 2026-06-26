@@ -17,11 +17,23 @@
 import { useEffect } from 'react'
 import { useSettings } from '@/lib/settings-store'
 import type { AIConfig } from './types'
+import { getDefaultProviderDefaults } from './providers'
 
 let _cachedAI: AIConfig | null | undefined = undefined
 
 export function getCurrentAI(): AIConfig | null {
   return _cachedAI === undefined ? null : _cachedAI
+}
+
+/** True iff AI is usable right now: configured + enabled + has a baseUrl
+ *  + (if the provider needs a key) a non-empty apiKey. null = not ready.
+ *  This is the single gate for "show AiActionMenu vs AiSetupCard". */
+export function isAIReady(cfg: AIConfig | null): boolean {
+  if (!cfg || !cfg.enabled) return false
+  if (cfg.baseUrl.length === 0) return false
+  const def = getDefaultProviderDefaults(cfg.provider)
+  if (def.needsKey && cfg.apiKey.length === 0) return false
+  return true
 }
 
 /** Sync component — mounts once at the layout root, subscribes to

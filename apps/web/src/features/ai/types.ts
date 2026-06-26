@@ -49,6 +49,10 @@ export interface AIConfig {
   baseUrl: string
   model: string
   enabled: boolean
+  /** Optional sampling temperature override (Task 2 default applies when unset). */
+  temperature?: number
+  /** Optional max output tokens override (Task 2 default applies when unset). */
+  maxTokens?: number
 }
 
 /** Maker closure — factory stores these, not instances, because each

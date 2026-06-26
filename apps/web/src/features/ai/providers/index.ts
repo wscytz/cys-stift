@@ -47,6 +47,10 @@ export interface ProviderDefaults {
   model: string
   needsKey: boolean
   displayName: string
+  /** One-line human description shown on the provider card. */
+  description: string
+  /** Bauhaus accent dot color. green is forbidden — only black/blue/yellow. */
+  accent: 'black' | 'blue' | 'yellow'
 }
 
 export function getDefaultProviderDefaults(provider: ProviderId): ProviderDefaults {
@@ -57,6 +61,8 @@ export function getDefaultProviderDefaults(provider: ProviderId): ProviderDefaul
         model: 'gpt-4o-mini',
         needsKey: true,
         displayName: 'OpenAI',
+        description: 'Hosted GPT-4o family. Needs an API key (paid).',
+        accent: 'black',
       }
     case 'anthropic':
       return {
@@ -64,6 +70,8 @@ export function getDefaultProviderDefaults(provider: ProviderId): ProviderDefaul
         model: 'claude-haiku-4-5',
         needsKey: true,
         displayName: 'Anthropic',
+        description: 'Hosted Claude family. Needs an API key (paid).',
+        accent: 'blue',
       }
     case 'ollama':
       return {
@@ -71,6 +79,8 @@ export function getDefaultProviderDefaults(provider: ProviderId): ProviderDefaul
         model: 'llama3.2:3b',
         needsKey: false,
         displayName: 'Ollama (local)',
+        description: 'Runs fully on your machine. Free, private, no API key.',
+        accent: 'yellow',
       }
   }
 }
