@@ -214,67 +214,69 @@ export function serializeCardsForAI(cards: Card[]): string {
 
 画布上的非卡片形状(箭头 / 手绘 / 矩形 / 便签) 也需要序列化。
 
-### 设计
+### 实现(已落地,2026-06-24)
+
+> ⚠️ 本节原写于 M3 规划期(tldraw 时代、`CanvasSnapshot` 计划接口、手绘发点序列)。**现状已变**:
+> - 画布已迁**自研 Canvas 2D**(`packages/canvas-engine`),序列化走 `host.getElements()`(`CanvasElement[]`),不再有 tldraw `editor`。
+> - 生产函数是 `apps/web/src/features/ai/canvas-dsl.ts` 的 `serializeCanvas` / `formatCanvasSnapshot`(非计划中的 `canvas-snapshot.ts`)。
+> - **R2 隐私收紧(最终决策)**:freedraw **点序列永不外发** AI;只发**抽象形状描述符**(见下)。本节下方已据此更新;若与旧描述冲突,以下方 + `docs/user/privacy.md` 为准。
+
+序列化输入 = `CanvasElement` 统一模型(5 个 active kind:card / arrow / freedraw / text / rect;legacy ellipse/line/note/image 仅读旧画布;frame 2026-06-26 加)。每个 kind 一行 DSL:
 
 ```ts
-// apps/web/src/features/ai/canvas-snapshot.ts (计划中)
+// apps/web/src/features/ai/canvas-dsl.ts(已实现)
 
-export interface CanvasSnapshot {
-  cards: Array<{ id: CardId; x: number; y: number; w: number; h: number; color?: string }>
-  arrows: Array<{ id: string; from: CardId; to: CardId; label?: string }>
-  freeShapes: Array<
-    | { kind: 'line'; x1: number; y1: number; x2: number; y2: number }
-    | { kind: 'rect'; x: number; y: number; w: number; h: number }
-    | { kind: 'ellipse'; x: number; y: number; w: number; h: number }
-    | { kind: 'draw'; points: Array<{ x: number; y: number }> }   // 手绘笔触
-    | { kind: 'note'; x: number; y: number; text: string }
-  >
-}
-
-export async function snapshotCanvas(editor: Editor, canvasId: CanvasId): Promise<CanvasSnapshot>
+// 伪示意:每元素一行;card 内容(title/body)从 CardService 取,几何从 element 取
+function serializeElement(el: CanvasElement, getCardInfo?): string
+function formatCanvasSnapshot(host: CanvasHost, getCardInfo, canvasId): string
 ```
 
-**判定逻辑在客户端**(启发式):
-- `tldraw shape.type === 'draw'` → `kind: 'draw'`(原笔触,不简化)
-- `shape.type === 'geo' && props.shape === 'rectangle'` → `kind: 'rect'`
-- `shape.type === 'geo' && props.shape === 'ellipse'` → `kind: 'ellipse'`
-- 闭合判定:**不**做(用户决策 2026-06-21:闭合 region 启发式风险高,**M3.1 不做**,M3.2 再评估)
-- 起点 ↔ 终点距离 < 阈值 → `kind: 'line'`(直线化)
-- `shape.type === 'note'` → `kind: 'note'` + text
+**freedraw 的 R2 安全形状描述**(本地跑 `classifyFreedraw` + `$1` recognizer,失败退化仅位置不抛):
+- `shape`:离散标签 `circle` / `rect` / `triangle` / `check` / `arrow` / `unknown`
+- `shapeConfidence`:0..1
+- `features`:4 个标量比例 `{ straightness, closure, elongation, pointCount }`
+- **绝不**输出 `meta.points`(绝对坐标点序列)——这是 R2 硬边界,有反向断言测试守护(多点 freedraw 序列化结果不含内部点坐标)
 
-### 序列化输出例
+判定**全程本地**(`$1` recognizer,Wobbrock UIST 2007;resample/rotate/scale/translate/GSS),点数据留在引擎存储,不进任何 prompt 文本。
+
+### 序列化输出例(当前 DSL 格式)
 
 ```
 Canvas: my-project (5 cards, 3 arrows, 2 free shapes)
 
-[card #a1] at (200, 300) size 240x120, color blue
+[card #a1] @pos(200, 300) @size(240, 120) @color(blue)
   title: Architecture
   body: System overview...
 
-[card #a2] at (700, 400) size 240x120, color red
+[card #a2] @pos(700, 400) @size(240, 120) @color(red)
   title: Implementation
   body: ...
 
-[arrow #arr1] from #a1 to #a2, label "references"]
+[arrow #arr1] from #a1 to #a2 @label("references")
 
-[free shape: line from (300, 100) to (500, 100)]
-[free shape: note at (900, 200), text "TODO: review auth flow"]
+[freedraw #f1] @pos(300, 100)
+  shape: circle (85%)
+[rect #r1] @pos(900, 200) @size(160, 80) @color(black)
 ```
+
+> freedraw 行**只**带位置 + 形状描述符注释(`# ...` 行 parser 跳过,round-trip 安全)。**绝不**出现点序列。card 行的 title/body 来自 CardService(单一可信源),几何来自 element。
 
 ---
 
 ## DSL 输出(AI 写的格式)
 
-AI 看到的输入 → 输出 DSL → 客户端解析 + apply:
+AI 看到的输入(snapshot)→ 输出 DSL → 客户端 `parseDsl` + `applyLayout` 应用。手写解析器(~150 行,在 `apps/web/src/features/ai/dsl-parser.ts`),跳过 `#` 注释行。
 
 ```
-[card #a1] @pos(300, 400) @cluster(architecture)
-[card #a2] @pos(700, 500) @cluster(implementation)
-[arrow #arr1] @label("references")
-[free: line from (300, 100) to (700, 100)] @stroke(red)
+[card #a1] @pos(300, 400) @size(240, 120) @color(blue)
+[arrow #arr1] from #a1 to #a2 @label("references") @type(references)
+[rect #r1] @pos(500, 100) @size(160, 80) @color(black)
 ```
 
-DSL parser 用 PEG / 手写(~ 100 行),参考 markdown 链接 + 标签语法。
+**约束**(设计性,非 bug):
+- **card update-only**:AI 不能 `[card #new]` 建卡(卡片内容来自 CardService 单一可信源);只能更新已存在 card 的几何/color。
+- **freedraw 单向**:AI 看得到 freedraw 的形状描述,但 DSL 不能创建/改 freedraw(R2:点序列不外发 → 无法还原)。
+- **arrow 端点必须存在**:`from`/`to` 指向不存在的 card → 该 op 静默跳过(per-op try/catch 容错)。
 
 ---
 
@@ -287,24 +289,29 @@ DSL parser 用 PEG / 手写(~ 100 行),参考 markdown 链接 + 标签语法。
 
 ---
 
-## 手绘内容 = 几何描述
+## 手绘内容 = 抽象形状描述(非点序列)
 
-**用户决策(2026-06-21 修正)**:
-- ✅ 手绘内容**可以**给 AI 看
-- 但**不**做 vision 解析像素
-- **方式**:客户端把 `tldraw draw shape` 编码成坐标点序列或直线,发给 AI
+> **R2 隐私最终决策(2026-06-24,永久)**:freedraw 的**点序列永不外发** AI。只发**抽象形状描述符**。本节据此更新;早期"编码成坐标点序列发给 AI"的描述**已废止**。
+
+**可以给 AI 看的**(抽象、不可逆推原图):
+- `shape`:离散标签 `circle` / `rect` / `triangle` / `check` / `arrow` / `unknown`
+- `shapeConfidence`:0..1
+- `features`:4 个标量比例 `{ straightness, closure, elongation, pointCount }`
+
+**永不外发的**:
+- ❌ `meta.points`(绝对坐标点序列)——R2 硬边界
+- ❌ 像素 / vision 解析(永久不做 vision 模型)
+
+**方式**(全程本地):
+- 客户端本地跑 `classifyFreedraw`(启发式 arrow/decoration)+ `$1` recognizer(Wobbrock UIST 2007;认圈/方/三角/对勾,score≥0.7 认否则 unknown)
+- 输出离散 shape 标签 + 标量 features,写进 snapshot 的 `# shape: circle (85%)` 注释行
+- 点数据留在引擎存储,不进任何 prompt 文本(有反向断言测试:多点 freedraw 序列化结果不含内部点坐标)
 
 ```
-[free shape: draw] points: (100,200) (150,180) (200,210) (250,190) (300,220)
-  ↓ 客户端启发式:5 个点接近直线 → 简化为
-[free shape: line from (100, 200) to (300, 220)]
+[freedraw #f1] @pos(300, 100)
+  shape: circle (85%)
+  ↑ 本地 $1 识别:像圆圈 85% → 只发标签 + 标量,点序列留在本地
 ```
-
-启发式判定规则:
-- 端点距离 / 路径长度 > 0.9 → 直线
-- 端点距离 / 路径长度 < 0.3 → 圆 / 弧(简化成 `kind: 'ellipse'`,M3.2 评估)
-- 其他 → `kind: 'draw'` + 原始点序列
-- **闭合**(首尾距离 < 阈值)→ M3.1 不做闭合 region(M3.2 评估启发式准确率)
 
 ---
 

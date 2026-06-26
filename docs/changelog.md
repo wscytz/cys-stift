@@ -5,6 +5,30 @@
 
 ---
 
+## 2026-06-26 · normalization · 准则规范化(文档对齐现实 + 修两个失效命令)
+
+用户「先做规范化开发,准则全部读一下,或许要更新」。读完 6 个 CLAUDE.md + development/ 全部规范后,核实 ground truth(package.json/Cargo.toml/实跑命令),发现准则整体框架好,但**几处和现状脱节,两条会咬人**:
+
+### 🔴 真 bug:文档写的命令跑不起来
+- **`pnpm --filter web test` 不存在**(web package.json 缺 test 脚本)→ 加 `"test": "vitest run"`,和 domain/db/canvas-engine 对齐。顺带让根 `pnpm -r test` 纳入 web(此前只跑 3 个包,漏 web 655 测试)。实跑 655 绿。
+- **`pnpm --filter web lint` 是 `next lint`**(从未配 ESLint → 非交互下交互 prompt 直接挂)→ 改 `tsc --noEmit`,和全部 sibling 包对齐。现有 25 个 `__tests__/` branded-id/color-token fixture 基线(polish-phase §B 已记的已知噪音),判据=零新增,非零错误。`pnpm -r lint` 现在 5 包一致跑 tsc、可预测、可脚本化(此前 web 交互卡死)。
+
+### 🔴 隐私矛盾修正(`docs/development/privacy-design.md`)
+§画布快照 + §手绘写"手绘内容可给 AI 看…编码成坐标点序列发给 AI"——**直接违反 R2 最终决策**(STATE 2026-06-24:freedraw 点序列永不外发)。文档比实际更宽松,照此做 AI 改动可能泄漏点序列。三处改正:① CanvasSnapshot 接口的 `draw; points` + tldraw 判定 → 现实的 host.getElements()/CanvasElement + 本地 $1 recognizer shape 描述符;② §手绘"点序列可发"→ R2 硬边界(只发 shape 标签 + confidence + 4 标量 features,点序列绝不外发,有反向断言);③ §DSL 输出删已废止的 `[free: ...]`/`@cluster` 语法 + 注明 card update-only / freedraw 单向约束。
+
+### 🟡 过时引用修正
+- **`docs/development/dependencies.md`** 整份重写:删已移除的 `@tldraw/tldraw 3.15.6`、删"web 无 vitest"(实际 655 测试)、补 `packages/canvas-engine`(整个包缺失)、补 `tauri-plugin-global-shortcut`/`markitdownllm`/`pdfjs-dist`、test 数改"见 pnpm -r test 实际输出"(不硬编码怕漂移)、补 canvas-engine test/lint 命令 + web 25-error 基线说明。指向 package.json 作真相源。
+- **`apps/web/CLAUDE.md`** 结构树(dev/db、dev/min)→ 真实路由(archive/canvas/inbox/search/timeline/trash/settings + features/feature-sliced + lib/stores);AI checklist 的 `snapshotCanvas(editor)`/"不遍历 tldraw shape" → `serializeCanvas(host.getElements())`。
+
+### 🟢 历史档加 banner(防误读)
+roadmap.md(Phase 7-9 已完成,指向 STATE)、reference.md + reference-patterns.md(画布栈 tldraw→自研,模式仍可参考)。
+
+验证:web test 655 绿;web build exit 0;`pnpm -r lint` 5 包一致(domain/db/ui/canvas-engine 干净,web 25 fixture 基线)。
+
+**教训(记入记忆)**:tldraw 移除 + 引擎独立化是大变更,但过程文档没同步,导致 4 份规范 + 2 个 package.json 脚本漂移。大迁移后该有一轮"准则对齐现实"。硬编码版本/test 数的文档最易漂移——改指向真相源(package.json/命令输出)。
+
+---
+
 ## 2026-06-26 · feature-phase-2 · Markdown 导出 + 双链 [[]](subagent,非 AI)
 
 用户反馈「不要基于 AI 的功能」后,选两个非 AI、围绕核心卖点的功能,各 subagent TDD 实现:

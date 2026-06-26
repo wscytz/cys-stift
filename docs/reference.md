@@ -12,6 +12,7 @@
 ## 画布
 
 - tldraw — https://tldraw.dev — v3 Custom Shape API
+  > 📌 **已移除(2026-06-23)。** 画布已迁**自研 Canvas 2D 引擎**(`packages/canvas-engine`,零业务依赖,见 ADR `docs/adr/2026-06-23-remove-tldraw.md`)。此条保留作历史参考;tldraw API 不再适用。
 
 ## 桌面壳
 

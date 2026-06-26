@@ -1,5 +1,7 @@
 # 参考项目分析 — drawio 30.2.5 + AFFiNE 0.26.3
 
+> 📌 **栈已变更(读前注意)。** 本分析写于 2026-06-21,当时画布栈是 tldraw。**画布已于 2026-06-23 迁自研 Canvas 2D**(`packages/canvas-engine`)。文中"我们移植…tldraw 提供…"的具体 API 不再适用,但**技术与 UX 模式本身**(导出边界解析、SVG→PNG 栅格化、字体嵌入、命令面板、标签调色板、配额派生等)仍是有效参考——把"tldraw API"读作"我们的 `CanvasHost`/`CanvasElement`"即可。
+>
 > 来源: 2026-06-21,用户提供 drawio + AFFiNE 源码 zip,挖可移植技术/UX 模式。
 > 原则: **只采技术与 UX,不采架构**(我们栈 = Next.js 静态导出 + tldraw 3.15 + localStorage + 纯 TS domain,无 yjs/blocksuite/mxgraph/后端)。
 > 每个 finding 标: 所属 phase / 技术 / 我们的移植方式 / 可移植性 / 源码位置(供核实)。

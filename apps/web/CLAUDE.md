@@ -15,17 +15,34 @@
 
 ```
 src/
-├── app/
-│   ├── layout.tsx         根布局（字体加载）
-│   ├── page.tsx           首页（占位）
-│   ├── design/page.tsx    /design 视觉契约页
-│   ├── dev/db/page.tsx    /dev/db 数据层烟测页（'use client'）
-│   └── dev/min/page.tsx   /dev/min 诊断占位
-├── lib/
-│   └── db-client.ts       客户端 DB 单例（useDb hook）
+├── app/                        Next.js App Router 路由(全部静态导出,'use client')
+│   ├── layout.tsx              根布局(字体 + i18n + capture host 挂载)
+│   ├── page.tsx                首页(home)
+│   ├── inbox/                  inbox 编辑
+│   ├── canvas/                 自研画布页(核心)
+│   ├── archive/                归档(网格/时间轴)
+│   ├── trash/                  软删恢复
+│   ├── search/                 全文搜索(⌘K)
+│   ├── timeline/               全局时间线(P10)
+│   ├── settings/               设置(快捷键/主题/AI/导入导出)
+│   ├── design/                 /design 视觉契约页
+│   └── dev/                    dev 烟测页(production 不含)
+├── features/                   按特性切(feature-sliced,ADR 0002)
+│   ├── ai/                     AI provider + DSL serialize/parse/apply + prompts
+│   ├── canvas/                 画布交互:host adapter / 关系 / outline / minimap / 导出 / wiki-links
+│   ├── capture/                捕获入口(mini input / 快捷键 / 文件拖拽)
+│   ├── card/                   卡片详情/编辑
+│   ├── archive/                归档视图组件
+│   └── settings/               设置面板
+├── lib/                        横切:store(localStorage 状态)+ 纯工具
+│   ├── db-client.ts            客户端 DB 单例(useDb hook)
+│   ├── *-store.ts              canvas / canvas-freeform / canvas-view / draft / media / settings / toast store
+│   ├── export-service.ts       JSON 全量备份往返(含画布几何)
+│   ├── i18n/                   中英双语
+│   └── safe-href.ts / serialize-card.ts / group-by-day.ts 等纯函数
 └── styles/
-    ├── globals.css        import tokens.css + tailwindcss
-    └── tokens.css         （已移到 packages/ui，这里保留兼容）
+    ├── globals.css             import tokens.css + tailwindcss
+    └── tokens.css              重导出 packages/ui tokens(权威源在 packages/ui)
 ```
 
 ## 改动检查清单
@@ -47,7 +64,7 @@ src/
 
 **加新 AI action / prompt**:
 - [ ] `prompts.ts` 走 `serializeCardForAI(card)` / `serializeCardsForAI(cards)`,**不**手写拼接字符串
-- [ ] 涉及画布形状时走 `snapshotCanvas(editor, canvasId)`,**不**直接遍历 tldraw shape
+- [ ] 涉及画布形状时走 `serializeCanvas(host.getElements())` / `formatCanvasSnapshot(host, …)`(`features/ai/canvas-dsl.ts`),**不**手写遍历 `CanvasElement`
 - [ ] `prompts.ts` 单测覆盖新模板
 - [ ] e2e 加"AI 看不到 deviceId / apiKey / 软删除卡"的反向断言
 

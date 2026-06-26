@@ -1,5 +1,9 @@
 # 路线图 · Phase 7 起 30 轮执行计划
 
+> 📌 **本路线图已完成(历史档)。** §5 进度表显示 spec §8 路线图(P7–P9.1)全部 ✅(P8 Tauri 打包卡 Apple 证书)。
+> 项目此后进入**打磨期 + 功能期**,超出本路线图范围;**当前状态以 [`docs/STATE.md`](../STATE.md) 为准**,方向判据见 [`docs/product-and-engine.md`](../product-and-engine.md) + [`docs/development/polish-phase.md`](polish-phase.md)。
+> 本文件保留作历史参考,不再更新进度。
+
 > **用途**:在 spec §8 路线图基础上,补齐 Phase 6 closeout 列出的"已知/后续",排出 Phase 7 → Phase 9+ 的 30 轮可执行队列。
 >
 > **生效日期**:2026-06-19
