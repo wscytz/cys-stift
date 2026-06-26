@@ -413,6 +413,16 @@ export function parseDslWithDiagnostics(dslText: string): {
       continue
     }
 
+    // ── Freedraw line: `[freedraw #id] @pos(x,y)` — recognized but a
+    //    deliberate NO-OP. freedraw point sequences never enter the DSL
+    //    (privacy R2), so serializeCanvasReadable emits position-only metadata
+    //    for human readability; the parser acknowledges the line (so a canvas
+    //    doesn't flag its OWN exported freedraw as "invalid") but produces no
+    //    apply op — the host's freedraw element is left untouched on apply.
+    if (line.startsWith('[freedraw ')) {
+      continue
+    }
+
     // ── `[`-prefixed but no recognized kind prefix (e.g. `[foo #x] ...`)
     errors.push({
       line: lineNo,

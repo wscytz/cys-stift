@@ -343,6 +343,27 @@ describe('parseDslWithDiagnostics', () => {
     expect(errors).toEqual([])
   })
 
+  it('recognizes [freedraw] as a known no-op (R2: points never enter DSL)', () => {
+    // serializeCanvasReadable emits `[freedraw #id] @pos(x,y)` for human
+    // readability, but freedraw can't be restored from DSL (point sequences
+    // stay local — privacy R2). The parser must ACKNOWLEDGE the line (so a
+    // round-tripped canvas doesn't flag its own freedraw as "invalid") while
+    // producing no apply op — the host's freedraw is left untouched on apply.
+    const { ops, errors } = parseDslWithDiagnostics(
+      '[freedraw #freedraw-abc-123] @pos(10,20)',
+    )
+    expect(errors).toEqual([])
+    expect(ops).toHaveLength(0)
+  })
+
+  it('a freedraw + card canvas round-trips with zero invalid lines', () => {
+    const { ops, errors } = parseDslWithDiagnostics(
+      '[freedraw #freedraw-1] @pos(5,5)\n[card #c1] @pos(10,20) @size(100,50)\n[freedraw #freedraw-2] @pos(30,30)',
+    )
+    expect(errors).toEqual([])
+    expect(ops).toHaveLength(1) // only the card; freedraw lines are no-ops
+  })
+
   it('parseDsl wrapper still returns plain DslOp[]', () => {
     const result = parseDsl('[card #a1] @pos(1,2)\n[rect #r1] @pos(3,4) @size(10,10)')
     expect(Array.isArray(result)).toBe(true)
