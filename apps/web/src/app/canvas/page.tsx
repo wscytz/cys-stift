@@ -11,6 +11,7 @@ import { SelfCanvas, type SelfCanvasHandle } from '@/features/canvas/self-canvas
 import { CardDetailModal } from '@/features/canvas/card-detail-modal'
 import { ExportDialog } from '@/features/canvas/export-dialog'
 import { DslDialog } from '@/features/canvas/dsl-dialog'
+import { CanvasOverviewModal } from '@/features/canvas/canvas-overview-modal'
 import { ShortcutHelpDialog } from '@/features/canvas/shortcut-help-dialog'
 import { DiffDialog } from '@/features/canvas/diff-dialog'
 import { applyLayout } from '@/features/canvas/apply-layout'
@@ -86,6 +87,7 @@ export default function CanvasPage() {
   const [dslOpen, setDslOpen] = useState(false)
   const [shortcutOpen, setShortcutOpen] = useState(false)
   const [diffOpen, setDiffOpen] = useState(false)
+  const [overviewOpen, setOverviewOpen] = useState(false)
 
   const onCanvas = service
     .listOnCanvas(activeCanvasId)
@@ -578,6 +580,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           onAutoRelate={handleAutoRelate}
           onFrame={handleFrame}
           onOutline={() => setOutlineOpen((o) => !o)}
+          onOverview={() => setOverviewOpen(true)}
           onDsl={() => setDslOpen(true)}
           onExport={() => setExportOpen(true)}
           onDiff={() => setDiffOpen(true)}
@@ -700,6 +703,13 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
 
       <DiffDialog open={diffOpen} onClose={() => setDiffOpen(false)} host={adapter} />
 
+      <CanvasOverviewModal
+        open={overviewOpen}
+        onClose={() => setOverviewOpen(false)}
+        host={adapter}
+        canvasEl={canvasElRef.current}
+      />
+
       <style>{styles}</style>
     </main>
   )
@@ -785,6 +795,7 @@ function CanvasSideRail({
   onFrame,
   onOutline,
   onDsl,
+  onOverview,
   onExport,
   onDiff,
   onShortcuts,
@@ -808,6 +819,7 @@ function CanvasSideRail({
   onAutoRelate: () => void
   onFrame: () => void
   onOutline: () => void
+  onOverview: () => void
   onDsl: () => void
   onExport: () => void
   onDiff: () => void
@@ -835,6 +847,7 @@ function CanvasSideRail({
       <RailButton label={t('canvas.frameSelection')} disabled={!adapterReady} onClick={onFrame} icon="▭" />
       {aiEnabled && <span className="cv-rail__sep" aria-hidden="true" />}
       <RailButton label={t('canvas.outline')} disabled={!adapterReady} onClick={onOutline} pressed={outlineOpen} icon="☰" />
+      <RailButton label={t('canvas.overview')} disabled={!adapterReady} onClick={onOverview} icon="▤" />
       <RailButton label={t('canvas.dslTitle')} disabled={!adapterReady} onClick={onDsl} icon="DSL" />
       <RailButton label={t('canvas.export')} disabled={!adapterReady} onClick={onExport} icon="⤓" />
       <RailButton label={t('canvas.diffTitle')} disabled={!adapterReady} onClick={onDiff} icon="±" />

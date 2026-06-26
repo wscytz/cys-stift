@@ -270,8 +270,9 @@ export function Minimap({
 
 /** 画单个元素的简化标记(不画内容,只占位/形状)。
  *  card=填色矩形、arrow=连线、rect=描边方框、text=横条、
- *  freedraw=点序列折线、legacy/其他=小圆点。颜色走 token(colorOf)。 */
-function drawElementMark(
+ *  freedraw=点序列折线、legacy/其他=小圆点。颜色走 token(colorOf)。
+ *  导出供 CanvasOverviewModal 复用(整画布缩略图视图,功能期批 3)。 */
+export function drawElementMark(
   ctx: CanvasRenderingContext2D,
   el: CanvasElement,
   proj: { scale: number; offsetX: number; offsetY: number },
