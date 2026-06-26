@@ -71,14 +71,14 @@ export function RelationPanel({
     return () => unsubs.forEach((u) => u())
   }, [host])
 
-  if (!host) return null
-  const sel = host.getSelectedIds()
+  // 早返回前用 optional chaining 解算(host null 时给空/null)。
+  // hooks(useRef/useEffect/useClampedPanelPosition)必须无条件调用,否则
+  // host null→非 null(adapterReady 修复后切画布会触发)变 hook 数 → React #310 崩。
+  const sel = host?.getSelectedIds() ?? []
   const arrowId = sel.length === 1 ? sel[0]! : null
-  const arrow = arrowId ? host.getElement(arrowId) : null
+  const arrow = arrowId ? host?.getElement(arrowId) ?? null : null
   const isArrowSelected = !!arrow && arrow.kind === 'arrow'
 
-  // Hooks 必须在 early return 之前调用(React hooks 顺序规则;此前 useRef/useEffect
-  // 放在 early return 后 → 选中箭头时 hooks 数量变化 → React error #310 崩溃)。
   const activeType = isArrowSelected ? inferRelationType(arrow!) : null
 
   // Keyword inference when the arrow has no type yet.
@@ -90,14 +90,12 @@ export function RelationPanel({
   }
 
   // Auto-apply inferred type once per (arrowId, arrow text, inferredType) pair.
-  // Keying on `${id}:${text}` (not just `${id}:${inferred.id}`) means: after the
-  // user undoes the auto-apply OR clears the label, re-selecting the arrow (or
-  // the text becoming empty) changes the key → inference is allowed to re-fire.
-  // Without this, the appliedKey ref would match forever and the undone type
-  // would never re-infer.
+  // Keying on `${id}:${text}` means: after undo of the auto-apply OR clearing the
+  // label, re-selecting / text-empty changes the key → inference may re-fire.
+  // (appliedKey = useRef;必须在所有 early return 之前调用)
   const appliedKey = useRef<string | null>(null)
   useEffect(() => {
-    if (!isArrowSelected || !arrow || !inferred || activeType) return
+    if (!host || !isArrowSelected || !arrow || !inferred || activeType) return
     const key = `${arrow.id}:${arrow.text ?? ''}:${inferred.id}`
     if (appliedKey.current === key) return
     appliedKey.current = key
@@ -105,6 +103,13 @@ export function RelationPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isArrowSelected, arrow, inferred?.id, activeType?.id, host])
 
+  // 位置夹紧(hook 无条件调用;无 arrow 时 ideal=null,hook 内部兜底)。
+  const ideal =
+    isArrowSelected && arrow && host ? computePanelPosition(arrow, host, canvasEl) : null
+  const position = useClampedPanelPosition(panelRef, ideal, { width: 520, height: 44 })
+
+  // 渲染早返回(所有 hooks 已跑完):
+  if (!host) return null
   if (!isArrowSelected || !arrow) return null
 
   const displayType: RelationType | null = activeType ?? inferred
@@ -127,9 +132,6 @@ export function RelationPanel({
     })
   }
 
-  const ideal = computePanelPosition(arrow, host, canvasEl)
-  // 视口夹紧(避免贴边裁切)。fallback 尺寸用 RelationPanel 内容宽度估算。
-  const position = useClampedPanelPosition(panelRef, ideal, { width: 520, height: 44 })
   const panelStyle = position
     ? {
         position: 'fixed' as const,

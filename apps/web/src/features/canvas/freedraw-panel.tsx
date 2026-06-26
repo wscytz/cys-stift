@@ -58,13 +58,25 @@ export function FreedrawPanel({
     return () => unsubs.forEach((u) => u())
   }, [host])
 
-  if (!host) return null
-  const sel = host.getSelectedIds()
-  if (sel.length !== 1) return null
-  const el = host.getElement(sel[0]!)
-  if (!el || el.kind !== 'freedraw') return null
+  // 早返回前先解算选中元素(供下方 useClampedPanelPosition 用)。
+  // 注意:hooks(useClampedPanelPosition)必须在所有条件 return 之前调用,
+  // 否则 host null→非 null 切换(adapterReady 修复后切画布会触发)会改变 hook 数 → React #310 崩。
+  const sel = host?.getSelectedIds() ?? []
+  const el = sel.length === 1 ? host?.getElement(sel[0]!) ?? null : null
+  const freedrawEl = el && el.kind === 'freedraw' ? el : null
 
-  const points = freedrawPoints(el)
+  // hook 无条件调用:无选中/非 freedraw 时 ideal 传 null,clamp hook 内部兜底。
+  const position = useClampedPanelPosition(
+    panelRef,
+    freedrawEl && host ? computePanelPosition(freedrawEl, host, canvasEl) : null,
+    { width: 360, height: 44 },
+  )
+
+  if (!host) return null
+  if (sel.length !== 1) return null
+  if (!freedrawEl) return null
+
+  const points = freedrawPoints(freedrawEl)
   if (!points) return null
   const { kind, confidence } = classifyFreedraw(points)
 
@@ -77,11 +89,6 @@ export function FreedrawPanel({
   // 面板文案:认出具体形状 → 用形状文案;否则回退 arrow/decoration/unknown。
   const guessKey = guessMessageKey(kind, shape)
 
-  const position = useClampedPanelPosition(
-    panelRef,
-    computePanelPosition(el, host, canvasEl),
-    { width: 360, height: 44 },
-  )
   const panelStyle = position
     ? {
         position: 'fixed' as const,
@@ -92,7 +99,7 @@ export function FreedrawPanel({
     : { display: 'none' as const }
 
   const duplicate = () => {
-    const dup = duplicateFreedraw(el, `freedraw-${shortId()}`, DUP_OFFSET, DUP_OFFSET)
+    const dup = duplicateFreedraw(freedrawEl, `freedraw-${shortId()}`, DUP_OFFSET, DUP_OFFSET)
     if (!dup) return
     host.upsert(dup)
     host.setSelectedIds([dup.id]) // 选中新副本,可连点连复制
@@ -107,10 +114,10 @@ export function FreedrawPanel({
       : detectedRoute?.kind === 'elbow' ? 'freedraw.toElbowArrow'
         : 'freedraw.toArrow'
   const toArrow = () => {
-    const arrow = freedrawToArrow(el, `arrow-${shortId()}`)
+    const arrow = freedrawToArrow(freedrawEl, `arrow-${shortId()}`)
     if (!arrow) return
     host.batch(() => {
-      host.remove(el.id)
+      host.remove(freedrawEl.id)
       host.upsert(arrow)
     })
     host.setSelectedIds([arrow.id])
