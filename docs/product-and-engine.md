@@ -69,55 +69,62 @@ Next.js 15 静态导出 + React 19 + TS strict + 自研 Canvas 2D + Tauri v2 + S
 
 ### 引擎边界
 
-- `CanvasElement` 5 个 active kind:card / arrow / freedraw / text / rect(legacy: ellipse/line/note/image 仅读旧画布)
+- `CanvasElement` 6 个 active kind:card / arrow / freedraw / text / rect / frame(legacy: ellipse/line/note/image 仅读旧画布)
 - card 几何来自 CardService/DB(单一可信源);freeform(text/freedraw/arrow/rect)几何来自 per-canvas OPFS store
 - freedraw 点序列**不进 DSL**(R2 隐私:不外发 AI;手绘是矢量,点数据留在引擎存储)
 - 引擎只动 `packages/canvas-engine`(零业务依赖);DSL/apply 层在 apps/web(可依赖 domain/engine)
 
 ---
 
-## 三、当前状态(2026-06-24)
+## 三、当前状态(2026-06-26)
 
-### 引擎:离线功能打磨完成
+### 引擎:离线功能打磨完成 + 独立成包
 
-- **五视图一致 + 鲁棒性**:交互层(kind×操作矩阵全清)、渲染/导出层(SVG 对齐渲染)、DSL 双向对称补全
-- **转义对 5 个 active kind 双向无损**——serialize→parse→apply→re-serialize 逐字节往返验证(仅 freedraw 例外=设计,守 R2 隐私)
-- 280 引擎测试 + 457 web 测试,build exit 0
+- **五视图一致 + 鲁棒性**:交互层(kind×操作矩阵全清)、渲染/导出层(SVG 对齐渲染)、DSL 双向对称补全;5 轮边界加固
+- **转义对全部 active kind 双向无损**——serialize→parse→apply→re-serialize 逐字节往返验证(仅 freedraw 例外=设计,守 R2 隐私)
+- **独立成包**:`packages/canvas-engine` 零业务依赖 + token 注入 + standalone 活证据(`InMemoryCanvasHost` + 自定义 tokenResolver;ADR `docs/adr/2026-06-23-canvas-engine-extract.md`)
+- 372 引擎测试 + 655 web 测试,build exit 0
 
-### 产品:核心闭环已落地
+### 产品:核心闭环 + 转义产品化 + 多轮加固,全部落地
 
-捕获 / inbox(多媒介编辑)/ canvas(自研画布)/ archive / search / tags / SVG-PNG-.cystift 导出。已 push 公开仓(`git@github.com:wscytz/cys-stift.git`)。
+捕获(全局快捷键 / mini input / 文件拖拽)/ inbox(多媒介编辑)/ canvas(自研画布 + 关系箭头三维签名 + Frame 分区 + Outline + Minimap + 全局缩略图 + 智能 elbow)/ archive / trash / search(打分)/ timeline / tags(10 色)/ SVG-PNG-.cystift 导出 / Markdown 导出 / 双链 [[]] / DSL 模态编辑器(看/编/应用/复制/下载 + 诊断)/ AI(3 provider + 排版 + auto-relate + cluster + 找重复)/ JSON 全量备份(含画布几何)。已 push 公开仓。
 
-### 缺口
+**多轮加固**:UI 审计 42 项 + a11y 系统化 ~45 项 + web 层鲁棒性 ~20 真 bug + 数据/反馈/坏输入修补轮 16 真 bug;功能期 6 个新功能(Backlink/Frame/全局缩略图/智能 elbow/Markdown 导出/双链)。
 
-- JSON 全量备份不完整(不含画布几何)= 数据可迁移信念 4 裂的(spec P9)
-- Tauri 未签名分发(spec P8,需 Apple 证书)
-- 转义已产品化:DSL 模态编辑器(`dsl-dialog.tsx`)——工具栏 DSL 按钮 → 模态看/编/应用/复制/下载画布文本,不门控 AI,所有用户可用(2026-06-24)
+### 剩余缺口
+
+- **Tauri 签名分发**(spec P8)— 卡 Apple 证书(用户侧);DMG 可本地构建(未签名)
+- **真实使用反馈**(打磨期燃料)— backlog A 当前空,核心动线待手测验证
 
 ---
 
-## 四、优先级框架
+## 四、优先级框架(2026-06-26 刷新)
 
-工作分三层,按"是否推进核心承诺"排序。**判断标准不是"还有没有缝可修",而是"这一步是否推进了产品的核心承诺"。**
+工作按"是否推进核心承诺"排序。**判断标准不是"还有没有缝可修",而是"这一步是否推进产品的核心承诺(转义 + 本地优先画布)"。**
 
-### 第一层 · 交付闭环(让产品成立)
+### 已完成(原三层框架,2026-06-24 立)
 
-1. **JSON 全量备份完整**(含画布几何)— 数据可迁移信念 4 的硬要求,spec P9。产品"数据不丢"承诺成立。
-2. **Tauri 签名分发** — 本地优先的可分发承诺,spec P8。(需 Apple 证书,可能卡用户侧)
+- ✅ **交付闭环**:JSON 全量备份(含画布几何,数据可迁移信念 4)/ 转义产品化(DSL 模态编辑器 + 诊断 + Outline + Markdown 导出 + 双链 [[]])/ AI 介入手绘(R2 安全形状描述,不发点序列)
+- ⏳ **Tauri 签名分发**(spec P8)— 唯一未闭合的交付项,**卡 Apple 证书**(用户侧),非纯技术阻塞;DMG 可本地构建
 
-### 第二层 · 让差异化可见(让转义成为产品能力)
+原三层已基本完成,加 3 轮加固 + 6 个功能扩展。**继续盲扫找缝的边际收益已很低**(见下文反模式)。
 
-3. **转义产品化** — 让 DSL 从埋在 AI 按钮后变成用户能摸到的功能:DSL 文本编辑器 / 粘贴 DSL 建画布 / 导出 DSL 文本 / AI 驱动更顺。**这是引擎投资的回报。**
+### 当前新前沿(方向选择,非"还有没有缝")
 
-### 第三层 · 增值(差异化扩张)
+核心承诺已落地。接下来是从下列方向里**选**,而非继续堆功能或找缝:
 
-4. **AI 介入手绘的额外判断** — 守 R2 隐私只发抽象几何特征(不发点序列)。引擎地基 + 数据完整 + 分发闭合后做。
+1. **发布稳定版 + 真实反馈** — 手测核心动线(捕获 / inbox 编辑 / 画布养 / 归档沉淀 / 导入导出往返),无 HIGH/MED 真 bug → 打 tag 发稳定版;backlog A 开始收真实反馈。**打磨期的正路退出**(polish-phase §五)。
+2. **引擎独立化深化(北极星)** — `canvas-engine` 做成可独立发布/复用的包:独立 demo 站 + npm 发布骨架 + 脱离 cys-stift 的示例应用。差异化资产的长期杠杆。
+3. **转义深化** — DSL 从"模态编辑器"升级:实时双向同步(编辑文本 = 编辑画布)/ 作为剪切板交换格式跨实例 / AI 驱动的工作流模板。
+4. **Tauri 签名分发**(待证书)— 证书到位即闭合。
+
+> 方向的具体权衡见对话;本节锁定"三层已完成 + 新前沿候选"的事实框架。当前状态见 `STATE.md`「下一步」。
 
 ### 反模式:停止"修缝"循环
 
-引擎已到"离线功能打磨完成"。继续"找缝"的边际收益已很低,且是防御性工作、不产出用户价值。除非某条缝直接阻断第一/二层主线,否则不主动挖。
+引擎已到"离线功能打磨完成"。继续"找缝"的边际收益已很低,且是防御性工作、不产出用户价值。除非某条缝直接阻断交付主线,否则不主动挖。
 
-> 产品已进入**打磨期**(2026-06-26)。这条原则的可操作落地——打磨 vs 修缝的判据、反馈驱动流程、活 backlog、退出标准——见 [`docs/development/polish-phase.md`](development/polish-phase.md)。判断"这一步该不该做"先读它。
+> 产品在**打磨期**(2026-06-26 起)。这条原则的可操作落地——打磨 vs 修缝判据、反馈驱动流程、活 backlog、退出标准——见 [`docs/development/polish-phase.md`](development/polish-phase.md)。判断"这一步该不该做"先读它。
 
 ---
 
