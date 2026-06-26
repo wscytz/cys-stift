@@ -117,6 +117,8 @@ Next.js 15 静态导出 + React 19 + TS strict + 自研 Canvas 2D + Tauri v2 + S
 
 引擎已到"离线功能打磨完成"。继续"找缝"的边际收益已很低,且是防御性工作、不产出用户价值。除非某条缝直接阻断第一/二层主线,否则不主动挖。
 
+> 产品已进入**打磨期**(2026-06-26)。这条原则的可操作落地——打磨 vs 修缝的判据、反馈驱动流程、活 backlog、退出标准——见 [`docs/development/polish-phase.md`](development/polish-phase.md)。判断"这一步该不该做"先读它。
+
 ---
 
 ## 五、约束(不可遗忘,详见根 `CLAUDE.md`)
