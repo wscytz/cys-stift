@@ -13,11 +13,22 @@ import type { Card } from '@cys-stift/domain'
 import { streamText } from './stream-text'
 import { PROMPTS, type AIAction } from './prompts'
 import type { AIConfig } from './types'
+import { settingsStore } from '@/lib/settings-store'
 
 export interface RunAIOptions {
   targetLang?: 'zh' | 'en'
+  /** Output locale for summarize/improveWriting (defaults to 'en'). */
+  locale?: 'zh' | 'en'
   onDelta?: (chunk: string) => void
   signal?: AbortSignal
+}
+
+/** Per-action sampling defaults. summarize/translate want stability; rewrite
+ *  wants creativity. The user's cfg.temperature/maxTokens override these. */
+const ACTION_DEFAULTS: Record<AIAction, { temperature: number; maxTokens: number }> = {
+  summarize: { temperature: 0.3, maxTokens: 1024 },
+  improveWriting: { temperature: 0.7, maxTokens: 1024 },
+  translate: { temperature: 0.3, maxTokens: 1024 },
 }
 
 export async function runAIAction(
@@ -27,20 +38,32 @@ export async function runAIAction(
   opts: RunAIOptions = {},
 ): Promise<{ content: string }> {
   const template = PROMPTS[action]
-  let user = template.buildUser(card)
+  const locale = opts.locale ?? currentLocale()
+  let user = template.buildUser(card, locale)
   if (action === 'translate') {
     const lang = opts.targetLang ?? 'en'
     user = user.replace('{{LANG}}', lang === 'zh' ? '中文' : 'English')
   }
+  const def = ACTION_DEFAULTS[action]
   return streamText(
     cfg,
     {
       system: template.system,
       user,
-      maxTokens: 1024,
-      temperature: 0.5,
+      temperature: cfg.temperature ?? def.temperature,
+      maxTokens: cfg.maxTokens ?? def.maxTokens,
     },
     opts.onDelta ?? (() => {}),
     opts.signal,
   )
+}
+
+/** Best-effort synchronous locale read for the default. useI18n() can't run
+ *  outside a component, so we fall back to the settings-store value, then 'en'. */
+function currentLocale(): 'zh' | 'en' {
+  try {
+    return settingsStore.get().locale
+  } catch {
+    return 'en'
+  }
 }

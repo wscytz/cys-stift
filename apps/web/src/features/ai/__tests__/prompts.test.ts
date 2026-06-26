@@ -29,7 +29,7 @@ function fakeCard(overrides: { title?: string; body?: string } = {}) {
 }
 
 function buildsFor(action: AIAction, card: ReturnType<typeof fakeCard>) {
-  return { system: PROMPTS[action].system, user: PROMPTS[action].buildUser(card as never) }
+  return { system: PROMPTS[action].system, user: PROMPTS[action].buildUser(card as never, 'en') }
 }
 
 describe('PROMPTS (privacy lock)', () => {
@@ -39,7 +39,7 @@ describe('PROMPTS (privacy lock)', () => {
   it('summarize user includes the title', () => { expect(sum.user).toContain('Test Title') })
   it('summarize user includes the body', () => { expect(sum.user).toContain('Test body') })
   it('summarize user shows no body text when body is empty', () => {
-    const u = PROMPTS.summarize.buildUser(fakeCard({ title: 'X', body: '' }) as never)
+    const u = PROMPTS.summarize.buildUser(fakeCard({ title: 'X', body: '' }) as never, 'en')
     expect(u).toContain('title: X')
     // body is empty so it won't appear or will show empty
     expect(u).not.toContain('Test body')
@@ -60,14 +60,14 @@ describe('PROMPTS (privacy lock)', () => {
   it.each<AIAction>(['summarize', 'improveWriting', 'translate'])(
     '%s prompt does NOT contain source.deviceId',
     (action) => {
-      const u = PROMPTS[action].buildUser(fakeCard())
+      const u = PROMPTS[action].buildUser(fakeCard() as never, 'en')
       expect(u).not.toContain('secret-device-id')
     },
   )
   it.each<AIAction>(['summarize', 'improveWriting', 'translate'])(
     '%s prompt does NOT contain "apiKey" (the AI config)',
     (action) => {
-      const u = PROMPTS[action].buildUser(fakeCard())
+      const u = PROMPTS[action].buildUser(fakeCard() as never, 'en')
       // The prompt templates never reference apiKey at all.
       expect(u).not.toMatch(/apiKey|api.key/i)
     },
@@ -81,10 +81,29 @@ describe('PROMPTS (privacy lock)', () => {
     (action) => {
       const deleted = fakeCard({ title: 'Leaked Title', body: 'Leaked body' })
       deleted.deletedAt = new Date('2026-06-21')
-      const u = PROMPTS[action].buildUser(deleted as never)
+      const u = PROMPTS[action].buildUser(deleted as never, 'en')
       expect(u).toBe('')
       expect(u).not.toContain('Leaked Title')
       expect(u).not.toContain('Leaked body')
     },
   )
+
+  // ── Locale-aware output (Task 2) ──
+  it('summarize buildUser instructs output in the zh locale', () => {
+    const u = PROMPTS.summarize.buildUser(fakeCard() as never, 'zh')
+    expect(u.toLowerCase()).toContain('中文')
+  })
+  it('summarize buildUser instructs output in the en locale', () => {
+    const u = PROMPTS.summarize.buildUser(fakeCard() as never, 'en')
+    expect(u.toLowerCase()).toContain('english')
+  })
+  it('improveWriting buildUser instructs output in the zh locale', () => {
+    const u = PROMPTS.improveWriting.buildUser(fakeCard() as never, 'zh')
+    expect(u.toLowerCase()).toContain('中文')
+  })
+  it('system prompts no longer ask the model for a "Here is" preamble', () => {
+    // The tuned prompts actively forbid preamble boilerplate.
+    expect(PROMPTS.summarize.system.toLowerCase()).not.toContain('here is')
+    expect(PROMPTS.improveWriting.system.toLowerCase()).not.toContain('here is')
+  })
 })

@@ -105,3 +105,54 @@ describe('runAIAction — passes through config', () => {
     expect(opts).toBe(ctrl.signal)
   })
 })
+
+describe('runAIAction — per-action temperature + maxTokens defaults', () => {
+  it('summarize uses a low (stable) temperature ~0.3', async () => {
+    await runAIAction(FAKE_CFG, 'summarize', fakeCard())
+    const opts = mockStreamText.mock.calls[0]?.[1] as { temperature: number }
+    expect(opts.temperature).toBeLessThan(0.5)
+    expect(opts.temperature).toBeGreaterThan(0)
+  })
+  it('improveWriting uses a higher (creative) temperature ~0.7', async () => {
+    await runAIAction(FAKE_CFG, 'improveWriting', fakeCard())
+    const opts = mockStreamText.mock.calls[0]?.[1] as { temperature: number }
+    expect(opts.temperature).toBeGreaterThanOrEqual(0.6)
+  })
+  it('translate uses a low (stable) temperature ~0.3', async () => {
+    await runAIAction(FAKE_CFG, 'translate', fakeCard())
+    const opts = mockStreamText.mock.calls[0]?.[1] as { temperature: number }
+    expect(opts.temperature).toBeLessThan(0.5)
+  })
+  it('caps maxTokens at a sane default (<= 2048)', async () => {
+    await runAIAction(FAKE_CFG, 'summarize', fakeCard())
+    const opts = mockStreamText.mock.calls[0]?.[1] as { maxTokens: number }
+    expect(opts.maxTokens).toBeLessThanOrEqual(2048)
+    expect(opts.maxTokens).toBeGreaterThan(0)
+  })
+})
+
+describe('runAIAction — cfg overrides temperature + maxTokens', () => {
+  it('cfg.temperature overrides the per-action default', async () => {
+    await runAIAction(
+      { ...FAKE_CFG, temperature: 0.95 },
+      'summarize',
+      fakeCard(),
+    )
+    const opts = mockStreamText.mock.calls[0]?.[1] as { temperature: number }
+    expect(opts.temperature).toBe(0.95)
+  })
+  it('cfg.maxTokens overrides the default', async () => {
+    await runAIAction(
+      { ...FAKE_CFG, maxTokens: 512 },
+      'improveWriting',
+      fakeCard(),
+    )
+    const opts = mockStreamText.mock.calls[0]?.[1] as { maxTokens: number }
+    expect(opts.maxTokens).toBe(512)
+  })
+  it('honours the i18n locale: zh shows up in the user prompt for summarize', async () => {
+    await runAIAction(FAKE_CFG, 'summarize', fakeCard(), { locale: 'zh' } as never)
+    const sent = mockStreamText.mock.calls[0]?.[1]?.user as string
+    expect(sent.toLowerCase()).toContain('中文')
+  })
+})

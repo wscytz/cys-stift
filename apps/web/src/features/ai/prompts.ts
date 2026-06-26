@@ -23,7 +23,9 @@ export type AIAction = 'summarize' | 'improveWriting' | 'translate'
 
 export interface PromptTemplate {
   system: string
-  buildUser: (card: Card) => string
+  /** Build the user-side prompt. `locale` controls the OUTPUT language for
+   *  summarize/improveWriting (translate already uses targetLang). */
+  buildUser: (card: Card, locale: 'zh' | 'en') => string
 }
 
 /**
@@ -37,29 +39,36 @@ function hiddenFromAI(card: Card): boolean {
   return Boolean(card.deletedAt)
 }
 
+/** Map a locale to the output-language instruction appended to summarize/rewrite. */
+function outputLangLine(locale: 'zh' | 'en'): string {
+  return locale === 'zh' ? 'Write the output in 中文 (Chinese).' : 'Write the output in English.'
+}
+
 export const PROMPTS: Record<AIAction, PromptTemplate> = {
   summarize: {
     system:
-      'You are a concise summarizer. Produce a 1-3 sentence summary preserving key facts. Output plain text only — no markdown, no preamble.',
-    buildUser: (card) => {
+      'You are a precise summarizer for a personal-notes app. Read the note and produce a 1-3 sentence summary that preserves the key facts and proper nouns. Output plain text only: no markdown, no headings, no list markers, no introductory label or lead-in — start directly with the summary itself.',
+    buildUser: (card, locale) => {
       if (hiddenFromAI(card)) return ''
       const ctx = serializeCardForAI(card)
-      return ctx || `Title: ${card.title}\n\nBody: ${card.body || '(empty)'}`
+      const body = ctx || `Title: ${card.title}\n\nBody: ${card.body || '(empty)'}`
+      return `${outputLangLine(locale)}\n\nSummarize this note.\n\n${body}`
     },
   },
   improveWriting: {
     system:
-      'You are a writing coach. Improve clarity, flow, and conciseness while preserving meaning. Output the improved body only — no preamble, no "Here is the improved version:".',
-    buildUser: (card) => {
+      'You are an expert writing editor for a personal-notes app. Improve clarity, flow, and conciseness while preserving the original meaning and the author\'s intent. Keep markdown formatting if present. Output the improved text only — no preamble, no explanations, no introductory lead-in.',
+    buildUser: (card, locale) => {
       if (hiddenFromAI(card)) return ''
       const ctx = serializeCardForAI(card)
-      return ctx || `Title: ${card.title}\n\nBody: ${card.body || '(empty)'}`
+      const body = ctx || `Title: ${card.title}\n\nBody: ${card.body || '(empty)'}`
+      return `${outputLangLine(locale)}\n\nRewrite the body of this note.\n\n${body}`
     },
   },
   translate: {
     system:
-      'You are a translator. Translate the body to the target language, preserving markdown formatting. Output only the translated body.',
-    // The {{LANG}} placeholder is replaced at runtime by ai-actions.ts
+      'You are a careful translator for a personal-notes app. Translate the body to the target language, preserving markdown formatting, code blocks, and proper nouns appropriately. Output only the translated text — no preamble, no notes about the translation.',
+    // The {{LANG}} placeholder is replaced at runtime by ai-actions.ts.
     buildUser: (card) => {
       if (hiddenFromAI(card)) return ''
       const ctx = serializeCardForAI(card)

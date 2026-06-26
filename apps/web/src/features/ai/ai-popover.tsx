@@ -39,7 +39,7 @@ export function AIPopover({
   onReplace,
   onAppendNew,
 }: Props) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const [streamed, setStreamed] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [running, setRunning] = useState(true)
@@ -57,6 +57,7 @@ export function AIPopover({
     setRunning(true)
     runAIAction(ai, action, card, {
       targetLang,
+      locale: locale,
       signal: ctrl.signal,
       onDelta: (chunk) => setStreamed((s) => s + chunk),
     })
