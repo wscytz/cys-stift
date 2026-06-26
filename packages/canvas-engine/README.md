@@ -2,6 +2,8 @@
 
 > 自研 Canvas 2D 画布引擎 —— cy's Stift 的画布核心,设计为可独立复用。
 
+> **状态**:已从 cy's Stift 抽出为零业务依赖的 workspace 包,有 `InMemoryCanvasHost` 作"脱离 cys-stift 仍完整运行"的活证据(见下)。**尚未发布到 npm** —— 当前经 workspace / 源码消费;独立 npm 发布 + demo 站是后续北极星工作。
+
 ## 为什么单独做一个
 
 tldraw / excalidraw 是优秀的画布库,但:① 许可有张力(tldraw 商用收费 / 遥测);② 箭头是「用户手选样式的几何箭头」,不是语义关系;③ 数据模型不透明。
@@ -14,7 +16,7 @@ canvas-engine 反过来:① **零许可依赖**(纯自研);② **关系箭头是
 - **透明统一模型**:`CanvasElement[]` 一份数据,live 渲染 / SVG 导出 / PNG 光栅化 / .cystift 往返 / DSL 文本 全是它的视图。
 - **token 注入**:引擎不假设 DOM 或调色板,消费者注入 `TokenResolver`。
 - **零业务依赖**:不认识「卡片 / 关系」概念,内容经 `getCardInfo` 回调注入。
-- **AI-native(转义)**:画布完全文字化(DSL 双向),任何 AI 能用文字驱动画布编辑。
+- **AI-native 模型(转义的根基)**:`CanvasElement` 透明统一,使画布完全文字化(DSL 双向)成为可能——任何 AI 用文字驱动画布编辑。注:DSL 文本层(serialize/parse/apply)是**消费侧**——cys-stift 里在 `apps/web`(因 card 内容需 CardService 注入);引擎本身提供承载它的透明模型 + 纯几何/渲染。
 
 ## 核心 API
 
@@ -48,6 +50,27 @@ adapter.upsert({ id: 'a1', kind: 'arrow', x:0, y:0, w:0, h:0, rotation:0, from: 
 
 adapter.onUserChange(({ updated, removed }) => persist(updated, removed))
 ```
+
+## 快速开始:无 DOM(纯逻辑 / Node / 测试)
+
+引擎**不依赖 DOM 就能完整运行** —— `InMemoryCanvasHost` 是"脱离 cys-stift 仍工作"的活证据,零参数、无浏览器、无 React:
+
+```ts
+import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
+
+const host = new InMemoryCanvasHost() // 零参数,无 DOM
+host.upsert({ id: 'c1', kind: 'card', x: 100, y: 100, w: 240, h: 120, rotation: 0 })
+host.upsert({ id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2' })
+
+host.onUserChange(({ updated, removed }) => console.log('changed:', updated, removed))
+host.batch(() => {
+  /* 多个 upsert 合并为一个 undo 步 */
+})
+const elements = host.getElements() // 确定性 z 序(按 KIND_LAYER 稳定排序)
+host.undo() // 内置 50 步 undo 栈
+```
+
+无需 cys-stift 的 Card/Relation 概念 —— 引擎只认 `CanvasElement`。
 
 ## 设计纪律(见 `CLAUDE.md`)
 
