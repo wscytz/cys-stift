@@ -247,7 +247,7 @@ export const settingsStore = {
    * matches the dropdown's default selection so the panel works out of
    * the box for first-time users.
    */
-  updateAISettings(patch: Partial<AIConfig>): void {
+  updateAISettings(patch: Partial<AIConfig>): boolean {
     hydrateOnce()
     const defaults: AIConfig = {
       provider: 'openai',
@@ -264,8 +264,11 @@ export const settingsStore = {
     if (!saveSettings(_settings)) {
       _settings = prev
       notifyQuota()
+      notify()
+      return false
     }
     notify()
+    return true
   },
 }
 

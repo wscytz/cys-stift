@@ -60,8 +60,12 @@ export function AISettingsPanel() {
   const update = (patch: Partial<AIConfig>) => setDraft((d) => ({ ...d!, ...patch }))
 
   const save = () => {
-    settingsStore.updateAISettings(draft)
-    pushToast({ kind: 'success', message: t('settings.aiSaved') })
+    // updateAISettings 返回 false = 配额失败已回滚内存 + notifyQuota(泛化配额 toast
+    // 由 AppMenu 订阅触发)。此时不该再 toast 成功(误导反馈真 bug:此前无条件 success
+    // toast → 用户看到「已保存」+「配额超限」两个矛盾 toast,reload 后配置消失)。
+    if (settingsStore.updateAISettings(draft)) {
+      pushToast({ kind: 'success', message: t('settings.aiSaved') })
+    }
   }
 
   const onProviderChange = (provider: ProviderId) => {

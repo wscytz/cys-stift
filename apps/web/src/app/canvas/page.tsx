@@ -386,9 +386,15 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
 
   const confirmDelete = () => {
     if (!confirmDeleteId) return
-    for (const c of service.listOnCanvas(confirmDeleteId)) service.removeFromCanvas(c.id)
-    canvasStore.delete(confirmDeleteId)
-    setConfirmDeleteId(null)
+    // 先删画布(localStorage,可能配额失败),成功才把卡片移回 inbox(DB)。
+    // 此前顺序反了:先 removeFromCanvas 再 delete —— 配额失败时画布回滚仍存在,
+    // 但卡片已离开画布,部分失败无反馈(真 bug)。原子化:delete 失败则不动卡片,
+    // 画布保留,用户可重试。notifyQuota 已弹泛化配额 toast;此处不关模态让用户知晓未删。
+    const cardsToMove = service.listOnCanvas(confirmDeleteId)
+    if (canvasStore.delete(confirmDeleteId)) {
+      for (const c of cardsToMove) service.removeFromCanvas(c.id)
+      setConfirmDeleteId(null)
+    }
   }
 
   const activeCanvas = canvases.find((c) => c.id === activeCanvasId)

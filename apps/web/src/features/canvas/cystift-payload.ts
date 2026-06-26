@@ -129,12 +129,24 @@ export async function restoreCystiftPayload(
   const elements = (payload.elements ?? []) as CanvasElement[]
   // 重映射 card id + arrow from/to(无论有无 host 都要重映射,因为下面要么进 host
   // 要么进 freeform store,两者都用新 id)。
+  // 配额中断保护:break 后 idMap 只含已成功创建的卡。引用失败卡片的元素必须跳过——
+  //   - card 元素:id 不在 idMap → 该卡几何没有对应 DB 卡,留下是孤儿(选不中/无内容)。
+  //   - arrow 元素:from/to 指向不在 idMap 的卡 → 悬空引用,渲染成连着虚无的箭头,
+  //     选不中删不掉,reload 仍在(真 bug,非设计约束)。跳过它。
+  // 自由箭头(无 from/to,bbox 编码端点)不依赖 idMap,正常保留。
   const remapped: CanvasElement[] = []
   for (const el of elements) {
-    const newEl: CanvasElement = { ...el }
-    if (el.kind === 'card' && idMap.has(el.id)) {
-      newEl.id = idMap.get(el.id)!
+    if (el.kind === 'card') {
+      if (!idMap.has(el.id)) continue // 配额中断:该卡未创建,跳过孤儿几何
+      const newEl: CanvasElement = { ...el, id: idMap.get(el.id)! }
+      remapped.push(newEl)
+      continue
     }
+    // arrow:from/to 若任一指向不在 idMap 的卡 → 悬空,跳过(自由箭头无 from/to 不受影响)
+    if (el.kind === 'arrow' && ((el.from && !idMap.has(el.from)) || (el.to && !idMap.has(el.to)))) {
+      continue
+    }
+    const newEl: CanvasElement = { ...el }
     if (el.from && idMap.has(el.from)) newEl.from = idMap.get(el.from)!
     if (el.to && idMap.has(el.to)) newEl.to = idMap.get(el.to)!
     remapped.push(newEl)

@@ -196,6 +196,7 @@ export const messages = {
   'canvas.dslCopyFail': { zh: '复制失败', en: 'Copy failed' },
   'canvas.dslDownload': { zh: '下载', en: 'Download' },
   'canvas.dslDownloaded': { zh: '已下载 DSL 文本', en: 'DSL text downloaded' },
+  'canvas.dslDownloadFail': { zh: '下载失败(存储已满?)', en: 'Download failed (storage full?)' },
   'canvas.dslEmpty': { zh: '没有可应用的指令', en: 'No directives to apply' },
   'canvas.dslErrorsTitle': { zh: '{n} 行无法识别', en: '{n} line(s) could not be parsed' },
   'canvas.dslErrorLine': { zh: '第 {line} 行:', en: 'Line {line}:' },

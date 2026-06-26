@@ -296,6 +296,24 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
       }
     }
   }
+
+  // canvasPosition 引用一致性:card.canvasPosition.canvasId 必须指向一个真实存在的
+  // 画布。旧版 JSON(无 canvases 字段)或手工编辑/损坏的 JSON 里,可能出现指向不存在
+  // 画布的 canvasPosition —— 这种卡既不出现在 inbox(listInbox 要求 !canvasPosition)
+  // 也不出现在任何画布(listOnCanvas 按 canvasId 过滤)→ 永久不可见不可找回(真 bug,
+  // 非设计约束)。修法:payload 带 canvases 时,校验每张卡的 canvasId;指向不存在画布的
+  // 清掉 canvasPosition(回 inbox,可见可找回),而非 reject 整体导入(更友好,不丢数据)。
+  // payload 不带 canvases(旧 JSON)→ 无法校验,保留原样(向后兼容)。
+  if (payload.canvases && Array.isArray(payload.canvases.canvases)) {
+    const validCanvasIds = new Set(payload.canvases.canvases.map((c) => c.id))
+    for (let i = 0; i < payload.cards.length; i++) {
+      const card = payload.cards[i] as Card & { canvasPosition?: { canvasId?: unknown } }
+      const cp = card.canvasPosition
+      if (cp && (typeof cp.canvasId !== 'string' || !validCanvasIds.has(cp.canvasId))) {
+        delete card.canvasPosition
+      }
+    }
+  }
   // Overwrite the four stores atomically. Missing optional keys are
   // skipped. We (1) serialise everything first — a serialise error must
   // abort before any store is touched; (2) snapshot each key's old raw

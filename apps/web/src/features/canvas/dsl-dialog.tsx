@@ -132,17 +132,24 @@ export function DslDialog({
   }
 
   const download = () => {
-    const baseName = canvasName || 'canvas'
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${baseName}.txt`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-    pushToast({ kind: 'success', message: t('canvas.dslDownloaded') })
+    // try/catch:text 极大时 new Blob / createObjectURL 可抛(配额/内存),冒泡到
+    // 错误边界不如 toast 友好(对齐 export-dialog doExport 的 try/catch 模式)。
+    // a.click() 本身 fire-and-forget 浏览器不让确认,那是浏览器限制,不算 bug。
+    try {
+      const baseName = canvasName || 'canvas'
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${baseName}.txt`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      pushToast({ kind: 'success', message: t('canvas.dslDownloaded') })
+    } catch {
+      pushToast({ kind: 'error', message: t('canvas.dslDownloadFail') })
+    }
   }
 
   return (

@@ -52,6 +52,10 @@ export function attachCanvasFreeformPersistence(
   let timer: ReturnType<typeof setTimeout> | null = null
   // 已知的 freeform 元素 id —— 用来判定 removed 的 id 是 freeform 还是 card。
   const knownFreeformIds = new Set<string>()
+  // hydrate 前用户已绘制但 unbind 时 load 未回:捕获当前 host 的 freeform 元素,
+  // 让迟到的 load .then 合并「持久化 ∪ 新建」做一次 save。否则这些笔画会永久丢失
+  // (load .then 在 disposed 后短路 return,cleanup 又因 !hydrated 不 flush)。
+  let pendingAtDisposal: CanvasElement[] | null = null
 
   const doSave = () => {
     timer = null
@@ -94,7 +98,16 @@ export function attachCanvasFreeformPersistence(
 
   // 异步 hydrate:load → restore 非 card(applyWithoutEcho)→ 标记 hydrated。
   void store.load(canvasId).then((snapshot) => {
-    if (disposed) return
+    if (disposed) {
+      // unbind 时 load 未回 + 用户在此期间画过:把持久化快照与 unbind 时捕获的
+      // 新建元素合并做一次 save(纯写,不 upsert host,disposed 后安全)。这救回
+      // 「OPFS 慢 + 画一笔立刻切画布」会丢的笔画(真 bug)。
+      if (pendingAtDisposal && dirtyDuringHydrate) {
+        const merged = mergeNewIntoSnapshot(snapshot, pendingAtDisposal)
+        void store.save(canvasId, merged)
+      }
+      return
+    }
     if (snapshot && snapshot.elements.length > 0) {
       host.applyWithoutEcho(() => {
         for (const el of snapshot.elements) {
@@ -127,5 +140,25 @@ export function attachCanvasFreeformPersistence(
         flushing = false
       }
     }
+    // 未 hydrate 但用户画过:捕获当前 freeform 元素,交给 load .then 合并保存
+    // (此时 host 仍存活——unbind 在 self-canvas effect cleanup 的 adapter.detach
+    // 之前跑,host.getElements() 安全)。
+    if (!hydrated && dirtyDuringHydrate) {
+      pendingAtDisposal = freeformElementsOf(host.getElements())
+    }
   }
+}
+
+/**
+ * 合并持久化快照与 hydrate 期间新建的元素:同 id 以新建为准(用户改动优先),
+ * 其余取并集。纯函数,不碰 host。
+ */
+function mergeNewIntoSnapshot(
+  snapshot: { elements: CanvasElement[] } | null | undefined,
+  newer: CanvasElement[],
+): CanvasElement[] {
+  const byId = new Map<string, CanvasElement>()
+  for (const el of snapshot?.elements ?? []) byId.set(el.id, el)
+  for (const el of newer) byId.set(el.id, el) // 新建/改动覆盖
+  return Array.from(byId.values())
 }
