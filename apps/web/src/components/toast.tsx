@@ -42,6 +42,25 @@ export function ToastHost() {
           className={`${styles.toast} ${styles[`toast--${tst.kind}`] ?? ''}`}
         >
           <span id={`toast-${tst.id}-msg`} className={styles.toast__msg}>{tst.message}</span>
+          {tst.actions?.map((act, i) => (
+            <button
+              key={`${tst.id}-act-${i}`}
+              type="button"
+              data-testid={`toast-action-${i}`}
+              className={styles.toast__action}
+              onClick={() => {
+                // fire the action, then ALWAYS dismiss (even if it threw) so
+                // the toast doesn't linger after a redirect attempt failed.
+                try {
+                  act.onClick()
+                } finally {
+                  dismissToast(tst.id)
+                }
+              }}
+            >
+              {act.label}
+            </button>
+          ))}
           <button
             type="button"
             className={styles.toast__close}

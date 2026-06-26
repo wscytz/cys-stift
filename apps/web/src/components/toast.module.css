@@ -53,6 +53,32 @@
   outline-offset: 1px;
 }
 
+.toast__action {
+  flex: 0 0 auto;
+  background: var(--color-white);
+  color: var(--color-black);
+  border: var(--border-hairline);
+  border-color: var(--color-black);
+  padding: 0 var(--space-2);
+  margin-left: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: lowercase;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  line-height: 1.6;
+}
+
+.toast__action:hover {
+  background: var(--color-black);
+  color: var(--color-white);
+}
+
+.toast__action:focus-visible {
+  outline: 2px solid var(--color-blue);
+  outline-offset: 1px;
+}
+
 .toast--info {
   border-color: var(--color-black);
 }
