@@ -16,7 +16,7 @@ import type {
 } from './canvas-host'
 import { sortByLayer, sanitizeView, ZOOM_MIN, ZOOM_MAX } from './canvas-host'
 import { renderElements, drawSelectionOutlines, drawMarquee, domTokenResolver, type CardInfo, type TokenResolver } from './self-built-render'
-import { hitTest, screenToPage } from './self-built-hittest'
+import { hitTest, screenToPage, eraserHitTest } from './self-built-hittest'
 import { commitFreedraw, translateFreedraw, scaleFreedrawToBox } from './self-built-freedraw'
 import { handleAtPoint, resizeGeometry, type Handle } from './self-built-resize'
 import { marqueeSelect } from './self-built-marquee'
@@ -270,19 +270,14 @@ export class SelfBuiltAdapter implements CanvasHost {
    *  - all 模式:删一切(host.remove)
    */
   private eraseAt(p: { x: number; y: number }): string | null {
-    // 橡皮命中比选择更宽松:先正常 hitTest(6px 容差),未中则用 2× 容差重试。
-    // 线/箭头很细,缩小视图下点偏一点就擦不掉(用户感知"删不掉"的真因之一)。
-    // 橡皮语义本就是"擦到附近",宽容差合理。bbox 元素(card/rect/frame)不受影响
-    // (它们面积大,6px 已够);只让细线/箭头更容易被擦中。
-    let id = hitTest(this.getElements(), p.x, p.y, this.view.zoom)
-    if (!id) id = hitTest(this.getElements(), p.x, p.y, this.view.zoom * 0.5) // zoom 减半 → tol 翻倍
+    // 橡皮用专属宽松命中(eraserHitTest):线类 16px 屏幕、bbox 类扩展 4px。
+    // 比 hitTest(6px)宽松得多,细线/箭头在缩小视图下也能擦到(用户"删不掉"真因)。
+    const id = eraserHitTest(this.getElements(), p.x, p.y, this.view.zoom)
     if (!id) return null
     const el = this.getElement(id)
     if (!el) return null
     if (this.eraserMode === 'text' && el.kind !== 'text') return null
     if (this.eraserMode === 'card' && el.kind !== 'card') return null
-    // card 模式命中卡片:先通知 web 层 softDelete(进回收桶),再 host.remove 删几何。
-    // onEraseCard 缺省(纯引擎/单测)时退化为直接 remove(不进回收桶,但元素仍消失)。
     if (this.eraserMode === 'card' && el.kind === 'card') {
       this.onEraseCard?.(id)
     }

@@ -1049,4 +1049,19 @@ describe('SelfBuiltAdapter eraser 宽容差', () => {
     tap(host, 650, 50);  // card
     expect(host.getElements()).toHaveLength(0)
   })
+
+  it('关系箭头:zoom=0.3 偏离线 30 页px 仍可擦(eraserHitTest 16px 屏幕)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'b', kind: 'card', x: 1000, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b' })
+    host.setTool('eraser'); host.setEraserMode('all')
+    host.setView({ panX: 0, panY: 0, zoom: 0.3, gridMode: 'free' })
+    // 线在页 y=50。zoom=0.3 → 屏幕 y=15。偏离 30 页px = 9 屏幕 → 屏幕 y=24。
+    // 16px 屏幕阈值 → 命中。hitTest(6px)在此距离早不中。
+    const c = host['canvas'] as HTMLCanvasElement
+    c.dispatchEvent(new PointerEvent('pointerdown', { clientX: 250, clientY: 24, bubbles: true }))
+    c.dispatchEvent(new PointerEvent('pointerup', { clientX: 250, clientY: 24, bubbles: true }))
+    expect(host.getElement('ar')).toBeUndefined()
+  })
 })
