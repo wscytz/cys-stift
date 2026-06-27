@@ -173,9 +173,10 @@ function EmptyState() {
   return (
     <UICard>
       <div className="empty">
-        <BauhausMotif />
+        <BauhausMotif variant="overlap" size={160} />
         <p className="eyebrow">{t('trash.crumb')}</p>
         <h2 className="display-title display-title--lg">{t('trash.empty')}</h2>
+        <p className="empty__lede">{t('trash.empty.lede')}</p>
       </div>
     </UICard>
   )

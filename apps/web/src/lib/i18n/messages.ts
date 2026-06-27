@@ -342,7 +342,8 @@ export const messages = {
   'archive.batchDeleteConfirmRecovery': { zh: '这些卡片将从归档中隐藏。你可以稍后从回收站恢复。', en: 'These cards will be hidden from the archive. You can restore them later from Trash.' },
   'archive.batchDeleteConfirmAction': { zh: '软删除 {n} 张', en: 'Soft-delete {n}' },
   'archive.confirmDelete': { zh: '删除', en: 'Delete' },
-  'archive.empty': { zh: '没有归档卡片。已归档的卡片会在这里出现。', en: 'No archived cards. Archived cards show up here.' },
+  'archive.empty': { zh: '归档区还空着', en: 'Archive is empty' },
+  'archive.empty.lede': { zh: '把暂时不用的卡片归档到这里,主视图更清爽;需要时随时找回。', en: "Archive cards you don't need now — they stay here until you bring them back." },
 
   /* ── Timeline (全局时间线视图,P10) ── */
   'timeline.crumb': { zh: '时间线', en: 'timeline' },
@@ -356,7 +357,8 @@ export const messages = {
 
   /* ── Trash ── */
   'trash.crumb': { zh: '回收站', en: 'trash' },
-  'trash.empty': { zh: '回收站为空。软删除的卡片会在这里出现，你可以恢复或永久删除。', en: 'Trash is empty. Soft-deleted cards show up here for recovery or permanent deletion.' },
+  'trash.empty': { zh: '回收站是空的', en: 'Trash is empty' },
+  'trash.empty.lede': { zh: '删掉的卡片会先到这里,随时可恢复或永久清空。', en: 'Deleted cards land here first — recover them anytime, or clear for good.' },
   'trash.restore': { zh: '恢复', en: 'Restore' },
   'trash.deleteForever': { zh: '永久删除', en: 'Delete forever' },
   'trash.deleteForeverTitle': { zh: '永久删除？', en: 'Delete forever?' },

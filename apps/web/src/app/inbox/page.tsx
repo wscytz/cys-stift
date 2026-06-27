@@ -623,7 +623,7 @@ function EmptyState({ view }: { view: View }) {
   return (
     <UICard>
       <div className="empty">
-        <BauhausMotif />
+        <BauhausMotif variant="overlap" size={160} />
         <p className="eyebrow">{t('inbox.crumb')}</p>
         <h2 className="display-title display-title--lg">
           {view === 'inbox' ? t('inbox.empty.title') : t('inbox.empty.titleArchived')}
