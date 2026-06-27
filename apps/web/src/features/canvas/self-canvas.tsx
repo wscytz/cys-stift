@@ -51,7 +51,7 @@ export function SelfCanvas({
   canvasId: CanvasId
   service: CardService
   /** 当前工具(page 持有)。切离 'text' 时收起编辑中的 textarea。 */
-  tool: 'select' | 'freedraw' | 'text' | 'connect'
+  tool: 'select' | 'freedraw' | 'eraser' | 'text' | 'connect'
   onOpenCard: (card: Card) => void
   adapterRef: React.MutableRefObject<SelfCanvasHandle>
   /** Page-supplied ref so the RelationPanel can read the canvas rect for

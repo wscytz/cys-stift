@@ -51,7 +51,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     up: (e: PointerEvent) => void
   } | null = null
   private wheelHandler: ((e: WheelEvent) => void) | null = null
-  private activeTool: 'select' | 'freedraw' | 'text' | 'connect' = 'select'
+  private activeTool: 'select' | 'freedraw' | 'eraser' | 'text' | 'connect' = 'select'
   private currentStroke: { points: [number, number][] } | null = null
   private selectedIds = new Set<string>()
   private resizing: { id: string; handle: Handle; start: { x: number; y: number; w: number; h: number } } | null = null
@@ -231,7 +231,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   }
 
   /** 切换工具(渲染器自身方法,不上 CanvasHost 接口)。 */
-  setTool(t: 'select' | 'freedraw' | 'text' | 'connect'): void {
+  setTool(t: 'select' | 'freedraw' | 'eraser' | 'text' | 'connect'): void {
     this.activeTool = t
     // R1.5:切工具时清掉一切进行中的交互状态,否则 connect/drag 中的 connecting/dragGroup
     // 残留 → 切回 select 后一个无谓的 pointermove 会用陈旧状态造幽灵 arrow / 移动元素。
@@ -240,7 +240,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     this.scheduleRender()
   }
 
-  getTool(): 'select' | 'freedraw' | 'text' | 'connect' {
+  getTool(): 'select' | 'freedraw' | 'eraser' | 'text' | 'connect' {
     return this.activeTool
   }
 
@@ -449,6 +449,13 @@ export class SelfBuiltAdapter implements CanvasHost {
       const sx = e.clientX - rect.left
       const sy = e.clientY - rect.top
       const p = screenToPage(this.view, sx, sy)
+      // eraser 模式:点中元素即删。remove() 自动 pushUndo + 级联清悬空箭头 +
+      // emitUser + scheduleRender,所以一次点击 = 一步可撤销的删除。
+      if (this.activeTool === 'eraser') {
+        const id = hitTest(this.getElements(), p.x, p.y, this.view.zoom)
+        if (id) this.remove(id)
+        return
+      }
       if (this.activeTool === 'freedraw') {
         this.currentStroke = { points: [[Math.round(p.x), Math.round(p.y)]] }
         try {

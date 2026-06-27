@@ -64,7 +64,7 @@ export default function CanvasPage() {
   const canvasElRef = useRef<HTMLCanvasElement | null>(null)
   const [detail, setDetail] = useState<{ card: Card } | null>(null)
   const [snapMode, setSnapMode] = useState<'snap' | 'free'>('snap')
-  const [tool, setTool] = useState<'select' | 'freedraw' | 'text' | 'connect'>('select')
+  const [tool, setTool] = useState<'select' | 'freedraw' | 'eraser' | 'text' | 'connect'>('select')
   // AI loading + abort(审计 M5+M9):async 调用期间禁用按钮防重复点击,
   // AbortController 在卸载/取消时 abort,省 API 费 + 防 unmounted setState。
   const [aiBusy, setAiBusy] = useState<null | 'layout' | 'cluster'>(null)
@@ -90,6 +90,9 @@ export default function CanvasPage() {
   const [creatingName, setCreatingName] = useState<string | null>(null)
   const [renamingId, setRenamingId] = useState<CanvasId | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<CanvasId | null>(null)
+  // 二次确认:删画布是不可撤销的破坏性操作,要求输入 "delete" 才点亮危险按钮
+  // (对齐 /trash 的 hard-delete 模式)。模态关闭时清空,下次重开从干净态开始。
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [exportOpen, setExportOpen] = useState(false)
   const [outlineOpen, setOutlineOpen] = useState(false)
   const [dslOpen, setDslOpen] = useState(false)
@@ -439,7 +442,12 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
   }
 
   const requestDelete = () => {
-    if (activeCanvasId === DEFAULT_CANVAS_ID) return
+    // 默认画布受 store 保护(canvasStore.delete 拒绝默认 id)——按钮保持可点
+    // (不再死灰),点了给明确提示告诉用户怎么走,而不是静默 no-op(原"用不了")。
+    if (activeCanvasId === DEFAULT_CANVAS_ID) {
+      pushToast({ kind: 'info', message: t('canvas.deleteDefaultHint') })
+      return
+    }
     setConfirmDeleteId(activeCanvasId)
   }
 
@@ -453,6 +461,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     if (canvasStore.delete(confirmDeleteId)) {
       for (const c of cardsToMove) service.removeFromCanvas(c.id)
       setConfirmDeleteId(null)
+      setDeleteConfirmText('')
     }
   }
 
@@ -568,7 +577,13 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           onSwitch={switchCanvas}
         />
         <span className="tb-divider" aria-hidden="true" />
-        {(['select', 'freedraw', 'text', 'connect'] as const).map((tk) => (
+        {([
+          { tk: 'select', icon: '↖', label: 'canvas.tool.select' },
+          { tk: 'freedraw', icon: '✎', label: 'canvas.tool.draw' },
+          { tk: 'eraser', icon: '⌫', label: 'canvas.tool.eraser' },
+          { tk: 'text', icon: 'T', label: 'canvas.tool.text' },
+          { tk: 'connect', icon: '⇄', label: 'canvas.tool.connect' },
+        ] as const).map(({ tk, icon, label }) => (
           <button
             key={tk}
             type="button"
@@ -576,9 +591,10 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
             onClick={() => setTool(tk)}
             disabled={!adapterReady}
             aria-pressed={tool === tk}
-            style={{ textTransform: 'none', letterSpacing: 0 }}
+            title={t(label)}
+            aria-label={t(label)}
           >
-            {tk === 'select' ? t('canvas.tool.select') : tk === 'freedraw' ? t('canvas.tool.draw') : tk === 'text' ? t('canvas.tool.text') : t('canvas.tool.connect')}
+            {icon}
           </button>
         ))}
         <span className="tb-divider" aria-hidden="true" />
@@ -618,7 +634,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           canUndo={canUndo}
           canRedo={canRedo}
           canRename={!!activeCanvas}
-          canDelete={activeCanvasId !== DEFAULT_CANVAS_ID}
+          canDelete={true}
           onUndo={handleUndo}
           onRedo={handleRedo}
           onNewCanvas={() => setCreatingName('')}
@@ -664,15 +680,25 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         </div>
       </Modal>
 
-      <Modal open={confirmDeleteId !== null} onClose={() => setConfirmDeleteId(null)} title={t('canvas.deleteModalTitle')}>
+      <Modal open={confirmDeleteId !== null} onClose={() => { setConfirmDeleteId(null); setDeleteConfirmText('') }} title={t('canvas.deleteModalTitle')}>
         <p className="confirm__body">
           {cardCountOnTarget > 0
             ? t('canvas.deleteModalBodyCards', { name: canvases.find((c) => c.id === confirmDeleteId)?.name ?? '', n: cardCountOnTarget })
             : t('canvas.deleteModalBodyNoCards', { name: canvases.find((c) => c.id === confirmDeleteId)?.name ?? '' })}
         </p>
+        <p className="confirm__body">{t('canvas.deleteConfirmType')}</p>
+        <input
+          className="confirm__type"
+          type="text"
+          autoFocus
+          autoComplete="off"
+          placeholder="delete"
+          value={deleteConfirmText}
+          onChange={(e) => setDeleteConfirmText(e.target.value)}
+        />
         <div className="confirm__actions">
-          <Button variant="ghost" onClick={() => setConfirmDeleteId(null)}>{t('common.cancel')}</Button>
-          <Button variant="danger" onClick={confirmDelete}>{t('canvas.deleteCanvas')}</Button>
+          <Button variant="ghost" onClick={() => { setConfirmDeleteId(null); setDeleteConfirmText('') }}>{t('common.cancel')}</Button>
+          <Button variant="danger" disabled={deleteConfirmText !== 'delete'} onClick={confirmDelete}>{t('canvas.deleteCanvas')}</Button>
         </div>
       </Modal>
 
@@ -921,6 +947,7 @@ function CanvasSideRail({
   onShortcuts: () => void
 }) {
   const { t } = useI18n()
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
   return (
     <nav className="cv-rail" aria-label={t('canvas.sideRail')}>
       <RailButton label={t('canvas.undo')} onClick={onUndo} disabled={!adapterReady || !canUndo} icon="↶" />
@@ -943,9 +970,20 @@ function CanvasSideRail({
       {aiEnabled && <span className="cv-rail__sep" aria-hidden="true" />}
       <RailButton label={t('canvas.outline')} disabled={!adapterReady} onClick={onOutline} pressed={outlineOpen} icon="☰" />
       <RailButton label={t('canvas.overview')} disabled={!adapterReady} onClick={onOverview} icon="▤" />
-      <RailButton label={t('canvas.dslTitle')} disabled={!adapterReady} onClick={onDsl} icon="DSL" />
-      <RailButton label={t('canvas.markdown')} disabled={!adapterReady} onClick={onMarkdown} icon="MD" />
-      <RailButton label={t('canvas.export')} disabled={!adapterReady} onClick={onExport} icon="⤓" />
+      {/* 导出:一个按钮 + 二级拓展(图片/Markdown/DSL)。Diff(版本对比)不是导出,留独立按钮。 */}
+      <div className="cv-rail__group">
+        <RailButton label={t('canvas.export')} disabled={!adapterReady} onClick={() => setExportMenuOpen((o) => !o)} icon="⤓" pressed={exportMenuOpen} />
+        {exportMenuOpen && (
+          <>
+            <div className="cv-rail__menu-backdrop" onClick={() => setExportMenuOpen(false)} aria-hidden="true" />
+            <div className="cv-rail__menu" role="menu" aria-label={t('canvas.export')}>
+              <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={!adapterReady} onClick={() => { setExportMenuOpen(false); onExport() }}>{t('canvas.exportImage')}</button>
+              <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={!adapterReady} onClick={() => { setExportMenuOpen(false); onMarkdown() }}>{t('canvas.markdown')}</button>
+              <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={!adapterReady} onClick={() => { setExportMenuOpen(false); onDsl() }}>{t('canvas.dslTitle')}</button>
+            </div>
+          </>
+        )}
+      </div>
       <RailButton label={t('canvas.diffTitle')} disabled={!adapterReady} onClick={onDiff} icon="±" />
       <span className="cv-rail__sep" aria-hidden="true" />
       <RailButton label={t('canvas.shortcuts')} onClick={onShortcuts} icon="?" />
@@ -1012,6 +1050,15 @@ const styles = `
 .crename { height: 32px; padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-sm); border: var(--border-hairline); border-radius: var(--radius-sm); outline: none; min-width: 200px; }
 .cinput { display: block; width: 100%; height: 32px; margin-top: var(--space-2); padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-base); border: var(--border-hairline); border-radius: var(--radius-sm); outline: none; }
 .confirm__body { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
+.confirm__body + .confirm__body { margin-top: var(--space-1); }
+.confirm__type {
+  display: block; width: 100%; margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-mono); font-size: var(--font-size-sm);
+  border: var(--border-hairline); border-radius: var(--radius-sm);
+  background: var(--color-white); color: var(--color-black); outline: none;
+}
+.confirm__type:focus { border-color: var(--color-red); }
 .confirm__actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-2); }
 .cv-rail {
   /* z-index scale (canvas chrome):
@@ -1042,4 +1089,23 @@ const styles = `
 .cv-rail__btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .cv-rail__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: -2px; }
 .cv-rail__sep { width: 24px; height: 1px; background: var(--color-gray-soft); margin: var(--space-1) 0; }
+.cv-rail__group { position: relative; display: flex; flex-direction: column; align-items: center; }
+/* 导出二级菜单:点 backdrop(覆盖 rail)关闭;菜单从 rail 左侧弹出。 */
+.cv-rail__menu-backdrop { position: fixed; inset: 0; z-index: 25; cursor: default; }
+.cv-rail__menu {
+  position: absolute; right: calc(100% + var(--space-2)); top: 0; z-index: 26;
+  min-width: 168px; padding: var(--space-1);
+  background: var(--color-white); border: 2px solid var(--color-black); border-radius: var(--radius-sm);
+  box-shadow: 4px 4px 0 0 var(--color-black);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.cv-rail__menu-item {
+  text-align: left; padding: var(--space-1) var(--space-2);
+  background: transparent; border: 0; border-radius: var(--radius-sm);
+  font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black);
+  cursor: pointer; white-space: nowrap;
+}
+.cv-rail__menu-item:hover:not(:disabled) { background: var(--color-yellow); }
+.cv-rail__menu-item:disabled { opacity: 0.5; cursor: not-allowed; }
+.cv-rail__menu-item:focus-visible { outline: 2px solid var(--color-blue); outline-offset: 1px; }
 `
