@@ -950,29 +950,29 @@ function CanvasSideRail({
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   return (
     <nav className="cv-rail" aria-label={t('canvas.sideRail')}>
-      <RailButton label={t('canvas.undo')} onClick={onUndo} disabled={!adapterReady || !canUndo} icon="↶" />
-      <RailButton label={t('canvas.redo')} onClick={onRedo} disabled={!adapterReady || !canRedo} icon="↷" />
+      <RailButton label={t('canvas.undo')} short={t('canvas.rail.undo')} onClick={onUndo} disabled={!adapterReady || !canUndo} icon="↶" />
+      <RailButton label={t('canvas.redo')} short={t('canvas.rail.redo')} onClick={onRedo} disabled={!adapterReady || !canRedo} icon="↷" />
       <span className="cv-rail__sep" aria-hidden="true" />
-      <RailButton label={t('canvas.newTitle')} onClick={onNewCanvas} icon="+" />
-      <RailButton label={t('canvas.renameTitle')} onClick={onRename} disabled={!canRename} icon="✎" />
-      <RailButton label={t('canvas.deleteTitle')} onClick={onDelete} disabled={!canDelete} icon="🗑" />
+      <RailButton label={t('canvas.newTitle')} short={t('canvas.rail.new')} onClick={onNewCanvas} icon="+" />
+      <RailButton label={t('canvas.renameTitle')} short={t('canvas.rail.rename')} onClick={onRename} disabled={!canRename} icon="✎" />
+      <RailButton label={t('canvas.deleteTitle')} short={t('canvas.rail.delete')} onClick={onDelete} disabled={!canDelete} icon="🗑" />
       <span className="cv-rail__sep" aria-hidden="true" />
       {aiEnabled && (
         <>
-          <RailButton label={t('canvas.aiLayout')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'layout'} ariaBusy={aiBusy === 'layout'} busyTitle={t('canvas.aiRunning')} onClick={onAILayout} icon="AI" />
-          <RailButton label={t('canvas.aiCluster')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'cluster'} onClick={onAICluster} icon="AC" />
+          <RailButton label={t('canvas.aiLayout')} short={t('canvas.rail.aiLayout')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'layout'} ariaBusy={aiBusy === 'layout'} busyTitle={t('canvas.aiRunning')} onClick={onAILayout} icon="✨" />
+          <RailButton label={t('canvas.aiCluster')} short={t('canvas.rail.aiCluster')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'cluster'} onClick={onAICluster} icon="🧠" />
         </>
       )}
       {showAutoRelate && (
-        <RailButton label={t('canvas.autoRelate')} onClick={onAutoRelate} icon="→" />
+        <RailButton label={t('canvas.autoRelate')} short={t('canvas.rail.autoRelate')} onClick={onAutoRelate} icon="→" />
       )}
-      <RailButton label={t('canvas.frameSelection')} disabled={!adapterReady} onClick={onFrame} icon="▭" />
+      <RailButton label={t('canvas.frameSelection')} short={t('canvas.rail.frame')} disabled={!adapterReady} onClick={onFrame} icon="▭" />
       {aiEnabled && <span className="cv-rail__sep" aria-hidden="true" />}
-      <RailButton label={t('canvas.outline')} disabled={!adapterReady} onClick={onOutline} pressed={outlineOpen} icon="☰" />
-      <RailButton label={t('canvas.overview')} disabled={!adapterReady} onClick={onOverview} icon="▤" />
+      <RailButton label={t('canvas.outline')} short={t('canvas.rail.outline')} disabled={!adapterReady} onClick={onOutline} pressed={outlineOpen} icon="☰" />
+      <RailButton label={t('canvas.overview')} short={t('canvas.rail.overview')} disabled={!adapterReady} onClick={onOverview} icon="▤" />
       {/* 导出:一个按钮 + 二级拓展(图片/Markdown/DSL)。Diff(版本对比)不是导出,留独立按钮。 */}
       <div className="cv-rail__group">
-        <RailButton label={t('canvas.export')} disabled={!adapterReady} onClick={() => setExportMenuOpen((o) => !o)} icon="⤓" pressed={exportMenuOpen} />
+        <RailButton label={t('canvas.export')} short={t('canvas.rail.export')} disabled={!adapterReady} onClick={() => setExportMenuOpen((o) => !o)} icon="⤓" pressed={exportMenuOpen} />
         {exportMenuOpen && (
           <>
             <div className="cv-rail__menu-backdrop" onClick={() => setExportMenuOpen(false)} aria-hidden="true" />
@@ -984,14 +984,14 @@ function CanvasSideRail({
           </>
         )}
       </div>
-      <RailButton label={t('canvas.diffTitle')} disabled={!adapterReady} onClick={onDiff} icon="±" />
+      <RailButton label={t('canvas.diffTitle')} short={t('canvas.rail.diff')} disabled={!adapterReady} onClick={onDiff} icon="±" />
       <span className="cv-rail__sep" aria-hidden="true" />
-      <RailButton label={t('canvas.shortcuts')} onClick={onShortcuts} icon="?" />
+      <RailButton label={t('canvas.shortcuts')} short={t('canvas.rail.shortcuts')} onClick={onShortcuts} icon="?" />
     </nav>
   )
 }
 
-function RailButton({ label, icon, onClick, disabled, busy, busyTitle, ariaBusy, pressed }: { label: string; icon: string; onClick: () => void; disabled?: boolean; busy?: boolean; busyTitle?: string; ariaBusy?: boolean; pressed?: boolean }) {
+function RailButton({ label, short, icon, onClick, disabled, busy, busyTitle, ariaBusy, pressed }: { label: string; short?: string; icon: string; onClick: () => void; disabled?: boolean; busy?: boolean; busyTitle?: string; ariaBusy?: boolean; pressed?: boolean }) {
   return (
     <button
       type="button"
@@ -1003,7 +1003,8 @@ function RailButton({ label, icon, onClick, disabled, busy, busyTitle, ariaBusy,
       aria-busy={ariaBusy ? true : undefined}
       aria-pressed={pressed ? true : undefined}
     >
-      {busy ? '…' : icon}
+      <span className="cv-rail__btn-icon" aria-hidden="true">{busy ? '…' : icon}</span>
+      {short ? <span className="cv-rail__btn-label">{short}</span> : null}
     </button>
   )
 }
@@ -1068,6 +1069,7 @@ const styles = `
      30 floating panels (relation/freedraw) — above rail
      100 modals / toasts  — above all canvas chrome */
   position: absolute; top: 72px; right: var(--space-1); z-index: 20;
+  max-height: calc(100vh - 84px); overflow-y: auto;
   display: flex; flex-direction: column; align-items: center; gap: var(--space-1);
   padding: var(--space-1);
   background: var(--color-white);
@@ -1076,11 +1078,10 @@ const styles = `
   box-shadow: 2px 2px 0 0 var(--color-black);
 }
 .cv-rail__btn {
-  width: 36px; height: 36px;
-  display: flex; align-items: center; justify-content: center;
+  width: 60px; min-height: 46px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  padding: var(--space-1) 0;
   background: var(--color-white); color: var(--color-black);
-  font-family: var(--font-mono); font-size: var(--font-size-xs);
-  letter-spacing: 0.04em;
   border: 0; border-radius: var(--radius-sm); cursor: pointer;
   transition: background 80ms ease-out, color 80ms ease-out;
 }
@@ -1088,7 +1089,9 @@ const styles = `
 .cv-rail__btn--pressed { background: var(--color-black); color: var(--color-white); }
 .cv-rail__btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .cv-rail__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: -2px; }
-.cv-rail__sep { width: 24px; height: 1px; background: var(--color-gray-soft); margin: var(--space-1) 0; }
+.cv-rail__btn-icon { font-family: var(--font-mono); font-size: var(--font-size-base); line-height: 1; }
+.cv-rail__btn-label { font-family: var(--font-body); font-size: 10px; line-height: 1; color: inherit; letter-spacing: 0; }
+.cv-rail__sep { width: 44px; height: 1px; background: var(--color-gray-soft); margin: var(--space-1) 0; }
 .cv-rail__group { position: relative; display: flex; flex-direction: column; align-items: center; }
 /* 导出二级菜单:点 backdrop(覆盖 rail)关闭;菜单从 rail 左侧弹出。 */
 .cv-rail__menu-backdrop { position: fixed; inset: 0; z-index: 25; cursor: default; }

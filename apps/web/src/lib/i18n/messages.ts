@@ -283,6 +283,21 @@ export const messages = {
   'canvas.srLabel': { zh: '灵感画布', en: 'Inspiration canvas' },
   'canvas.srLabelNamed': { zh: '灵感画布:{name}', en: 'Inspiration canvas: {name}' },
   'canvas.sideRail': { zh: '画布工具', en: 'Canvas tools' },
+  /* 右侧 rail 按钮的短标签(图标下方的可读文字,解决"看不出图标干嘛的") */
+  'canvas.rail.undo': { zh: '撤销', en: 'Undo' },
+  'canvas.rail.redo': { zh: '重做', en: 'Redo' },
+  'canvas.rail.new': { zh: '新建', en: 'New' },
+  'canvas.rail.rename': { zh: '改名', en: 'Rename' },
+  'canvas.rail.delete': { zh: '删除', en: 'Delete' },
+  'canvas.rail.aiLayout': { zh: '排版', en: 'Layout' },
+  'canvas.rail.aiCluster': { zh: '分组', en: 'Cluster' },
+  'canvas.rail.autoRelate': { zh: '连线', en: 'Relate' },
+  'canvas.rail.frame': { zh: '分框', en: 'Frame' },
+  'canvas.rail.outline': { zh: '大纲', en: 'Outline' },
+  'canvas.rail.overview': { zh: '总览', en: 'Overview' },
+  'canvas.rail.export': { zh: '导出', en: 'Export' },
+  'canvas.rail.diff': { zh: '对比', en: 'Diff' },
+  'canvas.rail.shortcuts': { zh: '快捷键', en: 'Shortcuts' },
 
   /* ── Archive ── */
   'archive.crumb': { zh: '归档', en: 'archive' },
