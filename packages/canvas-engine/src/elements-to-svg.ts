@@ -5,6 +5,34 @@ import { colorOf, domTokenResolver, type TokenResolver } from './self-built-rend
 import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments, arrowHeadAngle, autoElbowPath, cardObstacles } from './self-built-arrow'
 import { unionBounds, expandBounds, normalizeBox, type Bounds } from './bounds'
 
+/** SVG 无 ctx.measureText,用字符宽度估算软换行(近似实时渲染 wrapLines 的视觉)。
+ *  CJK/全角(code≥0x1100)按字号(12px),latin 按约 0.58 字号(7px)。
+ *  替代旧的硬截断 slice(0,40):窄卡不再溢出、宽卡不再被截。返回 ≤maxLines 行。 */
+function estimateSoftWrap(text: string, maxW: number, maxLines: number): string[] {
+  const out: string[] = []
+  const w = Math.max(maxW, 20)
+  for (const para of text.split('\n')) {
+    if (out.length >= maxLines) break
+    let line = ''
+    let width = 0
+    for (const ch of para) {
+      const code = ch.codePointAt(0) ?? 0
+      const cw = code >= 0x1100 ? 12 : 7
+      if (width + cw > w && line) {
+        out.push(line)
+        if (out.length >= maxLines) return out
+        line = ch
+        width = cw
+      } else {
+        line += ch
+        width += cw
+      }
+    }
+    out.push(line)
+  }
+  return out.slice(0, maxLines)
+}
+
 export interface ElementsToSvgOptions {
   background: boolean
   border: number
@@ -88,9 +116,9 @@ function elementToSvg(
         parts.push(`<text x="${x + 10}" y="${y + 14}" fill="${c.grayCol}" font-family="${c.fontMono}" font-size="10">${esc(info.type.toUpperCase())}</text>`)
         parts.push(`<text x="${x + 10}" y="${y + 32}" fill="${c.textCol}" font-family="${c.fontDisplay}" font-size="15" font-weight="500">${esc(info.title || '(untitled)')}</text>`)
         if (info.body) {
-          const lines = info.body.split('\n').slice(0, 3)
+          const lines = estimateSoftWrap(info.body, el.w - 20, 3)
           lines.forEach((ln, i) => {
-            parts.push(`<text x="${x + 10}" y="${y + 50 + i * 16}" fill="${c.textCol}" font-family="${c.fontBody}" font-size="12">${esc(ln.slice(0, 40))}</text>`)
+            parts.push(`<text x="${x + 10}" y="${y + 50 + i * 16}" fill="${c.textCol}" font-family="${c.fontBody}" font-size="12">${esc(ln)}</text>`)
           })
         }
       } else {
@@ -110,7 +138,7 @@ function elementToSvg(
       const b = normalizeBox(el)
       const stroke = colorOf(el.color, tokenResolver)
       const title = el.text
-        ? `<rect x="${b.x + dx}" y="${b.y + dy}" width="${Math.min(el.text.length * 7 + 12, b.w)}" height="18" fill="white" fill-opacity="0.85"/><text x="${b.x + dx + 6}" y="${b.y + dy + 14}" font-family="monospace" font-size="11" fill="${stroke}">${esc(el.text)}</text>`
+        ? `<rect x="${b.x + dx}" y="${b.y + dy}" width="${Math.min(el.text.length * 7 + 12, b.w)}" height="18" fill="white" fill-opacity="0.85"/><text x="${b.x + dx + 6}" y="${b.y + dy + 14}" font-family="${c.fontMono}" font-size="11" fill="${stroke}">${esc(el.text)}</text>`
         : ''
       return `<rect x="${b.x + dx}" y="${b.y + dy}" width="${b.w}" height="${b.h}" fill="${stroke}" fill-opacity="0.06" stroke="${stroke}" stroke-width="1.5" stroke-dasharray="8,4"/>${title}`
     }

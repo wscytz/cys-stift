@@ -457,7 +457,11 @@ export class SelfBuiltAdapter implements CanvasHost {
       // eraser 模式:点中元素即删 + 进入连续擦除态(按住拖拽擦过路径上的元素)。
       // remove() 自动 pushUndo + 级联清悬空箭头 + emitUser + scheduleRender。
       // 拖拽擦除:每次 pointermove 命中新元素就删,像真正的橡皮。
+      // coalescing:批前 pushUndo 一次,后续 onMove 的 remove 都被 coalescing 抑制不再推快照
+      // → 整个拖拽擦除 = 1 步 undo(对齐 drag/resize/multi-delete 的单步契约)。
       if (this.activeTool === 'eraser') {
+        this.pushUndo()
+        this.coalescing = true
         const id = hitTest(this.getElements(), p.x, p.y, this.view.zoom)
         if (id) this.remove(id)
         this.erasing = { lastId: id }
@@ -816,6 +820,10 @@ export class SelfBuiltAdapter implements CanvasHost {
     this.canvas.addEventListener('pointerdown', onDown)
     this.canvas.addEventListener('pointermove', onMove)
     this.canvas.addEventListener('pointerup', onUp)
+    // pointercancel:系统中断 pointer(浏览器手势/通知/触屏多点/OS 中断)时触发而非 up。
+    // 复用 onUp 清理 drag/resize/erase/connect 态 + 释放 capture,防残留状态导致
+    // 下一次 pointermove 用陈旧 dragGroup/erasing 造幽灵移动/误删。
+    this.canvas.addEventListener('pointercancel', onUp)
 
     // 滚轮/触摸板:ctrlKey(pinch 或 ctrl+滚轮)→ zoom-to-cursor;否则 → pan。
     this.wheelHandler = (e: WheelEvent) => {
@@ -930,6 +938,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       this.canvas.removeEventListener('pointerdown', this.pointerHandlers.down)
       this.canvas.removeEventListener('pointermove', this.pointerHandlers.move)
       this.canvas.removeEventListener('pointerup', this.pointerHandlers.up)
+      this.canvas.removeEventListener('pointercancel', this.pointerHandlers.up)
       this.pointerHandlers = null
     }
     if (this.wheelHandler) {

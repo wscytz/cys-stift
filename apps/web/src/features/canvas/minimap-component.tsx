@@ -349,6 +349,26 @@ export function drawElementMark(
     return
   }
 
+  // frame(主题分区):虚线描边方框 + 半透明填充,与实线 rect 区分(对齐实时渲染语义)。
+  // frame 是最底层容器(z=-1),鸟瞰里要能看到分区结构,不能落 fallback 小圆点。
+  if (el.kind === 'frame') {
+    const x = px(el.x)
+    const y = py(el.y)
+    const w = el.w * proj.scale
+    const h = el.h * proj.scale
+    ctx.save()
+    ctx.fillStyle = colorOf(el.color)
+    ctx.globalAlpha = 0.12
+    ctx.fillRect(x, y, Math.max(w, 4), Math.max(h, 4))
+    ctx.globalAlpha = 1
+    ctx.strokeStyle = colorOf(el.color)
+    ctx.lineWidth = 1
+    ctx.setLineDash([3, 2])
+    ctx.strokeRect(x, y, Math.max(w, 4), Math.max(h, 4))
+    ctx.restore()
+    return
+  }
+
   // text:又宽又矮 → 短宽横条描边(高度补足到 ≥2px 才看得见)。
   if (el.kind === 'text') {
     const x = px(el.x)

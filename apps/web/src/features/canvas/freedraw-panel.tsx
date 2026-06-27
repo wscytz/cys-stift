@@ -237,11 +237,14 @@ const styles = `
   letter-spacing: 0.12em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: background 80ms ease-out, color 80ms ease-out;
+  transition: background 80ms ease-out, color 80ms ease-out, transform 60ms ease-out;
 }
 .cv-freedraw__btn:hover {
   background: var(--color-black);
   color: var(--color-white);
+}
+.cv-freedraw__btn:active:not(:disabled) {
+  transform: scale(0.94);
 }
 .cv-freedraw__btn:focus-visible {
   outline: 2px solid var(--color-red);

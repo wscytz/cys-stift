@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import type { CanvasId, Card, CardId } from '@cys-stift/domain'
-import { SelfBuiltAdapter, elementCenter } from '@cys-stift/canvas-engine'
+import { SelfBuiltAdapter, elementCenter, unionBounds, normalizeBox } from '@cys-stift/canvas-engine'
 import { Button, Modal, Toolbar } from '@cys-stift/ui'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
@@ -123,8 +123,26 @@ export default function CanvasPage() {
       if (op === 'in') adapter.setView({ ...v, zoom: Math.min(8, v.zoom * 1.2) })
       else if (op === 'out') adapter.setView({ ...v, zoom: Math.max(0.1, v.zoom / 1.2) })
       else {
-        // fit:重置 pan/zoom
-        adapter.setView({ ...v, panX: 0, panY: 0, zoom: 1 })
+        // fit:算所有元素 bbox union → 缩放居中适配视口(对齐 Figma/tldraw「框选所有」语义)。
+        // 此前只是重置 pan/zoom 到原点 —— 内容在右下角时点 Fit 反而看不见(假适配)。
+        const els = adapter.getElements()
+        const hostEl = canvasElRef.current
+        const hw = hostEl?.clientWidth ?? 800
+        const hh = hostEl?.clientHeight ?? 600
+        if (els.length === 0) {
+          adapter.setView({ ...v, panX: 0, panY: 0, zoom: 1 })
+          return
+        }
+        const b = unionBounds(els.map((e) => normalizeBox(e)))
+        if (!b) {
+          adapter.setView({ ...v, panX: 0, panY: 0, zoom: 1 })
+          return
+        }
+        const pad = 80
+        const zoom = Math.max(0.1, Math.min(8, Math.min((hw - pad * 2) / b.w, (hh - pad * 2) / b.h)))
+        const panX = hw / 2 - (b.x + b.w / 2) * zoom
+        const panY = hh / 2 - (b.y + b.h / 2) * zoom
+        adapter.setView({ ...v, zoom, panX, panY })
       }
     },
     [],

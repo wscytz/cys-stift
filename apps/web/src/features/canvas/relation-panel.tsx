@@ -265,7 +265,7 @@ const styles = `
   letter-spacing: 0.12em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: background 80ms ease-out, color 80ms ease-out, border-color 80ms ease-out;
+  transition: background 80ms ease-out, color 80ms ease-out, border-color 80ms ease-out, transform 60ms ease-out;
 }
 .cv-relation__swatch {
   display: inline-block;
@@ -291,9 +291,13 @@ const styles = `
 .cv-relation__btn:hover:not(.cv-relation__btn--active) {
   background: var(--color-gray-soft);
 }
+.cv-relation__btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+/* 激活态:Bauhaus 黄底黑边(选中语义),非黑底(黑底是 toggle-ON 专用)。 */
 .cv-relation__btn--active {
-  background: var(--color-black);
-  color: var(--color-white);
+  background: var(--color-yellow);
+  color: var(--color-black);
   border-color: var(--color-black);
 }
 .cv-relation__btn--active .cv-relation__swatch {

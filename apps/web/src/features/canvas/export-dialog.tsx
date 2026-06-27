@@ -305,11 +305,13 @@ const styles = `
   font-family: var(--font-mono); font-size: var(--font-size-xs);
   letter-spacing: 0.1em; text-transform: uppercase;
   border: 0; border-right: var(--border-hairline); cursor: pointer;
-  transition: background 80ms ease-out, color 80ms ease-out;
+  transition: background 80ms ease-out, color 80ms ease-out, transform 60ms ease-out;
 }
 .exp-seg__btn:last-child { border-right: 0; }
 .exp-seg__btn:hover:not(:disabled):not(.exp-seg__btn--active) { background: var(--color-gray-soft); }
-.exp-seg__btn--active { background: var(--color-black); color: var(--color-white); }
+.exp-seg__btn:active:not(:disabled) { transform: scale(0.95); }
+/* 激活态:Bauhaus 黄底黑字(选中语义)。 */
+.exp-seg__btn--active { background: var(--color-yellow); color: var(--color-black); }
 .exp-seg__btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .exp-seg__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: -2px; }
 

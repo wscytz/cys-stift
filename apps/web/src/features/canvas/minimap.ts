@@ -6,7 +6,7 @@
  * 不依赖引擎逻辑,只用 CanvasElement 的 {x,y,w,h}(通用 AABB)。
  */
 import type { CanvasElement, CanvasView } from '@cys-stift/canvas-engine'
-import { elementCenter } from '@cys-stift/canvas-engine'
+import { elementCenter, normalizeBox } from '@cys-stift/canvas-engine'
 
 export interface MinimapProjection {
   /** 页坐标 → minimap 坐标的缩放(minimap px / 页 px)。 */
@@ -19,9 +19,11 @@ export interface MinimapProjection {
 /** 默认 projection(无元素 / 退化时):scale=1,原点对齐 minimap 左上角。 */
 const DEFAULT_PROJECTION: MinimapProjection = { scale: 1, offsetX: 0, offsetY: 0 }
 
-/** 算单个元素的 bbox(忽略 rotation,简化;minimap 比例小,旋转视觉差忽略)。 */
+/** 算单个元素的 bbox(忽略 rotation,简化;minimap 比例小,旋转视觉差忽略)。
+ *  normalizeBox 归一化负 bbox(自由箭头 w/h 可负表方向),否则 maxX = x+w < minX 算反。 */
 function elementBBox(el: CanvasElement): { minX: number; minY: number; maxX: number; maxY: number } {
-  return { minX: el.x, minY: el.y, maxX: el.x + el.w, maxY: el.y + el.h }
+  const b = normalizeBox(el)
+  return { minX: b.x, minY: b.y, maxX: b.x + b.w, maxY: b.y + b.h }
 }
 
 /**
