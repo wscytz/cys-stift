@@ -11,7 +11,7 @@
   调色板认知(6 原色映射)在 `colorOf`,但具体值由 resolver 给——引擎不耦合 DOM 也不认识 cys-stift token 表。
 - **CanvasHost 是契约**:绑定 / DSL / 快照 / 关系只依赖此接口。`SelfBuiltAdapter`
   (Canvas 2D) 与 `InMemoryCanvasHost`(单测)是两个实现,过同一套契约测试。
-- **CanvasElement 统一模型**:实时渲染 / SVG 导出 / DSL 文本全是它的不同视图。
+- **CanvasElement 统一模型**:实时渲染 / SVG 导出 / DSL 文本全是它的不同视图。6 个 active kind(card/arrow/freedraw/text/rect/frame);z 序由模型级 `KIND_LAYER` 决定(frame=-1 底层),非数组顺序。工具(tool)是 adapter 层概念(`'select'|'freedraw'|'eraser'|'text'|'connect'`),不在 CanvasElementKind 里。
 - 改引擎 → `pnpm --filter @cys-stift/canvas-engine lint`(tsc --noEmit)零错 + 单测全绿。
 
 ## 结构

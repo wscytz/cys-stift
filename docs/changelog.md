@@ -25,6 +25,21 @@
 
 ---
 
+## 2026-06-27 · doc-drift-fix · 规范文档对齐现实(6 文档核实+修)
+
+用户「确认开发规范文档是最新的吧」。派 subagent **只读核实**(对照代码实际 vs 文档),非凭印象。6 文档有漂移,按优先级修:
+
+- **privacy-design.md(2 个 HIGH 假信息)**:① §画布快照原写「`canvas-snapshot.ts` 不存在,生产函数在 `canvas-dsl.ts`」——**完全反了**:`canvas-snapshot.ts` 才是 AI 快照生产模块(`snapshotCanvas(host,service,canvasId)` + `formatCanvasSnapshot`),`canvas-dsl.ts` 是 DSL 文本路径。② 审计 checklist 残留 tldraw 引用 + `snapshotCanvas(editor,canvasId)` 签名错 → 改 `snapshotCanvas(host,service,canvasId)` + 不遍历 `CanvasElement`。③ `tag?:string[]` → `tags: TagRef[]`(实际字段名 + `.map(t=>t.value)` 抽取);④ `AI_REDACTED_FIELDS` 删已废止的 `captureShortcut`(实际 5 条)。
+- **lint 基线硬编码(3 文档 HIGH)**:definition-of-done.md / dependencies.md / 根 CLAUDE.md 都写「~25」,实际 23(且会随修复下降)。按记忆教训「硬编码 test/lint 数最易过期」→ 改「少量预存在 fixture 基线,判据=零新增,见 `grep -cE 'error TS'` 对比前后」,数字不进文档。
+- **dependencies.md**:补 **react-dom/client + act 测试 policy**(非 `@testing-library/react`,多处 test 文件强调但规范没写;新贡献者会误装 RTL)+ vitest `esbuild.jsx:'automatic'`。
+- **apps/web/CLAUDE.md**:结构树补新组件(AiSetupCard/AiActionMenu/isAIReady/canvas-snapshot/dsl-dialog/capture-hint/capture-redirect);AI checklist 加「AI 入口永远可见 + isAIReady 单闸门路由」架构点 + 画布快照走 canvas-snapshot.ts;改动清单加 react-dom/client 测试 policy。
+- **STATE.md**:「下一步」漏整批 06-27(AI 门槛/记录栏/canvas UI 自适应)→ 补 newest-first 条目 + 已知待修(#210 snap / #211 DSL drift);「当前能力」canvas 行刷新为 6 active kind + 新能力(橡皮/导出二级菜单/Outline/Minimap/双链/DSL 编辑器)。
+- **canvas-engine/CLAUDE.md**:补 6 active kind 含 frame + KIND_LAYER z 序 + tool 是 adapter 层概念(不在 CanvasElementKind)。
+
+验证:只改 docs;lint/test/build 不受影响(文档改动)。
+
+---
+
 ## 2026-06-26 · transliteration-validation · 转义赌注验证 + 引擎独立化第一步(3 轮自主,验收批)
 
 用户「不手测,你先跑 3 轮,40min 后验收」。按推荐主线"先证赌注再投资",3 轮一弧线(de-risk → 演示 → 北极星):

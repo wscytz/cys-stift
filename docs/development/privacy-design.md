@@ -43,7 +43,7 @@
 ```ts
 export interface Card {
   // ... 旧字段 ...
-  tag?: string[]              // ← M3.1 新增
+  tags: { value: string; color: string }[]   // TagRef[] — 注册见下,只发 value 不发 color
   priority?: 'low' | 'med' | 'high'  // ← M4 新增
 }
 ```
@@ -68,7 +68,7 @@ export const AI_CARD_FIELDS = {
   body: { kind: 'text' as const, include: (c: Card) => c.body },
   
   // 新字段(M3.1 加的)
-  tag: { kind: 'list' as const, include: (c: Card) => c.tag ?? [] },
+  tags: { kind: 'list' as const, include: (c: Card) => c.tags?.length ? c.tags.map((t: { value: string }) => t.value) : undefined },
   
   // 新字段(M4 加的,只发 metadata,不发 device ID)
   priority: { kind: 'enum' as const, include: (c: Card) => c.priority ?? 'med' },
@@ -168,7 +168,7 @@ export const AI_CARD_FIELDS = {
   sourceKind:    { kind: 'enum', include: (c) => c.source?.kind },
   
   // ── Future fields added here, never auto-detected ──
-  // tag:           { kind: 'list', include: (c) => c.tag },
+  // tags:          { kind: 'list', include: (c) => c.tags?.length ? c.tags.map(t => t.value) : undefined },
   // priority:      { kind: 'enum', include: (c) => c.priority },
 } as const satisfies Record<string, FieldDef<unknown>>
 
@@ -180,7 +180,6 @@ export const AI_REDACTED_FIELDS = [
   'media[].dataUrl',         // image/pdf binary — never sent
   'deletedAt',               // soft-deleted cards not in AI scope
   'apiKey',                  // settings — never in prompts
-  'captureShortcut',         // settings — irrelevant
 ] as const
 
 /** Serialize a single card into the structured text block that goes
@@ -218,7 +217,8 @@ export function serializeCardsForAI(cards: Card[]): string {
 
 > ⚠️ 本节原写于 M3 规划期(tldraw 时代、`CanvasSnapshot` 计划接口、手绘发点序列)。**现状已变**:
 > - 画布已迁**自研 Canvas 2D**(`packages/canvas-engine`),序列化走 `host.getElements()`(`CanvasElement[]`),不再有 tldraw `editor`。
-> - 生产函数是 `apps/web/src/features/ai/canvas-dsl.ts` 的 `serializeCanvas` / `formatCanvasSnapshot`(非计划中的 `canvas-snapshot.ts`)。
+> - **AI 画布快照**走 `apps/web/src/features/ai/canvas-snapshot.ts` 的 `snapshotCanvas(host, service, canvasId)` + `formatCanvasSnapshot(snapshot)`(生产模块,`canvas-prompt.ts` 已 import 在用)。
+> - **DSL 文本序列化**(模态编辑器/往返)走 `apps/web/src/features/ai/canvas-dsl.ts` 的 `serializeCanvas` / `serializeCanvasReadable`(纯几何,不带卡片内容)。
 > - **R2 隐私收紧(最终决策)**:freedraw **点序列永不外发** AI;只发**抽象形状描述符**(见下)。本节下方已据此更新;若与旧描述冲突,以下方 + `docs/user/privacy.md` 为准。
 
 序列化输入 = `CanvasElement` 统一模型(5 个 active kind:card / arrow / freedraw / text / rect;legacy ellipse/line/note/image 仅读旧画布;frame 2026-06-26 加)。每个 kind 一行 DSL:
@@ -327,7 +327,7 @@ phase 完成后,改 AI 的开发者**必须**回答这些问题:
 ### 新 action 相关
 - [ ] 加了新 AI action(summarize / layout / cluster / etc.)? → 在 `prompts.ts` 注册新模板
 - [ ] 新 action 用到 cards 列表吗? → 走 `serializeCardsForAI(cards)`,**不要**手写拼接字符串
-- [ ] 新 action 需要画布快照吗? → 走 `snapshotCanvas(editor, canvasId)`,**不要**直接遍历 tldraw shape
+- [ ] 新 action 需要画布快照吗? → 走 `snapshotCanvas(host, service, canvasId)` / `formatCanvasSnapshot(snapshot)`(`features/ai/canvas-snapshot.ts`),**不要**直接遍历 `CanvasElement`
 
 ### 媒体相关
 - [ ] 新代码读 `media.dataUrl` 然后传给 AI? → **禁止**,改成只发 `media[i].kind`

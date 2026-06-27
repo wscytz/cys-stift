@@ -25,7 +25,7 @@
 - **test**:必须全绿(exit 0)。新功能先写**红测试**(TDD),再实现到绿。
 - **lint**(`tsc --noEmit`):
   - domain / db / ui / canvas-engine:**必须 exit 0**。
-  - **web 允许 ~25 个 `__tests__/*/​*.test.ts` fixture 基线**(branded-id / color-token 强转;已知噪音,见 [`polish-phase.md`](polish-phase.md) §B)。**判据 = 零新增**——跑完对比基线,多出来的才算回归。不阻塞 build(Next build 不类型检查测试文件;vitest 自有配置跑它们)。
+  - **web 有少量预存在的 `__tests__/*/*.test.ts` fixture 基线**(branded-id / color-token 强转;已知噪音,见 [`polish-phase.md`](polish-phase.md) §B)。基线数字会随修复自然下降——**判据 = 零新增**:跑 `pnpm --filter web lint` 对比改动前后的 `grep -cE "error TS"` 计数,多出来的才算回归(数字本身不硬编码进文档)。不阻塞 build(Next build 不类型检查测试文件;vitest 自有配置跑它们)。
 - **build**(`pnpm --filter web build`):**必须 exit 0**(静态导出)。任何 web 改动的硬产品门。
 - **e2e / render-sweep**(可选,涉及渲染/路由/交互时):`node scripts/render-sweep.mjs`(静态产物捕 pageerror),或 `scripts/<name>-shots.cjs`。
 

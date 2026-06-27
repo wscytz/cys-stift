@@ -28,12 +28,12 @@ src/
 │   ├── design/                 /design 视觉契约页
 │   └── dev/                    dev 烟测页(production 不含)
 ├── features/                   按特性切(feature-sliced,ADR 0002)
-│   ├── ai/                     AI provider + DSL serialize/parse/apply + prompts
-│   ├── canvas/                 画布交互:host adapter / 关系 / outline / minimap / 导出 / wiki-links
-│   ├── capture/                捕获入口(mini input / 快捷键 / 文件拖拽)
-│   ├── card/                   卡片详情/编辑
+│   ├── ai/                     AI provider + isAIReady 门控 + AiSetupCard/AiActionMenu + DSL serialize/parse/apply + locale-aware prompts + canvas-snapshot
+│   ├── canvas/                 画布交互:host adapter / 关系 / outline / minimap / dsl-dialog / 导出(图片+MD+DSL)/ wiki-links / backlinks / canvas-overview
+│   ├── capture/                捕获入口(mini input / 快捷键 / 文件拖拽 / capture-hint 首次提示 / capture-redirect toast 重定向)
+│   ├── card/                   卡片详情/编辑(统一 ✨ AI 入口)
 │   ├── archive/                归档视图组件
-│   └── settings/               设置面板
+│   └── settings/               设置面板(AI provider 卡片 + 高级折叠)
 ├── lib/                        横切:store(localStorage 状态)+ 纯工具
 │   ├── db-client.ts            客户端 DB 单例(useDb hook)
 │   ├── *-store.ts              canvas / canvas-freeform / canvas-view / draft / media / settings / toast store
@@ -52,6 +52,7 @@ src/
 - [ ] 没有 `[param]` 动态路由段
 - [ ] 客户端组件标了 `'use client'`
 - [ ] `useDb()` 的 snapshot 引用稳定(数据变化才重新分配对象,否则 useSyncExternalStore 会炸)
+- [ ] **组件测试用 `react-dom/client` + `act`,不用 `@testing-library/react`**(非 devDep;样板见 `lib/__tests__/use-debounced-callback.test.tsx`)
 
 ## AI 改动 check-list(v0.30.0+ 必走)
 
@@ -63,8 +64,9 @@ src/
 - [ ] 大字段值(> 1KB / media 二进制)只发 metadata / count / kind
 
 **加新 AI action / prompt**:
+- [ ] **AI 入口永远可见**:不靠 `aiEnabled` 隐藏按钮;经 `isAIReady(getCurrentAI())`(`features/ai/ai-settings-provider.tsx`)单闸门 → 未就绪弹 `AiSetupCard`(引导,高亮 Ollama 零成本),就绪弹 `AiActionMenu` 走 `AIPopover`。新 AI 入口照此路由。
 - [ ] `prompts.ts` 走 `serializeCardForAI(card)` / `serializeCardsForAI(cards)`,**不**手写拼接字符串
-- [ ] 涉及画布形状时走 `serializeCanvas(host.getElements())` / `formatCanvasSnapshot(host, …)`(`features/ai/canvas-dsl.ts`),**不**手写遍历 `CanvasElement`
+- [ ] 涉及画布形状时走 `snapshotCanvas(host, service, canvasId)` / `formatCanvasSnapshot(snapshot)`(`features/ai/canvas-snapshot.ts`,AI 快照路径),**不**手写遍历 `CanvasElement`(`canvas-dsl.ts` 的 `serializeCanvas` 是 DSL 文本路径,不带卡片内容)
 - [ ] `prompts.ts` 单测覆盖新模板
 - [ ] e2e 加"AI 看不到 deviceId / apiKey / 软删除卡"的反向断言
 

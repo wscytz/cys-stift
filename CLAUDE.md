@@ -60,7 +60,7 @@
 
 ```bash
 pnpm -r test                  # 全包 vitest（domain / db / canvas-engine / web）
-pnpm -r lint                  # 全包 tsc --noEmit（web 有 ~25 fixture 基线，零新增即可）
+pnpm -r lint                  # 全包 tsc --noEmit（web 有少量预存在 fixture 基线，判据=零新增，见 definition-of-done.md）
 pnpm --filter web build       # Next.js 静态导出（产品门，必须 exit 0）
 ```
 

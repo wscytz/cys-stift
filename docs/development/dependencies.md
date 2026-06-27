@@ -104,7 +104,7 @@ pnpm --filter @cys-stift/canvas-engine test   # 引擎契约 + 纯函数
 pnpm --filter web test             # web feature 单测(vitest, jsdom)
 
 # 类型检查(各包 lint = tsc --noEmit)
-pnpm -r lint                       # 全包 tsc;web 有 ~25 个 __tests__ fixture 基线(已知噪音,见 polish-phase §B;判据=零新增)
+pnpm -r lint                       # 全包 tsc;web 有少量预存在 __tests__ fixture 基线(已知噪音,见 polish-phase §B;判据=零新增)
 
 # 静态导出(产品门)
 pnpm --filter web build            # 必须 exit 0,产物在 out/
@@ -117,7 +117,9 @@ pnpm --filter web dev --port 3016 &
 node scripts/<name>-shots.cjs      # 或 scripts/render-sweep.mjs
 ```
 
-> **web lint 基线说明**:`pnpm --filter web lint`(`tsc --noEmit`)目前有 ~25 个**预存在**错误,全在 `apps/web/src/**/__tests__/*.test.ts` 的 branded-id / color-token fixture 强转处(见 `docs/development/polish-phase.md` §B)。**不阻塞 build**(Next build 不类型检查测试文件;vitest 自有配置跑它们)。门禁判据是"零新增",不是"零错误"。
+> **web lint 基线说明**:`pnpm --filter web lint`(`tsc --noEmit`)有少量**预存在**错误,全在 `apps/web/src/**/__tests__/*.test.ts` 的 branded-id / color-token fixture 强转处(见 `docs/development/polish-phase.md` §B)。基线数字会随修复自然下降——**不硬编码进文档**;跑 `grep -cE 'error TS'` 对比改动前后即可。**不阻塞 build**(Next build 不类型检查测试文件;vitest 自有配置跑它们)。门禁判据是"零新增",不是"零错误"。
+>
+> **web 测试策略(policy)**:**不依赖 `@testing-library/react`**(非 devDep)。组件测试用 `react-dom/client`(`createRoot`)+ React 19 内置的 `act`,DOM 查询走 `querySelector('[data-testid=…]')`,点击走 `el.dispatchEvent(new MouseEvent('click',{bubbles:true}))`。参考样板:`apps/web/src/lib/__tests__/use-debounced-callback.test.tsx`。vitest 配了 `esbuild.jsx:'automatic'` 让无 `import React` 的组件可在测试渲染。
 
 ---
 
