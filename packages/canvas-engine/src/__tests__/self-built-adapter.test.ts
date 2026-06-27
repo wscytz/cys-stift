@@ -1014,3 +1014,39 @@ describe('SelfBuiltAdapter eraser modes', () => {
     expect(host.getElement('c1')).toBeDefined()
   })
 })
+
+// ── eraser 宽容差:细线/箭头缩小后仍可擦(回归:用户"删不掉"的真因之一) ────────
+describe('SelfBuiltAdapter eraser 宽容差', () => {
+  function tap(host: SelfBuiltAdapter, x: number, y: number) {
+    const canvas = host['canvas'] as HTMLCanvasElement
+    canvas.dispatchEvent(new PointerEvent('pointerdown', { clientX: x, clientY: y, bubbles: true }))
+    canvas.dispatchEvent(new PointerEvent('pointerup', { clientX: x, clientY: y, bubbles: true }))
+  }
+
+  it('关系箭头:zoom=0.5 偏离线 15 页px(>12 精确容差)仍可擦(宽容差兜底)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'b', kind: 'card', x: 1000, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b' })
+    host.setTool('eraser'); host.setEraserMode('all')
+    host.setView({ panX: 0, panY: 0, zoom: 0.5, gridMode: 'free' })
+    // 线在页 y=50(卡中心)。zoom=0.5 → 屏幕 y=25。偏离 15 页px = 30 屏幕 → 屏幕 y=55。
+    // 精确容差 tol=6/0.5=12 页 → 15>12 不中;宽容差 tol=12/0.5=24 页 → 15<24 中。
+    // tap 传 clientX/Y(屏幕),screenToPage: page = screen/zoom。屏幕(250,55)→页(500,110)。
+    // 页 y=110 偏线 y=50 = 60 页... 重新算:要偏离 15 页,页 y=65,屏幕 y=32.5。
+    tap(host, 250, 32)
+    expect(host.getElement('ar')).toBeUndefined()
+  })
+
+  it('frame/rect/card 在 all 模式都能擦', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'f', kind: 'frame', x: 0, y: 0, w: 200, h: 100, rotation: 0, text: '', color: 'blue' })
+    host.upsert({ id: 'r', kind: 'rect', x: 300, y: 0, w: 200, h: 100, rotation: 0, color: 'black' })
+    host.upsert({ id: 'c', kind: 'card', x: 600, y: 0, w: 100, h: 100, rotation: 0 })
+    host.setTool('eraser'); host.setEraserMode('all')
+    tap(host, 100, 50);  // frame
+    tap(host, 400, 50);  // rect
+    tap(host, 650, 50);  // card
+    expect(host.getElements()).toHaveLength(0)
+  })
+})

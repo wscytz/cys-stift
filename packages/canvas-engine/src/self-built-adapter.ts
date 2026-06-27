@@ -270,7 +270,12 @@ export class SelfBuiltAdapter implements CanvasHost {
    *  - all 模式:删一切(host.remove)
    */
   private eraseAt(p: { x: number; y: number }): string | null {
-    const id = hitTest(this.getElements(), p.x, p.y, this.view.zoom)
+    // 橡皮命中比选择更宽松:先正常 hitTest(6px 容差),未中则用 2× 容差重试。
+    // 线/箭头很细,缩小视图下点偏一点就擦不掉(用户感知"删不掉"的真因之一)。
+    // 橡皮语义本就是"擦到附近",宽容差合理。bbox 元素(card/rect/frame)不受影响
+    // (它们面积大,6px 已够);只让细线/箭头更容易被擦中。
+    let id = hitTest(this.getElements(), p.x, p.y, this.view.zoom)
+    if (!id) id = hitTest(this.getElements(), p.x, p.y, this.view.zoom * 0.5) // zoom 减半 → tol 翻倍
     if (!id) return null
     const el = this.getElement(id)
     if (!el) return null
