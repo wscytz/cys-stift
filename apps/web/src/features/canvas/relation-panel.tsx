@@ -236,7 +236,7 @@ const styles = `
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 6px var(--space-1);
+  padding: var(--space-0.5) var(--space-1);
   background: var(--color-white);
   border: 2px solid var(--color-black);
   border-radius: var(--radius-sm);
@@ -255,7 +255,7 @@ const styles = `
   padding: 0 var(--space-2);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-0.5);
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
