@@ -5,6 +5,25 @@
 
 ---
 
+## 2026-06-27 · v0.37.0 · eraser-reliability-and-motif-redesign(橡皮可靠性加固 + 几何装饰重做)
+
+两批:① 解决用户「三条线删不掉」的橡皮可靠性加固(writing-plans + subagent 驱动);② 用户不满意原 BauhausMotif(三形横排太散),重做并选 overlap variant 落地空状态。
+
+**橡皮可靠性加固(计划 `docs/plans/2026-06-27-eraser-reliability.md`,subagent + 主模型协同 5 task)**
+- **eraserHitTest 纯函数**(commit `19ff41c`):橡皮专属宽松命中 —— 线类(arrow/freedraw)16px 屏幕距离、bbox 类(card/rect/text/frame)扩展 4px。比 hitTest(6px)宽松得多,细线/箭头缩小视图下也能擦到(用户「删不掉」真因)。+3 测试。
+- **eraseAt 改用 eraserHitTest**(commit `58cc38c`):去掉原 2x 兜底,单次宽松命中。模式过滤(text/card/all)+ onEraseCard 保留。
+- **eraser 圆圈光标**(commit `d40c8a7`):SVG 28px 黑白双圈,看清擦除范围,不再无特征 crosshair。
+- **模式误选 toast**(commit `d40c8a7`):card/text 模式点了非匹配元素 → toast 引导切「全部」(5s 去重)。i18n canvas.eraserModeMismatch。
+
+**几何装饰重做(计划 `docs/plans/2026-06-27-ui-polish-motif.md`)**
+- **BauhausMotif 扩 3 精致 variant**(commit `bceda97`):overlap(Kandinsky 重叠构图正方 80×80)/linear(Bayer 描边+横线)/orbit(Itten 三圆叠加 mix-blend)。原 still/pulse 横排保留(向后兼容)。/design 页展示全部 5 variant 供挑选。
+- **空状态落地 overlap**(commit `5e8e707`):用户选 overlap(最有 Bauhaus 构图张力)。inbox/archive/trash 三处空状态换 overlap size=160,放大更醒目。文案打磨:archive/trash 拆短标题 + 引导 lede(有温度,非说明书)。
+- **Task 4 评估后维持现状**:PageLoading 已是克制 Bauhaus 骨架(灰色占位+脉动+reduced-motion 降级),路由 fade-in 风险 > 收益(静态导出页面快,改 layout 影响 hydration),不冒险。
+
+**纪律**:全走 token(6 色无 green);prefers-reduced-motion 降级;零新依赖;静态导出。验证:canvas-engine 390(+3)/domain 68/db 7/web 771 全绿;canvas-engine lint 干净;build exit 0;Tauri 打包成功。提交链:`19ff41c`→`58cc38c`→`d40c8a7`→`bceda97`→`5e8e707`。
+
+---
+
 ## 2026-06-27 · v0.37.0 · canvas-polish-and-qa-system(画布交互打磨 + 系统化质量保障)
 
 用户「桌面画布工具栏用不了 / 橡皮没有 / minimap 不显示箭头 / 打磨 3 轮」→ 滚雪球成一整批:从修具体 bug → subagent 四轮深度自查(30+ 修复)→ 系统化 UI 设计(token + 文档)→ 长效验收机制。主线仍是"打磨期",但这批把质量从"修缝"升级到"有机制防回退"。
