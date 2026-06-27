@@ -50,3 +50,16 @@
     opacity: 1;
   }
 }
+
+/* linear variant:描边(非填充),Bayer 线条美学。描边色走主题 token。 */
+.triStroke, .cirStroke, .sqrStroke, .lineStroke {
+  fill: none;
+  stroke-width: 2;
+}
+.triStroke { stroke: var(--color-yellow); }
+.cirStroke { stroke: var(--color-red); }
+.sqrStroke { stroke: var(--color-blue); }
+.lineStroke { stroke: var(--color-gray); }
+
+/* overlap/orbit 的形状仍用 .tri/.cir/.sqr 填充色(已在上方定义)。orbit 的 mix-blend-mode
+   在父 svg style 设(multiply 让叠加区产生中间色,深色主题下也成立)。 */

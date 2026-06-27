@@ -262,14 +262,13 @@ export default function DesignPage() {
           <section id="motif" className="section">
             <p className="section__eyebrow">component · motif</p>
             <h2 className="section__h2">Bauhaus motif</h2>
-            <Card>
-              <div className="row" style={{ gap: 'var(--space-4)', alignItems: 'center', flexWrap: 'wrap' }}>
-                <BauhausMotif />
-                <BauhausMotif variant="pulse" size={96} />
-                <BauhausMotif size={64} />
-              </div>
-              <p className="hint">基础形 ↔ 原色(Itten):黄三角 · 红圆 · 蓝方。<code>still</code>(默认)用于空状态,<code>pulse</code> 三形错峰呼吸可当轻量 loader;尊重 prefers-reduced-motion(降级静态)。</p>
-            </Card>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)', alignItems: 'flex-end' }}>
+              <div><BauhausMotif variant="still" /><p className="section__eyebrow">still · 横排(默认)</p></div>
+              <div><BauhausMotif variant="pulse" size={96} /><p className="section__eyebrow">pulse · 呼吸 loader</p></div>
+              <div><BauhausMotif variant="overlap" size={80} /><p className="section__eyebrow">overlap · 重叠构图</p></div>
+              <div><BauhausMotif variant="linear" size={120} /><p className="section__eyebrow">linear · 线条几何</p></div>
+              <div><BauhausMotif variant="orbit" size={80} /><p className="section__eyebrow">orbit · 圆叠加</p></div>
+            </div>
           </section>
         </article>
       </div>
