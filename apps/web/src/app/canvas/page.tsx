@@ -1059,12 +1059,32 @@ const styles = `
 .cv-empty__cta:hover { box-shadow: 2px 2px 0 0 var(--color-black); }
 .cv-empty__cta:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tb-divider { width: 1px; height: 24px; background: var(--color-gray-soft); margin: 0 var(--space-2); flex: 0 0 auto; }
+/* ── 工具按钮(选/画/擦/文/连)— Bauhaus 设计语言统一 ──
+   图标+中文标签两行,44×40px 目标区;激活态黄底黑边(Bauhaus 强调色,表示「在用」);
+   hover 浅灰;按下黄底+缩放触感。透明边框占位防 hover/active 布局跳动。 */
+.tb-tool {
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  height: 40px; min-width: 44px; padding: 2px var(--space-2);
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  background: var(--color-white); color: var(--color-black);
+  border: 2px solid var(--color-gray-soft); border-radius: var(--radius-sm); cursor: pointer;
+  transition: background 80ms ease-out, color 80ms ease-out, border-color 80ms ease-out, transform 60ms ease-out;
+}
+.tb-tool__icon { font-size: var(--font-size-base); line-height: 1; }
+.tb-tool__label { font-size: 10px; letter-spacing: 0; color: var(--color-gray); line-height: 1; }
+.tb-tool--active { background: var(--color-yellow); border-color: var(--color-black); color: var(--color-black); }
+.tb-tool--active .tb-tool__label { color: var(--color-black); }
+.tb-tool:hover:not(:disabled):not(.tb-tool--active) { background: var(--color-gray-soft); border-color: var(--color-gray); }
+.tb-tool:active:not(:disabled) { transform: scale(0.94); }
+.tb-tool:disabled { opacity: 0.55; cursor: not-allowed; }
+.tb-tool:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tb-snap { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.16em; text-transform: uppercase; background: var(--color-white); color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
 .tb-snap--snap { background: var(--color-black); color: var(--color-white); }
 .tb-snap--free { background: var(--color-white); color: var(--color-black); }
 /* P1 #6: 5 个工具按钮(↖✎⌫T⇄)补 hover,与 .tb-icon-btn 对齐;排除激活态
    (--snap 黑底)与 SnapToggle 的 --snap/--free 文字按钮,避免抢激活态视觉。 */
 .tb-snap:hover:not(:disabled):not(.tb-snap--snap):not(.tb-snap--free):not(.tb-snap--toggle) { background: var(--color-gray-soft); }
+.tb-snap:active:not(:disabled) { transform: scale(0.94); }
 .tb-snap:disabled { opacity: 0.55; cursor: not-allowed; }
 .tb-snap:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 /* SnapToggle 默认显示文字 label,glyph 隐藏;≤900px 反转(见响应式断点)。 */
@@ -1073,6 +1093,7 @@ const styles = `
 .tb-icon-btn { display: inline-flex; align-items: center; justify-content: center; height: 32px; min-width: 32px; padding: 0 var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.12em; text-transform: uppercase; background: transparent; color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
 .tb-icon-btn--fit { padding: 0 var(--space-3); }
 .tb-icon-btn:hover { background: var(--color-black); color: var(--color-white); }
+.tb-icon-btn:active:not(:disabled) { transform: scale(0.92); }
 .tb-icon-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .tb-icon-btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cselect { height: 32px; padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-sm); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; min-width: 200px; }
@@ -1100,10 +1121,10 @@ const styles = `
      30 floating panels (relation/freedraw) — above rail
      100 modals / toasts  — above all canvas chrome */
   position: absolute; top: 72px; right: var(--space-1); z-index: 20;
-  /* P0 #2: rail 是 .cv-host(已矮于 100vh)内的 absolute 子,用 100vh 会撑过 host
-     底沿。改用 % 解析到 host 高度,并给右下角 minimap(~160×120 @ bottom:8 right:8,
-     z-index 10)让出 136px,免得 rail 底按钮压在小地图上。内部仍可滚。 */
-  max-height: calc(100% - 136px - var(--space-2)); overflow-y: auto;
+  /* rail 从 top:72 往下延伸,要给右下角 minimap(高约 155px:120 canvas + 标题栏 + 边框)
+     让出完整空间。rail 底部 = 72 + max-height ≤ 容器高 - 155 → max-height ≤ 容器高 - 227。
+     取 calc(100% - 230px) 留余量,确保 rail 底按钮永不压在 minimap 上。内部仍可滚。 */
+  max-height: calc(100% - 230px); overflow-y: auto;
   display: flex; flex-direction: column; align-items: center; gap: var(--space-1);
   padding: var(--space-1);
   background: var(--color-white);
@@ -1120,11 +1141,15 @@ const styles = `
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   padding: var(--space-1) 0;
   background: var(--color-white); color: var(--color-black);
-  border: 0; border-radius: var(--radius-sm); cursor: pointer;
-  transition: background 80ms ease-out, color 80ms ease-out;
+  /* 透明边框占位,hover/pressed 切换边框色时布局不跳动 */
+  border: 2px solid transparent; border-radius: var(--radius-sm); cursor: pointer;
+  transition: background 80ms ease-out, color 80ms ease-out, border-color 80ms ease-out, transform 60ms ease-out;
 }
-.cv-rail__btn:hover:not(:disabled) { background: var(--color-black); color: var(--color-white); }
-.cv-rail__btn--pressed { background: var(--color-black); color: var(--color-white); }
+/* 设计语言:hover=浅灰底(轻提示),active(按下)=黄底黑边+缩放(触感),
+   pressed(持续选中)=黄底黑边(Bauhaus 黄黑强调色,表示「这个开着/在用」)。 */
+.cv-rail__btn:hover:not(:disabled) { background: var(--color-gray-soft); }
+.cv-rail__btn:active:not(:disabled) { background: var(--color-yellow); border-color: var(--color-black); transform: scale(0.96); }
+.cv-rail__btn--pressed { background: var(--color-yellow); border-color: var(--color-black); color: var(--color-black); }
 .cv-rail__btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .cv-rail__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: -2px; }
 .cv-rail__btn-icon { font-family: var(--font-mono); font-size: var(--font-size-base); line-height: 1; }

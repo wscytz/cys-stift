@@ -910,3 +910,50 @@ describe('SelfBuiltAdapter gridMode snap to 8px grid', () => {
     expect(host.getElement('c1')).toMatchObject({ x: 1, y: 0 })
   })
 })
+
+// ── eraser 连续擦除 — 按住拖拽擦过路径上的多个元素 ──────────────────────────
+describe('SelfBuiltAdapter eraser drag-erase', () => {
+  function dispatchEraserStroke(
+    host: SelfBuiltAdapter,
+    points: [number, number][],
+  ) {
+    const canvas = host['canvas'] as HTMLCanvasElement
+    const [start, ...rest] = points
+    canvas.dispatchEvent(new PointerEvent('pointerdown', { clientX: start![0], clientY: start![1], bubbles: true }))
+    for (const [x, y] of rest) {
+      canvas.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y, bubbles: true }))
+    }
+    const last = points[points.length - 1]!
+    canvas.dispatchEvent(new PointerEvent('pointerup', { clientX: last[0], clientY: last[1], bubbles: true }))
+  }
+
+  it('单击擦除命中元素', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.setTool('eraser')
+    dispatchEraserStroke(host, [[50, 50]])
+    expect(host.getElements()).toHaveLength(0)
+  })
+
+  it('按住拖拽连续擦除路径上的多个元素', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    // 三张并排的卡(0-100, 110-210, 220-320),橡皮从左拖到右穿过三张
+    host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'b', kind: 'card', x: 110, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'c', kind: 'card', x: 220, y: 0, w: 100, h: 100, rotation: 0 })
+    host.setTool('eraser')
+    // 50→160→270 穿过 a/b/c 中心
+    dispatchEraserStroke(host, [[50, 50], [160, 50], [270, 50]])
+    expect(host.getElements()).toHaveLength(0) // 三张全擦掉
+  })
+
+  it('拖拽路径上的空白不误删', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 50, h: 50, rotation: 0 })
+    host.upsert({ id: 'b', kind: 'card', x: 500, y: 500, w: 50, h: 50, rotation: 0 })
+    host.setTool('eraser')
+    // 点中 a,拖到 b 之间的空白,再到 b
+    dispatchEraserStroke(host, [[25, 25], [300, 300], [525, 525]])
+    expect(host.getElements()).toHaveLength(0)
+  })
+})

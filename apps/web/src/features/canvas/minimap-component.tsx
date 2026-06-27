@@ -14,7 +14,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
-import { readToken, colorOf } from '@cys-stift/canvas-engine'
+import { readToken, colorOf, arrowEndpoints } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
 import {
   computeMinimapProjection,
@@ -61,7 +61,7 @@ export function Minimap({
 
     // 画元素。
     for (const el of elements) {
-      drawElementMark(ctx, el, proj)
+      drawElementMark(ctx, el, proj, elements)
     }
 
     // 画视口框。
@@ -276,22 +276,45 @@ export function drawElementMark(
   ctx: CanvasRenderingContext2D,
   el: CanvasElement,
   proj: { scale: number; offsetX: number; offsetY: number },
+  /** 全部元素(用于解析关系箭头 from/to 端点)。可选:不传则 arrow 退化用 bbox。 */
+  allElements?: CanvasElement[],
 ) {
   // 通用 bbox 投影(arrow / card / rect / text 复用)。
   const px = (pageX: number) => pageX * proj.scale + proj.offsetX
+  const py = (pageY: number) => pageY * proj.scale + proj.offsetY
 
   if (el.kind === 'arrow') {
-    // arrow 几何:from/to 端点未解析时用 bbox 对角线端点。
-    const x1 = px(el.x)
-    const y1 = el.y * proj.scale + proj.offsetY
-    const x2 = px(el.x + el.w)
-    const y2 = (el.y + el.h) * proj.scale + proj.offsetY
+    // 关系箭头 bbox w=h=0(端点由 from/to 引用算),用 bbox 对角线画出来是一个点 — 看不见。
+    // 必须解析 from/to 真实端点画线。curve/elbow 在 minimap 鸟瞰简化为直线(足够表达连接)。
+    // 自由箭头(无 from/to)arrowEndpoints 返回 bbox 两角,w/h 非零,也是正确的线段。
+    let from: { x: number; y: number } | null = null
+    let to: { x: number; y: number } | null = null
+    if (allElements) {
+      const ends = arrowEndpoints(el, allElements)
+      from = ends.from
+      to = ends.to
+    }
+    // 无 elements 或端点解析失败 → 退化用 bbox 对角线(自由箭头 / 兜底)。
+    if (!from || !to) {
+      from = { x: el.x, y: el.y }
+      to = { x: el.x + el.w, y: el.y + el.h }
+    }
+    // 端点重合(关系箭头指向自身 / 零尺寸)→ 画小圆点而非不可见的退化线。
+    if (from.x === to.x && from.y === to.y) {
+      ctx.save()
+      ctx.fillStyle = colorOf(el.color)
+      ctx.beginPath()
+      ctx.arc(px(from.x), py(from.y), 2, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+      return
+    }
     ctx.save()
     ctx.strokeStyle = colorOf(el.color)
-    ctx.lineWidth = 1
+    ctx.lineWidth = 1.5
     ctx.beginPath()
-    ctx.moveTo(x1, y1)
-    ctx.lineTo(x2, y2)
+    ctx.moveTo(px(from.x), py(from.y))
+    ctx.lineTo(px(to.x), py(to.y))
     ctx.stroke()
     ctx.restore()
     return
@@ -299,7 +322,7 @@ export function drawElementMark(
 
   if (el.kind === 'card') {
     const x = px(el.x)
-    const y = el.y * proj.scale + proj.offsetY
+    const y = py(el.y)
     const w = el.w * proj.scale
     const h = el.h * proj.scale
     ctx.save()
@@ -315,7 +338,7 @@ export function drawElementMark(
   // rect(自由矩形):描边方框,与填色 card 区分。
   if (el.kind === 'rect') {
     const x = px(el.x)
-    const y = el.y * proj.scale + proj.offsetY
+    const y = py(el.y)
     const w = el.w * proj.scale
     const h = el.h * proj.scale
     ctx.save()
@@ -329,7 +352,7 @@ export function drawElementMark(
   // text:又宽又矮 → 短宽横条描边(高度补足到 ≥2px 才看得见)。
   if (el.kind === 'text') {
     const x = px(el.x)
-    const y = el.y * proj.scale + proj.offsetY
+    const y = py(el.y)
     const w = el.w * proj.scale
     const h = Math.max(el.h * proj.scale, 2)
     ctx.save()
@@ -351,7 +374,7 @@ export function drawElementMark(
       ctx.beginPath()
       for (let i = 0; i < pts.length; i++) {
         const X = px(pts[i]![0])
-        const Y = pts[i]![1] * proj.scale + proj.offsetY
+        const Y = py(pts[i]![1])
         if (i === 0) ctx.moveTo(X, Y)
         else ctx.lineTo(X, Y)
       }
@@ -362,7 +385,7 @@ export function drawElementMark(
     if (pts.length === 1) {
       // 单点 freedraw:小圆点(与实时渲染/elements-to-svg 单点一致)。
       const X = px(pts[0]![0])
-      const Y = pts[0]![1] * proj.scale + proj.offsetY
+      const Y = py(pts[0]![1])
       ctx.save()
       ctx.fillStyle = colorOf(el.color)
       ctx.beginPath()
@@ -376,7 +399,7 @@ export function drawElementMark(
 
   // legacy / 无点 freedraw / 其他:小圆点(bbox 中心)。
   const cx = px(el.x + el.w / 2)
-  const cy = (el.y + el.h / 2) * proj.scale + proj.offsetY
+  const cy = py(el.y + el.h / 2)
   ctx.save()
   ctx.fillStyle = colorOf(el.color)
   ctx.beginPath()

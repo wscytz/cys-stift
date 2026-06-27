@@ -62,6 +62,9 @@ export class SelfBuiltAdapter implements CanvasHost {
   private curveDragging: { id: string } | null = null
   /** 拖动折线箭头折点手柄(改 elbow[index] 位置)。null=未在拖。 */
   private elbowDragging: { id: string; index: number } | null = null
+  /** 橡皮擦按住拖拽连续擦除态。pointerdown 命中即置 true,pointermove 持续命中删除,
+   *  pointerup 置 false。null=未在擦。true 时记录上一次擦的 id 防同点重复 remove。 */
+  private erasing: { lastId: string | null } | null = null
   private keyHandler: ((e: KeyboardEvent) => void) | null = null
   private undoStack: CanvasElement[][] = []
   private redoStack: CanvasElement[][] = []
@@ -415,6 +418,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     this.currentStroke = null
     this.curveDragging = null
     this.elbowDragging = null
+    this.erasing = null
     this.coalescing = false
   }
 
@@ -450,11 +454,18 @@ export class SelfBuiltAdapter implements CanvasHost {
       const sx = e.clientX - rect.left
       const sy = e.clientY - rect.top
       const p = screenToPage(this.view, sx, sy)
-      // eraser 模式:点中元素即删。remove() 自动 pushUndo + 级联清悬空箭头 +
-      // emitUser + scheduleRender,所以一次点击 = 一步可撤销的删除。
+      // eraser 模式:点中元素即删 + 进入连续擦除态(按住拖拽擦过路径上的元素)。
+      // remove() 自动 pushUndo + 级联清悬空箭头 + emitUser + scheduleRender。
+      // 拖拽擦除:每次 pointermove 命中新元素就删,像真正的橡皮。
       if (this.activeTool === 'eraser') {
         const id = hitTest(this.getElements(), p.x, p.y, this.view.zoom)
         if (id) this.remove(id)
+        this.erasing = { lastId: id }
+        try {
+          this.canvas.setPointerCapture(e.pointerId)
+        } catch {
+          /* jsdom 无 setPointerCapture / 已捕获 */
+        }
         return
       }
       if (this.activeTool === 'freedraw') {
@@ -600,6 +611,16 @@ export class SelfBuiltAdapter implements CanvasHost {
       const rect = this.canvas.getBoundingClientRect()
       const sx = e.clientX - rect.left
       const sy = e.clientY - rect.top
+      if (this.erasing) {
+        // 连续擦除:拖拽路径上每命中一个新元素就删(lastId 防同点重复 remove)。
+        const p = screenToPage(this.view, sx, sy)
+        const id = hitTest(this.getElements(), p.x, p.y, this.view.zoom)
+        if (id && id !== this.erasing.lastId) {
+          this.remove(id)
+          this.erasing.lastId = id
+        }
+        return
+      }
       if (this.connecting) {
         const p = screenToPage(this.view, sx, sy)
         this.connecting.pointer = { x: p.x, y: p.y }
@@ -692,6 +713,15 @@ export class SelfBuiltAdapter implements CanvasHost {
     }
     const onUp = (e: PointerEvent) => {
       this.coalescing = false // 任何交互结束 → 关闭 coalescing(drag/resize 的连续 upsert 批到此为止)
+      if (this.erasing) {
+        this.erasing = null
+        try {
+          this.canvas.releasePointerCapture(e.pointerId)
+        } catch {
+          /* 已释放 */
+        }
+        return
+      }
       if (this.connecting) {
         const rect = this.canvas.getBoundingClientRect()
         const sx = e.clientX - rect.left

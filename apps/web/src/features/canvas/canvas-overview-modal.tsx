@@ -76,7 +76,7 @@ export function CanvasOverviewModal({
     ctx.fillStyle = readToken('--color-white', '#ffffff')
     ctx.fillRect(0, 0, OVERVIEW_W, OVERVIEW_H)
 
-    for (const el of elements) drawElementMark(ctx, el, proj)
+    for (const el of elements) drawElementMark(ctx, el, proj, elements)
 
     // 视口框(dashed,同 Minimap)。
     if (hostSize.w > 0 && hostSize.h > 0) {
