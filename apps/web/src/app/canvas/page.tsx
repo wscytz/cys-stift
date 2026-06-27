@@ -221,6 +221,28 @@ export default function CanvasPage() {
     service.softDelete(cardId as CardId)
   }, [service])
 
+  // eraser 模式误选提示:card/text 模式下点了非匹配元素(如 card 模式点 arrow),
+  // 模式过滤导致没删 → 用户困惑"为什么擦不掉"。检测 pointerdown 未导致删除时,
+  // toast 引导切「全部」(5s 去重防刷屏)。all 模式不提示(能擦一切)。
+  const lastMismatchRef = useRef(0)
+  useEffect(() => {
+    if (!adapter || tool !== 'eraser' || eraserMode === 'all') return
+    const canvas = canvasElRef.current
+    if (!canvas) return
+    const onDown = () => {
+      const before = adapter.getElements().length
+      setTimeout(() => {
+        if (adapter.getElements().length === before && Date.now() - lastMismatchRef.current > 5000) {
+          lastMismatchRef.current = Date.now()
+          pushToast({ kind: 'info', message: t('canvas.eraserModeMismatch') })
+        }
+      }, 0)
+    }
+    canvas.addEventListener('pointerdown', onDown)
+    return () => canvas.removeEventListener('pointerdown', onDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adapter, tool, eraserMode, t])
+
   // undo/redo 按钮 disabled 态:onHistoryChange(upsert/undo/redo)刷新。
   // 依赖 adapter state(Bug A 修复后):adapter 就绪/切画布重建后重订阅,
   // 避免旧 [activeCanvasId] ref 读到 null/旧 adapter 导致订阅不挂。
@@ -1109,7 +1131,10 @@ const styles = `
 .page { height: calc(100vh - var(--app-menu-height)); display: flex; flex-direction: column; background: var(--color-white); color: var(--color-black); }
 /* 根据当前工具显示不同光标 — 让用户知道正在用 select/freedraw/eraser/text/connect 哪种模式 */
 .cv-host { position: relative; flex: 1; min-height: 0; }
-.cv-host--eraser canvas { cursor: crosshair; }
+/* 橡皮光标:SVG 圆圈(28px),让用户看清擦除范围。其他工具保持 crosshair/text/cell。 */
+.cv-host--eraser canvas {
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'><circle cx='14' cy='14' r='11' fill='none' stroke='black' stroke-width='2'/><circle cx='14' cy='14' r='11' fill='none' stroke='white' stroke-width='1' stroke-dasharray='2,2'/></svg>") 14 14, crosshair;
+}
 .cv-host--freedraw canvas { cursor: crosshair; }
 .cv-host--text canvas { cursor: text; }
 .cv-host--connect canvas { cursor: cell; }

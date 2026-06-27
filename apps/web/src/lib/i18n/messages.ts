@@ -173,6 +173,7 @@ export const messages = {
   'canvas.eraserMode.text': { zh: '只擦文字', en: 'Erase text only' },
   'canvas.eraserMode.text.short': { zh: '文字', en: 'Text' },
   'canvas.eraserCardToTrash': { zh: '卡片已移到回收桶', en: 'Card moved to trash' },
+  'canvas.eraserModeMismatch': { zh: '当前模式擦不掉此元素,切到「全部」试试', en: 'This mode cannot erase it — try "All" mode' },
   /* 工具切换快捷键描述(shortcut-help 用) */
   'canvas.shortcutsTools': { zh: '工具', en: 'Tools' },
   'canvas.scToolSelect': { zh: '选择工具', en: 'Select tool' },
