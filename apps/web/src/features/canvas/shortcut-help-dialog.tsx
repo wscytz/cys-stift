@@ -21,13 +21,27 @@ export function ShortcutHelpDialog({
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key !== 'Escape') return
+      // 堆叠守卫:别的 dialog 已消费此 Escape 则不重复关。IME 组合态不关。
+      if (e.defaultPrevented || e.isComposing) return
+      e.preventDefault()
+      onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
   const groups: { title: string; rows: [string, string][] }[] = [
+    {
+      title: t('canvas.shortcutsTools'),
+      rows: [
+        ['v', t('canvas.scToolSelect')],
+        ['p', t('canvas.scToolDraw')],
+        ['e', t('canvas.scToolEraser')],
+        ['t', t('canvas.scToolText')],
+        ['c', t('canvas.scToolConnect')],
+      ],
+    },
     {
       title: t('canvas.shortcutsView'),
       rows: [
@@ -51,11 +65,11 @@ export function ShortcutHelpDialog({
       title: t('canvas.shortcutsNudge'),
       rows: [
         ['↑ ↓ ← →', t('canvas.scNudge1')],
-        ['Shift + 方向', t('canvas.scNudge10')],
+        [t('canvas.scNudge10Key'), t('canvas.scNudge10')],
       ],
     },
     {
-      title: t('canvas.shortcutsView'),
+      title: t('canvas.shortcutsGlobal'),
       rows: [['⌘⇧Space / Ctrl+⇧+Space', t('capture.shortcutHelp')]],
     },
   ]

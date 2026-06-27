@@ -219,7 +219,7 @@ export function SelfCanvas({
     if (v && curEdit && adapter && canvas) {
       const ctx = canvas.getContext('2d')
       if (ctx) {
-        const font = `14px ${readToken('--font-body', 'Inter, sans-serif')}`
+        const font = `${readToken('--font-size-sm', '14px')} ${readToken('--font-body', 'Inter, sans-serif')}`
         const { w, h } = measureText(v, ctx, font, 18)
         const id =
           'text-' +

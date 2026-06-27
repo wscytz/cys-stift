@@ -941,6 +941,13 @@ export class SelfBuiltAdapter implements CanvasHost {
 
   /** 解绑指针 + wheel 监听(页面卸载调)。 */
   detach(): void {
+    // 取消排队的渲染帧:切画布/卸载时若有一帧 RAF 正排队(刚 upsert/commit),回调会
+    // 持有 adapter 闭包 + canvas DOM 引用,对已卸载 canvas 做无意义重绘。每次切画布
+    // 确定性发生,累积泄漏。对照 minimap 卸载 cancel rafRef 的同类清理。
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId)
+      this.rafId = null
+    }
     if (this.pointerHandlers) {
       this.canvas.removeEventListener('pointerdown', this.pointerHandlers.down)
       this.canvas.removeEventListener('pointermove', this.pointerHandlers.move)

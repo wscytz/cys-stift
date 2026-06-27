@@ -606,11 +606,11 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         />
         <span className="tb-divider" aria-hidden="true" />
         {([
-          { tk: 'select', icon: '↖', label: 'canvas.tool.select', labelShort: '选' },
-          { tk: 'freedraw', icon: '✎', label: 'canvas.tool.draw', labelShort: '画' },
-          { tk: 'eraser', icon: '🗑', label: 'canvas.tool.eraser', labelShort: '擦' },
-          { tk: 'text', icon: 'T', label: 'canvas.tool.text', labelShort: '文' },
-          { tk: 'connect', icon: '⇄', label: 'canvas.tool.connect', labelShort: '连' },
+          { tk: 'select', icon: '↖', label: 'canvas.tool.select', labelShort: 'canvas.tool.select.short' },
+          { tk: 'freedraw', icon: '✎', label: 'canvas.tool.draw', labelShort: 'canvas.tool.draw.short' },
+          { tk: 'eraser', icon: '🗑', label: 'canvas.tool.eraser', labelShort: 'canvas.tool.eraser.short' },
+          { tk: 'text', icon: 'T', label: 'canvas.tool.text', labelShort: 'canvas.tool.text.short' },
+          { tk: 'connect', icon: '⇄', label: 'canvas.tool.connect', labelShort: 'canvas.tool.connect.short' },
         ] as const).map(({ tk, icon, label, labelShort }) => (
           <button
             key={tk}
@@ -623,7 +623,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
             aria-label={t(label)}
           >
             <span className="tb-tool__icon">{icon}</span>
-            <span className="tb-tool__label">{labelShort}</span>
+            <span className="tb-tool__label">{t(labelShort)}</span>
           </button>
         ))}
         <span className="tb-divider" aria-hidden="true" />

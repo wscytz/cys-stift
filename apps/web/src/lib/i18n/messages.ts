@@ -159,6 +159,20 @@ export const messages = {
   'canvas.tool.text': { zh: '文本', en: 'Text' },
   'canvas.tool.eraser': { zh: '橡皮', en: 'Eraser' },
   'canvas.tool.connect': { zh: '连接', en: 'Connect' },
+  /* 工具按钮短标签(图标下两字标签,英文 locale 不显示中文) */
+  'canvas.tool.select.short': { zh: '选择', en: 'Sel' },
+  'canvas.tool.draw.short': { zh: '手绘', en: 'Draw' },
+  'canvas.tool.eraser.short': { zh: '橡皮', en: 'Erase' },
+  'canvas.tool.text.short': { zh: '文本', en: 'Text' },
+  'canvas.tool.connect.short': { zh: '连接', en: 'Link' },
+  /* 工具切换快捷键描述(shortcut-help 用) */
+  'canvas.shortcutsTools': { zh: '工具', en: 'Tools' },
+  'canvas.scToolSelect': { zh: '选择工具', en: 'Select tool' },
+  'canvas.scToolDraw': { zh: '手绘工具', en: 'Draw tool' },
+  'canvas.scToolEraser': { zh: '橡皮工具', en: 'Eraser tool' },
+  'canvas.scToolText': { zh: '文本工具', en: 'Text tool' },
+  'canvas.scToolConnect': { zh: '连接工具', en: 'Connect tool' },
+  'canvas.scNudge10Key': { zh: 'Shift + 方向', en: 'Shift + Arrow' },
 
   /* ── Canvas export (P5) ── */
   'canvas.export': { zh: '导出画布', en: 'Export canvas' },
@@ -225,6 +239,7 @@ export const messages = {
   'canvas.shortcuts': { zh: '快捷键', en: 'Shortcuts' },
   'canvas.shortcutsView': { zh: '视图', en: 'View' },
   'canvas.shortcutsEdit': { zh: '编辑', en: 'Edit' },
+  'canvas.shortcutsGlobal': { zh: '全局', en: 'Global' },
   'canvas.shortcutsNudge': { zh: '微移', en: 'Nudge' },
   'canvas.scZoomIn': { zh: '放大', en: 'Zoom in' },
   'canvas.scZoomOut': { zh: '缩小', en: 'Zoom out' },

@@ -14,6 +14,7 @@ const GRAMMAR = `Canvas DSL grammar (one element per line):
   [card #id] @pos(x, y) @size(w, h) @color(red|yellow|blue|black|white|gray|grey)
   [rect #id] @pos(x, y) @size(w, h) @color(c)
   [text #id] @pos(x, y) @text("...") @color(c)
+  [frame #id] @pos(x, y) @size(w, h) @text("title") @color(c)   # themed group/section container
   [arrow #id] from #a to #b @label("...") @color(c) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none)
   [arrow #id] @pos(x, y) @size(w, h) @color(c)   # free arrow (no from/to)
   # arrow route (optional, to bend or elbow around obstacles):
