@@ -579,23 +579,24 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         />
         <span className="tb-divider" aria-hidden="true" />
         {([
-          { tk: 'select', icon: '↖', label: 'canvas.tool.select' },
-          { tk: 'freedraw', icon: '✎', label: 'canvas.tool.draw' },
-          { tk: 'eraser', icon: '⌫', label: 'canvas.tool.eraser' },
-          { tk: 'text', icon: 'T', label: 'canvas.tool.text' },
-          { tk: 'connect', icon: '⇄', label: 'canvas.tool.connect' },
-        ] as const).map(({ tk, icon, label }) => (
+          { tk: 'select', icon: '↖', label: 'canvas.tool.select', labelShort: '选' },
+          { tk: 'freedraw', icon: '✎', label: 'canvas.tool.draw', labelShort: '画' },
+          { tk: 'eraser', icon: '🗑', label: 'canvas.tool.eraser', labelShort: '擦' },
+          { tk: 'text', icon: 'T', label: 'canvas.tool.text', labelShort: '文' },
+          { tk: 'connect', icon: '⇄', label: 'canvas.tool.connect', labelShort: '连' },
+        ] as const).map(({ tk, icon, label, labelShort }) => (
           <button
             key={tk}
             type="button"
-            className={`tb-snap${tool === tk ? ' tb-snap--snap' : ''}`}
+            className={`tb-tool${tool === tk ? ' tb-tool--active' : ''}`}
             onClick={() => setTool(tk)}
             disabled={!adapterReady}
             aria-pressed={tool === tk}
             title={t(label)}
             aria-label={t(label)}
           >
-            {icon}
+            <span className="tb-tool__icon">{icon}</span>
+            <span className="tb-tool__label">{labelShort}</span>
           </button>
         ))}
         <span className="tb-divider" aria-hidden="true" />
@@ -604,7 +605,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         <ZoomGroup adapterReady={adapterReady} onZoom={zoomBy} />
       </Toolbar>
 
-      <div className="cv-host">
+      <div className={`cv-host cv-host--${tool}`}>
         <SelfCanvas
           key={activeCanvasId}
           canvasId={activeCanvasId}
@@ -1031,7 +1032,12 @@ function RailButton({ label, short, icon, onClick, disabled, busy, busyTitle, ar
 
 const styles = `
 .page { height: calc(100vh - var(--app-menu-height)); display: flex; flex-direction: column; background: var(--color-white); color: var(--color-black); }
+/* 根据当前工具显示不同光标 — 让用户知道正在用 select/freedraw/eraser/text/connect 哪种模式 */
 .cv-host { position: relative; flex: 1; min-height: 0; }
+.cv-host--eraser canvas { cursor: crosshair; }
+.cv-host--freedraw canvas { cursor: crosshair; }
+.cv-host--text canvas { cursor: text; }
+.cv-host--connect canvas { cursor: cell; }
 .cv-empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: var(--space-2); pointer-events: none; user-select: none; padding-bottom: 80px; }
 /* CTA link re-enables pointer events on itself only (parent overlay is
    pointer-events:none) so the user can act on the empty state. */
