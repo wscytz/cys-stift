@@ -43,6 +43,8 @@ export function SelfCanvas({
   canvasId,
   service,
   tool,
+  eraserMode,
+  onEraseCard,
   onOpenCard,
   adapterRef,
   canvasElRef,
@@ -52,6 +54,10 @@ export function SelfCanvas({
   service: CardService
   /** 当前工具(page 持有)。切离 'text' 时收起编辑中的 textarea。 */
   tool: 'select' | 'freedraw' | 'eraser' | 'text' | 'connect'
+  /** 橡皮模式:text 只擦文字 / card 只擦卡片(进回收桶)/ all 擦一切。 */
+  eraserMode: 'text' | 'card' | 'all'
+  /** card 模式命中卡片时触发(page 层 service.softDelete 进回收桶)。 */
+  onEraseCard: (cardId: string) => void
   onOpenCard: (card: Card) => void
   adapterRef: React.MutableRefObject<SelfCanvasHandle>
   /** Page-supplied ref so the RelationPanel can read the canvas rect for
@@ -93,7 +99,10 @@ export function SelfCanvas({
         const c = service.get(id as never)
         return c ? { title: c.title, body: c.body ?? '', type: c.type, pinned: c.pinned } : null
       },
+      // card 橡皮模式命中卡片 → 通知 page softDelete(进回收桶)。adapter 随后自己 remove 几何。
+      onEraseCard: (id) => onEraseCard(id),
     })
+    adapter.setEraserMode(eraserMode)
     adapterInner.current = adapter
     adapterRef.current = { adapter }
     onAdapterReady?.(adapter)
@@ -176,6 +185,12 @@ export function SelfCanvas({
   useEffect(() => {
     if (edit) textareaRef.current?.focus()
   }, [edit])
+
+  // 橡皮模式变化 → 同步到 adapter(text/card/all 命中过滤)。
+  // adapter 重建(切画布)时构造里已 setEraserMode 初值;这里处理运行时切换。
+  useEffect(() => {
+    adapterInner.current?.setEraserMode(eraserMode)
+  }, [eraserMode])
 
   // 切离 text 工具:收起编辑中的 textarea(blur 会触发 commit)。
   useEffect(() => {

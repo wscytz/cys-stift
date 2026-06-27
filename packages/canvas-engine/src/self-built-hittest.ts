@@ -85,6 +85,13 @@ export function hitTest(
         } else if (pointToSegmentDistance(pageX, pageY, from.x, from.y, to.x, to.y) <= tol) {
           return el.id
         }
+      } else {
+        // 悬空关系箭头(端点卡片已删 + bbox w=h=0):线段命中分支因 from/to null 跳过。
+        // 用 bbox + 容差兜底(w=h=0 退化为点容差 tol),让用户能选中删除这类幽灵元素。
+        const b = normalizeBox(el)
+        if (pageX >= b.x - tol && pageX <= b.x + b.w + tol && pageY >= b.y - tol && pageY <= b.y + b.h + tol) {
+          return el.id
+        }
       }
       continue
     }

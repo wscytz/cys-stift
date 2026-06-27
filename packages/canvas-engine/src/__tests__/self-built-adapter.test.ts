@@ -957,3 +957,60 @@ describe('SelfBuiltAdapter eraser drag-erase', () => {
     expect(host.getElements()).toHaveLength(0)
   })
 })
+
+// ── 橡皮三模式(text/card/all 命中过滤)──────────────────────────────────────
+describe('SelfBuiltAdapter eraser modes', () => {
+  function tap(host: SelfBuiltAdapter, x: number, y: number) {
+    const canvas = host['canvas'] as HTMLCanvasElement
+    canvas.dispatchEvent(new PointerEvent('pointerdown', { clientX: x, clientY: y, bubbles: true }))
+    canvas.dispatchEvent(new PointerEvent('pointerup', { clientX: x, clientY: y, bubbles: true }))
+  }
+
+  it('all 模式:擦一切(card + text)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 't1', kind: 'text', x: 200, y: 0, w: 100, h: 40, rotation: 0, text: 'hi' })
+    host.setTool('eraser')
+    host.setEraserMode('all')
+    tap(host, 50, 50)  // 擦 card
+    tap(host, 250, 20) // 擦 text
+    expect(host.getElements()).toHaveLength(0)
+  })
+
+  it('text 模式:只擦 text,card 不受影响', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 't1', kind: 'text', x: 0, y: 0, w: 100, h: 40, rotation: 0, text: 'hi' })
+    host.setTool('eraser')
+    host.setEraserMode('text')
+    // 点 text 区域(text 在 card 上层):命中 text,删
+    tap(host, 50, 20)
+    expect(host.getElement('t1')).toBeUndefined()
+    expect(host.getElement('c1')).toBeDefined() // card 保留
+  })
+
+  it('card 模式:只擦 card + 调 onEraseCard(进回收桶)', () => {
+    let erasedCard: string | null = null
+    const host = new SelfBuiltAdapter(document.createElement('canvas'), {
+      onEraseCard: (id) => { erasedCard = id },
+    })
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 't1', kind: 'text', x: 0, y: 0, w: 100, h: 40, rotation: 0, text: 'hi' })
+    host.setTool('eraser')
+    host.setEraserMode('card')
+    // 点 card 区域但避开 text(text h=0..40,点 y=70 在 card 内 text 外)
+    tap(host, 50, 70)
+    expect(host.getElement('c1')).toBeUndefined() // card 删了
+    expect(host.getElement('t1')).toBeDefined()   // text 保留
+    expect(erasedCard).toBe('c1')                 // onEraseCard 调用(→ softDelete)
+  })
+
+  it('text 模式点 card 区域不删(text 在上层但 mode 过滤)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.setTool('eraser')
+    host.setEraserMode('text')
+    tap(host, 50, 70) // 点 card,无 text → mode 过滤 → 不删
+    expect(host.getElement('c1')).toBeDefined()
+  })
+})

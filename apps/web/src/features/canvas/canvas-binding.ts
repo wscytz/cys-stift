@@ -187,8 +187,16 @@ export function bindCardWriteback(
         if (el.kind !== 'card') continue
         const cardId = el.id as CardId
         const card = service.get(cardId)
-        // 卡不在 DB(新建未落库 / 已真正删除)→ 跳过;软删 / 归档的卡不应回到画布。
-        if (!card || card.deletedAt || card.archived) continue
+        // 卡不在 DB(新建未落库 / 已真正删除)→ 跳过。
+        if (!card) continue
+        // eraser card 模式 softDelete 后 undo:host 恢复了卡元素,但 DB deletedAt 仍设。
+        // restore 找回(清 deletedAt),让卡回到画布而非留在回收桶。
+        // (redo 重新删除的不完美是预存限制,与 Delete 键 redo 同源,不新增问题。)
+        if (card.deletedAt) {
+          service.restore(cardId)
+        }
+        // 归档的卡不应回到画布(用户主动归档,非 eraser)。
+        if (card.archived) continue
         const pos = card.canvasPosition
         if (pos?.canvasId === canvasId) continue // 已一致:幂等 no-op
         // DB 无 canvasPosition(被 Delete 清掉,undo 刚恢复 host 元素)或指向别画布

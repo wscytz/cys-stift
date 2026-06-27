@@ -65,6 +65,11 @@ export class SelfBuiltAdapter implements CanvasHost {
   /** 橡皮擦按住拖拽连续擦除态。pointerdown 命中即置 true,pointermove 持续命中删除,
    *  pointerup 置 false。null=未在擦。true 时记录上一次擦的 id 防同点重复 remove。 */
   private erasing: { lastId: string | null } | null = null
+  /** 橡皮模式:text 只擦文字 / card 只擦卡片(进回收桶)/ all 擦一切。默认 all(兼容旧行为)。 */
+  private eraserMode: 'text' | 'card' | 'all' = 'all'
+  /** card 模式命中卡片时的回调(由 web 层注入:service.softDelete 进回收桶)。
+   *  引擎不接触 CardService,只通过此回调通知「用户擦了张卡」,由调用方决定 softDelete。 */
+  private onEraseCard: ((cardId: string) => void) | null = null
   private keyHandler: ((e: KeyboardEvent) => void) | null = null
   private undoStack: CanvasElement[][] = []
   private redoStack: CanvasElement[][] = []
@@ -77,11 +82,12 @@ export class SelfBuiltAdapter implements CanvasHost {
 
   constructor(
     private canvas: HTMLCanvasElement,
-    opts?: { getCardInfo?: (id: string) => CardInfo | null; tokenResolver?: TokenResolver },
+    opts?: { getCardInfo?: (id: string) => CardInfo | null; tokenResolver?: TokenResolver; onEraseCard?: (cardId: string) => void },
   ) {
     this.ctx = canvas.getContext('2d')
     this.getCardInfo = opts?.getCardInfo ?? (() => null)
     this.tokenResolver = opts?.tokenResolver ?? domTokenResolver
+    this.onEraseCard = opts?.onEraseCard ?? null
     this.attachPointer()
     this.attachKeyboard()
   }
@@ -246,6 +252,37 @@ export class SelfBuiltAdapter implements CanvasHost {
 
   getTool(): 'select' | 'freedraw' | 'eraser' | 'text' | 'connect' {
     return this.activeTool
+  }
+
+  /** 切换橡皮模式:text 只擦文字 / card 只擦卡片(进回收桶)/ all 擦一切。 */
+  setEraserMode(m: 'text' | 'card' | 'all'): void {
+    this.eraserMode = m
+  }
+  getEraserMode(): 'text' | 'card' | 'all' {
+    return this.eraserMode
+  }
+
+  /**
+   * 橡皮命中 + 按模式过滤 + 删除。返回命中的 id(供 erasing 态防重复),null=未命中/被模式过滤。
+   *  - text 模式:只删 kind==='text'
+   *  - card 模式:只删 kind==='card',删前调 onEraseCard(web 层 softDelete 进回收桶),
+   *    再 host.remove(视觉消失)。canvas-binding 的 removed 回写因 deletedAt 已设而跳过 removeFromCanvas。
+   *  - all 模式:删一切(host.remove)
+   */
+  private eraseAt(p: { x: number; y: number }): string | null {
+    const id = hitTest(this.getElements(), p.x, p.y, this.view.zoom)
+    if (!id) return null
+    const el = this.getElement(id)
+    if (!el) return null
+    if (this.eraserMode === 'text' && el.kind !== 'text') return null
+    if (this.eraserMode === 'card' && el.kind !== 'card') return null
+    // card 模式命中卡片:先通知 web 层 softDelete(进回收桶),再 host.remove 删几何。
+    // onEraseCard 缺省(纯引擎/单测)时退化为直接 remove(不进回收桶,但元素仍消失)。
+    if (this.eraserMode === 'card' && el.kind === 'card') {
+      this.onEraseCard?.(id)
+    }
+    this.remove(id)
+    return id
   }
 
   /**
@@ -462,8 +499,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       if (this.activeTool === 'eraser') {
         this.pushUndo()
         this.coalescing = true
-        const id = hitTest(this.getElements(), p.x, p.y, this.view.zoom)
-        if (id) this.remove(id)
+        const id = this.eraseAt(p)
         this.erasing = { lastId: id }
         try {
           this.canvas.setPointerCapture(e.pointerId)
@@ -617,10 +653,10 @@ export class SelfBuiltAdapter implements CanvasHost {
       const sy = e.clientY - rect.top
       if (this.erasing) {
         // 连续擦除:拖拽路径上每命中一个新元素就删(lastId 防同点重复 remove)。
+        // 走 eraseAt 以遵守当前 eraserMode(text/card/all 的命中过滤 + card 进回收桶)。
         const p = screenToPage(this.view, sx, sy)
-        const id = hitTest(this.getElements(), p.x, p.y, this.view.zoom)
+        const id = this.eraseAt(p)
         if (id && id !== this.erasing.lastId) {
-          this.remove(id)
           this.erasing.lastId = id
         }
         return

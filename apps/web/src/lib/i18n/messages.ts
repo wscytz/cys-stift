@@ -165,6 +165,14 @@ export const messages = {
   'canvas.tool.eraser.short': { zh: '橡皮', en: 'Erase' },
   'canvas.tool.text.short': { zh: '文本', en: 'Text' },
   'canvas.tool.connect.short': { zh: '连接', en: 'Link' },
+  /* 橡皮子模式(选中 eraser 时顶栏出 3 子模式切换) */
+  'canvas.eraserMode.all': { zh: '擦除全部', en: 'Erase all' },
+  'canvas.eraserMode.all.short': { zh: '全部', en: 'All' },
+  'canvas.eraserMode.card': { zh: '只擦卡片(进回收桶)', en: 'Erase cards (to trash)' },
+  'canvas.eraserMode.card.short': { zh: '卡片', en: 'Cards' },
+  'canvas.eraserMode.text': { zh: '只擦文字', en: 'Erase text only' },
+  'canvas.eraserMode.text.short': { zh: '文字', en: 'Text' },
+  'canvas.eraserCardToTrash': { zh: '卡片已移到回收桶', en: 'Card moved to trash' },
   /* 工具切换快捷键描述(shortcut-help 用) */
   'canvas.shortcutsTools': { zh: '工具', en: 'Tools' },
   'canvas.scToolSelect': { zh: '选择工具', en: 'Select tool' },

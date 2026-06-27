@@ -69,3 +69,18 @@ describe('hitTest', () => {
     expect(hitTest(elbowEls, 252, 52)).toBe('eb')
   })
 })
+
+// ── 悬空关系箭头(端点卡片已删,bbox w=h=0)命中兜底 ──────────────────────────
+describe('hitTest 悬空关系箭头', () => {
+  it('端点丢失的幽灵箭头可被 bbox+容差命中(能选中删除)', () => {
+    // 关系箭头 from/to 指向不存在的卡,bbox w=h=0 → 线段命中跳过。
+    // 无 fallback 则永远选不中/删不掉(三条线删不掉的根因)。
+    const els = [
+      { id: 'ghost', kind: 'arrow', x: 100, y: 100, w: 0, h: 0, rotation: 0, from: 'gone', to: 'also-gone' },
+    ] as never
+    // 正中: bbox 是点 (100,100),容差 tol=6(zoom=1)→ 100±6 命中
+    expect(hitTest(els, 100, 100, 1)).toBe('ghost')
+    expect(hitTest(els, 104, 104, 1)).toBe('ghost')  // 容差内
+    expect(hitTest(els, 120, 120, 1)).toBeNull()     // 容差外
+  })
+})

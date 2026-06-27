@@ -66,6 +66,8 @@ export default function CanvasPage() {
   const [detail, setDetail] = useState<{ card: Card } | null>(null)
   const [snapMode, setSnapMode] = useState<'snap' | 'free'>('snap')
   const [tool, setTool] = useState<'select' | 'freedraw' | 'eraser' | 'text' | 'connect'>('select')
+  /** 橡皮模式:text 只擦文字 / card 只擦卡片(进回收桶)/ all 擦一切。选中 eraser 时顶栏出 3 子模式切换。 */
+  const [eraserMode, setEraserMode] = useState<'text' | 'card' | 'all'>('all')
   // AI loading + abort(审计 M5+M9):async 调用期间禁用按钮防重复点击,
   // AbortController 在卸载/取消时 abort,省 API 费 + 防 unmounted setState。
   const [aiBusy, setAiBusy] = useState<null | 'layout' | 'cluster'>(null)
@@ -210,6 +212,14 @@ export default function CanvasPage() {
     pushToast({ kind: 'success', message: t('canvas.frameCreated') })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t])
+
+  // card 橡皮模式命中卡片 → 进回收桶(softDelete)。adapter 随后自己 remove 几何;
+  // canvas-binding 的 removed 回写因 deletedAt 已设而跳过 removeFromCanvas(不双删)。
+  // undo 由 reconcileHistory 恢复:host 恢复了卡元素但 DB deletedAt → service.restore。
+  // 不 toast:连续擦多张会刷屏;按钮 label 已说明"进回收桶",trash 可见可恢复。
+  const onEraseCard = useCallback((cardId: string) => {
+    service.softDelete(cardId as CardId)
+  }, [service])
 
   // undo/redo 按钮 disabled 态:onHistoryChange(upsert/undo/redo)刷新。
   // 依赖 adapter state(Bug A 修复后):adapter 就绪/切画布重建后重订阅,
@@ -530,6 +540,16 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
   const cardCountOnTarget = confirmDeleteId
     ? service.listOnCanvas(confirmDeleteId).filter((c) => !c.deletedAt).length
     : 0
+  // 画布是否还有 freeform 元素(text/freedraw/arrow/rect/frame)—— 用于 cv-empty 判断:
+  // 卡片擦完但还有 freeform 时不该显示空提示(用户在画线/手绘中途不该被打断)。
+  // onUserChange 触发重算;adapter 切换(切画布)重订阅 + 初始同步。
+  const [hasFreeform, setHasFreeform] = useState(false)
+  useEffect(() => {
+    if (!adapter) { setHasFreeform(false); return }
+    const check = () => setHasFreeform(adapter.getElements().some((e) => e.kind !== 'card'))
+    check()
+    return adapter.onUserChange(check)
+  }, [adapter])
   // Reflect the current card selection on the auto-relate button via the
   // host's onSelectionChange event (debt 收口 2026-06-23, 替原 300ms 轮询)。
   const [selectedCardCount, setSelectedCardCount] = useState(0)
@@ -626,6 +646,32 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
             <span className="tb-tool__label">{t(labelShort)}</span>
           </button>
         ))}
+        {/* 橡皮子模式:选中 eraser 时显示(文字/卡片/全部),各司其职。
+            全部=擦一切;卡片=只擦 card 进回收桶;文字=只擦 text 精确改字不误伤。 */}
+        {tool === 'eraser' && (
+          <>
+            <span className="tb-divider" aria-hidden="true" />
+            {([
+              { em: 'all', icon: '⌫' },
+              { em: 'card', icon: '▭' },
+              { em: 'text', icon: 'T' },
+            ] as const).map(({ em, icon }) => (
+              <button
+                key={em}
+                type="button"
+                className={`tb-tool tb-tool--sub${eraserMode === em ? ' tb-tool--active' : ''}`}
+                onClick={() => setEraserMode(em)}
+                disabled={!adapterReady}
+                aria-pressed={eraserMode === em}
+                title={t(`canvas.eraserMode.${em}`)}
+                aria-label={t(`canvas.eraserMode.${em}`)}
+              >
+                <span className="tb-tool__icon">{icon}</span>
+                <span className="tb-tool__label">{t(`canvas.eraserMode.${em}.short`)}</span>
+              </button>
+            ))}
+          </>
+        )}
         <span className="tb-divider" aria-hidden="true" />
         <SnapToggle mode={snapMode} onToggle={toggleSnap} disabled={!adapterReady} />
         <span className="tb-divider" aria-hidden="true" />
@@ -638,12 +684,14 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           canvasId={activeCanvasId}
           service={service}
           tool={tool}
+          eraserMode={eraserMode}
+          onEraseCard={onEraseCard}
           onOpenCard={(card) => setDetail({ card })}
           adapterRef={handle}
           canvasElRef={canvasElRef}
           onAdapterReady={setAdapter}
         />
-        {!ready ? null : onCanvas === 0 && (
+        {!ready ? null : onCanvas === 0 && !hasFreeform && (
           <div className="cv-empty">
             <span className="eyebrow">{t('canvas.emptyTitle')}</span>
             <span className="mono">{t('canvas.emptyHint')}</span>
@@ -1101,6 +1149,10 @@ const styles = `
 .tb-tool__label { font-size: 10px; letter-spacing: 0; color: var(--color-gray); line-height: 1; }
 .tb-tool--active { background: var(--color-yellow); border-color: var(--color-black); color: var(--color-black); }
 .tb-tool--active .tb-tool__label { color: var(--color-black); }
+/* 橡皮子模式:比主工具略小(36×34),与主工具激活态同黄底黑边,视觉连贯。 */
+.tb-tool--sub { height: 36px; min-width: 38px; padding: 2px var(--space-0.5); }
+.tb-tool--sub .tb-tool__icon { font-size: var(--font-size-sm); }
+.tb-tool--sub .tb-tool__label { font-size: 9px; }
 .tb-tool:hover:not(:disabled):not(.tb-tool--active) { background: var(--color-gray-soft); border-color: var(--color-gray); }
 .tb-tool:active:not(:disabled) { transform: scale(0.94); }
 .tb-tool:disabled { opacity: 0.55; cursor: not-allowed; }
