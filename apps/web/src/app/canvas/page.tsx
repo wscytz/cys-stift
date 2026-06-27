@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import type { CanvasId, Card, CardId } from '@cys-stift/domain'
 import { SelfBuiltAdapter, elementCenter } from '@cys-stift/canvas-engine'
@@ -799,35 +800,19 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         canvasEl={canvasElRef.current}
       />
 
-      {showAiSetup && (
-        <div
-          className="ai-setup-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-label={t('canvas.aiSetupTitle')}
-          onClick={() => setShowAiSetup(false)}
-        >
-          <div onClick={(e) => e.stopPropagation()}>
-            <AiSetupCard
-              onGoToSettings={() => {
-                setShowAiSetup(false)
-                window.location.href = '/settings'
-              }}
-            />
-            <Button variant="ghost" onClick={() => setShowAiSetup(false)}>
-              {t('card.detail.cancel')}
-            </Button>
-          </div>
-          <style>{`
-.ai-setup-overlay {
-  position: fixed; inset: 0; z-index: 150;
-  background: rgba(10,10,10,0.5);
-  display: grid; place-items: center; padding: var(--space-4);
-}
-.ai-setup-overlay > div { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }
-`}</style>
+      <Modal open={showAiSetup} onClose={() => setShowAiSetup(false)} title={t('canvas.aiSetupTitle')}>
+        <AiSetupCard
+          onGoToSettings={() => {
+            setShowAiSetup(false)
+            window.location.href = '/settings'
+          }}
+        />
+        <div className="confirm__actions">
+          <Button variant="ghost" onClick={() => setShowAiSetup(false)}>
+            {t('card.detail.cancel')}
+          </Button>
         </div>
-      )}
+      </Modal>
 
       <style>{styles}</style>
     </main>
@@ -873,8 +858,9 @@ function CanvasSwitcher({
 function SnapToggle({ mode, onToggle, disabled }: { mode: 'snap' | 'free'; onToggle: () => void; disabled: boolean }) {
   const { t } = useI18n()
   return (
-    <button type="button" className={`tb-snap tb-snap--${mode}`} onClick={onToggle} disabled={disabled} aria-pressed={mode === 'snap'} title={t('canvas.toggleSnap')}>
-      {mode === 'snap' ? t('canvas.snap') : t('canvas.free')}
+    <button type="button" className={`tb-snap tb-snap--${mode} tb-snap--toggle`} onClick={onToggle} disabled={disabled} aria-pressed={mode === 'snap'} title={t('canvas.toggleSnap')}>
+      <span className="tb-snap__label">{mode === 'snap' ? t('canvas.snap') : t('canvas.free')}</span>
+      <span className="tb-snap__glyph" aria-hidden="true">{mode === 'snap' ? '▦' : '⌗'}</span>
     </button>
   )
 }
@@ -885,7 +871,9 @@ function ZoomGroup({ adapterReady, onZoom }: { adapterReady: boolean; onZoom: (o
     <span className="tb-zoom">
       <button type="button" className="tb-icon-btn" onClick={() => onZoom('out')} disabled={!adapterReady} aria-label={t('canvas.zoomOut')} title={`${t('canvas.zoomOut')} (-)`}>−</button>
       <button type="button" className="tb-icon-btn" onClick={() => onZoom('in')} disabled={!adapterReady} aria-label={t('canvas.zoomIn')} title={`${t('canvas.zoomIn')} (+)`}>+</button>
-      <button type="button" className="tb-icon-btn tb-icon-btn--fit" onClick={() => onZoom('fit')} disabled={!adapterReady} aria-label={t('canvas.zoomFit')} title={`${t('canvas.zoomFit')} (0)`}>{t('canvas.zoomFit')}</button>
+      <button type="button" className="tb-icon-btn tb-icon-btn--fit" onClick={() => onZoom('fit')} disabled={!adapterReady} aria-label={t('canvas.zoomFit')} title={`${t('canvas.zoomFit')} (0)`}>
+        <span className="tb-icon-btn__label">{t('canvas.zoomFit')}</span>
+      </button>
     </span>
   )
 }
@@ -948,6 +936,31 @@ function CanvasSideRail({
 }) {
   const { t } = useI18n()
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  // P0 #1: 渲染到 body 的 portal,让导出二级菜单逃离 .cv-rail 的 overflow-y:auto
+  // (overflow-y:auto 会让 overflow-x 计算成 auto,横向裁掉左侧弹出的菜单)。
+  // 用 fixed 定位 + trigger 的 getBoundingClientRect;开/关 + 窗口 resize 时重测。
+  const exportTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null)
+  useLayoutEffect(() => {
+    if (!exportMenuOpen) {
+      setMenuPos(null)
+      return
+    }
+    const measure = () => {
+      const el = exportTriggerRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      // 菜单宽 168 + 8 间距;左边沿 = trigger 左沿 - 菜单宽 - 间距。
+      // 顶对齐 trigger 顶沿(原 .cv-rail__menu top:0 相对 group,行为一致)。
+      const MENU_WIDTH = 168
+      const left = Math.max(8, rect.left - MENU_WIDTH - 8)
+      const top = rect.top
+      setMenuPos((prev) => (prev && prev.left === left && prev.top === top ? prev : { left, top }))
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [exportMenuOpen])
   return (
     <nav className="cv-rail" aria-label={t('canvas.sideRail')}>
       <RailButton label={t('canvas.undo')} short={t('canvas.rail.undo')} onClick={onUndo} disabled={!adapterReady || !canUndo} icon="↶" />
@@ -972,28 +985,35 @@ function CanvasSideRail({
       <RailButton label={t('canvas.overview')} short={t('canvas.rail.overview')} disabled={!adapterReady} onClick={onOverview} icon="▤" />
       {/* 导出:一个按钮 + 二级拓展(图片/Markdown/DSL)。Diff(版本对比)不是导出,留独立按钮。 */}
       <div className="cv-rail__group">
-        <RailButton label={t('canvas.export')} short={t('canvas.rail.export')} disabled={!adapterReady} onClick={() => setExportMenuOpen((o) => !o)} icon="⤓" pressed={exportMenuOpen} />
-        {exportMenuOpen && (
-          <>
-            <div className="cv-rail__menu-backdrop" onClick={() => setExportMenuOpen(false)} aria-hidden="true" />
-            <div className="cv-rail__menu" role="menu" aria-label={t('canvas.export')}>
-              <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={!adapterReady} onClick={() => { setExportMenuOpen(false); onExport() }}>{t('canvas.exportImage')}</button>
-              <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={!adapterReady} onClick={() => { setExportMenuOpen(false); onMarkdown() }}>{t('canvas.markdown')}</button>
-              <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={!adapterReady} onClick={() => { setExportMenuOpen(false); onDsl() }}>{t('canvas.dslTitle')}</button>
-            </div>
-          </>
-        )}
+        <RailButton label={t('canvas.export')} short={t('canvas.rail.export')} disabled={!adapterReady} onClick={() => setExportMenuOpen((o) => !o)} pressed={exportMenuOpen} icon="⤓" buttonRef={exportTriggerRef} />
       </div>
       <RailButton label={t('canvas.diffTitle')} short={t('canvas.rail.diff')} disabled={!adapterReady} onClick={onDiff} icon="±" />
       <span className="cv-rail__sep" aria-hidden="true" />
       <RailButton label={t('canvas.shortcuts')} short={t('canvas.rail.shortcuts')} onClick={onShortcuts} icon="?" />
+      {exportMenuOpen && typeof document !== 'undefined' && createPortal(
+        <>
+          <div className="cv-rail__menu-backdrop" onClick={() => setExportMenuOpen(false)} aria-hidden="true" />
+          <div
+            className="cv-rail__menu"
+            role="menu"
+            aria-label={t('canvas.export')}
+            style={menuPos ? { left: `${menuPos.left}px`, top: `${menuPos.top}px` } : { visibility: 'hidden' }}
+          >
+            <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={!adapterReady} onClick={() => { setExportMenuOpen(false); onExport() }}>{t('canvas.exportImage')}</button>
+            <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={!adapterReady} onClick={() => { setExportMenuOpen(false); onMarkdown() }}>{t('canvas.markdown')}</button>
+            <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={!adapterReady} onClick={() => { setExportMenuOpen(false); onDsl() }}>{t('canvas.dslTitle')}</button>
+          </div>
+        </>,
+        document.body,
+      )}
     </nav>
   )
 }
 
-function RailButton({ label, short, icon, onClick, disabled, busy, busyTitle, ariaBusy, pressed }: { label: string; short?: string; icon: string; onClick: () => void; disabled?: boolean; busy?: boolean; busyTitle?: string; ariaBusy?: boolean; pressed?: boolean }) {
+function RailButton({ label, short, icon, onClick, disabled, busy, busyTitle, ariaBusy, pressed, buttonRef }: { label: string; short?: string; icon: string; onClick: () => void; disabled?: boolean; busy?: boolean; busyTitle?: string; ariaBusy?: boolean; pressed?: boolean; buttonRef?: React.RefObject<HTMLButtonElement | null> }) {
   return (
     <button
+      ref={buttonRef}
       type="button"
       className={`cv-rail__btn${pressed ? ' cv-rail__btn--pressed' : ''}`}
       onClick={onClick}
@@ -1032,19 +1052,24 @@ const styles = `
 }
 .cv-empty__cta:hover { box-shadow: 2px 2px 0 0 var(--color-black); }
 .cv-empty__cta:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-.tb-divider { width: 1px; height: 24px; background: var(--color-gray); margin: 0 var(--space-2); flex: 0 0 auto; }
+.tb-divider { width: 1px; height: 24px; background: var(--color-gray-soft); margin: 0 var(--space-2); flex: 0 0 auto; }
 .tb-snap { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.16em; text-transform: uppercase; background: var(--color-white); color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
 .tb-snap--snap { background: var(--color-black); color: var(--color-white); }
 .tb-snap--free { background: var(--color-white); color: var(--color-black); }
+/* P1 #6: 5 个工具按钮(↖✎⌫T⇄)补 hover,与 .tb-icon-btn 对齐;排除激活态
+   (--snap 黑底)与 SnapToggle 的 --snap/--free 文字按钮,避免抢激活态视觉。 */
+.tb-snap:hover:not(:disabled):not(.tb-snap--snap):not(.tb-snap--free):not(.tb-snap--toggle) { background: var(--color-gray-soft); }
 .tb-snap:disabled { opacity: 0.55; cursor: not-allowed; }
 .tb-snap:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+/* SnapToggle 默认显示文字 label,glyph 隐藏;≤900px 反转(见响应式断点)。 */
+.tb-snap__glyph { display: none; }
 .tb-zoom { display: inline-flex; align-items: center; gap: 0; }
 .tb-icon-btn { display: inline-flex; align-items: center; justify-content: center; height: 32px; min-width: 32px; padding: 0 var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.12em; text-transform: uppercase; background: transparent; color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
 .tb-icon-btn--fit { padding: 0 var(--space-3); }
 .tb-icon-btn:hover { background: var(--color-black); color: var(--color-white); }
 .tb-icon-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .tb-icon-btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-.cselect { height: 32px; padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-sm); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
+.cselect { height: 32px; padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-sm); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; min-width: 200px; }
 .cselect:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cselect-edit { height: 32px; width: 32px; background: transparent; color: var(--color-gray); border: 0; cursor: pointer; font-size: var(--font-size-base); }
 .cselect-edit:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
@@ -1069,17 +1094,24 @@ const styles = `
      30 floating panels (relation/freedraw) — above rail
      100 modals / toasts  — above all canvas chrome */
   position: absolute; top: 72px; right: var(--space-1); z-index: 20;
-  max-height: calc(100vh - 84px); overflow-y: auto;
+  /* P0 #2: rail 是 .cv-host(已矮于 100vh)内的 absolute 子,用 100vh 会撑过 host
+     底沿。改用 % 解析到 host 高度,并给右下角 minimap(~160×120 @ bottom:8 right:8,
+     z-index 10)让出 136px,免得 rail 底按钮压在小地图上。内部仍可滚。 */
+  max-height: calc(100% - 136px - var(--space-2)); overflow-y: auto;
   display: flex; flex-direction: column; align-items: center; gap: var(--space-1);
   padding: var(--space-1);
   background: var(--color-white);
   border: var(--border-hairline);
   border-radius: var(--radius-sm);
   box-shadow: 2px 2px 0 0 var(--color-black);
+  /* P2: 底部淡出蒙版 — rail 高时可滚但无视觉提示,加一条 ~18px 渐隐让用户读出
+     「下方还有」。按钮 44px(窄窗 40px),蒙版远矮于按钮,不会切掉 hover 态。 */
+  mask-image: linear-gradient(to bottom, black 0, black calc(100% - 18px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 0, black calc(100% - 18px), transparent 100%);
 }
 .cv-rail__btn {
-  width: 60px; min-height: 46px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  width: 60px; min-height: 44px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   padding: var(--space-1) 0;
   background: var(--color-white); color: var(--color-black);
   border: 0; border-radius: var(--radius-sm); cursor: pointer;
@@ -1090,13 +1122,15 @@ const styles = `
 .cv-rail__btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .cv-rail__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: -2px; }
 .cv-rail__btn-icon { font-family: var(--font-mono); font-size: var(--font-size-base); line-height: 1; }
-.cv-rail__btn-label { font-family: var(--font-body); font-size: 10px; line-height: 1; color: inherit; letter-spacing: 0; }
+.cv-rail__btn-label { font-family: var(--font-body); font-size: var(--font-size-xs); line-height: 1; color: inherit; letter-spacing: 0; }
 .cv-rail__sep { width: 44px; height: 1px; background: var(--color-gray-soft); margin: var(--space-1) 0; }
 .cv-rail__group { position: relative; display: flex; flex-direction: column; align-items: center; }
-/* 导出二级菜单:点 backdrop(覆盖 rail)关闭;菜单从 rail 左侧弹出。 */
+/* P0 #1: 导出二级菜单经 portal 渲染到 document.body,逃离 .cv-rail 的 overflow
+   裁剪。定位由 JS 写成 inline style(fixed + trigger 的 getBoundingClientRect),
+   这里只给视觉样式;backdrop 覆盖整屏点外关闭。 */
 .cv-rail__menu-backdrop { position: fixed; inset: 0; z-index: 25; cursor: default; }
 .cv-rail__menu {
-  position: absolute; right: calc(100% + var(--space-2)); top: 0; z-index: 26;
+  position: fixed; z-index: 26;
   min-width: 168px; padding: var(--space-1);
   background: var(--color-white); border: 2px solid var(--color-black); border-radius: var(--radius-sm);
   box-shadow: 4px 4px 0 0 var(--color-black);
@@ -1110,5 +1144,27 @@ const styles = `
 }
 .cv-rail__menu-item:hover:not(:disabled) { background: var(--color-yellow); }
 .cv-rail__menu-item:disabled { opacity: 0.5; cursor: not-allowed; }
-.cv-rail__menu-item:focus-visible { outline: 2px solid var(--color-blue); outline-offset: 1px; }
+.cv-rail__menu-item:focus-visible { outline: 2px solid var(--color-red); outline-offset: 1px; }
+
+/* ── P1 响应式断点 ───────────────────────────────────────────────
+   画布页此前零 @media;窄 Tauri 窗口下顶栏静默溢出、rail 占掉画布宽度。
+   两条断点:
+   - ≤960px:rail 收成纯图标,按钮缩到 40×40,腾回画布宽度(图标靠 tooltip 仍可辨)。
+   - ≤900px:顶栏 SnapToggle 与 ZoomGroup 的 Fit 文字收掉,800px 顶栏不再横向滚。
+   ─────────────────────────────────────────────────────────────── */
+@media (max-width: 960px) {
+  .cv-rail { padding: 4px; }
+  .cv-rail__btn { width: 40px; min-height: 40px; gap: 0; padding: 4px 0; }
+  .cv-rail__btn-label { display: none; }
+  .cv-rail__sep { width: 32px; margin: 4px 0; }
+}
+@media (max-width: 900px) {
+  /* SnapToggle:文字隐藏、改符号按钮,保留 aria-pressed + title。 */
+  .tb-snap--toggle .tb-snap__label { display: none; }
+  .tb-snap--toggle { min-width: 32px; padding: 0 var(--space-2); }
+  .tb-snap--toggle .tb-snap__glyph { display: inline; }
+  /* ZoomGroup Fit:文字隐藏,留按钮(仍 + / − 同列)。 */
+  .tb-icon-btn--fit .tb-icon-btn__label { display: none; }
+  .tb-icon-btn--fit { padding: 0 var(--space-2); }
+}
 `
