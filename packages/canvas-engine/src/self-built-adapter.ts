@@ -66,6 +66,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   private undoStack: CanvasElement[][] = []
   private redoStack: CanvasElement[][] = []
   private static readonly UNDO_LIMIT = 50
+  private static readonly GRID = 8
   /** coalescing=true 期间,echo 的 upsert/remove 不推快照(连续操作合并为 1 undo 步)。
    *  drag / resize 开始时置 true(批前已 pushUndo 一次),onUp 置 false。
    *  batch() 也用此门控实现分组。 */
@@ -639,8 +640,8 @@ export class SelfBuiltAdapter implements CanvasHost {
           const el = this.getElement(sid)
           const off = this.dragGroup.offsets.get(sid)
           if (!el || !off) continue
-          const nx = Math.round(p.x - off.x)
-          const ny = Math.round(p.y - off.y)
+          const nx = this.snapCoord(p.x - off.x)
+          const ny = this.snapCoord(p.y - off.y)
           if (el.kind === 'freedraw') {
             // freedraw 真身=点序列:按位移平移点序列(不只改 bbox)。
             const moved = translateFreedraw(el, nx - el.x, ny - el.y)
@@ -857,12 +858,14 @@ export class SelfBuiltAdapter implements CanvasHost {
         for (const id of this.selectedIds) {
           const el = this.getElement(id)
           if (!el) continue
+          const dx = this.view.gridMode === 'snap' ? delta.dx * SelfBuiltAdapter.GRID : delta.dx
+          const dy = this.view.gridMode === 'snap' ? delta.dy * SelfBuiltAdapter.GRID : delta.dy
           if (el.kind === 'freedraw') {
             // freedraw 真身=点序列:微移也须平移 points(同 drag,别只移 bbox)
-            const moved = translateFreedraw(el, delta.dx, delta.dy)
+            const moved = translateFreedraw(el, dx, dy)
             if (moved) this.upsert(moved)
           } else {
-            this.upsert({ ...el, x: el.x + delta.dx, y: el.y + delta.dy })
+            this.upsert({ ...el, x: el.x + dx, y: el.y + dy })
           }
         }
       }
@@ -907,6 +910,11 @@ export class SelfBuiltAdapter implements CanvasHost {
       window.removeEventListener('keydown', this.keyHandler)
       this.keyHandler = null
     }
+  }
+
+  private snapCoord(n: number): number {
+    if (this.view.gridMode !== 'snap') return Math.round(n)
+    return Math.round(n / SelfBuiltAdapter.GRID) * SelfBuiltAdapter.GRID
   }
 
   /** 供后续 Task(渲染/交互)读取相机。 */

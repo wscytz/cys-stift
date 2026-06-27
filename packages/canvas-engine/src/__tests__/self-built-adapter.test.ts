@@ -824,3 +824,89 @@ describe('SelfBuiltAdapter onHistoryChange', () => {
     expect(fired).toBe(0)
   })
 })
+
+// ── gridMode snap — TaskList #210 吸附失效修复 ───────────────────────────
+describe('SelfBuiltAdapter gridMode snap to 8px grid', () => {
+  /** Simulate drag: dispatch pointer events to move element */
+  function simulateDrag(
+    host: SelfBuiltAdapter,
+    startPageX: number,
+    startPageY: number,
+    deltaX: number,
+    deltaY: number,
+  ) {
+    const canvas = host['canvas'] as HTMLCanvasElement
+    // Pointer down on the element
+    const down = new PointerEvent('pointerdown', {
+      clientX: startPageX,
+      clientY: startPageY,
+      bubbles: true,
+    })
+    canvas.dispatchEvent(down)
+    // Pointer move to target position
+    const move = new PointerEvent('pointermove', {
+      clientX: startPageX + deltaX,
+      clientY: startPageY + deltaY,
+      bubbles: true,
+    })
+    canvas.dispatchEvent(move)
+    // Pointer up (end drag, coalescing off)
+    const up = new PointerEvent('pointerup', {
+      clientX: startPageX + deltaX,
+      clientY: startPageY + deltaY,
+      bubbles: true,
+    })
+    canvas.dispatchEvent(up)
+  }
+
+  it('free mode: drag uses Math.round (no snap)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'), { getCardInfo: () => null })
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.setView({ panX: 0, panY: 0, zoom: 1, gridMode: 'free' })
+
+    // Drag element from center (50,50) by +5/+5 → 5/5 offset → x=5,y=5 → round=5
+    simulateDrag(host, 50, 50, 5, 5)
+    // Math.round(5) = 5 (not snapped to 8)
+    expect(host.getElement('c1')).toMatchObject({ x: 5, y: 5 })
+  })
+
+  it('snap mode: drag snaps to 8px grid', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'), { getCardInfo: () => null })
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.setView({ panX: 0, panY: 0, zoom: 1, gridMode: 'snap' })
+
+    // Drag by +5/+5 → coordinate 5 → snap to 8 (nearest 8px multiple)
+    simulateDrag(host, 50, 50, 5, 5)
+    // snapCoord(5) = round(5/8)*8 = round(0.625)*8 = 1*8 = 8
+    expect(host.getElement('c1')).toMatchObject({ x: 8, y: 8 })
+  })
+
+  it('snap mode: arrow keys move by 8px (not 1px)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'), { getCardInfo: () => null })
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.setView({ panX: 0, panY: 0, zoom: 1, gridMode: 'snap' })
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['c1'])
+
+    // Dispatch ArrowRight to window
+    const right = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
+    window.dispatchEvent(right)
+    // snap mode: delta.dx * GRID(8) = 1*8 = 8
+    expect(host.getElement('c1')).toMatchObject({ x: 8, y: 0 })
+
+    // Dispatch ArrowDown
+    const down = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })
+    window.dispatchEvent(down)
+    expect(host.getElement('c1')).toMatchObject({ x: 8, y: 8 })
+  })
+
+  it('free mode: arrow keys move by 1px (baseline)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'), { getCardInfo: () => null })
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.setView({ panX: 0, panY: 0, zoom: 1, gridMode: 'free' })
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['c1'])
+
+    const right = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
+    window.dispatchEvent(right)
+    expect(host.getElement('c1')).toMatchObject({ x: 1, y: 0 })
+  })
+})

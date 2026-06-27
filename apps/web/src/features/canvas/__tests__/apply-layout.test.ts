@@ -35,13 +35,13 @@ describe('applyLayout', () => {
     expect(host.getElements()).toHaveLength(0)
   })
 
-  it('clamps negative coordinates to 0', () => {
+  it('preserves negative coordinates (no clamping)', () => {
     const host = new InMemoryCanvasHost()
     seedCard(host, 'a1')
 
     applyLayout(host, [{ type: 'card', cardId: 'a1' as CardId, x: -100, y: -50 }])
 
-    expect(host.getElement('a1')).toMatchObject({ x: 0, y: 0 })
+    expect(host.getElement('a1')).toMatchObject({ x: -100, y: -50 })
   })
 
   it('creates free rect shapes', () => {

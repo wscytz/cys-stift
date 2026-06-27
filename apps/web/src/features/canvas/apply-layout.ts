@@ -109,8 +109,8 @@ function applyCardOp(
 
   host.upsert({
     ...existing,
-    x: Math.max(0, Math.round(op.x)),
-    y: Math.max(0, Math.round(op.y)),
+    x: Math.round(op.x),
+    y: Math.round(op.y),
     ...(op.w !== undefined ? { w: op.w } : {}),
     ...(op.h !== undefined ? { h: op.h } : {}),
     ...(op.color ? { color: op.color } : {}),
@@ -119,8 +119,8 @@ function applyCardOp(
 }
 
 function applyFreeOp(host: CanvasHost, op: DslFreeOp): boolean {
-  const x = Math.max(0, Math.round(op.x))
-  const y = Math.max(0, Math.round(op.y))
+  const x = Math.round(op.x)
+  const y = Math.round(op.y)
 
   // ── Update path: op.id 命中已有同 kind 元素 → 覆盖提供的字段,保留其余 ──
   // rect op 只更新 rect,text op 只更新 text(防跨 kind 误更新)。
