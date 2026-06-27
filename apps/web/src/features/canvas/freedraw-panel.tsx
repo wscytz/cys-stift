@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n/messages'
-import { useClampedPanelPosition } from './panel-position'
+import { useClampedPanelPosition, FLOATING_PANEL_OFFSET } from './panel-position'
 import {
   classifyFreedraw,
   duplicateFreedraw,
@@ -187,7 +187,7 @@ function computePanelPosition(
   const cy = el.y
   const screenX = rect.left + view.panX + cx * view.zoom
   const screenY = rect.top + view.panY + cy * view.zoom
-  return { left: screenX, top: screenY - 56 }
+  return { left: screenX, top: screenY - FLOATING_PANEL_OFFSET }
 }
 
 const styles = `

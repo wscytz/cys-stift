@@ -35,7 +35,7 @@ import {
 } from './relation-types'
 import { inferRelationTypeFromContext } from './relation-inference'
 import { useCardService } from './card-service-context'
-import { useClampedPanelPosition } from './panel-position'
+import { useClampedPanelPosition, FLOATING_PANEL_OFFSET } from './panel-position'
 import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
 import { arrowRoute, arrowEndpoints } from '@cys-stift/canvas-engine'
 
@@ -226,7 +226,7 @@ function computePanelPosition(
   const screenY = rect.top + view.panY + cy * view.zoom
   return {
     left: screenX,
-    top: screenY - 56,
+    top: screenY - FLOATING_PANEL_OFFSET,
   }
 }
 

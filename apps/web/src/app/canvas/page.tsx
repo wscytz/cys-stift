@@ -1224,7 +1224,7 @@ const styles = `
      20 side rail (this)  — above minimap so rail buttons stay clickable
      30 floating panels (relation/freedraw) — above rail
      100 modals / toasts  — above all canvas chrome */
-  position: absolute; top: 72px; right: var(--space-1); z-index: 20;
+  position: absolute; top: calc(var(--app-menu-height) + 3px); right: var(--space-1); z-index: 20;
   /* rail 从 top:72 往下延伸,要给右下角 minimap(高约 155px:120 canvas + 标题栏 + 边框)
      让出完整空间。rail 底部 = 72 + max-height ≤ 容器高 - 155 → max-height ≤ 容器高 - 227。
      取 calc(100% - 230px) 留余量,确保 rail 底按钮永不压在 minimap 上。内部仍可滚。 */

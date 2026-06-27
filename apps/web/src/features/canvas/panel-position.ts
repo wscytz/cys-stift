@@ -16,6 +16,11 @@ import type { RefObject } from 'react'
 const MARGIN = 8
 /** 画布顶部工具栏的大致高度,面板顶边不能压到它上面。 */
 export const TOOLBAR_OFFSET = 72
+/** 浮动面板(relation/freedraw)在目标元素上方的偏移(= 面板高度估计 + 间距)。
+ *  让面板出现在元素上方而非遮挡。改面板 padding/内容行数要同步此估计;
+ *  clamp hook(useClampedPanelPosition)会实测 offsetHeight 修正视口内的夹紧,
+ *  此值只影响面板相对元素的垂直位置(偏高/偏低),不影响是否在屏内。 */
+export const FLOATING_PANEL_OFFSET = 56
 
 export interface PanelAnchor {
   /** 中心 x(pre-translateX 的居中锚点)。 */

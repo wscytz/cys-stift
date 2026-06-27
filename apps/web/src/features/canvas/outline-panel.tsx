@@ -103,7 +103,7 @@ export function OutlinePanel({
       style={{
         position: 'absolute',
         left: 'var(--space-1)',
-        top: 72,
+        top: 'calc(var(--app-menu-height) + 3px)',
         width: PANEL_WIDTH,
         zIndex: 30,
         background: 'var(--color-white)',

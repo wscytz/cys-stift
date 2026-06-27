@@ -138,7 +138,9 @@ export class SelfBuiltAdapter implements CanvasHost {
       this.tokenResolver('--color-canvas', '#ffffff'),
       this.tokenResolver,
     )
-    drawSelectionOutlines(ctx, this.getSelectedIds(), this.getElements(), this.view, this.tokenResolver)
+    // 传已缓存的 all(上方 line 127 算的),不再调 this.getElements() —— 否则每帧
+    // 第二次全量 sortByLayer 排序(5000 元素时浪费,drawSelectionOutlines 内部也只是遍历找 selected)。
+    drawSelectionOutlines(ctx, this.getSelectedIds(), all, this.view, this.tokenResolver)
     if (this.marquee) {
       drawMarquee(ctx, {
         x: Math.min(this.marquee.startX, this.marquee.curX),
@@ -296,8 +298,12 @@ export class SelfBuiltAdapter implements CanvasHost {
     const selId = [...this.selectedIds][0]!
     const el = this.getElement(selId)
     if (!el || el.kind !== 'arrow') return false
-    if (hitTest(this.getElements(), p.x, p.y, this.view.zoom) !== selId) return false
-    const { from, to } = arrowEndpoints(el, this.getElements())
+    // 函数内多次用全量元素(hitTest 命中判定 + arrowEndpoints 端点解析),取一次快照
+    // 复用 —— 否则每次 this.getElements() 都 O(n log n) 全排序 + 拷贝(5000 元素时双击 = 3 次)。
+    // 函数期间无 upsert/remove,排序结果恒等。
+    const els = this.getElements()
+    if (hitTest(els, p.x, p.y, this.view.zoom) !== selId) return false
+    const { from, to } = arrowEndpoints(el, els)
     if (!from || !to) return false
     const route = arrowRoute(el)
     this.pushUndo()
