@@ -52,6 +52,8 @@
 | 开发环境搭建 | `docs/development/setup.md` |
 | 依赖清单（装了什么） | `docs/development/dependencies.md` |
 | 验证门 + 提交纪律（改完代码照这跑） | `docs/development/definition-of-done.md` |
+| 长效验收（发布手测 + 守卫脚本 + 月度审计） | `docs/development/acceptance-plan.md` |
+| UI 设计系统（颜色/间距/尺寸/排版/分层规范） | `docs/design/design-system.md` + `docs/design/interaction-language.md`（交互态）|
 
 ## 验证命令（改完代码就跑）
 

@@ -5,6 +5,43 @@
 
 ---
 
+## 2026-06-27 · v0.37.0 · canvas-polish-and-qa-system(画布交互打磨 + 系统化质量保障)
+
+用户「桌面画布工具栏用不了 / 橡皮没有 / minimap 不显示箭头 / 打磨 3 轮」→ 滚雪球成一整批:从修具体 bug → subagent 四轮深度自查(30+ 修复)→ 系统化 UI 设计(token + 文档)→ 长效验收机制。主线仍是"打磨期",但这批把质量从"修缝"升级到"有机制防回退"。
+
+**根因 bug 修复(用户直接反馈)**
+- **#210 吸附失效**:snap 从未实装(gridMode 只驱动按钮,drag/方向键只 Math.round)。加 `GRID=8` + `snapCoord()` gate drag + 方向键(snap 模式 8px 步进)。+4 测试。
+- **#211 转义后卡片漂移**:`apply-layout.ts` 的 `Math.max(0,…)` 钳掉负坐标 → 拖到原点左上的卡 round-trip 跳 (0,0) + writeback 永久错位。去钳位,负坐标完整往返。
+- **橡皮擦连续擦除**:eraser 只在 pointerdown 触发一次(不支持拖拽)→ 加 erasing 态(down 删+进态/move 持续删/up 退)。+3 测试。
+- **minimap 不显示箭头**:关系箭头 bbox w=h=0,drawElementMark 画的是「点」非「线」→ 改用 `arrowEndpoints()` 解析真实端点。同时 frame 在 minimap 漏画(落 fallback)→ 加 frame 分支(虚线+半透明)。
+- **minimap 被侧栏遮挡**:侧栏 max-height 让位不足(重叠 82px)→ `calc(100%-230px)` 让出 minimap 全高。
+
+**DSL 四大高 ROI 优化**
+- 小数坐标支持(`toFixed(1)` + 正则)消灭 0.5px 往返漂移
+- `[card #id create]` 卡片创建路径(补齐语法完整性)
+- 增量 Apply(hash 缓存跳过已应用行,大画布 10x)
+- 选中元素 DSL 片段复制(模态「复制选中」按钮)
+
+**subagent 四轮深度自查(30+ 真 bug,3×并行审计)**
+- R1 交互/UI一致性/渲染:工具栏裸样式(脚本替换失败致按钮无反馈)、激活态黑底→黄底、frame minimap 漏画、负 bbox 投影
+- R2 数据/边缘/a11y:Escape 卡模态(adapter preventDefault 反吞)、OPFS save/load 竞态、.cystift null 崩溃、DSL Infinity 钳位、IME 守卫、工具快捷键 v/p/e/t/c、pointercancel、reduced-motion
+- R3 AI隐私/泄漏/i18n:**R2 红线零违规**(独立审计确认)、adapter detach 漏 cancelAnimationFrame、工具短标签硬编码中文→i18n、canvas-prompt GRAMMAR 补 frame
+- R4 设计系统:**gray 不一致**(#8c8c8c→#666,WCAG 3.22:1→5.5:1)、**画布 --color-canvas token 缺失**(暗色模式破功)、Toast/MiniInput z-index 层级冲突、token 阶梯补全(space-0.5/shadow-lg)
+
+**系统化 UI 设计**
+- `docs/design/design-system.md`:8 大维度规范 + 自检清单。与 `interaction-language.md`(交互态)互补。
+- token 阶梯补全:`--space-0.5:4px` / `--space-quarter:2px` / `--shadow-lg:4px 4px` / `--color-canvas`(浅暗色)。收编散落魔法值。
+
+**长效验收机制(防回退)**
+- `docs/development/acceptance-plan.md`:三层验收(L0 commit / L1 发布手测+守卫 / L2 月度九维审计)+ 质量基线 + 发布检查表
+- `scripts/design-guard.sh`:5 条 grep 守卫(hex/第7色/字体/z-index/8px网格)自动化
+
+**用户可感知的提升**:橡皮能拖擦、minimap 显示箭头和 frame、工具栏按下有缩放手感且激活态黄底醒目、v/p/e/t/c 键盘切工具、Escape 单次关模态、**暗色模式画布可读**、正文对比度达标、Fit 键真适配。
+
+**纪律**:零新依赖;全走 token(守卫验证);R2 不变;6 色无 green;静态导出。验证:canvas-engine 379(+7) / domain 68 / db 7 / web 771(+16) 全绿;build exit 0;守卫可跑。提交链:`fac88bb`→`d728d2c`→`dd0a835`→`af5423f`→`3c2cdfd`→`700e98c`→`0fead7c`。
+
+---
+
 ## 2026-06-26 · ai-barrier-capture-ux · 降低 AI 门槛 + 记录栏体验优化(产品定位落地)
 
 用户「定产品定位重要吧」→ 联网竞品研究坐实楔子(**本地 + 画布 + 开放文本 DSL 转义** 无竞品),两根支柱(转义已产品化为 `DslDialog`、BYOM 含 Ollama 本地免费)在代码里都是真的。短板在**可见性与门槛**:AI 对未配置用户完全隐形(`aiEnabled` 隐藏所有 AI 按钮)、点了裸报错;配置面板朴素;捕获栏新人不知快捷键、捕获后静默进 inbox 无去向。brainstorming → spec(`docs/specs/2026-06-26-ai-barrier-and-capture-ux-design.md`)→ writing-plans → **subagent 逐任务执行**(10 TDD 任务,2 phase,主模型审 diff + 跑门 + 提交,`git -c user.name=cy …` 无 footer)。
