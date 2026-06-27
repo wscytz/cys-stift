@@ -26,9 +26,14 @@
   --color-gray: #666666;
   --color-gray-soft: #d9d9d9;
 
+  /* Canvas surface — 画布页底色(自研引擎读此 token,不写死蓝灰兜底)。
+     浅色=白,暗色=深灰白(与 page-bg 同),让卡片在两种主题下都正确分层。 */
+  --color-canvas: var(--color-white-soft);
+
   /* Shadows — hard offset, no blur */
   --shadow-sm: 0 1px 0 0 currentColor;
   --shadow-md: 2px 2px 0 0 currentColor;
+  --shadow-lg: 4px 4px 0 0 currentColor;
 
   /* Surfaces — keep one extra off-page colour for both schemes. */
   --color-page-bg: var(--color-white);
@@ -68,7 +73,9 @@
 
   --shadow-sm: 0 1px 0 0 currentColor;
   --shadow-md: 2px 2px 0 0 currentColor;
+  --shadow-lg: 4px 4px 0 0 currentColor;
 
+  --color-canvas: var(--color-white-soft);
   --color-page-bg: var(--color-white);
   --color-page-fg: var(--color-black);
 }
@@ -87,6 +94,7 @@
   --color-white-soft: #ffffff;
   --color-gray: #666666;
   --color-gray-soft: #d9d9d9;
+  --color-canvas: var(--color-white-soft);
 
   /* Typography */
   --font-display: 'Space Grotesk', system-ui, sans-serif;
@@ -103,8 +111,10 @@
   --font-size-3xl: 48px;
   --font-size-4xl: 64px;
 
-  /* 8px grid */
+  /* 8px grid — 主阶 8px,半阶 4px 收编 <8px 孤儿值(2px 边框/4px 间距) */
   --space-0: 0;
+  --space-quarter: 2px;
+  --space-0.5: 4px;
   --space-1: 8px;
   --space-2: 16px;
   --space-3: 24px;
@@ -127,4 +137,5 @@
   /* Shadows — hard offset, no blur */
   --shadow-sm: 0 1px 0 0 currentColor;
   --shadow-md: 2px 2px 0 0 currentColor;
+  --shadow-lg: 4px 4px 0 0 currentColor;
 }

@@ -16,7 +16,8 @@ export const tokens = {
     blue: { DEFAULT: '#003f7f', soft: '#e0ebf5' },
     black: { DEFAULT: '#0a0a0a', soft: '#2b2b2b' },
     white: { DEFAULT: '#fafafa', soft: '#ffffff' },
-    gray: { DEFAULT: '#8c8c8c', soft: '#d9d9d9' },
+    gray: { DEFAULT: '#666666', soft: '#d9d9d9' },
+    // canvas 是 surface 色(非 6 原色),不进色板;CSS 变量 --color-canvas 在 tokens.css 定义
   },
   font: {
     display: '"Space Grotesk", system-ui, sans-serif',

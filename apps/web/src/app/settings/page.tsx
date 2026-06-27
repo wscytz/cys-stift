@@ -282,7 +282,7 @@ export default function SettingsPage() {
       <style>{`
 .page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
 .set__select { font-family: var(--font-body); font-size: var(--font-size-base); padding: var(--space-1) var(--space-2); border: var(--border-hairline); border-radius: var(--radius-sm); background: var(--color-white); color: var(--color-black); }
-.set__current-code { background: var(--color-gray-soft); padding: 2px var(--space-1); border-radius: 2px; }
+.set__current-code { background: var(--color-gray-soft); padding: 2px var(--space-1); border-radius: var(--radius-sm); }
 .set__import { margin-top: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); }
 .set__file { margin-top: var(--space-1); font-family: var(--font-body); font-size: var(--font-size-sm); }
 .set__import-result--error { color: var(--color-red); }

@@ -11,8 +11,9 @@
  * - Cmd/Ctrl+Enter（任意时）→ 校验 title 非空 → onSubmit → onClose
  * - Tab → 标准 input 行为
  *
- * z-index 200 高于 Modal 100（CaptureHost 不会与 Modal 同时打开，
- * 但保险起见 z-index 更高避免遮挡）。不在 portal 里 — React 树内即可。
+ * z-index 110 高于 Modal 100（CaptureHost 不会与 Modal 同时打开，
+ * 但保险起见 z-index 更高避免遮挡）。Toast 同 110（两者不同时出现）。
+ * 不在 portal 里 — React 树内即可。
  *
  * Focus 策略：`open` 从 false → true 时把 input 渲染出来，`autoFocus`
  * HTML 属性 + 一次 `useEffect` 兜底（autoFocus 在 React 重 mount 时才
@@ -226,7 +227,7 @@ if (
 
 const styles = `
 .mi-backdrop {
-  position: fixed; inset: 0; z-index: 200;
+  position: fixed; inset: 0; z-index: 110;
   background: rgba(10,10,10,0.5);
   display: grid; place-items: start center;
   padding-top: 20vh;

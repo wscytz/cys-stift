@@ -239,7 +239,7 @@ const styles = `
   padding: 6px var(--space-1);
   background: var(--color-white);
   border: 2px solid var(--color-black);
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   box-shadow: 4px 4px 0 0 var(--color-black);
   font-family: var(--font-mono);
   white-space: nowrap;
@@ -258,7 +258,7 @@ const styles = `
   gap: 6px;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   color: var(--color-black);
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);

@@ -129,7 +129,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       w,
       h,
       this.getCardInfo,
-      this.tokenResolver('--color-canvas', '#f8fafc'),
+      this.tokenResolver('--color-canvas', '#ffffff'),
       this.tokenResolver,
     )
     drawSelectionOutlines(ctx, this.getSelectedIds(), this.getElements(), this.view, this.tokenResolver)

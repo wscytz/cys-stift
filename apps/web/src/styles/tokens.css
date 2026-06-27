@@ -17,8 +17,9 @@
   --color-black-soft: #2b2b2b;
   --color-white: #fafafa;
   --color-white-soft: #ffffff;
-  --color-gray: #8c8c8c;
+  --color-gray: #666666;
   --color-gray-soft: #d9d9d9;
+  --color-canvas: var(--color-white-soft);
 
   /* Typography */
   --font-display: 'Space Grotesk', system-ui, sans-serif;
@@ -35,8 +36,10 @@
   --font-size-3xl: 48px;
   --font-size-4xl: 64px;
 
-  /* 8px grid */
+  /* 8px grid — 主阶 8px,半阶 4px 收编 <8px 孤儿值 */
   --space-0: 0;
+  --space-quarter: 2px;
+  --space-0.5: 4px;
   --space-1: 8px;
   --space-2: 16px;
   --space-3: 24px;
@@ -59,4 +62,5 @@
   /* Shadows — hard offset, no blur (Bauhaus signature). */
   --shadow-sm: 0 1px 0 0 currentColor;
   --shadow-md: 2px 2px 0 0 currentColor;
+  --shadow-lg: 4px 4px 0 0 currentColor;
 }
