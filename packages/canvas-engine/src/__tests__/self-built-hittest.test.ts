@@ -84,3 +84,34 @@ describe('hitTest 悬空关系箭头', () => {
     expect(hitTest(els, 120, 120, 1)).toBeNull()     // 容差外
   })
 })
+
+import { eraserHitTest } from '../self-built-hittest'
+
+describe('eraserHitTest 橡皮宽松命中', () => {
+  const cards = [
+    { id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+    { id: 'b', kind: 'card', x: 1000, y: 0, w: 100, h: 100, rotation: 0 },
+    { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b' },
+  ] as never
+
+  it('关系箭头:zoom=0.5 偏离线 25 页px(远超 6px 精确容差)仍命中', () => {
+    // 线在页 y=50。zoom=0.5 → 16px 屏幕 = 32 页px 阈值。偏离 25 < 32 → 命中。
+    // hitTest(6px)在此距离早不中。
+    expect(eraserHitTest(cards, 500, 75, 0.5)).toBe('ar')
+  })
+
+  it('bbox 元素(card)用 bbox+4px 扩展命中', () => {
+    // 用不含箭头穿过的元素集,单独测 bbox 扩展命中。
+    // card a 在 (0,0,100,100)。点 (105, 50):bbox 外 5px,扩展 4px... 5>4 不中。
+    const boxes = [
+      { id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+    ] as never
+    expect(eraserHitTest(boxes, 105, 50, 1)).not.toBe('a')
+    // 点 (103, 50):bbox 外 3px < 4 → 命中
+    expect(eraserHitTest(boxes, 103, 50, 1)).toBe('a')
+  })
+
+  it('无元素返回 null', () => {
+    expect(eraserHitTest([], 50, 50, 1)).toBeNull()
+  })
+})

@@ -115,3 +115,50 @@ function pointToSegmentDistance(
   t = Math.max(0, Math.min(1, t)) // 钳到线段上
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy))
 }
+
+/**
+ * 橡皮专属宽松命中:比 hitTest(6px)宽松得多,确保细线/箭头在缩小视图下也能擦到。
+ *
+ * - 线类(arrow/freedraw):点到线段距离 ≤ 16px 屏幕(页坐标 16/zoom)即命中。
+ *   arrow 走 arrowEndpoints 解析端点(悬空 arrow 用 bbox 兜底);freedraw 走点序列。
+ * - bbox 类(card/rect/text/frame):bbox 扩展 4px 命中(卡片面积大,不需要大距离)。
+ *
+ * 橡皮语义本就是"擦到附近",16px 屏幕距离让用户点偏也能擦中细线。
+ * 纯函数,不依赖 adapter 状态。
+ */
+export function eraserHitTest(
+  elements: CanvasElement[],
+  pageX: number,
+  pageY: number,
+  zoom: number = 1,
+): string | null {
+  const lineTol = 16 / zoom // 线类:16px 屏幕
+  const bboxPad = 4 / zoom   // bbox 类:扩展 4px
+  // 复用 hitTest 的线段距离逻辑,但用更大 tol。先尝试线类宽松,再 bbox 扩展。
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const el = elements[i]!
+    if (el.kind === 'arrow') {
+      const { from, to } = arrowEndpoints(el, elements)
+      if (from && to) {
+        if (pointToSegmentDistance(pageX, pageY, from.x, from.y, to.x, to.y) <= lineTol) return el.id
+        // curve/elbow 简化:直线距离够近就擦(橡皮宽松)
+      } else {
+        // 悬空 arrow:bbox+pad 兜底
+        const b = normalizeBox(el)
+        if (pageX >= b.x - bboxPad && pageX <= b.x + b.w + bboxPad && pageY >= b.y - bboxPad && pageY <= b.y + b.h + bboxPad) return el.id
+      }
+      continue
+    }
+    if (el.kind === 'freedraw') {
+      const pts = (el.meta?.points as [number, number][] | undefined) ?? []
+      for (let j = 1; j < pts.length; j++) {
+        if (pointToSegmentDistance(pageX, pageY, pts[j-1]![0], pts[j-1]![1], pts[j]![0], pts[j]![1]) <= lineTol) return el.id
+      }
+      continue
+    }
+    // bbox 类
+    const b = normalizeBox(el)
+    if (pageX >= b.x - bboxPad && pageX <= b.x + b.w + bboxPad && pageY >= b.y - bboxPad && pageY <= b.y + b.h + bboxPad) return el.id
+  }
+  return null
+}
