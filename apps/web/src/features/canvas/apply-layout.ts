@@ -17,7 +17,7 @@
  */
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import type { CardId } from '@cys-stift/domain'
-import type { DslOp, DslFreeOp, DslArrowOp } from '../ai/dsl-parser'
+import type { DslOp, DslCardOp, DslFreeOp, DslArrowOp } from '../ai/dsl-parser'
 
 /** AI-created free shapes / arrows need a unique id (tldraw used to auto-mint). */
 function uid(prefix: string): string {
@@ -35,21 +35,27 @@ function uid(prefix: string): string {
  * honest feedback instead of always reporting ops.length.
  *
  * `skipped` here ONLY counts apply-stage no-ops: a missing card/endpoint
- * (deliberate no-op), or an op that threw and was swallowed. Lines that
- * failed to *parse* never reach `applyLayout` — they are dropped by the
- * parser and reported separately via `parseDslWithDiagnostics` diagnostics.
+ * (deliberate no-op), an op that threw and was swallowed, OR an op that was
+ * already applied and skipped by the incremental cache. Lines that failed to
+ * *parse* never reach `applyLayout` — they are dropped by the parser and
+ * reported separately via `parseDslWithDiagnostics` diagnostics.
  */
 export interface ApplyResult {
   applied: number
   skipped: number
+  newlyApplied: string[]
 }
 
 /**
  * Apply a list of DSL operations to the host. All operations are within
  * `host.batch()` for a single undo step.
  *
- * Returns `{ applied, skipped }`: each applyXxxOp returns `true` when it
- * mutated the host, `false` when it was a deliberate no-op (card/endpoint
+ * If `appliedHashes` is provided, only ops with hashes not in the set are
+ * applied (incremental apply optimization). Matching hashes are skipped.
+ * Newly applied hashes are added to the set and returned as `newlyApplied`.
+ *
+ * Returns `{ applied, skipped, newlyApplied }`: each applyXxxOp returns `true`
+ * when it mutated the host, `false` when it was a deliberate no-op (card/endpoint
  * missing). Per-op throws count as skipped so one bad op doesn't abort the
  * rest — the caller can surface "N applied, M skipped" honestly.
  *
@@ -57,14 +63,20 @@ export interface ApplyResult {
  * lines) are not counted here — the caller (DSL dialog) pre-filters via
  * `parseDslWithDiagnostics` and surfaces those as a separate diagnostic list.
  */
-export function applyLayout(host: CanvasHost, ops: DslOp[]): ApplyResult {
-  if (ops.length === 0) return { applied: 0, skipped: 0 }
+export function applyLayout(host: CanvasHost, ops: DslOp[], appliedHashes?: Set<string>): ApplyResult {
+  if (ops.length === 0) return { applied: 0, skipped: 0, newlyApplied: [] }
 
   let applied = 0
   let skipped = 0
+  const newlyApplied: string[] = []
 
   host.batch(() => {
     for (const op of ops) {
+      const hash = JSON.stringify(op)
+      if (appliedHashes?.has(hash)) {
+        skipped++
+        continue
+      }
       try {
         let ok = false
         switch (op.type) {
@@ -78,8 +90,15 @@ export function applyLayout(host: CanvasHost, ops: DslOp[]): ApplyResult {
             ok = applyArrowOp(host, op)
             break
         }
-        if (ok) applied++
-        else skipped++
+        if (ok) {
+          applied++
+          if (appliedHashes !== undefined) {
+            appliedHashes.add(hash)
+            newlyApplied.push(hash)
+          }
+        } else {
+          skipped++
+        }
       } catch {
         // Swallow per-op errors — the rest of the layout still applies.
         skipped++
@@ -87,25 +106,34 @@ export function applyLayout(host: CanvasHost, ops: DslOp[]): ApplyResult {
     }
   })
 
-  return { applied, skipped }
+  return { applied, skipped, newlyApplied }
 }
 
 function applyCardOp(
   host: CanvasHost,
-  op: {
-    type: 'card'
-    cardId: CardId
-    x: number
-    y: number
-    w?: number
-    h?: number
-    color?: string
-  },
+  op: DslCardOp,
 ): boolean {
   // Partial update: preserve the existing card's w/h/rotation, override x/y
   // (and optionally color/size). Equivalent to tldraw's partial updateShape.
   const existing = host.getElement(String(op.cardId))
-  if (!existing) return false
+  if (!existing) {
+    if (!op.create) {
+      // No create flag: skip with no-op
+      return false
+    }
+    // create flag is set: create an empty card if it doesn't exist
+    host.upsert({
+      id: String(op.cardId),
+      kind: 'card',
+      x: Math.round(op.x),
+      y: Math.round(op.y),
+      w: op.w ?? 240,
+      h: op.h ?? 120,
+      rotation: 0,
+      color: op.color ?? 'white',
+    })
+    return true
+  }
 
   host.upsert({
     ...existing,

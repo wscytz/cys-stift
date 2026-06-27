@@ -37,8 +37,8 @@ describe('snapshotCanvas → formatCanvasSnapshot', () => {
 
     const text = formatCanvasSnapshot(snapshotCanvas(host, stubService({ c1: 'A', c2: 'B' }), CV))
     expect(text).toContain('[arrow #a1] from #c1 to #c2 @label("blocks")')
-    expect(text).toContain('[rect #r1] @pos(50,50) @size(200,100)')
-    expect(text).toContain('[text #t1] @pos(5,6) @text("note")')
+    expect(text).toContain('[rect #r1] @pos(50.0,50.0) @size(200.0,100.0)')
+    expect(text).toContain('[text #t1] @pos(5.0,6.0) @text("note")')
   })
 
   it('renders arrow relation signature (color + dash + arrowhead) — AI 改签名需看到现状', () => {
@@ -92,7 +92,7 @@ describe('snapshotCanvas → formatCanvasSnapshot', () => {
     host.upsert({ id: 'c1', kind: 'card', x: 10, y: 20, w: 240, h: 120, rotation: 0, color: 'blue' })
     const text = formatCanvasSnapshot(snapshotCanvas(host, stubService({ c1: 'A' }), CV))
     // 逗号 size(非叉号 x)、@color()(非 ", color")、pos 无空格。
-    expect(text).toContain('[card #c1] @pos(10,20) @size(240,120) @color(blue)')
+    expect(text).toContain('[card #c1] @pos(10.0,20.0) @size(240.0,120.0) @color(blue)')
     expect(text).not.toContain('@size(240x120)')
     expect(text).not.toContain(', color blue')
   })
@@ -101,7 +101,7 @@ describe('snapshotCanvas → formatCanvasSnapshot', () => {
     const host = new InMemoryCanvasHost()
     host.upsert({ id: 'r1', kind: 'rect', x: 50, y: 50, w: 200, h: 100, rotation: 0, color: 'red' })
     const text = formatCanvasSnapshot(snapshotCanvas(host, stubService({}), CV))
-    expect(text).toContain('[rect #r1] @pos(50,50) @size(200,100) @color(red)')
+    expect(text).toContain('[rect #r1] @pos(50.0,50.0) @size(200.0,100.0) @color(red)')
     expect(text).not.toContain('@size(200x100)')
   })
 })
@@ -122,7 +122,7 @@ describe('canvas snapshot — privacy reverse-asserts (R2 + allowlist)', () => {
       meta: { segments: [{ points: [{ x: 123, y: 456 }, { x: 789, y: 12 }] }] },
     })
     const text = formatCanvasSnapshot(snapshotCanvas(host, stubService({}), CV))
-    expect(text).toContain('[freedraw #f1] @pos(5,6)')
+    expect(text).toContain('[freedraw #f1] @pos(5.0,6.0)')
     // The actual point coordinates must never reach the AI view.
     expect(text).not.toContain('123')
     expect(text).not.toContain('456')
@@ -221,7 +221,7 @@ describe('canvas snapshot — freedraw shape descriptor', () => {
       meta: { points: circlePath(150, 150, 50) },
     })
     const text = formatCanvasSnapshot(snapshotCanvas(host, stubService({}), CV))
-    expect(text).toContain('[freedraw #f1] @pos(100,100)')
+    expect(text).toContain('[freedraw #f1] @pos(100.0,100.0)')
     // The shape annotation line mirrors the card `title:` pattern.
     expect(text).toMatch(/shape: \w+ \(\d+%\)/)
   })

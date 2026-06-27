@@ -70,16 +70,16 @@ export function serializeCanvasReadable(
 }
 
 export function serializeElement(e: CanvasElement): string {
-  const pos = `@pos(${Math.round(e.x)},${Math.round(e.y)})`
+  const pos = `@pos(${e.x.toFixed(1)},${e.y.toFixed(1)})`
   const color = e.color ? ` @color(${e.color})` : ''
   switch (e.kind) {
     case 'card':
-      return `[card #${e.id}] ${pos} @size(${Math.round(e.w)},${Math.round(e.h)})${color}`
+      return `[card #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}`
     case 'rect':
-      return `[rect #${e.id}] ${pos} @size(${Math.round(e.w)},${Math.round(e.h)})${color}`
+      return `[rect #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}`
     case 'frame':
       return (
-        `[frame #${e.id}] ${pos} @size(${Math.round(e.w)},${Math.round(e.h)})` +
+        `[frame #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})` +
         ` @text("${escapeQuoted(e.text ?? '')}")` +
         color
       )
@@ -97,14 +97,14 @@ export function serializeElement(e: CanvasElement): string {
           : ''
       const elbowAttr =
         e.elbow && e.elbow.length > 0
-          ? ` @elbow(${e.elbow.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(';')})`
+          ? ` @elbow(${e.elbow.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(';')})`
           : ''
       const sig =
         (e.text ? ` @label("${escapeQuoted(e.text)}")` : '') +
         color +
         (e.dash ? ` @dash(${e.dash})` : '') +
         (e.arrowhead ? ` @arrowhead(${e.arrowhead})` : '') +
-        (e.curve ? ` @curve(${Math.round(e.curve.cx)},${Math.round(e.curve.cy)})` : '') +
+        (e.curve ? ` @curve(${e.curve.cx.toFixed(1)},${e.curve.cy.toFixed(1)})` : '') +
         routeAttr +
         elbowAttr
       if (e.from && e.to) {
@@ -112,7 +112,7 @@ export function serializeElement(e: CanvasElement): string {
         return `[arrow #${e.id}] from #${e.from} to #${e.to}${sig}`
       }
       // Free arrow: bbox encodes the segment (w/h may be negative for direction).
-      return `[arrow #${e.id}] ${pos} @size(${Math.round(e.w)},${Math.round(e.h)})${sig}`
+      return `[arrow #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${sig}`
     }
     case 'freedraw':
       // Position only — never the point sequence (R2 + privacy).

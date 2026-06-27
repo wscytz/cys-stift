@@ -145,7 +145,7 @@ describe('DSL round-trip (serialize → parse) — lossless on all active kinds'
   // ── freedraw: the deliberate asymmetry guard ──
 
   it('freedraw is serialized (position only) — point sequence stays out of DSL', () => {
-    expect(text).toContain('[freedraw #f1] @pos(7,8)')
+    expect(text).toContain('[freedraw #f1] @pos(7.0,8.0)')
     expect(text).not.toContain('points')
     expect(text).not.toContain('(1,2)')
   })
@@ -156,5 +156,100 @@ describe('DSL round-trip (serialize → parse) — lossless on all active kinds'
     expect(freedrawOps).toHaveLength(0)
     // 5 ops parsed (card, rect, text, relation arrow, free arrow) — freedraw line is dropped.
     expect(ops).toHaveLength(5)
+  })
+
+  describe('decimal coordinate support', () => {
+    it('round-trips decimal coordinates (100.5, 200.5)', () => {
+      const elements: CanvasElement[] = [
+        {
+          id: 'decimal-card',
+          kind: 'card',
+          x: 100.5,
+          y: 200.5,
+          w: 240.0,
+          h: 120.5,
+          rotation: 0,
+          color: 'blue',
+        },
+      ]
+      const text = serializeCanvas(elements)
+      const card = parseDsl(text).find((o) => o.type === 'card')
+      expect(card).toMatchObject({
+        cardId: 'decimal-card',
+        x: 100.5,
+        y: 200.5,
+        w: 240.0,
+        h: 120.5,
+        color: 'blue',
+      })
+    })
+
+    it('round-trips negative decimal coordinates (-100.5, -200.5)', () => {
+      const elements: CanvasElement[] = [
+        {
+          id: 'neg-decimal',
+          kind: 'rect',
+          x: -100.5,
+          y: -200.5,
+          w: 100.0,
+          h: 100.0,
+          rotation: 0,
+        },
+      ]
+      const text = serializeCanvas(elements)
+      const rect = parseDsl(text).find((o) => o.type === 'free' && o.shape === 'rect')
+      expect(rect).toMatchObject({
+        id: 'neg-decimal',
+        x: -100.5,
+        y: -200.5,
+        w: 100.0,
+        h: 100.0,
+      })
+    })
+
+    it('round-trips arrow with curve and elbow decimal points', () => {
+      const elements: CanvasElement[] = [
+        {
+          id: 'arrow-decimal',
+          kind: 'arrow',
+          x: 10.5,
+          y: 20.5,
+          w: 100.5,
+          h: -50.5,
+          rotation: 0,
+          curve: { cx: 55.5, cy: 33.3 },
+          elbow: [
+            { x: 10.0, y: 20.5 },
+            { x: 30.5, y: 40.0 },
+          ],
+        },
+      ]
+      const text = serializeCanvas(elements)
+      const arrow = parseDsl(text).find((o) => o.type === 'arrow' && o.freeArrow)
+      if (arrow?.type !== 'arrow') throw new Error('expected arrow op')
+      expect(arrow.freeArrow).toBe(true)
+      expect(arrow.x).toBe(10.5)
+      expect(arrow.y).toBe(20.5)
+      expect(arrow.w).toBe(100.5)
+      expect(arrow.h).toBe(-50.5)
+      expect(arrow.curve).toEqual({ cx: 55.5, cy: 33.3 })
+      expect(arrow.elbow).toEqual([
+        { x: 10.0, y: 20.5 },
+        { x: 30.5, y: 40.0 },
+      ])
+    })
+
+    it('still parses old-style integer DSL (backward compatibility)', () => {
+      const dsl = '[card #old-card] @pos(100, 200) @size(240, 120) @color(red)'
+      const card = parseDsl(dsl).find((o) => o.type === 'card')
+      expect(card).toMatchObject({
+        cardId: 'old-card',
+        x: 100,
+        y: 200,
+        w: 240,
+        h: 120,
+        color: 'red',
+      })
+    })
   })
 })

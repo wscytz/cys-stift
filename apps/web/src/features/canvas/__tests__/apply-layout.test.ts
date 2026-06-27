@@ -182,6 +182,66 @@ describe('applyLayout', () => {
     expect(host.getElement('a1')).toMatchObject({ x: 50, y: 60, w: 240, h: 120 })
   })
 
+  // ── create flag for card creation (P0 DSL syntax completeness) ──
+
+  it('creates a new card when create=true and id does not exist', () => {
+    const host = new InMemoryCanvasHost()
+    expect(host.getElements()).toHaveLength(0)
+
+    applyLayout(host, [{ type: 'card', cardId: 'new' as CardId, x: 100, y: 200, create: true }])
+
+    expect(host.getElements()).toHaveLength(1)
+    const card = host.getElement('new')
+    expect(card).toMatchObject({
+      id: 'new',
+      kind: 'card',
+      x: 100,
+      y: 200,
+      w: 240,
+      h: 120,
+      color: 'white',
+      rotation: 0,
+    })
+  })
+
+  it('creates a new card with explicit size and color when create=true', () => {
+    const host = new InMemoryCanvasHost()
+    applyLayout(host, [
+      { type: 'card', cardId: 'new-card' as CardId, x: 50, y: 50, w: 300, h: 150, color: 'blue', create: true },
+    ])
+
+    const card = host.getElement('new-card')
+    expect(card).toMatchObject({
+      w: 300,
+      h: 150,
+      color: 'blue',
+    })
+  })
+
+  it('updates existing card when create=true and id already exists (no duplicate)', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'existing', 0, 0) // w:240, h:120
+    expect(host.getElements()).toHaveLength(1)
+
+    applyLayout(host, [{ type: 'card', cardId: 'existing' as CardId, x: 100, y: 200, color: 'red', create: true }])
+
+    expect(host.getElements()).toHaveLength(1)
+    expect(host.getElement('existing')).toMatchObject({
+      x: 100,
+      y: 200,
+      color: 'red',
+      w: 240, // preserved
+    })
+  })
+
+  it('does NOT create when no create flag (old behavior preserved)', () => {
+    const host = new InMemoryCanvasHost()
+    const result = applyLayout(host, [{ type: 'card', cardId: 'ghost' as CardId, x: 100, y: 200 }])
+
+    expect(host.getElements()).toHaveLength(0)
+    expect(result).toEqual({ applied: 0, skipped: 1, newlyApplied: [] })
+  })
+
   // ── text color — DSL symmetry fix 3 ──
 
   it('creates a text shape with the op color', () => {
@@ -391,12 +451,12 @@ describe('applyLayout', () => {
       { type: 'arrow', from: 'c1', to: 'ghost', label: 'ref' }, // 跳过:to 端点不存在
     ])
 
-    expect(res).toEqual({ applied: 2, skipped: 2 })
+    expect(res).toEqual({ applied: 2, skipped: 2, newlyApplied: [] })
   })
 
   it('empty ops returns zeros', () => {
     const host = new InMemoryCanvasHost()
-    expect(applyLayout(host, [])).toEqual({ applied: 0, skipped: 0 })
+    expect(applyLayout(host, [])).toEqual({ applied: 0, skipped: 0, newlyApplied: [] })
   })
 
   it('per-op throw counts as skipped', () => {
@@ -412,7 +472,7 @@ describe('applyLayout', () => {
       { type: 'free', shape: 'rect', x: 0, y: 0 },
       { type: 'free', shape: 'rect', x: 10, y: 10 },
     ])
-    expect(res).toEqual({ applied: 0, skipped: 2 })
+    expect(res).toEqual({ applied: 0, skipped: 2, newlyApplied: [] })
   })
 
   // ── arrow route (curve/elbow) apply ──────────────────────────────────────
@@ -448,5 +508,114 @@ describe('applyLayout', () => {
     const el = host.getElement('a1')!
     expect(el.route).toBe('elbow')
     expect(el.elbow).toEqual([{ x: 30, y: 5 }])
+  })
+
+  // ── incremental apply optimization — P1 performance ───────────────────────
+
+  it('second apply with same ops applies zero when using appliedHashes', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'c1', 0, 0)
+    seedCard(host, 'c2', 0, 0)
+
+    const ops: DslOp[] = [
+      { type: 'card', cardId: 'c1' as CardId, x: 100, y: 200 },
+      { type: 'card', cardId: 'c2' as CardId, x: 300, y: 400 },
+    ]
+
+    const appliedHashes = new Set<string>()
+    // First apply: both ops applied
+    const result1 = applyLayout(host, ops, appliedHashes)
+    expect(result1.applied).toBe(2)
+    expect(result1.skipped).toBe(0)
+    expect(result1.newlyApplied.length).toBe(2)
+    expect(appliedHashes.size).toBe(2)
+
+    // Second apply with same cache: both skipped, zero applied
+    const result2 = applyLayout(host, ops, appliedHashes)
+    expect(result2.applied).toBe(0)
+    expect(result2.skipped).toBe(2)
+    expect(result2.newlyApplied.length).toBe(0)
+  })
+
+  it('only changed op is applied on second incremental apply', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'c1', 0, 0)
+    seedCard(host, 'c2', 0, 0)
+    seedCard(host, 'c3', 0, 0)
+
+    const ops1: DslOp[] = [
+      { type: 'card', cardId: 'c1' as CardId, x: 100, y: 200 },
+      { type: 'card', cardId: 'c2' as CardId, x: 300, y: 400 },
+    ]
+
+    const appliedHashes = new Set<string>()
+    const result1 = applyLayout(host, ops1, appliedHashes)
+    expect(result1.applied).toBe(2)
+    expect(result1.skipped).toBe(0)
+
+    // Add one new op (c3)
+    const ops2: DslOp[] = [
+      { type: 'card', cardId: 'c1' as CardId, x: 100, y: 200 }, // unchanged
+      { type: 'card', cardId: 'c2' as CardId, x: 300, y: 400 }, // unchanged
+      { type: 'card', cardId: 'c3' as CardId, x: 500, y: 600 }, // new
+    ]
+
+    const result2 = applyLayout(host, ops2, appliedHashes)
+    expect(result2.applied).toBe(1)
+    expect(result2.skipped).toBe(2)
+    expect(result2.newlyApplied.length).toBe(1)
+    expect(appliedHashes.size).toBe(3)
+
+    // Verify positions
+    expect(host.getElement('c1')).toMatchObject({ x: 100, y: 200 })
+    expect(host.getElement('c2')).toMatchObject({ x: 300, y: 400 })
+    expect(host.getElement('c3')).toMatchObject({ x: 500, y: 600 })
+  })
+
+  it('modified op gets re-applied when hash changes', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'c1', 0, 0)
+
+    const appliedHashes = new Set<string>()
+
+    // First apply with x=100
+    const ops1: DslOp[] = [{ type: 'card', cardId: 'c1' as CardId, x: 100, y: 200 }]
+    applyLayout(host, ops1, appliedHashes)
+    expect(host.getElement('c1')).toMatchObject({ x: 100 })
+
+    // Second apply with x=200 (changed, so re-applied)
+    const ops2: DslOp[] = [{ type: 'card', cardId: 'c1' as CardId, x: 200, y: 200 }]
+    const result = applyLayout(host, ops2, appliedHashes)
+    expect(result.applied).toBe(1)
+    expect(result.skipped).toBe(0)
+    expect(host.getElement('c1')).toMatchObject({ x: 200 })
+  })
+
+  it('works with undefined appliedHashes (backward compatible)', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'c1', 0, 0)
+
+    const result = applyLayout(host, [{ type: 'card', cardId: 'c1' as CardId, x: 100, y: 200 }])
+
+    expect(result).toEqual({ applied: 1, skipped: 0, newlyApplied: [] })
+    expect(host.getElement('c1')).toMatchObject({ x: 100, y: 200 })
+  })
+
+  it('counts already-applied cached ops as skipped', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'c1', 0, 0)
+    seedCard(host, 'c2', 0, 0)
+
+    const appliedHashes = new Set<string>()
+    applyLayout(host, [{ type: 'card', cardId: 'c1' as CardId, x: 100, y: 200 }], appliedHashes)
+
+    // Second apply includes one cached (c1) and one new (c2)
+    const result = applyLayout(host, [
+      { type: 'card', cardId: 'c1' as CardId, x: 100, y: 200 },
+      { type: 'card', cardId: 'c2' as CardId, x: 300, y: 400 },
+    ], appliedHashes)
+
+    expect(result.applied).toBe(1)
+    expect(result.skipped).toBe(1)
   })
 })

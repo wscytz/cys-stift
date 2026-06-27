@@ -64,7 +64,7 @@ describe('转义价值闭环 walkthrough:乱画布 → AI 重排 → 结构化',
 
     // ── ⑤ 应用:op → 画布(单 undo 步,card update-only 命中已存在卡,frame/arrow 新建)──
     const result = applyLayout(host, ops)
-    expect(result).toEqual({ applied: 7, skipped: 0 })
+    expect(result).toEqual({ applied: 7, skipped: 0, newlyApplied: [] })
 
     // ── ⑥ 结果:画布结构化了 ──
     const elements = host.getElements()
@@ -105,7 +105,7 @@ describe('转义价值闭环 walkthrough:乱画布 → AI 重排 → 结构化',
 
     const humanDsl = '[card #c1] @pos(100,100)\n[card #c2] @pos(300,100)'
     const r = applyLayout(host, parseDslWithDiagnostics(humanDsl).ops)
-    expect(r).toEqual({ applied: 2, skipped: 0 })
+    expect(r).toEqual({ applied: 2, skipped: 0, newlyApplied: [] })
     expect(host.getElement('c1')?.x).toBe(100)
     expect(host.getElement('c2')?.x).toBe(300)
   })

@@ -18,7 +18,7 @@ import type { CardId, CanvasId, CardService } from '@cys-stift/domain'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
 import { pushToast } from '@/lib/toast-store'
-import { serializeCanvasReadable } from '../ai/canvas-dsl'
+import { serializeCanvasReadable, serializeCanvas } from '../ai/canvas-dsl'
 import { parseDslWithDiagnostics, type DslDiagnostic } from '../ai/dsl-parser'
 import { buildCanvasPrompt } from '../ai/canvas-prompt'
 import { applyLayout } from './apply-layout'
@@ -39,6 +39,7 @@ export function DslDialog({
   const { t } = useI18n()
   const [text, setText] = useState('')
   const [errors, setErrors] = useState<DslDiagnostic[]>([])
+  const [appliedHashes, setAppliedHashes] = useState<Set<string>>(new Set())
 
   // 实时预览:用户输入时即重新 parse,给出"待应用 N 条 / M 行无效"计数,
   // 不必等点 Apply。只在有可说之事时渲染(ok 或 warn),其余不渲染。
@@ -66,11 +67,13 @@ export function DslDialog({
 
   // 打开时填充当前画布文本(serializeCanvasReadable,card 附 title 注释)。
   // 同时清空诊断列表:刚序列化的文本恒为合法,无 parse 错误。
+  // 也清空增量应用缓存:每次打开模态都是全新编辑会话。
   useEffect(() => {
     if (!open || !host) return
     const els = host.getElements()
     setText(serializeCanvasReadable(els, (id) => service.get(id as CardId)?.title))
     setErrors([])
+    setAppliedHashes(new Set())
   }, [open, host, service])
 
   const apply = () => {
@@ -88,7 +91,11 @@ export function DslDialog({
       return
     }
 
-    const { applied, skipped } = applyLayout(host, ops)
+    const { applied, skipped } = applyLayout(host, ops, appliedHashes)
+    // 合并新应用的 hash 到现有集合触发状态更新
+    if (applied > 0) {
+      setAppliedHashes(new Set(appliedHashes))
+    }
     // 重序列化:apply 后画布变了,文本同步,防重复 Apply 造副本(create 类 op 幂等失效)。
     // host 是同引用 + host.batch 原地变更,上面填充 text 的 useEffect([open,host,service])
     // 不会重跑,必须手动 setText。
@@ -112,6 +119,24 @@ export function DslDialog({
     try {
       await navigator.clipboard.writeText(text)
       pushToast({ kind: 'success', message: t('canvas.dslCopied') })
+    } catch {
+      pushToast({ kind: 'error', message: t('canvas.dslCopyFail') })
+    }
+  }
+
+  const copySelected = async () => {
+    if (!host) return
+    const selectedIds = host.getSelectedIds()
+    if (selectedIds.length === 0) {
+      pushToast({ kind: 'info', message: '请先选中元素' })
+      return
+    }
+    const allElements = host.getElements()
+    const selectedElements = allElements.filter((e) => selectedIds.includes(e.id))
+    const dsl = serializeCanvas(selectedElements)
+    try {
+      await navigator.clipboard.writeText(dsl)
+      pushToast({ kind: 'success', message: `已复制 ${selectedIds.length} 个元素的 DSL` })
     } catch {
       pushToast({ kind: 'error', message: t('canvas.dslCopyFail') })
     }
@@ -199,6 +224,13 @@ export function DslDialog({
       )}
       <div className="dsl-actions">
         <Button variant="ghost" onClick={copy}>{t('canvas.dslCopy')}</Button>
+        <Button
+          variant="ghost"
+          onClick={copySelected}
+          disabled={!host || host.getSelectedIds().length === 0}
+        >
+          复制选中
+        </Button>
         <Button variant="ghost" onClick={copyAsPrompt}>{t('canvas.dslCopyAsPrompt')}</Button>
         <Button variant="ghost" onClick={download}>{t('canvas.dslDownload')}</Button>
         <span className="dsl-spacer" />

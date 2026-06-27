@@ -47,7 +47,7 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
     const { original, roundtripped } = roundTrip(host, [
       { id: 'c1', kind: 'card', x: 100, y: 200, w: 240, h: 120, rotation: 0, color: 'blue' },
     ])
-    expect(original).toBe('[card #c1] @pos(100,200) @size(240,120) @color(blue)')
+    expect(original).toBe('[card #c1] @pos(100.0,200.0) @size(240.0,120.0) @color(blue)')
     expect(roundtripped).toBe(original)
   })
 
@@ -56,7 +56,7 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
     const { original, roundtripped } = roundTrip(host, [
       { id: 'r1', kind: 'rect', x: 10, y: 20, w: 300, h: 400, rotation: 0, color: 'red' },
     ])
-    expect(original).toBe('[rect #r1] @pos(10,20) @size(300,400) @color(red)')
+    expect(original).toBe('[rect #r1] @pos(10.0,20.0) @size(300.0,400.0) @color(red)')
     expect(roundtripped).toBe(original)
   })
 
@@ -65,7 +65,7 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
     const { original, roundtripped } = roundTrip(host, [
       { id: 'f1', kind: 'frame', x: 10, y: 20, w: 400, h: 300, rotation: 0, text: '主题区', color: 'blue' },
     ])
-    expect(original).toBe('[frame #f1] @pos(10,20) @size(400,300) @text("主题区") @color(blue)')
+    expect(original).toBe('[frame #f1] @pos(10.0,20.0) @size(400.0,300.0) @text("主题区") @color(blue)')
     expect(roundtripped).toBe(original)
   })
 
@@ -75,7 +75,7 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
       { id: 't1', kind: 'text', x: 5, y: 6, w: 0, h: 0, rotation: 0, text: 'say "hi"', color: 'red' },
     ])
     // text branch emits pos + @text (quotes escaped) + color; NO @size.
-    expect(original).toBe('[text #t1] @pos(5,6) @text("say \\"hi\\"") @color(red)')
+    expect(original).toBe('[text #t1] @pos(5.0,6.0) @text("say \\"hi\\"") @color(red)')
     expect(roundtripped).toBe(original)
   })
 
@@ -91,8 +91,8 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
     ])
     // Layer order: card(2) < arrow(3) → cards first, then the relation arrow.
     expect(original).toBe(
-      '[card #c1] @pos(0,0) @size(10,10)\n' +
-      '[card #c2] @pos(100,0) @size(10,10)\n' +
+      '[card #c1] @pos(0.0,0.0) @size(10.0,10.0)\n' +
+      '[card #c2] @pos(100.0,0.0) @size(10.0,10.0)\n' +
       '[arrow #a1] from #c1 to #c2 @label("references") @color(red) @dash(dashed) @arrowhead(triangle)',
     )
     expect(roundtripped).toBe(original)
@@ -103,7 +103,7 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
     const { original, roundtripped } = roundTrip(host, [
       { id: 'fa1', kind: 'arrow', x: 10, y: 20, w: 100, h: 50, rotation: 0, dash: 'solid', arrowhead: 'arrow' },
     ])
-    expect(original).toBe('[arrow #fa1] @pos(10,20) @size(100,50) @dash(solid) @arrowhead(arrow)')
+    expect(original).toBe('[arrow #fa1] @pos(10.0,20.0) @size(100.0,50.0) @dash(solid) @arrowhead(arrow)')
     expect(roundtripped).toBe(original)
   })
 
@@ -112,7 +112,7 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
     const { original, roundtripped } = roundTrip(host, [
       { id: 'fa2', kind: 'arrow', x: 200, y: 200, w: -80, h: 30, rotation: 0 },
     ])
-    expect(original).toBe('[arrow #fa2] @pos(200,200) @size(-80,30)')
+    expect(original).toBe('[arrow #fa2] @pos(200.0,200.0) @size(-80.0,30.0)')
     expect(roundtripped).toBe(original)
   })
 
@@ -123,7 +123,7 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
       { id: 'c2', kind: 'card', x: 100, y: 0, w: 10, h: 10, rotation: 0 },
       { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2', route: 'curve', curve: { cx: 55, cy: -30 } },
     ])
-    expect(original).toContain('[arrow #a1] from #c1 to #c2 @curve(55,-30) @route(curve)')
+    expect(original).toContain('[arrow #a1] from #c1 to #c2 @curve(55.0,-30.0) @route(curve)')
     expect(roundtripped).toBe(original)
   })
 
@@ -134,7 +134,7 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
       { id: 'c2', kind: 'card', x: 200, y: 200, w: 10, h: 10, rotation: 0 },
       { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2', route: 'elbow', elbow: [{ x: 100, y: 0 }, { x: 100, y: -50 }] },
     ])
-    expect(original).toContain('[arrow #a1] from #c1 to #c2 @route(elbow) @elbow(100,0;100,-50)')
+    expect(original).toContain('[arrow #a1] from #c1 to #c2 @route(elbow) @elbow(100.0,0.0;100.0,-50.0)')
     expect(roundtripped).toBe(original)
   })
 
@@ -143,7 +143,7 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
     const { original, roundtripped } = roundTrip(host, [
       { id: 'fa1', kind: 'arrow', x: 10, y: 20, w: 100, h: 50, rotation: 0, route: 'elbow', elbow: [{ x: 60, y: 20 }] },
     ])
-    expect(original).toBe('[arrow #fa1] @pos(10,20) @size(100,50) @route(elbow) @elbow(60,20)')
+    expect(original).toBe('[arrow #fa1] @pos(10.0,20.0) @size(100.0,50.0) @route(elbow) @elbow(60.0,20.0)')
     expect(roundtripped).toBe(original)
   })
 
@@ -156,13 +156,13 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
       },
     ])
     // serialize emits position only (point sequence stays in the engine store).
-    expect(original).toBe('[freedraw #f1] @pos(7,8)')
+    expect(original).toBe('[freedraw #f1] @pos(7.0,8.0)')
     // parser has no freedraw branch → zero ops produced from a freedraw-only canvas.
     expect(ops).toHaveLength(0)
     expect(ops.filter((o) => o.type === 'free' && (o as { shape?: string }).shape === 'freedraw')).toHaveLength(0)
     // apply ran with no ops → the host's freedraw is untouched; re-serialize still emits it.
     // The guard proves "parse doesn't reproduce freedraw", NOT "freedraw disappears".
-    expect(roundtripped).toBe('[freedraw #f1] @pos(7,8)')
+    expect(roundtripped).toBe('[freedraw #f1] @pos(7.0,8.0)')
     expect(roundtripped).toBe(original)
   })
 
@@ -184,13 +184,13 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
     expect(roundtripped.split('\n')).toHaveLength(7)
     expect(roundtripped).toBe(original)
     // every active kind survives (freedraw too — it stays in the host, untouched).
-    expect(roundtripped).toContain('[rect #r1] @pos(10,20) @size(300,400) @color(red)')
-    expect(roundtripped).toContain('[freedraw #f1] @pos(7,8)')
-    expect(roundtripped).toContain('[card #c1] @pos(100,200) @size(240,120) @color(blue)')
-    expect(roundtripped).toContain('[card #c2] @pos(300,200) @size(240,120)')
+    expect(roundtripped).toContain('[rect #r1] @pos(10.0,20.0) @size(300.0,400.0) @color(red)')
+    expect(roundtripped).toContain('[freedraw #f1] @pos(7.0,8.0)')
+    expect(roundtripped).toContain('[card #c1] @pos(100.0,200.0) @size(240.0,120.0) @color(blue)')
+    expect(roundtripped).toContain('[card #c2] @pos(300.0,200.0) @size(240.0,120.0)')
     expect(roundtripped).toContain('[arrow #a1] from #c1 to #c2 @label("references") @color(red) @dash(dashed) @arrowhead(triangle)')
-    expect(roundtripped).toContain('[arrow #fa1] @pos(10,20) @size(100,50) @dash(solid) @arrowhead(arrow)')
-    expect(roundtripped).toContain('[text #t1] @pos(5,6) @text("note") @color(red)')
+    expect(roundtripped).toContain('[arrow #fa1] @pos(10.0,20.0) @size(100.0,50.0) @dash(solid) @arrowhead(arrow)')
+    expect(roundtripped).toContain('[text #t1] @pos(5.0,6.0) @text("note") @color(red)')
   })
 })
 
@@ -218,10 +218,10 @@ describe('DSL e2e via production serializer (formatCanvasSnapshot → parse → 
     const roundtripped = formatCanvasSnapshot(snapshotCanvas(host, service, CV))
 
     expect(roundtripped).toBe(original)
-    expect(roundtripped).toContain('[card #c1] @pos(10,20) @size(240,120) @color(blue)')
+    expect(roundtripped).toContain('[card #c1] @pos(10.0,20.0) @size(240.0,120.0) @color(blue)')
     expect(roundtripped).toContain('  title: A')
     expect(roundtripped).toContain('[arrow #a1] from #c1 to #c2 @label("blocks") @color(blue) @dash(dashed) @arrowhead(none)')
-    expect(roundtripped).toContain('[arrow #fa1] @pos(10,20) @size(100,-50) @dash(solid) @arrowhead(arrow)')
-    expect(roundtripped).toContain('[freedraw #f1] @pos(7,8)')
+    expect(roundtripped).toContain('[arrow #fa1] @pos(10.0,20.0) @size(100.0,-50.0) @dash(solid) @arrowhead(arrow)')
+    expect(roundtripped).toContain('[freedraw #f1] @pos(7.0,8.0)')
   })
 })

@@ -65,8 +65,18 @@ describe('parseDsl — 永不对抗性输入抛错', () => {
             const v = (op as Record<string, unknown>)[k]
             if (typeof v === 'number') {
               expect(Number.isFinite(v), `${k}=${v} 非有限,输入: ${input}`).toBe(true)
-              expect(Number.isInteger(v), `${k}=${v} 非整数,输入: ${input}`).toBe(true)
+              // 现在支持小数坐标，不再要求是整数
             }
+          }
+        }
+        if (op.type === 'arrow' && op.curve) {
+          expect(Number.isFinite(op.curve.cx), `curve.cx=${op.curve.cx} 非有限`).toBe(true)
+          expect(Number.isFinite(op.curve.cy), `curve.cy=${op.curve.cy} 非有限`).toBe(true)
+        }
+        if (op.type === 'arrow' && op.elbow) {
+          for (const p of op.elbow) {
+            expect(Number.isFinite(p.x), `elbow.x=${p.x} 非有限`).toBe(true)
+            expect(Number.isFinite(p.y), `elbow.y=${p.y} 非有限`).toBe(true)
           }
         }
       }
@@ -127,7 +137,7 @@ describe('applyLayout — 永不抛错 + 垃圾中的合法 op 仍生效', () =>
   it('空 ops → no-op,不抛错', () => {
     const host = new InMemoryCanvasHost()
     expect(() => applyLayout(host, [])).not.toThrow()
-    expect(applyLayout(host, [])).toEqual({ applied: 0, skipped: 0 })
+    expect(applyLayout(host, [])).toEqual({ applied: 0, skipped: 0, newlyApplied: [] })
   })
 
   it('纯垃圾解析结果 apply:啥也不建,不抛错', () => {

@@ -25,6 +25,7 @@ export type DslCardOp = {
   w?: number
   h?: number
   color?: string
+  create?: boolean
 }
 
 export type DslFreeOp =
@@ -116,8 +117,8 @@ const ID_RE = /#([a-zA-Z0-9_-]+:[a-zA-Z0-9_-]+|[a-zA-Z0-9_-]+)/
  *  negatives — elements dragged above/left of origin serialize as @pos(-x,-y)
  *  (canvas pan lets coords go negative), so the regex must round-trip them
  *  (else negative-coord cards fail to reparse → "missing @pos"). */
-const POS_RE = /@pos\((-?\d+),\s*(-?\d+)\)/
-const AT_RE = /at\s+\((-?\d+),\s*(-?\d+)\)/
+const POS_RE = /@pos\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)/
+const AT_RE = /at\s+\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)/
 
 /** Color directive: Bauhaus 6 原色 + grey 别名。引擎 colorOf 只认这 7 个
  *  名字(red/yellow/blue/black/white/gray/grey)。其他写法(green/teal/pink/
@@ -133,13 +134,13 @@ const LABEL_RE = /@label\("([^"]*)"\)/
 const TEXT_RE = /@text\("((?:[^"\\]|\\.)*)"\)/
 
 /** Size directive: `@size(w,h)` — supports negative values (free arrow direction encoding). */
-const SIZE_RE = /@size\((-?\d+),\s*(-?\d+)\)/
+const SIZE_RE = /@size\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)/
 
 /** Arrow relation signature — line style + terminal (semantics). */
 const DASH_RE = /@dash\((solid|dashed|dotted)\)/
 const ARROWHEAD_RE = /@arrowhead\((arrow|triangle|none)\)/
 /** 弯曲控制点:@curve(cx, cy)(支持负坐标)。 */
-const CURVE_RE = /@curve\((-?\d+),\s*(-?\d+)\)/
+const CURVE_RE = /@curve\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)/
 /** 路由形态:@route(straight|curve|elbow)。 */
 const ROUTE_RE = /@route\((straight|curve|elbow)\)/
 /** 折点:@elbow(x,y;x,y) — 分号分隔 1-2 个折点(均支持负坐标)。 */
@@ -152,9 +153,9 @@ function extractId(text: string): string | null {
 
 function extractPos(text: string): { x: number; y: number } | null {
   let m = text.match(POS_RE)
-  if (m) return { x: parseInt(m[1]!, 10), y: parseInt(m[2]!, 10) }
+  if (m) return { x: Number(m[1]), y: Number(m[2]) }
   m = text.match(AT_RE)
-  if (m) return { x: parseInt(m[1]!, 10), y: parseInt(m[2]!, 10) }
+  if (m) return { x: Number(m[1]), y: Number(m[2]) }
   return null
 }
 
@@ -177,7 +178,7 @@ function extractText(text: string): string | undefined {
 
 function extractSize(text: string): { w: number; h: number } | null {
   const m = text.match(SIZE_RE)
-  if (m) return { w: parseInt(m[1]!, 10), h: parseInt(m[2]!, 10) }
+  if (m) return { w: Number(m[1]), h: Number(m[2]) }
   return null
 }
 
@@ -214,7 +215,7 @@ function extractElbow(text: string): { x: number; y: number }[] | undefined {
   if (!m) return undefined
   const pts = m[1]!
     .split(';')
-    .map((pair) => pair.trim().match(/^(-?\d+)\s*,\s*(-?\d+)$/))
+    .map((pair) => pair.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/))
     .filter(Boolean)
     .map((pm) => ({ x: Number(pm![1]), y: Number(pm![2]) }))
   return pts.length >= 1 ? pts.slice(0, 2) : undefined
@@ -251,7 +252,7 @@ export function parseDslWithDiagnostics(dslText: string): {
     // Only `[`-prefixed lines that fail to parse are errors.
     if (!line.startsWith('[')) continue
 
-    // ── Card line: `[card #abc123] @pos(300, 400)`
+    // ── Card line: `[card #abc123] @pos(300, 400)` or `[card #abc123 create] @pos(300, 400)`
     if (line.startsWith('[card ')) {
       const id = extractId(line)
       if (!id) {
@@ -264,7 +265,8 @@ export function parseDslWithDiagnostics(dslText: string): {
         continue
       }
       const size = extractSize(line)
-      ops.push({
+      const hasCreate = /\bcreate\b/.test(line)
+      const op: any = {
         type: 'card',
         cardId: id as CardId,
         x: pos.x,
@@ -272,7 +274,11 @@ export function parseDslWithDiagnostics(dslText: string): {
         w: size?.w,
         h: size?.h,
         color: extractColor(line),
-      })
+      }
+      if (hasCreate) {
+        op.create = true
+      }
+      ops.push(op)
       continue
     }
 

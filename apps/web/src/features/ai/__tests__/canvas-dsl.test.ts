@@ -8,7 +8,7 @@ describe('serializeCanvas — active kinds', () => {
     const out = serializeCanvas([
       { id: 'c1', kind: 'card', x: 100, y: 200, w: 240, h: 120, rotation: 0, color: 'blue' },
     ])
-    expect(out).toBe('[card #c1] @pos(100,200) @size(240,120) @color(blue)')
+    expect(out).toBe('[card #c1] @pos(100.0,200.0) @size(240.0,120.0) @color(blue)')
   })
 
   it('emits rect / text / arrow', () => {
@@ -17,8 +17,8 @@ describe('serializeCanvas — active kinds', () => {
       { id: 't1', kind: 'text', x: 5, y: 6, w: 0, h: 0, rotation: 0, text: 'hello' },
       { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'r1', text: 'ref' },
     ])
-    expect(out).toContain('[rect #r1] @pos(10,20) @size(300,400) @color(red)')
-    expect(out).toContain('[text #t1] @pos(5,6) @text("hello")')
+    expect(out).toContain('[rect #r1] @pos(10.0,20.0) @size(300.0,400.0) @color(red)')
+    expect(out).toContain('[text #t1] @pos(5.0,6.0) @text("hello")')
     expect(out).toContain('[arrow #a1] from #c1 to #r1 @label("ref")')
   })
 
@@ -70,7 +70,7 @@ describe('serializeCanvas — active kinds', () => {
     const out = serializeCanvas([
       { id: 'fa1', kind: 'arrow', x: 10, y: 20, w: 100, h: 50, rotation: 0, dash: 'solid', arrowhead: 'arrow' },
     ])
-    expect(out).toContain('[arrow #fa1] @pos(10,20) @size(100,50)')
+    expect(out).toContain('[arrow #fa1] @pos(10.0,20.0) @size(100.0,50.0)')
     expect(out).not.toContain('from #')
     expect(out).not.toContain('to #')
   })
@@ -79,7 +79,7 @@ describe('serializeCanvas — active kinds', () => {
     const out = serializeCanvas([
       { id: 'fa2', kind: 'arrow', x: 10, y: 20, w: -80, h: 30, rotation: 0 },
     ])
-    expect(out).toContain('@size(-80,30)')
+    expect(out).toContain('@size(-80.0,30.0)')
   })
 
   it('serializes relation arrow unchanged', () => {
@@ -118,7 +118,7 @@ describe('serializeCanvas — active kinds', () => {
     const out = serializeCanvas([
       { id: 't1', kind: 'text', x: 5, y: 6, w: 0, h: 0, rotation: 0, text: 'hi', color: 'red' },
     ])
-    expect(out).toContain('[text #t1] @pos(5,6) @text("hi") @color(red)')
+    expect(out).toContain('[text #t1] @pos(5.0,6.0) @text("hi") @color(red)')
   })
 
   it('omits text @color when absent', () => {
@@ -153,7 +153,7 @@ describe('serializeCanvas — exclusions (R2 + privacy)', () => {
         meta: { segments: [{ points: [{ x: 9, y: 9 }, { x: 10, y: 10 }] }] },
       },
     ])
-    expect(out).toContain('[freedraw #f1] @pos(5,6)')
+    expect(out).toContain('[freedraw #f1] @pos(5.0,6.0)')
     expect(out).not.toContain('points')
     expect(out).not.toContain('(9,9)')
   })
@@ -199,14 +199,14 @@ describe('serializeCanvas — arrow route (curve/elbow)', () => {
       { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2', route: 'curve', curve: { cx: 150, cy: -30 } },
     ])
     expect(out).toContain('@route(curve)')
-    expect(out).toContain('@curve(150,-30)')
+    expect(out).toContain('@curve(150.0,-30.0)')
   })
   it('route=elbow 序列化 @route(elbow) + @elbow(分号分隔)', () => {
     const out = serializeCanvas([
       { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2', route: 'elbow', elbow: [{ x: 100, y: 50 }, { x: -20, y: 200 }] },
     ])
     expect(out).toContain('@route(elbow)')
-    expect(out).toContain('@elbow(100,50;-20,200)')
+    expect(out).toContain('@elbow(100.0,50.0;-20.0,200.0)')
   })
   it('route=straight 序列化 @route(straight)(显式,即便无 curve/elbow)', () => {
     const out = serializeCanvas([
@@ -259,7 +259,7 @@ describe('serializeCanvasReadable — card 行后附 title 注释', () => {
     ]
     const out = serializeCanvasReadable(elements, (id) => (id === 'c1' ? 'My Card' : undefined))
     const lines = out.split('\n')
-    expect(lines[0]).toBe('[card #c1] @pos(100,200) @size(240,120) @color(blue)')
+    expect(lines[0]).toBe('[card #c1] @pos(100.0,200.0) @size(240.0,120.0) @color(blue)')
     expect(lines[1]).toBe('  # title: My Card')
   })
 

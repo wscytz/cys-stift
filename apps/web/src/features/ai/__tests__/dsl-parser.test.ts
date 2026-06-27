@@ -157,6 +157,34 @@ describe('parseDsl', () => {
     expect(op.h).toBeUndefined()
   })
 
+  it('parses a card with create flag', () => {
+    const result = parseDsl('[card #new create] @pos(0, 0)')
+    expect(result).toHaveLength(1)
+    const op = result[0]!
+    if (op.type !== 'card') throw new Error('expected card op')
+    expect(op.cardId).toBe('new')
+    expect(op.x).toBe(0)
+    expect(op.y).toBe(0)
+    expect(op.create).toBe(true)
+  })
+
+  it('parses a card with create flag after pos', () => {
+    const result = parseDsl('[card #new] @pos(100, 200) create @size(200, 100)')
+    expect(result).toHaveLength(1)
+    const op = result[0]!
+    if (op.type !== 'card') throw new Error('expected card op')
+    expect(op.create).toBe(true)
+    expect(op.w).toBe(200)
+    expect(op.h).toBe(100)
+  })
+
+  it('parses a card without create flag → create undefined', () => {
+    const result = parseDsl('[card #abc123] @pos(300, 400)')
+    const op = result[0]!
+    if (op.type !== 'card') throw new Error('expected card op')
+    expect(op.create).toBeUndefined()
+  })
+
   // ── text color — DSL symmetry fix 3 ──
 
   it('parses a text line with @color', () => {
