@@ -109,6 +109,13 @@ export function applyLayout(host: CanvasHost, ops: DslOp[], appliedHashes?: Set<
   return { applied, skipped, newlyApplied }
 }
 
+/** Math.round + 有限性守卫:AI/用户输入 @pos(1e309) → Number 得 Infinity,
+ *  存进元素后 JSON.stringify 序列化成 null → reload 变 0(静默坐标损坏)。
+ *  非有限值回落 fallback(已有元素保留原坐标,新建元素用 0)。 */
+function finiteRound(n: unknown, fallback: number): number {
+  return typeof n === 'number' && Number.isFinite(n) ? Math.round(n) : fallback
+}
+
 function applyCardOp(
   host: CanvasHost,
   op: DslCardOp,
@@ -125,8 +132,8 @@ function applyCardOp(
     host.upsert({
       id: String(op.cardId),
       kind: 'card',
-      x: Math.round(op.x),
-      y: Math.round(op.y),
+      x: finiteRound(op.x, 0),
+      y: finiteRound(op.y, 0),
       w: op.w ?? 240,
       h: op.h ?? 120,
       rotation: 0,
@@ -137,8 +144,8 @@ function applyCardOp(
 
   host.upsert({
     ...existing,
-    x: Math.round(op.x),
-    y: Math.round(op.y),
+    x: finiteRound(op.x, existing.x),
+    y: finiteRound(op.y, existing.y),
     ...(op.w !== undefined ? { w: op.w } : {}),
     ...(op.h !== undefined ? { h: op.h } : {}),
     ...(op.color ? { color: op.color } : {}),
@@ -147,8 +154,8 @@ function applyCardOp(
 }
 
 function applyFreeOp(host: CanvasHost, op: DslFreeOp): boolean {
-  const x = Math.round(op.x)
-  const y = Math.round(op.y)
+  const x = finiteRound(op.x, 0)
+  const y = finiteRound(op.y, 0)
 
   // ── Update path: op.id 命中已有同 kind 元素 → 覆盖提供的字段,保留其余 ──
   // rect op 只更新 rect,text op 只更新 text(防跨 kind 误更新)。

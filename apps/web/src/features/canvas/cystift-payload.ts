@@ -98,6 +98,9 @@ export async function restoreCystiftPayload(
   // card id 重映射:旧 cardId → 新 cardId(service.create 生成)。
   const idMap = new Map<string, string>()
   for (const card of payload.cards) {
+    // 坏值防御(恶意/损坏 .cystift):card 本身为 null/非对象时,typeof card.title 抛
+    // TypeError → catch 回退当普通附件建卡(数据混淆)。与元素层 line 154 同源守卫。
+    if (!card || typeof card !== 'object') continue
     // 坏值防御(恶意/损坏 .cystift):.cystift card 字段无运行时校验,坏类型
     // (title=42 / links="x")直接进 DB → 后续 card.links.map / title.trim 崩到
     // 错误边界。逐字段守卫:非预期类型用默认值替代(best-effort 恢复,不跳整张卡)。
@@ -139,7 +142,8 @@ export async function restoreCystiftPayload(
 
   // 恢复几何元素:card 用新 id;arrow 的 from/to 重映射。旧 .cystift 文件
   // (含 snapshot,无 elements)降级为空元素(只恢复 cards)。
-  const elements = (payload.elements ?? []) as CanvasElement[]
+  // elements 非数组(恶意/损坏:数字/布尔)守卫 —— 否则 for...of 抛 not iterable。
+  const elements = (Array.isArray(payload.elements) ? payload.elements : []) as CanvasElement[]
   // 重映射 card id + arrow from/to(无论有无 host 都要重映射,因为下面要么进 host
   // 要么进 freeform store,两者都用新 id)。
   // 配额中断保护:break 后 idMap 只含已成功创建的卡。引用失败卡片的元素必须跳过——
@@ -177,7 +181,11 @@ export async function restoreCystiftPayload(
     // 无 host(拖放路径,host 还没为新画布建):把 freeform 元素持久化到新画布的
     // freeform store——新画布的 host mount 时 hydrate 会恢复它们。card 几何走 DB
     // (loadCardsIntoEditor 从 canvasPosition 重建),不进 store(三层防双写)。
-    void canvasFreeformStore.save(newCanvasId, remapped)
+    // await(非 fire-and-forget):OPFS 写完成后才 setActive → 新 host mount 时的 load
+    // 一定读到这次 save 的数据。此前 void + 紧随的 setActive 触发 mount load,save/load
+    // 竞争同一文件,load 可能先解析读到空 → freeform 不可见,用户再画一笔会覆盖性 save
+    // 永久销毁恢复的几何。localStorage 回退路径同步不受影响。
+    await canvasFreeformStore.save(newCanvasId, remapped)
   }
 
   canvasStore.setActive(newCanvasId)

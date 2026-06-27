@@ -58,6 +58,9 @@ export function DslDialog({
       // (e.g. a confirm stacked on top), bail so we don't close two on one
       // keypress. We mark it consumed only when we actually close ourselves.
       if (e.defaultPrevented) return
+      // IME 组合态(中日韩输入候选词)的 Escape 是取消候选,不该关模态 —— 否则
+      // 用户组词时按 Escape 会丢失整个 DSL 编辑(session 不存草稿)。
+      if (e.isComposing) return
       e.preventDefault()
       onClose()
     }

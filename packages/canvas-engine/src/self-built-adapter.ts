@@ -855,10 +855,17 @@ export class SelfBuiltAdapter implements CanvasHost {
         // 文本编辑中:只可能 IME;不拦截任何键(Delete/微移/undo 都不触发)
         return
       }
+      // IME 组合态统一守卫:组合中(中文/日文输入候选)的任何键都不触发画布操作,
+      // 否则 IME 的 Escape/方向键/Delete 会误清选区/误删/误移。undo/redo 分支内原有
+      // 的 isComposing 守卫由此统一覆盖。
+      if (e.isComposing) return
       // Escape:取消选区(通用画布习惯)。text/输入框已在上守卫排除。
+      // 不 preventDefault:模态(CardDetailModal/DSL/Export)的 Escape 关闭守卫依赖
+      // defaultPrevented 判断「我是不是最顶层」,adapter 的 preventDefault 会反向吞掉
+      // 单层模态的 Escape(选中态开模态 → Escape 只清选区不关模态)。adapter 清选区
+      // 无需阻止默认行为,去掉 preventDefault 让模态正常关(画布选区被清无害,模态已遮住)。
       if (e.key === 'Escape') {
         if (this.selectedIds.size === 0) return
-        e.preventDefault()
         this.setSelectedIds([])
         return
       }

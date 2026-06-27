@@ -366,20 +366,29 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCanvasId, service, t, aiBusy])
 
-  // 键盘:+ - 0 1 g(同 tldraw 版,改用 adapter)。input/textarea 时跳过。
+  // 键盘:+ - 0 1 g + 工具切换 v/p/e/t/c(Figma/Excalidraw 习惯)。input/textarea + 模态打开时跳过。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // 模态打开时画布快捷键全部让位(CardDetailModal/DSL/Export/Diff/Overview/Shortcut),
+      // 否则模态里按 +/g/v 等会在背后偷改画布视图/工具。
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return
       const tgt = e.target as HTMLElement | null
       if (tgt) {
         const tag = tgt.tagName
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tgt.isContentEditable) return
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return
-      const key = e.key
-      if (key === '+' || key === '=') { e.preventDefault(); zoomBy('in') }
+      const key = e.key.toLowerCase()
+      // 工具切换:v 选 / p 画 / e 擦 / t 文 / c 连
+      if (key === 'v') { e.preventDefault(); setTool('select') }
+      else if (key === 'p') { e.preventDefault(); setTool('freedraw') }
+      else if (key === 'e') { e.preventDefault(); setTool('eraser') }
+      else if (key === 't') { e.preventDefault(); setTool('text') }
+      else if (key === 'c') { e.preventDefault(); setTool('connect') }
+      else if (key === '+' || key === '=') { e.preventDefault(); zoomBy('in') }
       else if (key === '-' || key === '_') { e.preventDefault(); zoomBy('out') }
       else if (key === '0' || key === '1') { e.preventDefault(); zoomBy('fit') }
-      else if (key === 'g' || key === 'G') { e.preventDefault(); toggleSnap() }
+      else if (key === 'g') { e.preventDefault(); toggleSnap() }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -1215,5 +1224,11 @@ const styles = `
   /* ZoomGroup Fit:文字隐藏,留按钮(仍 + / − 同列)。 */
   .tb-icon-btn--fit .tb-icon-btn__label { display: none; }
   .tb-icon-btn--fit { padding: 0 var(--space-2); }
+}
+/* prefers-reduced-motion:禁用所有按钮按压缩放 + transition,尊重前庭敏感用户系统偏好
+   (codebase 其他处 page-loading/tooltip 已降级,画布页这一大块交互触感此前遗漏)。 */
+@media (prefers-reduced-motion: reduce) {
+  .tb-tool, .tb-snap, .tb-icon-btn, .cv-rail__btn { transition: none !important; }
+  .tb-tool:active, .tb-snap:active, .tb-icon-btn:active, .cv-rail__btn:active { transform: none !important; }
 }
 `
