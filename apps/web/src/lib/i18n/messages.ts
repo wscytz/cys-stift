@@ -18,6 +18,7 @@ export const messages = {
   'nav.archive': { zh: '归档', en: 'Archive' },
   'nav.timeline': { zh: '时间线', en: 'Timeline' },
   'nav.search': { zh: '搜索', en: 'Search' },
+  'nav.graph': { zh: '图谱', en: 'Graph' },
   'nav.trash': { zh: '回收站', en: 'Trash' },
   'nav.settings': { zh: '设置', en: 'Settings' },
   'nav.capture': { zh: '捕获', en: 'Capture' },
@@ -120,6 +121,16 @@ export const messages = {
   'card.detail.linkLabel': { zh: '链接', en: 'Link' },
   'card.detail.translateToEn': { zh: '→ 英文', en: '→ English' },
   'card.detail.translateToZh': { zh: '→ 中文', en: '→ Chinese' },
+
+  /* ── Graph ── */
+  'graph.title': { zh: '图谱', en: 'Graph' },
+  'graph.emptyTitle': { zh: '还没有关系', en: 'No connections yet' },
+  'graph.emptyHint': { zh: '建卡片、用 [[双链]] 或关系箭头连接，图谱会在这里展开', en: 'Create cards and link them with [[wikilinks]] or relation arrows' },
+  'graph.loading': { zh: '正在构建图谱…', en: 'Building graph…' },
+  'graph.filter.hideArchived': { zh: '隐藏归档', en: 'Hide archived' },
+  'graph.filter.tag': { zh: '标签', en: 'Tag' },
+  'graph.filter.type': { zh: '类型', en: 'Type' },
+  'graph.fit': { zh: '适配', en: 'Fit' },
 
   /* ── Canvas ── */
   'canvas.crumb': { zh: '画布', en: 'canvas' },
