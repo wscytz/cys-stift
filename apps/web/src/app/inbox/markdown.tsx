@@ -14,35 +14,122 @@ import rehypeSanitize from 'rehype-sanitize'
  * Style:
  *   - All rules are token-driven (no inline hex/px).
  *   - Headings use display font, code uses mono, lists use square bullets.
+ *
+ * Block references (BR-T3):
+ *   - `((标题))` embeds another card's body inline.
+ *   - splitEmbeds is a pure segmenter (exported for unit testing).
+ *   - EmbedRenderer renders recursively with cycle detection (visited Set)
+ *     and a depth cap (MAX_DEPTH=5).
+ *   - resolveEmbed is optional: callers that don't pass it keep the legacy
+ *     behavior where `((标题))` is treated as plain text. This preserves
+ *     backward compatibility for all existing MarkdownBody call sites.
  */
-export function MarkdownBody({ source }: { source: string }) {
+export interface EmbedSegment {
+  type: 'text' | 'embed'
+  value: string
+}
+
+/** 切分 source 成 text/embed 段。空串 → 空数组。纯函数。 */
+export function splitEmbeds(source: string): EmbedSegment[] {
+  if (!source) return []
+  const re = /\(\(([^)]+)\)\)/g
+  const out: EmbedSegment[] = []
+  let last = 0
+  let m: RegExpExecArray | null
+  while ((m = re.exec(source))) {
+    if (m.index > last) out.push({ type: 'text', value: source.slice(last, m.index) })
+    out.push({ type: 'embed', value: m[1]!.trim() })
+    last = m.index + m[0].length
+  }
+  if (last < source.length) out.push({ type: 'text', value: source.slice(last) })
+  return out
+}
+
+/** 现有 ReactMarkdown 逻辑(rehype-sanitize + 组件 a 的 safeHref)。 */
+function MarkdownBlock({ source }: { source: string }) {
+  return (
+    <ReactMarkdown
+      rehypePlugins={[rehypeSanitize]}
+      components={{
+        a: ({ href, children, ...rest }) => {
+          const safeHref =
+            typeof href === 'string' &&
+            (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('/'))
+              ? href
+              : '#'
+          return (
+            <a
+              href={safeHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              {...rest}
+            >
+              {children}
+            </a>
+          )
+        },
+      }}
+    >
+      {source}
+    </ReactMarkdown>
+  )
+}
+
+const MAX_DEPTH = 5
+
+function EmbedRenderer({
+  source,
+  resolveEmbed,
+  visited,
+  depth,
+}: {
+  source: string
+  resolveEmbed?: (title: string) => { body: string; title: string } | null
+  visited: Set<string>
+  depth: number
+}) {
+  const parts = splitEmbeds(source)
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.type === 'text') return <MarkdownBlock key={i} source={part.value} />
+        const title = part.value
+        // 无 resolver(向后兼容)→ 当文本。
+        if (!resolveEmbed) return <MarkdownBlock key={i} source={`((${title}))`} />
+        if (depth >= MAX_DEPTH) return <div key={i} className="md-embed md-embed--cycle">↻ 嵌套过深</div>
+        if (visited.has(title)) return <div key={i} className="md-embed md-embed--cycle">↻ {title}(循环引用)</div>
+        const target = resolveEmbed(title)
+        if (!target) return <div key={i} className="md-embed md-embed--missing">📌 {title}(卡片不存在或已删除)</div>
+        // 复制 visited,兄弟嵌入不互相污染。
+        const nextVisited = new Set(visited)
+        nextVisited.add(title)
+        return (
+          <div key={i} className="md-embed">
+            <div className="md-embed__title">{target.title}</div>
+            <EmbedRenderer
+              source={target.body}
+              resolveEmbed={resolveEmbed}
+              visited={nextVisited}
+              depth={depth + 1}
+            />
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
+export function MarkdownBody({
+  source,
+  resolveEmbed,
+}: {
+  source: string
+  resolveEmbed?: (title: string) => { body: string; title: string } | null
+}) {
   if (!source.trim()) return null
   return (
     <div className="md">
-      <ReactMarkdown
-        rehypePlugins={[rehypeSanitize]}
-        components={{
-          a: ({ href, children, ...rest }) => {
-            const safeHref =
-              typeof href === 'string' &&
-              (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('/'))
-                ? href
-                : '#'
-            return (
-              <a
-                href={safeHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                {...rest}
-              >
-                {children}
-              </a>
-            )
-          },
-        }}
-      >
-        {source}
-      </ReactMarkdown>
+      <EmbedRenderer source={source} resolveEmbed={resolveEmbed} visited={new Set()} depth={0} />
       <style>{styles}</style>
     </div>
   )
@@ -113,4 +200,18 @@ const styles = `
   color: var(--color-black);
 }
 .md hr { border: 0; border-top: var(--border-hairline); margin: var(--space-3) 0; }
+.md-embed {
+  border-left: 2px solid var(--color-yellow);
+  padding-left: var(--space-2);
+  margin: var(--space-1) 0;
+  background: var(--color-gray-soft);
+}
+.md-embed__title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-gray);
+  margin-bottom: var(--space-1);
+}
+.md-embed--missing { color: var(--color-gray); font-style: italic; }
+.md-embed--cycle { color: var(--color-red); font-size: var(--font-size-xs); }
 `
