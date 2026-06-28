@@ -160,6 +160,13 @@ function hydrateOnce() {
   if (_hydrated) return
   _hydrated = true
   _snap = loadSnapshot()
+  // P1 (2026-06-28): 首次 hydrate 落地 persist。此前 seed 仅入内存,用户未改过
+  // 画布(create/rename/setActive/delete 才 persist)时 localStorage 无 canvases.v1
+  // → export-service 读不到 canvases 列表 → freeform 几何(手绘/箭头/text/rect/
+  // frame)不进导出,canvases 列表也丢,备份不完整(核心卖点受损)。
+  // persist 幂等(写同样的 seed);失败(配额/隐私模式)静默——内存 _snap 仍正确,
+  // 不阻塞 hydrate。
+  saveSnapshot(_snap)
   notify()
 }
 

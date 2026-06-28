@@ -255,6 +255,38 @@ describe('canvasStore — quota exceeded', () => {
 // 直到下一次无关改动才纠正)。修复:回滚决策之后无条件再 notify 一次,使最后一次
 // 订阅者可见的快照 = prev。这里注册真实订阅者,捕获每次 notify 时的 getSnapshot(),
 // 断言最后一次捕获的快照就是回滚后的 prev。
+// P1 (2026-06-28) 回归:首次 hydrate 必须把 seed 落地到 localStorage。
+// 此前 hydrateOnce 只 loadSnapshot()+notify(),不 persist —— 用户未改过画布
+// (create/rename/setActive/delete 才 persist)时 localStorage 无 canvases.v1,
+// export-service 读不到 canvases 列表 → freeform 几何(手绘/箭头/text/rect/frame)
+// 全部不进导出,canvases 列表也丢,备份不完整(核心卖点受损)。
+describe('canvasStore — hydrateOnce persists seed (P1 export bug)', () => {
+  it('writes canvases.v1 after first hydrate so export can read it', async () => {
+    expect(window.localStorage.getItem('cys-stift.canvases.v1')).toBeNull()
+    // 触发 hydrate(get() 内部首调 hydrateOnce)。
+    canvasStore.get()
+    expect(window.localStorage.getItem('cys-stift.canvases.v1')).not.toBeNull()
+  })
+
+  it('persisted seed is valid JSON wrapping a snapshot with the default canvas', async () => {
+    canvasStore.get()
+    const raw = window.localStorage.getItem('cys-stift.canvases.v1')
+    expect(raw).not.toBeNull()
+    const parsed = JSON.parse(raw!) as { snapshot: { canvases: Array<{ name: string }>; activeCanvasId: string } }
+    expect(parsed.snapshot.canvases.length).toBeGreaterThanOrEqual(1)
+    expect(parsed.snapshot.canvases.some((c) => c.name === 'default canvas')).toBe(true)
+  })
+
+  it('hydrate persistence is idempotent — calling get() twice writes once-stable seed', async () => {
+    canvasStore.get()
+    const afterFirst = window.localStorage.getItem('cys-stift.canvases.v1')
+    canvasStore.get()
+    const afterSecond = window.localStorage.getItem('cys-stift.canvases.v1')
+    expect(afterFirst).not.toBeNull()
+    expect(afterFirst).toBe(afterSecond)
+  })
+})
+
 describe('canvasStore — quota rollback is subscriber-visible (Bug 1)', () => {
   let cs: typeof import('../canvas-store').canvasStore
   let subscribe: typeof import('../canvas-store').subscribe
