@@ -13,6 +13,7 @@
     "@cys-stift/canvas-engine": "workspace:*",
     "@cys-stift/domain": "workspace:*",
     "@cys-stift/ui": "workspace:*",
+    "d3-force": "^3.0.0",
     "eventsource-parser": "1.1.2",
     "markitdownllm": "^0.1.5",
     "next": "15.0.3",
@@ -24,6 +25,7 @@
     "tailwindcss": "4.0.0-beta.3"
   },
   "devDependencies": {
+    "@types/d3-force": "^3.0.10",
     "@types/node": "22.9.0",
     "@types/react": "19.0.0",
     "@types/react-dom": "19.0.0",
