@@ -675,7 +675,7 @@ export function CardDetailModal({
               onConfirmDelete()
             }}
           >
-            {t('card.detail.delete')}
+            {t('card.detail.deleteConfirmAction')}
           </Button>
         </div>
       </Modal>

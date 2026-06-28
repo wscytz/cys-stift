@@ -296,7 +296,7 @@ export function CardDetailModal({
             {t('card.detail.cancel')}
           </Button>
           <Button variant="danger" onClick={onDelete}>
-            {t('card.detail.delete')}
+            {t('card.detail.deleteConfirmAction')}
           </Button>
         </div>
       </Modal>
