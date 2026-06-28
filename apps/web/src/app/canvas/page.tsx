@@ -23,6 +23,7 @@ import { Minimap } from '@/features/canvas/minimap-component'
 import { OutlinePanel } from '@/features/canvas/outline-panel'
 import { autoRelate } from '@/features/canvas/auto-relate'
 import { CanvasContextMenu } from '@/features/canvas/canvas-context-menu'
+import { CanvasEmptyMotif } from '@/features/canvas/canvas-empty-motif'
 import { syncWikiLinkArrows } from '@/features/canvas/wiki-links'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { parseDsl, parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
@@ -742,6 +743,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         />
         {!ready ? null : onCanvas === 0 && !hasFreeform && (
           <div className="cv-empty">
+            <CanvasEmptyMotif />
             <span className="eyebrow">{t('canvas.emptyTitle')}</span>
             <span className="mono">{t('canvas.emptyHint')}</span>
             <Link href="/inbox" className="cv-empty__cta">
@@ -1185,6 +1187,7 @@ const styles = `
 .cv-host--text canvas { cursor: text; }
 .cv-host--connect canvas { cursor: cell; }
 .cv-empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: var(--space-2); pointer-events: none; user-select: none; padding-bottom: 80px; }
+.cv-empty__motif { margin-bottom: var(--space-2); }
 /* CTA link re-enables pointer events on itself only (parent overlay is
    pointer-events:none) so the user can act on the empty state. */
 .cv-empty__cta {

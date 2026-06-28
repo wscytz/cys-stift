@@ -150,6 +150,7 @@ export const messages = {
   'canvas.emptyTitle': { zh: '空白画布', en: 'Empty canvas' },
   'canvas.emptyHint': { zh: '双击创建 · 拖动摆放', en: 'double-click to create · drag to place' },
   'canvas.emptyCta': { zh: '去收件箱', en: 'Go to inbox' },
+  'canvas.emptyMotifHint': { zh: '右键建卡 · 双击打开', en: 'Right-click to create · Double-click to open' },
   'canvas.tools': { zh: '绘图工具', en: 'Drawing tools' },
   'canvas.tool.select': { zh: '选择', en: 'Select' },
   'canvas.tool.draw': { zh: '手绘', en: 'Draw' },
