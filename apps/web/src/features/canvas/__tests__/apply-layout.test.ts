@@ -619,3 +619,32 @@ describe('applyLayout', () => {
     expect(result.skipped).toBe(1)
   })
 })
+
+import type { DslCardOp } from '../../ai/dsl-parser'
+
+describe('applyLayout — card create + onCardCreate', () => {
+  it('invokes onCardCreate with DSL id + geometry when create flag set', () => {
+    const host = new InMemoryCanvasHost()
+    const created: { cardId: string; x: number; y: number; w: number; h: number; color?: string }[] = []
+    const op: DslCardOp = { type: 'card', cardId: 'c1' as CardId, x: 100, y: 200, w: 80, h: 60, create: true, color: 'blue' }
+    applyLayout(host, [op], undefined, (p) => created.push(p))
+    expect(created).toEqual([{ cardId: 'c1', x: 100, y: 200, w: 80, h: 60, color: 'blue' }])
+    expect(host.getElement('c1')).toMatchObject({ kind: 'card', x: 100, y: 200, w: 80, h: 60, color: 'blue' })
+  })
+
+  it('falls back to host.upsert only when no onCardCreate (InMemory test path)', () => {
+    const host = new InMemoryCanvasHost()
+    const op: DslCardOp = { type: 'card', cardId: 'c9' as CardId, x: 10, y: 20, create: true }
+    applyLayout(host, [op])
+    expect(host.getElement('c9')).toMatchObject({ kind: 'card', x: 10, y: 20 })
+  })
+
+  it('does not invoke onCardCreate when card already exists (update path)', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 240, h: 120, rotation: 0 })
+    let calls = 0
+    applyLayout(host, [{ type: 'card', cardId: 'c1' as CardId, x: 5, y: 6, create: true }], undefined, () => calls++)
+    expect(calls).toBe(0)
+    expect(host.getElement('c1')).toMatchObject({ x: 5, y: 6 })
+  })
+})

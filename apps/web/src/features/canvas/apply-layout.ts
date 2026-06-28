@@ -63,7 +63,12 @@ export interface ApplyResult {
  * lines) are not counted here — the caller (DSL dialog) pre-filters via
  * `parseDslWithDiagnostics` and surfaces those as a separate diagnostic list.
  */
-export function applyLayout(host: CanvasHost, ops: DslOp[], appliedHashes?: Set<string>): ApplyResult {
+export function applyLayout(
+  host: CanvasHost,
+  ops: DslOp[],
+  appliedHashes?: Set<string>,
+  onCardCreate?: (params: { cardId: string; x: number; y: number; w: number; h: number; color?: string }) => void,
+): ApplyResult {
   if (ops.length === 0) return { applied: 0, skipped: 0, newlyApplied: [] }
 
   let applied = 0
@@ -81,7 +86,7 @@ export function applyLayout(host: CanvasHost, ops: DslOp[], appliedHashes?: Set<
         let ok = false
         switch (op.type) {
           case 'card':
-            ok = applyCardOp(host, op)
+            ok = applyCardOp(host, op, onCardCreate)
             break
           case 'free':
             ok = applyFreeOp(host, op)
@@ -119,6 +124,7 @@ function finiteRound(n: unknown, fallback: number): number {
 function applyCardOp(
   host: CanvasHost,
   op: DslCardOp,
+  onCardCreate?: (params: { cardId: string; x: number; y: number; w: number; h: number; color?: string }) => void,
 ): boolean {
   // Partial update: preserve the existing card's w/h/rotation, override x/y
   // (and optionally color/size). Equivalent to tldraw's partial updateShape.
@@ -128,14 +134,22 @@ function applyCardOp(
       // No create flag: skip with no-op
       return false
     }
-    // create flag is set: create an empty card if it doesn't exist
+    // create flag is set: create an empty card if it doesn't exist.
+    // If a create callback was supplied, call it first (DSL id + geometry)
+    // so the web layer can persist the Card row before geometry is upserted
+    // under the same DSL id (BUG-A engine side).
+    const x = finiteRound(op.x, 0)
+    const y = finiteRound(op.y, 0)
+    const w = op.w ?? 240
+    const h = op.h ?? 120
+    onCardCreate?.({ cardId: String(op.cardId), x, y, w, h, color: op.color })
     host.upsert({
       id: String(op.cardId),
       kind: 'card',
-      x: finiteRound(op.x, 0),
-      y: finiteRound(op.y, 0),
-      w: op.w ?? 240,
-      h: op.h ?? 120,
+      x,
+      y,
+      w,
+      h,
       rotation: 0,
       color: op.color ?? 'white',
     })
