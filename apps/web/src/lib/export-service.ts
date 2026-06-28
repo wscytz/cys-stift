@@ -63,7 +63,14 @@ function readJson(key: string): unknown {
  * Async because per-canvas freeform geometry lives in OPFS (canvasFreeformStore.load);
  * we await each canvas's snapshot in sequence. SSR returns an empty payload.
  */
-export async function buildExportPayload(): Promise<ExportPayload> {
+export async function buildExportPayload(
+  opts?: { includeDeleted?: boolean },
+): Promise<ExportPayload> {
+  // includeDeleted defaults to true (full recoverable backup). When false
+  // (user unchecked the settings box), strip archived + soft-deleted cards
+  // so the export contains only live cards. Import remains full-accept — a
+  // backup is always the complete, restorable picture.
+  const includeDeleted = opts?.includeDeleted ?? true
   if (typeof window === 'undefined') {
     // SSR 早退:返回空 payload(与原 readJson-返回-null 兜底语义一致)。
     return {
@@ -84,6 +91,14 @@ export async function buildExportPayload(): Promise<ExportPayload> {
   const settingsPayload = readJson('cys-stift.settings.v1') as {
     settings?: Record<string, unknown>
   } | null
+
+  // Filter to live cards only when the user opted out of deleted/archived.
+  // Default (includeDeleted=true) keeps the full set — backups are always
+  // the complete, restorable picture.
+  let cards = cardsPayload?.cards ?? []
+  if (!includeDeleted) {
+    cards = cards.filter((c) => !c.archived && !c.deletedAt)
+  }
 
   // canvas 列表(同步 localStorage,取 .snapshot 部分)。直接读原始 key,不触发
   // canvasStore hydrate 副作用。
@@ -114,7 +129,7 @@ export async function buildExportPayload(): Promise<ExportPayload> {
     version: EXPORT_FORMAT_VERSION,
     exportedAt: new Date().toISOString(),
     app: "cy's Stift",
-    cards: cardsPayload?.cards ?? [],
+    cards: cards,
     mediaAssets: mediaPayload?.assets ?? {},
     drafts: draftsPayload?.drafts,
     settings: settingsPayload?.settings,
@@ -128,9 +143,11 @@ export async function buildExportPayload(): Promise<ExportPayload> {
  * Serialise the payload and trigger a browser download. Returns the
  * approximate byte size so the caller can show a hint.
  */
-export async function downloadExport(): Promise<number> {
+export async function downloadExport(
+  opts?: { includeDeleted?: boolean },
+): Promise<number> {
   if (typeof window === 'undefined') return 0
-  const payload = await buildExportPayload()
+  const payload = await buildExportPayload(opts)
   const json = JSON.stringify(payload, null, 2)
   const blob = new Blob([json], { type: 'application/json' })
   const url = URL.createObjectURL(blob)

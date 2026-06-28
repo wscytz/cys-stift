@@ -56,6 +56,9 @@ export interface Settings {
   /** One-time first-run capture-shortcut hint (plan Task 9). false until the
    *  user dismisses it. Backward-compat: missing field loads as false. */
   seenCaptureHint: boolean
+  /** 导出选项。includeDeleted=true(默认)导出全部含软删/归档卡(完整可恢复备份);
+   *  false 时仅导出活跃卡。P2 (2026-06-28)。向后兼容:旧 settings 无此字段 → 默认 true。 */
+  export?: { includeDeleted?: boolean }
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -64,6 +67,7 @@ export const DEFAULT_SETTINGS: Settings = {
   locale: 'zh',
   ai: null,
   seenCaptureHint: false,
+  export: { includeDeleted: true },
 }
 
 /** Validate a parsed AI config. null is valid (no AI configured).

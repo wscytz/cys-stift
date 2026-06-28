@@ -176,6 +176,51 @@ describe('buildExportPayload', () => {
   })
 })
 
+// ── buildExportPayload — includeDeleted filter (P2, 2026-06-28) ────────────
+// Default = include everything (full recoverable backup). When the user
+// unchecks "include deleted/archived" in settings, buildExportPayload must
+// filter out cards with archived=true or a deletedAt timestamp. The count
+// math in the settings page (live vs excluded) depends on this.
+
+describe('buildExportPayload includeDeleted', () => {
+  // 3 cards: 1 live, 1 archived, 1 soft-deleted.
+  const seedMixed = () => {
+    const live = makeCard({ id: 'card-live' as unknown as CardId, archived: false })
+    const archived = makeCard({
+      id: 'card-archived' as unknown as CardId,
+      archived: true,
+    })
+    const deleted = makeCard({
+      id: 'card-deleted' as unknown as CardId,
+      archived: false,
+      deletedAt: '2026-01-01T00:00:00.000Z' as unknown as Date,
+    })
+    seedStores({ cards: [live, archived, deleted] })
+    return { live, archived, deleted }
+  }
+
+  it('includes all cards by default (includeDeleted undefined)', async () => {
+    seedMixed()
+    const payload = await mod.buildExportPayload()
+    expect(payload.cards.length).toBe(3)
+  })
+
+  it('includes all cards when includeDeleted=true', async () => {
+    seedMixed()
+    const payload = await mod.buildExportPayload({ includeDeleted: true })
+    expect(payload.cards.length).toBe(3)
+  })
+
+  it('filters archived + deleted when includeDeleted=false', async () => {
+    seedMixed()
+    const payload = await mod.buildExportPayload({ includeDeleted: false })
+    expect(payload.cards.length).toBe(1)
+    // The lone surviving card must be the live one.
+    expect(payload.cards.every((c) => !c.archived && !c.deletedAt)).toBe(true)
+    expect(payload.cards[0]!.id).toBe('card-live')
+  })
+})
+
 // ── buildExportPayload — canvases + freeform geometry ──────────────────────
 
 describe('buildExportPayload — canvases + freeform', () => {

@@ -406,6 +406,8 @@ export const messages = {
   'settings.exportJson': { zh: '导出 JSON', en: 'Export JSON' },
   'settings.exportOk': { zh: '已导出 {cards} 张卡片 · {bytes}', en: 'Exported {cards} cards · {bytes}' },
   'settings.exportFail': { zh: '导出失败:{error}', en: 'Export failed: {error}' },
+  'settings.exportIncludeDeleted': { zh: '导出含已删除/归档卡(完整可恢复备份)', en: 'Include deleted/archived cards in export (full recoverable backup)' },
+  'settings.exportOkFiltered': { zh: '已导出 {live} 张活跃卡(另含 {excluded} 张回收站/归档,未导出)· {bytes}', en: 'Exported {live} active card(s) ({excluded} trash/archived excluded) · {bytes}' },
   'settings.importJson': { zh: '导入 JSON', en: 'Import JSON' },
   'settings.importHint': { zh: '会覆盖当前数据——请先导出备份。成功后会重新加载。', en: 'Overwrites current data — export a backup first. Reloads on success.' },
   'settings.importConfirmTitle': { zh: '确认导入', en: 'Confirm import' },

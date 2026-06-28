@@ -192,24 +192,53 @@ export default function SettingsPage() {
         <section className="section">
           <h2 className="section__h">{t('settings.data')}</h2>
           <p className="section__lede">{t('settings.dataLede')}</p>
+          <label
+            className="mono-label set__export-include"
+            style={{ display: 'block', marginBottom: 'var(--space-2)' }}
+          >
+            <input
+              type="checkbox"
+              checked={settings.export?.includeDeleted ?? true}
+              onChange={(e) => {
+                const cur = settings.export?.includeDeleted ?? true
+                // Only persist on actual change (matches update* no-op guards).
+                if (cur === e.target.checked) return
+                settingsStore.update({
+                  export: { includeDeleted: e.target.checked },
+                })
+              }}
+            />
+            {t('settings.exportIncludeDeleted')}
+          </label>
           <button
             type="button"
             className="btn-primary"
             onClick={async () => {
               try {
-                const bytes = await downloadExport()
-                const payload = await buildExportPayload()
-                console.info(
-                  `[export] ${bytes} bytes · ` +
-                    `${payload.cards.length} cards`,
-                )
-                pushToast({
-                  kind: 'success',
-                  message: t('settings.exportOk', {
-                    cards: String(payload.cards.length),
-                    bytes: formatBytes(bytes),
-                  }),
-                })
+                const includeDeleted = settings.export?.includeDeleted ?? true
+                const bytes = await downloadExport({ includeDeleted })
+                const payload = await buildExportPayload({ includeDeleted })
+                const live = payload.cards.filter(
+                  (c) => !c.archived && !c.deletedAt,
+                ).length
+                if (includeDeleted) {
+                  pushToast({
+                    kind: 'success',
+                    message: t('settings.exportOk', {
+                      cards: String(payload.cards.length),
+                      bytes: formatBytes(bytes),
+                    }),
+                  })
+                } else {
+                  pushToast({
+                    kind: 'success',
+                    message: t('settings.exportOkFiltered', {
+                      live: String(live),
+                      excluded: String(payload.cards.length - live),
+                      bytes: formatBytes(bytes),
+                    }),
+                  })
+                }
               } catch (e) {
                 pushToast({ kind: 'error', message: t('settings.exportFail', { error: (e as Error).message }) })
               }
