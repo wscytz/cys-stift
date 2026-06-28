@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import type { CanvasId, Card, CardId } from '@cys-stift/domain'
-import { SelfBuiltAdapter, elementCenter, unionBounds, normalizeBox } from '@cys-stift/canvas-engine'
+import { SelfBuiltAdapter, elementCenter, unionBounds, normalizeBox, screenToPage } from '@cys-stift/canvas-engine'
 import { Button, Modal, Toolbar } from '@cys-stift/ui'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
@@ -22,6 +22,7 @@ import { FreedrawPanel } from '@/features/canvas/freedraw-panel'
 import { Minimap } from '@/features/canvas/minimap-component'
 import { OutlinePanel } from '@/features/canvas/outline-panel'
 import { autoRelate } from '@/features/canvas/auto-relate'
+import { CanvasContextMenu } from '@/features/canvas/canvas-context-menu'
 import { syncWikiLinkArrows } from '@/features/canvas/wiki-links'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { parseDsl, parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
@@ -103,6 +104,7 @@ export default function CanvasPage() {
   const [shortcutOpen, setShortcutOpen] = useState(false)
   const [diffOpen, setDiffOpen] = useState(false)
   const [overviewOpen, setOverviewOpen] = useState(false)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; px: number; py: number } | null>(null)
 
   const onCanvas = service
     .listOnCanvas(activeCanvasId)
@@ -715,7 +717,17 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         <ZoomGroup adapterReady={adapterReady} onZoom={zoomBy} />
       </Toolbar>
 
-      <div className={`cv-host cv-host--${tool}`}>
+      <div className={`cv-host cv-host--${tool}`} onContextMenu={(e) => {
+        e.preventDefault()
+        const adapter = handle.current.adapter
+        if (!adapter) return
+        const canvas = canvasElRef.current
+        if (!canvas) return
+        const rect = canvas.getBoundingClientRect()
+        const view = adapter.getView()
+        const p = screenToPage(view, e.clientX - rect.left, e.clientY - rect.top)
+        setCtxMenu({ x: e.clientX, y: e.clientY, px: p.x, py: p.y })
+      }}>
         <SelfCanvas
           key={activeCanvasId}
           canvasId={activeCanvasId}
@@ -927,6 +939,24 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           </Button>
         </div>
       </Modal>
+
+      <CanvasContextMenu
+        open={ctxMenu !== null}
+        x={ctxMenu?.x ?? 0}
+        y={ctxMenu?.y ?? 0}
+        onClose={() => setCtxMenu(null)}
+        onCreateHere={(title) => {
+          const adapter = handle.current.adapter
+          if (!adapter || !ctxMenu) return
+          const card = createCardOnCanvas(service, adapter, activeCanvasId, { title, x: ctxMenu.px, y: ctxMenu.py })
+          adapter.setSelectedIds([String(card.id)])
+          setCtxMenu(null)
+        }}
+        onPasteDsl={() => {
+          navigator.clipboard?.readText().then((text) => applyDslFromText(text ?? '')).catch(() => {})
+        }}
+        onFitView={() => zoomBy('fit')}
+      />
 
       <style>{styles}</style>
     </main>
@@ -1296,6 +1326,9 @@ const styles = `
 .cv-rail__menu-item:hover:not(:disabled) { background: var(--color-yellow); }
 .cv-rail__menu-item:disabled { opacity: 0.5; cursor: not-allowed; }
 .cv-rail__menu-item:focus-visible { outline: 2px solid var(--color-red); outline-offset: 1px; }
+.cv-ctx-backdrop { position: fixed; inset: 0; z-index: 99; cursor: default; }
+.cv-ctx-menu { position: fixed; z-index: 100; }
+.cv-ctx-input { position: fixed; z-index: 100; width: 200px; }
 
 /* ── P1 响应式断点 ───────────────────────────────────────────────
    画布页此前零 @media;窄 Tauri 窗口下顶栏静默溢出、rail 占掉画布宽度。
