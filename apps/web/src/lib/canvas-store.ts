@@ -338,6 +338,19 @@ export const canvasStore = {
   },
 }
 
+// ── Cross-tab sync (P3, 2026-06-28) ─────────────────────────────────────────
+// 镜像 db-client.ts 的 cards.v1 监听:storage 事件只在「其它 tab 写入」时在本
+// tab 触发(本 tab 自己写不触发),所以不与 persist() 循环。多 tab 场景下 Tab A
+// 新建画布写 canvases.v1 → Tab B 收到 storage 事件 → 重新 loadSnapshot + notify,
+// 否则 Tab B 看不到新画布,直到手动 reload。
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key !== STORAGE_KEY) return
+    _snap = loadSnapshot()
+    notify()
+  })
+}
+
 export function useCanvases(): {
   snapshot: CanvasesSnapshot
   ready: boolean

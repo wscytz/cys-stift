@@ -395,3 +395,75 @@ describe('canvasStore — quota rollback is subscriber-visible (Bug 1)', () => {
     expect(seen[0]!.canvases.some((c) => c.name === 'happy')).toBe(true)
   })
 })
+
+// P3 (2026-06-28): 跨 tab storage 同步。多 tab 场景下,Tab A 新建画布写
+// 'cys-stift.canvases.v1',storage 事件在 Tab B(其它 tab)触发。此前
+// canvas-store 不监听 storage → Tab B 看不到新画布,直到手动 reload。
+// 修法镜像 db-client 的 cards.v1 监听:key === STORAGE_KEY 时重新 loadSnapshot
+// 并 notify。storage 事件本 tab 不触发(只其它 tab),所以不与 persist 循环。
+describe('cross-tab storage sync', () => {
+  it('reloads snapshot + notifies when canvases.v1 changes', async () => {
+    vi.resetModules()
+    window.localStorage.clear()
+    const mod = await import('../canvas-store')
+    const canvasStore = mod.canvasStore
+    const subscribe = mod.subscribe
+    // 先 hydrate 一次,让初始 seed 稳定 + _hydrated=true(否则监听里 loadSnapshot
+    // 跑了也覆盖不了 get() 没调过的场景)。
+    canvasStore.get()
+    const calls: number[] = []
+    const unsub = subscribe(() => calls.push(1))
+    // 模拟其它 tab 写了 canvases.v1(新增画布 c2)。snapshot 结构对齐 saveSnapshot:
+    // 外层 { snapshot: CanvasesSnapshot },CanvasesSnapshot = { canvases, activeCanvasId }。
+    // isSnapshot 校验每个 canvas 必须有 id/workspaceId/name/view/createdAt/updatedAt,
+    // 所以用完整合法对象构造。
+    const existing = canvasStore.get().canvases
+    const otherTab = JSON.stringify({
+      snapshot: {
+        canvases: [
+          ...existing,
+          {
+            id: 'canvas-c2',
+            workspaceId: existing[0]!.workspaceId,
+            name: 'other',
+            view: existing[0]!.view,
+            createdAt: new Date(0).toISOString(),
+            updatedAt: new Date(0).toISOString(),
+          },
+        ],
+        activeCanvasId: 'canvas-c2',
+      },
+    })
+    window.localStorage.setItem('cys-stift.canvases.v1', otherTab)
+    // storage 事件只是「localStorage 已被其它 tab 改了」的信号(浏览器在写的同时
+    // 触发);监听器靠 loadSnapshot() 重新读 localStorage。这里 setItem 模拟
+    // 「localStorage 已更新」,dispatchEvent 模拟「本 tab 收到通知」。
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: 'cys-stift.canvases.v1',
+        newValue: otherTab,
+      }),
+    )
+    const snap = canvasStore.get()
+    expect(snap.canvases.some((c) => c.id === 'canvas-c2')).toBe(true)
+    expect(calls.length).toBeGreaterThan(0)
+    unsub()
+  })
+
+  it('ignores storage events for other keys', async () => {
+    vi.resetModules()
+    window.localStorage.clear()
+    const mod = await import('../canvas-store')
+    const canvasStore = mod.canvasStore
+    const subscribe = mod.subscribe
+    canvasStore.get()
+    const calls: number[] = []
+    const unsub = subscribe(() => calls.push(1))
+    const before = calls.length
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: 'other-key', newValue: 'x' }),
+    )
+    expect(calls.length).toBe(before)
+    unsub()
+  })
+})
