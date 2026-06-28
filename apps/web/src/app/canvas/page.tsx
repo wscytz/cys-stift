@@ -43,6 +43,7 @@ import {
   removeCardShape,
   syncCardsToEditor,
   updateCardShape,
+  createCardOnCanvas,
 } from '@/features/canvas/canvas-binding'
 import { canvasStore, useCanvases } from '@/lib/canvas-store'
 import { canvasViewStore } from '@/lib/canvas-view-store'
@@ -426,6 +427,41 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     return () => window.removeEventListener('keydown', onKey)
   }, [zoomBy, toggleSnap])
 
+  // BUG-A:applyLayout 的 onCardCreate 回调——create 类 op 落库为真实 Card。
+  // 走 createCardOnCanvas(service, adapter, activeCanvasId, ...),复用 createWithId,
+  // cardId 来自 DSL 的 #id,坐标/尺寸来自 op。paste 监听 + DslDialog 共用。
+  const onCardCreate = useCallback((p: { cardId: string; x: number; y: number; w: number; h: number; color?: string }) => {
+    if (!handle.current.adapter) return
+    createCardOnCanvas(service, handle.current.adapter, activeCanvasId, {
+      id: p.cardId, title: '', x: p.x, y: p.y, w: p.w, h: p.h,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [service, activeCanvasId])
+
+  // BUG-B + BUG-A:把"疑似 DSL 文本 → 应用"抽成组件级回调,paste 监听和右键菜单(T6)共用。
+  // 放宽检测:任何含 `[` 开头的行都算疑似 DSL(不再只认 5 种 kind)。
+  // 整段疑似但 parse 出 0 ops → pasteDslNoneParsed(不静默);纯文本无 `[` 行 → 不打扰。
+  const applyDslFromText = useCallback((text: string) => {
+    const looksLikeDsl = text.split('\n').some((ln) => /^\s*\[/.test(ln))
+    if (!looksLikeDsl) return
+    const { ops, errors } = parseDslWithDiagnostics(text)
+    if (ops.length === 0) {
+      pushToast({ kind: 'info', message: t('canvas.pasteDslNoneParsed', { errors: String(errors.length) }) })
+      return
+    }
+    const adapter = handle.current.adapter
+    if (!adapter) return
+    const { applied, skipped } = applyLayout(adapter, ops, undefined, onCardCreate)
+    if (applied === 0) {
+      pushToast({ kind: 'info', message: t('canvas.pasteDslNone') })
+    } else if (skipped > 0 || errors.length > 0) {
+      pushToast({ kind: 'info', message: t('canvas.pasteDslPartial', { applied: String(applied), skipped: String(skipped + errors.length) }) })
+    } else {
+      pushToast({ kind: 'success', message: t('canvas.pasteDslApplied', { n: String(applied) }) })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onCardCreate, t])
+
   // 转义双向桥入口:画布页粘贴纯文本 DSL → 直接应用(不必打开 DSL 模态)。
   // 与全局 FileDropHandler 并存:它只处理文件项,纯文本 early-return;本监听
   // 只对 DSL 文本 preventDefault。input/textarea/contentEditable 时跳过。
@@ -452,33 +488,12 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       if (!textItem) return
       // 同步 preventDefault(避免浏览器把文本塞进聚焦元素),再异步判断+应用。
       e.preventDefault()
-      textItem.getAsString((raw) => {
-        const text = raw ?? ''
-        const looksLikeDsl = text.split('\n').some((ln) =>
-          /^\s*\[(card|arrow|rect|text|freedraw)\b/i.test(ln),
-        )
-        if (!looksLikeDsl) return
-        const { ops, errors } = parseDslWithDiagnostics(text)
-        if (ops.length === 0) {
-          pushToast({ kind: 'info', message: t('canvas.pasteDslNone') })
-          return
-        }
-        const adapter = handle.current.adapter
-        if (!adapter) return
-        const { applied, skipped } = applyLayout(adapter, ops)
-        if (applied === 0) {
-          pushToast({ kind: 'info', message: t('canvas.pasteDslNone') })
-        } else if (skipped > 0 || errors.length > 0) {
-          pushToast({ kind: 'info', message: t('canvas.pasteDslPartial', { applied: String(applied), skipped: String(skipped + errors.length) }) })
-        } else {
-          pushToast({ kind: 'success', message: t('canvas.pasteDslApplied', { n: String(applied) }) })
-        }
-      })
+      textItem.getAsString((raw) => applyDslFromText(raw ?? ''))
     }
     window.addEventListener('paste', onPaste)
     return () => window.removeEventListener('paste', onPaste)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adapterReady, t])
+  }, [adapterReady, applyDslFromText])
 
   const switchCanvas = (id: CanvasId) => {
     if (id === activeCanvasId) return
@@ -885,6 +900,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         host={adapter}
         service={service}
         canvasName={activeCanvas?.name ?? ''}
+        onCardCreate={onCardCreate}
       />
 
       <ShortcutHelpDialog open={shortcutOpen} onClose={() => setShortcutOpen(false)} />

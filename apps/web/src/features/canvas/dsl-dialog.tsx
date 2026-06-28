@@ -29,12 +29,14 @@ export function DslDialog({
   host,
   service,
   canvasName,
+  onCardCreate,
 }: {
   open: boolean
   onClose: () => void
   host: CanvasHost | null
   service: CardService
   canvasName: string
+  onCardCreate?: (p: { cardId: string; x: number; y: number; w: number; h: number; color?: string }) => void
 }) {
   const { t } = useI18n()
   const [text, setText] = useState('')
@@ -94,7 +96,7 @@ export function DslDialog({
       return
     }
 
-    const { applied, skipped } = applyLayout(host, ops, appliedHashes)
+    const { applied, skipped } = applyLayout(host, ops, appliedHashes, onCardCreate)
     // 合并新应用的 hash 到现有集合触发状态更新
     if (applied > 0) {
       setAppliedHashes(new Set(appliedHashes))

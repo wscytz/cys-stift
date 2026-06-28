@@ -243,6 +243,7 @@ export const messages = {
   'canvas.pasteDslApplied': { zh: '已应用 {n} 条 DSL 指令', en: 'Applied {n} DSL ops' },
   'canvas.pasteDslPartial': { zh: '应用 {applied} 条,{skipped} 条跳过', en: 'Applied {applied}, skipped {skipped}' },
   'canvas.pasteDslNone': { zh: '剪贴板文本不是有效的 DSL', en: 'Clipboard text is not valid DSL' },
+  'canvas.pasteDslNoneParsed': { zh: '看起来像 DSL,但 {errors} 行未能解析(打开 DSL 面板看行级诊断)', en: 'Looks like DSL, but {errors} line(s) failed to parse (open DSL panel for line diagnostics)' },
 
   /* ── Canvas shortcuts help (R3.5) ── */
   'canvas.shortcuts': { zh: '快捷键', en: 'Shortcuts' },
