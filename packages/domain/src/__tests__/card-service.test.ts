@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { CardService, type CardRepository } from '../services/card-service'
 import type { Card, CardId, CanvasId, MediaAssetId, MediaRef, WorkspaceId, TagRef } from '../types'
 import { TAG_COLORS } from '../types'
+import { toCardId } from '../codec'
 
 class InMemoryCardRepository implements CardRepository {
   private store = new Map<CardId, Card>()
@@ -355,5 +356,26 @@ describe('CardService', () => {
     const fetched = service.get(c.id)
     expect(fetched?.tags).toHaveLength(1)
     expect(fetched?.tags[0]?.value).toBe('new')
+  })
+})
+
+describe('CardService.createWithId', () => {
+  it('creates a card with the given id', () => {
+    const svc = new CardService(new InMemoryCardRepository())
+    const id = toCardId('c1')
+    const card = svc.createWithId(id, { title: 'hi', source: { kind: 'manual', deviceId: 'web' } })
+    expect(card.id).toBe(id)
+    expect(card.title).toBe('hi')
+    expect(svc.get(id)?.title).toBe('hi')
+  })
+
+  it('respects canvasPosition when provided', () => {
+    const svc = new CardService(new InMemoryCardRepository())
+    const id = toCardId('c2')
+    svc.createWithId(id, {
+      title: '', source: { kind: 'manual', deviceId: 'web' },
+      canvasPosition: { canvasId: 'default-canvas' as CanvasId, x: 100, y: 200, w: 240, h: 120, z: 0, rotation: 0 },
+    })
+    expect(svc.get(id)?.canvasPosition).toMatchObject({ x: 100, y: 200 })
   })
 })

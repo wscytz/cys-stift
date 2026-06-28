@@ -88,6 +88,39 @@ export class CardService {
     return card
   }
 
+  /**
+   * Like {@link create} but uses the caller-supplied id instead of minting one.
+   * Used by DSL `[card #id create]` paste / canvas right-click "create here",
+   * where the element id (DSL #id / right-click minted id) must equal the DB
+   * CardId to preserve the canvas-binding invariant (element id === CardId).
+   * Throws if the id already exists (caller should check `get` first or use
+   * moveToCanvas for the update path).
+   */
+  createWithId(id: CardId, input: CreateCardInput): Card {
+    const now = new Date()
+    const card: Card = {
+      id,
+      title: input.title,
+      body: input.body ?? '',
+      type: input.type ?? 'note',
+      media: input.media ?? [],
+      links: input.links ?? [],
+      codeSnippets: input.codeSnippets ?? [],
+      quotes: input.quotes ?? [],
+      source: input.source,
+      capturedAt: now,
+      createdAt: now,
+      updatedAt: now,
+      canvasPosition: input.canvasPosition,
+      color: input.color,
+      tags: input.tags ?? [],
+      pinned: false,
+      archived: false,
+    }
+    this.repo.insert(card)
+    return card
+  }
+
   fromCapture(input: CaptureInput): Card {
     return this.create({
       title: input.title ?? '',
