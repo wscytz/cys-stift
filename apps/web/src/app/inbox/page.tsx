@@ -88,6 +88,56 @@ export default function InboxPage() {
     return () => window.removeEventListener('cys-stift:open-card', onOpenCard as EventListener)
   }, [snap])
 
+  // DR2-T2: inbox 粘贴桥。inbox 没有画布 host(它是捕获入口),所以不能调
+  // createCardOnCanvas(它要 host 加几何)。直接用 service.createWithId 落 DB +
+  // canvasPosition,几何在用户去 /canvas 时由 loadCardsIntoEditor 从 DB 读出渲染。
+  // 粘 [card #x create] 行 → 建卡落默认画布;粘非 card DSL(rect/text/arrow,含
+  // `[` 但无 card create)→ toast 引导去 /canvas;普通文本(无 `[`)→ 不打扰。
+  useEffect(() => {
+    if (!ready) return
+    const isEditable = (el: EventTarget | null): boolean => {
+      if (!(el instanceof HTMLElement)) return false
+      if (el.isContentEditable) return true
+      const tag = el.tagName
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+    }
+    const onPaste = (e: ClipboardEvent) => {
+      if (isEditable(e.target)) return
+      const text = e.clipboardData?.getData('text/plain') ?? ''
+      const looksLikeDsl = text.split('\n').some((ln) => /^\s*\[/.test(ln))
+      if (!looksLikeDsl) return
+      e.preventDefault()
+      const cardLines = text.split('\n').filter((ln) => /^\s*\[card\b/i.test(ln) && /\bcreate\b/.test(ln))
+      let created = 0
+      for (const ln of cardLines) {
+        const idMatch = ln.match(/#([a-zA-Z0-9_-]+)/)
+        const posMatch = ln.match(/@pos\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/)
+        const sizeMatch = ln.match(/@size\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/)
+        if (!idMatch) continue
+        const id = idMatch[1] as CardId
+        if (service.get(id)) continue
+        const x = posMatch ? Number(posMatch[1]) : 0
+        const y = posMatch ? Number(posMatch[2]) : 0
+        const w = sizeMatch ? Number(sizeMatch[1]) : 240
+        const h = sizeMatch ? Number(sizeMatch[2]) : 120
+        service.createWithId(id, {
+          title: '',
+          source: { kind: 'manual', deviceId: 'web' } as never,
+          canvasPosition: { canvasId: DEFAULT_CANVAS_ID, x, y, w, h, z: 0, rotation: 0 },
+        })
+        created++
+      }
+      if (created > 0) {
+        pushToast({ kind: 'success', message: t('canvas.inboxPasteCreated', { n: String(created) }) })
+      } else if (cardLines.length === 0) {
+        pushToast({ kind: 'info', message: t('canvas.inboxPasteGuide') })
+      }
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, service, t])
+
   // 批量动作(循环调单卡 service;同步,一次 re-render)。
   // Reconcile against the live/visible card ids first: a selected card may
   // have been soft-deleted / archived-out elsewhere (e.g. via the detail
