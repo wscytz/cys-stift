@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   cardShapeIdOf,
   cardIdFromShapeId,
@@ -6,6 +6,7 @@ import {
   elementToCardPosition,
   bindCardWriteback,
   syncCardsToEditor,
+  createCardOnCanvas,
 } from '../canvas-binding'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
 import type { CanvasId, Card, CardId, CardService, CanvasPosition } from '@cys-stift/domain'
@@ -308,5 +309,56 @@ describe('bindCardWriteback: undo reconciles DB canvasPosition (no desync)', () 
     expect(moveToCanvasCalls.length).toBe(restoredMoveCalls)
 
     unbind()
+  })
+})
+
+/**
+ * createCardOnCanvas(v0.x):「在画布上 (x,y) 建卡」共用建卡函数,供 DSL paste
+ * (传 id,title 空)与右键建卡(不传 id)共用。保持「元素 id === CardId」不变量。
+ */
+function makeMockService() {
+  // 模拟真实 CardService:createWithId/get 联动并把 canvasPosition 落库,
+  // create 自 mint id。这样 createCardOnCanvas 调 service.get(id)! 拿到
+  // 带几何的卡,与真实行为一致。
+  const store = new Map<string, Record<string, unknown>>()
+  return {
+    create: vi.fn((input?: Record<string, unknown>) => {
+      const card = { id: 'minted', ...input }
+      store.set('minted', card)
+      return card
+    }),
+    createWithId: vi.fn((id: string, input?: Record<string, unknown>) => {
+      const card = { id, ...input }
+      store.set(id, card)
+      return card
+    }),
+    get: vi.fn((id: string) => store.get(id) ?? null),
+    moveToCanvas: vi.fn(),
+  } as unknown as Parameters<typeof createCardOnCanvas>[0]
+}
+
+describe('createCardOnCanvas', () => {
+  it('creates a card with the given id at the given position', () => {
+    const host = new InMemoryCanvasHost()
+    const svc = makeMockService()
+    createCardOnCanvas(svc, host, 'default-canvas' as never, { id: 'c1', title: 't', x: 100, y: 200 })
+    expect(svc.createWithId).toHaveBeenCalledWith('c1', expect.objectContaining({ title: 't' }))
+    expect(host.getElement('c1')).toMatchObject({ kind: 'card', x: 100, y: 200 })
+  })
+
+  it('mints id when none given (right-click path)', () => {
+    const host = new InMemoryCanvasHost()
+    const svc = makeMockService()
+    createCardOnCanvas(svc, host, 'default-canvas' as never, { title: 'r', x: 5, y: 6 })
+    expect(svc.create).toHaveBeenCalled()
+  })
+
+  it('falls back to moveToCanvas when id already exists', () => {
+    const host = new InMemoryCanvasHost()
+    const svc = makeMockService()
+    ;(svc.get as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'c1' })
+    createCardOnCanvas(svc, host, 'default-canvas' as never, { id: 'c1', title: 't', x: 1, y: 2 })
+    expect(svc.createWithId).not.toHaveBeenCalled()
+    expect(svc.moveToCanvas).toHaveBeenCalled()
   })
 })

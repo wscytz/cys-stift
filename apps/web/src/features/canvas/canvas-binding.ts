@@ -21,6 +21,7 @@ import type {
   CanvasId,
   CanvasPosition,
   CardService,
+  CaptureSource,
 } from '@cys-stift/domain'
 import type { CanvasElement, CanvasHost } from '@cys-stift/canvas-engine'
 
@@ -268,4 +269,59 @@ export function updateCardShape(host: CanvasHost, card: Card): void {
 export function removeCardShape(host: CanvasHost, cardId: CardId): void {
   if (!host.getElement(String(cardId))) return
   host.applyWithoutEcho(() => host.remove(String(cardId)))
+}
+
+/**
+ * Create a card on the canvas at (x, y). Shared by DSL paste (opts.id given,
+ * title may be empty) and right-click create (no opts.id, title from input).
+ * Invariant preserved: element id === CardId.
+ *
+ * - opts.id given (DSL path):
+ *   - already in service → moveToCanvas (geometry update only, no rebuild).
+ *   - not present         → createWithId (mint the supplied id).
+ *   - host missing element → upsert cardToElement (no-echo) so the canvas shows it.
+ * - opts.id absent (right-click path):
+ *   - service.create mints the id; addCardShape adds it to the host.
+ */
+export function createCardOnCanvas(
+  service: CardService,
+  host: CanvasHost,
+  canvasId: CanvasId,
+  opts: { id?: string; title: string; x: number; y: number; w?: number; h?: number },
+): Card {
+  const w = opts.w ?? DEFAULT_W
+  const h = opts.h ?? DEFAULT_H
+  const pos: CanvasPosition = {
+    canvasId,
+    x: opts.x,
+    y: opts.y,
+    w,
+    h,
+    z: 0,
+    rotation: 0,
+  }
+  const source = { kind: 'manual', deviceId: 'web' } as CaptureSource
+
+  if (opts.id) {
+    const existing = service.get(opts.id as CardId)
+    if (existing) {
+      service.moveToCanvas(opts.id as CardId, pos)
+    } else {
+      service.createWithId(opts.id as CardId, {
+        title: opts.title,
+        source,
+        canvasPosition: pos,
+      })
+    }
+    // host may not yet have the element (e.g. brand-new card, or restored card
+    // whose element was pruned) — ensure the canvas shows it.
+    if (!host.getElement(opts.id)) {
+      host.applyWithoutEcho(() => host.upsert(cardToElement(service.get(opts.id as CardId)!)))
+    }
+    return service.get(opts.id as CardId)!
+  }
+
+  const card = service.create({ title: opts.title, source, canvasPosition: pos })
+  addCardShape(host, card)
+  return card
 }
