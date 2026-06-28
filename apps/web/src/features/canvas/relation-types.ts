@@ -24,11 +24,11 @@ import type { MessageKey } from '@/lib/i18n/messages'
 // black/grey)——不再带 tldraw 调色板的 green/light-*/orange/violet(那些既无对应
 // 设计 token,也违反「6 原色」铁律)。dash/arrowhead 现已由 Canvas 2D arrow 渲染
 // (语义三维签名:线型 + 箭头形 + 颜色)。
-export type ArrowColor = 'black' | 'blue' | 'red' | 'grey'
+export type ArrowColor = 'black' | 'blue' | 'red' | 'grey' | 'yellow'
 export type ArrowDash = 'solid' | 'dashed' | 'dotted'
 export type ArrowArrowhead = 'arrow' | 'triangle' | 'none'
 
-export type RelationTypeId = 'blocks' | 'references' | 'derived-from' | 'related-to'
+export type RelationTypeId = 'blocks' | 'references' | 'derived-from' | 'related-to' | 'embeds'
 
 export interface RelationType {
   id: RelationTypeId
@@ -79,6 +79,15 @@ export const RELATION_TYPES: RelationType[] = [
     arrowhead: 'arrow',
     labelColor: 'grey',
     swatch: 'var(--color-gray)',
+  },
+  {
+    id: 'embeds',
+    labelKey: 'relation.embeds',
+    color: 'yellow',
+    dash: 'dotted',
+    arrowhead: 'none',
+    labelColor: 'yellow',
+    swatch: 'var(--color-yellow)',
   },
 ]
 

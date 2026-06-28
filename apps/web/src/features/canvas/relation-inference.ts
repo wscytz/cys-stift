@@ -19,6 +19,8 @@ const KEYWORDS: Record<RelationType['id'], string[]> = {
   references: ['引用', 'reference', 'ref', 'see also', '参见', '链接', 'link'],
   'derived-from': ['衍生', '派生', 'derived', 'based on', '出自从', '源自', 'from'],
   'related-to': ['相关', 'related', 'similar', '类似', '关联'],
+  // embeds 由块引用 ((标题)) 物化产生,签名明确,不靠关键词推断(空词表 → 永不命中)。
+  embeds: [],
 }
 
 export function inferRelationTypeFromContext(

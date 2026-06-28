@@ -299,6 +299,7 @@ export const messages = {
   'relation.references': { zh: '引用', en: 'References' },
   'relation.derivedFrom': { zh: '衍生自', en: 'Derived from' },
   'relation.relatedTo': { zh: '相关', en: 'Related to' },
+  'relation.embeds': { zh: '嵌入', en: 'Embeds' },
   'relation.custom': { zh: '自定义', en: 'Custom' },
   'relation.cardArrows': { zh: '× {n}', en: '× {n}' },
   'relation.inferred': { zh: '已推断: {type}', en: 'Inferred: {type}' },
