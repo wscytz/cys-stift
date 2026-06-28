@@ -205,6 +205,22 @@ export function bindCardWriteback(
         const z = pos?.z ?? 0
         service.moveToCanvas(cardId, elementToCardPosition(el, canvasId, z))
       }
+      // ── DB → host 方向(修撤销卡复活):DB 有本画布的卡但 host 没有 ──
+      // 触发场景:undo 把卡从 host 撤掉,但 DB 仍 canvasPosition@本画布(undo 走
+      // applyWithoutEcho,onUserChange 不触发,writeback 没清 DB)→ 不处理的话下次
+      // syncCardsToEditor 读 DB wantedIds 含此卡 → upsert 回 host → 幽灵卡复活。
+      // 解法:反向差集 → removeFromCanvas 回 inbox。与上面 moveToCanvas(host 有 DB 无)
+      // 配对:undo = remove,redo = move 回,闭环幂等。归档/软删卡跳过(归档卡本就不
+      // 在 host;软删卡 deletedAt 已设,listOnCanvas 是否含取决于 repo,统一跳过)。
+      const hostCardIds = new Set(
+        host.getElements().filter((e) => e.kind === 'card').map((e) => e.id),
+      )
+      for (const card of service.listOnCanvas(canvasId)) {
+        if (card.deletedAt || card.archived) continue
+        if (!hostCardIds.has(String(card.id))) {
+          service.removeFromCanvas(card.id)
+        }
+      }
     })
   }
   const unsubHistory = host.onHistoryChange?.(reconcileHistory) ?? (() => {})

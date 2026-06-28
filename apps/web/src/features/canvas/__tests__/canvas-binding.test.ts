@@ -313,6 +313,127 @@ describe('bindCardWriteback: undo reconciles DB canvasPosition (no desync)', () 
 })
 
 /**
+ * 撤销卡复活回归(P0):undo 把卡从 host 撤掉,但 undo 走 applyWithoutEcho →
+ * onUserChange 不触发 → writeback 没清 DB canvasPosition → DB 仍记录此卡在本画布,
+ * 但 host 无元素。下次任意 syncCardsToEditor 读 DB wantedIds 含此卡 → upsert 回
+ * host → 幽灵卡复活。
+ *
+ * 解法:reconcileHistory 在现有 host→DB 遍历后追加 DB→host 反向差集:DB 有本画布的
+ * 卡但 host 没有 → removeFromCanvas(回 inbox)。与现有 host 有 DB 无 → moveToCanvas
+ * 配对:undo = remove,redo = move 回,闭环幂等。
+ *
+ * 这里用 mock host(手动 fireHistoryChange)+ vi.fn service,聚焦 reconcileHistory 逻辑。
+ * 真实 InMemoryCanvasHost.undo() 恢复完整快照,不适合表达单卡撤销的不一致状态。
+ */
+function makeMockHost(): {
+  host: import('@cys-stift/canvas-engine').CanvasHost
+  fireHistoryChange: () => void
+} {
+  let historyCb: (() => void) | null = null
+  const host = {
+    getElements: vi.fn(() => [] as import('@cys-stift/canvas-engine').CanvasElement[]),
+    getElement: vi.fn(() => undefined),
+    upsert: vi.fn(),
+    remove: vi.fn(),
+    applyWithoutEcho: vi.fn((fn: () => void) => fn()),
+    onUserChange: vi.fn(() => () => {}),
+    onHistoryChange: vi.fn((cb: () => void) => {
+      historyCb = cb
+      return () => {
+        historyCb = null
+      }
+    }),
+  } as unknown as import('@cys-stift/canvas-engine').CanvasHost
+  return { host, fireHistoryChange: () => historyCb?.() }
+}
+
+function makeMockServiceForReconcile(): CardService {
+  return {
+    get: vi.fn(),
+    listOnCanvas: vi.fn(() => []),
+    moveToCanvas: vi.fn(),
+    removeFromCanvas: vi.fn(),
+  } as unknown as CardService
+}
+
+describe('reconcileHistory — undo removes orphan DB card (reverse diff)', () => {
+  it('removeFromCanvas when DB has card on canvas but host does not (undo path)', () => {
+    const { host, fireHistoryChange } = makeMockHost()
+    const svc = makeMockServiceForReconcile()
+    // 模拟 undo 后状态:host 空,DB 有一张本画布的卡(u1)
+    ;(svc.listOnCanvas as ReturnType<typeof vi.fn>).mockReturnValue([
+      { id: 'u1', canvasPosition: { canvasId: 'default-canvas' } },
+    ])
+    ;(svc.get as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'u1',
+      canvasPosition: { canvasId: 'default-canvas' },
+    }) // 非归档非软删
+    ;(host.getElements as ReturnType<typeof vi.fn>).mockReturnValue([]) // undo 把卡从 host 撤掉了
+
+    const unbind = bindCardWriteback(host, svc, 'default-canvas' as never)
+    fireHistoryChange() // 触发 reconcileHistory
+
+    expect(svc.removeFromCanvas).toHaveBeenCalledWith('u1')
+
+    unbind()
+  })
+
+  it('does not removeFromCanvas when host has the card (normal edit, no-op)', () => {
+    const { host, fireHistoryChange } = makeMockHost()
+    const svc = makeMockServiceForReconcile()
+    ;(svc.listOnCanvas as ReturnType<typeof vi.fn>).mockReturnValue([
+      { id: 'u1', canvasPosition: { canvasId: 'default-canvas' } },
+    ])
+    ;(host.getElements as ReturnType<typeof vi.fn>).mockReturnValue([
+      { id: 'u1', kind: 'card', x: 0, y: 0, w: 240, h: 120, rotation: 0 },
+    ])
+
+    const unbind = bindCardWriteback(host, svc, 'default-canvas' as never)
+    fireHistoryChange()
+
+    expect(svc.removeFromCanvas).not.toHaveBeenCalled()
+
+    unbind()
+  })
+
+  it('skips archived cards in the reverse diff', () => {
+    const { host, fireHistoryChange } = makeMockHost()
+    const svc = makeMockServiceForReconcile()
+    ;(svc.listOnCanvas as ReturnType<typeof vi.fn>).mockReturnValue([
+      { id: 'u1', archived: true, canvasPosition: { canvasId: 'default-canvas' } },
+    ])
+    ;(host.getElements as ReturnType<typeof vi.fn>).mockReturnValue([])
+
+    const unbind = bindCardWriteback(host, svc, 'default-canvas' as never)
+    fireHistoryChange()
+
+    expect(svc.removeFromCanvas).not.toHaveBeenCalled()
+
+    unbind()
+  })
+
+  it('skips soft-deleted cards in the reverse diff', () => {
+    const { host, fireHistoryChange } = makeMockHost()
+    const svc = makeMockServiceForReconcile()
+    ;(svc.listOnCanvas as ReturnType<typeof vi.fn>).mockReturnValue([
+      {
+        id: 'u1',
+        deletedAt: new Date(),
+        canvasPosition: { canvasId: 'default-canvas' },
+      },
+    ])
+    ;(host.getElements as ReturnType<typeof vi.fn>).mockReturnValue([])
+
+    const unbind = bindCardWriteback(host, svc, 'default-canvas' as never)
+    fireHistoryChange()
+
+    expect(svc.removeFromCanvas).not.toHaveBeenCalled()
+
+    unbind()
+  })
+})
+
+/**
  * createCardOnCanvas(v0.x):「在画布上 (x,y) 建卡」共用建卡函数,供 DSL paste
  * (传 id,title 空)与右键建卡(不传 id)共用。保持「元素 id === CardId」不变量。
  */
