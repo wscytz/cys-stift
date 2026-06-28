@@ -104,6 +104,11 @@ export default function GraphPage() {
           card={detail}
           actions={['archive', 'softDelete', 'sendToCanvas', 'pin']}
           onClose={() => setDetail(null)}
+          // BR-T5 — 注入全局边 + 卡标题查询,让详情里显示跨画布 backlinks 区。
+          // onJumpToCard 第一版:关闭 modal(图谱内高亮节点留 2b)。
+          globalEdges={edges}
+          getCardTitle={(id) => service.get(id as CardId)?.title}
+          onJumpToCard={() => setDetail(null)}
           onSave={(patch) => {
             const updated = service.update(detail.id, patch)
             if (updated) setDetail(updated)

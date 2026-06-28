@@ -18,6 +18,8 @@ import { useI18n } from '@/lib/i18n'
 import { safeHref } from '@/lib/safe-href'
 import { typeKeyOf } from '@/lib/type-label'
 import { findBacklinks } from './backlinks'
+import { resolveCardByTitle } from './embed-links'
+import { useDb } from '@/lib/db-client'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 
 export function CardDetailModal({
@@ -47,6 +49,16 @@ export function CardDetailModal({
   onJumpToCard?: (cardId: string) => void
 }) {
   const { t } = useI18n()
+  // BR-T5 — 块引用嵌入:((标题)) → 目标卡 body/title。useDb 拿 service 解析,
+  // 这样画布版正文也支持嵌入(与共享版口径一致)。
+  const { service } = useDb()
+  const resolveEmbed = (title: string): { body: string; title: string } | null => {
+    const id = resolveCardByTitle(service.listAll(), title)
+    if (!id) return null
+    const c = service.get(id)
+    if (!c) return null
+    return { body: c.body, title: c.title }
+  }
   // A card opened with no title (freshly created via double-click) opens in edit.
   const [mode, setMode] = useState<'view' | 'edit'>(card.title ? 'view' : 'edit')
   const [title, setTitle] = useState(card.title)
@@ -117,7 +129,7 @@ export function CardDetailModal({
                   {card.capturedAt.toISOString().slice(0, 19).replace('T', ' ')}
                 </span>
               </div>
-              <MarkdownBody source={card.body} />
+              <MarkdownBody source={card.body} resolveEmbed={resolveEmbed} />
               {card.links.length > 0 && (
                 <section className="cd__sec">
                   <h3 className="eyebrow">{t('card.detail.links')}</h3>

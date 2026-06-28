@@ -25,6 +25,7 @@ import { autoRelate } from '@/features/canvas/auto-relate'
 import { CanvasContextMenu } from '@/features/canvas/canvas-context-menu'
 import { CanvasEmptyMotif } from '@/features/canvas/canvas-empty-motif'
 import { syncWikiLinkArrows } from '@/features/canvas/wiki-links'
+import { syncEmbedArrows, resolveCardByTitle } from '@/features/canvas/embed-links'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { parseDsl, parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
 import { streamText } from '@/features/ai/stream-text'
@@ -853,6 +854,20 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
               })
               if (created > 0 || removed > 0) {
                 pushToast({ kind: 'info', message: t('canvas.wikiLinked', { created: String(created), removed: String(removed) }) })
+              }
+            }
+            // BR-T5 块引用同步:画布上编辑卡 body 保存后,解析 ((标题)) 自动建/删
+            // embeds 箭头。与 wikilink 同分支(wikiLinks 已 toast;embeds 仅在
+            // 有变更时单独 toast,口径一致)。
+            if (updated && handle.current.adapter && patch.body !== undefined) {
+              const emb = syncEmbedArrows({
+                host: handle.current.adapter,
+                getCardTitle: (id) => service.get(id as CardId)?.title,
+                sourceCardId: effectiveDetail.card.id,
+                body: patch.body,
+              })
+              if (emb.created > 0 || emb.removed > 0) {
+                pushToast({ kind: 'info', message: t('canvas.embedLinked', { created: String(emb.created), removed: String(emb.removed) }) })
               }
             }
           }}

@@ -315,6 +315,7 @@ export const messages = {
   'canvas.autoRelateDone': { zh: '已创建 {n} 条 AI 关系', en: 'Created {n} AI relations' },
   'canvas.autoRelateNone': { zh: '未找到可推断的关系', en: 'No inferable relations' },
   'canvas.wikiLinked': { zh: '双链:建 {created} 删 {removed}', en: 'Wiki-links: {created} created, {removed} removed' },
+  'canvas.embedLinked': { zh: '块引用:建 {created} 删 {removed}', en: 'Embeds: {created} created, {removed} removed' },
   'canvas.minimap': { zh: '鸟瞰', en: 'Overview' },
   'canvas.minimapExpand': { zh: '展开小地图', en: 'Expand minimap' },
   'canvas.minimapCollapse': { zh: '折叠小地图', en: 'Collapse minimap' },

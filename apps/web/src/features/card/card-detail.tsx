@@ -67,6 +67,10 @@ import { useI18n } from '@/lib/i18n'
 import { typeKeyOf } from '@/lib/type-label'
 import { downloadCardMarkdown } from '@/lib/export-card'
 import { pushToast } from '@/lib/toast-store'
+import { useDb } from '@/lib/db-client'
+import { resolveCardByTitle } from '@/features/canvas/embed-links'
+import type { GraphEdge } from '@/features/graph/aggregate-edges'
+import type { MessageKey } from '@/lib/i18n/messages'
 import { useAIEnabled, isAIReady, getCurrentAI } from '@/features/ai/ai-settings-provider'
 import { AIPopover } from '@/features/ai/ai-popover'
 import { AiSetupCard } from '@/features/ai/ai-setup-card'
@@ -118,6 +122,14 @@ export interface CardDetailModalProps {
    *  to create cards (that needs the active CardService), so the consumer
    *  wires it. Optional — if omitted the button is disabled. */
   onAIAppendNew?: (card: { title: string; body: string }) => void
+  /** BR-T5 — 全局关系边(跨所有画布聚合)。有传才显示 backlinks 区。
+   *  由 graph/inbox 等页用 useGlobalEdges() 注入;不传 = 向后兼容,
+   *  backlinks 区不渲染。 */
+  globalEdges?: GraphEdge[]
+  /** 查对方卡 title(从 CardService)。globalEdges 非空时用。 */
+  getCardTitle?: (id: string) => string | undefined
+  /** 点 backlink 跳转到对方卡(由调用方决定行为:关闭 modal / 选中节点等)。 */
+  onJumpToCard?: (cardId: string) => void
 }
 
 export function CardDetailModal({
@@ -132,8 +144,22 @@ export function CardDetailModal({
   onTogglePin,
   onConfirmDelete,
   onAIAppendNew,
+  globalEdges,
+  getCardTitle,
+  onJumpToCard,
 }: CardDetailModalProps) {
   const { t } = useI18n()
+  // BR-T5 — 共享版自动支持块引用嵌入:resolveEmbed 从 useDb 的 service 解析
+  // ((标题)) → 目标卡 body/title。所有用 CardDetailModal 的地方都免费拿到嵌入,
+  // 无需调用方传。useDb 在 SSR 返回稳定空快照,client 端拿到真实 service。
+  const { service } = useDb()
+  const resolveEmbed = (title: string): { body: string; title: string } | null => {
+    const id = resolveCardByTitle(service.listAll(), title)
+    if (!id) return null
+    const c = service.get(id)
+    if (!c) return null
+    return { body: c.body, title: c.title }
+  }
   const [mode, setMode] = useState<'view' | 'edit'>(initialMode)
   const [title, setTitle] = useState(card.title)
   const [body, setBody] = useState(card.body)
@@ -298,7 +324,44 @@ export function CardDetailModal({
                   {card.capturedAt.toISOString().slice(0, 19).replace('T', ' ')}
                 </span>
               </div>
-              <MarkdownBody source={card.body} />
+              <MarkdownBody source={card.body} resolveEmbed={resolveEmbed} />
+              {/* BR-T5 — 全局 backlinks 区:有传 globalEdges 才显示。按 card.id 过滤
+                  出/入边,复用 cd__backlink 样式(与 canvas 版一致)。 */}
+              {globalEdges && getCardTitle && (() => {
+                const incoming = globalEdges.filter((e) => e.to === card.id)
+                const outgoing = globalEdges.filter((e) => e.from === card.id)
+                const total = incoming.length + outgoing.length
+                if (total === 0) return null
+                const renderEdge = (e: GraphEdge, dir: 'in' | 'out') => {
+                  const otherId = dir === 'in' ? e.from : e.to
+                  const title = getCardTitle(otherId) ?? t('card.detail.untitledCard')
+                  const relLabel = e.relationType
+                    ? t(e.relationType.labelKey as MessageKey)
+                    : t('card.detail.relatedUntyped')
+                  return (
+                    <li key={e.arrowId} className="cd__backlink">
+                      <button
+                        type="button"
+                        className="cd__backlink-btn"
+                        onClick={() => onJumpToCard?.(otherId)}
+                        title={t(dir === 'in' ? 'card.detail.backlinkJumpIn' : 'card.detail.backlinkJumpOut')}
+                      >
+                        <span className="cd__backlink-dir" aria-hidden="true">{dir === 'in' ? '←' : '→'}</span>
+                        <span className="cd__backlink-title">{title}</span>
+                        <span className="cd__backlink-rel">{relLabel}</span>
+                      </button>
+                    </li>
+                  )
+                }
+                return (
+                  <Section label={t('card.detail.backlinks')}>
+                    <ul className="cd__backlinks">
+                      {incoming.map((e) => renderEdge(e, 'in'))}
+                      {outgoing.map((e) => renderEdge(e, 'out'))}
+                    </ul>
+                  </Section>
+                )
+              })()}
               {card.media.length > 0 && (
                 <Section label={t('card.detail.media')}>
                   <ul className="cd__media-list">
@@ -751,6 +814,14 @@ const styles = `
 .cd__links { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
 .cd__links a { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
 .cd__links a:hover { color: var(--color-black); }
+/* BR-T5 — backlinks 区(与 canvas 版 card-detail-modal.tsx 对齐)。 */
+.cd__backlinks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.cd__backlink-btn { display: flex; align-items: center; gap: var(--space-1); width: 100%; text-align: left; padding: 4px var(--space-1); background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black); transition: background 80ms ease-out, border-color 80ms ease-out; }
+.cd__backlink-btn:hover { background: var(--color-gray-soft); border-color: var(--color-gray-soft); }
+.cd__backlink-btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.cd__backlink-dir { color: var(--color-gray); font-family: var(--font-mono); flex: 0 0 auto; }
+.cd__backlink-title { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd__backlink-rel { flex: 0 0 auto; font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-gray); }
 
 .cd__code { border: var(--border-hairline); }
 .cd__code-lang { background: var(--color-gray-soft); padding: 2px var(--space-1); font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); border-bottom: var(--border-hairline); }
