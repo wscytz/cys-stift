@@ -109,6 +109,11 @@ export default function GraphPage() {
           globalEdges={edges}
           getCardTitle={(id) => service.get(id as CardId)?.title}
           onJumpToCard={() => setDetail(null)}
+          // RB-T3 — graph 页有 useGlobalEdges + service.listAll,放开详情页建/删关系。
+          // allCards 含已删,picker 内部过滤 !deletedAt。建/删走 relation-builder
+          // (写 default canvas 的 freeform store),乐观更新见 card-detail 的 localEdges。
+          allCards={service.listAll()}
+          canEditRelations={true}
           onSave={(patch) => {
             const updated = service.update(detail.id, patch)
             if (updated) setDetail(updated)

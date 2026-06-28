@@ -75,6 +75,10 @@ import { useAIEnabled, isAIReady, getCurrentAI } from '@/features/ai/ai-settings
 import { AIPopover } from '@/features/ai/ai-popover'
 import { AiSetupCard } from '@/features/ai/ai-setup-card'
 import { AiActionMenu } from '@/features/ai/ai-action-menu'
+// RB-T3 — 详情页建/删关系(graph 页接入):picker + builder + default canvas 常量。
+import { RelationPicker } from './relation-picker'
+import { addRelation, removeRelation } from '@/features/canvas/relation-builder'
+import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 
 export type CardDetailAction =
   | 'archive'
@@ -130,6 +134,14 @@ export interface CardDetailModalProps {
   getCardTitle?: (id: string) => string | undefined
   /** 点 backlink 跳转到对方卡(由调用方决定行为:关闭 modal / 选中节点等)。 */
   onJumpToCard?: (cardId: string) => void
+  /** RB-T3 — 全部卡(含已删;picker 内部过滤)。canEditRelations 时 picker 用。
+   *  不传 = 无「添加关系」入口,向后兼容(inbox/archive 等原行为)。 */
+  allCards?: Card[]
+  /** RB-T3 — 是否允许在详情页建/删关系。默认 false。仅 graph 页传 true
+   *  (它有 useGlobalEdges + service.listAll)。为 false 时:
+   *  - backlinks 区只读(无 × 删除按钮、无 notOnDefaultCanvas 提示);
+   *  - 无「添加关系」按钮。 */
+  canEditRelations?: boolean
 }
 
 export function CardDetailModal({
@@ -147,6 +159,8 @@ export function CardDetailModal({
   globalEdges,
   getCardTitle,
   onJumpToCard,
+  allCards,
+  canEditRelations = false,
 }: CardDetailModalProps) {
   const { t } = useI18n()
   // BR-T5 — 共享版自动支持块引用嵌入:resolveEmbed 从 useDb 的 service 解析
@@ -176,6 +190,14 @@ export function CardDetailModal({
   const [tags, setTags] = useState<TagRef[]>(card.tags)
   const [tagInput, setTagInput] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  // RB-T3 — 关系建/删的乐观更新:backlinks 区渲染用 localEdges(不是 globalEdges),
+  // 这样建/删后立刻可见,无需等 useGlobalEdges 重新聚合。globalEdges 变化时同步。
+  const [localEdges, setLocalEdges] = useState<GraphEdge[]>(globalEdges ?? [])
+  useEffect(() => {
+    setLocalEdges(globalEdges ?? [])
+  }, [globalEdges])
+  // RB-T3 — 「添加关系」picker 弹层(用 Modal 包)。
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   // M3 — AI entry state. The single ✨ AI button toggles:
   //   null           → entry closed
@@ -325,19 +347,43 @@ export function CardDetailModal({
                 </span>
               </div>
               <MarkdownBody source={card.body} resolveEmbed={resolveEmbed} />
-              {/* BR-T5 — 全局 backlinks 区:有传 globalEdges 才显示。按 card.id 过滤
-                  出/入边,复用 cd__backlink 样式(与 canvas 版一致)。 */}
+              {/* BR-T5 / RB-T3 — 全局 backlinks 区:有传 globalEdges 才显示。按
+                  card.id 过滤出/入边,复用 cd__backlink 样式(与 canvas 版一致)。
+                  RB-T3:canEditRelations 时每条 default-canvas 上的边带 × 删除按钮
+                  (→ removeRelation → 乐观从 localEdges 移除);非 default 画布上的
+                  边显示 notOnDefaultCanvas 提示(删要回画布,这里删不掉)。区底部
+                  canEditRelations && allCards 时有「添加关系」按钮 → 打开 picker。
+                  渲染用 localEdges(globalEdges 的本地副本),让乐观更新可见。 */}
               {globalEdges && getCardTitle && (() => {
-                const incoming = globalEdges.filter((e) => e.to === card.id)
-                const outgoing = globalEdges.filter((e) => e.from === card.id)
+                const incoming = localEdges.filter((e) => e.to === card.id)
+                const outgoing = localEdges.filter((e) => e.from === card.id)
                 const total = incoming.length + outgoing.length
-                if (total === 0) return null
+                // 没边且不允许添加 → 整个区不渲染(canEditRelations=false 的只读页保持原行为)。
+                if (total === 0 && !(canEditRelations && allCards)) return null
+                const handleRemove = async (edge: GraphEdge) => {
+                  // 乐观:先从 localEdges 移除,再异步落库。失败不回滚(graph 页
+                  // 会重新聚合 globalEdges 同步回来;失败时 store 已 save 抛错,
+                  // 这里的乐观视觉与 store 实际一致 —— removeRelation 内部按 id
+                  // filter,no-op 也不报错)。
+                  setLocalEdges((prev) => prev.filter((e) => e.arrowId !== edge.arrowId))
+                  try {
+                    await removeRelation(edge.arrowId)
+                  } catch (err) {
+                    console.error('[CardDetailModal] removeRelation failed', err)
+                    // 落库失败:回滚乐观移除,让 globalEdges 下次同步纠正。
+                    setLocalEdges(globalEdges ?? [])
+                  }
+                }
                 const renderEdge = (e: GraphEdge, dir: 'in' | 'out') => {
                   const otherId = dir === 'in' ? e.from : e.to
                   const title = getCardTitle(otherId) ?? t('card.detail.untitledCard')
                   const relLabel = e.relationType
                     ? t(e.relationType.labelKey as MessageKey)
                     : t('card.detail.relatedUntyped')
+                  // RB-T3 — 只 default canvas 上的边能在详情页删(关系活在 default
+                  // canvas 的 freeform store,见 relation-builder)。其它画布上的边
+                  // 显示提示,删要回对应画布。
+                  const removable = canEditRelations && e.canvasId === DEFAULT_CANVAS_ID
                   return (
                     <li key={e.arrowId} className="cd__backlink">
                       <button
@@ -350,6 +396,21 @@ export function CardDetailModal({
                         <span className="cd__backlink-title">{title}</span>
                         <span className="cd__backlink-rel">{relLabel}</span>
                       </button>
+                      {removable ? (
+                        <button
+                          type="button"
+                          className="cd__backlink-remove"
+                          onClick={() => { void handleRemove(e) }}
+                          aria-label={t('relation.remove')}
+                          title={t('relation.remove')}
+                        >
+                          ×
+                        </button>
+                      ) : canEditRelations ? (
+                        <span className="cd__backlink-hint" title={t('relation.notOnDefaultCanvas')}>
+                          {t('relation.notOnDefaultCanvas')}
+                        </span>
+                      ) : null}
                     </li>
                   )
                 }
@@ -359,6 +420,11 @@ export function CardDetailModal({
                       {incoming.map((e) => renderEdge(e, 'in'))}
                       {outgoing.map((e) => renderEdge(e, 'out'))}
                     </ul>
+                    {canEditRelations && allCards && (
+                      <Button variant="secondary" onClick={() => setPickerOpen(true)}>
+                        + {t('relation.add')}
+                      </Button>
+                    )}
                   </Section>
                 )
               })()}
@@ -742,6 +808,49 @@ export function CardDetailModal({
           </Button>
         </div>
       </Modal>
+
+      {/* RB-T3 — 「添加关系」picker 弹层。onConfirm 把 {targetId, type} 交给
+          addRelation(写 default canvas 的 freeform store)→ 拿回 arrow id →
+          构造乐观 GraphEdge push 到 localEdges(立刻可见)→ 关 picker。 */}
+      {pickerOpen && allCards && (
+        <Modal
+          open
+          onClose={() => setPickerOpen(false)}
+          title={t('relation.add')}
+        >
+          <RelationPicker
+            currentCardId={String(card.id)}
+            allCards={allCards}
+            onCancel={() => setPickerOpen(false)}
+            onConfirm={async ({ targetId, type }) => {
+              try {
+                const arrowId = await addRelation(String(card.id), String(targetId), type)
+                // 乐观 push:构造 GraphEdge,签名取自选中的 RelationType
+                // (color/dash/arrowhead),与 aggregateEdges 从箭头反推的签名一致,
+                // 画布打开后 inferRelationType 能正确反推。from=当前卡,to=目标卡。
+                const optimisticEdge: GraphEdge = {
+                  from: String(card.id),
+                  to: String(targetId),
+                  canvasId: DEFAULT_CANVAS_ID,
+                  relationType: type,
+                  isWikilink: false,
+                  arrowId,
+                  signature: {
+                    color: type.color,
+                    dash: type.dash,
+                    arrowhead: type.arrowhead,
+                  },
+                }
+                setLocalEdges((prev) => [...prev, optimisticEdge])
+              } catch (err) {
+                console.error('[CardDetailModal] addRelation failed', err)
+                pushToast({ kind: 'error', message: t('relation.add') })
+              }
+              setPickerOpen(false)
+            }}
+          />
+        </Modal>
+      )}
     </>
   )
 }
@@ -822,6 +931,25 @@ const styles = `
 .cd__backlink-dir { color: var(--color-gray); font-family: var(--font-mono); flex: 0 0 auto; }
 .cd__backlink-title { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cd__backlink-rel { flex: 0 0 auto; font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-gray); }
+/* RB-T3 — backlinks 区的 × 删除按钮(default canvas 上的边可删)与「在画布上删除」
+   提示(其它画布上的边不能在详情删)。× 复用 le__remove 的硬偏移风格,贴在 row 右侧。 */
+.cd__backlink-remove {
+  appearance: none; -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 24px; height: 24px;
+  background: transparent; color: var(--color-black);
+  border: 1px solid transparent;
+  font-family: var(--font-mono); font-size: var(--font-size-sm);
+  line-height: 1; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.cd__backlink-remove:hover { background: var(--color-red); color: var(--color-white); border-color: var(--color-red); }
+.cd__backlink-remove:focus-visible { outline: 2px solid var(--color-red); outline-offset: 1px; }
+.cd__backlink-hint {
+  flex: 0 0 auto;
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  color: var(--color-gray); text-transform: none; letter-spacing: 0;
+}
 
 .cd__code { border: var(--border-hairline); }
 .cd__code-lang { background: var(--color-gray-soft); padding: 2px var(--space-1); font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); border-bottom: var(--border-hairline); }
