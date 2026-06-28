@@ -8,46 +8,29 @@
  *
  * 静态导出:无 'use server' / API route;数据全走客户端 store。
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Toolbar } from '@cys-stift/ui'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
-import { useCanvases } from '@/lib/canvas-store'
-import { canvasFreeformStore } from '@/lib/canvas-freeform-store'
 import { useI18n } from '@/lib/i18n'
 import { PageLoading } from '@/components/page-loading'
 import { CardDetailModal } from '@/features/card/card-detail'
 import { GraphCanvas } from '@/features/graph/graph-canvas'
 import { GraphFilters } from '@/features/graph/graph-filters'
 import {
-  aggregateEdges,
   cardsToNodes,
   type GraphEdge,
 } from '@/features/graph/aggregate-edges'
+import { useGlobalEdges } from '@/features/graph/use-global-edges'
 import { filterGraph, type GraphFilter } from '@/features/graph/graph-filter'
 
 export default function GraphPage() {
   const { t } = useI18n()
   const { snap, service, ready } = useDb()
-  const { snapshot: canvasesSnap } = useCanvases()
 
-  // 异步聚合边:画布列表变化或 ready 时重跑。
-  const [edges, setEdges] = useState<GraphEdge[]>([])
-  const [loaded, setLoaded] = useState(false)
-  useEffect(() => {
-    let cancelled = false
-    setLoaded(false)
-    aggregateEdges(canvasesSnap.canvases, (id) => canvasFreeformStore.load(id)).then((es) => {
-      if (cancelled) return
-      setEdges(es)
-      setLoaded(true)
-    })
-    return () => {
-      cancelled = true
-    }
-    // canvasesSnap.canvases 是数组引用,store 变化即换实例。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, canvasesSnap.canvases])
+  // 异步聚合边(提升为 hook,供详情页 backlinks 共用)。
+  const { edges, loaded: edgesLoaded } = useGlobalEdges()
+  const loaded = ready && edgesLoaded
 
   // 节点:未软删的卡片。
   const nodes = useMemo(
