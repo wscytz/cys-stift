@@ -177,6 +177,21 @@ describe('searchCards', () => {
     const r = searchCards([card('1', 'Title')], '   ')
     expect(r).toHaveLength(1)
   })
+
+  it('缺字段的卡(老数据 tags/links/quotes/codeSnippets undefined)不崩', () => {
+    // 老数据/导入卡可能缺 tags 等数组字段 → buildSearchable 的 .map 崩
+    // (用户实测 n.tags.map 报错)。?? [] 兜底后应正常搜索,不抛。
+    const partial = {
+      ...card('1', 'hello world', 'searchable body'),
+      tags: undefined as unknown as never,
+      links: undefined as unknown as never,
+      quotes: undefined as unknown as never,
+      codeSnippets: undefined as unknown as never,
+    }
+    const r = searchCards([partial], 'hello')
+    expect(r).toHaveLength(1)
+    expect(r[0]!.card.id).toBe('1')
+  })
 })
 
 describe('bodySnippet', () => {

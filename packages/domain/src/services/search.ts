@@ -115,13 +115,15 @@ interface Searchable {
 }
 
 function buildSearchable(card: Card): Searchable {
+  // 老数据/导入卡可能缺字段(tags/links/codeSnippets/quotes === undefined),`.map` 会崩。
+  // ?? [] 兜底:缺字段当空数组,搜索该字段无命中(不崩)。对齐 card-detail 等处的防御。
   return {
     title: normalise(card.title),
     body: normalise(card.body),
-    tags: normalise(card.tags.map((t) => t.value).join(' ')),
-    links: normalise(card.links.map((l) => l.url).join(' ')),
-    code: normalise(card.codeSnippets.map((s) => s.code).join(' ')),
-    quotes: normalise(card.quotes.map((q) => q.text).join(' ')),
+    tags: normalise((card.tags ?? []).map((t) => t.value).join(' ')),
+    links: normalise((card.links ?? []).map((l) => l.url).join(' ')),
+    code: normalise((card.codeSnippets ?? []).map((s) => s.code).join(' ')),
+    quotes: normalise((card.quotes ?? []).map((q) => q.text).join(' ')),
   }
 }
 
