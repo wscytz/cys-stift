@@ -362,6 +362,8 @@ export const messages = {
   'canvas.autoLayoutTooFew': { zh: '画布上没有卡片可布局', en: 'No cards to lay out' },
   'canvas.autoLayoutDone': { zh: '已自动布局 {n} 张卡片', en: 'Auto-laid-out {n} cards' },
   'canvas.autoLayoutDonePartial': { zh: '已自动布局 {n} 张卡片(文本/矩形等未移动)', en: 'Auto-laid-out {n} cards (text/rect etc. untouched)' },
+  'canvas.focusMode': { zh: '焦点模式', en: 'Focus mode' },
+  'canvas.exitFocus': { zh: '退出焦点', en: 'Exit focus' },
   'canvas.overviewLede': { zh: '整画布鸟瞰——点击任意位置居中视口', en: 'Whole-canvas bird eye view — click anywhere to center' },
   'canvas.overviewEmpty': { zh: '画布上还没有元素', en: 'No elements on the canvas yet' },
   'canvas.outline.empty': { zh: '画布上还没有元素', en: 'No elements on the canvas yet' },

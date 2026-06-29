@@ -117,6 +117,9 @@ export default function CanvasPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [exportOpen, setExportOpen] = useState(false)
   const [outlineOpen, setOutlineOpen] = useState(false)
+  // 焦点模式(Batch A / 方向 5):隐藏所有 chrome(Toolbar/SideRail/Minimap/Outline),
+  // 只留画布 + 一个最小「退出」提示。整理/写作时减少干扰。⌘. 切入,Escape 退出。
+  const [focusMode, setFocusMode] = useState(false)
   const [dslOpen, setDslOpen] = useState(false)
   const [shortcutOpen, setShortcutOpen] = useState(false)
   const [diffOpen, setDiffOpen] = useState(false)
@@ -541,6 +544,16 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         }).catch(() => {})
         return
       }
+      // ⌘. / Ctrl+. 切换焦点模式(隐藏所有 chrome,只留画布)。独立于下面的
+      // 工具键,需在 modal 让位前处理吗?— 不需要:modal 开时也不该切焦点,
+      // 放下方 modal 让位之后即可。但要在 input/textarea 让位前(编辑态按 ⌘. 不切)。
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key === '.') {
+        const tgt = e.target as HTMLElement | null
+        if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return
+        e.preventDefault()
+        setFocusMode((m) => !m)
+        return
+      }
       // 模态打开时画布快捷键全部让位(CardDetailModal/DSL/Export/Diff/Overview/Shortcut),
       // 否则模态里按 +/g/v 等会在背后偷改画布视图/工具。
       if (document.querySelector('[role="dialog"][aria-modal="true"]')) return
@@ -551,6 +564,8 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return
       const key = e.key.toLowerCase()
+      // 焦点模式 Escape 优先退出(否则 Escape 给引擎取消选区)。
+      if (key === 'escape' && focusMode) { e.preventDefault(); setFocusMode(false); return }
       // 工具切换:v 选 / p 画 / e 擦 / t 文 / c 连
       if (key === 'v') { e.preventDefault(); setTool('select') }
       else if (key === 'p') { e.preventDefault(); setTool('freedraw') }
@@ -564,7 +579,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [zoomBy, toggleSnap, t])
+  }, [zoomBy, toggleSnap, t, focusMode])
 
   // BUG-A:applyLayout 的 onCardCreate 回调——create 类 op 落库为真实 Card。
   // 走 createCardOnCanvas(service, adapter, activeCanvasId, ...),复用 createWithId,
@@ -840,8 +855,9 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       : null
 
   return (
-    <main id="main" tabIndex={-1} className="page">
+    <main id="main" tabIndex={-1} className={`page${focusMode ? ' page--focus' : ''}`}>
       <h1 className="sr-only">{t('canvas.crumb')}</h1>
+      {!focusMode && (
       <Toolbar region="canvas">
         <CanvasSwitcher
           canvases={canvases}
@@ -925,6 +941,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           </>
         )}
       </Toolbar>
+      )}
 
       <div className={`cv-host cv-host--${tool}`} onContextMenu={(e) => {
         e.preventDefault()
@@ -961,6 +978,8 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         )}
         <RelationPanel host={adapter} canvasEl={canvasElRef.current} />
         <FreedrawPanel host={adapter} canvasEl={canvasElRef.current} />
+        {!focusMode && (
+        <>
         <CanvasSideRail
           aiEnabled={aiEnabled}
           aiBusy={aiBusy}
@@ -999,6 +1018,21 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           />
         )}
         <Minimap host={adapter} canvasEl={canvasElRef.current} />
+        </>
+        )}
+        {/* 焦点模式:画布占满,顶部留最小退出提示(Esc 或点)。RelationPanel/FreedrawPanel
+            是选中触发的浮面板,焦点模式下保留(用户整理时仍需看关系/手绘信息)。 */}
+        {focusMode && (
+          <button
+            type="button"
+            className="cv-focus-exit"
+            onClick={() => setFocusMode(false)}
+            aria-label={t('canvas.exitFocus')}
+            title={t('canvas.exitFocus')}
+          >
+            {t('canvas.exitFocus')} · Esc
+          </button>
+        )}
       </div>
 
       <Modal open={creatingName !== null} onClose={() => setCreatingName(null)} title={t('canvas.newModalTitle')}>
@@ -1495,6 +1529,19 @@ function RailButton({ label, short, icon, onClick, disabled, busy, busyTitle, ar
 
 const styles = `
 .page { height: calc(100vh - var(--app-menu-height)); display: flex; flex-direction: column; background: var(--color-white); color: var(--color-black); }
+/* 焦点模式:画布占满整个 page 高度(Toolbar 隐藏了),cv-host flex:1 撑开。 */
+.page--focus { }
+.page--focus .cv-host { flex: 1; }
+.cv-focus-exit {
+  position: absolute; top: var(--space-2); right: var(--space-2); z-index: 40;
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-white); color: var(--color-black);
+  border: var(--border-hairline); border-radius: var(--radius-sm);
+  cursor: pointer; opacity: 0.7;
+}
+.cv-focus-exit:hover { opacity: 1; border-color: var(--color-black); }
 /* 根据当前工具显示不同光标 — 让用户知道正在用 select/freedraw/eraser/text/connect 哪种模式 */
 .cv-host { position: relative; flex: 1; min-height: 0; }
 /* 橡皮光标:SVG 圆圈(28px),让用户看清擦除范围。其他工具保持 crosshair/text/cell。 */
