@@ -17,7 +17,9 @@
 
 下表列出了 AI 在做 **summarize / rewrite / translate / auto-relate / 画布排版 / 找相似(cluster)** 等动作时,会收到的字段。**未列出的字段一律不发送**。
 
-> **找相似(cluster,2026-06-23)**:读画布上多张卡的允许字段(同下表),让 AI 把近重复 / 相似卡分组,落成 `related-to` 关系箭头连接组内成员——**非破坏性**(只加关系,不合并、不删卡)。AI **看不到**卡的 `source.deviceId`、`media.dataUrl`(图片/PDF 二进制)、软删除卡;输出经白名单 id 校验(模型编造的 id 一律丢弃)。无 vision 模型(永久不做)。
+> **找相似(cluster,2026-06-23)**:读画布上多张卡的允许字段(同下表),让 AI 把近重复 / 相似卡分组,落成 `related-to` 关系箭头连接组内成员——**非破坏性**(只加关系,不合并、不删卡)。AI **看不到**卡的 `source.deviceId`、`media.dataUrl`(图片/PDF 二进制)、软删除卡;输出经白名单 id 校验(模型编造的 id 一律丢弃)。
+
+> **vision 模型(v0.38 修订)**:v0.30 曾决定"vision 永久不做",v0.38 修订为——vision 作为**附加能力放进实验室区,默认关闭**。未手动开启时,行为与"不做 vision"完全一致(见下文)。开启仍守 R2 铁律:`deviceId` / `apiKey` / 软删除卡永不进 vision prompt;默认 Ollama 本地 provider 即便开启也不外发。
 
 ### ✅ AI 可以看到的(默认)
 
@@ -47,11 +49,13 @@
 | 浏览器 localStorage 里的其他 key | AI 看不到 |
 | 操作系统 / 浏览器信息 | navigator.userAgent 等不上传 |
 
-### ❌ 多模态(图像理解)**不做**
+### ❌ 多模态(图像理解)默认不做
 
-cy's Stift **不**使用 GPT-4V / Claude Vision / 任何 vision 模型。你的图片卡:
+cy's Stift **默认不**使用 GPT-4V / Claude Vision / 任何 vision 模型。你的图片卡:
 - AI 只看得到"这是一张图"(元数据),**看不到图的内容**
 - 拖入 PDF / Word 时,M2.2 的 markitdownllm 已**本地**把文档转成 markdown 写到 `card.body` —— AI 读 markdown,看不到原文件二进制
+
+> **实验室区 vision 附加能力(v0.38)**:设置 → 实验室区可手动开启 vision(需二次确认门)。开启后仍守 R2:`deviceId` / `apiKey` / 软删除卡永不进 vision prompt;默认 Ollama 本地 provider 即便开启也不外发。**未开启时,行为与本节描述完全一致——不做任何图像理解。** vision 三能力(看图描述/画布视觉理解/图转 DSL)实装 defer,当前仅骨架。
 
 ### 📐 手绘 = 几何描述
 

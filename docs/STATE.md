@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.37.0。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.38.0(未 tag)。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 
@@ -28,7 +28,8 @@
 | v0.33.0 | 画布导出 SVG/PNG + `.cystift` 往返 | v0.33.0-canvas-export |
 | v0.33.1–v0.33.2 | AI 数据上下文 + AI 排版(DSL) | v0.33.1 / v0.33.2 |
 | v0.36.0 | 全文搜索增强(打分 + 摘要) | v0.36.0-search |
-| **v0.37.0** | **全量加固(第二个稳定版):真 bug 修复 + tsc 门禁 + 文档重构** | **v0.37.0** |
+| v0.37.0 | 全量加固(第二个稳定版):真 bug 修复 + tsc 门禁 + 文档重构 | v0.37.0 |
+| **v0.38.0** | **知识网络(graph/块引用/全局关系/详情建关系/命令面板/标签墙/⌘C)+ 白板专业度(对齐分布/模板/AI工作流)+ 打磨批(自动布局/焦点模式/模板导入/最近编辑跳转/跨画布backlinks/frame双击重命名/vision实验室骨架)** | *(未 tag,本地 main 领先)* |
 
 > v0.18–v0.21 版本号在历史中跳过(从 v0.17.0 直接进 v0.22.0),非缺失。
 > **v0.27.1-review-hardening 无独立 tag** — 该轮 hardening(rehydrateCards / parseCardsRaw / geometry reconcile / M1 label)的工作被折进 v0.31.0 重构(refactor v0.31.0-p1.2/p1.3,见 `docs/decisions/2026-06-21-v0.27.1-review-hardening.md`)。
@@ -106,18 +107,23 @@
 
 - **捕获**:全局快捷键 + Mini Input + 文件拖拽 + `.cystift` 文件拖回恢复
 - **inbox**:多媒介编辑(链接/代码/引用/媒体)+ 草稿自动保存 + 发送到画布
-- **canvas**:自研 Canvas 2D 自由画布(6 active kind:card/arrow/freedraw/text/rect/frame)+ 多画布 CRUD + 视图持久化 + 关系箭头(straight/curve/elbow + 手绘识别)+ 工具栏(选择/笔/橡皮/文本/连接)+ AI 排版(配 AI 才显,未配走引导卡)+ 导出(图片 SVG/PNG + Markdown + DSL 二级菜单)+ Outline/Minimap/全局缩略图三态 + 双链 [[]] 自动建箭头 + DSL 模态编辑器(转义)
+- **canvas**:自研 Canvas 2D 自由画布(6 active kind:card/arrow/freedraw/text/rect/frame)+ 多画布 CRUD + 视图持久化 + 关系箭头(straight/curve/elbow + 手绘识别)+ 工具栏(选择/笔/橡皮/文本/连接)+ AI 排版(配 AI 才显,未配走引导卡)+ 导出(图片 SVG/PNG + Markdown + DSL 二级菜单)+ Outline/Minimap/全局缩略图三态 + 双链 [[]] 自动建箭头 + DSL 模态编辑器(转义)+ **对齐分布 9 操作**(选中 ≥2)+ **画布模板**(4 预设 + 自建/导入)+ **AI 工作流模板**(聚类/关系/大纲)+ **自动布局**(dagre 分层,⇅ 按钮)+ **焦点模式**(⌘. 隐 chrome)+ **frame 双击重命名** + minimap 可拖拽
+- **graph**:全局图谱 `/graph` —— 语义三维签名力导向图(d3-force),跨画布消费已物化的双链/关系 arrow
 - **archive**:网格/时间轴 + 多选批量 + 详情 Modal
 - **trash**:软删恢复
 - **search**:全文检索(title 1.5x 权重 + body 摘要 + pinned 前置)
-- **settings**:快捷键自定义 + 导入/导出 + 暗色主题 + AI provider 配置
-- **标签**:10 色固定调色板,卡片标签 + 过滤
+- **命令面板**:⌘K 跳转项 + 卡片搜索 + **最近编辑跳转**(空 query 显 updatedAt 前 8,点卡智能开卡:在画布跳画布定位+开详情,否则开详情)
+- **标签**:10 色固定调色板,卡片标签 + 过滤 + **标签墙 `/tags`**(标签云 + 卡网格)
+- **关系网络**:块引用 `((标题))` 嵌入(embeds 关系)+ 详情建/删关系(relation-picker)+ 跨画布 backlinks(useGlobalEdges 聚合所有画布)
+- **settings**:快捷键自定义 + 导入/导出 + 暗色主题 + AI provider 配置 + **实验室区**(vision 附加能力,默认关,确认门)
 
 ## 下一步
 
 > **当前阶段:打磨期(2026-06-26 起)** — 主线 + P10 + UI/a11y/鲁棒三轮 + AI门槛/记录栏/canvas-UI 自适应批 全完成。
 > 判断"这一步该不该做"先读 **[`docs/development/polish-phase.md`](development/polish-phase.md)**(打磨 vs 修缝判据 + 反馈驱动流程 + 退出标准),而非"还有没有缝可修"。
 > 燃料 = 你手测的真实反馈(backlog A,当前空)。
+- **知识网络 + 白板专业度 + 打磨 Batch A/B(2026-06-28~29,v0.38.0)**:三批汇成 v0.38.0。**知识网络 Phase 1-3**(/graph 全局图谱 d3-force / `((标题))` 块引用嵌入 embeds 关系 / useGlobalEdges 跨画布聚合 / 详情 relation-picker 建删关系 / ⌘K 命令面板 + 最近编辑跳转 / `/tags` 标签墙 / ⌘C 选区 DSL)。**白板专业度 Phase 1**(applyAlign 对齐分布 9 操作纯函数 + 画布模板 4 预设+自建 + AI 工作流 3 预设)。**打磨 Batch A**(dagre 自动布局 ⇅ / ⌘. 焦点模式 / 模板导入 📥)。**打磨 Batch B**(B1 最近编辑跳转智能开卡 / B2 跨画布 backlinks / B3a frame 双击重命名;B3b 拖框 defer)。**产品 audit 修复**(老数据 `?? []` 兜底 / CRITICAL-2 软删卡嵌入穿透 / 标签对比度 / minimap 拖拽 / DSL 入口提级;HIGH-3 listOnCanvas 默认过滤经 review 判误判已回退,**勿重做**)。**vision 实验室骨架**(v0.30「永久不做」→ v0.38 修订为附加能力默认关 + 确认门 + `useVisionLabEnabled()` 代码守卫;R2 不破,三能力实装 defer)。测试全绿;build exit 0;.app/.dmg 已重建;**未 push**(本地 main 领先远程)。详见 changelog。
+
 - **橡皮可靠性加固 + 几何装饰重做(2026-06-27,eraser-reliability-and-motif-redesign)**:用户「三条线删不掉」→ 6 个 probe 证实引擎/web 都能删,真因是命中精度(线细+缩小)→ writing-plans + subagent 驱动 5 task 加固:`eraserHitTest` 线类 16px 宽松命中 + eraseAt 接入 + 圆圈光标(看清擦哪)+ 模式误选 toast(引导切全部)。另:用户不满意原 BauhausMotif(三形横排太散)→ 扩 overlap/linear/orbit 3 精致 variant(/design 展示),用户选 **overlap**(Kandinsky 重叠构图)落地 inbox/archive/trash 空状态(size 160),文案打磨有温度。PageLoading 已够好(克制骨架),路由 fade-in 风险>收益不改。canvas-engine 390(+3)/web 771 全绿;build exit 0。详见 changelog。
 - **画布交互打磨 + 系统化质量保障(2026-06-27,canvas-polish-and-qa-system)**:用户反馈「工具栏用不了/橡皮没有/minimap 不显示箭头」→ 修根因 → 滚雪球成 **subagent 四轮自查**(10 维,30+ 真 bug;**R2 隐私红线经独立审计零违规**)→ **系统化 UI 设计** → **长效验收机制**。**根因 bug**:#210 吸附失效(snap 从未实装,加 `GRID=8`+`snapCoord()` gate drag/方向键)/ #211 DSL 漂移(去 `Math.max(0,…)` 钳位)/ 橡皮连续擦除(erasing 态)/ minimap 箭头(`arrowEndpoints()` 解析)+ frame 漏画 + 侧栏遮挡。**四轮自查捞的**:#211 之外的 Infinity 钳位、Escape 卡模态(adapter preventDefault 反吞)、OPFS save/load 竞态、.cystift null 崩溃、pointercancel、工具栏裸样式(脚本替换失败)、gray WCAG 不达标(#8c8c8c→#666,3.22→5.5:1)、暗色画布 token 缺失、Toast/MiniInput z-index 倒置、adapter detach 漏 cancelAnimationFrame。**系统化**:`docs/design/design-system.md`(8 维规范)+ token 阶梯补全(space-0.5/shadow-lg/color-canvas)。**验收机制**:`docs/development/acceptance-plan.md`(三层 L0/L1/L2)+ `scripts/design-guard.sh`(5 条 grep 守卫)。**用户可感知**:橡皮拖擦/minimap 箭头+frame/工具栏按下缩放+黄底激活/v·p·e·t·c 键盘切工具/Escape 单次关模态/**暗色画布可读**/WCAG 达标。canvas-engine 379(+7)/web 771(+16) 全绿;build exit 0;守卫可跑。详见 changelog。
 - **AI 门槛降低 + 记录栏体验 + canvas UI 自适应(2026-06-27,产品定位落地批)**:联网竞品研究坐实楔子(本地+画布+开放文本 DSL 转义 无竞品),两根支柱(转义已产品化为 DslDialog、BYOM 含 Ollama 本地免费)代码里都是真的。短板是可见性/门槛。**#2 降低 AI 门槛**:card-detail 3 个分散 AI 按钮收敛成**永远可见**的 ✨ AI(不再被 aiEnabled 隐藏),经 `isAIReady()` 单闸门 → 未就绪 `AiSetupCard` 引导(高亮 Ollama 零成本)/ 就绪 `AiActionMenu`;canvas AI-layout 同路由;AI 设置面板重做成 provider 卡片 + 高级折叠;prompt 调优(locale 跟随)+ per-action temp/maxTokens。**#3 记录栏**:捕获秒存不变,成功 toast 带 `actions[]`(→画布/→归档/打开);首屏一次性 `seenCaptureHint` 提示;MiniInput 交互 hint 打磨。**canvas 工具栏**:笔/橡皮图标工具(eraser 引擎支持)+ 导出二级菜单 + 垃圾桶二次确认 + 右栏按钮加文字标签 + **3 轮 subagent UI 自适应**(此前 canvas chrome 零 @media;加 ≤960 rail 收图标 / ≤900 顶栏紧凑 / 导出菜单 portal 防夹 / rail 高度相对 host)。**freedraw DSL 修**:`[freedraw]` 解析为 no-op(R2:点序列不进 DSL),导出的 DSL 不再报"7 条无效"。测试用 `react-dom/client`+`act`(非 RTL,policy)。web 755(693→755,+62);tsc 23(基线零新增,净-2);build exit 0。详见 changelog。
@@ -153,6 +159,10 @@
 
 - **颜色类型双轨制**:`ColorToken`(6 色 Bauhaus)vs `TagColor`(10 个 CSS var)未统一 — 稳定版内不做重构(风险大)。详见 v0.37.0 review D 段。
 - **Tauri 未签名**:DMG 可本地构建(36MB,Apple Silicon),分发需签名公证。
+- **B3b frame 拖框创建**:触及引擎 tool union 类型 + 全 pointer 链,L 级;现有「框住选中」按钮 + DSL/Outline 两条建 frame 路够用。
+- **Batch C 智能关系推荐**:本地启发式 + 可选 AI,在详情/RelationPicker 给候选关系(打磨计划书方向 7,未开始)。
+- **vision 三能力实装**:看图描述/OCR、画布视觉理解、图转 DSL —— 实验室骨架已就位,实装 defer(用户判非必要,等真实需求)。
+- **图层 / 卡片版本 / 引擎 npm 化**:打磨计划书方向 8-10,L 级 defer。
 
 ## 约束(不可遗忘,详见根 `CLAUDE.md`)
 

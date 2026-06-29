@@ -5,6 +5,85 @@
 
 ---
 
+## 2026-06-29 · v0.38.0 · polish-batch-a-b(自动布局 + 焦点模式 + 模板导入 + 最近编辑跳转 + 跨画布 backlinks + frame 双击重命名)
+
+打磨计划书(10 方向 + 5 收尾轮)的 Batch A + B 落地。两批围绕"画布更专业 + 知识网络更可用",非 AI 依赖(自动布局用 dagre,其余纯本地)。
+
+**Batch A(画布专业度)**
+- **自动布局**(commit `19556ba`):dagre 分层 DAG 布局。`computeAutoLayout(elements, opts)` 纯函数放 web 层(非 canvas-engine,保引擎零依赖)。工具栏 ⇅ 按钮:选中 ≥2 卡局部布局,否则全画布。dagre 中心坐标转左上角;空/单卡原位;环 dagre 自断;freeform 不参与。11 单测。用户批 dagre 依赖(~46KB,静态导出兼容)。
+- **焦点模式**(commit `1805dc4`):⌘. 切换,隐藏画布 chrome(工具栏/侧栏/面板),留 `cv-focus-exit` 退出按钮;Esc 退出。深度工作免干扰。
+- **模板导入**(commit `d40ec11`):SideRail 📥 按钮,prompt 名字 + DSL → `addCustomTemplate`(同名覆盖)。配合 v0.38.0 已有的 4 预设 + 自建模板,模板可跨设备文字迁移(契合转义卖点)。
+
+**Batch B(知识网络可用性)**
+- **B1 最近编辑跳转**(commit `8f3fbfe`):⌘K 命令面板空 query 显「最近编辑」(updatedAt 倒序前 8)。点卡智能开卡:有 canvasPosition → `window.location.href = '/canvas/?card=ID'`(canvas 页读 query 居中 + 选中 + 开详情,replaceState 清 query);否则开详情 Modal(与搜索结果一致)。
+- **B2 跨画布 backlinks**(commit `cb8f088`):canvas 版 CardDetailModal 接 `useGlobalEdges`(异步聚合所有画布 freeform arrow),替代单画布 `findBacklinks`。incoming/outgoing 跨画布;边未 loaded 时 host 单画布兜底。与 graph 页 / 共享 CardDetailModal 口径统一。
+- **B3a frame 双击重命名**(commit `e7d6378`):select 模式双击 frame 空白边框区 → 中心起 input(预填 `el.text`)→ commit 走 `adapter.upsert({...existing, text: v})`。复用现有浮动 textarea 编辑会话(EditSession 加 `frameId`)。
+- **B3b(frame 拖框创建)defer**:触及引擎 tool union 类型 + 全 pointer 链,L 级;现有「框住选中」按钮 + DSL/Outline 两条建 frame 路够用。
+
+**验证**:domain/db/canvas-engine/web 测试全绿;build exit 0;.app/.dmg 已重建。详见 STATE.md「下一步」running log。
+
+---
+
+## 2026-06-29 · v0.38.0 · product-audit-and-labs(产品 audit 修复 + 标签对比度 + minimap 拖拽 + DSL 入口 + vision 实验室骨架)
+
+用户「整个项目 subagent review」+ UI 瑕疵反馈 + vision 改主意三股汇成一批。subagent 审计假阳性高(~60%),所有改动经实测复核才落地。
+
+**产品 audit 真 bug 修复(经核实)**
+- `52e90a5` 老数据/导入卡 `tags`/`links`/`codeSnippets`/`quotes`/`media` 可能 undefined → 全量 `?? []` 兜底(7 文件)。
+- `eef51d5` CRITICAL-1 duplicate-detect 缺字段崩 + CRITICAL-2 `resolveEmbed` 软删卡穿透(违反 R2 铁律,软删卡内容不通过 `((标题))` 嵌入活卡)。
+- `7f35f06` review 2 真 bug(graph/search 详情软删卡残留 → `effectiveDetail` 守卫;domain tag 方法 `?? []`)。
+- `1458aa8` **回退** audit HIGH-3(listOnCanvas 默认过滤软删/归档):review 发现引入「删画布孤儿卡」回归 —— canvas-binding 的 3 处 listOnCanvas 本就 `.filter(!archived && !deletedAt)`,默认过滤是误判。**勿重做。**
+- `6d35a22` 标签 chip 计数文字对比度(审计 H5 真因)。
+- `4d4ede3` / `1e76825` minimap 可拖拽(默认右下避让右栏)+ DSL(转义)入口提到 rail 一级 `»`。
+
+**vision 实验室骨架(commit `c2867e6`,附加能力不破坏默认隐私)**
+- v0.30.0「vision 永久不做」决策被 v0.38 修订:vision 作为**附加能力**放进实验室区,默认关闭。
+- settings 加 `labs.visionLab` 开关(红框实验室区)+ 确认门 Modal;`useVisionLabEnabled()` 代码级守卫(非仅 UI 隐藏)。
+- **R2 隐私不破**:默认 Ollama 本地 provider 即便开启也不外发;vision prompt 仍禁 deviceId/apiKey/软删卡。三能力(看图描述/画布视觉理解/图转 DSL)**仅骨架,实装 defer**(用户判 vision 非必要,等真实需求)。
+
+**验证**:测试全绿;build exit 0。详见 STATE.md「下一步」+ `docs/user/privacy.md`。
+
+---
+
+## 2026-06-28 · v0.38.0 · knowledge-network-phase1-3(全局图谱 + 块引用 + 全局关系 + 详情建关系 + 命令面板 + 标签墙 + ⌘C 选区)
+
+知识网络三阶段全完成 —— 把"卡片孤岛"连成语义网络,且全部围绕核心卖点(转义 + 本地)。
+
+**Phase 1 — 全局图谱(`/graph`,commit 链 见 git log)**
+- 语义三维签名图谱:d3-force 力导向(web 层,非引擎)。双链已物化成 arrow,graph 直接消费。
+- `useGlobalEdges` 异步聚合所有画布 freeform arrow → GraphEdge[];过滤函数(类型/画布/孤立);GraphCanvas + page 组装;e2e。
+
+**Phase 2a — 块引用 + 全局关系**
+- `((标题))` 嵌入:MarkdownBody 解析 → 目标卡 body/title 递归渲染(环检测)。embeds 关系类型(meta.embed 标记)。
+- `resolveCardByTitle` + 软删卡穿透守卫(R2:软删卡不通过嵌入进活卡)。
+- `useGlobalEdges` 成为跨画布关系的单一来源(graph 页 / 详情 backlinks 共用)。
+
+**Phase 2b — 详情建删关系**
+- 详情 Modal 建关系落 default canvas arrow(无 meta);`relation-picker` 搜索选卡;backlinks × 删除;乐观更新。
+
+**Phase 3 — 命令面板 / 标签墙 / 剪切板**
+- ⌘K 命令面板(`command-palette.tsx`):跳转项 + 卡片搜索前 8。
+- `/tags` 标签墙:标签云 + 卡网格。
+- 画布 ⌘C 复制选区 DSL(剪切板交换格式;⌘V 靠现有 paste)。
+
+**验证**:domain/db/canvas-engine/web 全绿;build exit 0;e2e 通过。详见 STATE.md + 各 feature memory。
+
+---
+
+## 2026-06-28 · v0.38.0 · whiteboard-pro-phase1(对齐分布 + 画布模板 + AI 工作流)
+
+画布从"能画"升级到"专业白板",对标 drawio/Excalidraw 的对齐与模板能力,方向 B+C 轻量落地。
+
+- **对齐分布 9 操作**(commit `2a88057` + `1f7a4cc`):`applyAlign` 引擎纯函数(左/中/右/上/中/下对齐 + 水平/垂直均分),选中 ≥2 显对齐工具条。单 undo 步(`host.batch` + upsert)。
+- **画布模板**(commit `bb5d225`):4 预设 + 自建(`addCustomTemplate`/`removeCustomTemplate`/`getTemplateDsl`)。模板 = DSL 文本,契合转义卖点。
+- **AI 工作流模板**(commit `17bcba1`):3 预设(聚类/关系/大纲),配 AI 才显。
+- **e2e**(commit `a6900d8`):白板专业度 e2e。
+- `ac40dbb` 版本 bump 0.37.0 → 0.38.0。
+
+**验证**:canvas-engine 全绿;build exit 0;e2e 通过。
+
+---
+
 ## 2026-06-27 · v0.37.0 · eraser-reliability-and-motif-redesign(橡皮可靠性加固 + 几何装饰重做)
 
 两批:① 解决用户「三条线删不掉」的橡皮可靠性加固(writing-plans + subagent 驱动);② 用户不满意原 BauhausMotif(三形横排太散),重做并选 overlap variant 落地空状态。
