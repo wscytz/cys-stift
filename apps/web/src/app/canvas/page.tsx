@@ -30,6 +30,8 @@ import { syncEmbedArrows, resolveCardByTitle } from '@/features/canvas/embed-lin
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { serializeCanvas } from '@/features/ai/canvas-dsl'
 import { parseDsl, parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
+import { TemplatePicker, type TemplateChoice } from '@/features/canvas/template-picker'
+import { allTemplates, saveCustomTemplate } from '@/lib/canvas-templates'
 import { streamText } from '@/features/ai/stream-text'
 import {
   buildClusterUserPrompt,
@@ -97,6 +99,15 @@ export default function CanvasPage() {
   }, [snap, activeCanvasId, service])
 
   const [creatingName, setCreatingName] = useState<string | null>(null)
+  /** 新建画布 modal 选中的模板('blank' | 模板名)。null = 模态未开。 */
+  const [creatingTemplate, setCreatingTemplate] = useState<TemplateChoice>('blank')
+  /**
+   * 待应用的模板名:canvasStore.create → setActive 切到新画布 → SelfCanvas 经
+   * key=canvasId 重建 adapter → onAdapterReady 抬进 state。模板 DSL 必须在新
+   * 画布的 adapter 就绪后 applyLayout(否则 host 是旧画布的/还没挂)。这里用
+   * 一个 pending ref 存模板名,onAdapterReady 触发时检查并消费它。
+   */
+  const pendingTemplateRef = useRef<TemplateChoice | null>(null)
   const [renamingId, setRenamingId] = useState<CanvasId | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<CanvasId | null>(null)
   // 二次确认:删画布是不可撤销的破坏性操作,要求输入 "delete" 才点亮危险按钮
@@ -552,7 +563,33 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     const name = raw.trim()
     setCreatingName(null)
     if (!name) return
+    // 记下要应用的模板(非 blank),onAdapterReady 时消费。canvasStore.create 会
+    // setActive 到新画布,SelfCanvas key=canvasId 重建,onAdapterReady 在新
+    // adapter 就绪时触发 → 此时 applyLayout 模板 DSL。
+    if (creatingTemplate !== 'blank') {
+      pendingTemplateRef.current = creatingTemplate
+    }
     canvasStore.create(name)
+  }
+
+  /** 存当前画布为自建模板:prompt 名字 → serializeCanvasReadable + localStorage。 */
+  const handleSaveAsTemplate = () => {
+    const adapter = handle.current.adapter
+    if (!adapter) return
+    const name = window.prompt(t('canvas.template.namePlaceholder'), activeCanvas?.name ?? '')
+    if (name === null) return // 取消
+    const trimmed = name.trim()
+    if (!trimmed) {
+      pushToast({ kind: 'info', message: t('canvas.template.needName') })
+      return
+    }
+    const ok = saveCustomTemplate(trimmed, adapter.getElements())
+    pushToast({
+      kind: ok ? 'success' : 'error',
+      message: ok
+        ? t('canvas.template.saved', { name: trimmed })
+        : t('canvas.template.saveFail'),
+    })
   }
 
   const startRename = () => setRenamingId(activeCanvasId)
@@ -679,6 +716,32 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       aiAbortRef.current?.abort()
     }
   }, [])
+
+  // 模板应用:新建画布后 pendingTemplateRef 携带模板名,新 adapter 一就绪就
+  // applyLayout。依赖 adapter —— canvasStore.create → setActive → SelfCanvas
+  // 重建(key=canvasId)→ onAdapterReady → setAdapter → 本 effect 重跑,此刻
+  // adapter 指向新画布,onCardCreate 也绑到新 activeCanvasId。消费后清 ref
+  // 防重入(后续无关的 adapter 变化不再误应用)。
+  useEffect(() => {
+    const tplName = pendingTemplateRef.current
+    if (!adapter || !tplName) return
+    const adapterLocal = adapter
+    const template = allTemplates().find((x) => x.name === tplName)
+    pendingTemplateRef.current = null
+    if (!template) return
+    const ops = parseDsl(template.dsl)
+    if (ops.length === 0) return
+    applyLayout(adapterLocal, ops, undefined, (p) => {
+      // onCardCreate 走 createCardOnCanvas:模板含 [card #id create] → 建空卡。
+      // 复用 page 现有 onCardCreate 逻辑(同 activeCanvasId / service)。
+      if (!handle.current.adapter) return
+      createCardOnCanvas(service, handle.current.adapter, activeCanvasId, {
+        id: p.cardId, title: '', x: p.x, y: p.y, w: p.w, h: p.h,
+      })
+    })
+    pushToast({ kind: 'success', message: t('canvas.template.applied', { name: tplName === 'blank' ? '' : tplName }) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adapter])
 
   // Bug B fix: derive the LIVE card from the store by id during render.
   // The page re-renders on any store change (useDb subscription), but the
@@ -818,9 +881,10 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           canDelete={true}
           onUndo={handleUndo}
           onRedo={handleRedo}
-          onNewCanvas={() => setCreatingName('')}
+          onNewCanvas={() => { setCreatingTemplate('blank'); setCreatingName('') }}
           onRename={startRename}
           onDelete={requestDelete}
+          onSaveAsTemplate={handleSaveAsTemplate}
           onAILayout={handleAILayout}
           onAICluster={handleAICluster}
           onAutoRelate={handleAutoRelate}
@@ -855,6 +919,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           }}
           placeholder={t('canvas.namePlaceholder')} maxLength={60}
         />
+        <TemplatePicker selected={creatingTemplate} onSelect={setCreatingTemplate} />
         <div className="confirm__actions">
           <Button variant="ghost" onClick={() => setCreatingName(null)}>{t('common.cancel')}</Button>
           <Button variant="primary" onClick={() => handleCreateCanvas(creatingName ?? '')} disabled={!creatingName?.trim()}>{t('canvas.new')}</Button>
@@ -1146,6 +1211,7 @@ function CanvasSideRail({
   onNewCanvas,
   onRename,
   onDelete,
+  onSaveAsTemplate,
   onAILayout,
   onAICluster,
   onAutoRelate,
@@ -1172,6 +1238,7 @@ function CanvasSideRail({
   onNewCanvas: () => void
   onRename: () => void
   onDelete: () => void
+  onSaveAsTemplate: () => void
   onAILayout: () => void
   onAICluster: () => void
   onAutoRelate: () => void
@@ -1219,6 +1286,7 @@ function CanvasSideRail({
       <RailButton label={t('canvas.newTitle')} short={t('canvas.rail.new')} onClick={onNewCanvas} icon="+" />
       <RailButton label={t('canvas.renameTitle')} short={t('canvas.rail.rename')} onClick={onRename} disabled={!canRename} icon="✎" />
       <RailButton label={t('canvas.deleteTitle')} short={t('canvas.rail.delete')} onClick={onDelete} disabled={!canDelete} icon="🗑" />
+      <RailButton label={t('canvas.template.saveAs')} short={t('canvas.rail.template')} disabled={!adapterReady} onClick={onSaveAsTemplate} icon="🗖" />
       <span className="cv-rail__sep" aria-hidden="true" />
       {aiEnabled && (
         <>
