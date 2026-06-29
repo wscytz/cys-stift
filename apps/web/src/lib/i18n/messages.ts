@@ -195,6 +195,16 @@ export const messages = {
   'canvas.eraserMode.text.short': { zh: '文字', en: 'Text' },
   'canvas.eraserCardToTrash': { zh: '卡片已移到回收桶', en: 'Card moved to trash' },
   'canvas.eraserModeMismatch': { zh: '当前模式擦不掉此元素,切到「全部」试试', en: 'This mode cannot erase it — try "All" mode' },
+  /* 对齐工具条(选中≥2 卡时顶栏出 9 对齐操作) */
+  'canvas.align.left': { zh: '左对齐', en: 'Align left' },
+  'canvas.align.right': { zh: '右对齐', en: 'Align right' },
+  'canvas.align.top': { zh: '顶对齐', en: 'Align top' },
+  'canvas.align.bottom': { zh: '底对齐', en: 'Align bottom' },
+  'canvas.align.centerH': { zh: '水平居中', en: 'Center horizontally' },
+  'canvas.align.centerV': { zh: '垂直居中', en: 'Center vertically' },
+  'canvas.align.distributeH': { zh: '水平等距', en: 'Distribute horizontally' },
+  'canvas.align.distributeV': { zh: '垂直等距', en: 'Distribute vertically' },
+  'canvas.align.equalize': { zh: '等大', en: 'Equalize size' },
   /* 工具切换快捷键描述(shortcut-help 用) */
   'canvas.shortcutsTools': { zh: '工具', en: 'Tools' },
   'canvas.scToolSelect': { zh: '选择工具', en: 'Select tool' },

@@ -4,8 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import type { CanvasId, Card, CardId } from '@cys-stift/domain'
-import { SelfBuiltAdapter, elementCenter, unionBounds, normalizeBox, screenToPage } from '@cys-stift/canvas-engine'
-import type { CanvasElement } from '@cys-stift/canvas-engine'
+import { SelfBuiltAdapter, applyAlign, elementCenter, unionBounds, normalizeBox, screenToPage } from '@cys-stift/canvas-engine'
+import type { AlignOp, CanvasElement } from '@cys-stift/canvas-engine'
 import { Button, Modal, Toolbar } from '@cys-stift/ui'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
@@ -224,6 +224,26 @@ export default function CanvasPage() {
   // canvas-binding 的 removed 回写因 deletedAt 已设而跳过 removeFromCanvas(不双删)。
   // undo 由 reconcileHistory 恢复:host 恢复了卡元素但 DB deletedAt → service.restore。
   // 不 toast:连续擦多张会刷屏;按钮 label 已说明"进回收桶",trash 可见可恢复。
+  // 对齐工具条:选中≥2 卡 → applyAlign 算 patch → host.batch 单 undo 步 upsert。
+  // distribute-h/v 仅≥3 有意义,但第一版都显示(applyAlign 内部对<3 no-op,不误伤)。
+  const onAlign = useCallback((op: AlignOp) => {
+    const adapter = handle.current.adapter
+    if (!adapter) return
+    const selected = adapter
+      .getSelectedIds()
+      .map((id) => adapter.getElement(id))
+      .filter((el): el is CanvasElement => !!el && el.kind === 'card')
+    if (selected.length < 2) return
+    const patches = applyAlign(selected, op)
+    if (patches.size === 0) return
+    adapter.batch(() => {
+      for (const [id, p] of patches) {
+        const existing = adapter.getElement(id)
+        if (existing) adapter.upsert({ ...existing, ...p })
+      }
+    })
+  }, [])
+
   const onEraseCard = useCallback((cardId: string) => {
     service.softDelete(cardId as CardId)
   }, [service])
@@ -740,6 +760,15 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         <SnapToggle mode={snapMode} onToggle={toggleSnap} disabled={!adapterReady} />
         <span className="tb-divider" aria-hidden="true" />
         <ZoomGroup adapterReady={adapterReady} onZoom={zoomBy} />
+        {/* 对齐工具条:选中≥2 卡时出现 9 操作(左/右/上/下/水平居中/垂直居中/
+            水平等距/垂直等距/等大)。图标用 unicode 符号(包豪斯风),applyAlign 算
+            patch,host.batch 单 undo 步。<2 隐藏;distribute 对<3 内部 no-op。 */}
+        {selectedCardCount >= 2 && (
+          <>
+            <span className="tb-divider" aria-hidden="true" />
+            <AlignGroup adapterReady={adapterReady} count={selectedCardCount} onAlign={onAlign} />
+          </>
+        )}
       </Toolbar>
 
       <div className={`cv-host cv-host--${tool}`} onContextMenu={(e) => {
@@ -1049,6 +1078,43 @@ function SnapToggle({ mode, onToggle, disabled }: { mode: 'snap' | 'free'; onTog
   )
 }
 
+function AlignGroup({ adapterReady, count, onAlign }: { adapterReady: boolean; count: number; onAlign: (op: AlignOp) => void }) {
+  const { t } = useI18n()
+  // 9 对齐操作 + unicode 图标。distribute-h/v 在 count<3 时 disable(无意义)。
+  const items: { op: AlignOp; icon: string; label: string }[] = [
+    { op: 'left', icon: '⇤', label: t('canvas.align.left') },
+    { op: 'center-h', icon: '⇆', label: t('canvas.align.centerH') },
+    { op: 'right', icon: '⇥', label: t('canvas.align.right') },
+    { op: 'top', icon: '⇧', label: t('canvas.align.top') },
+    { op: 'center-v', icon: '⇅', label: t('canvas.align.centerV') },
+    { op: 'bottom', icon: '⇩', label: t('canvas.align.bottom') },
+    { op: 'distribute-h', icon: '⇠⇢', label: t('canvas.align.distributeH') },
+    { op: 'distribute-v', icon: '⇡⇣', label: t('canvas.align.distributeV') },
+    { op: 'equalize', icon: '⬌', label: t('canvas.align.equalize') },
+  ]
+  return (
+    <span className="tb-align">
+      {items.map(({ op, icon, label }) => {
+        const needsThree = op === 'distribute-h' || op === 'distribute-v'
+        const disabled = !adapterReady || (needsThree && count < 3)
+        return (
+          <button
+            key={op}
+            type="button"
+            className="tb-icon-btn tb-align__btn"
+            onClick={() => onAlign(op)}
+            disabled={disabled}
+            title={label}
+            aria-label={label}
+          >
+            <span className="tb-align__icon" aria-hidden="true">{icon}</span>
+          </button>
+        )
+      })}
+    </span>
+  )
+}
+
 function ZoomGroup({ adapterReady, onZoom }: { adapterReady: boolean; onZoom: (op: 'in' | 'out' | 'fit') => void }) {
   const { t } = useI18n()
   return (
@@ -1287,6 +1353,10 @@ const styles = `
 .tb-icon-btn:active:not(:disabled) { transform: scale(0.92); }
 .tb-icon-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .tb-icon-btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+/* 对齐工具条:选中≥2 卡时出现。复用 .tb-icon-btn 视觉;组容器内联排布。 */
+.tb-align { display: inline-flex; align-items: center; gap: 0; }
+.tb-align__btn { min-width: 34px; padding: 0 var(--space-1); }
+.tb-align__icon { font-size: var(--font-size-base); line-height: 1; letter-spacing: 0; }
 .cselect { height: 32px; padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-sm); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; min-width: 200px; }
 .cselect:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cselect-edit { height: 32px; width: 32px; background: transparent; color: var(--color-gray); border: 0; cursor: pointer; font-size: var(--font-size-base); }
