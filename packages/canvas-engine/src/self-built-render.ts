@@ -115,14 +115,14 @@ function drawElement(
       ctx.fillStyle = tokenResolver('--color-gray', '#64748b')
       ctx.font = `10px ${tokenResolver('--font-mono', 'monospace')}`
       ctx.fillText(info.type.toUpperCase(), el.x + pad, el.y + pad)
-      // title(display,500)
+      // title(content 字体:用户卡片标题,带中文系统回退,Canvas ctx.font 按串内顺序回退)。
       ctx.fillStyle = tokenResolver('--color-black', '#0f172a')
-      ctx.font = `500 15px ${tokenResolver('--font-display', 'Inter, sans-serif')}`
+      ctx.font = `500 15px ${tokenResolver('--font-content', 'Inter, "PingFang SC", "Microsoft YaHei UI", sans-serif')}`
       ctx.fillText(info.title || '(untitled)', el.x + pad, el.y + pad + 16)
-      // body(3 行截断)
+      // body(3 行截断,content 字体:用户输入正文,中文回退同 title)
       if (info.body) {
         ctx.fillStyle = tokenResolver('--color-black-soft', '#475569')
-        ctx.font = `12px ${tokenResolver('--font-body', 'Inter, sans-serif')}`
+        ctx.font = `12px ${tokenResolver('--font-content', 'Inter, "PingFang SC", "Microsoft YaHei UI", sans-serif')}`
         const lines = wrapLines(info.body, el.w - pad * 2, ctx)
         for (let i = 0; i < Math.min(3, lines.length); i++) {
           ctx.fillText(lines[i]!, el.x + pad, el.y + pad + 38 + i * 16)

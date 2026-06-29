@@ -25,6 +25,9 @@
   --font-display: 'Space Grotesk', system-ui, sans-serif;
   --font-body: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+  /* 用户输入内容(卡片 title/body、Markdown)用系统字体,显式回退链。与 --font-body
+     (设计字体,UI chrome)区分。以后全量自托管中文只需把字体名插到链首。 */
+  --font-content: 'Inter', 'PingFang SC', 'Microsoft YaHei UI', system-ui, -apple-system, sans-serif;
 
   /* Font scale */
   --font-size-xs: 12px;

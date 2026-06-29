@@ -137,7 +137,7 @@ export function MarkdownBody({
 
 const styles = `
 .md {
-  font-family: var(--font-body);
+  font-family: var(--font-content);
   font-size: var(--font-size-base);
   line-height: 1.6;
   color: var(--color-black);
@@ -145,7 +145,7 @@ const styles = `
 }
 .md--empty { color: var(--color-gray); font-style: italic; margin: 0; }
 .md h1, .md h2, .md h3 {
-  font-family: var(--font-display);
+  font-family: var(--font-content);
   font-weight: 500;
   letter-spacing: -0.01em;
   margin: var(--space-3) 0 var(--space-2);

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Space_Grotesk, Inter } from 'next/font/google'
+import { Space_Grotesk, Inter, JetBrains_Mono } from 'next/font/google'
 import '../styles/globals.css'
 import { CaptureHost } from '@/features/capture/capture-host'
 import { FileDropHandler } from '@/features/capture/file-drop-handler'
@@ -25,6 +25,15 @@ const body = Inter({
   display: 'swap',
 })
 
+// 等宽自托管(v0.39.1):JetBrains Mono 是 Bauhaus UI 的骨架(时间戳/标签/
+// DSL/mono-label),Windows 无此字体且回退到 Consolas 最违和。自托管保证跨平台
+// 等宽一致。subsets: latin(等宽主要是拉丁/符号;代码块中文走 --font-content 回退)。
+const mono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-jetbrains-mono',
+  display: 'swap',
+})
+
 export const metadata: Metadata = {
   title: "cy's Stift",
   description: '本地优先的灵感画布。灵感 3 秒记，画布上慢慢养。',
@@ -34,7 +43,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN" suppressHydrationWarning className={`${display.variable} ${body.variable}`}>
+    <html lang="zh-CN" suppressHydrationWarning className={`${display.variable} ${body.variable} ${mono.variable}`}>
       <head>
         {/*
          * Early-apply theme (spec §5.6, 2026-06-20). The inline script

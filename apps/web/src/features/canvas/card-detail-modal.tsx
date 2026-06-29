@@ -368,7 +368,7 @@ const styles = `
 .cd__field { display: flex; flex-direction: column; gap: var(--space-1); }
 .cd__textarea {
   appearance: none; background: transparent; border: 0; border-bottom: var(--border-hairline);
-  padding: var(--space-1) 0; font-family: var(--font-body); font-size: var(--font-size-base);
+  padding: var(--space-1) 0; font-family: var(--font-content); font-size: var(--font-size-base);
   color: var(--color-black); outline: none; resize: vertical; min-height: 120px; line-height: 1.5;
 }
 .cd__textarea:focus { border-bottom-color: var(--color-red); }

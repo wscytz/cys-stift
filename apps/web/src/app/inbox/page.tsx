@@ -582,7 +582,7 @@ const styles = `
 .tile__body { flex: 1; padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
 .tile__title {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-content);
   font-size: var(--font-size-lg);
   font-weight: 500;
   line-height: 1.25;

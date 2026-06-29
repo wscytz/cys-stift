@@ -319,7 +319,7 @@ const styles = `
   border: 0;
   border-bottom: var(--border-hairline);
   padding: var(--space-1) 0;
-  font-family: var(--font-body);
+  font-family: var(--font-content);
   font-size: var(--font-size-base);
   color: var(--color-black);
   outline: none;

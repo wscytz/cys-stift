@@ -24,6 +24,7 @@ import { Button, Input } from '@cys-stift/ui'
 import { draftStore, useDraft, isDraftPersistOk } from '@/lib/draft-store'
 import { useDebouncedCallback } from '@/lib/use-debounced-callback'
 import { useI18n } from '@/lib/i18n'
+import { isMac } from '@/lib/platform'
 
 interface CaptureDraftPayload {
   title: string
@@ -203,7 +204,7 @@ if (
         </div>
         <div className="mi-actions">
           <strong className="mi-hint mi-hint--primary" data-testid="mini-submit-hint">
-            {navigator.platform?.includes('Mac') ? '⌘↩' : 'Ctrl+Enter'} {t('card.detail.save')} · esc {t('card.detail.cancel')}
+            {isMac() ? '⌘↩' : 'Ctrl+Enter'} {t('card.detail.save')} · esc {t('card.detail.cancel')}
           </strong>
           {persistFailed && (
             <span className="mi-warn" role="alert">{t('draft.persistFailed')}</span>

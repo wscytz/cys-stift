@@ -230,7 +230,7 @@ export default function DesignPage() {
             <h2 className="section__h2">Toolbar</h2>
             <Card>
               <div className="stack">
-                <Toolbar region="capture"><span>Capture · Cmd+Shift+Space</span></Toolbar>
+                <Toolbar region="capture"><span>Capture · ⌘/Ctrl+Shift+Space</span></Toolbar>
                 <Toolbar region="canvas"><span>Canvas · 灵感墙</span></Toolbar>
                 <Toolbar region="archive"><span>Archive · 2026 / 06</span></Toolbar>
               </div>

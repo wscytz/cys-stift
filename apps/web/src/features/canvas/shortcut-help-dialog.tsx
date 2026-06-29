@@ -8,6 +8,7 @@
 import { useEffect } from 'react'
 import { Modal } from '@cys-stift/ui'
 import { useI18n } from '@/lib/i18n'
+import { modSymbol, isMac } from '@/lib/platform'
 
 export function ShortcutHelpDialog({
   open,
@@ -31,6 +32,7 @@ export function ShortcutHelpDialog({
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
+  const mod = modSymbol()
   const groups: { title: string; rows: [string, string][] }[] = [
     {
       title: t('canvas.shortcutsTools'),
@@ -56,9 +58,9 @@ export function ShortcutHelpDialog({
       rows: [
         ['Esc', t('canvas.scEscape')],
         ['Delete / ⌫', t('canvas.scDelete')],
-        ['Ctrl/Cmd+Z', t('canvas.scUndo')],
-        ['Ctrl/Cmd+Shift+Z / Ctrl+Y', t('canvas.scRedo')],
-        ['Ctrl/Cmd+A', t('canvas.scSelectAll')],
+        [`${mod}+Z`, t('canvas.scUndo')],
+        [`${mod}+Shift+Z${isMac() ? '' : ' / Ctrl+Y'}`, t('canvas.scRedo')],
+        [`${mod}+A`, t('canvas.scSelectAll')],
       ],
     },
     {
@@ -70,7 +72,7 @@ export function ShortcutHelpDialog({
     },
     {
       title: t('canvas.shortcutsGlobal'),
-      rows: [['⌘⇧Space / Ctrl+⇧+Space', t('capture.shortcutHelp')]],
+      rows: [[isMac() ? '⌘⇧Space' : 'Ctrl+Shift+Space', t('capture.shortcutHelp')]],
     },
   ]
 

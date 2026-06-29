@@ -53,6 +53,7 @@
  * and any Tailwind preset reset of the same vars.
  */
 :root[data-theme='dark'] {
+  color-scheme: dark;
   --color-red: #ff4d4d;
   --color-red-soft: #3a0e0e;
   --color-yellow: #ffd633;
@@ -81,6 +82,9 @@
 }
 
 :root {
+  /* color-scheme: 让 WebView 的 native 控件(select/checkbox/滚动条/number spinner)
+     跟随明暗主题渲染。暗色下不再夹亮色系统控件(Windows WebView2 尤其出戏)。 */
+  color-scheme: light;
   /* Color tokens */
   --color-red: #d40000;
   --color-red-soft: #ffe5e5;
@@ -100,6 +104,10 @@
   --font-display: 'Space Grotesk', system-ui, sans-serif;
   --font-body: Inter, system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+  /* 用户输入内容(卡片 title/body、Markdown)用系统字体,显式回退链保证每平台都挑
+     能看的。与 --font-body(设计字体,UI chrome 用)区分:产品脸一致,用户内容接受
+     平台差异。以后想全量自托管中文,把字体名插到链首即可,其余不动。 */
+  --font-content: Inter, 'PingFang SC', 'Microsoft YaHei UI', system-ui, -apple-system, sans-serif;
 
   /* Font scale */
   --font-size-xs: 12px;

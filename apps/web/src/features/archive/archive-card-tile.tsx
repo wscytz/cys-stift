@@ -227,7 +227,7 @@ const styles = `
 }
 .tile__title {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-content);
   font-size: var(--font-size-lg);
   font-weight: 500;
   line-height: 1.25;
@@ -261,7 +261,7 @@ const styles = `
 .row { min-height: 56px; }
 .row__title {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-content);
   font-size: var(--font-size-base);
   font-weight: 500;
   line-height: 1.4;

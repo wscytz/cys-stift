@@ -29,6 +29,31 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Bauhaus 滚动条(v0.39.1 跨平台适配):硬色块、无圆角、无渐变,贴合 6 原色气质。
+   Mac 不复用系统 overlay 滚动条,Win 不用系统灰滚动条 —— 两端统一。
+   Firefox 走 scrollbar-color/width(不支持 webkit 伪元素)。 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-black) transparent;
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-black);
+  border: 2px solid var(--color-white);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-gray); }
+::-webkit-scrollbar-corner { background: transparent; }
+/* 暗色反相:thumb 白,边暗色。 */
+:root[data-theme='dark'] * {
+  scrollbar-color: var(--color-white) transparent;
+}
+:root[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: var(--color-white);
+  border-color: var(--color-black);
+}
+:root[data-theme='dark'] ::-webkit-scrollbar-thumb:hover { background: var(--color-gray); }
+
 a {
   color: var(--color-blue);
   text-decoration: underline;

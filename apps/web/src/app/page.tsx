@@ -10,13 +10,12 @@
  */
 import Link from 'next/link'
 import { useI18n } from '@/lib/i18n'
-import { useEffect, useState } from 'react'
+import { isMac as detectIsMac } from '@/lib/platform'
 import { CaptureHint } from '@/features/capture/capture-hint'
 
 export default function HomePage() {
   const { t } = useI18n()
-  const [isMac, setIsMac] = useState(true)
-  useEffect(() => { setIsMac(navigator.platform?.includes('Mac') ?? true) }, [])
+  const isMac = detectIsMac()
   return (
     <main id="main" tabIndex={-1} className="home">
       <CaptureHint />
