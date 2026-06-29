@@ -1,39 +1,50 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-
 /**
- * Global ⌘/ / Ctrl+/ keyboard shortcut to navigate to /search.
- * Mount once in layout (alongside ThemeBoot / CaptureHost).
+ * Global ⌘K / ⌘/ (Cmd/Ctrl+K or Cmd/Ctrl+/) opens the command palette.
+ * Mount once in layout (alongside ThemeBoot / CaptureHost). The palette
+ * itself (CommandPalette) is rendered here and owns the navigation +
+ * card-search surface — so this replaces the old router.push('/search').
  *
- * v0.23.2-hardening: was Cmd/Ctrl+K, which conflicts with the browser's
- * built-in search bar shortcut in Windows Edge (and "Find" in some IE
- * modes). Cmd/Ctrl+/ is the conventional "open search" binding (used by
- * Linear, Notion, GitHub) and is unbound in every major browser.
+ * Shortcut rules:
+ *  - ⌘K / Ctrl+K: opens the palette in any state (and preventDefault so it
+ *    does not trigger the browser's address-bar search on macOS). This is
+ *    the standard "command palette" binding (Notion, Linear, GitHub).
+ *  - ⌘/ / Ctrl+/: opens the palette, but NOT when the user is already
+ *    typing inside an input/textarea/contenteditable (let them type '/').
+ *  - Either combo toggles: pressing it again while open closes.
  */
-export function SearchShortcut() {
-  const router = useRouter()
+import { useCallback, useEffect, useState } from 'react'
+import { CommandPalette } from '@/features/command-palette/command-palette'
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.key !== '/') return
-      // L2 (v0.23.3): don't hijack the shortcut when the user is typing
-      // '/' inside an input/textarea/contenteditable (e.g. a search
-      // query, a card body, the mini-input title). Tag-name check is
-      // locale-stable and cheap.
+export function SearchShortcut() {
+  const [open, setOpen] = useState(false)
+
+  const onKey = useCallback((e: KeyboardEvent) => {
+    const mod = e.metaKey || e.ctrlKey
+    if (!mod) return
+    const key = e.key
+    const isK = key === 'k' || key === 'K'
+    const isSlash = key === '/'
+    if (!isK && !isSlash) return
+
+    // ⌘/: don't hijack when typing inside a field — let '/' be typed.
+    if (isSlash) {
       const target = e.target as HTMLElement | null
       const tag = target?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) {
         return
       }
-      e.preventDefault()
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      router.push('/search')
     }
+    // ⌘K: always intercept (prevent browser address-bar search).
+    e.preventDefault()
+    setOpen((v) => !v)
+  }, [])
+
+  useEffect(() => {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [router])
+  }, [onKey])
 
-  return null
+  return <CommandPalette open={open} onClose={() => setOpen(false)} />
 }

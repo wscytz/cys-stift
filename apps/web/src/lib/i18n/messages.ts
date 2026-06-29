@@ -23,6 +23,14 @@ export const messages = {
   'nav.settings': { zh: '设置', en: 'Settings' },
   'nav.capture': { zh: '捕获', en: 'Capture' },
   'nav.homeNav': { zh: '主页导航', en: 'Home navigation' },
+  'nav.tags': { zh: '标签', en: 'Tags' },
+
+  /* ── Command palette (P3-T1) ── */
+  'cmd.title': { zh: '命令面板', en: 'Command palette' },
+  'cmd.placeholder': { zh: '跳转或搜索…', en: 'Jump or search…' },
+  'cmd.group.navigate': { zh: '跳转', en: 'Navigate' },
+  'cmd.group.cards': { zh: '卡片', en: 'Cards' },
+  'cmd.empty': { zh: '无匹配', en: 'No matches' },
 
   /* ── Home page ── */
   'home.eyebrow': { zh: 'phase 0 · scaffold', en: 'phase 0 · scaffold' },
