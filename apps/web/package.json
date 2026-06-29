@@ -14,6 +14,7 @@
     "@cys-stift/domain": "workspace:*",
     "@cys-stift/ui": "workspace:*",
     "d3-force": "^3.0.0",
+    "dagre": "^0.8.5",
     "eventsource-parser": "1.1.2",
     "markitdownllm": "^0.1.5",
     "next": "15.0.3",
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@types/d3-force": "^3.0.10",
+    "@types/dagre": "^0.7.54",
     "@types/node": "22.9.0",
     "@types/react": "19.0.0",
     "@types/react-dom": "19.0.0",

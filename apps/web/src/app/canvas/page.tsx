@@ -17,6 +17,7 @@ import { CanvasOverviewModal } from '@/features/canvas/canvas-overview-modal'
 import { ShortcutHelpDialog } from '@/features/canvas/shortcut-help-dialog'
 import { DiffDialog } from '@/features/canvas/diff-dialog'
 import { applyLayout } from '@/features/canvas/apply-layout'
+import { computeAutoLayout } from '@/features/canvas/auto-layout'
 import { canvasToMarkdown, markdownFileName } from '@/features/canvas/canvas-to-markdown'
 import { RelationPanel } from '@/features/canvas/relation-panel'
 import { FreedrawPanel } from '@/features/canvas/freedraw-panel'
@@ -255,6 +256,42 @@ export default function CanvasPage() {
       }
     })
   }, [])
+
+  // 自动布局(Batch A / 方向 1):选中≥2 卡 → 布局选中;否则全画布所有 card。
+  // dagre 跑分层布局,坐标 batch upsert(保留各 card w/h/rotation),单 undo 步。
+  // freeform 元素(text/rect/frame)不参与,toast 明示。布局后 fit 让用户看到全貌。
+  const handleAutoLayout = useCallback(() => {
+    const adapter = handle.current.adapter
+    if (!adapter) return
+    const elements = adapter.getElements()
+    const selectedIds = adapter.getSelectedIds()
+    const selectedCards = selectedIds
+      .map((id) => adapter.getElement(id))
+      .filter((el): el is CanvasElement => !!el && el.kind === 'card')
+    // 选中≥2 → 局部;否则全画布 card。
+    const targetIds = selectedCards.length >= 2 ? new Set(selectedCards.map((c) => c.id)) : undefined
+    const positions = computeAutoLayout(elements, { targetIds })
+    if (positions.size === 0) {
+      pushToast({ kind: 'info', message: t('canvas.autoLayoutTooFew') })
+      return
+    }
+    adapter.batch(() => {
+      for (const [id, pos] of positions) {
+        const existing = adapter.getElement(id)
+        if (existing) adapter.upsert({ ...existing, x: pos.x, y: pos.y })
+      }
+    })
+    const freeformCount = elements.filter((e) => e.kind !== 'card' && e.kind !== 'arrow').length
+    pushToast({
+      kind: 'success',
+      message:
+        freeformCount > 0
+          ? t('canvas.autoLayoutDonePartial', { n: String(positions.size) })
+          : t('canvas.autoLayoutDone', { n: String(positions.size) }),
+    })
+    // fit 让用户立即看到布局全貌(下一个 tick,等 upsert 落渲染)。
+    setTimeout(() => zoomBy('fit'), 0)
+  }, [t, zoomBy])
 
   const onEraseCard = useCallback((cardId: string) => {
     service.softDelete(cardId as CardId)
@@ -867,6 +904,17 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         <SnapToggle mode={snapMode} onToggle={toggleSnap} disabled={!adapterReady} />
         <span className="tb-divider" aria-hidden="true" />
         <ZoomGroup adapterReady={adapterReady} onZoom={zoomBy} />
+        {/* 自动布局(Batch A):选中≥2 卡布局选中,否则全画布。dagre 分层,单 undo 步。 */}
+        <button
+          type="button"
+          className="tb-btn"
+          disabled={!adapterReady}
+          onClick={handleAutoLayout}
+          aria-label={t('canvas.autoLayout')}
+          title={t('canvas.autoLayout')}
+        >
+          <span className="tb-btn__icon" aria-hidden="true">⇅</span>
+        </button>
         {/* 对齐工具条:选中≥2 卡时出现 9 操作(左/右/上/下/水平居中/垂直居中/
             水平等距/垂直等距/等大)。图标用 unicode 符号(包豪斯风),applyAlign 算
             patch,host.batch 单 undo 步。<2 隐藏;distribute 对<3 内部 no-op。 */}
