@@ -565,6 +565,10 @@ export const messages = {
   'tag.filter': { zh: '按标签筛选', en: 'Filter by tags' },
   'tag.all': { zh: '全部', en: 'All' },
   'tag.noTags': { zh: '暂无标签', en: 'No tags yet' },
+  /* ── Tags wall (P3-T2) ── */
+  'tags.title': { zh: '标签', en: 'Tags' },
+  'tags.empty': { zh: '还没有标签。给卡片加标签来按主题组织。', en: 'No tags yet. Tag cards to organize by topic.' },
+  'tags.count': { zh: '{n} 张', en: '{n} cards' },
   /* ── AI Layout (P7) ── */
   'canvas.aiLayout': { zh: 'AI 排版', en: 'AI layout' },
   'canvas.aiRunning': { zh: '运行中…', en: 'Running…' },

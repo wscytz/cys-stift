@@ -53,6 +53,7 @@ export function AppMenu() {
     { href: '/canvas', key: 'nav.canvas' },
     { href: '/graph', key: 'nav.graph' },
     { href: '/archive', key: 'nav.archive' },
+    { href: '/tags', key: 'nav.tags' },
     { href: '/timeline', key: 'nav.timeline' },
     { href: '/search', key: 'nav.search' },
     { href: '/trash', key: 'nav.trash' },
