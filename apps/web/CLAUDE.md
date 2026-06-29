@@ -71,9 +71,18 @@ src/
 - [ ] e2e 加"AI 看不到 deviceId / apiKey / 软删除卡"的反向断言
 
 **禁项**:
-- ❌ 用 vision 模型(GPT-4V / Claude Vision)— v0.30.0 决策**永久不做**
-- ❌ 把 `media.dataUrl` 进 prompt
+- ❌ 把 `media.dataUrl` 进 prompt(**默认态**——除非用户在 /settings 实验验室显式开启 visionLab,见下)
 - ❌ 自动 codegen 从 Card schema 生成 AI context
+
+**实验室 / Labs(v0.38+ 附加能力)**:
+> v0.30.0 的「vision 永久不做」决策已被 v0.38 修订:vision 作为**附加能力**放进实验室区,
+> 由用户显式开启,不破坏默认隐私态。修订依据:vision 能力(看图描述/OCR、画布视觉理解、
+> 图片转 DSL)对产品能力提升大,且可通过"开关+确认门+代码守卫"把风险降到用户自主可控。
+- visionLab 开关默认关(`settings.labs.visionLab`),`/settings` 实验验室区开启,走不可撤销确认门
+- **代码层守卫**:所有 vision 路径用 `useVisionLabEnabled()`(`features/ai/ai-settings-provider.tsx`)if 守卫,关时完全不可达(非仅 UI 隐藏)
+- 开启后 `media.dataUrl` 可进 prompt(违反默认 R2),但仅限 vision 路径 + provider 支持 vision
+- 默认 Ollama 本地 provider 即使开 lab 也不外发(本地不算外发)
+- 仍**禁止**:把 deviceId / apiKey / 软删卡进 vision prompt(allowlist 不变)
 
 **改完必做**:
 - [ ] `docs/user/privacy.md` 字段表更新

@@ -59,6 +59,17 @@ export interface Settings {
   /** 导出选项。includeDeleted=true(默认)导出全部含软删/归档卡(完整可恢复备份);
    *  false 时仅导出活跃卡。P2 (2026-06-28)。向后兼容:旧 settings 无此字段 → 默认 true。 */
   export?: { includeDeleted?: boolean }
+  /** 实验室功能(Labs)。默认全关,用户显式开启 = 接受附加风险。
+   *  visionLab 开启后允许 AI 接收图片二进制(media.dataUrl 进 prompt),
+   *  违反默认 R2 隐私铁律——仅作为「附加能力」由用户主动授权,不破坏默认安全态。
+   *  开启时:① /settings 弹不可撤销确认门;② 代码层 if 守卫,vision 路径才可达;
+   *  ③ 默认 Ollama 本地 provider 即使开 lab 也不外发(本地不算外发)。
+   *  向后兼容:旧 settings 无此字段 → 默认全关(labs = {})。 */
+  labs?: {
+    /** vision 大模型实验室:看图描述/OCR、画布视觉理解、图片转画布元素。
+     *  关闭时 vision 路径完全不可达(代码层守卫,非仅 UI 隐藏)。 */
+    visionLab?: boolean
+  }
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -68,6 +79,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ai: null,
   seenCaptureHint: false,
   export: { includeDeleted: true },
+  labs: {},
 }
 
 /** Validate a parsed AI config. null is valid (no AI configured).
@@ -117,6 +129,12 @@ function isValid(v: unknown): v is Settings {
   if (!isValidAIConfig(o.ai)) return false
   if ('seenCaptureHint' in o && typeof o.seenCaptureHint !== 'boolean')
     return false
+  // labs 字段可选(向后兼容);存在时必须是对象,visionLab 可选 boolean。
+  if ('labs' in o && o.labs !== undefined && o.labs !== null) {
+    if (typeof o.labs !== 'object') return false
+    const l = o.labs as Record<string, unknown>
+    if ('visionLab' in l && typeof l.visionLab !== 'boolean') return false
+  }
   return true
 }
 
@@ -132,6 +150,10 @@ function loadSettings(): Settings {
     // Back-fill false so the rest of the app can assume the field exists.
     if (typeof loaded.seenCaptureHint !== 'boolean') {
       loaded.seenCaptureHint = false
+    }
+    // labs 向后兼容:旧 payload 无此字段 → 默认全关(空对象)。
+    if (!loaded.labs || typeof loaded.labs !== 'object') {
+      loaded.labs = {}
     }
     return loaded
   } catch {
@@ -275,6 +297,25 @@ export const settingsStore = {
       notifyQuota()
     }
     notify()
+  },
+  /**
+   * 实验室功能开关更新。partial merge 到现有 labs 对象。
+   * visionLab 等「附加能力」开关,默认全关;用户显式开启 = 接受附加风险。
+   * 返回 true=持久化成功(与 updateAISettings 口径一致,便于 UI toast)。
+   */
+  updateLabs(patch: Partial<NonNullable<Settings['labs']>>): boolean {
+    hydrateOnce()
+    const prev = _settings
+    const merged = { ...(_settings.labs ?? {}), ...patch }
+    _settings = { ..._settings, labs: merged }
+    if (!saveSettings(_settings)) {
+      _settings = prev
+      notifyQuota()
+      notify()
+      return false
+    }
+    notify()
+    return true
   },
   /**
    * M3 — AI settings updater. Accepts a partial patch and merges onto the

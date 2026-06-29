@@ -47,6 +47,9 @@ coverage/
 # One-off audit scripts (underscore prefix = ad-hoc, not shipped tooling)
 scripts/_*.cjs
 
+# One-off product overview reports (not shipped, learning/recap only)
+docs/audit/product-overview-*.md
+
 # Undocumented UX-audit scratch screenshots (auto-generated, no doc reference)
 docs/design/screenshots/phase-ux-mmxa/
 

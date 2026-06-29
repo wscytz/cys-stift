@@ -28,6 +28,8 @@ export default function SettingsPage() {
   const sc = settings.captureShortcut
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
+  // 实验室 vision 开关确认门:开启是不可撤销的隐私让步(允许发图),先弹 Modal。
+  const [visionConfirmOpen, setVisionConfirmOpen] = useState(false)
 
   // 选文件后先弹确认门(覆盖不可撤销),确认后才真正导入。
   const handleImportFile = (files: FileList | null) => {
@@ -189,6 +191,35 @@ export default function SettingsPage() {
 
         <AISettingsPanel />
 
+        {/* 实验室 / Labs — 附加能力,默认全关。开启 = 用户显式接受附加风险。
+            visionLab:允许 AI 接收图片二进制(违反默认 R2 铁律,作为附加能力授权)。
+            开启走确认门(不可撤销隐私让步);关闭直接生效。 */}
+        <section className="section section--labs">
+          <h2 className="section__h">{t('settings.labs.title')}</h2>
+          <p className="section__lede">{t('settings.labs.lede')}</p>
+          <label className="mono-label set__lab-item">
+            <input
+              type="checkbox"
+              checked={settings.labs?.visionLab ?? false}
+              onChange={(e) => {
+                const cur = settings.labs?.visionLab ?? false
+                if (e.target.checked && !cur) {
+                  // 开启走确认门(不可撤销隐私让步)
+                  setVisionConfirmOpen(true)
+                } else if (!e.target.checked && cur) {
+                  settingsStore.updateLabs({ visionLab: false })
+                }
+              }}
+            />
+            <span>
+              {t('settings.labs.visionLabel')}
+              <span className="mono mono--xs set__lab-warn">
+                {t('settings.labs.visionWarn')}
+              </span>
+            </span>
+          </label>
+        </section>
+
         <section className="section">
           <h2 className="section__h">{t('settings.data')}</h2>
           <p className="section__lede">{t('settings.dataLede')}</p>
@@ -308,6 +339,29 @@ export default function SettingsPage() {
         </div>
       </Modal>
 
+      <Modal
+        open={visionConfirmOpen}
+        onClose={() => setVisionConfirmOpen(false)}
+        title={t('settings.labs.visionConfirmTitle')}
+      >
+        <p className="set__confirm-body">{t('settings.labs.visionConfirmBody')}</p>
+        <div className="set__confirm-actions">
+          <Button variant="ghost" onClick={() => setVisionConfirmOpen(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              settingsStore.updateLabs({ visionLab: true })
+              setVisionConfirmOpen(false)
+              pushToast({ kind: 'info', message: t('settings.labs.visionEnabled') })
+            }}
+          >
+            {t('settings.labs.visionConfirmAction')}
+          </Button>
+        </div>
+      </Modal>
+
       <style>{`
 .page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
 .set__select { font-family: var(--font-body); font-size: var(--font-size-base); padding: var(--space-1) var(--space-2); border: var(--border-hairline); border-radius: var(--radius-sm); background: var(--color-white); color: var(--color-black); }
@@ -317,6 +371,10 @@ export default function SettingsPage() {
 .set__import-result--error { color: var(--color-red); }
 .set__confirm-body { margin: 0 0 var(--space-3); font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black-soft); line-height: 1.5; }
 .set__confirm-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
+/* 实验室区:红色左边框 + 警告底色,视觉上区别于普通设置区(暗示附加风险)。 */
+.section--labs { border-left: 3px solid var(--color-red); padding-left: var(--space-3); background: var(--color-red-soft); padding-top: var(--space-3); padding-bottom: var(--space-3); padding-right: var(--space-3); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.set__lab-item { display: flex; gap: var(--space-2); align-items: flex-start; }
+.set__lab-warn { display: block; margin-top: 2px; color: var(--color-red); }
 `}</style>
     </main>
   )
