@@ -30,6 +30,9 @@ export const messages = {
   'cmd.placeholder': { zh: '跳转或搜索…', en: 'Jump or search…' },
   'cmd.group.navigate': { zh: '跳转', en: 'Navigate' },
   'cmd.group.cards': { zh: '卡片', en: 'Cards' },
+  'cmd.group.recent': { zh: '最近编辑', en: 'Recently edited' },
+  'cmd.onCanvas': { zh: '在画布', en: 'On canvas' },
+  'cmd.inInbox': { zh: '在收件箱', en: 'In inbox' },
   'cmd.empty': { zh: '无匹配', en: 'No matches' },
 
   /* ── Home page ── */

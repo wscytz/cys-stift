@@ -110,13 +110,35 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     return hits.slice(0, MAX_CARDS)
   }, [q, query, liveCards])
 
+  // B1 — 最近编辑:空 query 时显示,按 updatedAt 倒序取前 8。点卡走 openCard
+  // (有 canvasPosition 跳画布定位,否则开详情)。
+  const recentCards = useMemo(() => {
+    if (q !== '') return []
+    return [...liveCards]
+      .sort((a, b) => +b.updatedAt - +a.updatedAt)
+      .slice(0, MAX_CARDS)
+  }, [q, liveCards])
+
+  // B1 — 智能开卡:在画布 → 跳 /canvas/?card=ID(canvas 页读 query 居中+开详情);
+  // 不在画布(inbox)→ 开详情 Modal(与现有搜索结果一致)。
+  const openCard = (card: Card) => {
+    if (card.canvasPosition) {
+      onClose()
+      // 用 location 而非 router.push:静态导出下 search params 浏览器原生处理,
+      // 且若已在 /canvas 需触发挂载 effect 重新读 query(push 同页不重挂载)。
+      window.location.href = '/canvas/?card=' + encodeURIComponent(String(card.id))
+    } else {
+      setDetail(card)
+    }
+  }
+
   const go = (href: string) => {
     onClose()
     router.push(href)
   }
 
   const hasNothing =
-    navMatches.length === 0 && cardMatches.length === 0
+    navMatches.length === 0 && cardMatches.length === 0 && recentCards.length === 0
 
   // CardDetailModal 打开时,面板主体藏掉避免视觉重叠(详情 modal 覆盖在上)。
   const showDetail = Boolean(detail)
@@ -160,6 +182,30 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                 </div>
               )}
 
+              {recentCards.length > 0 && (
+                <div className="cmd__group">
+                  <p className="cmd__group-label">{t('cmd.group.recent')}</p>
+                  <ul className="cmd__items">
+                    {recentCards.map((c) => (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          className="cmd__item"
+                          onClick={() => openCard(c)}
+                        >
+                          <span className="cmd__item-label">
+                            {c.title || t('card.untitled')}
+                          </span>
+                          <span className="cmd__item-hint">
+                            {c.canvasPosition ? t('cmd.onCanvas') : t('cmd.inInbox')}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {cardMatches.length > 0 && (
                 <div className="cmd__group">
                   <p className="cmd__group-label">{t('cmd.group.cards')}</p>
@@ -169,7 +215,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                         <button
                           type="button"
                           className="cmd__item"
-                          onClick={() => setDetail(r.card)}
+                          onClick={() => openCard(r.card)}
                         >
                           <span className="cmd__item-label">
                             {r.card.title || t('card.untitled')}

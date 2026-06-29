@@ -110,6 +110,9 @@ export default function CanvasPage() {
    * 一个 pending ref 存模板名,onAdapterReady 触发时检查并消费它。
    */
   const pendingTemplateRef = useRef<TemplateChoice | null>(null)
+  // B1 — 最近编辑跳转的待定位卡 id。从 /canvas/?card=ID 读入,等 adapter 就绪 +
+  // (必要时切画布后 adapter 重建)消费:居中选中 + 开详情。跨 onAdapterReady 保活。
+  const pendingJumpCardRef = useRef<string | null>(null)
   const [renamingId, setRenamingId] = useState<CanvasId | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<CanvasId | null>(null)
   // 二次确认:删画布是不可撤销的破坏性操作,要求输入 "delete" 才点亮危险按钮
@@ -833,6 +836,53 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       aiAbortRef.current?.abort()
     }
   }, [])
+
+  // B1 — 挂载时读 ?card=ID(C command palette 最近编辑跳转来的)。记入 pendingRef,
+  // 清掉 query string(避免刷新重复触发)。消费见下方 adapter 就绪 effect。
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const cardId = params.get('card')
+    if (cardId) {
+      pendingJumpCardRef.current = cardId
+      // 清 query string(replaceState 不留历史,刷新不再触发)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+
+  // B1 — 消费 pendingJumpCardRef:adapter 就绪时,定位到目标卡。
+  // 卡可能在别的画布 → 切画布(SelfCanvas 重建,adapter 重新就绪,本 effect 再跑)。
+  useEffect(() => {
+    const cardId = pendingJumpCardRef.current
+    if (!adapter || !cardId) return
+    const card = service.get(cardId as CardId)
+    if (!card || card.deletedAt) {
+      // 卡不存在/已删 → 清 ref 静默退出
+      pendingJumpCardRef.current = null
+      return
+    }
+    const targetCanvas = card.canvasPosition?.canvasId
+    // 卡在别的画布 → 切过去(adapter 重建,本 effect 再跑消费)
+    if (targetCanvas && targetCanvas !== activeCanvasId) {
+      canvasStore.setActive(targetCanvas)
+      return // 切画布后 adapter 重建,本 effect 重跑
+    }
+    // 卡在当前画布(adapter 有该元素)→ 居中选中 + 开详情
+    const el = adapter.getElement(cardId)
+    if (el) {
+      const v = adapter.getView()
+      const hostEl = document.querySelector('.cv-host canvas') as HTMLCanvasElement | null
+      const cx = (hostEl?.clientWidth ?? 800) / 2
+      const cy = (hostEl?.clientHeight ?? 600) / 2
+      const c = elementCenter(el)
+      const zoom = v.zoom || 1
+      adapter.setView({ ...v, panX: cx - c.x * zoom, panY: cy - c.y * zoom })
+      adapter.setSelectedIds([cardId])
+    }
+    setDetail({ card })
+    pendingJumpCardRef.current = null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adapter])
 
   // 模板应用:新建画布后 pendingTemplateRef 携带模板名,新 adapter 一就绪就
   // applyLayout。依赖 adapter —— canvasStore.create → setActive → SelfCanvas
