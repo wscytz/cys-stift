@@ -54,6 +54,102 @@ body {
 }
 :root[data-theme='dark'] ::-webkit-scrollbar-thumb:hover { background: var(--color-gray); }
 
+/* ── Bauhaus native 控件自绘(v0.39.1 跨平台适配)──────────────────────────
+   Mac/Win 都不复用系统控件 —— 统一一套硬边框、无圆角、token 配色的 Bauhaus 控件。
+   checkbox/select/number 的 native 部分仍由 WebView 处理(语义/可访问性),只覆盖
+   外观(appearance: none + 自绘)。color-scheme 保证残留 native(如 select 下拉面板
+   本体、number 右键菜单)跟随明暗。 */
+
+/* checkbox:硬边框方框,选中实心黑块 + 白勾(暗色反相)。 */
+input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 2px solid var(--color-black);
+  background: var(--color-white);
+  cursor: pointer;
+  display: inline-block;
+  position: relative;
+  flex-shrink: 0;
+  transition: background 80ms ease-out;
+}
+input[type='checkbox']:hover { border-color: var(--color-gray); }
+input[type='checkbox']:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+input[type='checkbox']:checked { background: var(--color-black); }
+input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--color-white);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+:root[data-theme='dark'] input[type='checkbox'] {
+  border-color: var(--color-white);
+  background: transparent;
+}
+:root[data-theme='dark'] input[type='checkbox']:hover { border-color: var(--color-gray); }
+:root[data-theme='dark'] input[type='checkbox']:checked { background: var(--color-white); }
+:root[data-theme='dark'] input[type='checkbox']:checked::after { border-color: var(--color-black); }
+
+/* select:自绘触发器(token 边框 + 自定义 ▾ 箭头),下拉面板本体仍 native。
+   保留原生焦点环供可访问性。 */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--color-white);
+  color: var(--color-black);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-6) var(--space-1) var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  /* 自定义 ▾ 箭头:线性渐变画的 V 形,token 灰。 */
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-gray) 50%),
+    linear-gradient(135deg, var(--color-gray) 50%, transparent 50%);
+  background-position: calc(100% - 14px) calc(50% - 2px), calc(100% - 10px) calc(50% - 2px);
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+}
+select:hover { border-color: var(--color-black); }
+select:focus-visible { outline: 2px solid var(--color-red); outline-offset: 1px; }
+:root[data-theme='dark'] select {
+  background-color: var(--color-black);
+  color: var(--color-white);
+  border-color: var(--color-white);
+}
+:root[data-theme='dark'] select option { background: var(--color-black); color: var(--color-white); }
+
+/* number:隐藏 spinner(Tauri WebView2 下暗色出戏),保留可输入。
+   体积/数量输入用步进,但靠键盘;spinner 隐藏统一外观。 */
+input[type='number'] {
+  background: var(--color-white);
+  color: var(--color-black);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+input[type='number']:focus-visible { outline: 2px solid var(--color-red); outline-offset: 1px; }
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] { -moz-appearance: textfield; }
+:root[data-theme='dark'] input[type='number'] {
+  background-color: var(--color-black);
+  color: var(--color-white);
+  border-color: var(--color-white);
+}
+
 a {
   color: var(--color-blue);
   text-decoration: underline;

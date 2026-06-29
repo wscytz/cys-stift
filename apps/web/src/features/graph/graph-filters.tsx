@@ -98,16 +98,22 @@ const styles = `
   gap: var(--space-1);
 }
 .graph-filters__select {
+  appearance: none; -webkit-appearance: none;
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-1) var(--space-5) var(--space-1) var(--space-2);
   background: var(--color-white);
   color: var(--color-black);
   border: var(--border-hairline);
   border-radius: var(--radius-sm);
   cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-gray) 50%),
+    linear-gradient(135deg, var(--color-gray) 50%, transparent 50%);
+  background-position: calc(100% - 12px) calc(50% - 1px), calc(100% - 9px) calc(50% - 1px);
+  background-size: 3px 3px, 3px 3px; background-repeat: no-repeat;
 }
 .graph-filters__select:focus { outline: 2px solid var(--color-red); outline-offset: 1px; }
+:root[data-theme='dark'] .graph-filters__select { background-color: var(--color-black); color: var(--color-white); border-color: var(--color-white); }
 `

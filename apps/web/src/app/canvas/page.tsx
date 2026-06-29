@@ -1705,7 +1705,19 @@ const styles = `
 .tb-align { display: inline-flex; align-items: center; gap: 0; }
 .tb-align__btn { min-width: 34px; padding: 0 var(--space-1); }
 .tb-align__icon { font-size: var(--font-size-base); line-height: 1; letter-spacing: 0; }
-.cselect { height: 32px; padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-sm); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; min-width: 200px; }
+.cselect {
+  height: 32px; padding: 0 var(--space-6) 0 var(--space-2);
+  background: var(--color-white); color: var(--color-black);
+  font-family: var(--font-mono); font-size: var(--font-size-sm);
+  border: var(--border-hairline); border-radius: var(--radius-sm);
+  cursor: pointer; min-width: 200px;
+  appearance: none; -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-gray) 50%),
+    linear-gradient(135deg, var(--color-gray) 50%, transparent 50%);
+  background-position: calc(100% - 14px) calc(50% - 2px), calc(100% - 10px) calc(50% - 2px);
+  background-size: 4px 4px, 4px 4px; background-repeat: no-repeat;
+}
+:root[data-theme='dark'] .cselect { background-color: var(--color-black); color: var(--color-white); border-color: var(--color-white); }
 .cselect:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cselect-edit { height: 32px; width: 32px; background: transparent; color: var(--color-gray); border: 0; cursor: pointer; font-size: var(--font-size-base); }
 .cselect-edit:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }

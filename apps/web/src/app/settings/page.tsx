@@ -364,7 +364,18 @@ export default function SettingsPage() {
 
       <style>{`
 .page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
-.set__select { font-family: var(--font-body); font-size: var(--font-size-base); padding: var(--space-1) var(--space-2); border: var(--border-hairline); border-radius: var(--radius-sm); background: var(--color-white); color: var(--color-black); }
+.set__select {
+  appearance: none; -webkit-appearance: none;
+  font-family: var(--font-body); font-size: var(--font-size-base);
+  padding: var(--space-1) var(--space-6) var(--space-1) var(--space-2);
+  border: var(--border-hairline); border-radius: var(--radius-sm);
+  background: var(--color-white); color: var(--color-black);
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-gray) 50%),
+    linear-gradient(135deg, var(--color-gray) 50%, transparent 50%);
+  background-position: calc(100% - 14px) calc(50% - 2px), calc(100% - 10px) calc(50% - 2px);
+  background-size: 4px 4px, 4px 4px; background-repeat: no-repeat;
+}
+:root[data-theme='dark'] .set__select { background-color: var(--color-black); color: var(--color-white); border-color: var(--color-white); }
 .set__current-code { background: var(--color-gray-soft); padding: 2px var(--space-1); border-radius: var(--radius-sm); }
 .set__import { margin-top: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); }
 .set__file { margin-top: var(--space-1); font-family: var(--font-body); font-size: var(--font-size-sm); }
