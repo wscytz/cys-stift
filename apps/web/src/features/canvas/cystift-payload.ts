@@ -59,7 +59,7 @@ export function buildCystiftPayload(
     v: 1,
     app: 'cys-stift',
     canvas: { id: canvasId, name: canvasName },
-    cards: service.listAll().filter((c) => c.canvasPosition?.canvasId === canvasId),
+    cards: service.listOnCanvas(canvasId),
     elements: host.getElements(),
   }
 }
