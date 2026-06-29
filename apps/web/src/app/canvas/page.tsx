@@ -901,7 +901,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           canvasElRef={canvasElRef}
           onAdapterReady={setAdapter}
         />
-        {!ready ? null : onCanvas === 0 && !hasFreeform && (
+        {!ready ? null : onCanvas === 0 && !hasFreeform && (adapter?.getElements().length ?? 0) === 0 && (
           <div className="cv-empty">
             <CanvasEmptyMotif />
             <span className="eyebrow">{t('canvas.emptyTitle')}</span>

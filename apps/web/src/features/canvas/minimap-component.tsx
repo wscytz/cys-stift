@@ -22,8 +22,8 @@ import {
   minimapClickToPage,
 } from './minimap'
 
-const MINIMAP_W = 160
-const MINIMAP_H = 120
+const MINIMAP_W = 180
+const MINIMAP_H = 135
 
 export function Minimap({
   host,
@@ -193,7 +193,9 @@ export function Minimap({
     <div
       style={{
         position: 'absolute',
-        right: 'var(--space-1)',
+        // 挪到左下:画布右栏(CanvasSideRail)占据右下,minimap 在右下会被完全遮挡
+        // 不可见。左下角空闲,挪过去避让。Z-index 10 高于画布(0)低于浮 panel(30)。
+        left: 'var(--space-1)',
         bottom: 'var(--space-1)',
         width: MINIMAP_W,
         zIndex: 10,
