@@ -25,6 +25,39 @@ import {
 const MINIMAP_W = 180
 const MINIMAP_H = 135
 
+/** minimap 位置持久化 key。null = 用默认(右下偏左避让右栏)。 */
+const POSITION_KEY = 'cys-stift.minimap-pos.v1'
+
+interface MinimapPos {
+  /** 相对画布容器的 left/right 二选一(未设的那侧用 null)。
+   *  用 right 优先(默认避让右栏),拖到左半屏自动切 left 锚定。 */
+  left: number | null
+  top: number | null
+}
+
+/** 默认位置:右下,但 right 偏移跳过右栏(~78px + 留白),不挡 rail。 */
+const DEFAULT_POS: MinimapPos = { left: null, top: null }
+
+function loadPos(): MinimapPos {
+  if (typeof window === 'undefined') return DEFAULT_POS
+  try {
+    const raw = window.localStorage.getItem(POSITION_KEY)
+    if (!raw) return DEFAULT_POS
+    const p = JSON.parse(raw) as Partial<MinimapPos>
+    if (typeof p.left === 'number' || typeof p.top === 'number') {
+      return { left: typeof p.left === 'number' ? p.left : null, top: typeof p.top === 'number' ? p.top : null }
+    }
+  } catch { /* ignore */ }
+  return DEFAULT_POS
+}
+
+function savePos(p: MinimapPos): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(POSITION_KEY, JSON.stringify(p))
+  } catch { /* quota — best-effort, 静默 */ }
+}
+
 export function Minimap({
   host,
   canvasEl,
@@ -38,6 +71,10 @@ export function Minimap({
   // 拖拽态:pointer down 后挂 window move/up 监听,使拖拽不离开 minimap 也连续。
   const [collapsed, setCollapsed] = useState(false)
   const draggingRef = useRef(false)
+  // minimap 位置(可拖拽,持久化到 localStorage)。null left/right = 默认右下避让右栏。
+  const [pos, setPos] = useState<MinimapPos>(DEFAULT_POS)
+  const containerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { setPos(loadPos()) }, [])
   const { t } = useI18n()
 
   /** 绘制一帧。 */
@@ -184,19 +221,69 @@ export function Minimap({
     window.addEventListener('pointercancel', onUp)
   }
 
+  // 拖拽标题栏移动 minimap。用绝对 left/top 定位(脱离默认右下),拖完持久化。
+  // 拖拽中阻止点击折叠(避免拖完误折叠)。clamp 在画布容器内,不超出。
+  const justDraggedRef = useRef(false)
+  // 持久化:pos 变化时(拖拽中实时 + 初始化后)写 localStorage。
+  // 用 ref 避免初始化 DEFAULT_POS 时也写一次(只写用户拖拽过的)。
+  const wroteInitialRef = useRef(false)
+  useEffect(() => {
+    if (!wroteInitialRef.current) { wroteInitialRef.current = true; return }
+    savePos(pos)
+  }, [pos])
+
   if (!host || !canvasEl) return null
 
   const title = t('canvas.minimap')
   const collapseLabel = collapsed ? t('canvas.minimapExpand') : t('canvas.minimapCollapse')
 
+  const onTitlePointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return
+    const container = containerRef.current?.parentElement
+    if (!container) return
+    const startClientX = e.clientX
+    const startClientY = e.clientY
+    const box = containerRef.current!.getBoundingClientRect()
+    const startLeft = box.left
+    const startTop = box.top
+    let moved = false
+    const onMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - startClientX
+      const dy = ev.clientY - startClientY
+      if (!moved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return
+      moved = true
+      justDraggedRef.current = true
+      const contRect = container.getBoundingClientRect()
+      // clamp:left ∈ [0, contW - minimapW], top ∈ [appMenuH, contH - titleH]
+      const maxLeft = Math.max(0, contRect.width - MINIMAP_W - 4)
+      const maxTop = Math.max(0, contRect.height - 40)
+      const newLeft = Math.min(Math.max(0, startLeft - contRect.left + dx), maxLeft)
+      const newTop = Math.min(Math.max(0, startTop - contRect.top + dy), maxTop)
+      setPos({ left: newLeft, top: newTop })
+    }
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+  }
+
+
+  // 定位:有用户位置用 left/top,否则默认右下避让右栏。
+  const positioned = pos.left !== null && pos.top !== null
+  const positionStyle: React.CSSProperties = positioned
+    ? { left: pos.left!, top: pos.top!, right: 'auto', bottom: 'auto' }
+    : { right: 'calc(78px + var(--space-2))', bottom: 'var(--space-1)', left: 'auto', top: 'auto' }
+
   return (
     <div
+      ref={containerRef}
       style={{
         position: 'absolute',
-        // 挪到左下:画布右栏(CanvasSideRail)占据右下,minimap 在右下会被完全遮挡
-        // 不可见。左下角空闲,挪过去避让。Z-index 10 高于画布(0)低于浮 panel(30)。
-        left: 'var(--space-1)',
-        bottom: 'var(--space-1)',
+        ...positionStyle,
         width: MINIMAP_W,
         zIndex: 10,
         background: 'var(--color-white)',
@@ -205,17 +292,19 @@ export function Minimap({
         borderRadius: 'var(--radius-sm)',
       }}
     >
-      {/* 标题栏:mono small-caps 标题 + 折叠开关。group landmark 让 SR 把
-          标题和折叠按钮视为一个整体区域(标题文字作为 group 的 accessible name)。 */}
+      {/* 标题栏:mono small-caps 标题 + 折叠开关。可拖拽(cursor: move)。group landmark。 */}
       <div
         role="group"
         aria-label={title}
+        onPointerDown={onTitlePointerDown}
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: 'var(--space-1)',
           borderBottom: collapsed ? 'none' : 'var(--border-hairline)',
+          cursor: 'move',
+          touchAction: 'none',
         }}
       >
         <span
@@ -231,7 +320,11 @@ export function Minimap({
         </span>
         <button
           type="button"
-          onClick={() => setCollapsed((c) => !c)}
+          onClick={() => {
+            // 拖拽刚结束(pointerup 后浏览器仍 fire click)→ 吞掉,不折叠
+            if (justDraggedRef.current) { justDraggedRef.current = false; return }
+            setCollapsed((c) => !c)
+          }}
           aria-label={collapseLabel}
           aria-expanded={!collapsed}
           title={collapseLabel}
