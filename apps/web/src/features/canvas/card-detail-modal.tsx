@@ -20,6 +20,8 @@ import { typeKeyOf } from '@/lib/type-label'
 import { findBacklinks } from './backlinks'
 import { resolveCardByTitle } from './embed-links'
 import { useDb } from '@/lib/db-client'
+import { useGlobalEdges } from '@/features/graph/use-global-edges'
+import type { MessageKey } from '@/lib/i18n/messages'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 
 export function CardDetailModal({
@@ -52,6 +54,10 @@ export function CardDetailModal({
   // BR-T5 — 块引用嵌入:((标题)) → 目标卡 body/title。useDb 拿 service 解析,
   // 这样画布版正文也支持嵌入(与共享版口径一致)。
   const { service } = useDb()
+  // B2 — 跨画布 backlinks:用全局边(聚合所有画布 freeform arrow),替代单画布
+  // findBacklinks。与 graph 页 / 共享版 CardDetailModal 口径统一。loaded=false
+  // 时边还在异步聚合,先空 backlinks 区,算完补上(与共享版同)。
+  const { edges: globalEdges, loaded: edgesLoaded } = useGlobalEdges()
   const resolveEmbed = (title: string): { body: string; title: string } | null => {
     const id = resolveCardByTitle(service.listAll(), title)
     if (!id) return null
@@ -145,34 +151,34 @@ export function CardDetailModal({
                   </ul>
                 </section>
               )}
-              {host && getCardTitle && (() => {
-                const bl = findBacklinks(host, card.id)
-                const total = bl.incoming.length + bl.outgoing.length
-                if (total === 0) return null
-                const renderRow = (b: { otherCardId: string; relation: { labelKey: import('@/lib/i18n/messages').MessageKey } | null; arrowId: string }, dir: 'in' | 'out') => {
-                  const title = getCardTitle(b.otherCardId) ?? t('card.detail.untitledCard')
-                  const relLabel = b.relation ? t(b.relation.labelKey) : t('card.detail.relatedUntyped')
-                  return (
-                    <li key={b.arrowId} className="cd__backlink">
-                      <button
-                        type="button"
-                        className="cd__backlink-btn"
-                        onClick={() => onJumpToCard?.(b.otherCardId)}
-                        title={t(dir === 'in' ? 'card.detail.backlinkJumpIn' : 'card.detail.backlinkJumpOut')}
-                      >
-                        <span className="cd__backlink-dir" aria-hidden="true">{dir === 'in' ? '←' : '→'}</span>
-                        <span className="cd__backlink-title">{title}</span>
-                        <span className="cd__backlink-rel">{relLabel}</span>
-                      </button>
-                    </li>
+              {(() => {
+                // B2 — 跨画布 backlinks:用 globalEdges(所有画布聚合),替代单画布
+                // findBacklinks。host 仅作 fallback(无 globalEdges 时退回单画布)。
+                // card.id 在画布上是 element id === CardId,直接过滤 from/to。
+                const cid = String(card.id)
+                const incoming = globalEdges.filter((e) => e.to === cid)
+                const outgoing = globalEdges.filter((e) => e.from === cid)
+                const total = incoming.length + outgoing.length
+                // 边还在聚合(异步)且 host 有(单画布兜底) → 用 findBacklinks 先显
+                if (total === 0 && !edgesLoaded && host) {
+                  const bl = findBacklinks(host, card.id)
+                  return bl.incoming.length + bl.outgoing.length === 0 ? null : (
+                    <section className="cd__sec">
+                      <h3 className="eyebrow">{t('card.detail.backlinks')}</h3>
+                      <ul className="cd__backlinks">
+                        {bl.incoming.map((b) => renderBacklinkRow(b.otherCardId, b.relation?.labelKey ?? null, b.arrowId, 'in', getCardTitle, t, onJumpToCard))}
+                        {bl.outgoing.map((b) => renderBacklinkRow(b.otherCardId, b.relation?.labelKey ?? null, b.arrowId, 'out', getCardTitle, t, onJumpToCard))}
+                      </ul>
+                    </section>
                   )
                 }
+                if (total === 0) return null
                 return (
                   <section className="cd__sec">
                     <h3 className="eyebrow">{t('card.detail.backlinks')}</h3>
                     <ul className="cd__backlinks">
-                      {bl.incoming.map((b) => renderRow(b, 'in'))}
-                      {bl.outgoing.map((b) => renderRow(b, 'out'))}
+                      {incoming.map((e) => renderBacklinkRow(e.from, e.relationType?.labelKey ?? null, e.arrowId, 'in', getCardTitle, t, onJumpToCard))}
+                      {outgoing.map((e) => renderBacklinkRow(e.to, e.relationType?.labelKey ?? null, e.arrowId, 'out', getCardTitle, t, onJumpToCard))}
                     </ul>
                   </section>
                 )
@@ -316,6 +322,35 @@ export function CardDetailModal({
 
       <style>{styles}</style>
     </>
+  )
+}
+
+/** B2 — backlinks 行渲染(跨画布 globalEdges + 单画布 findBacklinks 兜底共用)。
+ *  抽出来避免 backlinks 区里两个分支重复 JSX。 */
+function renderBacklinkRow(
+  otherCardId: string,
+  labelKey: MessageKey | null,
+  arrowId: string,
+  dir: 'in' | 'out',
+  getCardTitle: ((id: string) => string | undefined) | undefined,
+  t: (k: MessageKey) => string,
+  onJumpToCard: ((cardId: string) => void) | undefined,
+) {
+  const title = getCardTitle?.(otherCardId) ?? t('card.detail.untitledCard')
+  const relLabel = labelKey ? t(labelKey) : t('card.detail.relatedUntyped')
+  return (
+    <li key={arrowId} className="cd__backlink">
+      <button
+        type="button"
+        className="cd__backlink-btn"
+        onClick={() => onJumpToCard?.(otherCardId)}
+        title={t(dir === 'in' ? 'card.detail.backlinkJumpIn' : 'card.detail.backlinkJumpOut')}
+      >
+        <span className="cd__backlink-dir" aria-hidden="true">{dir === 'in' ? '←' : '→'}</span>
+        <span className="cd__backlink-title">{title}</span>
+        <span className="cd__backlink-rel">{relLabel}</span>
+      </button>
+    </li>
   )
 }
 
