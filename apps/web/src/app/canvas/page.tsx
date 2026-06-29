@@ -33,13 +33,14 @@ import { parseDsl, parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
 import { TemplatePicker, type TemplateChoice } from '@/features/canvas/template-picker'
 import { allTemplates, saveCustomTemplate } from '@/lib/canvas-templates'
 import { streamText } from '@/features/ai/stream-text'
+import { summarizeOutline } from '@/features/ai/workflows'
 import {
   buildClusterUserPrompt,
   parseClusters,
   applyClusters,
   CLUSTER_SYSTEM_PROMPT,
 } from '@/features/ai/cluster'
-import { useAIEnabled, getCurrentAI } from '@/features/ai/ai-settings-provider'
+import { useAIEnabled, getCurrentAI, isAIReady } from '@/features/ai/ai-settings-provider'
 import { AiSetupCard } from '@/features/ai/ai-setup-card'
 import { shouldShowAiSetupForLayout } from './ai-layout-gate'
 import type { AIConfig } from '@/features/ai/types'
@@ -78,7 +79,7 @@ export default function CanvasPage() {
   const [eraserMode, setEraserMode] = useState<'text' | 'card' | 'all'>('all')
   // AI loading + abort(审计 M5+M9):async 调用期间禁用按钮防重复点击,
   // AbortController 在卸载/取消时 abort,省 API 费 + 防 unmounted setState。
-  const [aiBusy, setAiBusy] = useState<null | 'layout' | 'cluster'>(null)
+  const [aiBusy, setAiBusy] = useState<null | 'layout' | 'cluster' | 'outline'>(null)
   const aiAbortRef = useRef<AbortController | null>(null)
   // Task 6: when AI isn't ready, the AI-layout entry shows the AiSetupCard
   // guide overlay instead of silently no-oping. Toggled by handleAILayout.
@@ -436,7 +437,50 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCanvasId, service, t, aiBusy])
 
-  // 键盘:+ - 0 1 g + 工具切换 v/p/e/t/c(Figma/Excalidraw 习惯)。input/textarea + 模态打开时跳过。
+  // 总结大纲工作流(W-T4):读当前画布卡片 → AI 生成 Markdown 大纲 → 写入 inbox
+  // 新卡。走 summarizeOutline(内部 serializeCardsForAI allowlist + 软删过滤,
+  // 无 deviceId / 无 media.dataUrl,遵守 AI 隐私铁律,无 vision)。
+  // AI 未就绪 → AiSetupCard 引导(与 handleAILayout 同门,不静默 no-op)。
+  const handleAIOutline = useCallback(async () => {
+    // 防重复点击:已在跑则忽略(审计 M5)。
+    if (aiBusy) return
+    // AI 未就绪(未配置 / 禁用 / 缺 key)→ 弹 AiSetupCard 引导,不静默 no-op。
+    const cfg = getCurrentAI()
+    if (!isAIReady(cfg)) {
+      setShowAiSetup(true)
+      return
+    }
+    setAiBusy('outline')
+    const ac = new AbortController()
+    aiAbortRef.current = ac
+    try {
+      const res = await summarizeOutline({
+        service,
+        canvasId: activeCanvasId,
+        signal: ac.signal,
+      })
+      if (!res.ok) {
+        // 卡片太少(<2):AI 已在函数内门控返回;此处给明确提示而非静默。
+        pushToast({ kind: 'info', message: t('ai.workflow.outlineTooFew') })
+        return
+      }
+      if (res.empty) {
+        pushToast({ kind: 'info', message: t('ai.workflow.outlineEmpty') })
+        return
+      }
+      pushToast({ kind: 'success', message: t('ai.workflow.outlineDone') })
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') {
+        pushToast({ kind: 'info', message: t('canvas.aiCancelled') })
+      } else {
+        pushToast({ kind: 'error', message: t('ai.error', { error: (e as Error).message }) })
+      }
+    } finally {
+      setAiBusy(null)
+      aiAbortRef.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCanvasId, service, t, aiBusy])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // ⌘C / Ctrl+C 复制选中元素为 DSL(剪贴板交换格式)。必须在下面
@@ -888,6 +932,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           onAILayout={handleAILayout}
           onAICluster={handleAICluster}
           onAutoRelate={handleAutoRelate}
+          onAIOutline={handleAIOutline}
           onFrame={handleFrame}
           onOutline={() => setOutlineOpen((o) => !o)}
           onOverview={() => setOverviewOpen(true)}
@@ -1215,6 +1260,7 @@ function CanvasSideRail({
   onAILayout,
   onAICluster,
   onAutoRelate,
+  onAIOutline,
   onFrame,
   onOutline,
   onDsl,
@@ -1225,7 +1271,7 @@ function CanvasSideRail({
   onShortcuts,
 }: {
   aiEnabled: boolean
-  aiBusy: null | 'layout' | 'cluster'
+  aiBusy: null | 'layout' | 'cluster' | 'outline'
   showAutoRelate: boolean
   adapterReady: boolean
   outlineOpen: boolean
@@ -1242,6 +1288,7 @@ function CanvasSideRail({
   onAILayout: () => void
   onAICluster: () => void
   onAutoRelate: () => void
+  onAIOutline: () => void
   onFrame: () => void
   onOutline: () => void
   onOverview: () => void
@@ -1253,31 +1300,56 @@ function CanvasSideRail({
 }) {
   const { t } = useI18n()
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  // AI 工作流 popover(聚类重排 / 生成关系 / 总结大纲)。复用导出菜单同款 portal
+  // + fixed 定位模式(逃离 rail 的 overflow 裁剪)。
+  const [wfMenuOpen, setWfMenuOpen] = useState(false)
+  const wfTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const [wfMenuPos, setWfMenuPos] = useState<{ left: number; top: number } | null>(null)
   // P0 #1: 渲染到 body 的 portal,让导出二级菜单逃离 .cv-rail 的 overflow-y:auto
   // (overflow-y:auto 会让 overflow-x 计算成 auto,横向裁掉左侧弹出的菜单)。
   // 用 fixed 定位 + trigger 的 getBoundingClientRect;开/关 + 窗口 resize 时重测。
   const exportTriggerRef = useRef<HTMLButtonElement | null>(null)
   const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null)
+  const measureMenu = (
+    open: boolean,
+    triggerRef: React.RefObject<HTMLButtonElement | null>,
+    setPos: (updater: (prev: { left: number; top: number } | null) => { left: number; top: number } | null) => void,
+    menuWidth = 168,
+  ) => {
+    if (!open) {
+      setPos(() => null)
+      return
+    }
+    const el = triggerRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    // 菜单宽 + 8 间距;左边沿 = trigger 左沿 - 菜单宽 - 间距。顶对齐 trigger 顶沿。
+    const left = Math.max(8, rect.left - menuWidth - 8)
+    const top = rect.top
+    setPos((prev) => (prev && prev.left === left && prev.top === top ? prev : { left, top }))
+  }
   useLayoutEffect(() => {
     if (!exportMenuOpen) {
       setMenuPos(null)
       return
     }
-    const measure = () => {
-      const el = exportTriggerRef.current
-      if (!el) return
-      const rect = el.getBoundingClientRect()
-      // 菜单宽 168 + 8 间距;左边沿 = trigger 左沿 - 菜单宽 - 间距。
-      // 顶对齐 trigger 顶沿(原 .cv-rail__menu top:0 相对 group,行为一致)。
-      const MENU_WIDTH = 168
-      const left = Math.max(8, rect.left - MENU_WIDTH - 8)
-      const top = rect.top
-      setMenuPos((prev) => (prev && prev.left === left && prev.top === top ? prev : { left, top }))
-    }
+    const measure = () => measureMenu(exportMenuOpen, exportTriggerRef, setMenuPos)
     measure()
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exportMenuOpen])
+  useLayoutEffect(() => {
+    if (!wfMenuOpen) {
+      setWfMenuPos(null)
+      return
+    }
+    const measure = () => measureMenu(wfMenuOpen, wfTriggerRef, setWfMenuPos)
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wfMenuOpen])
   return (
     <nav className="cv-rail" aria-label={t('canvas.sideRail')}>
       <RailButton label={t('canvas.undo')} short={t('canvas.rail.undo')} onClick={onUndo} disabled={!adapterReady || !canUndo} icon="↶" />
@@ -1291,7 +1363,12 @@ function CanvasSideRail({
       {aiEnabled && (
         <>
           <RailButton label={t('canvas.aiLayout')} short={t('canvas.rail.aiLayout')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'layout'} ariaBusy={aiBusy === 'layout'} busyTitle={t('canvas.aiRunning')} onClick={onAILayout} icon="✨" />
-          <RailButton label={t('canvas.aiCluster')} short={t('canvas.rail.aiCluster')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'cluster'} onClick={onAICluster} icon="🧠" />
+          {/* AI 工作流 popover:聚类重排 / 生成关系 / 总结大纲。3 项分别是现有
+              handler 的分组入口。菜单项 disabled 同各自前置(cluster/relate 走
+              现有 handler,内含选中/卡片数门控;outline 走 summarizeOutline)。 */}
+          <div className="cv-rail__group">
+            <RailButton label={t('ai.workflow.title')} short={t('canvas.rail.aiWorkflow')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'outline'} ariaBusy={aiBusy === 'outline'} busyTitle={t('canvas.aiRunning')} onClick={() => setWfMenuOpen((o) => !o)} pressed={wfMenuOpen} icon="⚙" buttonRef={wfTriggerRef} />
+          </div>
         </>
       )}
       {showAutoRelate && (
@@ -1320,6 +1397,24 @@ function CanvasSideRail({
             <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={!adapterReady} onClick={() => { setExportMenuOpen(false); onExport() }}>{t('canvas.exportImage')}</button>
             <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={!adapterReady} onClick={() => { setExportMenuOpen(false); onMarkdown() }}>{t('canvas.markdown')}</button>
             <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={!adapterReady} onClick={() => { setExportMenuOpen(false); onDsl() }}>{t('canvas.dslTitle')}</button>
+          </div>
+        </>,
+        document.body,
+      )}
+      {wfMenuOpen && typeof document !== 'undefined' && createPortal(
+        <>
+          <div className="cv-rail__menu-backdrop" onClick={() => setWfMenuOpen(false)} aria-hidden="true" />
+          <div
+            className="cv-rail__menu"
+            role="menu"
+            aria-label={t('ai.workflow.title')}
+            style={wfMenuPos ? { left: `${wfMenuPos.left}px`, top: `${wfMenuPos.top}px` } : { visibility: 'hidden' }}
+          >
+            {/* 聚类重排 / 生成关系 复用现有 handler(内含选中/卡片数门控);
+                总结大纲走 summarizeOutline(AI 未就绪时 handler 弹 AiSetupCard)。 */}
+            <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={aiBusy !== null} onClick={() => { setWfMenuOpen(false); onAICluster() }}>{t('ai.workflow.cluster')}</button>
+            <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={aiBusy !== null} onClick={() => { setWfMenuOpen(false); onAutoRelate() }}>{t('ai.workflow.relate')}</button>
+            <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={aiBusy !== null} onClick={() => { setWfMenuOpen(false); onAIOutline() }}>{t('ai.workflow.outline')}</button>
           </div>
         </>,
         document.body,
