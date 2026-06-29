@@ -5,6 +5,35 @@
 
 ---
 
+## 2026-06-30 · v0.39.1 · windows-adaptation(跨平台字体分层 + native 控件 Bauhaus 化 + color-scheme)
+
+Windows 内测反馈驱动的适配批。目标:Windows 上观感与 macOS 一致(Bauhaus 气质不垮)。
+
+**字体分层(切法 1:用户内容走系统中文回退)**
+- 新增 `--font-content` token(Inter→苹方→雅黑UI),用户内容(卡片 title/body、MarkdownBody、详情编辑、inbox 创建框、archive tile、**Canvas 2D 卡片渲染**)走系统中文回退;UI chrome 仍用自托管设计字体。
+- **JetBrains Mono 补自托管**(Bauhaus 等宽骨架,Win 回退 Consolas 最违和)。三套设计字体(Space Grotesk + Inter + JetBrains Mono)跨平台自托管。
+- 保留全量自托管中文可能:`--font-content` 回退链结构在,以后链首插字体名即可。
+
+**平台显示 util(`platform.ts`)**
+- `isMac()` 三级检测(userAgentData→userAgent→废弃的 platform)+ `modSymbol()`。
+- 首页 hint / mini-input 提交提示 / shortcut-help-dialog 按 ⌘/Ctrl 切显示,不再 `Ctrl/Cmd` 模糊。
+
+**`color-scheme` 声明(暗色 native 控件出戏根因)**
+- `:root` 加 `color-scheme: light`,`[data-theme='dark']` 加 `color-scheme: dark`。
+- WebView2/WebKit 的 native 控件(select/checkbox/滚动条/number spinner)看的是 `color-scheme` 非 CSS var → 暗色下曾渲染系统亮色夹在暗色 token 里出戏。声明后跟随明暗。
+
+**Bauhaus native 控件自绘(Mac/Win 全量适配,不复用系统)**
+- **checkbox**(5 处自动继承):`appearance:none` 硬边框方框 + 选中实心黑块白勾,暗色反相。
+- **select**(全局 + 3 个 class:set__select/cselect/graph-filters__select):自绘触发器(token 边框 + CSS 渐变 ▾ 箭头),下拉面板本体仍 native(color-scheme 暗色跟随)。
+- **number**:隐藏 webkit spinner(WebView2 暗色出戏)。
+- **滚动条**:全局 `::-webkit-scrollbar` 硬色块无圆角 + Firefox `scrollbar-color`,暗色反相。Mac 不复用 overlay,Win 不用系统灰。
+
+**修正**:`apps/web/src/styles/tokens.css` 是死副本(globals 只 import packages/ui),font-content/color-scheme 以 `packages/ui/src/tokens.css` 为权威源。
+
+**验证**:domain/db/canvas-engine/web 测试全绿(842);build exit 0。tag `v0.39.1`。Windows 打包走 CI(本地 macOS 无法 cross-compile,缺 llvm-rc)。
+
+---
+
 ## 2026-06-29 · v0.39.0 · polish-followup-fixes(自审修复 + 版本对齐 + 文档同步)
 
 v0.38.0 落地后的收尾轮:主模型自查承重代码(避开 subagent 审计的假阳性),修 3 个真 bug + 文档同步 + 版本号对齐。
