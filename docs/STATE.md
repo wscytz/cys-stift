@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.38.0(未 tag)。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.39.0。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 
@@ -29,7 +29,8 @@
 | v0.33.1–v0.33.2 | AI 数据上下文 + AI 排版(DSL) | v0.33.1 / v0.33.2 |
 | v0.36.0 | 全文搜索增强(打分 + 摘要) | v0.36.0-search |
 | v0.37.0 | 全量加固(第二个稳定版):真 bug 修复 + tsc 门禁 + 文档重构 | v0.37.0 |
-| **v0.38.0** | **知识网络(graph/块引用/全局关系/详情建关系/命令面板/标签墙/⌘C)+ 白板专业度(对齐分布/模板/AI工作流)+ 打磨批(自动布局/焦点模式/模板导入/最近编辑跳转/跨画布backlinks/frame双击重命名/vision实验室骨架)** | *(未 tag,本地 main 领先)* |
+| **v0.38.0** | **知识网络(graph/块引用/全局关系/详情建关系/命令面板/标签墙/⌘C)+ 白板专业度(对齐分布/模板/AI工作流)+ 打磨批(自动布局/焦点模式/模板导入/最近编辑跳转/跨画布backlinks/frame双击重命名/vision实验室骨架)** | v0.38.0 |
+| **v0.39.0** | **自审修复(minimap 拖拽 clamp / B1 孤儿卡卡死 / 模板空 DSL 误导)+ 版本号对齐 + 文档同步** | v0.39.0 |
 
 > v0.18–v0.21 版本号在历史中跳过(从 v0.17.0 直接进 v0.22.0),非缺失。
 > **v0.27.1-review-hardening 无独立 tag** — 该轮 hardening(rehydrateCards / parseCardsRaw / geometry reconcile / M1 label)的工作被折进 v0.31.0 重构(refactor v0.31.0-p1.2/p1.3,见 `docs/decisions/2026-06-21-v0.27.1-review-hardening.md`)。
@@ -122,6 +123,7 @@
 > **当前阶段:打磨期(2026-06-26 起)** — 主线 + P10 + UI/a11y/鲁棒三轮 + AI门槛/记录栏/canvas-UI 自适应批 全完成。
 > 判断"这一步该不该做"先读 **[`docs/development/polish-phase.md`](development/polish-phase.md)**(打磨 vs 修缝判据 + 反馈驱动流程 + 退出标准),而非"还有没有缝可修"。
 > 燃料 = 你手测的真实反馈(backlog A,当前空)。
+- **自审修复 + 文档同步(2026-06-29,v0.39.0)**:v0.38.0 落地后主模型自查承重代码(避开 subagent 审计假阳性),修 3 真 bug —— minimap 拖拽底部 clamp(展开态拖出容器)/ B1 跳转孤儿卡卡死(canvasPosition 指向已删画布 setActive no-op → ref 永不清)/ 模板导入空 DSL 误导反馈。核验 auto-layout/B1/B3a/B2/useGlobalEdges 无 bug。文档同步 v0.38.0(changelog 四段 + STATE 当前能力 + user/README frame+布局+Graph/命令面板/标签墙 + privacy vision 修订)。`.gitignore` 补过程文件规则(一次 `git add -A` 误提 216 过程文件,reset+force push 清除)。测试全绿(842)+ build exit 0。详见 changelog。
 - **知识网络 + 白板专业度 + 打磨 Batch A/B(2026-06-28~29,v0.38.0)**:三批汇成 v0.38.0。**知识网络 Phase 1-3**(/graph 全局图谱 d3-force / `((标题))` 块引用嵌入 embeds 关系 / useGlobalEdges 跨画布聚合 / 详情 relation-picker 建删关系 / ⌘K 命令面板 + 最近编辑跳转 / `/tags` 标签墙 / ⌘C 选区 DSL)。**白板专业度 Phase 1**(applyAlign 对齐分布 9 操作纯函数 + 画布模板 4 预设+自建 + AI 工作流 3 预设)。**打磨 Batch A**(dagre 自动布局 ⇅ / ⌘. 焦点模式 / 模板导入 📥)。**打磨 Batch B**(B1 最近编辑跳转智能开卡 / B2 跨画布 backlinks / B3a frame 双击重命名;B3b 拖框 defer)。**产品 audit 修复**(老数据 `?? []` 兜底 / CRITICAL-2 软删卡嵌入穿透 / 标签对比度 / minimap 拖拽 / DSL 入口提级;HIGH-3 listOnCanvas 默认过滤经 review 判误判已回退,**勿重做**)。**vision 实验室骨架**(v0.30「永久不做」→ v0.38 修订为附加能力默认关 + 确认门 + `useVisionLabEnabled()` 代码守卫;R2 不破,三能力实装 defer)。测试全绿;build exit 0;.app/.dmg 已重建;**未 push**(本地 main 领先远程)。详见 changelog。
 
 - **橡皮可靠性加固 + 几何装饰重做(2026-06-27,eraser-reliability-and-motif-redesign)**:用户「三条线删不掉」→ 6 个 probe 证实引擎/web 都能删,真因是命中精度(线细+缩小)→ writing-plans + subagent 驱动 5 task 加固:`eraserHitTest` 线类 16px 宽松命中 + eraseAt 接入 + 圆圈光标(看清擦哪)+ 模式误选 toast(引导切全部)。另:用户不满意原 BauhausMotif(三形横排太散)→ 扩 overlap/linear/orbit 3 精致 variant(/design 展示),用户选 **overlap**(Kandinsky 重叠构图)落地 inbox/archive/trash 空状态(size 160),文案打磨有温度。PageLoading 已够好(克制骨架),路由 fade-in 风险>收益不改。canvas-engine 390(+3)/web 771 全绿;build exit 0。详见 changelog。

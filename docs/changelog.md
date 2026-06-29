@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-06-29 · v0.39.0 · polish-followup-fixes(自审修复 + 版本对齐 + 文档同步)
+
+v0.38.0 落地后的收尾轮:主模型自查承重代码(避开 subagent 审计的假阳性),修 3 个真 bug + 文档同步 + 版本号对齐。
+
+**自审修复(主模型逐文件核验,实测复核)**
+- **minimap 拖拽底部 clamp 错误**(commit `b346566`):`maxTop = contRect.height - 40` 只预留 40px,展开态(~155px)能被拖出容器底边 ~115px。修:改用 `box.height`(minimap 实际高度,展开/折叠都对)。
+- **B1 跳转孤儿卡卡死**(commit `692d383`):命令面板跳 `/canvas/?card=ID`,卡片 `canvasPosition` 指向已删画布(老数据/导入边界)→ `canvasStore.setActive` no-op → adapter 不重建 → effect 不重跑 → `pendingJumpCardRef` 永不清 → 跳转卡死。修:切画布前查画布存在性(`getCanvasesSnapshot`),孤儿卡清 canvasPosition 回 inbox + 开详情(不卡死)。
+- **模板导入空 DSL 误导反馈**(commit `692d383`):用户清空 DSL 输入点确定(非取消)原走 `addCustomTemplate` 返回 false → 显示「存储已满」。修:空 DSL 单独提示 `needDsl`。
+- **首页版本号漏更**(commit `692d383`):footer v0.37.0 → v0.38.0(本轮再 → v0.39.0)。
+
+**核验无 bug 的承重代码**:auto-layout(dagre 建图/读回/中心转左上角,环/孤立/单卡边界)/ B1 切画布链路 / B3a frame 双击重命名(`adapter.getElement` 存在性已核实)/ B2 backlinks(relation-builder 虽不带 meta,但 `text=type.id`+五色不撞签名让 `inferRelationType` 反推正确)/ useGlobalEdges 聚合去重。
+
+**文档同步**(commit `6af182f`):changelog 补 v0.38.0 四段(知识网络/白板专业度/打磨 Batch A-B/audit+vision);STATE 版本表 + 当前能力 + 下一步 + 已知 debt;user/README 补 frame 交互 + 专业布局工具 + Graph/命令面板/标签墙三节;privacy vision「永久不做」→「实验室附加能力默认关」。
+
+**纪律**:`.gitignore` 补过程文件忽略规则(scripts/_*.mjs/_*.json/_screenshots/、audit-canvas-*.cjs、docs/audit/、.superpowers/)—— 起因一次 `git add -A` 误提交 216 过程文件,reset 重做 + force push 清除远程脏历史。
+
+**验证**:domain/db/canvas-engine/web 测试全绿(842);build exit 0。tag `v0.39.0`。
+
+---
+
 ## 2026-06-29 · v0.38.0 · polish-batch-a-b(自动布局 + 焦点模式 + 模板导入 + 最近编辑跳转 + 跨画布 backlinks + frame 双击重命名)
 
 打磨计划书(10 方向 + 5 收尾轮)的 Batch A + B 落地。两批围绕"画布更专业 + 知识网络更可用",非 AI 依赖(自动布局用 dagre,其余纯本地)。

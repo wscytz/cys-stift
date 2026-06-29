@@ -80,7 +80,7 @@ export default function HomePage() {
               and root package.json "version". Kept in sync manually here —
               a static export has no build-time version injection without a
               new dependency. Update when bumping the tag. */}
-          <span>v0.38.0</span>
+          <span>v0.39.0</span>
         </footer>
       </section>
       <style>{`
