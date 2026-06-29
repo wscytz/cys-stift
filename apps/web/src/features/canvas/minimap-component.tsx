@@ -254,9 +254,11 @@ export function Minimap({
       moved = true
       justDraggedRef.current = true
       const contRect = container.getBoundingClientRect()
-      // clamp:left ∈ [0, contW - minimapW], top ∈ [appMenuH, contH - titleH]
+      // clamp:left ∈ [0, contW - minimapW], top ∈ [0, contH - minimapH]。
+      // 用 box.height(展开/折叠态实际高度)而非写死 40,否则展开态(~155px)
+      // 能被拖出容器底边(maxTop 只预留 40 → 底部探出 ~115px)。
       const maxLeft = Math.max(0, contRect.width - MINIMAP_W - 4)
-      const maxTop = Math.max(0, contRect.height - 40)
+      const maxTop = Math.max(0, contRect.height - box.height)
       const newLeft = Math.min(Math.max(0, startLeft - contRect.left + dx), maxLeft)
       const newTop = Math.min(Math.max(0, startTop - contRect.top + dy), maxTop)
       setPos({ left: newLeft, top: newTop })
