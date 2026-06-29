@@ -100,3 +100,7 @@ export { arrowKeyDelta, selectAllIds, parseKeyboardAction } from './self-built-k
 // ── 通用 AABB 几何(供 SVG 导出 bbox 计算 + viewport 视锥剔除) ──────────────────
 export { unionBounds, expandBounds, normalizeBox, intersectsBounds, viewportBounds } from './bounds'
 export type { Bounds } from './bounds'
+
+// ── 对齐 / 分布 / 等大(选中多元素 → patch Map) ───────────────────────────────
+export { applyAlign } from './align-distribute'
+export type { AlignOp, AlignPatch } from './align-distribute'
