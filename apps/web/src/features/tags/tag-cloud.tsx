@@ -36,7 +36,7 @@ export function TagCloud({ cards }: { cards: Card[] }) {
   if (tags.length === 0) return null
 
   const filtered = selected
-    ? cards.filter((c) => c.tags.some((tag) => tag.value === selected))
+    ? cards.filter((c) => (c.tags ?? []).some((tag) => tag.value === selected))
     : []
 
   const toggle = (value: string) =>
@@ -100,7 +100,8 @@ function aggregateTags(
 ): { value: string; color: string; count: number }[] {
   const map = new Map<string, { color: string; count: number }>()
   for (const c of cards) {
-    for (const tag of c.tags) {
+    // 老数据/导入卡可能 tags === undefined(.some / for..of 崩)。?? [] 兜底。
+    for (const tag of c.tags ?? []) {
       const entry = map.get(tag.value)
       if (entry) entry.count++
       else map.set(tag.value, { color: tag.color, count: 1 })

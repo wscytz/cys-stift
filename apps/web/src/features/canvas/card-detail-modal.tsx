@@ -63,7 +63,7 @@ export function CardDetailModal({
   const [mode, setMode] = useState<'view' | 'edit'>(card.title ? 'view' : 'edit')
   const [title, setTitle] = useState(card.title)
   const [body, setBody] = useState(card.body)
-  const [tags, setTags] = useState<TagRef[]>(card.tags)
+  const [tags, setTags] = useState<TagRef[]>(card.tags ?? [])
   const [tagInput, setTagInput] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [pending, startTransition] = useTransition()
@@ -72,7 +72,7 @@ export function CardDetailModal({
   useEffect(() => {
     setTitle(card.title)
     setBody(card.body)
-    setTags(card.tags)
+    setTags(card.tags ?? [])
     setTagInput('')
   }, [card.id, card.title, card.body, card.tags])
 
@@ -120,7 +120,7 @@ export function CardDetailModal({
             <>
               <div className="cd__meta">
                 <Tag color="black">{t(typeKeyOf(card.type))}</Tag>
-                {card.tags.map((tag) => (
+                {(card.tags ?? []).map((tag) => (
                   <span key={tag.value} className="cd__tag-chip" style={{ background: tag.color }}>
                     {tag.value}
                   </span>
@@ -130,11 +130,11 @@ export function CardDetailModal({
                 </span>
               </div>
               <MarkdownBody source={card.body} resolveEmbed={resolveEmbed} />
-              {card.links.length > 0 && (
+              {(card.links ?? []).length > 0 && (
                 <section className="cd__sec">
                   <h3 className="eyebrow">{t('card.detail.links')}</h3>
                   <ul className="cd__links">
-                    {card.links.map((l, i) => (
+                    {(card.links ?? []).map((l, i) => (
                       <li key={i}>
                         <a href={safeHref(l.url)} target="_blank" rel="noopener noreferrer">
                           {l.url}
@@ -176,10 +176,10 @@ export function CardDetailModal({
                   </section>
                 )
               })()}
-              {card.codeSnippets.length > 0 && (
+              {(card.codeSnippets ?? []).length > 0 && (
                 <section className="cd__sec">
                   <h3 className="eyebrow">{t('card.detail.code')}</h3>
-                  {card.codeSnippets.map((c, i) => (
+                  {(card.codeSnippets ?? []).map((c, i) => (
                     <div key={i} className="cd__code">
                       <div className="cd__code-lang">{c.language}</div>
                       <pre className="cd__code-pre">
@@ -189,10 +189,10 @@ export function CardDetailModal({
                   ))}
                 </section>
               )}
-              {card.quotes.length > 0 && (
+              {(card.quotes ?? []).length > 0 && (
                 <section className="cd__sec">
                   <h3 className="eyebrow">{t('card.detail.quotes')}</h3>
-                  {card.quotes.map((q, i) => (
+                  {(card.quotes ?? []).map((q, i) => (
                     <blockquote key={i} className="cd__quote">
                       <p>{q.text}</p>
                       {q.attribution && <cite className="cd__cite">— {q.attribution}</cite>}

@@ -31,7 +31,7 @@ export default function TagsPage() {
     [service, snap],
   )
 
-  const hasTags = cards.some((c) => c.tags.length > 0)
+  const hasTags = cards.some((c) => (c.tags ?? []).length > 0)
 
   return (
     <main id="main" tabIndex={-1} className="page">
@@ -65,8 +65,8 @@ export default function TagsPage() {
 }
 
 /** 统计带至少一个 tag 的卡数(Toolbar 计数用,不复用聚合避免双重遍历意图)。 */
-function countTaggedCards(cards: { tags: { value: string }[] }[]): number {
-  return cards.reduce((n, c) => (c.tags.length > 0 ? n + 1 : n), 0)
+function countTaggedCards(cards: { tags?: { value: string }[] }[]): number {
+  return cards.reduce((n, c) => ((c.tags ?? []).length > 0 ? n + 1 : n), 0)
 }
 
 function EmptyState() {

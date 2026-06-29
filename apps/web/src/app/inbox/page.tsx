@@ -623,7 +623,7 @@ function CardTile({
   const { t } = useI18n()
   const preview = card.body.slice(0, 120)
   const totalMedia =
-    card.links.length + card.codeSnippets.length + card.quotes.length
+    (card.links ?? []).length + (card.codeSnippets ?? []).length + (card.quotes ?? []).length
   return (
     <div className={`tile ${card.pinned ? 'tile--pinned' : ''} ${selected ? 'tile--selected' : ''}`}>
       <button

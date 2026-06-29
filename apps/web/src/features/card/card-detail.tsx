@@ -177,17 +177,17 @@ export function CardDetailModal({
   const [mode, setMode] = useState<'view' | 'edit'>(initialMode)
   const [title, setTitle] = useState(card.title)
   const [body, setBody] = useState(card.body)
-  const [media, setMedia] = useState<MediaRef[]>(card.media)
+  const [media, setMedia] = useState<MediaRef[]>(card.media ?? [])
   const [links, setLinks] = useState<DraftLink[]>(() =>
-    card.links.map((l) => ({ url: l.url })),
+    (card.links ?? []).map((l) => ({ url: l.url })),
   )
   const [codes, setCodes] = useState<DraftCode[]>(() =>
-    card.codeSnippets.map((c) => ({ language: c.language, code: c.code })),
+    (card.codeSnippets ?? []).map((c) => ({ language: c.language, code: c.code })),
   )
   const [quotes, setQuotes] = useState<DraftQuote[]>(() =>
-    card.quotes.map((q) => ({ text: q.text, attribution: q.attribution ?? '' })),
+    (card.quotes ?? []).map((q) => ({ text: q.text, attribution: q.attribution ?? '' })),
   )
-  const [tags, setTags] = useState<TagRef[]>(card.tags)
+  const [tags, setTags] = useState<TagRef[]>(card.tags ?? [])
   const [tagInput, setTagInput] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   // RB-T3 — 关系建/删的乐观更新:backlinks 区渲染用 localEdges(不是 globalEdges),
@@ -233,11 +233,11 @@ export function CardDetailModal({
     if (mode === 'edit') return
     setTitle(card.title)
     setBody(card.body)
-    setMedia(card.media)
-    setLinks(card.links.map((l) => ({ url: l.url })))
-    setCodes(card.codeSnippets.map((c) => ({ language: c.language, code: c.code })))
-    setQuotes(card.quotes.map((q) => ({ text: q.text, attribution: q.attribution ?? '' })))
-    setTags(card.tags)
+    setMedia(card.media ?? [])
+    setLinks((card.links ?? []).map((l) => ({ url: l.url })))
+    setCodes((card.codeSnippets ?? []).map((c) => ({ language: c.language, code: c.code })))
+    setQuotes((card.quotes ?? []).map((q) => ({ text: q.text, attribution: q.attribution ?? '' })))
+    setTags(card.tags ?? [])
     setTagInput('')
     setMode(initialMode)
     setConfirmDelete(false)
@@ -337,7 +337,7 @@ export function CardDetailModal({
             <>
               <div className="cd__meta">
                 <Tag color="red">{t(typeKeyOf(card.type))}</Tag>
-                {card.tags.map((tag) => (
+                {(card.tags ?? []).map((tag) => (
                   <span key={tag.value} className="cd__tag-chip" style={{ background: tag.color }}>
                     {tag.value}
                   </span>
@@ -428,10 +428,10 @@ export function CardDetailModal({
                   </Section>
                 )
               })()}
-              {card.media.length > 0 && (
+              {(card.media ?? []).length > 0 && (
                 <Section label={t('card.detail.media')}>
                   <ul className="cd__media-list">
-                    {card.media.map((m, i) => {
+                    {(card.media ?? []).map((m, i) => {
                       const asset = mediaStore.getAsset(m.assetId)
                       if (!asset) return null
                       if (asset.kind === 'image') {
@@ -483,10 +483,10 @@ export function CardDetailModal({
                   </ul>
                 </Section>
               )}
-              {card.links.length > 0 && (
+              {(card.links ?? []).length > 0 && (
                 <Section label={t('card.detail.links')}>
                   <ul className="cd__links">
-                    {card.links.map((l, i) => (
+                    {(card.links ?? []).map((l, i) => (
                       <li key={i}>
                         <a
                           href={safeHref(l.url)}
@@ -500,9 +500,9 @@ export function CardDetailModal({
                   </ul>
                 </Section>
               )}
-              {card.codeSnippets.length > 0 && (
+              {(card.codeSnippets ?? []).length > 0 && (
                 <Section label={t('card.detail.code')}>
-                  {card.codeSnippets.map((c, i) => (
+                  {(card.codeSnippets ?? []).map((c, i) => (
                     <div key={i} className="cd__code">
                       <div className="cd__code-lang">{c.language}</div>
                       <pre className="cd__code-pre">
@@ -512,9 +512,9 @@ export function CardDetailModal({
                   ))}
                 </Section>
               )}
-              {card.quotes.length > 0 && (
+              {(card.quotes ?? []).length > 0 && (
                 <Section label={t('card.detail.quotes')}>
-                  {card.quotes.map((q, i) => (
+                  {(card.quotes ?? []).map((q, i) => (
                     <blockquote key={i} className="cd__quote">
                       <p>{q.text}</p>
                       {q.attribution && (

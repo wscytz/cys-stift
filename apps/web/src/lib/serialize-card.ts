@@ -45,9 +45,9 @@ export function serializeCard(card: Card, opts: SerializeOptions = {}): string {
   // Otherwise an orphan-ref card (e.g. cleaned storage export) would produce
   // a misleading empty `## 媒体` heading with no content. Collect first,
   // skip missing assets, then decide.
-  if (card.media.length > 0) {
+  if ((card.media ?? []).length > 0) {
     const resolved: { ref: Card['media'][number]; asset: NonNullable<ReturnType<typeof mediaStore.getAsset>> }[] = []
-    for (const ref of card.media) {
+    for (const ref of card.media ?? []) {
       const asset = mediaStore.getAsset(ref.assetId)
       if (!asset) continue
       resolved.push({ ref, asset })
@@ -72,9 +72,9 @@ export function serializeCard(card: Card, opts: SerializeOptions = {}): string {
   }
 
   // Links
-  if (card.links.length > 0) {
+  if ((card.links ?? []).length > 0) {
     lines.push('## 链接')
-    for (const l of card.links) {
+    for (const l of card.links ?? []) {
       lines.push(
         `- [${l.title || l.url}](${l.url})${l.description ? ` — ${l.description}` : ''}`,
       )
@@ -83,9 +83,9 @@ export function serializeCard(card: Card, opts: SerializeOptions = {}): string {
   }
 
   // Code snippets
-  if (card.codeSnippets.length > 0) {
+  if ((card.codeSnippets ?? []).length > 0) {
     lines.push('## 代码')
-    for (const s of card.codeSnippets) {
+    for (const s of card.codeSnippets ?? []) {
       lines.push('```' + (s.language || ''))
       lines.push(s.code)
       lines.push('```')
@@ -95,9 +95,9 @@ export function serializeCard(card: Card, opts: SerializeOptions = {}): string {
   }
 
   // Quotes
-  if (card.quotes.length > 0) {
+  if ((card.quotes ?? []).length > 0) {
     lines.push('## 引用')
-    for (const q of card.quotes) {
+    for (const q of card.quotes ?? []) {
       lines.push(`> ${q.text.replace(/\n/g, '\n> ')}`)
       if (q.attribution) lines.push(`> — ${q.attribution}`)
       if (q.sourceUrl) lines.push(`> (${q.sourceUrl})`)
