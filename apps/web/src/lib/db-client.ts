@@ -200,7 +200,12 @@ const cardRepo = {
       .sort((a, b) => b.capturedAt.getTime() - a.capturedAt.getTime())
   },
   listOnCanvas(canvasId: CanvasId) {
-    return _cards.filter((c) => c.canvasPosition?.canvasId === canvasId)
+    // HIGH-3 fix: 默认排除软删卡(deletedAt)。之前调用方各自 .filter，漏一个就软删卡视觉复活
+    // （如 cystift-payload 导出死卡、canvas page 663/706 用 listOnCanvas 计算 delete 计划）。
+    // 归档(archived)不算删除但也不应显示在画布上(HIGH-3 同源)。
+    return _cards.filter(
+      (c) => c.canvasPosition?.canvasId === canvasId && !c.archived && !c.deletedAt,
+    )
   },
   listAll() {
     return _cards

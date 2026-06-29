@@ -56,7 +56,8 @@ export function CardDetailModal({
     const id = resolveCardByTitle(service.listAll(), title)
     if (!id) return null
     const c = service.get(id)
-    if (!c) return null
+    // CRITICAL-2 fix: 软删卡内容不通过 ((标题)) 嵌入到活卡详情(R2 铁律)。
+    if (!c || c.deletedAt) return null
     return { body: c.body, title: c.title }
   }
   // A card opened with no title (freshly created via double-click) opens in edit.

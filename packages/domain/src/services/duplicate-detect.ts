@@ -114,19 +114,20 @@ export function findDuplicateGroups(cards: Card[]): DuplicateGroup[] {
   }
 
   // URL:每张卡每个 link url 归一化(一张卡多 link 各算)。
+  // 守卫(c.links ?? [])：外部导入/老数据的卡可能缺 links 字段,崩了整页 inbox。
   const urlFps: { id: string; fp: string | null }[] = []
   for (const c of cards) {
-    for (const link of c.links) {
+    for (const link of c.links ?? []) {
       const fp = normaliseUrl(link.url)
       if (fp) urlFps.push({ id: c.id, fp })
     }
   }
   groupBy('url', urlFps, (fp) => `same URL: ${fp}`)
 
-  // 代码:每张卡每个 code snippet 归一化。
+  // 代码:每张卡每个 code snippet 归一化。同上守卫。
   const codeFps: { id: string; fp: string | null }[] = []
   for (const c of cards) {
-    for (const snip of c.codeSnippets) {
+    for (const snip of c.codeSnippets ?? []) {
       const fp = normaliseCode(snip.code)
       if (fp) codeFps.push({ id: c.id, fp })
     }
