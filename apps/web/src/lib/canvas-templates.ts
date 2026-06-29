@@ -120,3 +120,47 @@ export function saveCustomTemplate(name: string, elements: CanvasElement[]): boo
 export function allTemplates(): CanvasTemplate[] {
   return [...PRESET_TEMPLATES, ...listCustomTemplates()]
 }
+
+/**
+ * 用 DSL 文本 + 名字直接存为自建模板(Batch A / 方向 3:模板导入)。
+ * 用户可粘贴别处复制的 DSL(或手写)存成模板。dsl 不校验语法(parseDsl 在应用时
+ * 才解析,容错友好),只校验非空 + name 非空。返回 true=成功,false=配额/异常。
+ * 同名模板:覆盖(用户期望"更新模板"而非"加重复")。
+ */
+export function addCustomTemplate(name: string, dsl: string): boolean {
+  if (typeof window === 'undefined') return false
+  const trimmedName = name.trim()
+  const trimmedDsl = dsl.trim()
+  if (!trimmedName || !trimmedDsl) return false
+  const list = listCustomTemplates().filter((t) => t.name !== trimmedName)
+  list.push({ name: trimmedName, dsl: trimmedDsl })
+  try {
+    window.localStorage.setItem(KEY, JSON.stringify(list))
+    return true
+  } catch (e) {
+    console.warn('[canvas-templates] persist failed (quota?)', e)
+    return false
+  }
+}
+
+/** 删除自建模板(预设不可删)。返回 true=存在并删除,false=未找到。 */
+export function removeCustomTemplate(name: string): boolean {
+  if (typeof window === 'undefined') return false
+  const list = listCustomTemplates()
+  const next = list.filter((t) => t.name !== name)
+  if (next.length === list.length) return false
+  try {
+    window.localStorage.setItem(KEY, JSON.stringify(next))
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** 取某模板的 DSL 文本(导出用)。预设返回其硬编码 dsl,自建从 localStorage 取。 */
+export function getTemplateDsl(name: string): string | null {
+  const preset = PRESET_TEMPLATES.find((t) => t.name === name)
+  if (preset) return preset.dsl
+  const custom = listCustomTemplates().find((t) => t.name === name)
+  return custom?.dsl ?? null
+}

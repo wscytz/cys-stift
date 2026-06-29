@@ -32,7 +32,7 @@ import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snaps
 import { serializeCanvas } from '@/features/ai/canvas-dsl'
 import { parseDsl, parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
 import { TemplatePicker, type TemplateChoice } from '@/features/canvas/template-picker'
-import { allTemplates, saveCustomTemplate } from '@/lib/canvas-templates'
+import { allTemplates, saveCustomTemplate, addCustomTemplate } from '@/lib/canvas-templates'
 import { streamText } from '@/features/ai/stream-text'
 import { summarizeOutline } from '@/features/ai/workflows'
 import {
@@ -688,6 +688,27 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     })
   }
 
+  /** 导入模板(Batch A / 方向 3):prompt 名字 + 粘贴 DSL → addCustomTemplate。
+   *  DSL 应用时才解析(parseDsl 容错),这里只存文本。分享/备份模板的入口。 */
+  const handleImportTemplate = () => {
+    const name = window.prompt(t('canvas.template.importNamePrompt'))
+    if (name === null) return
+    const trimmedName = name.trim()
+    if (!trimmedName) {
+      pushToast({ kind: 'info', message: t('canvas.template.needName') })
+      return
+    }
+    const dsl = window.prompt(t('canvas.template.importDslPrompt'))
+    if (dsl === null) return
+    const ok = addCustomTemplate(trimmedName, dsl)
+    pushToast({
+      kind: ok ? 'success' : 'error',
+      message: ok
+        ? t('canvas.template.imported', { name: trimmedName })
+        : t('canvas.template.saveFail'),
+    })
+  }
+
   const startRename = () => setRenamingId(activeCanvasId)
   const handleRename = (raw: string) => {
     const name = raw.trim()
@@ -996,6 +1017,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           onRename={startRename}
           onDelete={requestDelete}
           onSaveAsTemplate={handleSaveAsTemplate}
+          onImportTemplate={handleImportTemplate}
           onAILayout={handleAILayout}
           onAICluster={handleAICluster}
           onAutoRelate={handleAutoRelate}
@@ -1339,6 +1361,7 @@ function CanvasSideRail({
   onRename,
   onDelete,
   onSaveAsTemplate,
+  onImportTemplate,
   onAILayout,
   onAICluster,
   onAutoRelate,
@@ -1367,6 +1390,7 @@ function CanvasSideRail({
   onRename: () => void
   onDelete: () => void
   onSaveAsTemplate: () => void
+  onImportTemplate: () => void
   onAILayout: () => void
   onAICluster: () => void
   onAutoRelate: () => void
@@ -1441,6 +1465,7 @@ function CanvasSideRail({
       <RailButton label={t('canvas.renameTitle')} short={t('canvas.rail.rename')} onClick={onRename} disabled={!canRename} icon="✎" />
       <RailButton label={t('canvas.deleteTitle')} short={t('canvas.rail.delete')} onClick={onDelete} disabled={!canDelete} icon="🗑" />
       <RailButton label={t('canvas.template.saveAs')} short={t('canvas.rail.template')} disabled={!adapterReady} onClick={onSaveAsTemplate} icon="🗖" />
+      <RailButton label={t('canvas.template.import')} short={t('canvas.rail.importTpl')} onClick={onImportTemplate} icon="📥" />
       <span className="cv-rail__sep" aria-hidden="true" />
       {aiEnabled && (
         <>
