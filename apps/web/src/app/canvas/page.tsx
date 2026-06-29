@@ -54,7 +54,7 @@ import {
   updateCardShape,
   createCardOnCanvas,
 } from '@/features/canvas/canvas-binding'
-import { canvasStore, useCanvases } from '@/lib/canvas-store'
+import { canvasStore, useCanvases, getSnapshot as getCanvasesSnapshot } from '@/lib/canvas-store'
 import { canvasViewStore } from '@/lib/canvas-view-store'
 
 /**
@@ -703,6 +703,10 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     }
     const dsl = window.prompt(t('canvas.template.importDslPrompt'))
     if (dsl === null) return
+    if (!dsl.trim()) {
+      pushToast({ kind: 'info', message: t('canvas.template.needDsl') })
+      return
+    }
     const ok = addCustomTemplate(trimmedName, dsl)
     pushToast({
       kind: ok ? 'success' : 'error',
@@ -862,10 +866,18 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       return
     }
     const targetCanvas = card.canvasPosition?.canvasId
-    // 卡在别的画布 → 切过去(adapter 重建,本 effect 再跑消费)
+    // 卡在别的画布 → 切过去(adapter 重建,本 effect 再跑消费)。
+    // 但要先确认该画布存在:孤儿卡(canvasPosition 指向已删画布,老数据/导入边界)
+    // 会让 canvasStore.setActive no-op → adapter 不重建 → 本 effect 不重跑 →
+    // pendingJumpCardRef 永不清 → 跳转卡死。画布不存在时不切,落到下方开详情。
     if (targetCanvas && targetCanvas !== activeCanvasId) {
-      canvasStore.setActive(targetCanvas)
-      return // 切画布后 adapter 重建,本 effect 重跑
+      const exists = getCanvasesSnapshot().canvases.some((c) => c.id === targetCanvas)
+      if (exists) {
+        canvasStore.setActive(targetCanvas)
+        return // 切画布后 adapter 重建,本 effect 重跑
+      }
+      // 孤儿卡:不切画布,清掉陈旧 canvasPosition 回 inbox,继续开详情。
+      service.removeFromCanvas(card.id)
     }
     // 卡在当前画布(adapter 有该元素)→ 居中选中 + 开详情
     const el = adapter.getElement(cardId)

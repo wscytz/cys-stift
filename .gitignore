@@ -46,9 +46,18 @@ coverage/
 
 # One-off audit scripts (underscore prefix = ad-hoc, not shipped tooling)
 scripts/_*.cjs
+scripts/_*.mjs
+scripts/_*.json
+scripts/_screenshots/
 
-# One-off product overview reports (not shipped, learning/recap only)
-docs/audit/product-overview-*.md
+# Canvas interaction audit scripts (process, multi-round, not shipped tooling)
+scripts/audit-canvas-*.cjs
+
+# One-off audit reports (not shipped, learning/recap only)
+docs/audit/
+
+# AI assistant skill scratch dir (session-local, not shipped)
+.superpowers/
 
 # Undocumented UX-audit scratch screenshots (auto-generated, no doc reference)
 docs/design/screenshots/phase-ux-mmxa/

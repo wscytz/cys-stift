@@ -172,6 +172,7 @@ export const messages = {
   'canvas.template.saved': { zh: '已存为模板 {name}', en: 'Saved as template {name}' },
   'canvas.template.saveFail': { zh: '模板保存失败(存储已满?)', en: 'Failed to save template (storage full?)' },
   'canvas.template.needName': { zh: '模板名不能为空', en: 'Template name cannot be empty' },
+  'canvas.template.needDsl': { zh: '模板 DSL 不能为空', en: 'Template DSL cannot be empty' },
   'canvas.template.import': { zh: '导入模板', en: 'Import template' },
   'canvas.template.importNamePrompt': { zh: '新模板名:', en: 'New template name:' },
   'canvas.template.importDslPrompt': { zh: '粘贴模板 DSL 文本(可从导出的画布 DSL 复制):', en: 'Paste template DSL text (copy from an exported canvas DSL):' },
