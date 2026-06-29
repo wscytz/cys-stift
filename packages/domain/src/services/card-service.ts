@@ -256,12 +256,14 @@ export class CardService {
   addTag(id: CardId, value: string, color?: TagColor): Card | null {
     const card = this.repo.getById(id)
     if (!card) return null
-    const existing = card.tags.find((t) => t.value === value)
+    // BUG-2 fix: 老数据/导入卡可能 tags === undefined,守卫与 web 层 ?? [] 一致。
+    const tags = card.tags ?? []
+    const existing = tags.find((t) => t.value === value)
     if (existing) return card
     const chosen = color ?? TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)]!
     const next: Card = {
       ...card,
-      tags: [...card.tags, { value: value.trim(), color: chosen }],
+      tags: [...tags, { value: value.trim(), color: chosen }],
       updatedAt: new Date(),
     }
     this.repo.update(next)
@@ -276,24 +278,24 @@ export class CardService {
   removeTag(id: CardId, value: string): Card | null {
     const card = this.repo.getById(id)
     if (!card) return null
-    if (!card.tags.some((t) => t.value === value)) return card
+    const tags = card.tags ?? []
+    if (!tags.some((t) => t.value === value)) return card
     const next: Card = {
       ...card,
-      tags: card.tags.filter((t) => t.value !== value),
+      tags: tags.filter((t) => t.value !== value),
       updatedAt: new Date(),
     }
     this.repo.update(next)
     return next
   }
 
-  /**
-
   /** List all unique tag values across all cards. */
   listTags(): { value: string; color: TagColor; count: number }[] {
     const all = this.repo.listAll()
     const map = new Map<string, { color: TagColor; count: number }>()
     for (const c of all) {
-      for (const t of c.tags) {
+      // BUG-2 fix: 老数据/导入卡可能 tags === undefined(类型声明非可选但运行时可缺)。
+      for (const t of c.tags ?? []) {
         const entry = map.get(t.value)
         if (entry) {
           entry.count++
@@ -313,7 +315,7 @@ export class CardService {
   listByTags(tagValues: string[]): Card[] {
     if (tagValues.length === 0) return []
     return this.repo.listAll().filter((c) =>
-      c.tags.some((t) => tagValues.includes(t.value)),
+      (c.tags ?? []).some((t) => tagValues.includes(t.value)),
     )
   }
 

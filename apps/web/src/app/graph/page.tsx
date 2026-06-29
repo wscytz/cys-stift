@@ -63,6 +63,15 @@ export default function GraphPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snap, service])
   const [detail, setDetail] = useState<Card | null>(null)
+  // BUG-1 fix: detail 是 local state,跨 tab 软删/归档后 useDb re-render 但 detail 不清
+  // → modal 残留幽灵卡。从 store 实时取卡 + 过滤软删,变 null 则 modal 自动卸载
+  // (与 canvas page effectiveDetail 同口径)。
+  const effectiveDetail = detail
+    ? (() => {
+        const live = service.get(detail.id)
+        return live && !live.deletedAt ? live : null
+      })()
+    : null
 
   const isLoading = !ready || !loaded
   const isEmpty = filtered.nodes.length === 0
@@ -99,9 +108,9 @@ export default function GraphPage() {
         )}
       </div>
 
-      {detail && (
+      {effectiveDetail && (
         <CardDetailModal
-          card={detail}
+          card={effectiveDetail}
           actions={['archive', 'softDelete', 'sendToCanvas', 'pin']}
           onClose={() => setDetail(null)}
           // BR-T5 — 注入全局边 + 卡标题查询,让详情里显示跨画布 backlinks 区。
@@ -115,15 +124,15 @@ export default function GraphPage() {
           allCards={service.listAll()}
           canEditRelations={true}
           onSave={(patch) => {
-            const updated = service.update(detail.id, patch)
+            const updated = service.update(effectiveDetail.id, patch)
             if (updated) setDetail(updated)
           }}
           onTogglePin={() => {
-            const updated = service.update(detail.id, { pinned: !detail.pinned })
+            const updated = service.update(effectiveDetail.id, { pinned: !effectiveDetail.pinned })
             if (updated) setDetail(updated)
           }}
           onConfirmDelete={() => {
-            service.softDelete(detail.id)
+            service.softDelete(effectiveDetail.id)
             setDetail(null)
           }}
         />

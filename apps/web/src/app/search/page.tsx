@@ -22,6 +22,15 @@ export default function SearchPage() {
   const { snap, service, ready } = useDb()
   const [query, setQuery] = useState('')
   const [detail, setDetail] = useState<{ card: Card } | null>(null)
+  // BUG-1 fix: detail 是 local state,跨 tab 软删/归档后 useDb re-render 但 detail 不清
+  // → modal 残留幽灵卡。从 store 实时取卡 + 过滤软删,变 null 则 modal 自动卸载
+  // (与 canvas/timeline/graph effectiveDetail 同口径)。
+  const effectiveDetail = detail
+    ? (() => {
+        const live = service.get(detail.card.id)
+        return live && !live.deletedAt ? { card: live } : null
+      })()
+    : null
 
   const allCards = useMemo(() => service.listAll(), [snap, service])
   const results = useMemo(() => {
@@ -85,23 +94,23 @@ export default function SearchPage() {
         )}
       </div>
 
-      {detail && (
+      {effectiveDetail && (
         <CardDetailModal
-          card={detail.card}
+          card={effectiveDetail.card}
           actions={['archive', 'softDelete', 'sendToCanvas', 'pin']}
           onClose={() => setDetail(null)}
           onSave={(patch) => {
-            const updated = service.update(detail.card.id, patch)
+            const updated = service.update(effectiveDetail.card.id, patch)
             if (updated) setDetail({ card: updated })
           }}
           onTogglePin={() => {
-            const updated = service.update(detail.card.id, {
-              pinned: !detail.card.pinned,
+            const updated = service.update(effectiveDetail.card.id, {
+              pinned: !effectiveDetail.card.pinned,
             })
             if (updated) setDetail({ card: updated })
           }}
           onConfirmDelete={() => {
-            service.softDelete(detail.card.id)
+            service.softDelete(effectiveDetail.card.id)
             setDetail(null)
           }}
         />
