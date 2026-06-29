@@ -33,6 +33,9 @@ interface EditSession {
   screenY: number
   pageX: number
   pageY: number
+  /** B3 — frame 重命名:双击 frame 时设此 id。commit 时 upsert 该 frame 的 text
+   *  (而非新建 text 元素)。无 frameId = 普通 text 工具新建文本。 */
+  frameId?: string
 }
 
 export interface SelfCanvasHandle {
@@ -177,7 +180,27 @@ export function SelfCanvas({
         return
       }
     }
-    // 未命中卡片:选中箭头时双击 → 加折点(elbow 未满)/ 重置直线(否则)。
+    // B3 — 未命中 card:检查 frame(底层容器,双击改标题)。frame 在 card 下层,
+    // 双击点上方若无 card,命中 frame 空白边框区 → 起重命名 input。
+    for (let i = els.length - 1; i >= 0; i--) {
+      const el = els[i]!
+      if (
+        el.kind === 'frame' &&
+        p.x >= el.x && p.x <= el.x + el.w &&
+        p.y >= el.y && p.y <= el.y + el.h
+      ) {
+        // frame 中心位置起 input(screen 坐标)。
+        const v = adapter.getView()
+        const zoom = v.zoom || 1
+        const centerX = (el.x + el.w / 2) * zoom + v.panX
+        const centerY = el.y * zoom + v.panY
+        setEdit({ screenX: centerX, screenY: centerY, pageX: 0, pageY: 0, frameId: el.id })
+        setTextValue(el.text ?? '')
+        committedRef.current = false
+        return
+      }
+    }
+    // 未命中卡片/frame:选中箭头时双击 → 加折点(elbow 未满)/ 重置直线(否则)。
     adapter.doubleClickArrowAt(p)
   }
 
@@ -231,7 +254,22 @@ export function SelfCanvas({
     const curEdit = editRef.current
     const adapter = adapterInner.current
     const canvas = innerCanvasRef.current
-    if (v && curEdit && adapter && canvas) {
+    if (!curEdit || !adapter) {
+      setEdit(null)
+      setTextValue('')
+      return
+    }
+    // B3 — frame 重命名:upsert 现有 frame 的 text(不新建元素)。
+    if (curEdit.frameId) {
+      const existing = adapter.getElement(curEdit.frameId)
+      if (existing) {
+        adapter.upsert({ ...existing, text: v })
+      }
+      setEdit(null)
+      setTextValue('')
+      return
+    }
+    if (v && canvas) {
       const ctx = canvas.getContext('2d')
       if (ctx) {
         const font = `${readToken('--font-size-sm', '14px')} ${readToken('--font-body', 'Inter, sans-serif')}`
