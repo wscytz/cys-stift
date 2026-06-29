@@ -379,6 +379,7 @@ export const messages = {
   'canvas.rail.frame': { zh: '分框', en: 'Frame' },
   'canvas.rail.outline': { zh: '大纲', en: 'Outline' },
   'canvas.rail.overview': { zh: '总览', en: 'Overview' },
+  'canvas.rail.dsl': { zh: '转义', en: 'DSL' },
   'canvas.rail.export': { zh: '导出', en: 'Export' },
   'canvas.rail.diff': { zh: '对比', en: 'Diff' },
   'canvas.rail.shortcuts': { zh: '快捷键', en: 'Shortcuts' },

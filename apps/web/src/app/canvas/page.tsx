@@ -1378,6 +1378,9 @@ function CanvasSideRail({
       {aiEnabled && <span className="cv-rail__sep" aria-hidden="true" />}
       <RailButton label={t('canvas.outline')} short={t('canvas.rail.outline')} disabled={!adapterReady} onClick={onOutline} pressed={outlineOpen} icon="☰" />
       <RailButton label={t('canvas.overview')} short={t('canvas.rail.overview')} disabled={!adapterReady} onClick={onOverview} icon="▤" />
+      {/* 转义(DSL)是核心卖点,提一级独立按钮(双向:编辑画布文本/导出 DSL)。
+          导出菜单里保留同名项(作为「导出 DSL」入口),两条路都通 DslDialog。 */}
+      <RailButton label={t('canvas.dslTitle')} short={t('canvas.rail.dsl')} disabled={!adapterReady} onClick={onDsl} icon="»" />
       {/* 导出:一个按钮 + 二级拓展(图片/Markdown/DSL)。Diff(版本对比)不是导出,留独立按钮。 */}
       <div className="cv-rail__group">
         <RailButton label={t('canvas.export')} short={t('canvas.rail.export')} disabled={!adapterReady} onClick={() => setExportMenuOpen((o) => !o)} pressed={exportMenuOpen} icon="⤓" buttonRef={exportTriggerRef} />
