@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import type { CanvasId, Card, CardId } from '@cys-stift/domain'
 import { SelfBuiltAdapter, elementCenter, unionBounds, normalizeBox, screenToPage } from '@cys-stift/canvas-engine'
+import type { CanvasElement } from '@cys-stift/canvas-engine'
 import { Button, Modal, Toolbar } from '@cys-stift/ui'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
@@ -27,6 +28,7 @@ import { CanvasEmptyMotif } from '@/features/canvas/canvas-empty-motif'
 import { syncWikiLinkArrows } from '@/features/canvas/wiki-links'
 import { syncEmbedArrows, resolveCardByTitle } from '@/features/canvas/embed-links'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
+import { serializeCanvas } from '@/features/ai/canvas-dsl'
 import { parseDsl, parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
 import { streamText } from '@/features/ai/stream-text'
 import {
@@ -406,6 +408,27 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
   // 键盘:+ - 0 1 g + 工具切换 v/p/e/t/c(Figma/Excalidraw 习惯)。input/textarea + 模态打开时跳过。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // ⌘C / Ctrl+C 复制选中元素为 DSL(剪贴板交换格式)。必须在下面
+      // `metaKey/ctrlKey/altKey return` 之前处理,否则被吞掉。
+      // 编辑态(input/textarea/contentEditable)不拦——让浏览器正常复制选中文本;
+      // 无选中也不拦——让浏览器正常复制。
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key === 'c') {
+        const adapter = handle.current.adapter
+        const tgt = e.target as HTMLElement | null
+        if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return
+        if (!adapter) return
+        const selected = adapter
+          .getSelectedIds()
+          .map((id) => adapter.getElement(id))
+          .filter((el): el is CanvasElement => !!el)
+        if (selected.length === 0) return
+        e.preventDefault()
+        const dsl = serializeCanvas(selected)
+        navigator.clipboard?.writeText(dsl).then(() => {
+          pushToast({ kind: 'success', message: t('canvas.copyDslOk', { n: String(selected.length) }) })
+        }).catch(() => {})
+        return
+      }
       // 模态打开时画布快捷键全部让位(CardDetailModal/DSL/Export/Diff/Overview/Shortcut),
       // 否则模态里按 +/g/v 等会在背后偷改画布视图/工具。
       if (document.querySelector('[role="dialog"][aria-modal="true"]')) return
@@ -429,7 +452,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [zoomBy, toggleSnap])
+  }, [zoomBy, toggleSnap, t])
 
   // BUG-A:applyLayout 的 onCardCreate 回调——create 类 op 落库为真实 Card。
   // 走 createCardOnCanvas(service, adapter, activeCanvasId, ...),复用 createWithId,

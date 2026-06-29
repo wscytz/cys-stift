@@ -269,6 +269,7 @@ export const messages = {
   'canvas.pasteDslPartial': { zh: '应用 {applied} 条,{skipped} 条跳过', en: 'Applied {applied}, skipped {skipped}' },
   'canvas.pasteDslNone': { zh: '剪贴板文本不是有效的 DSL', en: 'Clipboard text is not valid DSL' },
   'canvas.pasteDslNoneParsed': { zh: '看起来像 DSL,但 {errors} 行未能解析(打开 DSL 面板看行级诊断)', en: 'Looks like DSL, but {errors} line(s) failed to parse (open DSL panel for line diagnostics)' },
+  'canvas.copyDslOk': { zh: '已复制 {n} 个元素的 DSL(⌘V 粘贴还原)', en: 'Copied {n} element(s) as DSL (⌘V to paste)' },
   'canvas.inboxPasteCreated': { zh: '已在画布创建 {n} 张卡(去 /canvas 查看)', en: 'Created {n} card(s) on canvas (see /canvas)' },
   'canvas.inboxPasteGuide': { zh: '画布几何 DSL(rect/text/arrow)请在 /canvas 页粘贴', en: 'Canvas-shape DSL (rect/text/arrow) works on the /canvas page' },
 
