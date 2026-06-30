@@ -568,9 +568,10 @@ export class SelfBuiltAdapter implements CanvasHost {
       // coalescing:批前 pushUndo 一次,后续 onMove 的 remove 都被 coalescing 抑制不再推快照
       // → 整个拖拽擦除 = 1 步 undo(对齐 drag/resize/multi-delete 的单步契约)。
       if (this.activeTool === 'eraser') {
-        this.pushUndo()
-        this.coalescing = true
+        // undo 粒度:eraseAt→remove 内置 pushUndo(coalescing=false 时自推)。
+        // 命中才 set coalescing 抑制后续 move 的 remove 推快照(整擦=1 步);空白不推。
         const id = this.eraseAt(p)
+        if (id) this.coalescing = true
         this.erasing = { lastId: id }
         try {
           this.canvas.setPointerCapture(e.pointerId)
@@ -667,9 +668,7 @@ export class SelfBuiltAdapter implements CanvasHost {
           const handle = handleAtPoint(sel, p, this.view.zoom)
           if (handle) {
             this.resizing = { id: selId, handle, start: { x: sel.x, y: sel.y, w: sel.w, h: sel.h } }
-            // resize 开始:批前推一次快照,后续 onMove 的连续 upsert 合并为这一步。
-            this.pushUndo()
-            this.coalescing = true
+            // undo 粒度:pushUndo 推迟到 onMove 首次实际 resize(lazy)。
             try {
               this.canvas.setPointerCapture(e.pointerId)
             } catch {
@@ -699,9 +698,7 @@ export class SelfBuiltAdapter implements CanvasHost {
           if (sel) offsets.set(sid, { x: p.x - sel.x, y: p.y - sel.y })
         }
         this.dragGroup = { ids: [...this.selectedIds], offsets }
-        // drag 开始:批前推一次快照,后续 onMove 的连续 upsert 合并为这一步(coalescing)。
-        this.pushUndo()
-        this.coalescing = true
+        // undo 粒度:pushUndo 推迟到 onMove 首次实际移动(lazy),纯点击不拖不污染 undo 栈。
       } else if (!e.shiftKey) {
         // 空白 + 无 shift → pan + 清选择(现有)
         this.setSelectedIds([])
@@ -727,6 +724,8 @@ export class SelfBuiltAdapter implements CanvasHost {
         // 走 eraseAt 以遵守当前 eraserMode(text/card/all 的命中过滤 + card 进回收桶)。
         const p = screenToPage(this.view, sx, sy)
         const id = this.eraseAt(p)
+        // 首次 move 命中(onDown 未命中/空白起手):remove 已自推,开 coalescing 抑制后续。
+        if (id && !this.coalescing) this.coalescing = true
         if (id && id !== this.erasing.lastId) {
           this.erasing.lastId = id
         }
@@ -760,6 +759,11 @@ export class SelfBuiltAdapter implements CanvasHost {
         const p = screenToPage(this.view, sx, sy)
         const el = this.getElement(this.resizing.id)
         if (el) {
+          // lazy pushUndo:首次实际 resize 才推(点 handle 不拖不推)。
+          if (!this.coalescing) {
+            this.pushUndo()
+            this.coalescing = true
+          }
           const g = resizeGeometry(this.resizing.handle, this.resizing.start, p)
           if (el.kind === 'freedraw') {
             // freedraw 真身=点序列:把点序列从旧 bbox 线性映射到新 box(不只改 bbox)。
@@ -773,6 +777,11 @@ export class SelfBuiltAdapter implements CanvasHost {
       }
       if (this.dragGroup) {
         const p = screenToPage(this.view, sx, sy)
+        // lazy pushUndo:首次实际移动才推快照(纯点击不拖不推),后续 upsert 被 coalescing 合并。
+        if (!this.coalescing) {
+          this.pushUndo()
+          this.coalescing = true
+        }
         for (const sid of this.dragGroup.ids) {
           const el = this.getElement(sid)
           const off = this.dragGroup.offsets.get(sid)

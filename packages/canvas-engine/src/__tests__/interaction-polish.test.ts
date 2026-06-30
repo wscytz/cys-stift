@@ -84,3 +84,54 @@ describe('[B1-T2] 方向键 undo 粒度 — 按住重复只推 1 步', () => {
     expect(stack.length).toBeGreaterThanOrEqual(2)
   })
 })
+
+describe('[B2-T1] 空 undo 步 — 纯点击/点空白不污染 undo 栈', () => {
+  it('select 点选元素(不拖)→ undo 栈不增', () => {
+    const { host, canvas } = makeHost()
+    const before = (host as unknown as { undoStack: unknown[] }).undoStack.length
+    dispatch(canvas, 'pointerdown', 50, 50) // 命中卡A
+    dispatch(canvas, 'pointerup', 50, 50) // 松手,没拖
+    const after = (host as unknown as { undoStack: unknown[] }).undoStack.length
+    expect(after).toBe(before) // 无空步
+  })
+
+  it('select 拖动元素 → undo 栈 +1(1 步整拖)', () => {
+    const { host, canvas } = makeHost()
+    const before = (host as unknown as { undoStack: unknown[] }).undoStack.length
+    dispatch(canvas, 'pointerdown', 50, 50)
+    dispatch(canvas, 'pointermove', 120, 50) // 实际拖动
+    dispatch(canvas, 'pointerup', 120, 50)
+    const after = (host as unknown as { undoStack: unknown[] }).undoStack.length
+    expect(after - before).toBe(1)
+  })
+
+  it('eraser 点空白(没擦到)→ undo 栈不增', () => {
+    const { host, canvas } = makeHost()
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('eraser')
+    const before = (host as unknown as { undoStack: unknown[] }).undoStack.length
+    dispatch(canvas, 'pointerdown', 500, 500) // 空白
+    dispatch(canvas, 'pointerup', 500, 500)
+    const after = (host as unknown as { undoStack: unknown[] }).undoStack.length
+    expect(after).toBe(before)
+  })
+
+  it('eraser 擦元素 → undo 栈 +1', () => {
+    const { host, canvas } = makeHost()
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('eraser')
+    const before = (host as unknown as { undoStack: unknown[] }).undoStack.length
+    dispatch(canvas, 'pointerdown', 50, 50) // 擦卡A
+    dispatch(canvas, 'pointerup', 50, 50)
+    const after = (host as unknown as { undoStack: unknown[] }).undoStack.length
+    expect(after - before).toBe(1)
+  })
+
+  it('resize 点 handle 不拖 → undo 栈不增', () => {
+    const { host, canvas } = makeHost()
+    // 卡A 右下角 handle 约在 (100,100)
+    const before = (host as unknown as { undoStack: unknown[] }).undoStack.length
+    dispatch(canvas, 'pointerdown', 100, 100) // 命中 handle
+    dispatch(canvas, 'pointerup', 100, 100) // 不拖
+    const after = (host as unknown as { undoStack: unknown[] }).undoStack.length
+    expect(after).toBe(before)
+  })
+})

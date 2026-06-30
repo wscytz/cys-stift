@@ -683,7 +683,8 @@ describe('SelfBuiltAdapter interaction-state reset (R1.4 / R1.5)', () => {
     const host = new SelfBuiltAdapter(document.createElement('canvas'))
     const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
     host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
-    dispatch(canvas, 'pointerdown', 50, 50) // 命中 → drag 开始(dragGroup 设 + coalescing)
+    dispatch(canvas, 'pointerdown', 50, 50) // 命中 → drag 开始(dragGroup 设)
+    dispatch(canvas, 'pointermove', 120, 50) // 实际拖动 → lazy pushUndo 推 drag 前快照
     const h = host as unknown as { undo: () => void }
     h.undo() // 中途 undo:restore 替换 elements,但若不清 dragGroup → 下次 move 误移
     // undo 后 c1 恢复到 drag 前的位置(0,0)
