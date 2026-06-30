@@ -27,6 +27,12 @@ const MINIMAP_H = 135
 
 /** minimap 位置持久化 key。null = 用默认(右下偏左避让右栏)。 */
 const POSITION_KEY = 'cys-stift.minimap-pos.v1'
+// #19 折叠态持久化(reload 后保留用户折叠/展开)。
+const COLLAPSED_KEY = 'cys-stift.minimap-collapsed.v1'
+function loadCollapsed(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.localStorage.getItem(COLLAPSED_KEY) === '1'
+}
 
 interface MinimapPos {
   /** 相对画布容器的 left/right 二选一(未设的那侧用 null)。
@@ -69,7 +75,7 @@ export function Minimap({
   const miniRef = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef<number | null>(null)
   // 拖拽态:pointer down 后挂 window move/up 监听,使拖拽不离开 minimap 也连续。
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(loadCollapsed)
   const draggingRef = useRef(false)
   // minimap 位置(可拖拽,持久化到 localStorage)。null left/right = 默认右下避让右栏。
   const [pos, setPos] = useState<MinimapPos>(DEFAULT_POS)
@@ -325,7 +331,9 @@ export function Minimap({
           onClick={() => {
             // 拖拽刚结束(pointerup 后浏览器仍 fire click)→ 吞掉,不折叠
             if (justDraggedRef.current) { justDraggedRef.current = false; return }
-            setCollapsed((c) => !c)
+            const next = !collapsed
+            setCollapsed(next)
+            try { window.localStorage.setItem(COLLAPSED_KEY, next ? '1' : '0') } catch { /* quota */ }
           }}
           aria-label={collapseLabel}
           aria-expanded={!collapsed}

@@ -29,6 +29,13 @@ const PANEL_WIDTH = 220
  *  the body scrolls internally. Leaves room for the title bar + bottom gap. */
 const BODY_MAX_HEIGHT = 360
 
+// #19 折叠态持久化(reload 后保留用户折叠/展开)。
+const COLLAPSED_KEY = 'cys-stift.outline-collapsed.v1'
+function loadCollapsed(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.localStorage.getItem(COLLAPSED_KEY) === '1'
+}
+
 export function OutlinePanel({
   host,
   canvasEl,
@@ -42,7 +49,7 @@ export function OutlinePanel({
   getEndpointTitle: (id: string) => string | undefined
 }) {
   const { t } = useI18n()
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(loadCollapsed)
   // Re-render on host changes — mirrors RelationPanel's subscription pattern
   // (debt 收口 2026-06-23, replaces polling). user change covers add/remove/edit
   // of elements; selection change keeps the highlighted row in sync; view change
@@ -135,7 +142,11 @@ export function OutlinePanel({
         </span>
         <button
           type="button"
-          onClick={() => setCollapsed((c) => !c)}
+          onClick={() => {
+            const next = !collapsed
+            setCollapsed(next)
+            try { window.localStorage.setItem(COLLAPSED_KEY, next ? '1' : '0') } catch { /* quota */ }
+          }}
           aria-label={collapseLabel}
           aria-expanded={!collapsed}
           title={collapseLabel}
