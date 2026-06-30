@@ -16,6 +16,7 @@
     "d3-force": "^3.0.0",
     "dagre": "^0.8.5",
     "eventsource-parser": "1.1.2",
+    "lucide-react": "^1.22.0",
     "markitdownllm": "^0.1.5",
     "next": "15.0.3",
     "pdfjs-dist": "^6.0.227",

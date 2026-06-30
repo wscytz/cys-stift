@@ -10,6 +10,7 @@ import { Button, Modal, Toolbar } from '@cys-stift/ui'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
 import { SelfCanvas, type SelfCanvasHandle } from '@/features/canvas/self-canvas'
+import { CanvasIcon, CanvasBusyIcon, type CanvasIconName } from '@/features/canvas/canvas-icons'
 import { CardDetailModal } from '@/features/canvas/card-detail-modal'
 import { ExportDialog } from '@/features/canvas/export-dialog'
 import { DslDialog } from '@/features/canvas/dsl-dialog'
@@ -953,11 +954,11 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         />
         <span className="tb-divider" aria-hidden="true" />
         {([
-          { tk: 'select', icon: '↖', label: 'canvas.tool.select', labelShort: 'canvas.tool.select.short' },
-          { tk: 'freedraw', icon: '✎', label: 'canvas.tool.draw', labelShort: 'canvas.tool.draw.short' },
-          { tk: 'eraser', icon: '🗑', label: 'canvas.tool.eraser', labelShort: 'canvas.tool.eraser.short' },
-          { tk: 'text', icon: 'T', label: 'canvas.tool.text', labelShort: 'canvas.tool.text.short' },
-          { tk: 'connect', icon: '⇄', label: 'canvas.tool.connect', labelShort: 'canvas.tool.connect.short' },
+          { tk: 'select', icon: 'select' as CanvasIconName, label: 'canvas.tool.select', labelShort: 'canvas.tool.select.short' },
+          { tk: 'freedraw', icon: 'pen' as CanvasIconName, label: 'canvas.tool.draw', labelShort: 'canvas.tool.draw.short' },
+          { tk: 'eraser', icon: 'eraser' as CanvasIconName, label: 'canvas.tool.eraser', labelShort: 'canvas.tool.eraser.short' },
+          { tk: 'text', icon: 'text' as CanvasIconName, label: 'canvas.tool.text', labelShort: 'canvas.tool.text.short' },
+          { tk: 'connect', icon: 'connect' as CanvasIconName, label: 'canvas.tool.connect', labelShort: 'canvas.tool.connect.short' },
         ] as const).map(({ tk, icon, label, labelShort }) => (
           <button
             key={tk}
@@ -969,7 +970,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
             title={t(label)}
             aria-label={t(label)}
           >
-            <span className="tb-tool__icon">{icon}</span>
+            <span className="tb-tool__icon"><CanvasIcon name={icon} /></span>
             <span className="tb-tool__label">{t(labelShort)}</span>
           </button>
         ))}
@@ -979,9 +980,9 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           <>
             <span className="tb-divider" aria-hidden="true" />
             {([
-              { em: 'all', icon: '⌫' },
-              { em: 'card', icon: '▭' },
-              { em: 'text', icon: 'T' },
+              { em: 'all', icon: 'erase-all' as CanvasIconName },
+              { em: 'card', icon: 'erase-card' as CanvasIconName },
+              { em: 'text', icon: 'text' as CanvasIconName },
             ] as const).map(({ em, icon }) => (
               <button
                 key={em}
@@ -993,7 +994,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
                 title={t(`canvas.eraserMode.${em}`)}
                 aria-label={t(`canvas.eraserMode.${em}`)}
               >
-                <span className="tb-tool__icon">{icon}</span>
+                <span className="tb-tool__icon"><CanvasIcon name={icon} /></span>
                 <span className="tb-tool__label">{t(`canvas.eraserMode.${em}.short`)}</span>
               </button>
             ))}
@@ -1012,7 +1013,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           aria-label={t('canvas.autoLayout')}
           title={t('canvas.autoLayout')}
         >
-          <span className="tb-btn__icon" aria-hidden="true">⇅</span>
+          <span className="tb-btn__icon" aria-hidden="true"><CanvasIcon name="auto-layout" /></span>
         </button>
         {/* 对齐工具条:选中≥2 卡时出现 9 操作(左/右/上/下/水平居中/垂直居中/
             水平等距/垂直等距/等大)。图标用 unicode 符号(包豪斯风),applyAlign 算
@@ -1356,17 +1357,17 @@ function SnapToggle({ mode, onToggle, disabled }: { mode: 'snap' | 'free'; onTog
 
 function AlignGroup({ adapterReady, count, onAlign }: { adapterReady: boolean; count: number; onAlign: (op: AlignOp) => void }) {
   const { t } = useI18n()
-  // 9 对齐操作 + unicode 图标。distribute-h/v 在 count<3 时 disable(无意义)。
-  const items: { op: AlignOp; icon: string; label: string }[] = [
-    { op: 'left', icon: '⇤', label: t('canvas.align.left') },
-    { op: 'center-h', icon: '⇆', label: t('canvas.align.centerH') },
-    { op: 'right', icon: '⇥', label: t('canvas.align.right') },
-    { op: 'top', icon: '⇧', label: t('canvas.align.top') },
-    { op: 'center-v', icon: '⇅', label: t('canvas.align.centerV') },
-    { op: 'bottom', icon: '⇩', label: t('canvas.align.bottom') },
-    { op: 'distribute-h', icon: '⇠⇢', label: t('canvas.align.distributeH') },
-    { op: 'distribute-v', icon: '⇡⇣', label: t('canvas.align.distributeV') },
-    { op: 'equalize', icon: '⬌', label: t('canvas.align.equalize') },
+  // 9 对齐操作 + lucide 图标。distribute-h/v 在 count<3 时 disable(无意义)。
+  const items: { op: AlignOp; icon: CanvasIconName; label: string }[] = [
+    { op: 'left', icon: 'align-left', label: t('canvas.align.left') },
+    { op: 'center-h', icon: 'align-center-h', label: t('canvas.align.centerH') },
+    { op: 'right', icon: 'align-right', label: t('canvas.align.right') },
+    { op: 'top', icon: 'align-top', label: t('canvas.align.top') },
+    { op: 'center-v', icon: 'align-center-v', label: t('canvas.align.centerV') },
+    { op: 'bottom', icon: 'align-bottom', label: t('canvas.align.bottom') },
+    { op: 'distribute-h', icon: 'distribute-h', label: t('canvas.align.distributeH') },
+    { op: 'distribute-v', icon: 'distribute-v', label: t('canvas.align.distributeV') },
+    { op: 'equalize', icon: 'equalize', label: t('canvas.align.equalize') },
   ]
   return (
     <span className="tb-align">
@@ -1383,7 +1384,7 @@ function AlignGroup({ adapterReady, count, onAlign }: { adapterReady: boolean; c
             title={label}
             aria-label={label}
           >
-            <span className="tb-align__icon" aria-hidden="true">{icon}</span>
+            <span className="tb-align__icon" aria-hidden="true"><CanvasIcon name={icon} /></span>
           </button>
         )
       })}
@@ -1520,43 +1521,43 @@ function CanvasSideRail({
   }, [wfMenuOpen])
   return (
     <nav className="cv-rail" aria-label={t('canvas.sideRail')}>
-      <RailButton label={t('canvas.undo')} short={t('canvas.rail.undo')} onClick={onUndo} disabled={!adapterReady || !canUndo} icon="↶" />
-      <RailButton label={t('canvas.redo')} short={t('canvas.rail.redo')} onClick={onRedo} disabled={!adapterReady || !canRedo} icon="↷" />
+      <RailButton label={t('canvas.undo')} short={t('canvas.rail.undo')} onClick={onUndo} disabled={!adapterReady || !canUndo} icon="undo" />
+      <RailButton label={t('canvas.redo')} short={t('canvas.rail.redo')} onClick={onRedo} disabled={!adapterReady || !canRedo} icon="redo" />
       <span className="cv-rail__sep" aria-hidden="true" />
-      <RailButton label={t('canvas.newTitle')} short={t('canvas.rail.new')} onClick={onNewCanvas} icon="+" />
-      <RailButton label={t('canvas.renameTitle')} short={t('canvas.rail.rename')} onClick={onRename} disabled={!canRename} icon="✎" />
-      <RailButton label={t('canvas.deleteTitle')} short={t('canvas.rail.delete')} onClick={onDelete} disabled={!canDelete} icon="🗑" />
-      <RailButton label={t('canvas.template.saveAs')} short={t('canvas.rail.template')} disabled={!adapterReady} onClick={onSaveAsTemplate} icon="🗖" />
-      <RailButton label={t('canvas.template.import')} short={t('canvas.rail.importTpl')} onClick={onImportTemplate} icon="📥" />
+      <RailButton label={t('canvas.newTitle')} short={t('canvas.rail.new')} onClick={onNewCanvas} icon="new-canvas" />
+      <RailButton label={t('canvas.renameTitle')} short={t('canvas.rail.rename')} onClick={onRename} disabled={!canRename} icon="rename" />
+      <RailButton label={t('canvas.deleteTitle')} short={t('canvas.rail.delete')} onClick={onDelete} disabled={!canDelete} icon="delete" />
+      <RailButton label={t('canvas.template.saveAs')} short={t('canvas.rail.template')} disabled={!adapterReady} onClick={onSaveAsTemplate} icon="template" />
+      <RailButton label={t('canvas.template.import')} short={t('canvas.rail.importTpl')} onClick={onImportTemplate} icon="import" />
       <span className="cv-rail__sep" aria-hidden="true" />
       {aiEnabled && (
         <>
-          <RailButton label={t('canvas.aiLayout')} short={t('canvas.rail.aiLayout')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'layout'} ariaBusy={aiBusy === 'layout'} busyTitle={t('canvas.aiRunning')} onClick={onAILayout} icon="✨" />
+          <RailButton label={t('canvas.aiLayout')} short={t('canvas.rail.aiLayout')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'layout'} ariaBusy={aiBusy === 'layout'} busyTitle={t('canvas.aiRunning')} onClick={onAILayout} icon="ai" />
           {/* AI 工作流 popover:聚类重排 / 生成关系 / 总结大纲。3 项分别是现有
               handler 的分组入口。菜单项 disabled 同各自前置(cluster/relate 走
               现有 handler,内含选中/卡片数门控;outline 走 summarizeOutline)。 */}
           <div className="cv-rail__group">
-            <RailButton label={t('ai.workflow.title')} short={t('canvas.rail.aiWorkflow')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'outline'} ariaBusy={aiBusy === 'outline'} busyTitle={t('canvas.aiRunning')} onClick={() => setWfMenuOpen((o) => !o)} pressed={wfMenuOpen} icon="⚙" buttonRef={wfTriggerRef} />
+            <RailButton label={t('ai.workflow.title')} short={t('canvas.rail.aiWorkflow')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'outline'} ariaBusy={aiBusy === 'outline'} busyTitle={t('canvas.aiRunning')} onClick={() => setWfMenuOpen((o) => !o)} pressed={wfMenuOpen} icon="workflow" buttonRef={wfTriggerRef} />
           </div>
         </>
       )}
       {showAutoRelate && (
-        <RailButton label={t('canvas.autoRelate')} short={t('canvas.rail.autoRelate')} onClick={onAutoRelate} icon="→" />
+        <RailButton label={t('canvas.autoRelate')} short={t('canvas.rail.autoRelate')} onClick={onAutoRelate} icon="relation" />
       )}
-      <RailButton label={t('canvas.frameSelection')} short={t('canvas.rail.frame')} disabled={!adapterReady} onClick={onFrame} icon="▭" />
+      <RailButton label={t('canvas.frameSelection')} short={t('canvas.rail.frame')} disabled={!adapterReady} onClick={onFrame} icon="frame" />
       {aiEnabled && <span className="cv-rail__sep" aria-hidden="true" />}
-      <RailButton label={t('canvas.outline')} short={t('canvas.rail.outline')} disabled={!adapterReady} onClick={onOutline} pressed={outlineOpen} icon="☰" />
-      <RailButton label={t('canvas.overview')} short={t('canvas.rail.overview')} disabled={!adapterReady} onClick={onOverview} icon="▤" />
+      <RailButton label={t('canvas.outline')} short={t('canvas.rail.outline')} disabled={!adapterReady} onClick={onOutline} pressed={outlineOpen} icon="outline" />
+      <RailButton label={t('canvas.overview')} short={t('canvas.rail.overview')} disabled={!adapterReady} onClick={onOverview} icon="overview" />
       {/* 转义(DSL)是核心卖点,提一级独立按钮(双向:编辑画布文本/导出 DSL)。
           导出菜单里保留同名项(作为「导出 DSL」入口),两条路都通 DslDialog。 */}
-      <RailButton label={t('canvas.dslTitle')} short={t('canvas.rail.dsl')} disabled={!adapterReady} onClick={onDsl} icon="»" />
+      <RailButton label={t('canvas.dslTitle')} short={t('canvas.rail.dsl')} disabled={!adapterReady} onClick={onDsl} icon="dsl" />
       {/* 导出:一个按钮 + 二级拓展(图片/Markdown/DSL)。Diff(版本对比)不是导出,留独立按钮。 */}
       <div className="cv-rail__group">
-        <RailButton label={t('canvas.export')} short={t('canvas.rail.export')} disabled={!adapterReady} onClick={() => setExportMenuOpen((o) => !o)} pressed={exportMenuOpen} icon="⤓" buttonRef={exportTriggerRef} />
+        <RailButton label={t('canvas.export')} short={t('canvas.rail.export')} disabled={!adapterReady} onClick={() => setExportMenuOpen((o) => !o)} pressed={exportMenuOpen} icon="export" buttonRef={exportTriggerRef} />
       </div>
-      <RailButton label={t('canvas.diffTitle')} short={t('canvas.rail.diff')} disabled={!adapterReady} onClick={onDiff} icon="±" />
+      <RailButton label={t('canvas.diffTitle')} short={t('canvas.rail.diff')} disabled={!adapterReady} onClick={onDiff} icon="diff" />
       <span className="cv-rail__sep" aria-hidden="true" />
-      <RailButton label={t('canvas.shortcuts')} short={t('canvas.rail.shortcuts')} onClick={onShortcuts} icon="?" />
+      <RailButton label={t('canvas.shortcuts')} short={t('canvas.rail.shortcuts')} onClick={onShortcuts} icon="shortcuts" />
       {exportMenuOpen && typeof document !== 'undefined' && createPortal(
         <>
           <div className="cv-rail__menu-backdrop" onClick={() => setExportMenuOpen(false)} aria-hidden="true" />
@@ -1595,7 +1596,7 @@ function CanvasSideRail({
   )
 }
 
-function RailButton({ label, short, icon, onClick, disabled, busy, busyTitle, ariaBusy, pressed, buttonRef }: { label: string; short?: string; icon: string; onClick: () => void; disabled?: boolean; busy?: boolean; busyTitle?: string; ariaBusy?: boolean; pressed?: boolean; buttonRef?: React.RefObject<HTMLButtonElement | null> }) {
+function RailButton({ label, short, icon, onClick, disabled, busy, busyTitle, ariaBusy, pressed, buttonRef }: { label: string; short?: string; icon: CanvasIconName; onClick: () => void; disabled?: boolean; busy?: boolean; busyTitle?: string; ariaBusy?: boolean; pressed?: boolean; buttonRef?: React.RefObject<HTMLButtonElement | null> }) {
   return (
     <button
       ref={buttonRef}
@@ -1608,7 +1609,7 @@ function RailButton({ label, short, icon, onClick, disabled, busy, busyTitle, ar
       aria-busy={ariaBusy ? true : undefined}
       aria-pressed={pressed ? true : undefined}
     >
-      <span className="cv-rail__btn-icon" aria-hidden="true">{busy ? '…' : icon}</span>
+      <span className="cv-rail__btn-icon" aria-hidden="true">{busy ? <CanvasBusyIcon /> : <CanvasIcon name={icon} />}</span>
       {short ? <span className="cv-rail__btn-label">{short}</span> : null}
     </button>
   )
@@ -1672,6 +1673,13 @@ const styles = `
   transition: background 80ms ease-out, color 80ms ease-out, border-color 80ms ease-out, transform 60ms ease-out;
 }
 .tb-tool__icon { font-size: var(--font-size-base); line-height: 1; }
+/* 图标容器现在装 lucide SVG(非字符),让 SVG 跟随容器字号 + 居中 */
+.tb-tool__icon svg, .tb-align__icon svg, .tb-btn__icon svg, .cv-rail__btn-icon svg
+  { width: 1em; height: 1em; display: block; }
+/* busy 旋转(AI 运行中),尊重 reduced-motion */
+.cv-rail__busy-spin { animation: cys-spin 1s linear infinite; }
+@keyframes cys-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .cv-rail__busy-spin { animation: none; } }
 .tb-tool__label { font-size: 10px; letter-spacing: 0; color: var(--color-gray); line-height: 1; }
 .tb-tool--active { background: var(--color-yellow); border-color: var(--color-black); color: var(--color-black); }
 .tb-tool--active .tb-tool__label { color: var(--color-black); }
