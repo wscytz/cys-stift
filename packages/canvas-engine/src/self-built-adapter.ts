@@ -737,7 +737,8 @@ export class SelfBuiltAdapter implements CanvasHost {
         this.connecting.pointer = { x: p.x, y: p.y }
         // move 中跟踪当前命中目标(用 card 容差命中),供目标高亮 + 松手判定。
         // 排除 fromId(不自连)。toId 即"对准了"的视觉反馈数据源。
-        const hit = hitTestCardWithTolerance(this.getElements(), p.x, p.y, this.view.zoom)
+        // 用 getSortedElements()(层排序缓存)而非 getElements()(每帧全量排序)。
+        const hit = hitTestCardWithTolerance(this.getSortedElements(), p.x, p.y, this.view.zoom)
         this.connecting.toId = hit && hit !== this.connecting.fromId ? hit : null
         this.scheduleRender()
         return
@@ -843,10 +844,11 @@ export class SelfBuiltAdapter implements CanvasHost {
         const sy = e.clientY - rect.top
         const p = screenToPage(this.view, sx, sy)
         // 优先用 move 中跟踪的 toId(已排除 fromId);松手点可能再偏一点,用 card 容差兜底重算。
+        // 用 getSortedElements()(层排序缓存)而非 getElements()(每次全量排序)。
         const toId =
           this.connecting.toId ??
           (() => {
-            const hit = hitTestCardWithTolerance(this.getElements(), p.x, p.y, this.view.zoom)
+            const hit = hitTestCardWithTolerance(this.getSortedElements(), p.x, p.y, this.view.zoom)
             return hit && hit !== this.connecting!.fromId ? hit : null
           })()
         if (toId) {
