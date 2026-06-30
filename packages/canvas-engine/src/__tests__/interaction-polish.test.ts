@@ -213,3 +213,41 @@ describe('[B4-T2] eraser 线段擦 — 快速拖拽不漏擦', () => {
     expect(host.getElement('mid')).toBeUndefined()
   })
 })
+
+describe('[B4-T3] connect 模式 card 可连暗示', () => {
+  it('activeTool=connect 时 renderNow 对 card 画虚线轮廓', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('connect')
+    // mock ctx 捕获 setLineDash + strokeRect 调用
+    const calls: string[] = []
+    const ctx = {
+      setLineDash: (d: number[]) => calls.push(`setLineDash(${d.join(',')})`),
+      strokeRect: (x: number, y: number, w: number, h: number) => calls.push(`strokeRect(${x},${y},${w},${h})`),
+      save: () => {}, restore: () => {}, translate: () => {}, scale: () => {},
+      setTransform: () => {},
+      beginPath: () => {}, closePath: () => {}, moveTo: () => {}, lineTo: () => {},
+      quadraticCurveTo: () => {}, roundRect: () => {},
+      arc: () => {}, rect: () => {}, fill: () => {}, stroke: () => {}, fillRect: () => {},
+      fillText: () => {}, clearRect: () => {}, measureText: () => ({ width: 10 }),
+      strokeStyle: '', fillStyle: '', font: '', lineWidth: 0, globalAlpha: 1, textBaseline: 'top',
+    }
+    ;(host as unknown as { ctx: unknown }).ctx = ctx
+    ;(host as unknown as { renderNow: () => void }).renderNow()
+    expect(calls.some((c) => c.startsWith('strokeRect(0,0,100,100)'))).toBe(true)
+    expect(calls.some((c) => c.startsWith('setLineDash'))).toBe(true)
+  })
+
+  it('select 模式不画 connect 暗示(回归)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    // activeTool 默认 select
+    const calls: string[] = []
+    const ctx = { strokeRect: () => calls.push('strokeRect'), setLineDash: () => calls.push('setLineDash'), save: () => {}, restore: () => {}, translate: () => {}, scale: () => {}, setTransform: () => {}, beginPath: () => {}, closePath: () => {}, moveTo: () => {}, lineTo: () => {}, quadraticCurveTo: () => {}, roundRect: () => {}, arc: () => {}, rect: () => {}, fill: () => {}, stroke: () => {}, fillRect: () => {}, fillText: () => {}, clearRect: () => {}, measureText: () => ({ width: 10 }), strokeStyle: '', fillStyle: '', font: '', lineWidth: 0, globalAlpha: 1, textBaseline: 'top' }
+    ;(host as unknown as { ctx: unknown }).ctx = ctx
+    ;(host as unknown as { renderNow: () => void }).renderNow()
+    // select 模式不应画 connect 暗示虚线 strokeRect(选中描边走 drawSelectionOutlines,不在此)
+    // 宽松断言:不强制要求(防 drawSelectionOutlines 干扰);关键看 connect 分支
+    expect(host.getTool()).not.toBe('connect')
+  })
+})

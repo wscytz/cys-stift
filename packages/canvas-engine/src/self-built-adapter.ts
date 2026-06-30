@@ -162,6 +162,23 @@ export class SelfBuiltAdapter implements CanvasHost {
         h: Math.abs(this.marquee.curY - this.marquee.startY),
       }, this.view, this.tokenResolver)
     }
+    // connect 模式:给所有可连元素(card/rect/text/frame)画淡虚线轮廓,暗示可连(教育新用户)。
+    if (this.activeTool === 'connect') {
+      ctx.save()
+      ctx.translate(this.view.panX, this.view.panY)
+      ctx.scale(this.view.zoom, this.view.zoom)
+      ctx.strokeStyle = this.tokenResolver('--color-blue', '#1d4ed8')
+      ctx.lineWidth = 1 / this.view.zoom
+      ctx.globalAlpha = 0.4
+      ctx.setLineDash([4 / this.view.zoom, 3 / this.view.zoom])
+      for (const el of this.getSortedElements()) {
+        if (el.kind === 'arrow') continue
+        const b = normalizeBox(el)
+        ctx.strokeRect(b.x, b.y, b.w, b.h)
+      }
+      ctx.setLineDash([])
+      ctx.restore()
+    }
     if (this.connecting) {
       const fromEl = this.getElement(this.connecting.fromId)
       if (fromEl) {
