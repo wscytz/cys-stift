@@ -103,6 +103,34 @@ export function hitTest(
   return null
 }
 
+/** connect 松手用的 card 宽松命中:bbox 外扩 CARD_HIT_TOLERANCE_PX(屏幕)容差。
+ *  比严格 hitTest(线段 6px)更适合"拖到卡片附近松手" — 偏几像素仍连上。
+ *  只命中非 arrow 元素(card/rect/text/frame),arrow 不作 connect 目标。 */
+const CARD_HIT_TOLERANCE_PX = 6
+
+export function hitTestCardWithTolerance(
+  elements: CanvasElement[],
+  pageX: number,
+  pageY: number,
+  zoom: number = 1,
+): string | null {
+  const tol = CARD_HIT_TOLERANCE_PX / zoom
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const el = elements[i]!
+    if (el.kind === 'arrow') continue
+    const b = normalizeBox(el)
+    if (
+      pageX >= b.x - tol &&
+      pageX <= b.x + b.w + tol &&
+      pageY >= b.y - tol &&
+      pageY <= b.y + b.h + tol
+    ) {
+      return el.id
+    }
+  }
+  return null
+}
+
 /** 点 (px,py) 到线段 (ax,ay)-(bx,by) 的最短距离。 */
 function pointToSegmentDistance(
   px: number, py: number, ax: number, ay: number, bx: number, by: number,

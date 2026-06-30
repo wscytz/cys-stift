@@ -48,3 +48,49 @@ describe('[connect 打磨] pointercancel — 系统中断不在坏坐标判定',
     expect(arrowCount(host)).toBe(0)
   })
 })
+
+describe('[connect 打磨] 松手容差 — 偏几像素仍能连上', () => {
+  it('松手点偏目标卡 4px(页)→ 仍建箭头(card 容差)', () => {
+    const { host, canvas } = makeHost()
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('connect')
+    dispatch(canvas, 'pointerdown', 50, 50) // 卡A
+    // 卡B bbox x=300..400, y=0..100。松在 (404, 50) = 偏右边 4px
+    dispatch(canvas, 'pointermove', 404, 50)
+    dispatch(canvas, 'pointerup', 404, 50)
+    const arrows = host.getElements().filter((e) => e.kind === 'arrow')
+    expect(arrows).toHaveLength(1)
+    expect(arrows[0]).toMatchObject({ from: 'a', to: 'b' })
+  })
+
+  it('松手点偏目标卡 12px(超出容差)→ 不建', () => {
+    const { host, canvas } = makeHost()
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('connect')
+    dispatch(canvas, 'pointerdown', 50, 50)
+    dispatch(canvas, 'pointermove', 412, 50) // 偏 12px,超容差
+    dispatch(canvas, 'pointerup', 412, 50)
+    expect(host.getElements().filter((e) => e.kind === 'arrow')).toHaveLength(0)
+  })
+})
+
+describe('[connect 打磨] move 中目标高亮 — connecting.toId 跟踪', () => {
+  it('move 到卡B 上 → connecting.toId=b;移开 → toId=null', () => {
+    const { host, canvas } = makeHost()
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('connect')
+    dispatch(canvas, 'pointerdown', 50, 50)
+    dispatch(canvas, 'pointermove', 350, 50) // 卡B 中心
+    const connecting = (host as unknown as { connecting: { fromId: string; toId: string | null } | null }).connecting
+    expect(connecting?.toId).toBe('b')
+    dispatch(canvas, 'pointermove', 500, 500) // 移到空白
+    const connecting2 = (host as unknown as { connecting: { toId: string | null } | null }).connecting
+    expect(connecting2?.toId).toBeNull()
+  })
+
+  it('move 到 fromId 卡自身 → toId=null(不自连)', () => {
+    const { host, canvas } = makeHost()
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('connect')
+    dispatch(canvas, 'pointerdown', 50, 50)
+    dispatch(canvas, 'pointermove', 60, 60) // 仍在卡A
+    const connecting = (host as unknown as { connecting: { toId: string | null } | null }).connecting
+    expect(connecting?.toId).toBeNull()
+  })
+})

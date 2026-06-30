@@ -16,7 +16,7 @@ import type {
 } from './canvas-host'
 import { sortByLayer, sanitizeView, ZOOM_MIN, ZOOM_MAX } from './canvas-host'
 import { renderElements, drawSelectionOutlines, drawMarquee, domTokenResolver, type CardInfo, type TokenResolver } from './self-built-render'
-import { hitTest, screenToPage, eraserHitTest } from './self-built-hittest'
+import { hitTest, screenToPage, eraserHitTest, hitTestCardWithTolerance } from './self-built-hittest'
 import { commitFreedraw, translateFreedraw, scaleFreedrawToBox } from './self-built-freedraw'
 import { handleAtPoint, resizeGeometry, type Handle } from './self-built-resize'
 import { marqueeSelect } from './self-built-marquee'
@@ -58,7 +58,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   private resizing: { id: string; handle: Handle; start: { x: number; y: number; w: number; h: number } } | null = null
   private dragGroup: { ids: string[]; offsets: Map<string, { x: number; y: number }> } | null = null
   private marquee: { startX: number; startY: number; curX: number; curY: number } | null = null
-  private connecting: { fromId: string; pointer: { x: number; y: number } } | null = null
+  private connecting: { fromId: string; pointer: { x: number; y: number }; toId: string | null } | null = null
   /** 拖动箭头弯曲手柄(设 curve 控制点)。null=未在拖。 */
   private curveDragging: { id: string } | null = null
   /** 拖动折线箭头折点手柄(改 elbow[index] 位置)。null=未在拖。 */
@@ -165,6 +165,20 @@ export class SelfBuiltAdapter implements CanvasHost {
         ctx.lineTo(to.x, to.y)
         ctx.stroke()
         ctx.restore()
+      }
+      // 目标命中高亮:move 中对准的卡描蓝边(给"对准了"反馈)。
+      if (this.connecting.toId) {
+        const target = this.getElement(this.connecting.toId)
+        if (target) {
+          const b = normalizeBox(target)
+          ctx.save()
+          ctx.translate(this.view.panX, this.view.panY)
+          ctx.scale(this.view.zoom, this.view.zoom)
+          ctx.strokeStyle = this.tokenResolver('--color-blue', '#1d4ed8')
+          ctx.lineWidth = 3 / this.view.zoom
+          ctx.strokeRect(b.x, b.y, b.w, b.h)
+          ctx.restore()
+        }
       }
     }
   }
@@ -529,7 +543,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       if (this.activeTool === 'connect') {
         const id = hitTest(this.getElements(), p.x, p.y, this.view.zoom)
         if (id) {
-          this.connecting = { fromId: id, pointer: { x: p.x, y: p.y } }
+          this.connecting = { fromId: id, pointer: { x: p.x, y: p.y }, toId: null }
           try {
             this.canvas.setPointerCapture(e.pointerId)
           } catch {
@@ -671,6 +685,10 @@ export class SelfBuiltAdapter implements CanvasHost {
       if (this.connecting) {
         const p = screenToPage(this.view, sx, sy)
         this.connecting.pointer = { x: p.x, y: p.y }
+        // move 中跟踪当前命中目标(用 card 容差命中),供目标高亮 + 松手判定。
+        // 排除 fromId(不自连)。toId 即"对准了"的视觉反馈数据源。
+        const hit = hitTestCardWithTolerance(this.getElements(), p.x, p.y, this.view.zoom)
+        this.connecting.toId = hit && hit !== this.connecting.fromId ? hit : null
         this.scheduleRender()
         return
       }
@@ -774,8 +792,14 @@ export class SelfBuiltAdapter implements CanvasHost {
         const sx = e.clientX - rect.left
         const sy = e.clientY - rect.top
         const p = screenToPage(this.view, sx, sy)
-        const toId = hitTest(this.getElements(), p.x, p.y, this.view.zoom)
-        if (toId && toId !== this.connecting.fromId) {
+        // 优先用 move 中跟踪的 toId(已排除 fromId);松手点可能再偏一点,用 card 容差兜底重算。
+        const toId =
+          this.connecting.toId ??
+          (() => {
+            const hit = hitTestCardWithTolerance(this.getElements(), p.x, p.y, this.view.zoom)
+            return hit && hit !== this.connecting!.fromId ? hit : null
+          })()
+        if (toId) {
           const id =
             'arrow-' +
             (typeof crypto !== 'undefined' && 'randomUUID' in crypto
