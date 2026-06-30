@@ -924,12 +924,15 @@ export class SelfBuiltAdapter implements CanvasHost {
         return
       }
       if (this.currentStroke) {
-        const id =
-          'freedraw-' +
-          (typeof crypto !== 'undefined' && 'randomUUID' in crypto
-            ? crypto.randomUUID()
-            : Math.random().toString(36).slice(2))
-        this.upsert(commitFreedraw(id, this.currentStroke.points))
+        // 单点(points<2)不建:commitFreedraw 对 1 点返 w=h=0 不可见不可选幽灵元素。
+        if (this.currentStroke.points.length >= 2) {
+          const id =
+            'freedraw-' +
+            (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+              ? crypto.randomUUID()
+              : Math.random().toString(36).slice(2))
+          this.upsert(commitFreedraw(id, this.currentStroke.points))
+        }
         this.currentStroke = null
         try {
           this.canvas.releasePointerCapture(e.pointerId)

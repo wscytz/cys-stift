@@ -177,3 +177,24 @@ describe('[B2-T2] resize snap — snap 模式尺寸落 8 倍数', () => {
     expect(a.w).toBe(123)
   })
 })
+
+describe('[B4-T1] freedraw 单点不建幽灵元素', () => {
+  it('freedraw 单点点击(不拖)→ 不建元素', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('freedraw')
+    dispatch(canvas, 'pointerdown', 50, 50)
+    dispatch(canvas, 'pointerup', 50, 50) // 单点,无 move
+    expect(host.getElements().filter((e) => e.kind === 'freedraw')).toHaveLength(0)
+  })
+
+  it('freedraw 多点(正常笔画)→ 建元素(回归)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('freedraw')
+    dispatch(canvas, 'pointerdown', 10, 10)
+    dispatch(canvas, 'pointermove', 50, 50)
+    dispatch(canvas, 'pointerup', 50, 50)
+    expect(host.getElements().filter((e) => e.kind === 'freedraw')).toHaveLength(1)
+  })
+})
