@@ -367,7 +367,7 @@ export default function CanvasPage() {
       const formatted = formatCanvasSnapshot(snap)
 
       const systemPrompt =
-        'You are a canvas editing assistant. Given the current canvas (cards, shapes, arrows with their relation signatures), output DSL directives to improve it. You may reposition/resize cards, change colors, create/update rect and text shapes, and rewrite arrow relation signatures (dash line style + arrowhead shape). Reuse an existing element #id to UPDATE it (relation arrow endpoints are kept; free arrow bbox is kept); omit the id to CREATE new. Cards can only be UPDATEd — never created (card content comes from the inbox, not the canvas). Free arrows (arrows with no from/to) encode their line as @pos + @size (w/h may be negative for direction). Output DSL directives only — no explanations.'
+        'You are a canvas editing assistant. Given the current canvas (cards, shapes, arrows with their relation signatures), output DSL directives to improve it. You may reposition/resize cards, change colors, create/update rect and text shapes, and rewrite arrow relation signatures (dash line style + arrowhead shape). Reuse an existing element #id to UPDATE it (relation arrow endpoints are kept; free arrow bbox is kept); omit the id to CREATE new. Cards can only be UPDATEd — never created (card content comes from the inbox, not the canvas). Free arrows (arrows with no from/to) encode their line as @pos + @size (w/h may be negative for direction). Output DSL directives ONLY: one per line, each starting with "[", no markdown fences (no ```), no explanations, no preamble.'
 
       const userPrompt = `Improve this canvas. Reorganize positions, adjust sizes/colors, and refine arrow relation signatures where appropriate. Do NOT change items that are already well-placed.
 
@@ -381,14 +381,25 @@ Output DSL (one directive per line):
 [arrow #id] @pos(x, y) @size(w, h) @color(c) @dash(...) @arrowhead(...)   (free arrow: no from/to; w/h may be negative for direction)
 Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbox kept for free arrows); omit #id to CREATE new — except cards, which are update-only; colors limited to blue/red/black/grey/yellow.`
 
-      const result = await streamText(ready, { system: systemPrompt, user: userPrompt }, () => {}, ac.signal)
+      // maxTokens 提到 4096:排版 DSL 需要完整结构化输出,默认 1024 对思考模式模型
+      // (DeepSeek-v4-pro 等)不够 —— 思考吃掉大半,DSL 还没输出完就被截断 → 解析 0 条。
+      const result = await streamText(ready, { system: systemPrompt, user: userPrompt, maxTokens: 4096 }, () => {}, ac.signal)
       if (!result?.content) {
         pushToast({ kind: 'info', message: t('canvas.aiLayoutEmpty') })
         return
       }
-      const ops = parseDsl(result.content)
+      // 用诊断版解析:ops 空 + 有 errors → 模型输出了「[ 开头但格式错」的行(格式偏差 /
+      // 思考截断)。给用户具体反馈而非一句「未生效」(转义核心卖点的信任:不静默失败)。
+      const { ops, errors } = parseDslWithDiagnostics(result.content)
       if (ops.length === 0) {
-        pushToast({ kind: 'info', message: t('canvas.aiLayoutEmpty') })
+        // errors 非空 = 模型确实输出了类 DSL 行但解析失败 → 格式问题(非空输出)。
+        // errors 空 = 模型根本没输出 [ 行(纯散文/空) → 用 Empty 文案。
+        pushToast({
+          kind: 'info',
+          message: errors.length > 0
+            ? t('canvas.aiLayoutParseFail', { n: String(errors.length) })
+            : t('canvas.aiLayoutEmpty'),
+        })
         return
       }
       const { applied, skipped } = applyLayout(adapter, ops)
