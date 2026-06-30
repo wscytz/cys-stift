@@ -939,8 +939,21 @@ export class SelfBuiltAdapter implements CanvasHost {
     // 可能建出错箭头或落空致预览突消(v0.40 手测反馈"拖到一半消失")。connect 走丢弃路径:
     // 直接清 connecting,不 hitTest、不建箭头(取消即取消)。
     const onCancel = (e: PointerEvent) => {
+      // connect:系统中断不在坏坐标判定(v0.40),直接丢弃。
       if (this.connecting) {
         this.connecting = null
+        try {
+          this.canvas.releasePointerCapture(e.pointerId)
+        } catch {
+          /* 已释放 */
+        }
+        this.scheduleRender()
+        return
+      }
+      // freedraw:系统中断不 commit 半截笔画(v0.41,与 connect 同构)。
+      // 旧逻辑走 onUp 会把 currentStroke commit 成残线元素(进 undo + 持久化)。
+      if (this.currentStroke) {
+        this.currentStroke = null
         try {
           this.canvas.releasePointerCapture(e.pointerId)
         } catch {

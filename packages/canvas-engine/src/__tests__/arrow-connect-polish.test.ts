@@ -94,3 +94,35 @@ describe('[connect 打磨] move 中目标高亮 — connecting.toId 跟踪', () 
     expect(connecting?.toId).toBeNull()
   })
 })
+
+describe('[B1-T3] freedraw pointercancel — 系统中断不 commit 残线', () => {
+  it('freedraw 中途 pointercancel → currentStroke 丢弃,不建 freedraw 元素', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('freedraw')
+    const before = host.getElements().length
+    dispatch(canvas, 'pointerdown', 10, 10) // 起笔
+    dispatch(canvas, 'pointermove', 50, 50) // 画了一段
+    dispatch(canvas, 'pointermove', 80, 80)
+    // pointercancel:系统中断,不应 commit 半截笔画
+    dispatch(canvas, 'pointercancel', 80, 80)
+    expect(host.getElements().length).toBe(before) // 没新增 freedraw 元素
+    // currentStroke 应清空
+    const stroke = (host as unknown as { currentStroke: unknown }).currentStroke
+    expect(stroke).toBeNull()
+  })
+
+  it('pointercancel 后无残留(后续 move 不 commit)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('freedraw')
+    dispatch(canvas, 'pointerdown', 10, 10)
+    dispatch(canvas, 'pointermove', 50, 50)
+    dispatch(canvas, 'pointercancel', 50, 50)
+    // cancel 后陈旧 move/up 不应 commit
+    dispatch(canvas, 'pointermove', 90, 90)
+    dispatch(canvas, 'pointerup', 90, 90)
+    expect(host.getElements().filter((e) => e.kind === 'freedraw')).toHaveLength(0)
+  })
+})
