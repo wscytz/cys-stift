@@ -362,6 +362,8 @@ export const messages = {
   'md.embed.cycleDepth': { zh: '嵌套过深', en: 'Too deeply nested' },
   'md.embed.cycleRef': { zh: '循环引用', en: 'cyclic reference' },
   'md.embed.missing': { zh: '卡片不存在或已删除', en: 'card not found or deleted' },
+
+  'canvas.textEmpty': { zh: '内容为空,未创建', en: 'Empty content, not created' },
   'relation.empty': { zh: '没有匹配的卡片', en: 'No matching cards' },
   'relation.suggested': { zh: '建议关联', en: 'Suggested links' },
   'relation.suggestedHint': { zh: '这张卡可能还和它们相关', en: 'Might also be related' },

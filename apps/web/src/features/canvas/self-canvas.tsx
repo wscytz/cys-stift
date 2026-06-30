@@ -26,6 +26,7 @@ import { screenToPage } from '@cys-stift/canvas-engine'
 import { measureText, textEditKeyAction } from '@cys-stift/canvas-engine'
 import { readToken } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
+import { pushToast } from '@/lib/toast-store'
 
 /** 浮动 textarea 编辑会话:屏幕锚点(textarea 定位)+ 页锚点(text 元素落点)。 */
 interface EditSession {
@@ -89,7 +90,12 @@ export function SelfCanvas({
   const textValueRef = useRef('')
   editRef.current = edit
   textValueRef.current = textValue
+  // #16 textarea 跟随 view:编辑中 onViewChange 触发 tick → 重渲染重算 textarea left/top。
+  // 非编辑期 editRef.current=null 不触发,零性能影响。
+  const [, setEditViewTick] = useState(0)
   const { t } = useI18n()
+  // 编辑中 textarea 定位用的当前 view(pageX/pageY × view = screen)。
+  const editView = edit ? adapterInner.current?.getView() : null
 
   useEffect(() => {
     const canvas = innerCanvasRef.current
@@ -124,6 +130,8 @@ export function SelfCanvas({
     // 视图持久化:onViewChange + 500ms debounce 写 canvasViewStore(替代轮询)。
     let viewTimer: ReturnType<typeof setTimeout> | null = null
     const unbindView = adapter.onViewChange(() => {
+      // #16 编辑中文本 textarea 跟随 view:即时 tick 重渲染重算 left/top(非编辑期 no-op)。
+      if (editRef.current) setEditViewTick((n) => n + 1)
       if (viewTimer) clearTimeout(viewTimer)
       viewTimer = setTimeout(() => {
         const v = adapter.getView()
@@ -245,7 +253,7 @@ export function SelfCanvas({
     setTextValue('')
   }
 
-  const commitEdit = () => {
+  const commitEdit = (silent = false) => {
     if (committedRef.current) return // 已 commit/cancel(防 onBlur + Ctrl+Enter 双触发)
     committedRef.current = true
     // Read from refs (not state) so this stays safe when called from an
@@ -281,6 +289,10 @@ export function SelfCanvas({
             : Math.random().toString(36).slice(2))
         adapter.upsert({ id, kind: 'text', x: curEdit.pageX, y: curEdit.pageY, w, h, rotation: 0, text: v, color: 'black' })
       }
+    } else if (!v && !silent) {
+      // #17 空文本提交不再静默:提示用户内容为空未创建(frame 重命名走上面 frameId 分支,不在此)。
+      // silent=unmount cleanup 不打扰(切画布等无输入场景)。
+      pushToast({ kind: 'info', message: t('canvas.textEmpty') })
     }
     setEdit(null)
     setTextValue('')
@@ -293,7 +305,7 @@ export function SelfCanvas({
   useEffect(() => {
     return () => {
       if (editRef.current && !committedRef.current) {
-        commitEdit()
+        commitEdit(true)
       }
     }
   }, [])
@@ -325,11 +337,12 @@ export function SelfCanvas({
               commitEdit()
             }
           }}
-          onBlur={commitEdit}
+          onBlur={() => commitEdit()}
           style={{
             position: 'absolute',
-            left: edit.screenX,
-            top: edit.screenY,
+            // #16 跟随 view:用 pageX/pageY × 当前 view 重算(编辑中 pan/zoom textarea 不再飘)。
+            left: edit.pageX * (editView?.zoom ?? 1) + (editView?.panX ?? 0),
+            top: edit.pageY * (editView?.zoom ?? 1) + (editView?.panY ?? 0),
             fontFamily: 'var(--font-body)',
             fontSize: 'var(--font-size-sm)',
             lineHeight: '1.3',
