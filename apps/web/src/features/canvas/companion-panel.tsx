@@ -10,11 +10,21 @@
  * recommendRelations 本地信号,不经 serializeCardsForAI、不发网络。本 task(T2)只接
  * 「选中定位」动作;建立关联 = T3 / AI 深挖 = T4(按钮留位)。对话 tab = 二期占位。
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Card } from '@cys-stift/domain'
 import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
+import { settingsStore } from '@/lib/settings-store'
+import { getCurrentAI, isAIReady } from '@/features/ai/ai-settings-provider'
+import { streamText } from '@/features/ai/stream-text'
+import { pushToast } from '@/lib/toast-store'
 import { discoverInsights, elementsCenter, buildConnectArrows, type Insight } from './companion-discovery'
+import {
+  buildDeepenUserPrompt,
+  parseDeepenResult,
+  DEEPEN_SYSTEM_PROMPT,
+  type DeepenResult,
+} from './companion-discovery-ai'
 
 const PANEL_WIDTH = 360
 /** 限制列表高度,避免大画布把面板顶出屏;内部滚动。 */
@@ -52,6 +62,10 @@ export function CanvasCompanionPanel({
   const [tab, setTab] = useState<Tab>(loadTab)
   // host 变更触发重算 + 重渲染 —— 镜像 OutlinePanel 的 force 范式(它也没把 force 进 deps)。
   const [, force] = useState(0)
+  // AI 深挖 note 按 insight.id 索引(稳定 id = kind + 排序后 cardIds),重算后 note 仍在。
+  const deepenedRef = useRef<Map<string, DeepenResult>>(new Map())
+  // deepenedRef 写入后手动触发重渲染(note 不会自动驱动视图)。
+  const [, setDeepenTick] = useState(0)
 
   useEffect(() => {
     if (!host) return
@@ -100,6 +114,43 @@ export function CanvasCompanionPanel({
     host.batch(() => { for (const a of arrows) host.upsert(a) })
     focusInsight(insight)
   }, [host, focusInsight])
+
+  /** AI 深挖:对单条 insight 按需问 AI 一句话解释(R2:走 serializeCardsForAI allowlist)。
+   *  返回 {note, relationType?} 按 insight.id 回填 Map —— id 内容稳定(排序后 cardIds),
+   *  discoverInsights 重算后 note 不丢。isAIReady 门 + toast;structuredOutput:true 关思考。 */
+  const deepenInsight = useCallback(async (insight: Insight) => {
+    const cfg = getCurrentAI()
+    if (!isAIReady(cfg) || !cfg) {
+      pushToast({ kind: 'info', message: t('canvas.companion.aiNotReady') })
+      return
+    }
+    const insightCards = cards.filter((c) => insight.cardIds.includes(c.id))
+    if (insightCards.length === 0) return
+    const locale: 'zh' | 'en' = settingsStore.get().locale
+    const ctrl = new AbortController()
+    try {
+      const res = await streamText(
+        cfg,
+        {
+          system: DEEPEN_SYSTEM_PROMPT,
+          user: buildDeepenUserPrompt(insightCards, locale),
+          structuredOutput: true,
+          maxTokens: 512,
+        },
+        () => {}, // note 短,不流式渲染,完成后一次性解析 res.content
+        ctrl.signal,
+      )
+      const parsed = parseDeepenResult(res.content)
+      if (parsed) {
+        deepenedRef.current.set(insight.id, parsed)
+        setDeepenTick((n) => n + 1)
+      } else {
+        pushToast({ kind: 'info', message: t('canvas.companion.deepenFail') })
+      }
+    } catch {
+      pushToast({ kind: 'error', message: t('canvas.companion.deepenFail') })
+    }
+  }, [cards, t])
 
   if (!host) return null
   const title = t('canvas.companion')
@@ -258,6 +309,18 @@ export function CanvasCompanionPanel({
                       >
                         {titles || '—'}
                       </div>
+                      {deepenedRef.current.get(ins.id)?.note && (
+                        <div
+                          style={{
+                            fontStyle: 'italic',
+                            color: 'var(--color-blue)',
+                            fontSize: 'var(--font-size-xs)',
+                            marginBottom: 'var(--space-1)',
+                          }}
+                        >
+                          {deepenedRef.current.get(ins.id)!.note}
+                        </div>
+                      )}
                       {/* 动作:选中定位(本 task)。建立关联 / AI 深挖 = T3/T4 接线。 */}
                       <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
                         <button
@@ -278,7 +341,14 @@ export function CanvasCompanionPanel({
                             {t('canvas.companion.action.connect')}
                           </button>
                         )}
-                        {/* T4: 深挖 */}
+                        <button
+                          type="button"
+                          className="cv-companion__action"
+                          onClick={() => deepenInsight(ins)}
+                          style={actionBtnStyle}
+                        >
+                          {t('canvas.companion.action.deepen')}
+                        </button>
                       </div>
                     </div>
                   </li>

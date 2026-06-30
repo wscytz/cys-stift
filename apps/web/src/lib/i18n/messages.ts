@@ -441,6 +441,8 @@ export const messages = {
   'canvas.companion.kind.relation': { zh: '可能关联', en: 'Likely related' },
   'canvas.companion.kind.orphan': { zh: '孤立卡', en: 'Orphan card' },
   'canvas.companion.chat.soon': { zh: '对话能力建设中(二期)', en: 'Chat coming soon (phase 2)' },
+  'canvas.companion.aiNotReady': { zh: '先在设置配好 AI 才能深挖', en: 'Configure AI in settings to deepen' },
+  'canvas.companion.deepenFail': { zh: 'AI 没返回有效结果', en: 'AI returned no valid result' },
   'canvas.srLabel': { zh: '灵感画布', en: 'Inspiration canvas' },
   'canvas.srLabelNamed': { zh: '灵感画布:{name}', en: 'Inspiration canvas: {name}' },
   'canvas.sideRail': { zh: '画布工具', en: 'Canvas tools' },
