@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-06-30 · v0.41 · v041-batch4(P2 打磨,11 条全做)
+
+v0.41 审计批 4。plan `docs/plans/2026-06-30-v041-batch4.md`。canvas-engine 三条 TDD + web inline。**v0.41 全 24 条 backlog 闭合。**
+
+- **freedraw 单点不建幽灵元素**:onUp 无条件 commit,1 点 → w=h=0 不可见不可选元素(进 undo+持久化)。points.length<2 丢弃。
+- **eraser 线段擦**:onMove 只对当前点 eraseAt,稀疏采样间跳过线元素。lastPoint→当前点间采样(~4px 屏幕/步,封顶 8)逐个 eraseAt。
+- **connect 模式 card 可连暗示**:新用户不知需从卡拖连线。connect 模式 renderNow 给可连元素画淡虚线轮廓(token 蓝 alpha 0.4),select 模式不画。
+- **textarea 跟随 view**:编辑中 pan/zoom textarea 用 screen 坐标定位不跟随 → 视觉错位。加 editViewTick,onViewChange 编辑中触发重渲染,textarea 用 pageX/pageY×view 重算 left/top(非编辑期不触发)。
+- **空文本提交 toast**:commitEdit 空文本静默丢弃 → info toast(内容为空,未创建);unmount cleanup silent 不打扰。
+- **outline/minimap 折叠态持久**:reload 后默认展开(丢折叠)。collapsed 读写 localStorage(参照 minimap pos 持久模式)。
+- **UI 机械批**:focus-visible 统一(cv-focus-exit 补 + search/ask/ai-settings/graph-filters `:focus`→`:focus-visible`)/ disabled opacity 0.55→0.5 统一(canvas-page 4 处)/ freedraw+relation panel 裸 px→token(gap4→space-0.5,h30→space-4,h18→space-2)/ home__secondary-sep 去 opacity 0.6 + cv-focus-exit 0.7→0.85 / mini-input backdrop rgba→color-mix 暗色自动反转。
+
+**验证**:canvas-engine 468(+5 interaction-polish:freedraw 单点/eraser 线段擦/connect 暗示)/ web 926 全绿;canvas-engine lint exit 0;web build exit 0;tsc 零新增(23 预存在 fixture 基线)。6 commit(B4-T1 7cc3e9f / B4-T2 de9d29b / B4-T3 ff86614 / B4-T4 70a70d5 / B4-T5 d3c4bd8 / B4-T6 7adf61c)。
+
+---
+
 ## 2026-06-30 · v0.41 · v041-batch23(P1 交互 + P1 UI)
 
 v0.41 审计批 2(交互)+ 批 3(UI)。spec `docs/specs/2026-06-30-v041-batch23-design.md`;plan `docs/plans/2026-06-30-v041-batch23.md`。#5 eraser card redo **defer**(undo 已工作,redo 是罕见边缘 + 代码标注预存限制,修需区分 undo/redo 方向风险高)。
