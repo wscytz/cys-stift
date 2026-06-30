@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import type { CanvasId, Card, CardId } from '@cys-stift/domain'
 import { SelfBuiltAdapter, applyAlign, elementCenter, unionBounds, normalizeBox, screenToPage } from '@cys-stift/canvas-engine'
 import type { AlignOp, CanvasElement } from '@cys-stift/canvas-engine'
@@ -67,6 +68,7 @@ export default function CanvasPage() {
   const { t } = useI18n()
   const { snap, service, ready } = useDb()
   void snap
+  const pathname = usePathname()
   const handle = useRef<SelfCanvasHandle>({ adapter: null })
   // adapter 就绪态抬进 state(ref 赋值不触发 re-render,否则冷启动/切画布后
   // toolbar disabled、RelationPanel/FreedrawPanel/Minimap host=null 不挂载,
@@ -668,9 +670,20 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
 
   const switchCanvas = (id: CanvasId) => {
     if (id === activeCanvasId) return
+    // 切画布显式清选择 — 不只靠 key={canvasId} 重建的隐式副作用(契约化,防 key 防线被改)。
+    handle.current.adapter?.setSelectedIds([])
     setDetail(null)
     canvasStore.setActive(id)
   }
+
+  // 路由离开 /canvas(去 /inbox、/search 等)清 selection。
+  // 静态导出 + 持久 layout 下 page 实例保留,选中态会原样残留 — 这是用户实测场景。
+  // 若 layout 真卸载 page,adapter ref 为 null,此 effect no-op,不破坏。
+  useEffect(() => {
+    if (pathname && !pathname.startsWith('/canvas')) {
+      handle.current.adapter?.setSelectedIds([])
+    }
+  }, [pathname])
 
   const handleCreateCanvas = (raw: string) => {
     const name = raw.trim()
