@@ -148,9 +148,9 @@ const styles = `
   font-size: var(--font-size-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  /* 半透明黑:在所有饱和 tag 背景上(红/蓝/黄/紫…)对比度都达标,
-     比 var(--color-gray)(#666)在饱和底上仅 ~2:1 可读。审计 H5 真因。 */
-  color: rgba(0, 0, 0, 0.7);
+  /* black-soft:在所有饱和 tag 背景上(红/蓝/黄/紫…)对比度达标,且暗色模式自动反转
+     (rgba(0,0,0,0.7) 暗色 tag 深底上不可读)。审计 H5 + v0.41 暗色可读。 */
+  color: var(--color-black-soft);
 }
 .tag-grid {
   list-style: none;
