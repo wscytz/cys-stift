@@ -74,6 +74,8 @@ export class SelfBuiltAdapter implements CanvasHost {
    *  引擎不接触 CardService,只通过此回调通知「用户擦了张卡」,由调用方决定 softDelete。 */
   private onEraseCard: ((cardId: string) => void) | null = null
   private keyHandler: ((e: KeyboardEvent) => void) | null = null
+  /** keyup handler(关方向键 coalescing)。null=未挂。 */
+  private keyUpHandler: ((e: KeyboardEvent) => void) | null = null
   private undoStack: CanvasElement[][] = []
   private redoStack: CanvasElement[][] = []
   private static readonly UNDO_LIMIT = 50
@@ -1041,6 +1043,13 @@ export class SelfBuiltAdapter implements CanvasHost {
       if (delta) {
         if (this.selectedIds.size === 0) return
         e.preventDefault()
+        // undo 粒度:按住方向键 OS 自动重复 fire keydown,若每次推快照 → undo 栈爆炸
+        // (按 2 秒 = 几十步,用户得按几十次 Ctrl+Z)。首次按下(repeat=false)推一次快照 +
+        // 开 coalescing;重复事件不再推。keyup 关 coalescing(见 keyUpHandler)。
+        if (!e.repeat) {
+          this.pushUndo()
+          this.coalescing = true
+        }
         for (const id of this.selectedIds) {
           const el = this.getElement(id)
           if (!el) continue
@@ -1054,9 +1063,18 @@ export class SelfBuiltAdapter implements CanvasHost {
             this.upsert({ ...el, x: el.x + dx, y: el.y + dy })
           }
         }
+        this.scheduleRender()
+        return
       }
     }
     window.addEventListener('keydown', this.keyHandler)
+    this.keyUpHandler = (e: KeyboardEvent) => {
+      // 方向键松开 → 关 coalescing(本轮连续微移结束,后续操作正常推快照)。
+      if (arrowKeyDelta(e.key, e.shiftKey) && this.coalescing) {
+        this.coalescing = false
+      }
+    }
+    window.addEventListener('keyup', this.keyUpHandler)
   }
 
   /**
@@ -1103,6 +1121,10 @@ export class SelfBuiltAdapter implements CanvasHost {
     if (this.keyHandler) {
       window.removeEventListener('keydown', this.keyHandler)
       this.keyHandler = null
+    }
+    if (this.keyUpHandler) {
+      window.removeEventListener('keyup', this.keyUpHandler)
+      this.keyUpHandler = null
     }
     if (this.visibilityHandler) {
       window.removeEventListener('visibilitychange', this.visibilityHandler)

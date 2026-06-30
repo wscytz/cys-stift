@@ -54,3 +54,33 @@ describe('[B1-T1] visibilitychange — 页面隐藏清交互残留', () => {
     expect(host.getElement('a')).toMatchObject({ id: 'a' })
   })
 })
+
+describe('[B1-T2] 方向键 undo 粒度 — 按住重复只推 1 步', () => {
+  it('首次 keydown + 多次 repeat → undo 栈只增 1(连续微移合并)', () => {
+    const { host } = makeHost()
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['a'])
+    const before = (host as unknown as { undoStack: unknown[] }).undoStack.length
+    // 首次按下
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', repeat: false, bubbles: true }))
+    // OS 自动重复 N 次
+    for (let i = 0; i < 5; i++) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', repeat: true, bubbles: true }))
+    }
+    const after = (host as unknown as { undoStack: unknown[] }).undoStack.length
+    expect(after - before).toBe(1) // 5 次 repeat 不再推快照
+    // 卡片应移动了 6 次(首次 + 5 repeat)
+    expect(host.getElement('a')!.x).toBeGreaterThan(0)
+  })
+
+  it('松开 keyup 后再按 → 推新一步(不同按下回合分开)', () => {
+    const { host } = makeHost()
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['a'])
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', repeat: false, bubbles: true }))
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true }))
+    // 新一轮按下
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', repeat: false, bubbles: true }))
+    const stack = (host as unknown as { undoStack: unknown[] }).undoStack
+    // 两轮各推 1 步(初始快照 + 第一轮后快照 + 第二轮后快照);关键:第二轮按下推了新步
+    expect(stack.length).toBeGreaterThanOrEqual(2)
+  })
+})
