@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { readToken } from '@cys-stift/canvas-engine'
 import type { CardType } from '@cys-stift/domain'
+import { graphViewStore } from '@/lib/graph-view-store'
 import type { GraphEdge, GraphNode } from './aggregate-edges'
 import { createGraphSimulation, type PositionedNode, type SimulationHandle } from './graph-layout'
 
@@ -49,7 +50,8 @@ interface GraphCanvasProps {
 export function GraphCanvas({ nodes, edges, onNodeClick }: GraphCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const handleRef = useRef<SimulationHandle | null>(null)
-  const viewRef = useRef<View>({ zoom: 1, panX: 0, panY: 0 })
+  // mount 时从 store 恢复上次视口(无则默认)。
+  const viewRef = useRef<View>(graphViewStore.getView())
   const dragRef = useRef<DragState | null>(null)
   /** 平移(空白拖)上下文,与节点拖拽互斥。 */
   const panRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null)
@@ -129,20 +131,52 @@ export function GraphCanvas({ nodes, edges, onNodeClick }: GraphCanvasProps) {
     }
   }, [edges, hover])
 
+  /** view 回写 throttle 句柄。 */
+  const viewWriteRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const writeView = useCallback(() => {
+    if (viewWriteRef.current) return
+    viewWriteRef.current = setTimeout(() => {
+      viewWriteRef.current = null
+      const v = viewRef.current
+      graphViewStore.updateView({ zoom: v.zoom, panX: v.panX, panY: v.panY })
+    }, 200)
+  }, [])
+
   // ── useEffect 1:建/重建 simulation(nodes/edges 依赖)──
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const w = canvas.clientWidth || 800
     const h = canvas.clientHeight || 600
-    const handle = createGraphSimulation(nodes, edges, { width: w, height: h })
+    // 从 store 恢复节点坐标(含 fx/fy 固定点);新节点 fallback 抖动。
+    const handle = createGraphSimulation(nodes, edges, {
+      width: w,
+      height: h,
+      initialPositions: graphViewStore.getAllPositions(),
+    })
     handleRef.current = handle
-    handle.onTick(render)
+    let writeTickTimer: ReturnType<typeof setTimeout> | null = null
+    handle.onTick(() => {
+      render()
+      // tick 稳定后 throttle 回写所有节点坐标(200ms)。
+      if (writeTickTimer) return
+      writeTickTimer = setTimeout(() => {
+        writeTickTimer = null
+        const positions: Record<string, { x: number; y: number; fx?: number; fy?: number }> = {}
+        for (const n of handle.nodes) {
+          positions[n.id] = { x: n.x, y: n.y, fx: n.fx ?? undefined, fy: n.fy ?? undefined }
+        }
+        graphViewStore.setPositions(positions)
+      }, 200)
+    })
     handle.restart()
-    render() // 首帧(布局尚未 tick,但画出初始随机位置)
+    render() // 首帧
+    // 清掉已不存在的节点缓存(节点删除后淘汰旧坐标)。
+    graphViewStore.prunePositions(new Set(nodes.map((n) => n.id)))
     return () => {
       handle.stop()
       handleRef.current = null
+      if (writeTickTimer) clearTimeout(writeTickTimer)
     }
     // nodes/edges 是数组引用;父组件换实例即重建。render 闭包随 edges/hover 更新由 onTick 间接读到最新。
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -211,6 +245,7 @@ export function GraphCanvas({ nodes, edges, onNodeClick }: GraphCanvasProps) {
         viewRef.current.panX = pan.panX + (screenX - pan.startX)
         viewRef.current.panY = pan.panY + (screenY - pan.startY)
         render()
+        writeView()
         return
       }
       // 无拖拽:更新 hover。
@@ -229,6 +264,11 @@ export function GraphCanvas({ nodes, edges, onNodeClick }: GraphCanvasProps) {
         }
         // 松手释放固定点 → 回弹到力平衡。
         handleRef.current?.releaseNode(drag.nodeId)
+        // 回写拖拽后位置(普通坐标,非固定点 — releaseNode 已松固定)。
+        const dragged = handleRef.current?.nodes.find((n) => n.id === drag.nodeId)
+        if (dragged) {
+          graphViewStore.setPosition(drag.nodeId, { x: dragged.x, y: dragged.y })
+        }
         handleRef.current?.restart()
         dragRef.current = null
         try {
@@ -262,6 +302,7 @@ export function GraphCanvas({ nodes, edges, onNodeClick }: GraphCanvasProps) {
       view.panY = screenY - ((screenY - view.panY) / view.zoom) * nextZoom
       view.zoom = nextZoom
       render()
+      writeView()
     }
 
     canvas.addEventListener('pointerdown', onPointerDown)
@@ -275,7 +316,7 @@ export function GraphCanvas({ nodes, edges, onNodeClick }: GraphCanvasProps) {
       canvas.removeEventListener('wheel', onWheel)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [render, onNodeClick])
+  }, [render, onNodeClick, writeView])
 
   return (
     <canvas
