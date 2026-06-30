@@ -5,6 +5,27 @@
 
 ---
 
+## 2026-06-30 · v0.39.2 · ai-structured-output-thinking-adapt(思考模式适配 + 排版微调)
+
+用户反馈「主流大模型(DeepSeek)AI 排版没成功」。真实 API 测试定位根因 + 微调。
+
+**根因(真实 API 验证)**:DeepSeek-v4 系列**默认开思考模式**,`completion_tokens_details.reasoning_tokens` 显示 1024~4096 token 全花在 reasoning,`content` 0 字 → DSL 解析 0 条 → 「未生效」。pro 思考更重,4096 也截断。
+
+**修复(实测 6/6 全过,12 卡全覆盖)**:
+- **`structuredOutput` 标志**(`AIRequest`):结构化任务(排版/cluster/关系推荐)设 true。OpenAI provider 见此标志 + DeepSeek 端点(baseUrl 识别)→ 发 `thinking: {type: disabled}` 关思考。真 OpenAI/Claude 端点不发(不破坏兼容)。非思考模型 no-op。
+- **strict prompt**:排版 system prompt 加「必须为每张输入卡输出 UPDATE」+ 「保留已有颜色除非明显错」+ 降 temperature(治模型偷懒漏卡)。
+- **maxTokens**:排版 4096 / cluster 2048 / 关系推荐 1024(结构化任务给足预算)。
+- **错误消息友好化**:openai provider 解析 `{error:{message}}`,401/403/404/429 给中文友好提示(替代整段 JSON)。
+- **失败诊断**(排版):parseDslWithDiagnostics 区分「模型没输出 [ 行」(Empty)vs「输出了但格式错」(ParseFail,带行数),指引用户换非思考模型。
+
+**实测对比**(复杂画布 12 卡):思考+1024 → 0 行截断;关思考+strict+4096 → **flash/pro 各 3 次 12 卡全覆盖,reasoning 0 token,快 2-3 倍**。
+
+**AI 入口文案统一前缀**:rail「排版/分组/连线」→「AI 排版/AI 分组/AI 连线」;菜单「摘要/改写/翻译」→「AI 摘要/AI 改写/AI 翻译」。
+
+**验证**:8 个 provider 单测(structuredOutput 行为 + 错误友好化)+ 4 个 DSL 诊断场景单测;全量 886 全绿;build exit 0。隐私文档 privacy.md 同步(思考模式适配说明)。
+
+---
+
 ## 2026-06-30 · v0.39.x · batch-c-smart-relation-recommend(本地智能关系推荐)
 
 知识网络的「主动发现」补强:看一张卡时,反链区只显示【已经连上】的关系,没有任何能力回答"这张卡**可能**还和谁相关、但还没连"。本批填补它。

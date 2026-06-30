@@ -292,7 +292,7 @@ export function CardDetailModal({
       }
       const result = await streamText(
         cfg,
-        { system: AI_RECOMMEND_SYSTEM_PROMPT, user: userPrompt, maxTokens: 512, temperature: 0.3 },
+        { system: AI_RECOMMEND_SYSTEM_PROMPT, user: userPrompt, maxTokens: 1024, temperature: 0.3, structuredOutput: true },
         () => {},
       )
       const recs = parseAIRecommendations(result?.content ?? '', knownIds).slice(0, AI_RECOMMEND_MAX)

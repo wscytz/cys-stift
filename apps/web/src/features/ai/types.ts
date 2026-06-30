@@ -20,6 +20,18 @@ export interface AIRequest {
   model?: string
   maxTokens?: number
   temperature?: number
+  /**
+   * 结构化输出任务标志(排版 DSL / cluster 分组 / 关系候选推荐等)。
+   *
+   * 设 true 时,provider 会尽量抑制模型的「思考/推理」模式 —— 思考模式会吃掉
+   * 大量 token(实测 DeepSeek-v4 思考把 1024~4096 token 全花在 reasoning,DSL
+   * 输出 0 字 → 排版「未生效」),且让输出随机偷懒(只改部分卡)。结构化任务
+   * 不需要推理,关掉思考后:不截断、省 ~75% token、快 2-3 倍、输出更完整。
+   *
+   * 实现是 provider 特定的(DeepSeek 走 thinking:disabled;OpenAI/Claude 无此
+   * 字段则 no-op),非思考模型 no-op。不破坏现有兼容性。
+   */
+  structuredOutput?: boolean
 }
 
 export interface AIResponse {

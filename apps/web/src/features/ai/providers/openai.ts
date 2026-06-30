@@ -24,6 +24,14 @@ export function createOpenAIProvider(cfg: OpenAIConfig): AIProvider {
     defaultModel: 'gpt-4o-mini',
     models: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'],
     async streamText(req, onDelta, signal) {
+      // 结构化输出任务(排版/cluster/关系推荐):对支持「思考模式」的 OpenAI 兼容
+      // 端点(DeepSeek)发 thinking:disabled,避免思考吃光 token 导致 DSL 输出被
+      // 截断(实测根因)。真正的 OpenAI 端点不认此字段 → 只对 deepseek baseUrl 发,
+      // 其他端点 no-op,不破坏兼容。思考是 DeepSeek 专有扩展,靠 baseUrl 检测而非
+      // provider id(DeepSeek 走 openai provider)。
+      const isDeepSeek = /(^|\.)deepseek\.com/.test(cfg.baseUrl)
+      const extraBody =
+        req.structuredOutput && isDeepSeek ? { thinking: { type: 'disabled' } } : {}
       const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -39,12 +47,12 @@ export function createOpenAIProvider(cfg: OpenAIConfig): AIProvider {
           max_tokens: req.maxTokens ?? 1024,
           temperature: req.temperature ?? 0.7,
           stream: true,
+          ...extraBody,
         }),
         signal,
       })
       if (!res.ok || !res.body) {
-        const errText = await res.text().catch(() => '')
-        throw new Error(`OpenAI ${res.status}: ${errText}`)
+        throw new Error(openAiErrorMessage(res.status, await res.text().catch(() => '')))
       }
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
@@ -99,7 +107,9 @@ export function createOpenAIProvider(cfg: OpenAIConfig): AIProvider {
           }),
           signal,
         })
-        if (!res.ok) return { ok: false, error: `HTTP ${res.status}` }
+        if (!res.ok) {
+          return { ok: false, error: openAiErrorMessage(res.status, await res.text().catch(() => '')) }
+        }
         await res.json()
         return { ok: true, latencyMs: Math.round(performance.now() - t0) }
       } catch (e) {
@@ -107,4 +117,25 @@ export function createOpenAIProvider(cfg: OpenAIConfig): AIProvider {
       }
     },
   }
+}
+
+/**
+ * 把 OpenAI 兼容端点的错误响应解析成用户可读消息。这些端点(OpenAI / DeepSeek /
+ * 其他兼容)错误体通常是 `{error:{message, type, code}}`。直接抛整段 JSON 对用户
+ * 不友好(一堆转义符)。提取 message + 按 status 给中文提示。
+ */
+function openAiErrorMessage(status: number, body: string): string {
+  let apiMsg = ''
+  try {
+    const parsed = JSON.parse(body)
+    apiMsg = parsed?.error?.message ?? ''
+  } catch {
+    apiMsg = body.slice(0, 200)
+  }
+  // 常见 status 的友好提示(覆盖用户最常踩的:key 错 / 限额 / 模型名错)。
+  if (status === 401) return `API key 无效或未授权(${apiMsg || 'authentication failed'})`
+  if (status === 403) return `无访问权限(${apiMsg || 'forbidden'})`
+  if (status === 404) return `端点或模型不存在 — 检查 baseUrl 和 model(${apiMsg || 'not found'})`
+  if (status === 429) return `请求过频或额度用尽(${apiMsg || 'rate limited'})`
+  return `OpenAI ${status}: ${apiMsg || body.slice(0, 120)}`
 }

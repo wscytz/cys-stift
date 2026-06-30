@@ -399,6 +399,49 @@ describe('parseDslWithDiagnostics', () => {
     expect(result[0]!.type).toBe('card')
     expect(result[1]!.type).toBe('free')
   })
+
+  // ── AI 排版真实输出场景(v0.39.2 排版 bug 修复配套) ────────────────────────
+  // handleAILayout 用 errors.length 区分两种失败:
+  //   errors.length === 0 + ops 空 → 模型根本没输出 [ 行(纯散文/空)→ Empty 文案
+  //   errors.length > 0 + ops 空   → 模型输出了类 DSL 行但格式错 → ParseFail 文案
+  // 这几个测试锁住该判定的输入分类,防止回归成「一律 Empty」的静默失败。
+
+  it('思考模式截断:只有半截 [card 行 → errors 非空(触发 ParseFail 而非 Empty)', () => {
+    // 模型思考吃光 token,DSL 输出被砍到只剩半行。
+    const { ops, errors } = parseDslWithDiagnostics('[card #a1] @pos(1,')
+    expect(ops).toHaveLength(0)
+    expect(errors.length).toBeGreaterThan(0) // 关键:非空 → 用户看到「格式错」而非「未生效」
+  })
+
+  it('markdown 围栏:围栏行被跳过,内部 DSL 正常解析', () => {
+    // 模型无视「no fences」要求,用 ``` 包 DSL。围栏行非 [ 开头 → 静默跳过,
+    // 内部 [ 行正常解析。这场景应「成功」而非失败。
+    const dsl = '```dsl\n[card #a1] @pos(1,2)\n[rect #r1] @pos(3,4) @size(10,10)\n```'
+    const { ops, errors } = parseDslWithDiagnostics(dsl)
+    expect(ops).toHaveLength(2)
+    expect(errors).toEqual([])
+  })
+
+  it('纯散文前言 + 解释(无任何 [ 行)→ errors 空 + ops 空(触发 Empty)', () => {
+    // 模型输出了纯解释文字,没产出任何 DSL 行。这是「没输出」非「格式错」。
+    const { ops, errors } = parseDslWithDiagnostics(
+      '好的,我来帮你重新排版这个画布。考虑到卡片之间的逻辑关系,我建议把相关卡片聚拢。\n\n希望这个布局对你有帮助。',
+    )
+    expect(ops).toHaveLength(0)
+    expect(errors).toHaveLength(0) // 关键:空 → Empty 文案(不是 ParseFail)
+  })
+
+  it('混合:部分合法 + 部分格式错 → ops 非空 + errors 非空(应用合法的,报错的跳过)', () => {
+    const dsl = [
+      '[card #a1] @pos(1,2)', // 合法
+      '[card #b2] @color(blue)', // 格式错(缺 pos)
+      '[rect #r1] @pos(3,4) @size(10,10)', // 合法
+    ].join('\n')
+    const { ops, errors } = parseDslWithDiagnostics(dsl)
+    expect(ops).toHaveLength(2)
+    expect(errors).toHaveLength(1)
+    expect(errors[0]!.line).toBe(2)
+  })
 })
 
 // ── COLOR_RE Bauhaus 6 色收窄(审计 H3)─────────────────────────────────────

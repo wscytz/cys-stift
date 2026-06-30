@@ -367,7 +367,7 @@ export default function CanvasPage() {
       const formatted = formatCanvasSnapshot(snap)
 
       const systemPrompt =
-        'You are a canvas editing assistant. Given the current canvas (cards, shapes, arrows with their relation signatures), output DSL directives to improve it. You may reposition/resize cards, change colors, create/update rect and text shapes, and rewrite arrow relation signatures (dash line style + arrowhead shape). Reuse an existing element #id to UPDATE it (relation arrow endpoints are kept; free arrow bbox is kept); omit the id to CREATE new. Cards can only be UPDATEd — never created (card content comes from the inbox, not the canvas). Free arrows (arrows with no from/to) encode their line as @pos + @size (w/h may be negative for direction). Output DSL directives ONLY: one per line, each starting with "[", no markdown fences (no ```), no explanations, no preamble.'
+        'You are a canvas editing assistant. Given the current canvas (cards, shapes, arrows with their relation signatures), output DSL directives to improve it. You may reposition/resize cards, change colors, create/update rect and text shapes, and rewrite arrow relation signatures (dash line style + arrowhead shape). Reuse an existing element #id to UPDATE it (relation arrow endpoints are kept; free arrow bbox is kept); omit the id to CREATE new. Cards can only be UPDATEd — never created (card content comes from the inbox, not the canvas). Free arrows (arrows with no from/to) encode their line as @pos + @size (w/h may be negative for direction). Output DSL directives ONLY: one per line, each starting with "[", no markdown fences (no ```), no explanations, no preamble. You MUST output one UPDATE directive for EVERY input card (reuse its #id) — do not omit any card. Keep changes minimal: only reposition/resize to improve readability; preserve existing colors unless clearly wrong.'
 
       const userPrompt = `Improve this canvas. Reorganize positions, adjust sizes/colors, and refine arrow relation signatures where appropriate. Do NOT change items that are already well-placed.
 
@@ -383,7 +383,9 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
 
       // maxTokens 提到 4096:排版 DSL 需要完整结构化输出,默认 1024 对思考模式模型
       // (DeepSeek-v4-pro 等)不够 —— 思考吃掉大半,DSL 还没输出完就被截断 → 解析 0 条。
-      const result = await streamText(ready, { system: systemPrompt, user: userPrompt, maxTokens: 4096 }, () => {}, ac.signal)
+      // structuredOutput:对 DeepSeek 等思考端点发 thinking:disabled,省 token 防截断
+      // (实测:关思考后 17 行完整输出 vs 思考下 0 行截断)。非思考端点 no-op。
+      const result = await streamText(ready, { system: systemPrompt, user: userPrompt, maxTokens: 4096, structuredOutput: true }, () => {}, ac.signal)
       if (!result?.content) {
         pushToast({ kind: 'info', message: t('canvas.aiLayoutEmpty') })
         return
@@ -458,7 +460,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
 
       const result = await streamText(
         cfg,
-        { system: CLUSTER_SYSTEM_PROMPT, user: userPrompt, maxTokens: 1024, temperature: 0.2 },
+        { system: CLUSTER_SYSTEM_PROMPT, user: userPrompt, maxTokens: 2048, temperature: 0.2, structuredOutput: true },
         () => {},
         ac.signal,
       )
