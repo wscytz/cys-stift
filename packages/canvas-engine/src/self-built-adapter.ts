@@ -49,6 +49,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     down: (e: PointerEvent) => void
     move: (e: PointerEvent) => void
     up: (e: PointerEvent) => void
+    cancel: (e: PointerEvent) => void
   } | null = null
   private wheelHandler: ((e: WheelEvent) => void) | null = null
   private activeTool: 'select' | 'freedraw' | 'eraser' | 'text' | 'connect' = 'select'
@@ -858,14 +859,29 @@ export class SelfBuiltAdapter implements CanvasHost {
       this.dragGroup = null
       this.panning = null
     }
-    this.pointerHandlers = { down: onDown, move: onMove, up: onUp }
+    // pointercancel:系统中断 pointer(浏览器手势/通知/触屏多点/OS 中断)时触发而非 up。
+    // 对 drag/resize/erase/pan 等"清理型"态复用 onUp(只清状态,无副作用)。
+    // 但 connect 态除外:onUp 会在 cancel 事件的坏坐标(常为 0 或中断点)上 hitTest,
+    // 可能建出错箭头或落空致预览突消(v0.40 手测反馈"拖到一半消失")。connect 走丢弃路径:
+    // 直接清 connecting,不 hitTest、不建箭头(取消即取消)。
+    const onCancel = (e: PointerEvent) => {
+      if (this.connecting) {
+        this.connecting = null
+        try {
+          this.canvas.releasePointerCapture(e.pointerId)
+        } catch {
+          /* 已释放 */
+        }
+        this.scheduleRender()
+        return
+      }
+      onUp(e)
+    }
+    this.pointerHandlers = { down: onDown, move: onMove, up: onUp, cancel: onCancel }
     this.canvas.addEventListener('pointerdown', onDown)
     this.canvas.addEventListener('pointermove', onMove)
     this.canvas.addEventListener('pointerup', onUp)
-    // pointercancel:系统中断 pointer(浏览器手势/通知/触屏多点/OS 中断)时触发而非 up。
-    // 复用 onUp 清理 drag/resize/erase/connect 态 + 释放 capture,防残留状态导致
-    // 下一次 pointermove 用陈旧 dragGroup/erasing 造幽灵移动/误删。
-    this.canvas.addEventListener('pointercancel', onUp)
+    this.canvas.addEventListener('pointercancel', onCancel)
 
     // 滚轮/触摸板:ctrlKey(pinch 或 ctrl+滚轮)→ zoom-to-cursor;否则 → pan。
     this.wheelHandler = (e: WheelEvent) => {
@@ -994,7 +1010,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       this.canvas.removeEventListener('pointerdown', this.pointerHandlers.down)
       this.canvas.removeEventListener('pointermove', this.pointerHandlers.move)
       this.canvas.removeEventListener('pointerup', this.pointerHandlers.up)
-      this.canvas.removeEventListener('pointercancel', this.pointerHandlers.up)
+      this.canvas.removeEventListener('pointercancel', this.pointerHandlers.cancel)
       this.pointerHandlers = null
     }
     if (this.wheelHandler) {
