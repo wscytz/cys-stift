@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-06-30 · v0.42 · canvas-companion-panel-plan-a(画布 AI 伴侣面板 · 发现 tab)
+
+v0.40 手测反馈「AI 感知不强」。根因诊断:已有 8 个 live AI 功能(卡片总结/改写/翻译、AI 排版/聚类/大纲、/ask agent、关系推荐)**散在 4 个入口 + 全被动 + 藏在子菜单/独立页**,无统一 AI 存在感。方向:**让 AI 在场**(用户选)—— 给画布加常驻 AI 浮面板,而非按规划做下一个默认关的 lab(autoCurate)。spec `docs/specs/2026-06-30-canvas-companion-panel-design.md`;plan `docs/plans/2026-06-30-canvas-companion-panel.md`(Plan A = 面板+发现;Plan B = 对话 tab 下次)。
+
+**面板**(`<CanvasCompanionPanel>`,镜像 OutlinePanel 范式):浮面板右侧 360px / z30 / Bauhaus chrome / rail ✨ 开关 / 发现·对话两 tab / 折叠态 + 激活 tab localStorage 持久 / 订阅 `host.onUserChange`+`onSelectionChange`(force 重渲染,非轮询)。
+
+**发现 tab —— 本地预筛零成本常驻 + AI 深化**:
+- `discoverInsights(elements, cards)` 纯函数,复用 `findDuplicateGroups`(domain)+ `recommendRelations` 本地四信号,三类发现:**duplicate**(疑似重复,score=组大小)/ **relation**(可能关联,扩到全画布卡对扫描,去重 A↔B + 封顶 12 + >50 卡标签+标题剪枝)/ **orphan**(零关系箭头的卡)。排序 duplicate>relation>orphan。insight.id 内容稳定(排序后 cardIds)供 AI note 索引。
+- 三动作:**选中定位**(elementsCenter 并集 bbox 居中 + setSelectedIds,零改动)/ **建立关联**(`buildConnectArrows` → host.batch 单 undo,duplicate 星形·relation 单箭头·orphan 无,已有箭头跳过;建完 focusInsight 让用户立刻看到新箭头)/ **AI 深挖**(每 insight 独立按需,`structuredOutput:true` 关 DeepSeek 思考,返回 {note, relationType?} 按稳定 id 回填 Map;isAIReady 门 + toast;locale 走 settingsStore 与现有 AI prompt 一致)。
+
+**分层判定**:**默认开、非 lab** —— 非破坏性(只建议 + 逐条确认 + 可撤销),过 labs strategy §2 反向判据(只读 allowlist + 用户确认/可撤销 + 稳定)。不经 LAB_REGISTRY/useLabEnabled。= /ask spec「画布侧边栏二期」+ labs strategy「默认开(规划中)」的实装。
+
+**R2 隐私**:本地预筛零外发(纯函数,不经 serializeCardsForAI/不发网络);AI 深挖过 `serializeCardsForAI` allowlist + 反向断言(塞 deviceId/dataUrl 哨兵 → 断言不进 prompt)。
+
+**执行**:subagent TDD 逐 task + 主会话 review。T1 发现引擎(18 测)/ T2 面板 shell + 渲染 + 选中定位 / T3 建立关联 / T4 AI 深挖(6 测)/ T5 主会话收尾(audit + 全量门 + 文档)。**T1 review 主会话修了真 bug**:`pruneCandidates` 标签匹配用对象恒等(`new Set(source.tags)` 装 TagRef 对象)→ >50 卡大画布标签关系永不命中;改 `.value` 匹配 + 补剪枝路径测试(平行路径无覆盖,又是该模式)。
+
+**验证**:web 950(+24:discovery 18 + deepen 6)/ db 7 / canvas-engine 468 / domain 全绿;web build exit 0;tsc 零新增(预存在 __tests__ fixture 基线不变)。i18n 13 键全覆盖(中英)/ 零裸 hex / 非lab 守卫确认。5 commit(T1 27d95f6 / T2 a431caa / T3 e9d3555 / T4 cb0ea8d / T5 收尾)。**手测待办**:Plan B(对话 tab)+ minScore 噪声调参(现 =1 高召回,大画布若 content-overlap 噪声大可调 1.5)+ cards prop 每渲新数组致 useMemo 重算(现可接受)。
+
+---
+
 ## 2026-06-30 · v0.41 · v041-batch4(P2 打磨,11 条全做)
 
 v0.41 审计批 4。plan `docs/plans/2026-06-30-v041-batch4.md`。canvas-engine 三条 TDD + web inline。**v0.41 全 24 条 backlog 闭合。**
