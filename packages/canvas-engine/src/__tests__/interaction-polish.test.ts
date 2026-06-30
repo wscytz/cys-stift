@@ -198,3 +198,18 @@ describe('[B4-T1] freedraw 单点不建幽灵元素', () => {
     expect(host.getElements().filter((e) => e.kind === 'freedraw')).toHaveLength(1)
   })
 })
+
+describe('[B4-T2] eraser 线段擦 — 快速拖拽不漏擦', () => {
+  it('两次 move 间有元素 → 线段采样擦到(不只端点)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    // 一条贯穿中间的细箭头(自由箭头 bbox 编码线段):从 (200,50) 到 (200,50) ... 用 rect 模拟障碍
+    host.upsert({ id: 'mid', kind: 'rect', x: 190, y: 40, w: 20, h: 20, rotation: 0 })
+    ;(host as unknown as { setTool: (t: string) => void }).setTool('eraser')
+    dispatch(canvas, 'pointerdown', 100, 50) // 左侧起手(未命中 mid)
+    dispatch(canvas, 'pointermove', 300, 50) // 快速拖到右侧,跳过中间 mid(200,50)
+    dispatch(canvas, 'pointerup', 300, 50)
+    // 线段采样应在 (200,50) 附近命中 mid 并删除;不做线段擦则 mid 残留
+    expect(host.getElement('mid')).toBeUndefined()
+  })
+})

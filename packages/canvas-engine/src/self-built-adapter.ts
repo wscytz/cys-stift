@@ -67,7 +67,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   private elbowDragging: { id: string; index: number } | null = null
   /** 橡皮擦按住拖拽连续擦除态。pointerdown 命中即置 true,pointermove 持续命中删除,
    *  pointerup 置 false。null=未在擦。true 时记录上一次擦的 id 防同点重复 remove。 */
-  private erasing: { lastId: string | null } | null = null
+  private erasing: { lastId: string | null; lastPoint: { x: number; y: number } | null } | null = null
   /** 橡皮模式:text 只擦文字 / card 只擦卡片(进回收桶)/ all 擦一切。默认 all(兼容旧行为)。 */
   private eraserMode: 'text' | 'card' | 'all' = 'all'
   /** card 模式命中卡片时的回调(由 web 层注入:service.softDelete 进回收桶)。
@@ -572,7 +572,7 @@ export class SelfBuiltAdapter implements CanvasHost {
         // 命中才 set coalescing 抑制后续 move 的 remove 推快照(整擦=1 步);空白不推。
         const id = this.eraseAt(p)
         if (id) this.coalescing = true
-        this.erasing = { lastId: id }
+        this.erasing = { lastId: id, lastPoint: p }
         try {
           this.canvas.setPointerCapture(e.pointerId)
         } catch {
@@ -723,12 +723,30 @@ export class SelfBuiltAdapter implements CanvasHost {
         // 连续擦除:拖拽路径上每命中一个新元素就删(lastId 防同点重复 remove)。
         // 走 eraseAt 以遵守当前 eraserMode(text/card/all 的命中过滤 + card 进回收桶)。
         const p = screenToPage(this.view, sx, sy)
-        const id = this.eraseAt(p)
-        // 首次 move 命中(onDown 未命中/空白起手):remove 已自推,开 coalescing 抑制后续。
-        if (id && !this.coalescing) this.coalescing = true
-        if (id && id !== this.erasing.lastId) {
-          this.erasing.lastId = id
+        // 线段擦:上一点到当前点之间采样(快速拖拽防跳过细线)。~4px 屏幕/步,封顶 8 步。
+        const pts: { x: number; y: number }[] = []
+        if (this.erasing.lastPoint) {
+          const a = this.erasing.lastPoint
+          const dx = p.x - a.x,
+            dy = p.y - a.y
+          const distPx = Math.hypot(dx, dy) * this.view.zoom
+          const steps = Math.min(8, Math.max(1, Math.ceil(distPx / 4)))
+          for (let s = 1; s <= steps; s++) {
+            const t = s / steps
+            pts.push({ x: a.x + dx * t, y: a.y + dy * t })
+          }
+        } else {
+          pts.push(p)
         }
+        for (const sp of pts) {
+          const id = this.eraseAt(sp)
+          // 首次 move 命中(onDown 未命中/空白起手):remove 已自推,开 coalescing 抑制后续。
+          if (id) {
+            if (!this.coalescing) this.coalescing = true
+            this.erasing.lastId = id
+          }
+        }
+        this.erasing.lastPoint = p
         return
       }
       if (this.connecting) {
