@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Card } from '@cys-stift/domain'
 import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
-import { discoverInsights, elementsCenter, type Insight } from './companion-discovery'
+import { discoverInsights, elementsCenter, buildConnectArrows, type Insight } from './companion-discovery'
 
 const PANEL_WIDTH = 360
 /** 限制列表高度,避免大画布把面板顶出屏;内部滚动。 */
@@ -89,6 +89,17 @@ export function CanvasCompanionPanel({
     })
     host.setSelectedIds(insight.cardIds)
   }, [host, canvasEl])
+
+  /** 建立关联:按 insight 建 relation arrow(duplicate 星形 / relation 单箭头 / orphan 无)。
+   *  走 host.batch 单 undo 步;已有箭头的 pair 跳过(buildConnectArrows 内去重)。
+   *  建完调 focusInsight 选中+居中 —— 面板在右侧、卡可能在画布别处,聚焦让用户立刻看到新箭头。 */
+  const connectInsight = useCallback((insight: Insight) => {
+    if (!host) return
+    const arrows = buildConnectArrows(insight, host.getElements())
+    if (arrows.length === 0) return // 已全连 / orphan —— 无事可做
+    host.batch(() => { for (const a of arrows) host.upsert(a) })
+    focusInsight(insight)
+  }, [host, focusInsight])
 
   if (!host) return null
   const title = t('canvas.companion')
@@ -257,7 +268,16 @@ export function CanvasCompanionPanel({
                         >
                           {t('canvas.companion.action.locate')}
                         </button>
-                        {/* T3: 建立 */}
+                        {(ins.kind === 'relation' || ins.kind === 'duplicate') && (
+                          <button
+                            type="button"
+                            className="cv-companion__action"
+                            onClick={() => connectInsight(ins)}
+                            style={actionBtnStyle}
+                          >
+                            {t('canvas.companion.action.connect')}
+                          </button>
+                        )}
                         {/* T4: 深挖 */}
                       </div>
                     </div>
