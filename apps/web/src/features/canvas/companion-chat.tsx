@@ -1,0 +1,412 @@
+'use client'
+
+/**
+ * CompanionChat — 画布伴侣「对话」tab。= /ask agent 上画布,live host。
+ *
+ * 复用 AGENT_SYSTEM_PROMPT/buildAgentUserPrompt/extractDslBlocks/extractCardRefs/
+ * AgentConfirmCard/RAG/streamText。与 /ask 唯一架构差:
+ *  - context 读 live host(snapshotCanvas(host))而非 temp host;
+ *  - DSL 确认门传 liveHost={host},Apply 走 applyLayout(host) 单 undo(靠画布页 writeback 持久化)。
+ *
+ * 多轮:沿用 /ask 实际行为 —— 每轮发新问题 + 新鲜 RAG/snapshot;messages 仅 UI 历史,
+ * 不重发 transcript(真多轮 deferred)。
+ *
+ * R2:沿用 /ask —— buildAgentUserPrompt 内 serializeCardsForAI allowlist(不含 deviceId/
+ * apiKey/软删卡);snapshotCanvas 只几何/关系/shape 描述符。本组件不新增 AI 数据路径。
+ */
+import { useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useRouter } from 'next/navigation'
+import type { Card, CanvasId, CardId, CardService } from '@cys-stift/domain'
+import type { CanvasHost } from '@cys-stift/canvas-engine'
+import { useI18n } from '@/lib/i18n'
+import { pushToast } from '@/lib/toast-store'
+import { isAIReady, getCurrentAI } from '@/features/ai/ai-settings-provider'
+import { streamText } from '@/features/ai/stream-text'
+import { AiSetupCard } from '@/features/ai/ai-setup-card'
+import {
+  AGENT_SYSTEM_PROMPT,
+  buildAgentUserPrompt,
+  extractDslBlocks,
+  extractCardRefs,
+} from '@/features/ai/agent-prompt'
+import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
+import { AgentConfirmCard } from '@/features/ai/agent-confirm-card'
+import { CardDetailModal } from '@/features/card/card-detail'
+
+interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  /** assistant 消息里提取的 DSL 块(供确认门渲染)。 */
+  dslBlocks?: string[]
+  /** 流式进行中标记。 */
+  streaming?: boolean
+}
+
+const MAX_HISTORY = 20
+
+export function CompanionChat({
+  host,
+  service,
+  canvasId,
+  getCardTitle,
+}: {
+  host: CanvasHost
+  service: CardService
+  canvasId: CanvasId
+  getCardTitle: (id: string) => string | undefined
+}) {
+  const { t } = useI18n()
+  const router = useRouter()
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [input, setInput] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [detailCard, setDetailCard] = useState<Card | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  const aiReady = isAIReady(getCurrentAI())
+
+  const send = async () => {
+    const question = input.trim()
+    if (!question || busy || !aiReady) return
+    const cfg = getCurrentAI()!
+    setInput('')
+    setBusy(true)
+
+    // 截断老消息(超 MAX_HISTORY 丢最早);history 仅 UI,不重发 transcript。
+    const userMsg: ChatMessage = { role: 'user', content: question }
+    const asstMsg: ChatMessage = { role: 'assistant', content: '', streaming: true }
+    setMessages((prev) => [...prev.slice(-MAX_HISTORY), userMsg, asstMsg])
+
+    const ac = new AbortController()
+    abortRef.current = ac
+    try {
+      // RAG + 当前画布 live snapshot(改画布时让 AI 看到当前布局,含未存改动)。
+      const allCards = service.listAll()
+      const canvasSnapshot = formatCanvasSnapshot(snapshotCanvas(host, service, canvasId))
+      const userPrompt = buildAgentUserPrompt(question, allCards, canvasSnapshot)
+
+      let acc = ''
+      const result = await streamText(
+        cfg,
+        // structuredOutput:对 DeepSeek 思考端点关思考(实测 DSL 稳定);非思考端点 no-op。
+        { system: AGENT_SYSTEM_PROMPT, user: userPrompt, maxTokens: 4096, structuredOutput: true },
+        (chunk) => {
+          acc += chunk
+          setMessages((prev) => {
+            const next = [...prev]
+            const last = next[next.length - 1]
+            if (last && last.role === 'assistant') {
+              next[next.length - 1] = { ...last, content: acc, streaming: true }
+            }
+            return next
+          })
+        },
+        ac.signal,
+      )
+      const final = result?.content ?? acc
+      const dslBlocks = extractDslBlocks(final)
+      setMessages((prev) => {
+        const next = [...prev]
+        const last = next[next.length - 1]
+        if (last && last.role === 'assistant') {
+          next[next.length - 1] = { role: 'assistant', content: final, dslBlocks, streaming: false }
+        }
+        return next
+      })
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') {
+        pushToast({ kind: 'info', message: t('ai.error', { error: 'cancelled' }) })
+      } else {
+        pushToast({ kind: 'error', message: t('ai.error', { error: (e as Error).message }) })
+      }
+      setMessages((prev) => {
+        const next = [...prev]
+        const last = next[next.length - 1]
+        if (last && last.role === 'assistant' && last.streaming) {
+          next[next.length - 1] = {
+            ...last,
+            content: last.content || t('ai.error', { error: (e as Error).message }),
+            streaming: false,
+          }
+        }
+        return next
+      })
+    } finally {
+      setBusy(false)
+      abortRef.current = null
+    }
+  }
+
+  const onRejected = (msgIdx: number) => {
+    // 镜像 /ask:append 一条 user 消息「用户拒绝了,换方案」,让 AI 下一轮重试。
+    const rejectMsg: ChatMessage = {
+      role: 'user',
+      content: t('canvas.companion.chat.rejected'),
+    }
+    setMessages((prev) => [...prev.slice(0, msgIdx + 1), rejectMsg])
+    setInput(t('agent.rejected'))
+  }
+
+  const liveDetail = detailCard ? (service.get(detailCard.id) ?? null) : null
+  const effectiveDetail = liveDetail && !liveDetail.deletedAt ? liveDetail : null
+
+  if (!aiReady) {
+    return <AiSetupCard onGoToSettings={() => router.push('/settings')} />
+  }
+
+  return (
+    <div className="cc-chat" style={chatStyle}>
+      <div className="cc-chat__thread" ref={scrollRef} style={threadStyle}>
+        {messages.length === 0 && (
+          <p className="cc-chat__empty" style={emptyStyle}>{t('canvas.companion.chat.empty')}</p>
+        )}
+        {messages.map((m, i) => (
+          <div key={i} className={`cc-chat__msg cc-chat__msg--${m.role}`} style={m.role === 'user' ? userMsgStyle : asstMsgStyle}>
+            {m.role === 'assistant' && <span className="cc-chat__role" style={roleStyle}>{t('nav.ask')}</span>}
+            {m.role === 'user' && <span className="cc-chat__role" style={roleStyle}>{t('brand.name')}</span>}
+            <MessageContent
+              content={m.content}
+              streaming={m.streaming}
+              dslBlocks={m.dslBlocks}
+              canvasId={canvasId}
+              service={service}
+              host={host}
+              getCardTitle={getCardTitle}
+              onCardRefClick={(id) => {
+                const c = service.get(id as CardId)
+                if (c && !c.deletedAt) setDetailCard(c)
+              }}
+              onApplied={() => { /* useDb 订阅自动 re-render;确认门内部已切 applied 态 */ }}
+              onRejected={() => { void onRejected(i) }}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="cc-chat__input-row" style={inputRowStyle}>
+        <input
+          className="cc-chat__input"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              void send()
+            }
+          }}
+          placeholder={t('canvas.companion.chat.inputPlaceholder')}
+          aria-label={t('canvas.companion.chat.inputPlaceholder')}
+          disabled={busy}
+          style={inputStyle}
+        />
+        <button
+          type="button"
+          className="cc-chat__send"
+          onClick={() => void send()}
+          disabled={busy || !input.trim()}
+          style={sendStyle}
+        >
+          {busy ? t('ask.thinking') : t('canvas.companion.chat.send')}
+        </button>
+      </div>
+
+      {effectiveDetail && (
+        <CardDetailModal
+          card={effectiveDetail}
+          actions={['archive', 'softDelete', 'sendToCanvas', 'pin']}
+          onClose={() => setDetailCard(null)}
+          getCardTitle={(id) => service.get(id as CardId)?.title}
+          onJumpToCard={() => setDetailCard(null)}
+          allCards={service.listAll()}
+          canEditRelations={false}
+          onSave={(patch) => {
+            const updated = service.update(effectiveDetail.id, patch)
+            if (updated) setDetailCard(updated)
+          }}
+          onTogglePin={() => {
+            const updated = service.update(effectiveDetail.id, { pinned: !effectiveDetail.pinned })
+            if (updated) setDetailCard(updated)
+          }}
+          onConfirmDelete={() => {
+            service.softDelete(effectiveDetail.id)
+            setDetailCard(null)
+          }}
+        />
+      )}
+
+      <style>{styles}</style>
+    </div>
+  )
+}
+
+/** 渲染单条消息:文本 + [card #id] 可点引用按钮 + DSL 块确认门。
+ *  引用切分镜像 ask/page.tsx MessageContent 的正则 /\[card\s+#([a-zA-Z0-9_-]+)\]/gi。 */
+function MessageContent({
+  content,
+  streaming,
+  dslBlocks,
+  canvasId,
+  service,
+  host,
+  getCardTitle,
+  onCardRefClick,
+  onApplied,
+  onRejected,
+}: {
+  content: string
+  streaming?: boolean
+  dslBlocks?: string[]
+  canvasId: CanvasId
+  service: CardService
+  host: CanvasHost
+  getCardTitle: (id: string) => string | undefined
+  onCardRefClick: (id: string) => void
+  onApplied: () => void
+  onRejected: () => void
+}) {
+  const refs = useMemo(() => new Set(extractCardRefs(content)), [content])
+  const parts = useMemo(() => {
+    const re = /\[card\s+#([a-zA-Z0-9_-]+)\]/gi
+    const out: { text: string; cardId?: string }[] = []
+    let last = 0
+    let m: RegExpExecArray | null
+    while ((m = re.exec(content)) !== null) {
+      if (m.index > last) out.push({ text: content.slice(last, m.index) })
+      out.push({ text: m[0], cardId: m[1] })
+      last = m.index + m[0].length
+    }
+    if (last < content.length) out.push({ text: content.slice(last) })
+    return out
+  }, [content])
+
+  return (
+    <div className="cc-chat__content" style={contentStyle}>
+      <p className="cc-chat__text" style={textStyle}>
+        {parts.map((p, i) =>
+          p.cardId ? (
+            <button
+              key={i}
+              type="button"
+              className="cc-chat__card-ref"
+              onClick={() => onCardRefClick(p.cardId!)}
+              title={getCardTitle(p.cardId!)}
+              style={cardRefStyle}
+            >
+              {p.text}
+            </button>
+          ) : (
+            <span key={i}>{p.text}</span>
+          ),
+        )}
+        {streaming && <span className="cc-chat__cursor" aria-hidden="true">▋</span>}
+      </p>
+      {refs.size === 0 && !dslBlocks?.length && !content && !streaming && (
+        <span className="cc-chat__empty-reply" />
+      )}
+      {dslBlocks?.map((dsl, i) => (
+        <AgentConfirmCard
+          key={i}
+          dsl={dsl}
+          targetCanvasId={canvasId}
+          service={service}
+          liveHost={host}
+          onApplied={() => onApplied()}
+          onRejected={() => onRejected()}
+        />
+      ))}
+    </div>
+  )
+}
+
+const chatStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }
+const threadStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-1)',
+  maxHeight: '50vh',
+  overflowY: 'auto',
+  minHeight: '120px',
+  padding: 'var(--space-1)',
+  border: 'var(--border-hairline)',
+  borderRadius: 'var(--radius-sm)',
+  background: 'var(--color-white)',
+}
+const emptyStyle: CSSProperties = {
+  margin: '0',
+  padding: 'var(--space-2)',
+  fontFamily: 'var(--font-mono)',
+  fontSize: 'var(--font-size-xs)',
+  color: 'var(--color-gray)',
+  lineHeight: 1.6,
+  textAlign: 'center',
+}
+const userMsgStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end' }
+const asstMsgStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }
+const roleStyle: CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 'var(--font-size-xs)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  color: 'var(--color-gray)',
+}
+const contentStyle: CSSProperties = {
+  padding: 'var(--space-1) var(--space-2)',
+  borderRadius: 'var(--radius-sm)',
+  maxWidth: '100%',
+  wordBreak: 'break-word',
+}
+const textStyle: CSSProperties = {
+  margin: 0,
+  fontFamily: 'var(--font-body)',
+  fontSize: 'var(--font-size-xs)',
+  lineHeight: 1.5,
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+}
+const cardRefStyle: CSSProperties = {
+  display: 'inline',
+  background: 'transparent',
+  border: 0,
+  padding: '0 2px',
+  color: 'var(--color-blue)',
+  textDecoration: 'underline',
+  textUnderlineOffset: '2px',
+  cursor: 'pointer',
+  font: 'inherit',
+}
+const inputRowStyle: CSSProperties = { display: 'flex', gap: 'var(--space-1)', alignItems: 'stretch' }
+const inputStyle: CSSProperties = {
+  flex: '1 1 auto',
+  minWidth: 0,
+  fontFamily: 'var(--font-body)',
+  fontSize: 'var(--font-size-xs)',
+  padding: 'var(--space-1)',
+  border: 'var(--border-hairline)',
+  borderRadius: 'var(--radius-sm)',
+  background: 'var(--color-white)',
+  color: 'var(--color-black)',
+}
+const sendStyle: CSSProperties = {
+  flex: '0 0 auto',
+  fontFamily: 'var(--font-display)',
+  fontSize: 'var(--font-size-xs)',
+  padding: 'var(--space-1) var(--space-2)',
+  background: 'var(--color-black)',
+  color: 'var(--color-white)',
+  border: '1px solid var(--color-black)',
+  borderRadius: 'var(--radius-sm)',
+  cursor: 'pointer',
+}
+
+const styles = `
+.cc-chat__msg--user .cc-chat__content { background: var(--color-black); color: var(--color-white); }
+.cc-chat__msg--user .cc-chat__card-ref { color: var(--color-yellow); }
+.cc-chat__msg--assistant .cc-chat__content { background: var(--color-gray-soft); }
+.cc-chat__card-ref:hover { opacity: 0.7; }
+.cc-chat__cursor { animation: cc-chat-blink 1s steps(2) infinite; }
+@keyframes cc-chat-blink { 50% { opacity: 0; } }
+.cc-chat__send:focus-visible { outline: 2px solid var(--color-blue); outline-offset: 2px; }
+.cc-chat__send:disabled { opacity: 0.5; cursor: default; }
+.cc-chat__input:focus-visible { outline: 2px solid var(--color-red); outline-offset: 1px; }
+`
