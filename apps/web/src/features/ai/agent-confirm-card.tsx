@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@cys-stift/ui'
 import type { CanvasId, CardService } from '@cys-stift/domain'
 import type { CanvasElement } from '@cys-stift/canvas-engine'
-import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
+import { InMemoryCanvasHost, readToken } from '@cys-stift/canvas-engine'
 import { parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
 import { applyLayout } from '@/features/canvas/apply-layout'
 import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
@@ -228,8 +228,8 @@ function Thumb({ elements, label }: { elements: CanvasElement[]; label: string }
     const s = Math.min(sx, sy)
     const ox = pad - minX * s, oy = pad - minY * s
     for (const el of elements) {
-      ctx.strokeStyle = el.kind === 'card' ? '#0a0a0a' : el.kind === 'arrow' ? '#d40000' : '#6b6b6b'
-      ctx.fillStyle = el.kind === 'card' ? 'rgba(10,10,10,0.08)' : 'transparent'
+      ctx.strokeStyle = el.kind === 'card' ? readToken('--color-black', '#0a0a0a') : el.kind === 'arrow' ? readToken('--color-red', '#d40000') : readToken('--color-gray', '#6b6b6b')
+      ctx.fillStyle = el.kind === 'card' ? readToken('--color-black-soft', 'rgba(10,10,10,0.08)') : 'transparent'
       ctx.lineWidth = 1
       if (el.kind === 'arrow' && el.from && el.to) {
         // 关系箭头:不画(x/y=0),缩略图里看不到线段;跳过。
