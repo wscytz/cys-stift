@@ -5,6 +5,24 @@
 
 ---
 
+## 2026-06-30 · v0.42 · canvas-companion-panel-plan-b(画布 AI 伴侣面板 · 对话 tab)
+
+Plan A(发现 tab)的对话半边。= /ask agent 上画布,操作 **live host**(替代 /ask 的 temp host + `applyOpsAndPersist`)。spec 同 Plan A(§4)。plan `docs/plans/2026-06-30-canvas-companion-panel-plan-b.md`。
+
+**核心架构改动 —— AgentConfirmCard 加 `liveHost?` prop**(T1):有则 preview「before」直接读 `liveHost.getElements()`(同步,反映当前画布含未存改动)+ Apply 走 `applyLayout(liveHost, ops, undefined, onCardCreate)` 单 undo(靠画布页已有的 `bindCardWriteback` + freeform binding 持久化,**不调 `applyOpsAndPersist` 免双写**);无则 /ask 原 temp 路径(`buildCanvasHostForCanvas` + `applyOpsAndPersist`)字节不变 —— **/ask 不回归**。抽 `makeOnCardCreate(canvasId, service)` factory(live/temp 共用,镜像 canvas-host-builder:90-99,deviceId=`companion-agent`)。
+
+**CompanionChat 组件**(T2,新 `companion-chat.tsx`):消息流 + 输入 + 流式。上下文 = `formatCanvasSnapshot(snapshotCanvas(liveHost, service, canvasId))`(live host,免 temp host 异步构建)+ RAG(`service.listAll()` → `buildAgentUserPrompt` 内 searchCards top-8 + serializeCardsForAI)。`streamText` 用 `AGENT_SYSTEM_PROMPT` + `structuredOutput:true`(关 DeepSeek 思考)+ `maxTokens:4096`;`extractDslBlocks` 提议 → `AgentConfirmCard`(传 `liveHost`)确认门。`[card #id]` 引用正则切分可点开 `CardDetailModal`(镜像 ask/page.tsx)。未配 AI → `AiSetupCard`。多轮沿用 /ask 实际行为(每轮发新问题+新鲜 RAG/snapshot,history 仅 UI;真多轮留 agentToolCallingLab)。onRejected 喂回 AI 换方案(同 /ask)。
+
+**接线**(T3):面板加 `service`/`canvasId` props;chat 占位换 `<CompanionChat host={host} ...>`;画布页传 `service` + `canvasId={activeCanvasId}`。
+
+**默认开、非 lab**:对话 Apply 走确认门 + 单 undo = 非破坏性,过 labs strategy 反向判据,不经 lab 守卫。= /ask spec「画布侧边栏二期」+ labs strategy「默认开(规划中)」完整实装。**R2**:沿用 /ask 既有保障(buildAgentUserPrompt 内 serializeCardsForAI allowlist + snapshotCanvas 只几何/关系签名/shape 描述符无 freedraw 点序列),无新 AI 数据路径。
+
+**执行**:subagent TDD(T1 AgentConfirmCard liveHost + 6 测 / T2 CompanionChat / T3 接线)+ T4 主会话收尾(全量门 + audit + 文档)。T1 subagent 正确以 canvas-host-builder.ts:88-99 为准(makeOnCardCreate 补 z/rotation/color/try-catch,plan 简化片段漏了 —— 按 plan 脚注该这么修)。
+
+**验证**:web 956(+6:agent-confirm-card)/ domain 71 / canvas-engine 468 / db 7 全绿;web build exit 0;tsc 零新增(预存在 __tests__ fixture 基线不变)。i18n 4 chat 键全覆盖(中英)+ 复用 agent.*;零裸 hex;非 lab 守卫确认。4 commit(T1 fac4433 / T2 b4c8e32 / T3 6adbda6 / T4 收尾)。**画布 AI 伴侣面板(发现+对话)完整闭合**。手测待办:对话流式 + DSL 提议确认门 + 引用点开;窄面板(360px)确认门缩略图可用性;`chat.soon` i18n 键现未用(无害遗留,可后续清)。
+
+---
+
 ## 2026-06-30 · v0.42 · canvas-companion-panel-plan-a(画布 AI 伴侣面板 · 发现 tab)
 
 v0.40 手测反馈「AI 感知不强」。根因诊断:已有 8 个 live AI 功能(卡片总结/改写/翻译、AI 排版/聚类/大纲、/ask agent、关系推荐)**散在 4 个入口 + 全被动 + 藏在子菜单/独立页**,无统一 AI 存在感。方向:**让 AI 在场**(用户选)—— 给画布加常驻 AI 浮面板,而非按规划做下一个默认关的 lab(autoCurate)。spec `docs/specs/2026-06-30-canvas-companion-panel-design.md`;plan `docs/plans/2026-06-30-canvas-companion-panel.md`(Plan A = 面板+发现;Plan B = 对话 tab 下次)。
