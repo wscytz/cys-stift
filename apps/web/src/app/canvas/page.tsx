@@ -1138,6 +1138,8 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
             cards={service.listOnCanvas(activeCanvasId).filter((c) => !c.deletedAt)}
             canvasEl={canvasElRef.current}
             getCardTitle={(id) => service.get(id as CardId)?.title}
+            service={service}
+            canvasId={activeCanvasId}
           />
         )}
         <Minimap host={adapter} canvasEl={canvasElRef.current} />

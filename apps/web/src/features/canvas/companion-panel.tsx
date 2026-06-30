@@ -12,12 +12,14 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Card } from '@cys-stift/domain'
+import type { CanvasId, CardService } from '@cys-stift/domain'
 import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
 import { settingsStore } from '@/lib/settings-store'
 import { getCurrentAI, isAIReady } from '@/features/ai/ai-settings-provider'
 import { streamText } from '@/features/ai/stream-text'
 import { pushToast } from '@/lib/toast-store'
+import { CompanionChat } from './companion-chat'
 import { discoverInsights, elementsCenter, buildConnectArrows, type Insight } from './companion-discovery'
 import {
   buildDeepenUserPrompt,
@@ -49,6 +51,8 @@ export function CanvasCompanionPanel({
   cards,
   canvasEl,
   getCardTitle,
+  service,
+  canvasId,
 }: {
   host: CanvasHost | null
   /** 当前画布卡(page 传 service.listOnCanvas(canvasId).filter(!deletedAt))。 */
@@ -56,6 +60,10 @@ export function CanvasCompanionPanel({
   /** 主画布元素(读 CSS 尺寸做居中数学)。null → 隐藏。 */
   canvasEl: HTMLCanvasElement | null
   getCardTitle: (id: string) => string | undefined
+  /** 对话 tab:/ask agent 上下文 + 建卡持久化 + CardDetailModal 需要。 */
+  service: CardService
+  /** 当前画布 id(对话建卡 canvasPosition + snapshotCanvas)。 */
+  canvasId: CanvasId
 }) {
   const { t } = useI18n()
   const [collapsed, setCollapsed] = useState(loadCollapsed)
@@ -247,9 +255,9 @@ export function CanvasCompanionPanel({
           }}
         >
           {tab === 'chat' ? (
-            <p style={mutedTextStyle}>
-              {t('canvas.companion.chat.soon')}
-            </p>
+            host ? (
+              <CompanionChat host={host} service={service} canvasId={canvasId} getCardTitle={getCardTitle} />
+            ) : null
           ) : insights.length === 0 ? (
             <p style={mutedTextStyle}>
               {t('canvas.companion.empty')}
