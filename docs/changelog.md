@@ -5,6 +5,31 @@
 
 ---
 
+## 2026-06-30 · v0.39.2 · ai-agent-ask(Claude Code 式画布 agent + 知识问答)
+
+用户要的「AI 像 Claude 那样能对话改画布」。落地 `/ask` 页:对话提需求 → AI 输出 `cys-dsl` 块提议 → 确认门 review → 应用/拒绝。
+
+**核心机制:对话 + DSL 提议 + 确认门**
+- AI 回复里需要改画布时输出 ` ```cys-dsl ` 块 + 自然语言解释
+- 确认门:变更摘要(added/removed/changed)+ before/after 缩略图 + [应用][拒绝][编辑 DSL]
+- 应用 → 进 CardService(moveToCanvas)+ freeform store;拒绝 → 喂回 AI 换方案
+
+**三类能力**(system prompt 分诊):查知识(RAG 引用 `[card #id]` 可点开)/ 改画布(DSL 提议)/ 建卡(create 指令)。
+
+**架构关键**:`/ask` 不在画布上,无实时 CanvasHost。新 `canvas-host-builder.ts`:用 InMemoryCanvasHost 临时装载目标画布(cards via cardToElement + freeform via store.load),让 applyLayout/diffCanvasSnapshots 脱离 /canvas 页运行。落库分两路:freeform → store.save;card 位置 → service.moveToCanvas;create → service.createWithId。
+
+**RAG**:发问前本地 searchCards 取 top-8 相关卡,走 serializeCardsForAI(allowlist)预注入。AI 被动看相关卡(MVP 不做 tool-calling)。
+
+**思考模式适配(实测驱动)**:agent 也设 `structuredOutput: true`(对 DeepSeek 关思考)。实测思考模式下 DSL 格式不稳(输出 `reuse #id` 而非 `[card #id]`)+ 慢 3-7x;关思考 + 严格 prompt 后 flash 稳定输出合法 DSL。spec 原写「agent 保留思考」实测后修正。
+
+**prompt 收紧**:显式给出 `[card #id]`/`[arrow #id]`/`[rect #id]` 三种合法形式;禁止把卡片标题写进 DSL;禁止自造 `reuse #id` 语法;强调 `[card #id]` 引用格式。
+
+**入口**:首页次级导航加「AI 对话」(/ask)。目标画布下拉选择。未配 AI → AiSetupCard 引导。
+
+**验证**:25 新单测(canvas-host-builder 10 + agent-prompt 15,含 R2 反向断言 deviceId/media 不进 prompt);全量 911 全绿;build exit 0;真实 DeepSeek 验证 agent 输出合法 DSL。隐私文档 privacy.md 同步。
+
+---
+
 ## 2026-06-30 · v0.39.2 · ai-structured-output-thinking-adapt(思考模式适配 + 排版微调)
 
 用户反馈「主流大模型(DeepSeek)AI 排版没成功」。真实 API 测试定位根因 + 微调。

@@ -67,6 +67,8 @@ export default function HomePage() {
           </Link>
         </nav>
         <nav className="home__secondary" aria-label="Secondary">
+          <Link href="/ask" className="home__secondary-link home__secondary-link--accent">{t('nav.ask')}</Link>
+          <span className="home__secondary-sep" aria-hidden="true">/</span>
           <Link href="/search" className="home__secondary-link">{t('nav.search')}</Link>
           <span className="home__secondary-sep" aria-hidden="true">/</span>
           <Link href="/trash" className="home__secondary-link">{t('nav.trash')}</Link>
@@ -79,7 +81,7 @@ export default function HomePage() {
               and root package.json "version". Kept in sync manually here —
               a static export has no build-time version injection without a
               new dependency. Update when bumping the tag. */}
-          <span>v0.39.1</span>
+          <span>v0.39.2</span>
         </footer>
       </section>
       <style>{`

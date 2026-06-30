@@ -15,11 +15,13 @@
 
 ## AI 看到了什么(逐字段)
 
-下表列出了 AI 在做 **summarize / rewrite / translate / auto-relate / 画布排版 / 找相似(cluster) / AI 关系候选推荐** 等动作时,会收到的字段。**未列出的字段一律不发送**。
+下表列出了 AI 在做 **summarize / rewrite / translate / auto-relate / 画布排版 / 找相似(cluster) / AI 关系候选推荐 / AI 对话 agent(/ask)** 等动作时,会收到的字段。**未列出的字段一律不发送**。
 
 > **找相似(cluster,2026-06-23)**:读画布上多张卡的允许字段(同下表),让 AI 把近重复 / 相似卡分组,落成 `related-to` 关系箭头连接组内成员——**非破坏性**(只加关系,不合并、不删卡)。AI **看不到**卡的 `source.deviceId`、`media.dataUrl`(图片/PDF 二进制)、软删除卡;输出经白名单 id 校验(模型编造的 id 一律丢弃)。
 
 > **AI 关系候选推荐(2026-06-30)**:在图谱详情页点「AI 再找找」时,把**当前卡的允许字段**(同下表,走 allowlist)+ **候选卡的 id 和标题**(只标题,不发正文/媒体/deviceId)发给 AI,让它挑出语义相关但字面无重合的卡作为**候选**(不自动建关系,用户一键才建)。同样守 R2:`deviceId` / `media.dataUrl` / 软删除卡永不发;输出经白名单 id 校验。**未配 AI 时不显示该按钮**,本地启发式推荐照常工作(零 AI)。
+
+> **AI 对话 agent /ask(2026-06-30)**:在 `/ask` 页对话时,把你的问题 + **RAG 检索到的 top-8 相关卡**(走 allowlist,同下表)+ **目标画布的元素几何快照**(只 id+位置+颜色+关系签名,不含卡片正文)发给 AI。AI 回答时引用 `[card #id]`(UI 渲染可点开);要改画布时输出 `cys-dsl` 块,**经你确认才应用**(确认门显示 before/after 缩略图 + 变更摘要)。同样守 R2:`deviceId` / `media.dataUrl` / `apiKey` / 软删除卡永不发;DSL 只含几何/关系不含卡片内容;对 DeepSeek 等思考端点关思考(structuredOutput,同排版)。
 
 > **思考模式适配(2026-06-30)**:DeepSeek 等 OpenAI 兼容端点默认开「思考模式」,思考会吃掉大量 token 导致排版/分组/关系推荐这类**结构化输出**被截断(实测 1024~4096 token 全花在思考,DSL/JSON 输出 0 字 → 「未生效」)。结构化任务现在对 DeepSeek 端点发 `thinking: {type: disabled}` 关闭思考 —— 不截断、省约 75% token、快 2-3 倍、输出更完整。**只对 DeepSeek 端点发此字段**(靠 baseUrl 识别),真 OpenAI/Claude 端点不发(不破坏兼容)。总结/改写/翻译等需理解推理的任务**不关思考**(保留模型推理能力)。这不涉及隐私——思考内容留在模型侧,不发额外数据。
 
