@@ -36,20 +36,47 @@ type LinkDatum = { source: string; target: string }
  * 初始位置在画布中心附近随机抖动(避免完全重叠导致 charge 力方向随机)。
  * 立即 .stop() —— T4 决定何时 restart + 监听 tick。
  */
+export interface NodeInitialPosition {
+  x: number
+  y: number
+  fx?: number
+  fy?: number
+}
+
 export function createGraphSimulation(
   nodes: GraphNode[],
   edges: GraphEdge[],
-  opts: { width: number; height: number },
+  opts: {
+    width: number
+    height: number
+    /** 持久化的节点坐标(含拖拽固定点 fx/fy)。有则用缓存,无则中心抖动 fallback。 */
+    initialPositions?: Record<string, NodeInitialPosition>
+  },
 ): SimulationHandle {
-  const positioned: PositionedNode[] = nodes.map((n) => ({
-    ...n,
-    x: opts.width / 2 + (Math.random() - 0.5) * 100,
-    y: opts.height / 2 + (Math.random() - 0.5) * 100,
-    vx: 0,
-    vy: 0,
-    fx: null,
-    fy: null,
-  }))
+  const positioned: PositionedNode[] = nodes.map((n) => {
+    const cached = opts.initialPositions?.[n.id]
+    if (cached) {
+      return {
+        ...n,
+        x: cached.x,
+        y: cached.y,
+        vx: 0,
+        vy: 0,
+        fx: cached.fx ?? null,
+        fy: cached.fy ?? null,
+      }
+    }
+    // 无缓存:中心附近抖动(避免完全重叠导致 charge 力方向随机)。
+    return {
+      ...n,
+      x: opts.width / 2 + (Math.random() - 0.5) * 100,
+      y: opts.height / 2 + (Math.random() - 0.5) * 100,
+      vx: 0,
+      vy: 0,
+      fx: null,
+      fy: null,
+    }
+  })
   const idToIdx = new Map(positioned.map((n, i) => [n.id, i]))
   // 只保留两端都在 nodes 里的边(悬空 from/to 会让 forceLink 初始化报错)。
   const linkData: LinkDatum[] = edges
