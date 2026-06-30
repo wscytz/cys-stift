@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-06-30 · v0.40.0 · v040-interaction-polish(v0.40 手测反馈三块打磨)
+
+v0.40.0 打包手测反馈的交互打磨。spec `docs/specs/2026-06-30-v040-polish-design.md`(根因见同目录 backlog);plan `docs/plans/2026-06-30-v040-polish.md`;subagent 逐任务 TDD(失败测试→实装→回归→commit),主会话 review 间夹。三块互相独立,按 B→A→C 顺序。
+
+**B 选择态清理**(`apps/web/src/app/canvas/page.tsx`):选中卡后切画布/页面再回来仍选中 —— 选中态唯一源是 adapter 实例字段,`switchCanvas` 没显式清,靠 `key={canvasId}` 重建隐式清(副作用非契约);路由离开 /canvas 不触发 key 变化 → 残留(用户实测场景)。修:`switchCanvas` 显式 `setSelectedIds([])` + `usePathname` effect(pathname 不以 /canvas 开头时清)。
+
+**A 箭头拖拽手感**(`packages/canvas-engine/src/self-built-adapter.ts` + `self-built-hittest.ts`):拖到一半卡顿 + 换目标没拉到就消失。双根因:① **卡顿**=渲染路径重(renderNow 每帧全量 sortByLayer + 视口剔除,connect 预览未做增量)→ **双层渲染缓存**(层排序 + 视口剔除两层,`_elementsVersion` 计数器失效;初版 `getSortedElements` 经 `getElements()` 查缓存,但后者每次 sortByLayer,排序发生在缓存检查前形同虚设,改直接读 `this.elements` Map + 版本计数器 O(1) 命中);② **中途消失**=`pointercancel`(系统手势/触屏/通知打断)复用 `onUp` 在坏坐标 hitTest 失败 → connect 走丢弃路径(不 hitTest 不建);次要:松手无容差(card bbox 严格命中,偏 1px 失败)→ `hitTestCardWithTolerance`(外扩 6px);move 中无目标反馈 → `connecting.toId` 跟踪 + 蓝边描边高亮。
+
+**C 图谱状态维持**(`apps/web/src/lib/graph-view-store.ts` 新 + `features/graph/graph-layout.ts` + `graph-canvas.tsx`):/graph 每次打开重跑 force 布局丢状态。完全无持久化(节点坐标 `Math.random` 重置、zoom/pan 在 useRef 卸载即丢)。修:新 `graph-view-store`(照搬 `canvas-view-store` 范式:localStorage + 配额回滚 + useSyncExternalStore,存 `{view, positions:Record<nodeId,{x,y,fx?,fy?}>}`)+ `createGraphSimulation` 参数化 `initialPositions`(有缓存用缓存含 fx/fy 固定点,无则抖动 fallback)+ GraphCanvas mount 恢复视口/坐标 + view 变化(wheel/pan)与 tick 稳定 throttle 200ms 回写 + `prunePositions` 清已删节点缓存。
+
+**验证**:canvas-engine 448(+4 新测试文件:arrow-connect-polish/render-cache)+ web 926 全绿;`pnpm --filter web build` exit 0;tsc 零新增(23 预存在 `__tests__/` fixture 基线,判据零新增)。8 commit 线性历史(B-T1 / A-T1 / A-T2 / A-T3 / A-T3 缓存修正 / C-T1 / C-T2 / C-T3)。未 push(本地 main 领先远程)。
+
+---
+
 ## 2026-06-30 · v0.39.2 · ai-labs-infrastructure(实验室分层基础设施)
 
 把 AI 能力分层(默认开 vs 实验室)做成可扩展基础设施。spec:`docs/specs/2026-06-30-ai-labs-strategy.md`。
