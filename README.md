@@ -20,9 +20,11 @@
 
 ## 状态
 
-**完整可用的本地优先灵感画布**(v0.37.0 stable)。
+**完整可用的本地优先灵感画布**(v0.42.0)。
 
-捕获 / inbox(多媒介编辑)/ canvas(自研 Canvas 2D 画布 + 多画布 + 语义关系箭头 + AI 排版 + 导出)/ archive / trash / search / 标签 / AI(3 provider) 全部交付。桌面端可本地构建未签名 DMG。
+捕获 / inbox(多媒介编辑)/ canvas(自研 Canvas 2D 画布 + 多画布 + 语义关系箭头 + 双链 + frame + 模板 + 自动布局 + 导出)/ 全局图谱 / 块引用 / 标签 / 命令面板 / 时间线 / **画布 AI 伴侣面板(发现 + 对话)** / AI(3 provider,DeepSeek/OpenAI/Ollama) 全部交付。桌面端可本地构建未签名 DMG。
+
+**画布 AI 伴侣面板**(v0.42):画布常驻 AI 浮面板。**发现** tab 本地预筛零成本常驻(重复 / 可关联 / 孤立卡)+ 选中定位 / 建立关联 / AI 深挖;**对话** tab = /ask agent 上画布,操作 live host + DSL 提议确认门。非破坏性,默认开。
 
 **当前状态、版本里程碑、下一步、已知 debt 全见 [`docs/STATE.md`](docs/STATE.md)** — 单一可信源。历史见 [`docs/changelog.md`](docs/changelog.md)。
 
