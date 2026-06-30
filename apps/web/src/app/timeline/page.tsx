@@ -213,7 +213,7 @@ export default function TimelinePage() {
 
 const styles = `
 .page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
-.lede { margin: 0 0 var(--space-4); color: var(--color-black-soft); font-size: var(--font-size-sm); line-height: 1.5; max-width: 60ch; }
+.lede { margin: 0 0 var(--space-4); color: var(--color-black-soft); font-family: var(--font-content); font-size: var(--font-size-lg); line-height: 1.5; max-width: 60ch; }
 
 .tl { display: flex; flex-direction: column; gap: var(--space-4); }
 .tl__day { display: flex; flex-direction: column; gap: var(--space-2); }
