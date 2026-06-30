@@ -32,7 +32,7 @@
  * is in flight — `useAIEnabled()` hides the buttons themselves if the
  * user has no AI config.
  */
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import {
   Button,
   Input,
@@ -78,7 +78,16 @@ import { AiActionMenu } from '@/features/ai/ai-action-menu'
 // RB-T3 — 详情页建/删关系(graph 页接入):picker + builder + default canvas 常量。
 import { RelationPicker } from './relation-picker'
 import { addRelation, removeRelation } from '@/features/canvas/relation-builder'
+import { recommendRelations, type RecommendReason, type RelationRecommendation } from '@/features/canvas/relation-recommend'
+import type { RelationType } from '@/features/canvas/relation-types'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
+import {
+  AI_RECOMMEND_SYSTEM_PROMPT,
+  AI_RECOMMEND_MAX,
+  buildAIRecommendPrompt,
+  parseAIRecommendations,
+} from '@/features/ai/relation-recommend-ai'
+import { streamText } from '@/features/ai/stream-text'
 
 export type CardDetailAction =
   | 'archive'
@@ -201,6 +210,110 @@ export function CardDetailModal({
   // RB-T3 — 「添加关系」picker 弹层(用 Modal 包)。
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pending, startTransition] = useTransition()
+
+  // 智能关系推荐(Batch C 选项 A)— 本地零 AI,给当前卡算「可能相关但还没连」的候选。
+  // excludeCardIds = 已有 from/to 关系的卡(从 localEdges 算,避免重复推荐已连接的卡)。
+  // 仅 canEditRelations && allCards 时计算(graph 页);否则候选恒空,区不渲染。
+  // 依赖 localEdges:连上一条后该候选自动从列表消失(进 exclude),无需手动移除。
+  const connectedIds = useMemo(() => {
+    const s = new Set<string>()
+    for (const e of localEdges) {
+      s.add(e.from)
+      s.add(e.to)
+    }
+    return s
+  }, [localEdges])
+
+  const localRecommendations = useMemo(() => {
+    if (!canEditRelations || !allCards) return []
+    return recommendRelations(card, allCards, { excludeCardIds: connectedIds, limit: 5 })
+  }, [canEditRelations, allCards, card, connectedIds])
+
+  // AI 关系候选(Batch C AI 增强)— 用户点「AI 再找找」后填充。补本地启发式盲区
+  // (语义相关但字面无重合)。连上后随 connectedIds 变化重算 localRecommendations;
+  // aiRecs 是独立 state,卡片切换时重置(见 card.id effect)。
+  const [aiRecs, setAiRecs] = useState<RelationRecommendation[]>([])
+  const [aiSuggestBusy, setAiSuggestBusy] = useState(false)
+  // AI 是否就绪(配了可用 provider+key)。详情页用它决定「AI 再找找」按钮显隐
+  // (未就绪不显示;本地推荐是默认能力,AI 是可选增强,这里不套 setup modal)。
+  const aiReady = isAIReady(getCurrentAI())
+
+  // 合并:本地优先(score 高 + 排前),AI 去重(去掉本地已推荐 + 已连接 + 自己)。
+  const recommendations = useMemo(() => {
+    const localIds = new Set(localRecommendations.map((r) => r.otherCardId))
+    const ai = aiRecs.filter(
+      (r) => !localIds.has(r.otherCardId) && !connectedIds.has(r.otherCardId) && r.otherCardId !== String(card.id),
+    )
+    return [...localRecommendations, ...ai]
+  }, [localRecommendations, aiRecs, connectedIds, card.id])
+
+  // 推荐区「关联」按钮 → 复用 addRelation 写 default canvas + 乐观 push 到 localEdges。
+  // 与上面 picker 的 onConfirm 同构(只是 targetId/type 来自推荐而非用户选)。
+  const handleConnectRecommendation = async (targetId: string, type: RelationType) => {
+    try {
+      const arrowId = await addRelation(String(card.id), targetId, type)
+      setLocalEdges((prev) => [
+        ...prev,
+        {
+          from: String(card.id),
+          to: targetId,
+          canvasId: DEFAULT_CANVAS_ID,
+          relationType: type,
+          isWikilink: false,
+          arrowId,
+          signature: { color: type.color, dash: type.dash, arrowhead: type.arrowhead },
+        },
+      ])
+    } catch (err) {
+      console.error('[CardDetailModal] connect recommendation failed', err)
+      pushToast({ kind: 'error', message: t('relation.connect') })
+    }
+  }
+
+  // AI 再找找:候选池 = 未删 + 非自己 + 非已连接 + 非本地已推荐(避免重复发)。
+  // 走 buildAIRecommendPrompt(当前卡 serializeCardForAI allowlist + 候选只发 id/title)→
+  // streamText → parseAIRecommendations(白名单 id 过滤)→ setAiRecs。
+  // R2 安全:当前卡走 allowlist,候选只 id+title,无 deviceId/media/软删卡。
+  const handleAISuggest = async () => {
+    if (aiSuggestBusy || !allCards) return
+    const cfg = getCurrentAI()
+    if (!cfg || !isAIReady(cfg)) return
+    setAiSuggestBusy(true)
+    try {
+      const localIds = new Set(localRecommendations.map((r) => r.otherCardId))
+      const candidates = allCards.filter(
+        (c) => !c.deletedAt && String(c.id) !== String(card.id) && !connectedIds.has(String(c.id)) && !localIds.has(String(c.id)),
+      )
+      const knownIds = new Set(candidates.map((c) => String(c.id)))
+      const userPrompt = buildAIRecommendPrompt(card, candidates)
+      if (!userPrompt) {
+        pushToast({ kind: 'info', message: t('relation.aiSuggestNone') })
+        return
+      }
+      const result = await streamText(
+        cfg,
+        { system: AI_RECOMMEND_SYSTEM_PROMPT, user: userPrompt, maxTokens: 512, temperature: 0.3 },
+        () => {},
+      )
+      const recs = parseAIRecommendations(result?.content ?? '', knownIds).slice(0, AI_RECOMMEND_MAX)
+      setAiRecs(recs)
+      pushToast({
+        kind: recs.length > 0 ? 'success' : 'info',
+        message:
+          recs.length > 0
+            ? t('relation.aiSuggestDone', { n: String(recs.length) })
+            : t('relation.aiSuggestNone'),
+      })
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        console.error('[CardDetailModal] AI suggest failed', err)
+        pushToast({ kind: 'error', message: t('relation.aiSuggestFailed') })
+      }
+    } finally {
+      setAiSuggestBusy(false)
+    }
+  }
+
   // M3 — AI entry state. The single ✨ AI button toggles:
   //   null           → entry closed
   //   'setup'        → AI not ready, show AiSetupCard
@@ -254,6 +367,11 @@ export function CardDetailModal({
     card.quotes,
     initialMode,
   ])
+
+  // 切换到另一张卡时,清掉上一张的 AI 推荐候选(避免串卡)。
+  useEffect(() => {
+    setAiRecs([])
+  }, [card.id])
 
   // Escape closes — works whether in main modal or in confirm-delete modal.
   // Guard: when a nested Escape-consuming overlay is open, dismiss THAT inner
@@ -430,6 +548,65 @@ export function CardDetailModal({
                   </Section>
                 )
               })()}
+              {/* 智能关系推荐(Batch C 选项 A)— 本地零 AI + 可选 AI 增强的「可能相关」候选。
+                  与上面 backlinks 区互补:那里是【已连】,这里是【建议连】。每条显示
+                  对方标题 + 命中理由(正文提及/标题相近/同标签/内容相关/AI 判断)+
+                  建议关系类型 +「关联」按钮(一键即建,复用 handleConnectRecommendation)。
+                  canEditRelations && allCards 时才有(graph 页)。区在「无候选 && AI 未就绪」
+                  时不渲染;AI 就绪时即使本地无候选也渲染(给「AI 再找找」入口)。 */}
+              {canEditRelations && allCards && getCardTitle && (recommendations.length > 0 || aiReady) && (
+                <Section label={t('relation.suggested')}>
+                  {recommendations.length > 0 && (
+                    <>
+                      <p className="cd__suggest-hint">{t('relation.suggestedHint')}</p>
+                      <ul className="cd__suggest">
+                        {recommendations.map((rec) => {
+                          const title = getCardTitle(rec.otherCardId) ?? t('card.detail.untitledCard')
+                          const typeLabel = t(rec.suggestedType.labelKey as MessageKey)
+                          // 取首个命中理由做主标签(排序已隐含最强信号在前)。
+                          const reasonKey = reasonToKey(rec.reasons[0])
+                          return (
+                            <li key={rec.otherCardId} className="cd__suggest-item">
+                              <button
+                                type="button"
+                                className="cd__suggest-main"
+                                onClick={() => onJumpToCard?.(rec.otherCardId)}
+                                title={t('card.detail.backlinkJumpOut')}
+                              >
+                                <span className="cd__suggest-title">{title}</span>
+                                <span className="cd__suggest-reason">
+                                  {t(reasonKey)}
+                                  {rec.aiReason ? ` · ${rec.aiReason}` : ''}
+                                </span>
+                              </button>
+                              <span className="cd__suggest-type" title={typeLabel}>{typeLabel}</span>
+                              <button
+                                type="button"
+                                className="cd__suggest-connect"
+                                onClick={() => { void handleConnectRecommendation(rec.otherCardId, rec.suggestedType) }}
+                              >
+                                + {t('relation.connect')}
+                              </button>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </>
+                  )}
+                  {/* AI 再找找:补本地启发式盲区(语义相关但字面无重合)。仅 AI 就绪时显示
+                      (未就绪不显示 —— 本地推荐是默认能力,AI 是可选增强,详情页不套 setup
+                      modal)。busy 时禁用 + 显示「思考中」。 */}
+                  {aiReady && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => { void handleAISuggest() }}
+                      disabled={aiSuggestBusy}
+                    >
+                      {aiSuggestBusy ? t('relation.aiSuggestBusy') : `✨ ${t('relation.aiSuggest')}`}
+                    </Button>
+                  )}
+                </Section>
+              )}
               {(card.media ?? []).length > 0 && (
                 <Section label={t('card.detail.media')}>
                   <ul className="cd__media-list">
@@ -857,6 +1034,18 @@ export function CardDetailModal({
   )
 }
 
+/** 推荐理由 → i18n key(主标签用首个命中理由)。 */
+function reasonToKey(reason: RecommendReason | undefined): MessageKey {
+  switch (reason) {
+    case 'title-mention': return 'relation.reason.titleMention'
+    case 'title-similar': return 'relation.reason.titleSimilar'
+    case 'shared-tag': return 'relation.reason.sharedTag'
+    case 'content-overlap': return 'relation.reason.contentOverlap'
+    case 'ai': return 'relation.reason.ai'
+    default: return 'relation.reason.contentOverlap'
+  }
+}
+
 function Section({
   label,
   children,
@@ -952,6 +1141,46 @@ const styles = `
   font-family: var(--font-mono); font-size: var(--font-size-xs);
   color: var(--color-gray); text-transform: none; letter-spacing: 0;
 }
+
+/* 智能关系推荐区(Batch C 选项 A)— 与 backlinks 区呼应:建议连 vs 已连。 */
+.cd__suggest-hint {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  color: var(--color-gray);
+}
+.cd__suggest { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.cd__suggest-item { display: flex; align-items: center; gap: var(--space-1); }
+.cd__suggest-main {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: baseline; gap: var(--space-1);
+  text-align: left; padding: 4px var(--space-1);
+  background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm);
+  cursor: pointer; font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black);
+  transition: background 80ms ease-out, border-color 80ms ease-out;
+}
+.cd__suggest-main:hover { background: var(--color-gray-soft); border-color: var(--color-gray-soft); }
+.cd__suggest-main:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.cd__suggest-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd__suggest-reason {
+  flex: 0 0 auto;
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  color: var(--color-gray);
+}
+.cd__suggest-type {
+  flex: 0 0 auto;
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-gray);
+}
+.cd__suggest-connect {
+  flex: 0 0 auto;
+  padding: 4px var(--space-2);
+  background: var(--color-white); color: var(--color-black);
+  border: 1px solid var(--color-black); border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  cursor: pointer; white-space: nowrap;
+}
+.cd__suggest-connect:hover { background: var(--color-black); color: var(--color-white); }
+.cd__suggest-connect:focus-visible { outline: 2px solid var(--color-red); outline-offset: 1px; }
 
 .cd__code { border: var(--border-hairline); }
 .cd__code-lang { background: var(--color-gray-soft); padding: 2px var(--space-1); font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); border-bottom: var(--border-hairline); }

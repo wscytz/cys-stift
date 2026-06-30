@@ -5,6 +5,35 @@
 
 ---
 
+## 2026-06-30 · v0.39.x · batch-c-smart-relation-recommend(本地智能关系推荐)
+
+知识网络的「主动发现」补强:看一张卡时,反链区只显示【已经连上】的关系,没有任何能力回答"这张卡**可能**还和谁相关、但还没连"。本批填补它。
+
+**纯函数 `relation-recommend.ts`(零 AI、零新依赖)**
+- `recommendRelations(current, allCards, {excludeCardIds})` 给当前卡算 top-5「可能相关」候选。四个打分信号,中英文都 work:
+  - **标题互提**(中文主力):正文含对方标题的子串 includes(中文没空格,tokenise 整句成块,子串才有效;标题 <2 字不参与,避单字误命中)。+3
+  - **标题相似**:标题 token 集 Jaccard ≥ 0.34。tokenSet 对英文取整词、中文取相邻 bigram,让中英混合标题相似度可算。+2
+  - **标签重合**:共享 tag value,每共享一个 +1.5。
+  - **内容重合**:正文 ASCII 词交集 ≥ 3(中文 bigram 在长正文噪声大,此信号只用 ASCII 词,保可预测)。+1
+- **建议关系类型**:复用 `inferRelationTypeFromContext` —— 命中 blocks/references 等关键词就建议那个具体类型,否则默认 related-to。推荐不只是"相关",还带类型建议。
+- `excludeCardIds` = 已有 from/to 关系的卡(调用方从 globalEdges 算),不重复推荐已连接的卡。
+- 文本工具自包含(与 relation-inference 同风格,不依赖 domain 内部 normalise)。R2 安全:只读 title/body/tags。
+
+**接入 graph 详情页(card-detail.tsx)**
+- 反链区(backlinks = 已连)下方新增「建议关联」区(suggested = 建议连),互补。每条:对方标题 + 首个命中理由标签(正文提及/标题相近/同标签/内容相关)+ 建议关系类型 +「+ 关联」按钮。
+- 一键即建:复用 `addRelation`(写 default canvas freeform)+ 乐观 push 到 localEdges → 候选自动从列表消失(进 exclude)+ 出现在图谱上。无新增建关系路径。
+- 仅 graph 页显示(唯一传 `canEditRelations`+`allCards` 的入口);inbox/archive/timeline 保持只读,向后兼容。
+
+**AI 关系候选增强(`relation-recommend-ai.ts`,可选)**
+- 补本地启发式盲区:语义相关但字面无重合的卡(如「做早餐」vs「营养学笔记」,本地 0 分)。用户点「✨ AI 再找找」→ AI 粗筛标题列表 → 候选并入推荐列表(标「AI 判断」+ 模型给的一句理由)。
+- **策略**:发当前卡全文(serializeCardForAI allowlist)+ 候选池每张 `[card #id] title`(只标题,省 token)。AI 返回 JSON [{id, reason}],白名单 id 校验(防编 id)。
+- **R2 安全**:当前卡走 allowlist(无 deviceId/media.dataUrl/apiKey),候选只发 id+title,软删卡过滤。AI 候选 score 0.5(低于本地最低 1.0,本地优先排前)。未配 AI 不显示按钮,本地推荐照常(零 AI 兜底)。
+- 15 单测覆盖 build/parse(白名单/去重/坏 JSON/编 id);build exit 0。
+
+**验证**:web 测试 + build exit 0。**隐私文档同步**(privacy.md 加 AI 关系候选条目 + 字段表)。
+
+---
+
 ## 2026-06-30 · v0.39.1 · windows-adaptation(跨平台字体分层 + native 控件 Bauhaus 化 + color-scheme)
 
 Windows 内测反馈驱动的适配批。目标:Windows 上观感与 macOS 一致(Bauhaus 气质不垮)。

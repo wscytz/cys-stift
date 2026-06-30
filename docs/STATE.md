@@ -116,7 +116,7 @@
 - **search**:全文检索(title 1.5x 权重 + body 摘要 + pinned 前置)
 - **命令面板**:⌘K 跳转项 + 卡片搜索 + **最近编辑跳转**(空 query 显 updatedAt 前 8,点卡智能开卡:在画布跳画布定位+开详情,否则开详情)
 - **标签**:10 色固定调色板,卡片标签 + 过滤 + **标签墙 `/tags`**(标签云 + 卡网格)
-- **关系网络**:块引用 `((标题))` 嵌入(embeds 关系)+ 详情建/删关系(relation-picker)+ 跨画布 backlinks(useGlobalEdges 聚合所有画布)
+- **关系网络**:块引用 `((标题))` 嵌入(embeds 关系)+ 详情建/删关系(relation-picker)+ 跨画布 backlinks(useGlobalEdges 聚合所有画布)+ **智能关系推荐**(graph 详情页「建议关联」,本地零 AI 四信号打分 + 可选「AI 再找找」语义粗筛,一键即建)
 - **settings**:快捷键自定义 + 导入/导出 + 暗色主题 + AI provider 配置 + **实验室区**(vision 附加能力,默认关,确认门)
 
 ## 下一步
@@ -164,7 +164,7 @@
 - **颜色类型双轨制**:`ColorToken`(6 色 Bauhaus)vs `TagColor`(10 个 CSS var)未统一 — 稳定版内不做重构(风险大)。详见 v0.37.0 review D 段。
 - **Tauri 未签名**:DMG 可本地构建(36MB,Apple Silicon),分发需签名公证。
 - **B3b frame 拖框创建**:触及引擎 tool union 类型 + 全 pointer 链,L 级;现有「框住选中」按钮 + DSL/Outline 两条建 frame 路够用。
-- **Batch C 智能关系推荐**:本地启发式 + 可选 AI,在详情/RelationPicker 给候选关系(打磨计划书方向 7,未开始)。
+- **Batch C 智能关系推荐(已落地)**:`relation-recommend.ts` 本地启发式四信号 + `relation-recommend-ai.ts` 可选 AI 语义粗筛,均在 graph 详情页接入。**剩余**:inbox/timeline 详情页只读看推荐(目前仅 graph 页可建关系)。
 - **vision 三能力实装**:看图描述/OCR、画布视觉理解、图转 DSL —— 实验室骨架已就位,实装 defer(用户判非必要,等真实需求)。
 - **图层 / 卡片版本 / 引擎 npm 化**:打磨计划书方向 8-10,L 级 defer。
 
