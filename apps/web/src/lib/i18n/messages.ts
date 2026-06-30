@@ -342,7 +342,7 @@ export const messages = {
   'relation.custom': { zh: '自定义', en: 'Custom' },
   'relation.cardArrows': { zh: '× {n}', en: '× {n}' },
   'relation.inferred': { zh: '已推断: {type}', en: 'Inferred: {type}' },
-  'relation.autoApplied': { zh: '已自动设为「{type}」', en: 'Auto-set to "{type}"' },
+  'relation.autoApplied': { zh: '已识别为 {type},可点其他类型覆盖', en: 'Recognized as {type} — click another type to override' },
   'relation.route.straight': { zh: '直线', en: 'Straight' },
   'relation.route.curve': { zh: '弯曲', en: 'Curved' },
   'relation.route.elbow': { zh: '折线', en: 'Elbow' },

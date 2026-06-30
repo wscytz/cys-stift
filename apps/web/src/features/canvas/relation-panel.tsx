@@ -27,6 +27,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useI18n } from '@/lib/i18n'
+import { pushToast } from '@/lib/toast-store'
 import {
   RELATION_TYPES,
   inferRelationType,
@@ -100,6 +101,7 @@ export function RelationPanel({
     if (appliedKey.current === key) return
     appliedKey.current = key
     applyRelationType(host, arrow.id, inferred, inferred.id)
+    pushToast({ kind: 'info', message: t('relation.autoApplied', { type: t(inferred.labelKey) }) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isArrowSelected, arrow, inferred?.id, activeType?.id, host])
 
