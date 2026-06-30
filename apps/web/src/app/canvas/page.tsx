@@ -25,6 +25,7 @@ import { RelationPanel } from '@/features/canvas/relation-panel'
 import { FreedrawPanel } from '@/features/canvas/freedraw-panel'
 import { Minimap } from '@/features/canvas/minimap-component'
 import { OutlinePanel } from '@/features/canvas/outline-panel'
+import { CanvasCompanionPanel } from '@/features/canvas/companion-panel'
 import { autoRelate } from '@/features/canvas/auto-relate'
 import { CanvasContextMenu } from '@/features/canvas/canvas-context-menu'
 import { CanvasEmptyMotif } from '@/features/canvas/canvas-empty-motif'
@@ -123,6 +124,7 @@ export default function CanvasPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [exportOpen, setExportOpen] = useState(false)
   const [outlineOpen, setOutlineOpen] = useState(false)
+  const [companionOpen, setCompanionOpen] = useState(false)
   // 焦点模式(Batch A / 方向 5):隐藏所有 chrome(Toolbar/SideRail/Minimap/Outline),
   // 只留画布 + 一个最小「退出」提示。整理/写作时减少干扰。⌘. 切入,Escape 退出。
   const [focusMode, setFocusMode] = useState(false)
@@ -1096,6 +1098,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           showAutoRelate={showAutoRelate}
           adapterReady={adapterReady}
           outlineOpen={outlineOpen}
+          companionOpen={companionOpen}
           canUndo={canUndo}
           canRedo={canRedo}
           canRename={!!activeCanvas}
@@ -1113,6 +1116,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           onAIOutline={handleAIOutline}
           onFrame={handleFrame}
           onOutline={() => setOutlineOpen((o) => !o)}
+          onCompanion={() => setCompanionOpen((o) => !o)}
           onOverview={() => setOverviewOpen(true)}
           onDsl={() => setDslOpen(true)}
           onExport={() => setExportOpen(true)}
@@ -1126,6 +1130,14 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
             canvasEl={canvasElRef.current}
             getCardTitle={(id) => service.get(id as CardId)?.title}
             getEndpointTitle={(id) => service.get(id as CardId)?.title}
+          />
+        )}
+        {companionOpen && (
+          <CanvasCompanionPanel
+            host={adapter}
+            cards={service.listOnCanvas(activeCanvasId).filter((c) => !c.deletedAt)}
+            canvasEl={canvasElRef.current}
+            getCardTitle={(id) => service.get(id as CardId)?.title}
           />
         )}
         <Minimap host={adapter} canvasEl={canvasElRef.current} />
@@ -1440,6 +1452,7 @@ function CanvasSideRail({
   showAutoRelate,
   adapterReady,
   outlineOpen,
+  companionOpen,
   canUndo,
   canRedo,
   canRename,
@@ -1457,6 +1470,7 @@ function CanvasSideRail({
   onAIOutline,
   onFrame,
   onOutline,
+  onCompanion,
   onDsl,
   onOverview,
   onExport,
@@ -1469,6 +1483,7 @@ function CanvasSideRail({
   showAutoRelate: boolean
   adapterReady: boolean
   outlineOpen: boolean
+  companionOpen: boolean
   canUndo: boolean
   canRedo: boolean
   canRename: boolean
@@ -1486,6 +1501,7 @@ function CanvasSideRail({
   onAIOutline: () => void
   onFrame: () => void
   onOutline: () => void
+  onCompanion: () => void
   onOverview: () => void
   onDsl: () => void
   onExport: () => void
@@ -1573,6 +1589,7 @@ function CanvasSideRail({
       <RailButton label={t('canvas.frameSelection')} short={t('canvas.rail.frame')} disabled={!adapterReady} onClick={onFrame} icon="frame" />
       {aiEnabled && <span className="cv-rail__sep" aria-hidden="true" />}
       <RailButton label={t('canvas.outline')} short={t('canvas.rail.outline')} disabled={!adapterReady} onClick={onOutline} pressed={outlineOpen} icon="outline" />
+      <RailButton label={t('canvas.companion')} short={t('canvas.rail.companion')} disabled={!adapterReady} onClick={onCompanion} pressed={companionOpen} icon="outline" />
       <RailButton label={t('canvas.overview')} short={t('canvas.rail.overview')} disabled={!adapterReady} onClick={onOverview} icon="overview" />
       {/* 转义(DSL)是核心卖点,提一级独立按钮(双向:编辑画布文本/导出 DSL)。
           导出菜单里保留同名项(作为「导出 DSL」入口),两条路都通 DslDialog。 */}
