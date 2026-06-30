@@ -80,6 +80,14 @@ export class SelfBuiltAdapter implements CanvasHost {
    *  drag / resize 开始时置 true(批前已 pushUndo 一次),onUp 置 false。
    *  batch() 也用此门控实现分组。 */
   private coalescing = false
+  /** 静态层缓存:层排序后的元素数组。元素集签名变化时失效。 */
+  private _sortedElements: CanvasElement[] | null = null
+  /** 静态层签名:元素 id+kind+layer 相关字段的 hash,用于检测元素集变化。 */
+  private _sortedSignature: string = ''
+  /** 视口剔除缓存:可见元素数组。依赖 _sortedElements + view 签名。 */
+  private _visibleElements: CanvasElement[] | null = null
+  /** 视口剔除签名:_sortedSignature + view(pan/zoom/尺寸)。 */
+  private _visibleSignature: string = ''
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -125,10 +133,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     // arrow 无条件保留(不过滤)。自由箭头(无 from/to、bbox 非零)走正常剔除。
     // freedraw 预览(__preview,用户正画的)也无条件保留。
     const vp = viewportBounds(this.view, w, h)
-    const all = this.getElements()
-    const visible = all.filter(
-      (el) => (el.kind === 'arrow' && el.from && el.to) || intersectsBounds(normalizeBox(el), vp),
-    )
+    const visible = this.getVisibleElements(vp, w, h)
     renderElements(
       ctx,
       [...visible, ...preview],
@@ -139,9 +144,8 @@ export class SelfBuiltAdapter implements CanvasHost {
       this.tokenResolver('--color-canvas', '#ffffff'),
       this.tokenResolver,
     )
-    // 传已缓存的 all(上方 line 127 算的),不再调 this.getElements() —— 否则每帧
-    // 第二次全量 sortByLayer 排序(5000 元素时浪费,drawSelectionOutlines 内部也只是遍历找 selected)。
-    drawSelectionOutlines(ctx, this.getSelectedIds(), all, this.view, this.tokenResolver)
+    // selection outline 需要全部元素(找 selected id),用层排序缓存(不另调 getElements)。
+    drawSelectionOutlines(ctx, this.getSelectedIds(), this.getSortedElements(), this.view, this.tokenResolver)
     if (this.marquee) {
       drawMarquee(ctx, {
         x: Math.min(this.marquee.startX, this.marquee.curX),
@@ -189,11 +193,42 @@ export class SelfBuiltAdapter implements CanvasHost {
     return sortByLayer([...this.elements.values()])
   }
 
+  /** 层排序后的元素(缓存)。元素集签名变化时重算。 */
+  private getSortedElements(): CanvasElement[] {
+    const all = this.getElements()
+    const sig = all
+      .map((e) => `${e.id}:${e.kind}:${e.x}:${e.y}:${e.w}:${e.h}:${e.rotation}`)
+      .join('|')
+    if (this._sortedElements && sig === this._sortedSignature) {
+      return this._sortedElements
+    }
+    this._sortedSignature = sig
+    this._sortedElements = sortByLayer(all)
+    // 层排序变化 → 视口剔除也失效
+    this._visibleElements = null
+    return this._sortedElements
+  }
+
+  /** 视口剔除后的可见元素(缓存)。层排序或 view 变化时重算。 */
+  private getVisibleElements(vp: { x: number; y: number; w: number; h: number }, w: number, h: number): CanvasElement[] {
+    const sorted = this.getSortedElements()
+    const sig = `${this._sortedSignature}|${vp.x},${vp.y},${vp.w},${vp.h}|${w},${h}`
+    if (this._visibleElements && sig === this._visibleSignature) {
+      return this._visibleElements
+    }
+    this._visibleSignature = sig
+    this._visibleElements = sorted.filter(
+      (el) => (el.kind === 'arrow' && el.from && el.to) || intersectsBounds(normalizeBox(el), vp),
+    )
+    return this._visibleElements
+  }
+
   getElement(id: string): CanvasElement | undefined {
     return this.elements.get(id)
   }
 
   upsert(el: CanvasElement): void {
+    this._sortedElements = null
     if (this.echoing && !this.coalescing) this.pushUndo() // 变更前快照(供 undo 恢复到本次 upsert 前);coalescing 期间不推(由 drag/resize/batch 批前推一次)
     this.elements.set(el.id, el)
     if (this.echoing) this.emitUser({ updated: [el], removed: [] })
@@ -202,6 +237,7 @@ export class SelfBuiltAdapter implements CanvasHost {
 
   remove(id: string): void {
     if (!this.elements.has(id)) return
+    this._sortedElements = null
     if (this.echoing && !this.coalescing) this.pushUndo() // 变更前快照;coalescing 期间不推
     this.elements.delete(id)
     // 级联删:所有 from===id 或 to===id 的关系箭头一并删(drawio/tldraw 惯例)。
@@ -229,6 +265,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       fn()
     } finally {
       this.coalescing = wasCoalescing
+      this._sortedElements = null
     }
   }
 
@@ -490,6 +527,8 @@ export class SelfBuiltAdapter implements CanvasHost {
       this.elements.clear()
       for (const el of snapshot) this.elements.set(el.id, el)
     })
+    // 快照替换整个元素集 → 静态层缓存失效(签名必变,显式失效防签名碰撞/幽灵元素)。
+    this._sortedElements = null
     // 选区同步:undo/redo 可能让被选中的元素消失(撤掉 upsert),残留的幽灵 id 会让
     // 后续 Delete/方向键/resize handle 取到 undefined → 静默失效、选中框画空。过滤掉
     // 快照里不存在的 id;若选区实际变了才 emit(跟 setSelectedIds 一致,避免多余事件)。
