@@ -52,6 +52,8 @@ export class SelfBuiltAdapter implements CanvasHost {
     cancel: (e: PointerEvent) => void
   } | null = null
   private wheelHandler: ((e: WheelEvent) => void) | null = null
+  /** visibilitychange handler(Tab 切走/失焦清交互态)。null=未挂。 */
+  private visibilityHandler: (() => void) | null = null
   private activeTool: 'select' | 'freedraw' | 'eraser' | 'text' | 'connect' = 'select'
   private currentStroke: { points: [number, number][] } | null = null
   private selectedIds = new Set<string>()
@@ -953,6 +955,17 @@ export class SelfBuiltAdapter implements CanvasHost {
     this.canvas.addEventListener('pointerup', onUp)
     this.canvas.addEventListener('pointercancel', onCancel)
 
+    // visibilitychange:Tab 切走/页面失焦时浏览器不发 pointerup/cancel,交互态
+    // (dragGroup/currentStroke/connecting/…)会残留,回来后首个 pointermove 用陈旧
+    // 态造幽灵移动/误建箭头(v0.41 审计 P0,v0.40 同类根因)。页面隐藏时清全部交互态。
+    this.visibilityHandler = () => {
+      if (document.visibilityState === 'hidden') {
+        this.clearInteractionState()
+        this.scheduleRender()
+      }
+    }
+    window.addEventListener('visibilitychange', this.visibilityHandler)
+
     // 滚轮/触摸板:ctrlKey(pinch 或 ctrl+滚轮)→ zoom-to-cursor;否则 → pan。
     this.wheelHandler = (e: WheelEvent) => {
       e.preventDefault()
@@ -1090,6 +1103,10 @@ export class SelfBuiltAdapter implements CanvasHost {
     if (this.keyHandler) {
       window.removeEventListener('keydown', this.keyHandler)
       this.keyHandler = null
+    }
+    if (this.visibilityHandler) {
+      window.removeEventListener('visibilitychange', this.visibilityHandler)
+      this.visibilityHandler = null
     }
   }
 
