@@ -1706,13 +1706,13 @@ const styles = `
 .cv-rail__busy-spin { animation: cys-spin 1s linear infinite; }
 @keyframes cys-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .cv-rail__busy-spin { animation: none; } }
-.tb-tool__label { font-size: 10px; letter-spacing: 0; color: var(--color-gray); line-height: 1; }
+.tb-tool__label { font-size: var(--font-size-xs); letter-spacing: 0; color: var(--color-gray); line-height: 1; }
 .tb-tool--active { background: var(--color-yellow); border-color: var(--color-black); color: var(--color-black); }
 .tb-tool--active .tb-tool__label { color: var(--color-black); }
 /* 橡皮子模式:比主工具略小(36×34),与主工具激活态同黄底黑边,视觉连贯。 */
 .tb-tool--sub { height: 36px; min-width: 38px; padding: 2px var(--space-0.5); }
 .tb-tool--sub .tb-tool__icon { font-size: var(--font-size-sm); }
-.tb-tool--sub .tb-tool__label { font-size: 9px; }
+.tb-tool--sub .tb-tool__label { font-size: var(--font-size-xs); }
 .tb-tool:hover:not(:disabled):not(.tb-tool--active) { background: var(--color-gray-soft); border-color: var(--color-gray); }
 .tb-tool:active:not(:disabled) { transform: scale(0.94); }
 .tb-tool:disabled { opacity: 0.55; cursor: not-allowed; }
