@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-06-30 · v0.41 · v041-batch23(P1 交互 + P1 UI)
+
+v0.41 审计批 2(交互)+ 批 3(UI)。spec `docs/specs/2026-06-30-v041-batch23-design.md`;plan `docs/plans/2026-06-30-v041-batch23.md`。#5 eraser card redo **defer**(undo 已工作,redo 是罕见边缘 + 代码标注预存限制,修需区分 undo/redo 方向风险高)。
+
+**批 2 交互**:
+- **resize snap**:snap 模式拖角 resize 尺寸不是 8 倍数(drag 吸附 resize 不吸附,手感不一致)。onMove resize 分支拖动角点 p 过 snapCoord,对角由 start 固定。
+- **lazy pushUndo(空 undo 步)**:select 点选/resize 点 handle 不拖 / eraser 点空白,onDown 提前 pushUndo 致 undo 栈被频繁选择污染。改 lazy:drag/resize 首次实际 move 才显式 pushUndo;eraser 依赖 remove 内置 pushUndo + 命中后 set coalescing。R1.4 测试补一次 pointermove 对齐 lazy 语义。
+- **RelationPanel auto-apply toast**:选中无标签可推断箭头自动应用关系类型后,弹一次 info toast「已识别为 X,可点其他类型覆盖」。键控(appliedKey 每 id:text:type 一次)不刷屏。
+
+**批 3 UI**:
+- **error.tsx i18n**:崩溃页全量硬编码中文(英文用户不可读)→ 新增 `error.boundary.*` 键走 t()。
+- **markdown 嵌入提示 i18n**:循环/不存在/嵌套过深提示硬编码 → 新增 `md.embed.*` 键,EmbedRenderer 加 useI18n。
+- **agent-confirm-card hex → readToken**:缩略图描边 `#0a0a0a/#d40000/#6b6b6b` 写死(违反铁律 + 暗色 #0a0a0a 描边在 #0a0a0a 底不可见)→ readToken,暗色自动反转。
+- **tag-cloud 计数色**:rgba(0,0,0,0.7) 暗色 tag 深底不可读 → var(--color-black-soft) 暗色反转。
+- **toolbar 标签字号**:10px/9px 不进 token 阶(最小 xs=12px)→ var(--font-size-xs) 统一。
+
+**验证**:canvas-engine 463(+10 interaction-polish:lazy pushUndo 6 + resize snap 2 + resize undo 补测 2)/ web 926 全绿;canvas-engine lint exit 0;web build exit 0;tsc 零新增(23 预存在 fixture 基线)。8 commit(B2-T1 cd9ce03 / B2-T2 bf1f989 / B2-T3 57189b5 / B3 i18n 0440d6d / agent-confirm 10aee74 / tag-cloud ec9a20f / toolbar ec33a5e)。批 4(P2 打磨)待续。
+
+---
+
 ## 2026-06-30 · v0.41 · v041-batch1(工具栏/交互审计批 1:P0 + v0.40 遗漏)
 
 v0.40 落地后系统审计画布工具栏 5 工具逻辑 + 画布交互手感 + UI(3 Explore subagent,24 条 backlog `docs/specs/2026-06-30-v041-polish-backlog.md`)。多条是 v0.40 修过的问题在**平行路径漏网**。批 1 = 4 条 P0,全集中在 `packages/canvas-engine/src/self-built-adapter.ts`,plan `docs/plans/2026-06-30-v041-batch1.md`,subagent 逐任务 TDD。
