@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-06-30 · v0.41 · v041-batch1(工具栏/交互审计批 1:P0 + v0.40 遗漏)
+
+v0.40 落地后系统审计画布工具栏 5 工具逻辑 + 画布交互手感 + UI(3 Explore subagent,24 条 backlog `docs/specs/2026-06-30-v041-polish-backlog.md`)。多条是 v0.40 修过的问题在**平行路径漏网**。批 1 = 4 条 P0,全集中在 `packages/canvas-engine/src/self-built-adapter.ts`,plan `docs/plans/2026-06-30-v041-batch1.md`,subagent 逐任务 TDD。
+
+- **visibilitychange 清交互残留**:Tab 切走/页面失焦时浏览器不发 pointerup/cancel,dragGroup/currentStroke/connecting 等残留,回来后首个 pointermove 用陈旧态造幽灵移动/误建箭头。挂 window visibilitychange,hidden 时 `clearInteractionState()`(v0.40 pointercancel 修了 connect 一条路径,此条覆盖全部态)。
+- **方向键 undo 粒度**:按住方向键 OS 自动重复 fire keydown,每次 upsert 推快照 → undo 栈爆炸(按 2 秒 = 几十步)。首次 keydown(repeat=false)pushUndo+coalescing=true;repeat 跳过(upsert 内 coalescing 守卫);keyup 关 coalescing。
+- **freedraw pointercancel discard**:手绘中途系统打断 → onCancel 走 onUp 把 currentStroke commit 成残线 freedraw 元素(进 undo + 持久化)。onCancel 加 freedraw discard 分支(currentStroke=null 不 commit)。与 v0.40 connect cancel **完全同构**,补 freedraw 漏网。
+- **connect hitTest 用渲染缓存**:v0.40 双层渲染缓存修了 renderNow,但 connect onMove/onUp 的 `hitTestCardWithTolerance(this.getElements(), …)` 仍每帧全量排序。改 `getSortedElements()` 命中缓存。大画布拖线不再卡顿。
+
+**验证**:canvas-engine 455(+7 新测试:interaction-polish 5 + arrow-connect-polish 追加 2)/ web 926 全绿;canvas-engine lint exit 0;`pnpm --filter web build` exit 0;tsc 零新增(23 预存在 fixture 基线)。4 commit(520c2c9 / 3293b73 / 2a365ce / caefeee)。批 2-4(交互/UI/打磨)待续。
+
+---
+
 ## 2026-06-30 · v0.40.0 · v040-interaction-polish(v0.40 手测反馈三块打磨)
 
 v0.40.0 打包手测反馈的交互打磨。spec `docs/specs/2026-06-30-v040-polish-design.md`(根因见同目录 backlog);plan `docs/plans/2026-06-30-v040-polish.md`;subagent 逐任务 TDD(失败测试→实装→回归→commit),主会话 review 间夹。三块互相独立,按 B→A→C 顺序。
