@@ -20,9 +20,8 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@cys-stift/ui'
-import type { CanvasId, CardService } from '@cys-stift/domain'
-import type { CanvasElement } from '@cys-stift/canvas-engine'
-import { InMemoryCanvasHost, readToken } from '@cys-stift/canvas-engine'
+import type { CanvasId, CardId, CardService, ColorToken } from '@cys-stift/domain'
+import { InMemoryCanvasHost, readToken, type CanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
 import { parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
 import { applyLayout } from '@/features/canvas/apply-layout'
 import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
@@ -34,13 +33,38 @@ interface Props {
   dsl: string
   targetCanvasId: CanvasId
   service: CardService
+  /** 可选 live host:提供则 Apply 直接改它(单 undo,靠画布页 writeback 持久化),
+   *  不提供则走 /ask 原 temp host + applyOpsAndPersist 路径(不变)。 */
+  liveHost?: CanvasHost
   onApplied: (result: { applied: number; cardsUpdated: number; cardsCreated: number }) => void
   onRejected: () => void
 }
 
 type Phase = 'confirming' | 'applying' | 'applied' | 'error'
 
-export function AgentConfirmCard({ dsl, targetCanvasId, service, onApplied, onRejected }: Props) {
+/**
+ * DSL create op 建新卡(空卡 + 几何)—— live 与 temp 路径共用。
+ * mirror canvas-host-builder.ts:88-99 的 onCardCreate(ask-agent 建卡模板):
+ * 同样的 createWithId 字段(title/body/type/canvasPosition{z,rotation}/color?/source)。
+ */
+export function makeOnCardCreate(canvasId: CanvasId, service: CardService) {
+  return (p: { cardId: string; x: number; y: number; w: number; h: number; color?: string }) => {
+    try {
+      service.createWithId(p.cardId as CardId, {
+        title: '',
+        body: '',
+        type: 'note',
+        canvasPosition: { canvasId, x: p.x, y: p.y, w: p.w, h: p.h, z: Date.now(), rotation: 0 },
+        ...(p.color ? { color: p.color as ColorToken } : {}),
+        source: { kind: 'manual', deviceId: 'companion-agent' },
+      })
+    } catch (err) {
+      console.error('[agent-confirm-card] createWithId failed', p.cardId, err)
+    }
+  }
+}
+
+export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApplied, onRejected }: Props) {
   const { t } = useI18n()
   const [phase, setPhase] = useState<Phase>('confirming')
   const [editing, setEditing] = useState(false)
@@ -65,9 +89,13 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, onApplied, onRe
     setAfterState(null)
     if (preview.kind !== 'ok') return
     void (async () => {
-      const { host: beforeHost, before } = await buildCanvasHostForCanvas(targetCanvasId, service)
+      // live 模式:before 直接读 live host(同步,反映当前画布含未存改动)。
+      // temp 模式(/ask):重建 temp host(async load)。
+      const before = liveHost
+        ? liveHost.getElements()
+        : (await buildCanvasHostForCanvas(targetCanvasId, service)).before
       if (cancelled) return
-      // 克隆 before host → applyLayout 预演(不写真实 host)。
+      // afterHost 仍是 InMemoryCanvasHost 克隆(预演绝不改 live host)。
       const afterHost = new InMemoryCanvasHost()
       afterHost.applyWithoutEcho(() => {
         for (const el of before) afterHost.upsert(el)
@@ -78,7 +106,7 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, onApplied, onRe
       setAfterState(afterHost.getElements())
     })()
     return () => { cancelled = true }
-  }, [targetCanvasId, service, preview])
+  }, [targetCanvasId, service, preview, liveHost])
 
   const diff = useMemo(() => {
     if (!beforeState || !afterState) return null
@@ -89,9 +117,18 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, onApplied, onRe
     if (preview.kind !== 'ok' || !afterState) return
     setPhase('applying')
     try {
-      // 重建 host(before)再 applyOpsAndPersist(它内部会再 applyLayout 一次到落库)。
-      const { host, before } = await buildCanvasHostForCanvas(targetCanvasId, service)
-      const res = await applyOpsAndPersist(host, before, preview.ops, targetCanvasId, service)
+      let res: { applied: number; cardsUpdated: number; cardsCreated: number }
+      if (liveHost) {
+        // live:host.batch 单 undo;onCardCreate 建卡;画布页 bindCardWriteback + freeform
+        // binding 持久化。不调 applyOpsAndPersist(会双写)。
+        const r = applyLayout(liveHost, preview.ops, undefined, makeOnCardCreate(targetCanvasId, service))
+        res = { applied: r.applied, cardsUpdated: 0, cardsCreated: r.newlyApplied.length }
+      } else {
+        // /ask 原 temp 路径(不变):重建 host(before)再 applyOpsAndPersist(内部再 applyLayout 一次落库)。
+        const { host, before } = await buildCanvasHostForCanvas(targetCanvasId, service)
+        const p = await applyOpsAndPersist(host, before, preview.ops, targetCanvasId, service)
+        res = { applied: p.applied, cardsUpdated: p.cardsUpdated, cardsCreated: p.cardsCreated }
+      }
       setPhase('applied')
       pushToast({
         kind: 'success',
