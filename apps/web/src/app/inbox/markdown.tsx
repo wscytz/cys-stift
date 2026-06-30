@@ -2,6 +2,7 @@
 
 import ReactMarkdown from 'react-markdown'
 import rehypeSanitize from 'rehype-sanitize'
+import { useI18n } from '@/lib/i18n'
 
 /**
  * Markdown body renderer (spec §1.4 + §5.3).
@@ -88,6 +89,7 @@ function EmbedRenderer({
   visited: Set<string>
   depth: number
 }) {
+  const { t } = useI18n()
   const parts = splitEmbeds(source)
   return (
     <>
@@ -96,10 +98,10 @@ function EmbedRenderer({
         const title = part.value
         // 无 resolver(向后兼容)→ 当文本。
         if (!resolveEmbed) return <MarkdownBlock key={i} source={`((${title}))`} />
-        if (depth >= MAX_DEPTH) return <div key={i} className="md-embed md-embed--cycle">↻ 嵌套过深</div>
-        if (visited.has(title)) return <div key={i} className="md-embed md-embed--cycle">↻ {title}(循环引用)</div>
+        if (depth >= MAX_DEPTH) return <div key={i} className="md-embed md-embed--cycle">↻ {t('md.embed.cycleDepth')}</div>
+        if (visited.has(title)) return <div key={i} className="md-embed md-embed--cycle">↻ {title}({t('md.embed.cycleRef')})</div>
         const target = resolveEmbed(title)
-        if (!target) return <div key={i} className="md-embed md-embed--missing">📌 {title}(卡片不存在或已删除)</div>
+        if (!target) return <div key={i} className="md-embed md-embed--missing">📌 {title}({t('md.embed.missing')})</div>
         // 复制 visited,兄弟嵌入不互相污染。
         const nextVisited = new Set(visited)
         nextVisited.add(title)

@@ -12,6 +12,7 @@
  * (layout 错误需 app/global-error.tsx);此处覆盖 page 级渲染。
  */
 import { useEffect } from 'react'
+import { useI18n } from '@/lib/i18n'
 
 export default function GlobalError({
   error,
@@ -20,6 +21,7 @@ export default function GlobalError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  const { t } = useI18n()
   useEffect(() => {
     console.error('[error-boundary] route crashed', error)
   }, [error])
@@ -27,24 +29,22 @@ export default function GlobalError({
   return (
     <main className="err-boundary" role="alert">
       <div className="err-boundary__bar" aria-hidden="true" />
-      <h1 className="err-boundary__h">渲染出错</h1>
-      <p className="err-boundary__msg">
-        这一步崩了,但你的数据没丢(都存在本地)。可以重试,或回首页。
-      </p>
+      <h1 className="err-boundary__h">{t('error.boundary.title')}</h1>
+      <p className="err-boundary__msg">{t('error.boundary.subtitle')}</p>
       {error.digest && (
-        <p className="err-boundary__digest">错误码:{error.digest}</p>
+        <p className="err-boundary__digest">{t('error.boundary.errorCode')}:{error.digest}</p>
       )}
       {/* 调试:显示真实错误信息 + stack(生产也留,便于用户反馈定位) */}
       <details className="err-boundary__details">
-        <summary className="err-boundary__digest">技术详情(可复制反馈)</summary>
+        <summary className="err-boundary__digest">{t('error.boundary.tech')}</summary>
         <pre className="err-boundary__stack">{error.message}\n{error.stack ?? ''}</pre>
       </details>
       <div className="err-boundary__actions">
         <button type="button" className="err-boundary__btn" onClick={reset}>
-          重试
+          {t('error.boundary.retry')}
         </button>
         <a className="err-boundary__btn err-boundary__btn--ghost" href="/">
-          回首页
+          {t('error.boundary.home')}
         </a>
       </div>
       <style>{`

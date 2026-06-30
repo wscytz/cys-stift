@@ -351,6 +351,17 @@ export const messages = {
   'relation.searchPlaceholder': { zh: '搜索卡片…', en: 'Search cards…' },
   'relation.confirm': { zh: '确认', en: 'Confirm' },
   'relation.notOnDefaultCanvas': { zh: '在画布上删除', en: 'Remove on canvas' },
+
+  'error.boundary.title': { zh: '渲染出错', en: 'Something went wrong' },
+  'error.boundary.subtitle': { zh: '这一步崩了,但你的数据没丢(都存在本地)。可以重试,或回首页。', en: 'This step crashed, but your data is safe (stored locally). Retry or go home.' },
+  'error.boundary.retry': { zh: '重试', en: 'Retry' },
+  'error.boundary.home': { zh: '回首页', en: 'Go home' },
+  'error.boundary.errorCode': { zh: '错误码', en: 'Error code' },
+  'error.boundary.tech': { zh: '技术详情(可复制反馈)', en: 'Technical details (copy to report)' },
+
+  'md.embed.cycleDepth': { zh: '嵌套过深', en: 'Too deeply nested' },
+  'md.embed.cycleRef': { zh: '循环引用', en: 'cyclic reference' },
+  'md.embed.missing': { zh: '卡片不存在或已删除', en: 'card not found or deleted' },
   'relation.empty': { zh: '没有匹配的卡片', en: 'No matching cards' },
   'relation.suggested': { zh: '建议关联', en: 'Suggested links' },
   'relation.suggestedHint': { zh: '这张卡可能还和它们相关', en: 'Might also be related' },
