@@ -9,6 +9,8 @@ import { useI18n } from '@/lib/i18n'
 import { pushToast } from '@/lib/toast-store'
 import { StorageMeter } from '@/components/storage-meter'
 import { AISettingsPanel } from '@/features/settings/ai-settings-panel'
+import { LabToggle } from '@/features/ai/lab-toggle'
+import { LAB_REGISTRY } from '@/features/ai/labs-registry'
 import {
   buildExportPayload,
   downloadExport,
@@ -28,8 +30,6 @@ export default function SettingsPage() {
   const sc = settings.captureShortcut
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
-  // 实验室 vision 开关确认门:开启是不可撤销的隐私让步(允许发图),先弹 Modal。
-  const [visionConfirmOpen, setVisionConfirmOpen] = useState(false)
 
   // 选文件后先弹确认门(覆盖不可撤销),确认后才真正导入。
   const handleImportFile = (files: FileList | null) => {
@@ -192,32 +192,18 @@ export default function SettingsPage() {
         <AISettingsPanel />
 
         {/* 实验室 / Labs — 附加能力,默认全关。开启 = 用户显式接受附加风险。
-            visionLab:允许 AI 接收图片二进制(违反默认 R2 铁律,作为附加能力授权)。
-            开启走确认门(不可撤销隐私让步);关闭直接生效。 */}
+            从 LAB_REGISTRY 渲染;每个 lab 走确认门(不可撤销风险让步);关闭直接生效。
+            分层判据见 docs/specs/2026-06-30-ai-labs-strategy.md。 */}
         <section className="section section--labs">
           <h2 className="section__h">{t('settings.labs.title')}</h2>
           <p className="section__lede">{t('settings.labs.lede')}</p>
-          <label className="mono-label set__lab-item">
-            <input
-              type="checkbox"
-              checked={settings.labs?.visionLab ?? false}
-              onChange={(e) => {
-                const cur = settings.labs?.visionLab ?? false
-                if (e.target.checked && !cur) {
-                  // 开启走确认门(不可撤销隐私让步)
-                  setVisionConfirmOpen(true)
-                } else if (!e.target.checked && cur) {
-                  settingsStore.updateLabs({ visionLab: false })
-                }
-              }}
+          {LAB_REGISTRY.map((meta) => (
+            <LabToggle
+              key={meta.id}
+              lab={meta.id}
+              enabled={settings.labs?.[meta.id] ?? false}
             />
-            <span>
-              {t('settings.labs.visionLabel')}
-              <span className="mono mono--xs set__lab-warn">
-                {t('settings.labs.visionWarn')}
-              </span>
-            </span>
-          </label>
+          ))}
         </section>
 
         <section className="section">
@@ -335,29 +321,6 @@ export default function SettingsPage() {
           </Button>
           <Button variant="primary" onClick={confirmImport}>
             {t('settings.importJson')}
-          </Button>
-        </div>
-      </Modal>
-
-      <Modal
-        open={visionConfirmOpen}
-        onClose={() => setVisionConfirmOpen(false)}
-        title={t('settings.labs.visionConfirmTitle')}
-      >
-        <p className="set__confirm-body">{t('settings.labs.visionConfirmBody')}</p>
-        <div className="set__confirm-actions">
-          <Button variant="ghost" onClick={() => setVisionConfirmOpen(false)}>
-            {t('common.cancel')}
-          </Button>
-          <Button
-            variant="danger"
-            onClick={() => {
-              settingsStore.updateLabs({ visionLab: true })
-              setVisionConfirmOpen(false)
-              pushToast({ kind: 'info', message: t('settings.labs.visionEnabled') })
-            }}
-          >
-            {t('settings.labs.visionConfirmAction')}
           </Button>
         </div>
       </Modal>

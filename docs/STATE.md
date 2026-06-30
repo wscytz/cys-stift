@@ -117,7 +117,7 @@
 - **命令面板**:⌘K 跳转项 + 卡片搜索 + **最近编辑跳转**(空 query 显 updatedAt 前 8,点卡智能开卡:在画布跳画布定位+开详情,否则开详情)
 - **标签**:10 色固定调色板,卡片标签 + 过滤 + **标签墙 `/tags`**(标签云 + 卡网格)
 - **关系网络**:块引用 `((标题))` 嵌入(embeds 关系)+ 详情建/删关系(relation-picker)+ 跨画布 backlinks(useGlobalEdges 聚合所有画布)+ **智能关系推荐**(graph 详情页「建议关联」,本地零 AI 四信号打分 + 可选「AI 再找找」语义粗筛,一键即建)+ **AI 对话 agent**(`/ask` 页:对话提需求 → AI 输出 cys-dsl 块 → 确认门 before/after 缩略图 + 变更摘要 → 应用/拒绝;RAG 引用卡片;改任意目标画布)
-- **settings**:快捷键自定义 + 导入/导出 + 暗色主题 + AI provider 配置 + **实验室区**(vision 附加能力,默认关,确认门)
+- **settings**:快捷键自定义 + 导入/导出 + 暗色主题 + AI provider 配置 + **实验室区**(vision/autoCurate/autoTag/autoCapture/agentToolCalling 五个实验室,默认关,LAB_REGISTRY 注册表 + useLabEnabled 守卫 + 确认门;分层判据见 ai-labs-strategy spec)
 
 ## 下一步
 
@@ -166,7 +166,8 @@
 - **B3b frame 拖框创建**:触及引擎 tool union 类型 + 全 pointer 链,L 级;现有「框住选中」按钮 + DSL/Outline 两条建 frame 路够用。
 - **Batch C 智能关系推荐(已落地)**:`relation-recommend.ts` 本地启发式四信号 + `relation-recommend-ai.ts` 可选 AI 语义粗筛,均在 graph 详情页接入。**剩余**:inbox/timeline 详情页只读看推荐(目前仅 graph 页可建关系)。
 - **AI agent /ask 二期**:画布侧边栏版(画布内对话,上下文=当前画布);tool-calling 主动检索(目前 RAG 预注入被动);对话持久化(reload 清空);历史摘要(超阈值直接丢老消息)。
-- **vision 三能力实装**:看图描述/OCR、画布视觉理解、图转 DSL —— 实验室骨架已就位,实装 defer(用户判非必要,等真实需求)。
+- **vision 三能力实装**:看图描述/OCR、画布视觉理解、图转 DSL —— 实验室骨架已就位(labs-registry 注册表 + useLabEnabled 守卫),实装 defer(用户判非必要,等真实需求)。
+- **新实验室实装(基础设施已就位)**:autoCurate(自动整理)/autoTag(自动打标签)/autoCapture(自动建卡)/agentToolCalling(/ask 主动检索)——labs 类型 + LAB_REGISTRY + LabToggle 已落地,功能实装按 spec 顺序 autoCurate→autoTag→toolCalling→autoCapture。
 - **图层 / 卡片版本 / 引擎 npm 化**:打磨计划书方向 8-10,L 级 defer。
 
 ## 约束(不可遗忘,详见根 `CLAUDE.md`)

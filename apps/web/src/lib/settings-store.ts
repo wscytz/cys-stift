@@ -60,15 +60,28 @@ export interface Settings {
    *  false 时仅导出活跃卡。P2 (2026-06-28)。向后兼容:旧 settings 无此字段 → 默认 true。 */
   export?: { includeDeleted?: boolean }
   /** 实验室功能(Labs)。默认全关,用户显式开启 = 接受附加风险。
-   *  visionLab 开启后允许 AI 接收图片二进制(media.dataUrl 进 prompt),
-   *  违反默认 R2 隐私铁律——仅作为「附加能力」由用户主动授权,不破坏默认安全态。
-   *  开启时:① /settings 弹不可撤销确认门;② 代码层 if 守卫,vision 路径才可达;
-   *  ③ 默认 Ollama 本地 provider 即使开 lab 也不外发(本地不算外发)。
+   *  分层判据见 docs/specs/2026-06-30-ai-labs-strategy.md:隐私升级/自动副作用/
+   *  破坏性/新颖不稳定 → 实验室;只读+确认+可撤销+稳定 → 默认开。
+   *  开启时:① /settings 弹不可撤销确认门;② 代码层 useLabEnabled(id) 守卫,
+   *  路径才可达(非仅 UI 隐藏);③ R2 铁律永不放宽(deviceId/apiKey/软删卡)。
    *  向后兼容:旧 settings 无此字段 → 默认全关(labs = {})。 */
   labs?: {
     /** vision 大模型实验室:看图描述/OCR、画布视觉理解、图片转画布元素。
-     *  关闭时 vision 路径完全不可达(代码层守卫,非仅 UI 隐藏)。 */
+     *  关闭时 vision 路径完全不可达(代码层守卫,非仅 UI 隐藏)。
+     *  隐私升级:开启后 media.dataUrl 可进 prompt(违反默认 R2)。 */
     visionLab?: boolean
+    /** AI 自动整理实验室:跨画布自动归类/合并近重复卡。
+     *  破坏性:可能合并/软删卡。开启后需逐次确认 + 可撤销。 */
+    autoCurateLab?: boolean
+    /** AI 自动建卡实验室:从对话/剪贴板自动生成卡片。
+     *  自动副作用 + 不可预测:可能产生垃圾卡。 */
+    autoCaptureLab?: boolean
+    /** AI 自动打标签实验室:捕获/编辑后 AI 自动建议标签。
+     *  自动副作用(低破坏):自动改卡片 tags。 */
+    autoTagLab?: boolean
+    /** /ask tool-calling 实验室:AI 主动多轮检索卡片。
+     *  不可预测 + 多轮外发:token 不可控。 */
+    agentToolCallingLab?: boolean
   }
 }
 
@@ -129,11 +142,13 @@ function isValid(v: unknown): v is Settings {
   if (!isValidAIConfig(o.ai)) return false
   if ('seenCaptureHint' in o && typeof o.seenCaptureHint !== 'boolean')
     return false
-  // labs 字段可选(向后兼容);存在时必须是对象,visionLab 可选 boolean。
+  // labs 字段可选(向后兼容);存在时必须是对象,各 lab 可选 boolean。
   if ('labs' in o && o.labs !== undefined && o.labs !== null) {
     if (typeof o.labs !== 'object') return false
     const l = o.labs as Record<string, unknown>
-    if ('visionLab' in l && typeof l.visionLab !== 'boolean') return false
+    for (const k of ['visionLab', 'autoCurateLab', 'autoCaptureLab', 'autoTagLab', 'agentToolCallingLab']) {
+      if (k in l && typeof l[k] !== 'boolean') return false
+    }
   }
   return true
 }

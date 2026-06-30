@@ -5,6 +5,25 @@
 
 ---
 
+## 2026-06-30 · v0.39.2 · ai-labs-infrastructure(实验室分层基础设施)
+
+把 AI 能力分层(默认开 vs 实验室)做成可扩展基础设施。spec:`docs/specs/2026-06-30-ai-labs-strategy.md`。
+
+**分层判据**:隐私升级/自动副作用/破坏性/新颖不稳定 → 实验室;只读+确认+可撤销+稳定 → 默认开。R2 铁律永不放宽(无论实验室)。
+
+**基础设施**:
+- `settings.labs` 从单字段(visionLab)扩展为多实验室对象:vision/autoCurate/autoTag/autoCapture/agentToolCalling。向后兼容(旧 settings 默认全关)。
+- `LAB_REGISTRY` 注册表(`features/ai/labs-registry.ts`):集中 lab 元数据(标题/风险说明/确认门文案)。新加 lab 只改注册表 + 类型,不改 UI。
+- `useLabEnabled(labId)` 统一守卫 hook(代码层,关时路径完全不可达)。
+- `<LabToggle>` 组件:从注册表渲染,开启走不可撤销确认门(风险说明),关闭直接生效。
+- /settings 实验室区改造:遍历 LAB_REGISTRY 渲染,visionLab 迁到统一框架(行为不变)。
+
+**规划实验室(开关就位,功能实装按顺序)**:autoCurate(自动整理,破坏性)/autoTag(自动打标签)/autoCapture(自动建卡)/agentToolCalling(/ask 主动检索)。实装顺序:autoCurate → autoTag → toolCalling → autoCapture。
+
+**验证**:5 新单测(注册表完整性);全量 916 全绿;build exit 0。
+
+---
+
 ## 2026-06-30 · v0.39.2 · ai-agent-ask(Claude Code 式画布 agent + 知识问答)
 
 用户要的「AI 像 Claude 那样能对话改画布」。落地 `/ask` 页:对话提需求 → AI 输出 `cys-dsl` 块提议 → 确认门 review → 应用/拒绝。
