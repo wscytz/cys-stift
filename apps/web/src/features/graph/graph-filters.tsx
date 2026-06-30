@@ -114,6 +114,6 @@ const styles = `
   background-position: calc(100% - 12px) calc(50% - 1px), calc(100% - 9px) calc(50% - 1px);
   background-size: 3px 3px, 3px 3px; background-repeat: no-repeat;
 }
-.graph-filters__select:focus { outline: 2px solid var(--color-red); outline-offset: 1px; }
+.graph-filters__select:focus-visible { outline: 2px solid var(--color-red); outline-offset: 1px; }
 :root[data-theme='dark'] .graph-filters__select { background-color: var(--color-black); color: var(--color-white); border-color: var(--color-white); }
 `

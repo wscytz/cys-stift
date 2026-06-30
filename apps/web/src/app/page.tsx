@@ -177,7 +177,7 @@ export default function HomePage() {
         }
         .home__secondary-link:hover { color: var(--color-black); }
 .home__secondary-link:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-        .home__secondary-sep { color: var(--color-gray); opacity: 0.6; }
+        .home__secondary-sep { color: var(--color-gray); }
         .home__nav { margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
         .home__nav-link--canvas .home__nav-arrow { background: var(--color-black); }
         .home__nav-link--canvas:hover { box-shadow: 4px 4px 0 0 var(--color-black); }

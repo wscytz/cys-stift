@@ -139,7 +139,7 @@ const styles = `
   background: var(--color-white); color: var(--color-black);
   outline: none;
 }
-.search-input:focus { border-color: var(--color-black); border-width: 2px; padding: 0 calc(var(--space-3) - 1px); }
+.search-input:focus-visible { border-color: var(--color-black); border-width: 2px; padding: 0 calc(var(--space-3) - 1px); }
 .search-hint { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-sm); color: var(--color-gray); }
 .search-snippet {
   margin: var(--space-1) 0 0; font-family: var(--font-mono);

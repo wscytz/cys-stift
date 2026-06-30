@@ -229,7 +229,7 @@ if (
 const styles = `
 .mi-backdrop {
   position: fixed; inset: 0; z-index: 110;
-  background: rgba(10,10,10,0.5);
+  background: color-mix(in srgb, var(--color-black) 50%, transparent);
   display: grid; place-items: start center;
   padding-top: 20vh;
 }

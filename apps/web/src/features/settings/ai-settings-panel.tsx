@@ -311,7 +311,7 @@ const panelStyles = `
 .aip__row { display: flex; align-items: center; gap: var(--space-2); margin: 0 var(--space-3) var(--space-2); }
 .aip__label { flex: 0 0 140px; font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); }
 .aip__input { flex: 1 1 auto; padding: var(--space-1) var(--space-2); border: var(--border-hairline); font-family: var(--font-mono); font-size: var(--font-size-sm); background: var(--color-white); color: var(--color-black); }
-.aip__input:focus { outline: 2px solid var(--color-blue); outline-offset: 1px; }
+.aip__input:focus-visible { outline: 2px solid var(--color-blue); outline-offset: 1px; }
 .aip__keyWrap { display: flex; flex: 1 1 auto; gap: var(--space-1); }
 .aip__btnGhost { padding: var(--space-1) var(--space-2); border: var(--border-hairline); background: transparent; font-family: var(--font-mono); font-size: var(--font-size-xs); cursor: pointer; }
 .aip__providerRow { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin: 0 var(--space-3) var(--space-3); }

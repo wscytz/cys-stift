@@ -1653,9 +1653,10 @@ const styles = `
   padding: var(--space-1) var(--space-2);
   background: var(--color-white); color: var(--color-black);
   border: var(--border-hairline); border-radius: var(--radius-sm);
-  cursor: pointer; opacity: 0.7;
+  cursor: pointer; opacity: 0.85;
 }
 .cv-focus-exit:hover { opacity: 1; border-color: var(--color-black); }
+.cv-focus-exit:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 /* 根据当前工具显示不同光标 — 让用户知道正在用 select/freedraw/eraser/text/connect 哪种模式 */
 .cv-host { position: relative; flex: 1; min-height: 0; }
 /* 橡皮光标:SVG 圆圈(28px),让用户看清擦除范围。其他工具保持 crosshair/text/cell。 */
@@ -1715,7 +1716,7 @@ const styles = `
 .tb-tool--sub .tb-tool__label { font-size: var(--font-size-xs); }
 .tb-tool:hover:not(:disabled):not(.tb-tool--active) { background: var(--color-gray-soft); border-color: var(--color-gray); }
 .tb-tool:active:not(:disabled) { transform: scale(0.94); }
-.tb-tool:disabled { opacity: 0.55; cursor: not-allowed; }
+.tb-tool:disabled { opacity: 0.5; cursor: not-allowed; }
 .tb-tool:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tb-snap { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.16em; text-transform: uppercase; background: var(--color-white); color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
 .tb-snap--snap { background: var(--color-black); color: var(--color-white); }
@@ -1724,7 +1725,7 @@ const styles = `
    (--snap 黑底)与 SnapToggle 的 --snap/--free 文字按钮,避免抢激活态视觉。 */
 .tb-snap:hover:not(:disabled):not(.tb-snap--snap):not(.tb-snap--free):not(.tb-snap--toggle) { background: var(--color-gray-soft); }
 .tb-snap:active:not(:disabled) { transform: scale(0.94); }
-.tb-snap:disabled { opacity: 0.55; cursor: not-allowed; }
+.tb-snap:disabled { opacity: 0.5; cursor: not-allowed; }
 .tb-snap:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 /* SnapToggle 默认显示文字 label,glyph 隐藏;≤900px 反转(见响应式断点)。 */
 .tb-snap__glyph { display: none; }
@@ -1733,7 +1734,7 @@ const styles = `
 .tb-icon-btn--fit { padding: 0 var(--space-3); }
 .tb-icon-btn:hover { background: var(--color-black); color: var(--color-white); }
 .tb-icon-btn:active:not(:disabled) { transform: scale(0.92); }
-.tb-icon-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.tb-icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .tb-icon-btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 /* 对齐工具条:选中≥2 卡时出现。复用 .tb-icon-btn 视觉;组容器内联排布。 */
 .tb-align { display: inline-flex; align-items: center; gap: 0; }
@@ -1805,7 +1806,7 @@ const styles = `
 .cv-rail__btn:hover:not(:disabled) { background: var(--color-gray-soft); }
 .cv-rail__btn:active:not(:disabled) { background: var(--color-yellow); border-color: var(--color-black); transform: scale(0.96); }
 .cv-rail__btn--pressed { background: var(--color-yellow); border-color: var(--color-black); color: var(--color-black); }
-.cv-rail__btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.cv-rail__btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .cv-rail__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: -2px; }
 .cv-rail__btn-icon { font-family: var(--font-mono); font-size: var(--font-size-base); line-height: 1; }
 .cv-rail__btn-label { font-family: var(--font-body); font-size: var(--font-size-xs); line-height: 1; color: inherit; letter-spacing: 0; }

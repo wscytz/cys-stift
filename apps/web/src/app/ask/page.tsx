@@ -387,7 +387,7 @@ const styles = `
 @keyframes ask-blink { 50% { opacity: 0; } }
 .ask__input-row { display: flex; gap: var(--space-2); align-items: flex-end; }
 .ask__input { flex: 1 1 auto; font-family: var(--font-body); font-size: var(--font-size-sm); padding: var(--space-2); border: var(--border-hairline); border-radius: var(--radius-sm); resize: none; min-height: 44px; max-height: 200px; background: var(--color-white); color: var(--color-black); }
-.ask__input:focus { outline: 2px solid var(--color-red); outline-offset: 1px; }
+.ask__input:focus-visible { outline: 2px solid var(--color-red); outline-offset: 1px; }
 .ask__canvas-select { font-family: var(--font-mono); font-size: var(--font-size-xs); }
 .empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) 0; }
 `
