@@ -764,7 +764,11 @@ export class SelfBuiltAdapter implements CanvasHost {
             this.pushUndo()
             this.coalescing = true
           }
-          const g = resizeGeometry(this.resizing.handle, this.resizing.start, p)
+          // snap 模式:拖动角点 p 过 snapCoord(对角由 start 固定,snap 移动角即让尺寸落网格)。
+          const sp = this.view.gridMode === 'snap'
+            ? { x: this.snapCoord(p.x), y: this.snapCoord(p.y) }
+            : p
+          const g = resizeGeometry(this.resizing.handle, this.resizing.start, sp)
           if (el.kind === 'freedraw') {
             // freedraw 真身=点序列:把点序列从旧 bbox 线性映射到新 box(不只改 bbox)。
             const scaled = scaleFreedrawToBox(el, g)

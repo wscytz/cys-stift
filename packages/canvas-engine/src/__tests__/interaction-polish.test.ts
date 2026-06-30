@@ -125,13 +125,55 @@ describe('[B2-T1] 空 undo 步 — 纯点击/点空白不污染 undo 栈', () =>
     expect(after - before).toBe(1)
   })
 
-  it('resize 点 handle 不拖 → undo 栈不增', () => {
+  it('resize 点 handle 不拖 → undo 栈不增(预选,真实进 resize 路径)', () => {
     const { host, canvas } = makeHost()
+    // resize 起手需先选中卡A(se handle 命中条件 = selectedIds.size===1)。
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['a'])
     // 卡A 右下角 handle 约在 (100,100)
     const before = (host as unknown as { undoStack: unknown[] }).undoStack.length
-    dispatch(canvas, 'pointerdown', 100, 100) // 命中 handle
+    dispatch(canvas, 'pointerdown', 100, 100) // 命中 handle,进 resizing 态
     dispatch(canvas, 'pointerup', 100, 100) // 不拖
     const after = (host as unknown as { undoStack: unknown[] }).undoStack.length
-    expect(after).toBe(before)
+    expect(after).toBe(before) // lazy:未实际 resize 不推
+  })
+
+  it('resize 拖动 → undo 栈 +1(1 步整 resize)', () => {
+    const { host, canvas } = makeHost()
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['a'])
+    const before = (host as unknown as { undoStack: unknown[] }).undoStack.length
+    dispatch(canvas, 'pointerdown', 100, 100) // handle
+    dispatch(canvas, 'pointermove', 140, 140) // 实际 resize
+    dispatch(canvas, 'pointerup', 140, 140)
+    const after = (host as unknown as { undoStack: unknown[] }).undoStack.length
+    expect(after - before).toBe(1)
+  })
+})
+
+describe('[B2-T2] resize snap — snap 模式尺寸落 8 倍数', () => {
+  it('snap 模式拖角 resize → w/h 是 8 倍数', () => {
+    const { host, canvas } = makeHost()
+    ;(host as unknown as { setView: (v: unknown) => void }).setView({ panX: 0, panY: 0, zoom: 1, gridMode: 'snap' })
+    // resize 起手需先选中卡A(se handle 命中条件 = selectedIds.size===1)。
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['a'])
+    // 卡A 右下角 handle 约 (100,100);拖到 (123, 123)
+    dispatch(canvas, 'pointerdown', 100, 100)
+    dispatch(canvas, 'pointermove', 123, 123)
+    dispatch(canvas, 'pointerup', 123, 123)
+    const a = host.getElement('a')!
+    expect(a.w % 8).toBe(0)
+    expect(a.h % 8).toBe(0)
+    expect(a.w).toBeGreaterThan(100) // 确实放大了
+  })
+
+  it('free 模式 resize → 尺寸不强制 8 倍数(回归)', () => {
+    const { host, canvas } = makeHost()
+    ;(host as unknown as { setView: (v: unknown) => void }).setView({ panX: 0, panY: 0, zoom: 1, gridMode: 'free' })
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['a'])
+    dispatch(canvas, 'pointerdown', 100, 100)
+    dispatch(canvas, 'pointermove', 123, 123)
+    dispatch(canvas, 'pointerup', 123, 123)
+    const a = host.getElement('a')!
+    // free 模式:123-0=123,不强制网格(123 不是 8 倍数)
+    expect(a.w).toBe(123)
   })
 })
