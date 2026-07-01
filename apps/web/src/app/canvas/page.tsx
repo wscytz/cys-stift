@@ -1898,7 +1898,7 @@ const styles = `
 .cv-organize__section { display: flex; flex-direction: column; gap: var(--space-1); }
 .cv-organize__label {
   font-family: var(--font-mono); font-size: var(--font-size-xs);
-  color: var(--color-gray); letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--color-black-soft); letter-spacing: 0.04em; text-transform: uppercase;
   display: flex; align-items: center; justify-content: space-between;
 }
 .cv-organize__gap-val { font-family: var(--font-mono); color: var(--color-black); text-transform: none; }

@@ -1070,9 +1070,9 @@ const styles = `
    the title. */
 .cd > :first-child { margin-top: calc(-1 * var(--space-2)); }
 .cd__meta { display: flex; align-items: center; gap: var(--space-2); }
-.cd__time { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
+.cd__time { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black-soft); }
 .cd__field { display: flex; flex-direction: column; gap: var(--space-1); }
-.cd__label { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-gray); }
+.cd__label { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-black-soft); }
 .cd__textarea {
   appearance: none; background: transparent; border: 0; border-bottom: var(--border-hairline);
   padding: var(--space-1) 0; font-family: var(--font-body); font-size: var(--font-size-base);
@@ -1111,7 +1111,7 @@ const styles = `
 }
 .cd__translate-select:disabled { opacity: 0.5; cursor: not-allowed; }
 .cd__sec { display: flex; flex-direction: column; gap: var(--space-2); }
-.cd__sec-h { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.16em; color: var(--color-gray); }
+.cd__sec-h { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.16em; color: var(--color-black-soft); }
 .cd__sec-body { display: flex; flex-direction: column; gap: var(--space-2); }
 
 .cd__media-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); }
@@ -1130,9 +1130,9 @@ const styles = `
 .cd__backlink-btn { display: flex; align-items: center; gap: var(--space-1); width: 100%; text-align: left; padding: 4px var(--space-1); background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black); transition: background 80ms ease-out, border-color 80ms ease-out; }
 .cd__backlink-btn:hover { background: var(--color-gray-soft); border-color: var(--color-gray-soft); }
 .cd__backlink-btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-.cd__backlink-dir { color: var(--color-gray); font-family: var(--font-mono); flex: 0 0 auto; }
+.cd__backlink-dir { color: var(--color-black-soft); font-family: var(--font-mono); flex: 0 0 auto; }
 .cd__backlink-title { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cd__backlink-rel { flex: 0 0 auto; font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-gray); }
+.cd__backlink-rel { flex: 0 0 auto; font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); }
 /* RB-T3 — backlinks 区的 × 删除按钮(default canvas 上的边可删)与「在画布上删除」
    提示(其它画布上的边不能在详情删)。× 复用 le__remove 的硬偏移风格,贴在 row 右侧。 */
 .cd__backlink-remove {
@@ -1150,14 +1150,14 @@ const styles = `
 .cd__backlink-hint {
   flex: 0 0 auto;
   font-family: var(--font-mono); font-size: var(--font-size-xs);
-  color: var(--color-gray); text-transform: none; letter-spacing: 0;
+  color: var(--color-black-soft); text-transform: none; letter-spacing: 0;
 }
 
 /* 智能关系推荐区(Batch C 选项 A)— 与 backlinks 区呼应:建议连 vs 已连。 */
 .cd__suggest-hint {
   margin: 0 0 var(--space-1);
   font-family: var(--font-mono); font-size: var(--font-size-xs);
-  color: var(--color-gray);
+  color: var(--color-black-soft);
 }
 .cd__suggest { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
 .cd__suggest-item { display: flex; align-items: center; gap: var(--space-1); }
@@ -1175,12 +1175,12 @@ const styles = `
 .cd__suggest-reason {
   flex: 0 0 auto;
   font-family: var(--font-mono); font-size: var(--font-size-xs);
-  color: var(--color-gray);
+  color: var(--color-black-soft);
 }
 .cd__suggest-type {
   flex: 0 0 auto;
   font-family: var(--font-mono); font-size: var(--font-size-xs);
-  text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-gray);
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft);
 }
 .cd__suggest-connect {
   flex: 0 0 auto;

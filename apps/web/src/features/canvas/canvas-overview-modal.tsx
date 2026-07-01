@@ -158,7 +158,7 @@ const styles = `
   margin: 0 0 var(--space-2);
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
-  color: var(--color-gray);
+  color: var(--color-black-soft);
 }
 .cv-overview__empty {
   margin: 0;
@@ -166,6 +166,6 @@ const styles = `
   text-align: center;
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
-  color: var(--color-gray);
+  color: var(--color-black-soft);
 }
 `

@@ -458,10 +458,10 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
  * 解析失败回退中性灰(YAGNI:不引额外映射表,readToken 已是项目标准)。
  */
 function resolveColor(raw: string | null | undefined): string {
-  if (!raw) return '#9ca3af'
+  if (!raw) return '#666666'
   const m = /^var\((--[\w-]+)\)$/.exec(raw.trim())
   const name = m?.[1] ?? (raw.startsWith('--') ? raw : mapDslName(raw))
-  return readToken(name, '#9ca3af')
+  return readToken(name, '#666666')
 }
 
 /** DSL/关系 color 名(6 原色口径)→ token 名。仅兜底裸名输入;var(...) 形式已剥壳。 */
@@ -492,7 +492,7 @@ function drawNode(
   ctx.globalAlpha = dim ? 0.2 : 1
   const fill = node.tagColor ? resolveColor(node.tagColor) : readToken('--color-black', '#0a0a0a')
   ctx.fillStyle = fill
-  ctx.strokeStyle = node.archived ? readToken('--color-gray', '#9ca3af') : fill
+  ctx.strokeStyle = node.archived ? readToken('--color-gray', '#666666') : fill
   ctx.lineWidth = isHover ? 2.5 : 1
 
   drawShape(ctx, node.type, cx, cy)

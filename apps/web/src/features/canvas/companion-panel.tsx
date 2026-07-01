@@ -390,7 +390,7 @@ const mutedTextStyle: React.CSSProperties = {
   padding: 'var(--space-1)',
   fontFamily: 'var(--font-mono)',
   fontSize: 'var(--font-size-xs)',
-  color: 'var(--color-gray)',
+  color: 'var(--color-black-soft)',
 }
 
 const actionBtnStyle: React.CSSProperties = {
