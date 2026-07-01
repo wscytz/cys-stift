@@ -32,13 +32,14 @@ const DEFAULT_VIEW: GraphView = { zoom: 1, panX: 0, panY: 0 }
 function isValidView(v: unknown): v is GraphView {
   if (!v || typeof v !== 'object') return false
   const o = v as Record<string, unknown>
-  return typeof o.zoom === 'number' && typeof o.panX === 'number' && typeof o.panY === 'number'
+  // Number.isFinite 而非 typeof === 'number':NaN 会通过 typeof 但让整张图爆炸不可恢复。
+  return Number.isFinite(o.zoom) && Number.isFinite(o.panX) && Number.isFinite(o.panY)
 }
 
 function isValidPosition(v: unknown): v is NodePosition {
   if (!v || typeof v !== 'object') return false
   const o = v as Record<string, unknown>
-  return typeof o.x === 'number' && typeof o.y === 'number'
+  return Number.isFinite(o.x) && Number.isFinite(o.y)
 }
 
 function loadState(): GraphState {

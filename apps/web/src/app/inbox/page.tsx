@@ -68,7 +68,8 @@ export default function InboxPage() {
   const archived = pinFirst(
     service
       .listAll()
-      .filter((c) => c.archived && !c.deletedAt),
+      .filter((c) => c.archived && !c.deletedAt)
+      .sort((a, b) => b.capturedAt.getTime() - a.capturedAt.getTime()),
   )
   const visible = view === 'inbox' ? inbox : archived
 

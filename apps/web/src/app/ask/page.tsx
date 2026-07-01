@@ -49,6 +49,9 @@ interface ChatMessage {
   dslBlocks?: string[]
   /** 流式进行中标记。 */
   streaming?: boolean
+  /** 发送时的目标画布快照 —— 确认门的「应用」必须落到 AI 分析时的画布,
+   *  而非用户事后切换的实时 state(否则切画布后应用旧提议会落到错画布)。 */
+  targetCanvasId?: CanvasId
 }
 
 const MAX_HISTORY = 20
@@ -91,7 +94,7 @@ export default function AskPage() {
       content: m.content,
     }))
     const userMsg: ChatMessage = { role: 'user', content: question }
-    const asstMsg: ChatMessage = { role: 'assistant', content: '', streaming: true }
+    const asstMsg: ChatMessage = { role: 'assistant', content: '', streaming: true, targetCanvasId }
     setMessages((prev) => [...prev, userMsg, asstMsg])
 
     const ac = new AbortController()
@@ -222,7 +225,7 @@ export default function AskPage() {
                     content={m.content}
                     streaming={m.streaming}
                     dslBlocks={m.dslBlocks}
-                    targetCanvasId={targetCanvasId}
+                    targetCanvasId={m.targetCanvasId ?? targetCanvasId}
                     service={service}
                     getCardTitle={(id) => service.get(id as CardId)?.title ?? id}
                     onCardRefClick={(id) => {

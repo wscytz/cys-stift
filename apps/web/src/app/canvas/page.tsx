@@ -461,14 +461,19 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
   const handleAICluster = useCallback(async () => {
     // 防重复点击:已在跑则忽略(审计 M5)。
     if (aiBusy) return
+    // AI 未就绪 → 弹 AiSetupCard 引导(与 Layout/Outline 一致;原缺此守卫致用户点聚类静默无反馈)。
+    const cfg = getCurrentAI()
+    if (shouldShowAiSetupForLayout(cfg)) {
+      setShowAiSetup(true)
+      return
+    }
+    const ready = cfg as AIConfig
     setAiBusy('cluster')
     const ac = new AbortController()
     aiAbortRef.current = ac
     try {
       const adapter = handle.current.adapter
       if (!adapter) return
-      const cfg = getCurrentAI()
-      if (!cfg) return
 
       const cards = service
         .listOnCanvas(activeCanvasId)
@@ -488,7 +493,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       }
 
       const result = await streamText(
-        cfg,
+        ready,
         { system: CLUSTER_SYSTEM_PROMPT, user: userPrompt, maxTokens: 2048, temperature: 0.2, structuredOutput: true, timeoutMs: 60_000 },
         () => {},
         ac.signal,

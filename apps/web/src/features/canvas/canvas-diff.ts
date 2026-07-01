@@ -22,6 +22,9 @@ export interface ElementDiff {
 
 const COMPARE_FIELDS: (keyof CanvasElement)[] = [
   'x', 'y', 'w', 'h', 'rotation', 'color', 'dash', 'arrowhead', 'text', 'from', 'to',
+  // 箭头路由变化(直线↔曲线↔折线 / 拖曲柄改 curve / 加折点改 elbow)需报 changed ——
+  // 原漏这些字段,用户改箭头路由后版本对比显示"无变化",破坏 diff 信任。
+  'route', 'curve', 'elbow',
 ]
 
 export function diffCanvasSnapshots(
