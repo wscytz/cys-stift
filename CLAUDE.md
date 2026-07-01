@@ -59,12 +59,12 @@
 
 ## 验证命令（改完代码就跑）
 
-> **完整验证门 + 判据**（web lint 基线、产品门、提交纪律）见
+> **完整验证门 + 判据**（产品门、提交纪律）见
 > 🔒 `docs/development/definition-of-done.md`（私有仓库 cys-stift-docs）。简版：
 
 ```bash
 pnpm -r test                  # 全包 vitest（domain / db / canvas-engine / web）
-pnpm -r lint                  # 全包 tsc --noEmit（web 有少量预存在 fixture 基线，判据=零新增，见 definition-of-done.md）
+pnpm -r lint                  # 全包 tsc --noEmit（全包零 lint 基线,必须全绿）
 pnpm --filter web build       # Next.js 静态导出（产品门，必须 exit 0）
 ```
 
