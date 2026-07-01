@@ -32,6 +32,15 @@ v0.43 打包后内测 + 用户反馈三 bug,同思路主动排查。3 commit:
 
 验证:web 1031(+7)全绿;源码 tsc 零新增(23 基线不变);build exit 0。重新打包 v0.43.0 含三修。
 
+### 自查续修(2026-07-01,v0.43 push 后主模型承重代码自查,4 真 bug)
+
+push 后按 L2 九维自查 v0.43 承重代码(避 subagent 假阳性,主模型直读)。6 项审完,4 真 bug 全修(各带测试):
+- **A2 organize 损坏坐标守卫**(2f095c1):① organize apply 路径(`host.upsert` x/y)不守卫 NaN/Infinity——一张卡 w=Infinity → maxW=Infinity → 全盘位置 NaN → 写 host → 序列化 null → reload 变 0(静默坐标损坏,同 applyLayout finiteRound 防的类)。修:auto-layout 中心化 `finitePos`(非有限回落原坐标)+ `maxW/maxH` 仅取有限值(`finiteMax` 防毒化)+ pack 质心 shift 守卫;popover apply 兜底 finite 检查(防御纵深)。② **dagre 遇 Infinity/NaN 维度直接抛** "Not possible to find intersection" → 整个 organize 崩(popover 无 try/catch)。修:`setNode` 传有限 w/h fallback(240×120)+ `dagre.layout` 包 try/catch(抛则返回各卡原位 no-op)。+5 边缘测试。顺手修文档谎言(注释说"按 title 排序"实为 id)。
+- **A3 对话历史持久化**(18ec6f9):① `streaming:true` 持久化——debounce 400ms 可能在流式中途保存,reload 后那条消息永远显示流式光标 ▋(stream 已随卸载而死)。修:`loadChatHistory` 加载时清 `streaming:true`→false(持久化的 streaming 永远陈旧)。② **切 canvas 不重载历史**——`useState` lazy init 只跑一次;Batch 3 让 chat tab 跨折叠保持挂载,但切 canvas 时 CompanionChat 无 key 也保持挂载 → 显示旧 canvas 历史 + 新消息存新 canvasId key(数据错位)。修:`CompanionChat` 加 `key={canvasId}` 切画布重挂载。R2 复核:历史 content 是用户自己的数据本地存(apiKey/deviceId 经 allowlist 不进),无新隐私路径。+1 测试。
+- **A1 freeform 订阅 / A4 箭头五视图 / A5 AI prompt R2 / A6 graph 重建缩放**:审完无 bug(订阅 cleanup 正确 + 画图时 useGlobalEdges 未挂载无 thrash;arrow cull fix 默认值向后兼容 + SVG/overview 各自路径不受影响;prompt 仍走 snapshotCanvas 几何+title 无 media/deviceId、summarizeMovement 纯函数;wheel-math 全 deltaMode 覆盖 + clamp 界限、gray-fix stop 旧 handle 无泄漏)。
+
+验证:web 1037(+6 自查)全绿;源码 tsc 零错;build exit 0。2 commit 本地(**未 push**,等用户确认)。
+
 ---
 
 ## 2026-06-30 · v0.42 · canvas-companion-panel-plan-b(画布 AI 伴侣面板 · 对话 tab)
