@@ -114,4 +114,24 @@ describe('eraserHitTest 橡皮宽松命中', () => {
   it('无元素返回 null', () => {
     expect(eraserHitTest([], 50, 50, 1)).toBeNull()
   })
+
+  // ── B6 回归:强弯 curve 箭头能被 eraserHitTest 命中 ──
+  // 旧版 eraserHitTest 用直线近似曲线,强弯箭头实际路径远离直线 → 擦不掉。
+  // 升级后 curve 走精确贝塞尔采样,橡皮应能命中曲线真正经过的点。
+  it('B6:强弯 curve 自由箭头 —— 点在曲线弧顶(远离直线)能擦到', () => {
+    // 自由箭头 bbox:(0,0)→(200,0),水平基线 y=0。
+    // 控制点 ctrl=(100,150) 把曲线向上拱到 y≈75(二次贝塞尔 t=0.5 高点 = 0.5·ctrl = 75)。
+    // 直线近似下擦 y=75 永远擦不到(y=0 直线距 75px > 16px 阈值)。
+    // 精确采样下擦 y=75 正中弧顶 → 距离 0 ≤ 16 → 命中。
+    const strongCurve = [
+      {
+        id: 'cv', kind: 'arrow' as const, x: 0, y: 0, w: 200, h: 0, rotation: 0,
+        route: 'curve' as const, curve: { cx: 100, cy: 150 },
+      },
+    ] as never
+    // 弧顶点 (100,75):zoom=1 → 16px 屏幕阈值。直线距离 75 ≫ 16(旧版擦不到)。
+    expect(eraserHitTest(strongCurve, 100, 75, 1)).toBe('cv')
+    // 离弧顶远(下方)→ 仍不命中
+    expect(eraserHitTest(strongCurve, 100, -50, 1)).toBeNull()
+  })
 })

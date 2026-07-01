@@ -16,6 +16,74 @@ export function screenToPage(
 }
 
 /**
+ * 点 (x,y) 到 arrow 元素的几何最短距离(页坐标)。
+ *
+ * 路由分派(与渲染/DSL 一致):
+ * - **straight**:from→to 单线段距离。
+ * - **curve**:沿二次贝塞尔(控制点 el.curve)采样 16 段,取点到每段距离的 min。
+ *   采样法对强弯箭头也精确(修正旧 eraser 用直线简化导致擦不掉的 B6)。
+ * - **elbow**:手设 elbow → elbowSegments [from,...elbow,to];空 elbow → autoElbowPath
+ *   自动绕障(obstacles 排除 from/to 卡)。点到每段折线距离取 min。
+ *
+ * 端点解析失败(悬空 arrow,from/to null)→ 返回 Infinity(调用方走 bbox 兜底)。
+ */
+function pointToArrowDistance(
+  el: CanvasElement,
+  elements: CanvasElement[],
+  x: number,
+  y: number,
+): number {
+  const { from, to } = arrowEndpoints(el, elements)
+  if (!from || !to) return Infinity // 悬空:由调用方 bbox 兜底
+
+  const route = arrowRoute(el)
+
+  if (route === 'elbow') {
+    // 手设 elbow → elbowSegments;空 elbow → autoElbowPath 自动绕障(路径与渲染一致)。
+    const hasManual = !!(el.elbow && el.elbow.length > 0)
+    const segs = hasManual
+      ? elbowSegments(el, from, to)
+      : autoElbowPath(
+          el,
+          from,
+          to,
+          cardObstacles(elements, new Set([el.from, el.to].filter((v): v is string => !!v))),
+        )
+    if (!segs || segs.length < 2) return Infinity
+    let best = Infinity
+    for (let i = 1; i < segs.length; i++) {
+      const d = pointToSegmentDistance(x, y, segs[i - 1]!.x, segs[i - 1]!.y, segs[i]!.x, segs[i]!.y)
+      if (d < best) best = d
+    }
+    return best
+  }
+
+  if (route === 'curve' && el.curve) {
+    // 沿二次贝塞尔(控制点 ctrl)采样 N 段,点到每段距离取 min。
+    const ctrl = { x: el.curve.cx, y: el.curve.cy }
+    const N = 16
+    let prev = from
+    let best = Infinity
+    for (let s = 1; s <= N; s++) {
+      const t = s / N
+      // 二次贝塞尔点:B(t) = (1-t)²P0 + 2(1-t)t·C + t²·P1
+      const u = 1 - t
+      const pt = {
+        x: u * u * from.x + 2 * u * t * ctrl.x + t * t * to.x,
+        y: u * u * from.y + 2 * u * t * ctrl.y + t * t * to.y,
+      }
+      const d = pointToSegmentDistance(x, y, prev.x, prev.y, pt.x, pt.y)
+      if (d < best) best = d
+      prev = pt
+    }
+    return best
+  }
+
+  // straight(含 curve 标了 route 但无 curve 数据的退化):直线距离
+  return pointToSegmentDistance(x, y, from.x, from.y, to.x, to.y)
+}
+
+/**
  * 命中测试:返回包含页坐标 (pageX,pageY) 的最上层元素 id,无则 null。
  * 「最上层」= 数组末尾(后画的盖先画的)。
  *
@@ -37,57 +105,13 @@ export function hitTest(
     const el = elements[i]!
     if (el.kind === 'arrow') {
       const { from, to } = arrowEndpoints(el, elements)
-      if (from && to) {
-        const route = arrowRoute(el)
-        if (route === 'elbow') {
-          // 折线箭头:点到每段折线距离取 min。
-          // 手设 elbow → elbowSegments [from, ...elbow, to];
-          // 空 elbow → autoElbowPath 自动绕障(obstacles 排除 from/to 卡),路径与渲染一致。
-          const hasManual = !!(el.elbow && el.elbow.length > 0)
-          const segs = hasManual
-            ? elbowSegments(el, from, to)
-            : autoElbowPath(
-                el,
-                from,
-                to,
-                cardObstacles(elements, new Set([el.from, el.to].filter((v): v is string => !!v))),
-              )
-          if (segs && segs.length >= 2) {
-            for (let i = 1; i < segs.length; i++) {
-              if (pointToSegmentDistance(pageX, pageY, segs[i - 1]!.x, segs[i - 1]!.y, segs[i]!.x, segs[i]!.y) <= tol) {
-                return el.id
-              }
-            }
-          }
-          continue
-        }
-        if (route === 'curve' && el.curve) {
-          // 弯曲箭头:沿二次贝塞尔采样,点到每段距离取 min。
-          const ctrl = { x: el.curve.cx, y: el.curve.cy }
-          const N = 16
-          let prev = from
-          let hit = false
-          for (let s = 1; s <= N; s++) {
-            const t = s / N
-            // 二次贝塞尔点:B(t) = (1-t)²P0 + 2(1-t)t·C + t²·P1
-            const u = 1 - t
-            const pt = {
-              x: u * u * from.x + 2 * u * t * ctrl.x + t * t * to.x,
-              y: u * u * from.y + 2 * u * t * ctrl.y + t * t * to.y,
-            }
-            if (pointToSegmentDistance(pageX, pageY, prev.x, prev.y, pt.x, pt.y) <= tol) {
-              hit = true
-              break
-            }
-            prev = pt
-          }
-          if (hit) return el.id
-        } else if (pointToSegmentDistance(pageX, pageY, from.x, from.y, to.x, to.y) <= tol) {
-          return el.id
-        }
-      } else {
-        // 悬空关系箭头(端点卡片已删 + bbox w=h=0):线段命中分支因 from/to null 跳过。
-        // 用 bbox + 容差兜底(w=h=0 退化为点容差 tol),让用户能选中删除这类幽灵元素。
+      if (pointToArrowDistance(el, elements, pageX, pageY) <= tol) {
+        return el.id
+      }
+      // 悬空关系箭头(端点卡片已删 + bbox w=h=0):pointToArrowDistance 返回 Infinity 跳过线段命中。
+      // 仅对悬空 arrow(from/to 都解析不出)走 bbox+容差兜底(w=h=0 退化为点容差 tol),
+      // 让用户能选中删除这类幽灵元素;有端点的 arrow 保持纯线段命中(行为不变)。
+      if (!from || !to) {
         const b = normalizeBox(el)
         if (pageX >= b.x - tol && pageX <= b.x + b.w + tol && pageY >= b.y - tol && pageY <= b.y + b.h + tol) {
           return el.id
@@ -167,11 +191,12 @@ export function eraserHitTest(
     const el = elements[i]!
     if (el.kind === 'arrow') {
       const { from, to } = arrowEndpoints(el, elements)
-      if (from && to) {
-        if (pointToSegmentDistance(pageX, pageY, from.x, from.y, to.x, to.y) <= lineTol) return el.id
-        // curve/elbow 简化:直线距离够近就擦(橡皮宽松)
-      } else {
-        // 悬空 arrow:bbox+pad 兜底
+      // 复用与 hitTest 同源的精确距离(straight/curve 采样/elbow 折线)。
+      // lineTol(16px 屏幕)比 hitTest 的 6px 宽松,但几何不再简化 —— 修正旧版
+      // 「curve/elbow 用直线近似」导致强弯箭头擦不掉的 B6。
+      if (pointToArrowDistance(el, elements, pageX, pageY) <= lineTol) return el.id
+      // 悬空 arrow:bbox+pad 兜底(pointToArrowDistance 对悬空返回 Infinity)
+      if (!from || !to) {
         const b = normalizeBox(el)
         if (pageX >= b.x - bboxPad && pageX <= b.x + b.w + bboxPad && pageY >= b.y - bboxPad && pageY <= b.y + b.h + bboxPad) return el.id
       }
