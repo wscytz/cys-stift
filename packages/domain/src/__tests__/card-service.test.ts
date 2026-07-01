@@ -3,6 +3,7 @@ import { CardService, type CardRepository } from '../services/card-service'
 import type { Card, CardId, CanvasId, MediaAssetId, MediaRef, WorkspaceId, TagRef } from '../types'
 import { TAG_COLORS } from '../types'
 import { toCardId } from '../codec'
+import { StorageQuotaError } from '../errors'
 
 class InMemoryCardRepository implements CardRepository {
   private store = new Map<CardId, Card>()
@@ -421,5 +422,82 @@ describe('CardService.createWithId', () => {
       canvasPosition: { canvasId: 'default-canvas' as CanvasId, x: 100, y: 200, w: 240, h: 120, z: 0, rotation: 0 },
     })
     expect(svc.get(id)?.canvasPosition).toMatchObject({ x: 100, y: 200 })
+  })
+})
+
+// ── 配额失败:CardService.write 捕获 StorageQuotaError(quota-update-fix) ──
+// update/addTag 等配额满时返失败值(null/false),不返幻影状态;void mutator 静默 no-op。
+class QuotaCardRepository implements CardRepository {
+  private store = new Map<CardId, Card>()
+  insert(card: Card) { this.store.set(card.id, card) }
+  update(_card: Card) { throw new StorageQuotaError() }
+  delete(_id: CardId) { throw new StorageQuotaError() }
+  getById(id: CardId) { return this.store.get(id) ?? null }
+  listInbox() { return [...this.store.values()] }
+  listOnCanvas(canvasId: CanvasId) {
+    return [...this.store.values()].filter((c) => c.canvasPosition?.canvasId === canvasId)
+  }
+  listAll() { return [...this.store.values()] }
+}
+
+describe('CardService quota failure (write helper)', () => {
+  let service: CardService
+  beforeEach(() => {
+    const repo = new QuotaCardRepository()
+    service = new CardService(repo)
+    // 带 canvasPosition:create 不抛(insert),且 removeFromCanvas 才会走到 update。
+    service.create({
+      title: 'x',
+      source: { kind: 'manual', deviceId: 'd' },
+      canvasPosition: { canvasId: 'default-canvas' as CanvasId, x: 0, y: 0, w: 240, h: 120, z: 0 },
+    })
+  })
+
+  it('update returns null on quota failure (not phantom next)', () => {
+    const c = service.listAll()[0]!
+    expect(service.update(c.id, { title: 'edited' })).toBeNull()
+  })
+
+  it('addTag returns null on quota failure (not phantom next)', () => {
+    const c = service.listAll()[0]!
+    expect(service.addTag(c.id, 't')).toBeNull()
+  })
+
+  it('removeFromCanvas returns false on quota failure', () => {
+    const c = service.listAll()[0]!
+    expect(service.removeFromCanvas(c.id)).toBe(false)
+  })
+
+  it('restore returns false on quota failure', () => {
+    const c = service.listAll()[0]!
+    expect(service.restore(c.id)).toBe(false)
+  })
+
+  it('hardDelete returns false on quota failure', () => {
+    const c = service.listAll()[0]!
+    expect(service.hardDelete(c.id)).toBe(false)
+  })
+
+  it('archive is a silent no-op on quota failure (does not throw)', () => {
+    const c = service.listAll()[0]!
+    expect(() => service.archive(c.id)).not.toThrow()
+  })
+
+  it('moveToCanvas is a silent no-op on quota failure', () => {
+    const c = service.listAll()[0]!
+    expect(() =>
+      service.moveToCanvas(c.id, { canvasId: 'other' as CanvasId, x: 1, y: 2, w: 240, h: 120, z: 0 }),
+    ).not.toThrow()
+  })
+
+  it('write re-throws non-quota errors (does not swallow programming errors)', () => {
+    const badRepo = new QuotaCardRepository()
+    ;(badRepo as { update: (c: Card) => void }).update = () => {
+      throw new TypeError('bad')
+    }
+    const svc = new CardService(badRepo)
+    svc.create({ title: 'x', source: { kind: 'manual', deviceId: 'd' } })
+    const c = svc.listAll()[0]!
+    expect(() => svc.update(c.id, { title: 'y' })).toThrow(TypeError)
   })
 })

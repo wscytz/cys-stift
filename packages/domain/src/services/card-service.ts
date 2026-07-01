@@ -22,8 +22,15 @@ import type {
 } from '../types'
 import { TAG_COLORS } from '../types'
 import { generateId } from '../codec'
+import { StorageQuotaError } from '../errors'
 
 export interface CardRepository {
+  /**
+   * 持久化失败(localStorage 配额满 / 磁盘满 / 隐私模式)时:内存已回滚,
+   * insert/update/delete 抛 {@link StorageQuotaError}。CardService.write 据此
+   * 返失败值(不透传到调用方);capture 链路靠 insert 的 promise rejection 捕获。
+   * 实现不触发配额时(SqliteCardRepository / 测试 mock)可不抛。
+   */
   insert(card: Card): void
   update(card: Card): void
   delete(id: CardId): void
@@ -69,6 +76,22 @@ export interface UpdateCardPatch {
 
 export class CardService {
   constructor(private repo: CardRepository) {}
+
+  /**
+   * 持久化写包装:捕获 StorageQuotaError(db 层已回滚)→ 返 false;其他错误
+   * re-throw(不吞编程错误)。调用方按各自失败语义返值(Card→null / boolean→false
+   * / void→静默)。配额满时不透传到调用方 —— 保护「忽略返回值」的 writeback/
+   * toggle-pin(quota-update-fix)。
+   */
+  private write(fn: () => void): boolean {
+    try {
+      fn()
+      return true
+    } catch (e) {
+      if (e instanceof StorageQuotaError) return false
+      throw e
+    }
+  }
 
   create(input: CreateCardInput): Card {
     const now = new Date()
@@ -174,7 +197,7 @@ export class CardService {
       ...(patch.quotes !== undefined ? { quotes: patch.quotes } : {}),
       updatedAt: new Date(),
     }
-    this.repo.update(next)
+    if (!this.write(() => this.repo.update(next))) return null
     return next
   }
 
@@ -193,13 +216,13 @@ export class CardService {
   archive(id: CardId): void {
     const card = this.repo.getById(id)
     if (!card) return
-    this.repo.update({ ...card, archived: true, updatedAt: new Date() })
+    this.write(() => this.repo.update({ ...card, archived: true, updatedAt: new Date() }))
   }
 
   unarchive(id: CardId): void {
     const card = this.repo.getById(id)
     if (!card) return
-    this.repo.update({ ...card, archived: false, updatedAt: new Date() })
+    this.write(() => this.repo.update({ ...card, archived: false, updatedAt: new Date() }))
   }
 
   moveToCanvas(id: CardId, position: CanvasPosition): void {
@@ -220,10 +243,12 @@ export class CardService {
         ? { rotation: Number.isFinite(position.rotation) ? position.rotation : 0 }
         : {}),
     }
-    this.repo.update({
-      ...card,
-      canvasPosition: safePos,
-      updatedAt: new Date(),
+    this.write(() => {
+      this.repo.update({
+        ...card,
+        canvasPosition: safePos,
+        updatedAt: new Date(),
+      })
     })
   }
 
@@ -238,18 +263,21 @@ export class CardService {
     const card = this.repo.getById(id)
     if (!card) return false
     if (!card.canvasPosition) return false
-    this.repo.update({
-      ...card,
-      canvasPosition: undefined,
-      updatedAt: new Date(),
+    const ok = this.write(() => {
+      this.repo.update({
+        ...card,
+        canvasPosition: undefined,
+        updatedAt: new Date(),
+      })
     })
+    if (!ok) return false
     return true
   }
 
   softDelete(id: CardId): void {
     const card = this.repo.getById(id)
     if (!card) return
-    this.repo.update({ ...card, deletedAt: new Date(), updatedAt: new Date() })
+    this.write(() => this.repo.update({ ...card, deletedAt: new Date(), updatedAt: new Date() }))
   }
 
   /**
@@ -262,11 +290,14 @@ export class CardService {
   restore(id: CardId): boolean {
     const card = this.repo.getById(id)
     if (!card) return false
-    this.repo.update({
-      ...card,
-      deletedAt: undefined,
-      updatedAt: new Date(),
+    const ok = this.write(() => {
+      this.repo.update({
+        ...card,
+        deletedAt: undefined,
+        updatedAt: new Date(),
+      })
     })
+    if (!ok) return false
     return true
   }
 
@@ -288,7 +319,7 @@ export class CardService {
       tags: [...tags, { value: value.trim(), color: chosen }],
       updatedAt: new Date(),
     }
-    this.repo.update(next)
+    if (!this.write(() => this.repo.update(next))) return null
     return next
   }
 
@@ -307,7 +338,7 @@ export class CardService {
       tags: tags.filter((t) => t.value !== value),
       updatedAt: new Date(),
     }
-    this.repo.update(next)
+    if (!this.write(() => this.repo.update(next))) return null
     return next
   }
 
@@ -350,7 +381,7 @@ export class CardService {
   hardDelete(id: CardId): boolean {
     const card = this.repo.getById(id)
     if (!card) return false
-    this.repo.delete(id)
+    if (!this.write(() => this.repo.delete(id))) return false
     return true
   }
 
