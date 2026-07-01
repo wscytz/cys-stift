@@ -12,7 +12,8 @@
  *   ranksep = gap*1.5(层间距更宽,思维导图可读)。这是 v0.42 之前的老行为泛化。
  * - flow(流程图):dagre 分层,默认 direction LR,nodesep=gap,ranksep = gap*2
  *   (横向流水线,层间距更宽)。
- * - grid(网格):纯几何(不走 dagre)。按 title 排序定稳定顺序,
+ * - grid(网格):纯几何(不走 dagre)。按 id 排序定稳定顺序(CanvasElement 无 title
+ *   字段,title 在 Card 实体上;保纯签名不传 resolver),
  *   cols = ceil(sqrt(n)),按 direction 决定填充走向(TB 行优先 / LR 列优先 /
  *   BT 上下镜像 / RL 左右镜像)。每卡用自己的 w/h。
  * - pack(紧凑):grid 同款几何,但 effectiveGap = gap*0.5、cols = round(sqrt(n))
@@ -55,6 +56,26 @@ export interface AutoLayoutOptions {
 export interface LayoutPosition {
   x: number
   y: number
+}
+
+/**
+ * 位置有限性守卫:computed 非有限(NaN/Infinity)→ 回落 card 原坐标。
+ * 防「某卡 w/h 损坏(Infinity)→ maxW=Infinity → 全盘位置 NaN → 写进 host →
+ * JSON.stringify(NaN)=null → reload 变 0」的静默坐标损坏(同 applyLayout finiteRound 防的类)。
+ * 原坐标也非有限时(卡本就已损坏)原样保留 —— 至少 organize 不引入新损坏。
+ */
+function finitePos(computed: { x: number; y: number }, orig: CanvasElement): LayoutPosition {
+  return {
+    x: Number.isFinite(computed.x) ? Math.round(computed.x) : orig.x,
+    y: Number.isFinite(computed.y) ? Math.round(computed.y) : orig.y,
+  }
+}
+
+/** 仅取有限 w/h 算 max(损坏卡的 Infinity/NaN 不参与,免毒化 step)。 */
+function finiteMax(nums: number[]): number {
+  let m = 0
+  for (const n of nums) if (Number.isFinite(n) && n > m) m = n
+  return m
 }
 
 /**
@@ -125,23 +146,31 @@ function computeDagreLayout(
 
   for (const c of cards) {
     // dagre 要节点尺寸算布局;用 card 实际 w/h(防重叠)。
-    g.setNode(c.id, { width: c.w, height: c.h })
+    // 有限性守卫:dagre 遇 Infinity/NaN 维度会抛 "Not possible to find intersection"
+    // (intersectRect 崩)→ 整个 organize 失灵。损坏维度回落默认尺寸(240×120)。
+    const w = Number.isFinite(c.w) ? c.w : 240
+    const h = Number.isFinite(c.h) ? c.h : 120
+    g.setNode(c.id, { width: w, height: h })
   }
   for (const e of edges) {
     // 同 from→to 去重(dagre 多重同向边会让布局怪);setEdge 幂等。
     g.setEdge(e.from!, e.to!)
   }
 
-  dagre.layout(g)
+  // dagre.layout 对某些退化输入(如全孤立 + 怪尺寸)理论上仍可能抛 —— 包一层兜底:
+  // 抛了就返回各卡原位(organize no-op),不崩整个调用方(popover 无 try/catch)。
+  try {
+    dagre.layout(g)
+  } catch {
+    for (const c of cards) result.set(c.id, { x: c.x, y: c.y })
+    return result
+  }
 
   // 读回坐标。dagre 给的是节点中心(x,y),转成左上角(我们 CanvasElement 用左上角)。
   for (const c of cards) {
     const node = g.node(c.id)
     if (!node) continue
-    result.set(c.id, {
-      x: Math.round(node.x - c.w / 2),
-      y: Math.round(node.y - c.h / 2),
-    })
+    result.set(c.id, finitePos({ x: node.x - c.w / 2, y: node.y - c.h / 2 }, c))
   }
 
   return result
@@ -171,7 +200,8 @@ function computeGridLayout(
   const result = new Map<string, LayoutPosition>()
   const n = cards.length
 
-  // 排序:title(稳定可比)优先,fallback id。保证布局顺序稳定可复现(便于单测)。
+  // 排序:按 id(稳定可比)。CanvasElement 无 title 字段(title 在 Card 实体),
+  // 保纯签名不传 resolver;id 通常含语义,稳定可复现(便于单测)。
   const sorted = [...cards].sort((a, b) => {
     const ta = cardSortKey(a)
     const tb = cardSortKey(b)
@@ -222,8 +252,9 @@ function computeGridLayout(
   // 算坐标。注意:列优先(RL/LR)时同一列内卡 w 可能不同,但 col 步进用该列最大 w。
   // 为简化(且单测固定尺寸),列宽统一取所有卡最大 w;行高统一取最大 h。
   // 这样网格规整、可断言,代价是尺寸不一的卡之间留白略多(可接受)。
-  const maxW = Math.max(...sorted.map((c) => c.w))
-  const maxH = Math.max(...sorted.map((c) => c.h))
+  // finiteMax 仅取有限值:损坏卡的 Infinity/NaN w/h 不毒化 step(否则全盘位置 NaN)。
+  const maxW = finiteMax(sorted.map((c) => c.w)) || 240
+  const maxH = finiteMax(sorted.map((c) => c.h)) || 120
   const stepX = maxW + effectiveGap
   const stepY = maxH + effectiveGap
 
@@ -243,8 +274,12 @@ function computeGridLayout(
   const rawMinY = Math.min(...raw.map((r) => r.y))
   const dx = minX - rawMinX
   const dy = minY - rawMinY
-  for (const r of raw) {
-    result.set(r.id, { x: Math.round(r.x + dx), y: Math.round(r.y + dy) })
+  for (let i = 0; i < raw.length; i++) {
+    const r = raw[i]!
+    const c = sorted[i]!
+    // finitePos:非有限(NaN/Infinity,如某卡 x 损坏致 origin NaN)→ 回落卡原坐标,
+    // 防 NaN 进 host 序列化损坏。
+    result.set(r.id, finitePos({ x: r.x + dx, y: r.y + dy }, c))
   }
 
   // pack:整体平移到原质心(grid 已对齐左上,不平移)。
@@ -257,8 +292,9 @@ function computeGridLayout(
       Array.from(result.values()).reduce((s, p) => s + p.x, 0) / n + maxW / 2
     const cyNew =
       Array.from(result.values()).reduce((s, p) => s + p.y, 0) / n + maxH / 2
-    const shiftX = Math.round(cxOrig - cxNew)
-    const shiftY = Math.round(cyOrig - cyNew)
+    // 原坐标损坏(NaN/Infinity)→ cxOrig 非有限 → shift 不平移(0),免重新毒化已守卫的位置。
+    const shiftX = Number.isFinite(cxOrig - cxNew) ? Math.round(cxOrig - cxNew) : 0
+    const shiftY = Number.isFinite(cyOrig - cyNew) ? Math.round(cyOrig - cyNew) : 0
     for (const [id, p] of result) {
       result.set(id, { x: p.x + shiftX, y: p.y + shiftY })
     }

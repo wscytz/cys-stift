@@ -65,7 +65,13 @@ export function OrganizePopover({ pos, host, onFit, onClose, toast }: Props) {
     host.batch(() => {
       for (const [id, p] of positions) {
         const existing = host.getElement(id)
-        if (existing) host.upsert({ ...existing, x: p.x, y: p.y })
+        if (!existing) continue
+        // 有限性守卫(防御纵深,镜像 applyLayout 的 finiteRound):computeAutoLayout
+        // 已中心化守卫,这里再兜底 —— 非有限位置回落 existing 原坐标,防 NaN 进 host
+        // 序列化成 null → reload 变 0 的静默坐标损坏。
+        const x = Number.isFinite(p.x) ? Math.round(p.x) : existing.x
+        const y = Number.isFinite(p.y) ? Math.round(p.y) : existing.y
+        host.upsert({ ...existing, x, y })
       }
     })
     const freeformCount = elements.filter((e) => e.kind !== 'card' && e.kind !== 'arrow').length

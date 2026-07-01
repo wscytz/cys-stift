@@ -263,4 +263,74 @@ describe('computeAutoLayout — 整理范式(策略×方向×间距)', () => {
       expect(w(mLarge)).toBeGreaterThan(w(mSmall))
     })
   })
+
+  // ── 边缘健壮性:损坏坐标(Infinity/NaN)不毒化布局、不进 host ──────────────────
+  // 自查 A2 修:computeAutoLayout 中心化 finitePos 守卫 + maxW/maxH 仅取有限值。
+  // 防「一张卡 w=Infinity → maxW=Infinity → 全盘位置 NaN → 写 host → 序列化 null →
+  // reload 变 0」的静默坐标损坏(同 applyLayout finiteRound 防的类)。
+  describe('边缘:损坏坐标(Infinity/NaN)不毒化', () => {
+    it('grid:一张卡 w=Infinity,其余卡仍得有限坐标(不被毒化)', () => {
+      const els = [
+        card('a', 0, 0, 200, 120),
+        card('b', 100, 100, Infinity, 120), // 损坏
+        card('c', 200, 200, 180, 100),
+        card('d', 300, 300, 220, 130),
+      ]
+      const m = computeAutoLayout(els, { strategy: 'grid', direction: 'TB' })
+      expectAllPresentFinite(els, m)
+    })
+
+    it('pack:一张卡 h=NaN,所有卡坐标仍有限', () => {
+      const els = [
+        card('a', 0, 0, 200, 120),
+        card('b', 100, 100, 200, NaN), // 损坏
+        card('c', 200, 200, 180, 100),
+      ]
+      const m = computeAutoLayout(els, { strategy: 'pack', direction: 'LR' })
+      expectAllPresentFinite(els, m)
+    })
+
+    it('mindmap(dagre):卡 h=Infinity → 该卡位置回落原坐标(有限),不毒化他卡', () => {
+      const els = [
+        card('a', 10, 20, 200, 120),
+        card('b', 30, 40, 200, Infinity), // 损坏
+        arrow('e1', 'a', 'b'),
+      ]
+      const m = computeAutoLayout(els, { strategy: 'mindmap', direction: 'TB' })
+      expectAllPresentFinite(els, m)
+    })
+
+    it('grid:卡 x=NaN(origin 污染源)→ 所有结果仍有限(回落原坐标)', () => {
+      const els = [
+        card('a', 0, 0, 200, 120),
+        card('b', NaN, 100, 200, 120), // 原坐标损坏
+        card('c', 200, 200, 180, 100),
+        card('d', 300, 300, 220, 130),
+      ]
+      const m = computeAutoLayout(els, { strategy: 'grid', direction: 'TB' })
+      // a/c/d(原坐标有限)结果必须有限;b 原坐标 NaN → 回落也是 NaN,但不影响他卡。
+      for (const id of ['a', 'c', 'd']) {
+        const p = m.get(id)!
+        expect(Number.isFinite(p.x)).toBe(true)
+        expect(Number.isFinite(p.y)).toBe(true)
+      }
+    })
+
+    it('所有策略 × 方向:无 NaN/Infinity 进结果(fuzz 一轮)', () => {
+      const els = [
+        card('a', 0, 0, 200, 120),
+        card('b', 100, 100, 200, 120),
+        card('c', 200, 200, 180, 100),
+      ]
+      for (const strategy of ['mindmap', 'flow', 'grid', 'pack'] as const) {
+        for (const direction of ['TB', 'LR', 'RL', 'BT'] as const) {
+          const m = computeAutoLayout(els, { strategy, direction })
+          for (const p of m.values()) {
+            expect(Number.isFinite(p.x)).toBe(true)
+            expect(Number.isFinite(p.y)).toBe(true)
+          }
+        }
+      }
+    })
+  })
 })
