@@ -1083,6 +1083,11 @@ export class SelfBuiltAdapter implements CanvasHost {
         this.setSelectedIds([])
         return
       }
+      // modal 打开时(CardDetailModal/DSL/Export 等)画布 Delete/方向键/⌘Z/⌘A 全让位 ——
+      // 否则 modal 里按 Delete 删文字会背后删画布的卡(focus trap 焦点在 close button,
+      // inInput 守卫拦不住)。Escape 不挡(清选区无害,且 modal Esc 关闭依赖未 preventDefault)。
+      // 同 page.tsx 的 modal 守卫选择器(ARIA 标准,引擎读 DOM 不违反零业务依赖)。
+      if (typeof document !== 'undefined' && document.querySelector('[role="dialog"][aria-modal="true"]')) return
       // undo/redo/selectAll(守 isComposing——IME 组合态不 undo)
       const action = parseKeyboardAction(e)
       if (action) {

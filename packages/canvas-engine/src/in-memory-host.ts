@@ -63,7 +63,17 @@ export class InMemoryCanvasHost implements CanvasHost {
     if (!this.elements.has(id)) return
     if (this.echoing) this.pushUndo()
     this.elements.delete(id)
-    if (this.echoing) this.emit({ updated: [], removed: [id] })
+    // 级联删悬空关系箭头(from/to 指向被删 id),与 SelfBuiltAdapter 同契约 ——
+    // 否则 AI 用 InMemoryHost 预演删 card 的 after 状态含悬空 arrow,真实 apply
+    // (SelfBuilt)会删 arrow,预演与实际不符。
+    const removed: string[] = [id]
+    for (const [eid, el] of this.elements) {
+      if (el.kind === 'arrow' && (el.from === id || el.to === id)) {
+        this.elements.delete(eid)
+        removed.push(eid)
+      }
+    }
+    if (this.echoing) this.emit({ updated: [], removed })
   }
 
   /** 测试用最小 undo:恢复栈顶快照,清 redo,广播 onHistoryChange。 */
