@@ -10,6 +10,7 @@
  */
 import Link from 'next/link'
 import { useI18n } from '@/lib/i18n'
+import { VERSION } from '@/lib/version'
 import { isMac as detectIsMac } from '@/lib/platform'
 import { CaptureHint } from '@/features/capture/capture-hint'
 
@@ -77,11 +78,10 @@ export default function HomePage() {
         </nav>
         <footer className="home__foot">
           <span>{t('home.eyebrow')}</span>
-          {/* Version: canonical source is the repo git tags (see docs/STATE.md)
-              and root package.json "version". Kept in sync manually here —
-              a static export has no build-time version injection without a
-              new dependency. Update when bumping the tag. */}
-          <span>v0.40.0</span>
+          {/* Version:单一可信源 = root package.json "version",由
+              scripts/gen-version.mjs 在 prebuild 时写入 lib/version.ts。
+              静态导出无 server,这里只 import build-time 常量。 */}
+          <span>v{VERSION}</span>
         </footer>
       </section>
       <style>{`

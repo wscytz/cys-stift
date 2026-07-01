@@ -13,6 +13,7 @@ import { onQuotaExceeded as onCanvasListQuota } from '@/lib/canvas-store'
 import { onQuotaExceeded as onSettingsQuota } from '@/lib/settings-store'
 import { onQuotaExceeded as onCanvasViewQuota } from '@/lib/canvas-view-store'
 import { pushToast } from '@/lib/toast-store'
+import { VERSION } from '@/lib/version'
 
 /**
  * AppMenu — global top menu bar (v0.22.3-i18n-restore).
@@ -68,6 +69,7 @@ export function AppMenu() {
       <Link href="/" className="app-menu__brand">
         {t('brand.name')}
       </Link>
+      <span className="app-menu__version" aria-label="app version">v{VERSION}</span>
       <span className="app-menu__sep" aria-hidden="true">/</span>
       <div className="app-menu__entries">
         {entries.map((e) => (
@@ -120,6 +122,13 @@ const styles = `
   letter-spacing: -0.005em;
 }
 .app-menu__sep { color: var(--color-gray); }
+.app-menu__version {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-gray);
+  letter-spacing: 0.04em;
+  user-select: none;
+}
 .app-menu__entries { display: flex; gap: var(--space-1); }
 .app-menu__link {
   text-transform: uppercase;
