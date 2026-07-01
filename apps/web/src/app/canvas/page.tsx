@@ -45,10 +45,9 @@ import {
   applyClusters,
   CLUSTER_SYSTEM_PROMPT,
 } from '@/features/ai/cluster'
-import { useAIEnabled, getCurrentAI, isAIReady } from '@/features/ai/ai-settings-provider'
+import { useAIEnabled } from '@/features/ai/ai-settings-provider'
 import { AiSetupCard } from '@/features/ai/ai-setup-card'
-import { shouldShowAiSetupForLayout } from './ai-layout-gate'
-import type { AIConfig } from '@/features/ai/types'
+import { useAIAction } from '@/features/ai/use-ai-action'
 import { pushToast } from '@/lib/toast-store'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import {
@@ -83,13 +82,17 @@ export default function CanvasPage() {
   const [tool, setTool] = useState<'select' | 'freedraw' | 'eraser' | 'text' | 'connect'>('select')
   /** 橡皮模式:text 只擦文字 / card 只擦卡片(进回收桶)/ all 擦一切。选中 eraser 时顶栏出 3 子模式切换。 */
   const [eraserMode, setEraserMode] = useState<'text' | 'card' | 'all'>('all')
-  // AI loading + abort(审计 M5+M9):async 调用期间禁用按钮防重复点击,
-  // AbortController 在卸载/取消时 abort,省 API 费 + 防 unmounted setState。
-  const [aiBusy, setAiBusy] = useState<null | 'layout' | 'cluster' | 'outline'>(null)
-  const aiAbortRef = useRef<AbortController | null>(null)
+  // AI loading + abort(审计 M5+M9):骨架已抽进 useAIAction(R3),它拥有 aiBusy
+  // state + aiAbortRef + 卸载 abort + 统一就绪守卫/catch。三个 handler 只提供
+  // 业务体。防重复点击 / AbortController / 错误 toast 全在 hook 内。
   // Task 6: when AI isn't ready, the AI-layout entry shows the AiSetupCard
-  // guide overlay instead of silently no-oping. Toggled by handleAILayout.
+  // guide overlay instead of silently no-oping. Toggled by runAI(经 onNotReady)。
   const [showAiSetup, setShowAiSetup] = useState(false)
+  // 稳定引用(setShowAiSetup 本就稳定):避免内联箭头每渲染新引用 → useAIAction 的
+  // runAI 因 onNotReady dep 每渲染变 → 三 handler 每渲染重建(失稳定性)。包 useCallback
+  // 后 runAI 只在 aiBusy/t 变时变,handler 稳定性回到原 aiBusy-dep 语义。
+  const handleAiNotReady = useCallback(() => setShowAiSetup(true), [])
+  const { aiBusy, runAI } = useAIAction(handleAiNotReady)
 
   const { snapshot: canvasesSnap } = useCanvases()
   const activeCanvasId = canvasesSnap.activeCanvasId
@@ -339,22 +342,7 @@ export default function CanvasPage() {
   }, [])
 
   const handleAILayout = useCallback(async () => {
-    // 防重复点击:已在跑则忽略(审计 M5)。
-    if (aiBusy) return
-    // Task 6: AI 未就绪(未配置 / 禁用 / 缺 key)→ 弹 AiSetupCard 引导,
-    // 不再静默 no-op。就绪检查提到 setAiBusy 之前,避免空转 busy 态。
-    const cfg = getCurrentAI()
-    if (shouldShowAiSetupForLayout(cfg)) {
-      setShowAiSetup(true)
-      return
-    }
-    // shouldShowAiSetupForLayout 返回 false ⟺ isAIReady(cfg) ⟺ cfg 非空;
-    // 此处显式断言给 TS,使其后 streamText(cfg) 不报 AIConfig|null。
-    const ready = cfg as AIConfig
-    setAiBusy('layout')
-    const ac = new AbortController()
-    aiAbortRef.current = ac
-    try {
+    await runAI('layout', async (ready, signal) => {
       const adapter = handle.current.adapter
       if (!adapter) return
 
@@ -381,7 +369,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       // structuredOutput:对 DeepSeek 等思考端点发 thinking:disabled,省 token 防截断
       // (实测:关思考后 17 行完整输出 vs 思考下 0 行截断)。非思考端点 no-op。
       // timeoutMs:60s — 排版产出长(每卡一行 DSL,卡多时超 30s 默认会被截断)。
-      const result = await streamText(ready, { system: systemPrompt, user: userPrompt, maxTokens: 4096, structuredOutput: true, timeoutMs: 60_000 }, () => {}, ac.signal)
+      const result = await streamText(ready, { system: systemPrompt, user: userPrompt, maxTokens: 4096, structuredOutput: true, timeoutMs: 60_000 }, () => {}, signal)
       if (!result?.content) {
         pushToast({ kind: 'info', message: t('canvas.aiLayoutEmpty') })
         return
@@ -442,36 +430,15 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         // AI 返回了 DSL 但坐标没变 → 诚实告知未改动(而非假成功)。
         pushToast({ kind: 'info', message: t('canvas.aiLayoutUnchanged') })
       }
-    } catch (e) {
-      if ((e as Error).name === 'AbortError') {
-        pushToast({ kind: 'info', message: t('canvas.aiCancelled') })
-      } else {
-        pushToast({ kind: 'error', message: t('ai.error', { error: (e as Error).message }) })
-      }
-    } finally {
-      setAiBusy(null)
-      aiAbortRef.current = null
-    }
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCanvasId, service, t, aiBusy])
+  }, [activeCanvasId, service, t, runAI])
 
   // AI cluster(找重复 / 找相似):读画布上的卡 → AI 分组 → 落 related-to 关系箭头
   // 连组内成员(非破坏性:只加关系,不合并不删卡)。走 serializeCardsForAI(allowlist
   // + 软删除过滤,无 deviceId / 无 media.dataUrl),遵守 AI 隐私铁律(无 vision)。
   const handleAICluster = useCallback(async () => {
-    // 防重复点击:已在跑则忽略(审计 M5)。
-    if (aiBusy) return
-    // AI 未就绪 → 弹 AiSetupCard 引导(与 Layout/Outline 一致;原缺此守卫致用户点聚类静默无反馈)。
-    const cfg = getCurrentAI()
-    if (shouldShowAiSetupForLayout(cfg)) {
-      setShowAiSetup(true)
-      return
-    }
-    const ready = cfg as AIConfig
-    setAiBusy('cluster')
-    const ac = new AbortController()
-    aiAbortRef.current = ac
-    try {
+    await runAI('cluster', async (ready, signal) => {
       const adapter = handle.current.adapter
       if (!adapter) return
 
@@ -496,7 +463,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         ready,
         { system: CLUSTER_SYSTEM_PROMPT, user: userPrompt, maxTokens: 2048, temperature: 0.2, structuredOutput: true, timeoutMs: 60_000 },
         () => {},
-        ac.signal,
+        signal,
       )
       if (!result?.content) {
         pushToast({ kind: 'info', message: t('canvas.aiClusterEmpty') })
@@ -515,40 +482,20 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
             ? t('canvas.aiClusterDone', { n: String(res.arrowsCreated) })
             : t('canvas.aiClusterNone'),
       })
-    } catch (e) {
-      if ((e as Error).name === 'AbortError') {
-        pushToast({ kind: 'info', message: t('canvas.aiCancelled') })
-      } else {
-        pushToast({ kind: 'error', message: t('ai.error', { error: (e as Error).message }) })
-      }
-    } finally {
-      setAiBusy(null)
-      aiAbortRef.current = null
-    }
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCanvasId, service, t, aiBusy])
+  }, [activeCanvasId, service, t, runAI])
 
   // 总结大纲工作流(W-T4):读当前画布卡片 → AI 生成 Markdown 大纲 → 写入 inbox
   // 新卡。走 summarizeOutline(内部 serializeCardsForAI allowlist + 软删过滤,
   // 无 deviceId / 无 media.dataUrl,遵守 AI 隐私铁律,无 vision)。
   // AI 未就绪 → AiSetupCard 引导(与 handleAILayout 同门,不静默 no-op)。
   const handleAIOutline = useCallback(async () => {
-    // 防重复点击:已在跑则忽略(审计 M5)。
-    if (aiBusy) return
-    // AI 未就绪(未配置 / 禁用 / 缺 key)→ 弹 AiSetupCard 引导,不静默 no-op。
-    const cfg = getCurrentAI()
-    if (!isAIReady(cfg)) {
-      setShowAiSetup(true)
-      return
-    }
-    setAiBusy('outline')
-    const ac = new AbortController()
-    aiAbortRef.current = ac
-    try {
+    await runAI('outline', async (_ready, signal) => {
       const res = await summarizeOutline({
         service,
         canvasId: activeCanvasId,
-        signal: ac.signal,
+        signal,
       })
       if (!res.ok) {
         // 卡片太少(<2):AI 已在函数内门控返回;此处给明确提示而非静默。
@@ -560,18 +507,9 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         return
       }
       pushToast({ kind: 'success', message: t('ai.workflow.outlineDone') })
-    } catch (e) {
-      if ((e as Error).name === 'AbortError') {
-        pushToast({ kind: 'info', message: t('canvas.aiCancelled') })
-      } else {
-        pushToast({ kind: 'error', message: t('ai.error', { error: (e as Error).message }) })
-      }
-    } finally {
-      setAiBusy(null)
-      aiAbortRef.current = null
-    }
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCanvasId, service, t, aiBusy])
+  }, [activeCanvasId, service, t, runAI])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // ⌘C / Ctrl+C 复制选中元素为 DSL(剪贴板交换格式)。必须在下面
@@ -895,14 +833,6 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     const unsub = adapter.onViewChange((v) => setSnapMode(v.gridMode))
     return () => unsub()
   }, [adapter])
-
-  // 卸载时 abort 进行中的 AI 请求(审计 M9:防切走后请求继续跑浪费
-  // API 费 + 可能 unmounted setState)。
-  useEffect(() => {
-    return () => {
-      aiAbortRef.current?.abort()
-    }
-  }, [])
 
   // B1 — 挂载时读 ?card=ID(C command palette 最近编辑跳转来的)。记入 pendingRef,
   // 清掉 query string(避免刷新重复触发)。消费见下方 adapter 就绪 effect。
