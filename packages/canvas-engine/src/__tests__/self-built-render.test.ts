@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { renderElements, drawSelectionOutlines, drawMarquee, colorOf, domTokenResolver } from '../self-built-render'
+import { arrowEndpoints } from '../self-built-arrow'
+import { intersectsBounds, normalizeBox } from '../bounds'
 import type { CanvasElement, CanvasView } from '../canvas-host'
 
 /** mock CanvasRenderingContext2D:记录所有方法调用。 */
@@ -234,6 +236,65 @@ describe('renderElements', () => {
       renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => null, '#ffffff'),
     ).not.toThrow()
     expect(ctx._calls.some((c) => c.startsWith('fillText((untitled)@'))).toBe(true)
+  })
+})
+
+// ─── 回归:关系箭头高倍放大消失 ───────────────────────────────────────────
+// 视锥剔除(getVisibleElements)会丢掉屏外的端点 card,但保留 bbox=w=h=0 的关系
+// 箭头。若 renderElements 用「被剔除后的列表」resolve 端点,from/to 的 card find
+// 不到 → arrowEndpoints 返 null → drawElement 早退 → 箭头凭空消失。
+// 修复:renderElements 接收独立的 allForResolution(全集)用于端点解析,与「要画
+// 哪些」(toDraw)解耦。以下验证该解耦成立。
+describe('回归:关系箭头端点解析脱离视锥剔除列表', () => {
+  const view: CanvasView = { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }
+  // 两张卡 + 一条关系箭头:A(0..100) → B(1000..1100),箭头 bbox w=h=0。
+  const fullSet: CanvasElement[] = [
+    { id: 'A', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+    { id: 'B', kind: 'card', x: 1000, y: 0, w: 100, h: 100, rotation: 0 },
+    { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'A', to: 'B' },
+  ] as unknown as CanvasElement[]
+  const arrow = fullSet[2]!
+
+  it('arrowEndpoints 用全集时能解析出非空 from/to', () => {
+    const { from, to } = arrowEndpoints(arrow, fullSet)
+    expect(from).not.toBeNull()
+    expect(to).not.toBeNull()
+  })
+
+  it('arrowEndpoints 用被剔除后的子集(端点 card 缺失)→ from/to=null(复现根因)', () => {
+    // 模拟「两端点 card 都被视锥剔除」:只剩箭头自己。
+    const culled = [arrow]
+    const { from, to } = arrowEndpoints(arrow, culled)
+    expect(from).toBeNull()
+    expect(to).toBeNull()
+  })
+
+  it('视锥剔除保留关系箭头但丢端点 card(复现 cull 场景)', () => {
+    // 高倍放大到画面中间:视口框(10000..10800)只盖住箭头线段中段,两端的 A/B 都在屏外。
+    // 关系箭头(from/to 非空)被 getVisibleElements 无条件保留;A/B 的 bbox 与视口不相交 → 被剔除。
+    const vp = { x: 10000, y: -100, w: 800, h: 600 }
+    const visible = fullSet.filter(
+      (el) => (el.kind === 'arrow' && el.from && el.to) || intersectsBounds(normalizeBox(el), vp),
+    )
+    expect(visible.map((e) => e.id)).toEqual(['ar'])
+    expect(visible.some((e) => e.id === 'A' || e.id === 'B')).toBe(false)
+  })
+
+  it('renderElements(toDraw=[arrow], allForResolution=fullSet) → 仍画出箭头主线(修复成立)', () => {
+    const ctx = mockCtx()
+    // toDraw = 视锥剔除后的列表(只有箭头);allForResolution = 全集(含 A/B)。
+    renderElements(ctx, [arrow], view, 800, 600, () => null, '#ffffff', domTokenResolver, fullSet)
+    // A 中心 (50,50) 朝 B:from=(100,50);B 中心 (1050,50) 朝 A:to=(1000,50)。
+    expect(ctx._calls).toContain('moveTo(100,50)')
+    expect(ctx._calls).toContain('lineTo(1000,50)')
+  })
+
+  it('renderElements 未传 allForResolution → 默认用 toDraw(向后兼容:全集自解析)', () => {
+    const ctx = mockCtx()
+    // 旧行为:不传第 9 参,allForResolution 默认 = toDraw。全集场景箭头照常 resolve。
+    renderElements(ctx, fullSet, view, 800, 600, () => null, '#ffffff')
+    expect(ctx._calls).toContain('moveTo(100,50)')
+    expect(ctx._calls).toContain('lineTo(1000,50)')
   })
 })
 

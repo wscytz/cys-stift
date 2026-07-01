@@ -57,13 +57,18 @@ export const domTokenResolver: TokenResolver = (name, fallback) => {
 
 export function renderElements(
   ctx: CanvasRenderingContext2D,
-  elements: CanvasElement[],
+  toDraw: CanvasElement[],
   view: CanvasView,
   cssWidth: number,
   cssHeight: number,
   getCardInfo: (id: string) => CardInfo | null,
   background: string,
   tokenResolver: TokenResolver = domTokenResolver,
+  // 端点解析用全集:关系箭头的 from/to 端点指向其它元素(常是 card),渲染时靠
+  // arrowEndpoints(arrow, allForResolution) find 出来。若传的只是「要画的」子集
+  // (如视锥剔除后的可见列表),端点 card 被剔除→ find 不到→ from/to=null→ 箭头不画。
+  // 故实时渲染时这里传 getSortedElements()(全集),SVG 导出等不剔除场景传同一全集两次。
+  allForResolution: CanvasElement[] = toDraw,
 ): void {
   ctx.clearRect(0, 0, cssWidth, cssHeight)
   ctx.fillStyle = background
@@ -72,8 +77,10 @@ export function renderElements(
   ctx.save()
   ctx.translate(view.panX, view.panY)
   ctx.scale(view.zoom, view.zoom)
-  for (const el of elements) {
-    drawElement(ctx, el, elements, getCardInfo, tokenResolver)
+  for (const el of toDraw) {
+    // drawElement 接收的 allElements 是端点解析全集(非 toDraw),保证箭头即便其
+    // 端点 card 被视锥剔除也能 resolve 端点画出来(高倍放大消失 bug 的根因)。
+    drawElement(ctx, el, allForResolution, getCardInfo, tokenResolver)
   }
   ctx.restore()
 }

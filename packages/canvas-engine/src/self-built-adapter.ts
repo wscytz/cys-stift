@@ -142,6 +142,10 @@ export class SelfBuiltAdapter implements CanvasHost {
     // freedraw 预览(__preview,用户正画的)也无条件保留。
     const vp = viewportBounds(this.view, w, h)
     const visible = this.getVisibleElements(vp, w, h)
+    // allForResolution = 全集(getSortedElements 缓存):关系箭头端点靠 from/to id
+    // 在元素集里 find 出来。视锥剔除会丢掉屏外端点 card → 若箭头从「被剔除后的
+    // 列表」里 resolve 端点会 find 不到 → 不画 → 高倍放大时长箭头凭空消失。
+    // 故「画哪些」(toDraw=visible+preview)与「解析端点用哪些」(全集)解耦。
     renderElements(
       ctx,
       [...visible, ...preview],
@@ -151,6 +155,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       this.getCardInfo,
       this.tokenResolver('--color-canvas', '#ffffff'),
       this.tokenResolver,
+      this.getSortedElements(),
     )
     // selection outline 需要全部元素(找 selected id),用层排序缓存(不另调 getElements)。
     drawSelectionOutlines(ctx, this.getSelectedIds(), this.getSortedElements(), this.view, this.tokenResolver)
