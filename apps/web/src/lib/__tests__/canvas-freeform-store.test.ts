@@ -85,6 +85,8 @@ function installNoOpfs() {
 
 let store: typeof import('../canvas-freeform-store').canvasFreeformStore
 let onQuotaExceeded: typeof import('../canvas-freeform-store').onQuotaExceeded
+let subscribeFreeformChanges: typeof import('../canvas-freeform-store').subscribeFreeformChanges
+let getFreeformVersion: typeof import('../canvas-freeform-store').getFreeformVersion
 
 beforeEach(async () => {
   vi.resetModules()
@@ -93,6 +95,8 @@ beforeEach(async () => {
   const mod = await import('../canvas-freeform-store')
   store = mod.canvasFreeformStore
   onQuotaExceeded = mod.onQuotaExceeded
+  subscribeFreeformChanges = mod.subscribeFreeformChanges
+  getFreeformVersion = mod.getFreeformVersion
 })
 
 describe('canvasFreeformStore — OPFS primary path', () => {
@@ -241,5 +245,68 @@ describe('canvasFreeformStore.save — quota failure', () => {
   it('returns true on success', async () => {
     const ok = await store.save(CANVAS_B, [textEl('t2')])
     expect(ok).toBe(true)
+  })
+})
+
+// ── 内容变更订阅(2026-07-01:图谱加关系实时刷新的根因修复)──────────────────
+// relation-builder 写关系箭头 → store.save → notifyChange → useGlobalEdges 重聚合。
+// 此前 freeform 写入无通知通道,读取方只靠 canvas 列表变或重挂载 → 要切页面才看到。
+
+describe('canvasFreeformStore — 内容变更订阅', () => {
+  it('初始 version 为 0', () => {
+    expect(getFreeformVersion()).toBe(0)
+  })
+
+  it('save 成功后 version 递增 + 触发订阅回调', async () => {
+    const cb = vi.fn()
+    const unsub = subscribeFreeformChanges(cb)
+    const before = getFreeformVersion()
+    await store.save(CANVAS_A, [textEl('t1')])
+    expect(getFreeformVersion()).toBe(before + 1)
+    expect(cb).toHaveBeenCalledTimes(1)
+    unsub()
+  })
+
+  it('remove 后 version 递增 + 触发回调', async () => {
+    await store.save(CANVAS_A, [textEl('t1')])
+    const cb = vi.fn()
+    const unsub = subscribeFreeformChanges(cb)
+    const before = getFreeformVersion()
+    await store.remove(CANVAS_A)
+    expect(getFreeformVersion()).toBe(before + 1)
+    expect(cb).toHaveBeenCalledTimes(1)
+    unsub()
+  })
+
+  it('多次 save 每次都递增(不合并)', async () => {
+    const cb = vi.fn()
+    subscribeFreeformChanges(cb)
+    await store.save(CANVAS_A, [textEl('t1')])
+    await store.save(CANVAS_A, [textEl('t1'), textEl('t2')])
+    await store.save(CANVAS_A, [textEl('t3')])
+    expect(cb).toHaveBeenCalledTimes(3)
+  })
+
+  it('取消订阅后不再收到回调', async () => {
+    const cb = vi.fn()
+    const unsub = subscribeFreeformChanges(cb)
+    unsub()
+    await store.save(CANVAS_A, [textEl('t1')])
+    expect(cb).not.toHaveBeenCalled()
+  })
+
+  it('配额失败(save 返回 false)不递增 version、不触发回调', async () => {
+    // localStorage 抛错 → lsSave 返回 false + 触发 quota 订阅,但内容没写成 → 不 notifyChange。
+    const cb = vi.fn()
+    subscribeFreeformChanges(cb)
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError')
+    })
+    // OPFS 在 jsdom 不可用 → 走 localStorage 回退路径 → 抛 → save 返回 false。
+    const ok = await store.save(CANVAS_A, [textEl('t1')])
+    expect(ok).toBe(false)
+    expect(cb).not.toHaveBeenCalled()
+    expect(getFreeformVersion()).toBe(0)
+    vi.restoreAllMocks()
   })
 })

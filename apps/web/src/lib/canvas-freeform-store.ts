@@ -46,6 +46,35 @@ export function onQuotaExceeded(cb: QuotaCallback): () => void {
   }
 }
 
+// ── 内容变更订阅(2026-07-01)──────────────────────────────────────────────────
+// 镜像 quota 订阅 + db-client/canvas-store 的 subscribe/notify 模式。用途:useGlobalEdges
+// 等「读取方」订阅——relation-builder 写关系箭头后,/graph 与详情 backlinks 实时刷新。
+// 此前 freeform 写入(save/remove)无任何通知通道,读取方只靠 canvas 列表变或重挂载才
+// 重新聚合 → 「图谱加关系要切页面才看到」(同删卡灰屏类的缺订阅 bug)。
+let _version = 0
+const _changeSubscribers = new Set<() => void>()
+
+function notifyChange(): void {
+  _version++
+  for (const cb of _changeSubscribers) cb()
+}
+
+/**
+ * 订阅 freeform 内容变更(save/remove 成功后触发)。返回取消订阅。
+ * 配合 {@link getFreeformVersion} 给 `useSyncExternalStore` 用。
+ */
+export function subscribeFreeformChanges(cb: () => void): () => void {
+  _changeSubscribers.add(cb)
+  return () => {
+    _changeSubscribers.delete(cb)
+  }
+}
+
+/** 当前内容版本号(每次 save/remove 单调递增)。`useSyncExternalStore` 的 getSnapshot。 */
+export function getFreeformVersion(): number {
+  return _version
+}
+
 const KEY_PREFIX = 'cys-stift.canvas-freeform.'
 const KEY_SUFFIX = '.v1'
 
@@ -234,8 +263,13 @@ export const canvasFreeformStore = {
     if (typeof window === 'undefined') return true
     const snapshot = makeSnapshot(elements)
     const ok = await opfsSave(canvasId, snapshot)
-    if (ok) return true
-    return lsSave(canvasId, snapshot)
+    if (ok) {
+      notifyChange()
+      return true
+    }
+    const lsOk = lsSave(canvasId, snapshot)
+    if (lsOk) notifyChange()
+    return lsOk
   },
 
   /**
@@ -246,5 +280,6 @@ export const canvasFreeformStore = {
     if (typeof window === 'undefined') return
     await opfsRemove(canvasId)
     lsRemove(canvasId)
+    notifyChange()
   },
 }
