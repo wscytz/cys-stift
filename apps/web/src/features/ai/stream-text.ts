@@ -82,9 +82,11 @@ export async function streamText(
   const provider = aiProviderFactory.create(cfg)
   if (!provider) throw new Error(`Provider "${cfg.provider}" not registered`)
   const effectiveReq: AIRequest = { ...req, model: req.model ?? cfg.model }
+  // 单请求 timeout:req.timeoutMs 覆盖默认(重型 DSL 任务传 60_000);否则 30s。
+  const effectiveTimeout = req.timeoutMs ?? timeoutMs
   // 合并用户 signal + 内部 timeout。provider 收到的是 merged.signal。
   // finally 必清 timer —— 正常返回 / 抛错 / 用户取消都走 cleanup。
-  const merged = mergeSignalWithTimeout(signal, timeoutMs)
+  const merged = mergeSignalWithTimeout(signal, effectiveTimeout)
   try {
     return await provider.streamText(effectiveReq, onDelta, merged.signal)
   } finally {

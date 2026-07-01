@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { createOpenAIProvider } from '../providers/openai'
+import { createOpenAIProvider, isDeepSeekEndpoint } from '../providers/openai'
 import type { AIConfig } from '../types'
 
 /**
@@ -72,6 +72,53 @@ describe('openai provider — structuredOutput 思考模式适配', () => {
     const p = createOpenAIProvider({ apiKey: 'sk-test', baseUrl: 'https://api.deepseek.com', model: 'm' })
     await p.streamText({ system: 's', user: 'u', structuredOutput: true }, () => {}, undefined)
     expect(calls[0]!.body.thinking).toEqual({ type: 'disabled' })
+  })
+
+  // Fix 4a 拓宽:Volcano / SiliconFlow 等镜像走非 deepseek.com 域名,但模型名仍是
+  // deepseek-chat / deepseek-reasoner 等。只靠 baseUrl 域名会漏 → thinking 不发 →
+  // 思考吃光 token → DSL 截断 → 「排版从未生效」。模型名兜底检测覆盖这些镜像。
+  it('SiliconFlow baseUrl + deepseek 模型名 → body 含 thinking:disabled(镜像兜底)', async () => {
+    const calls = mockFetch('data: [DONE]\n\n')
+    const p = createOpenAIProvider({ apiKey: 'sk-test', baseUrl: 'https://api.siliconflow.cn/v1', model: 'deepseek-chat' })
+    await p.streamText({ system: 's', user: 'u', structuredOutput: true }, () => {}, undefined)
+    expect(calls[0]!.body.thinking).toEqual({ type: 'disabled' })
+  })
+
+  it('Volcano baseUrl + deepseek 模型名 → body 含 thinking:disabled(镜像兜底)', async () => {
+    const calls = mockFetch('data: [DONE]\n\n')
+    const p = createOpenAIProvider({ apiKey: 'sk-test', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'deepseek-v3-241226' })
+    await p.streamText({ system: 's', user: 'u', structuredOutput: true }, () => {}, undefined)
+    expect(calls[0]!.body.thinking).toEqual({ type: 'disabled' })
+  })
+
+  it('非 deepseek baseUrl + 非 deepseek 模型 + structuredOutput → 不发 thinking', async () => {
+    const calls = mockFetch('data: [DONE]\n\n')
+    const p = createOpenAIProvider({ apiKey: 'sk-test', baseUrl: 'https://api.siliconflow.cn/v1', model: 'qwen2.5-72b' })
+    await p.streamText({ system: 's', user: 'u', structuredOutput: true }, () => {}, undefined)
+    expect(calls[0]!.body.thinking).toBeUndefined()
+  })
+})
+
+// isDeepSeekEndpoint 纯函数单测(Fix 4a 拓宽:baseUrl OR model)。
+describe('isDeepSeekEndpoint', () => {
+  it('deepseek baseUrl 命中', () => {
+    expect(isDeepSeekEndpoint('https://api.deepseek.com/v1', 'whatever')).toBe(true)
+  })
+
+  it('deepseek 模型名命中(即使 baseUrl 非 deepseek.com)', () => {
+    expect(isDeepSeekEndpoint('https://api.siliconflow.cn/v1', 'deepseek-chat')).toBe(true)
+    expect(isDeepSeekEndpoint('https://ark.cn-beijing.volces.com/api/v3', 'deepseek-v3-241226')).toBe(true)
+    expect(isDeepSeekEndpoint('https://api.openai.com/v1', 'deepseek-reasoner')).toBe(true)
+  })
+
+  it('大小写不敏感', () => {
+    expect(isDeepSeekEndpoint('https://API.DeepSeek.COM/v1', 'm')).toBe(true)
+    expect(isDeepSeekEndpoint('https://api.x.com/v1', 'DeepSeek-Chat')).toBe(true)
+  })
+
+  it('两者都不是 deepseek → false', () => {
+    expect(isDeepSeekEndpoint('https://api.openai.com/v1', 'gpt-4o-mini')).toBe(false)
+    expect(isDeepSeekEndpoint('https://api.siliconflow.cn/v1', 'qwen2.5-72b')).toBe(false)
   })
 })
 

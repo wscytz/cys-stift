@@ -43,6 +43,10 @@ export function createAnthropicProvider(cfg: AnthropicConfig): AIProvider {
           max_tokens: req.maxTokens ?? 1024,
           temperature: req.temperature ?? 0.7,
           stream: true,
+          // Anthropic 扩展思考默认就是关闭的(只有显式发 thinking:{type:'enabled',
+          // budget_tokens} 才开启,我们从不发)。因此 req.structuredOutput 在此为 no-op:
+          // 结构化输出任务无需关思考 —— 思考本来就没开,不会吃 token。刻意不发送
+          // thinking:{type:'disabled'} 字段:Anthropic Messages API 不认该值,会 400。
         }),
         signal,
       })

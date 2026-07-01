@@ -19,6 +19,7 @@ import { CanvasOverviewModal } from '@/features/canvas/canvas-overview-modal'
 import { ShortcutHelpDialog } from '@/features/canvas/shortcut-help-dialog'
 import { DiffDialog } from '@/features/canvas/diff-dialog'
 import { applyLayout } from '@/features/canvas/apply-layout'
+import { summarizeMovement } from '@/features/canvas/layout-movement'
 import { computeAutoLayout } from '@/features/canvas/auto-layout'
 import { canvasToMarkdown, markdownFileName } from '@/features/canvas/canvas-to-markdown'
 import { RelationPanel } from '@/features/canvas/relation-panel'
@@ -371,9 +372,9 @@ export default function CanvasPage() {
       const formatted = formatCanvasSnapshot(snap)
 
       const systemPrompt =
-        'You are a canvas editing assistant. Given the current canvas (cards, shapes, arrows with their relation signatures), output DSL directives to improve it. You may reposition/resize cards, change colors, create/update rect and text shapes, and rewrite arrow relation signatures (dash line style + arrowhead shape). Reuse an existing element #id to UPDATE it (relation arrow endpoints are kept; free arrow bbox is kept); omit the id to CREATE new. Cards can only be UPDATEd — never created (card content comes from the inbox, not the canvas). Free arrows (arrows with no from/to) encode their line as @pos + @size (w/h may be negative for direction). Output DSL directives ONLY: one per line, each starting with "[", no markdown fences (no ```), no explanations, no preamble. You MUST output one UPDATE directive for EVERY input card (reuse its #id) — do not omit any card. Keep changes minimal: only reposition/resize to improve readability; preserve existing colors unless clearly wrong.'
+        'You are an active canvas layout organizer. The user clicked "AI layout" because they WANT the canvas reorganized — do not preserve the current layout unless it is already a clean, non-overlapping arrangement. Read each card\'s current position (provided in the snapshot) and substantially REPOSITION cards into a readable, well-spaced layout: group semantically related cards (by title keywords / tags) into clusters, align cards into a clear grid or DAG flow with consistent column widths, and ELIMINATE all overlap (no two cards may overlap). Use the full canvas: spread cards out with comfortable spacing (cards ~240x120, gap ~40-60px between neighbors). It IS expected and correct to substantially move cards from their current positions. You may reposition/resize cards and change colors; refine existing arrow relation signatures (dash style + arrowhead) where appropriate. IRON RULES (never break): (1) Cards are UPDATE-only — never create or delete cards; card content comes from the inbox. Reuse each existing #id to UPDATE. (2) Output one UPDATE directive for EVERY input card (reuse its #id) — never omit a card. (3) Do NOT create new relation arrows — only refine signatures of existing arrows (from/to are kept). (4) Free arrows (no from/to) keep their bbox. (5) Colors limited to blue/red/black/grey/yellow. Output DSL directives ONLY: one per line, each starting with "[", no markdown fences (no ```), no explanations, no preamble.'
 
-      const userPrompt = `Improve this canvas. Reorganize positions, adjust sizes/colors, and refine arrow relation signatures where appropriate. Do NOT change items that are already well-placed.
+      const userPrompt = `Reorganize this canvas into a clean, non-overlapping, well-spaced layout. Group related cards into clusters, align into a readable grid/DAG flow, and spread cards out across the canvas. Substantially reposition cards that are overlapping, cramped, or scattered — do not just nudge them.
 
 ${formatted}
 
@@ -383,13 +384,14 @@ Output DSL (one directive per line):
 [text #id] @pos(x, y) @text("...") @color(c)
 [arrow #id] from #a to #b @label("...") @color(c) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none)
 [arrow #id] @pos(x, y) @size(w, h) @color(c) @dash(...) @arrowhead(...)   (free arrow: no from/to; w/h may be negative for direction)
-Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbox kept for free arrows); omit #id to CREATE new — except cards, which are update-only; colors limited to blue/red/black/grey/yellow.`
+Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbox kept for free arrows); cards are update-only — output one UPDATE per input card; colors limited to blue/red/black/grey/yellow; do NOT create new relation arrows.`
 
       // maxTokens 提到 4096:排版 DSL 需要完整结构化输出,默认 1024 对思考模式模型
       // (DeepSeek-v4-pro 等)不够 —— 思考吃掉大半,DSL 还没输出完就被截断 → 解析 0 条。
       // structuredOutput:对 DeepSeek 等思考端点发 thinking:disabled,省 token 防截断
       // (实测:关思考后 17 行完整输出 vs 思考下 0 行截断)。非思考端点 no-op。
-      const result = await streamText(ready, { system: systemPrompt, user: userPrompt, maxTokens: 4096, structuredOutput: true }, () => {}, ac.signal)
+      // timeoutMs:60s — 排版产出长(每卡一行 DSL,卡多时超 30s 默认会被截断)。
+      const result = await streamText(ready, { system: systemPrompt, user: userPrompt, maxTokens: 4096, structuredOutput: true, timeoutMs: 60_000 }, () => {}, ac.signal)
       if (!result?.content) {
         pushToast({ kind: 'info', message: t('canvas.aiLayoutEmpty') })
         return
@@ -408,14 +410,47 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         })
         return
       }
-      const { applied, skipped } = applyLayout(adapter, ops)
-      // 诚实 toast(保留此前修复):applied=0 / skipped>0 / 全成功三分支。
+      // 诚实位移反馈(Fix 4c):applyLayout 的 applied/skipped 无法区分「AI 真重排」
+      // vs「AI 把坐标原样吐回」(两者 applied 都 >0)。在 apply 前后快照卡的 x/y,
+      // 用纯函数 summarizeMovement 算实际位移 → 三分支反馈。这是「排版从来没有改变
+      // 过我的布局」投诉的根因诊断:坐标原样返回时给「AI 认为当前布局已合理」而非
+      // 假成功。只对比将被 apply 的卡 id(交集),省去无关元素。
+      const cardIdsInOps = new Set(
+        ops
+          .filter((op): op is typeof op & { type: 'card' } => op.type === 'card')
+          .map((op) => String(op.cardId)),
+      )
+      const snapshotPositions = (): Record<string, { x: number; y: number }> => {
+        const map: Record<string, { x: number; y: number }> = {}
+        for (const el of adapter.getElements()) {
+          if (el.kind !== 'card') continue
+          if (!cardIdsInOps.has(el.id)) continue
+          map[el.id] = { x: el.x, y: el.y }
+        }
+        return map
+      }
+      const before = snapshotPositions()
+      const { applied } = applyLayout(adapter, ops)
+      const after = snapshotPositions()
+      const summary = summarizeMovement(before, after)
+      // 三分支(替换旧 applied/skipped 双分支):
+      //  - applied=0:卡/端点缺失(原逻辑保留)
+      //  - moved>0:真重排 → success「重排了 N 张(平均 Xpx)」
+      //  - moved=0 但 applied>0:AI 把坐标原样吐回 → info「认为当前布局已合理,未改动」
+      //    (这才是用户感知「没变」的诚实解释;skipped 作为次要信息并入此分支)
       if (applied === 0) {
         pushToast({ kind: 'info', message: t('canvas.aiLayoutNoneApplied') })
-      } else if (skipped > 0) {
-        pushToast({ kind: 'info', message: t('canvas.aiLayoutAppliedSkipped', { applied: String(applied), skipped: String(skipped) }) })
+      } else if (summary.moved > 0) {
+        pushToast({
+          kind: 'success',
+          message: t('canvas.aiLayoutMoved', {
+            moved: String(summary.moved),
+            avgPx: String(summary.avgPx),
+          }),
+        })
       } else {
-        pushToast({ kind: 'success', message: t('canvas.aiLayoutDone') })
+        // AI 返回了 DSL 但坐标没变 → 诚实告知未改动(而非假成功)。
+        pushToast({ kind: 'info', message: t('canvas.aiLayoutUnchanged') })
       }
     } catch (e) {
       if ((e as Error).name === 'AbortError') {
@@ -464,7 +499,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
 
       const result = await streamText(
         cfg,
-        { system: CLUSTER_SYSTEM_PROMPT, user: userPrompt, maxTokens: 2048, temperature: 0.2, structuredOutput: true },
+        { system: CLUSTER_SYSTEM_PROMPT, user: userPrompt, maxTokens: 2048, temperature: 0.2, structuredOutput: true, timeoutMs: 60_000 },
         () => {},
         ac.signal,
       )

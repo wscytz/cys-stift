@@ -193,4 +193,51 @@ describe('streamText signal 转发', () => {
     // 应在 ~50ms 附近 reject,绝不能永挂(>2s 就说明 timeout 没生效)。
     expect(elapsed).toBeLessThan(2000)
   })
+
+  // Fix 4d:req.timeoutMs 覆盖默认 timeout。重型 DSL 任务(排版/cluster/对话)
+  // 传 60_000,短任务留默认。验证 req.timeoutMs 优先于第 5 参 timeoutMs。
+  it('req.timeoutMs 优先于第 5 参 timeoutMs', async () => {
+    const seenTimeouts: number[] = []
+    let providerSignal: AbortSignal | undefined
+    const mockProvider: AIProvider = {
+      id: 'openai',
+      name: 'OpenAI',
+      defaultBaseUrl: 'https://api.openai.com/v1',
+      defaultModel: 'gpt-4o-mini',
+      models: ['gpt-4o-mini'],
+      streamText: vi.fn().mockImplementation((_req, _onDelta, signal) => {
+        providerSignal = signal
+        return new Promise<void>((resolve) => {
+          // 记录 signal 何时 abort,推算实际 timeout。
+          signal?.addEventListener('abort', () => {
+            seenTimeouts.push(Date.now() - t0)
+            resolve()
+          })
+        })
+      }),
+      testConnection: vi.fn(),
+    }
+    vi.doMock('../provider-factory', () => ({
+      aiProviderFactory: {
+        create: () => mockProvider,
+        register: () => {},
+        unregister: () => {},
+        list: () => [],
+      },
+    }))
+    const { streamText: streamTextMocked } = await import('../stream-text')
+    const t0 = Date.now()
+    await streamTextMocked(
+      { provider: 'openai', apiKey: 'sk-x', baseUrl: 'x', model: 'm', enabled: true } as AIConfig,
+      // req.timeoutMs = 100 应覆盖第 5 参 30000。
+      { system: 's', user: 'u', timeoutMs: 100 },
+      () => {},
+      undefined,
+      30_000,
+    )
+    expect(providerSignal?.aborted).toBe(true)
+    const elapsed = seenTimeouts[0] ?? 9999
+    // 100ms 附近 abort,绝非 30000ms。
+    expect(elapsed).toBeLessThan(1000)
+  })
 })

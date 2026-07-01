@@ -109,7 +109,7 @@ export function CompanionChat({
       const result = await streamText(
         cfg,
         // structuredOutput:对 DeepSeek 思考端点关思考(实测 DSL 稳定);非思考端点 no-op。
-        { system: AGENT_SYSTEM_PROMPT, user: userPrompt, maxTokens: 4096, structuredOutput: true },
+        { system: AGENT_SYSTEM_PROMPT, user: userPrompt, maxTokens: 4096, structuredOutput: true, timeoutMs: 60_000 },
         (chunk) => {
           acc += chunk
           setMessages((prev) => {

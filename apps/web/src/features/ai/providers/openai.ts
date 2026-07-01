@@ -16,6 +16,18 @@ interface OpenAIConfig {
   model: string
 }
 
+/**
+ * 是否为 DeepSeek 系端点(需关思考)。纯函数,可单测。
+ *
+ * 检测逻辑(拓宽):Volcano / SiliconFlow / 其他 DeepSeek 镜像走非 deepseek.com 域名,
+ * 但模型名仍是 deepseek-chat / deepseek-reasoner / deepseek-v3 / deepseek-v4 等。
+ * 只靠 baseUrl 域名正则会漏掉这些镜像 → thinking:disabled 不发 → 思考吃光 token →
+ * DSL 截断。改为 baseUrl OR model 任一含 deepseek(大小写不敏感)即判定。
+ */
+export function isDeepSeekEndpoint(baseUrl: string, model: string): boolean {
+  return /deepseek/i.test(baseUrl) || /deepseek/i.test(model)
+}
+
 export function createOpenAIProvider(cfg: OpenAIConfig): AIProvider {
   return {
     id: 'openai',
@@ -25,11 +37,11 @@ export function createOpenAIProvider(cfg: OpenAIConfig): AIProvider {
     models: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'],
     async streamText(req, onDelta, signal) {
       // 结构化输出任务(排版/cluster/关系推荐):对支持「思考模式」的 OpenAI 兼容
-      // 端点(DeepSeek)发 thinking:disabled,避免思考吃光 token 导致 DSL 输出被
-      // 截断(实测根因)。真正的 OpenAI 端点不认此字段 → 只对 deepseek baseUrl 发,
-      // 其他端点 no-op,不破坏兼容。思考是 DeepSeek 专有扩展,靠 baseUrl 检测而非
-      // provider id(DeepSeek 走 openai provider)。
-      const isDeepSeek = /(^|\.)deepseek\.com/.test(cfg.baseUrl)
+      // 端点(DeepSeek 及其镜像)发 thinking:disabled,避免思考吃光 token 导致 DSL
+      // 输出被截断(实测根因)。真正的 OpenAI 端点不认此字段 → 只对 deepseek 端点发,
+      // 其他端点 no-op,不破坏兼容。思考是 DeepSeek 专有扩展,靠 isDeepSeekEndpoint
+      // 检测(baseUrl OR model,见下方纯函数)而非 provider id(DeepSeek 走 openai provider)。
+      const isDeepSeek = isDeepSeekEndpoint(cfg.baseUrl, cfg.model)
       const extraBody =
         req.structuredOutput && isDeepSeek ? { thinking: { type: 'disabled' } } : {}
       const res = await fetch(`${cfg.baseUrl}/chat/completions`, {

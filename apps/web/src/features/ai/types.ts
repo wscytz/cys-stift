@@ -32,6 +32,12 @@ export interface AIRequest {
    * 字段则 no-op),非思考模型 no-op。不破坏现有兼容性。
    */
   structuredOutput?: boolean
+  /**
+   * 单次请求超时(ms)。不传则用 streamText 的 DEFAULT_TIMEOUT_MS(30s)。
+   * 重型 DSL 产出任务(排版/cluster/对话 agent)产出长,传 60_000 防止中途
+   * 因默认 30s 截断而输出不全;短任务(关系推荐/总结)留默认即可。
+   */
+  timeoutMs?: number
 }
 
 export interface AIResponse {

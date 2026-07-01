@@ -114,7 +114,7 @@ export default function AskPage() {
         // structuredOutput:对 DeepSeek 等思考端点关思考。实测思考模式下 DSL
         // 格式不稳定(reuse #id 而非 [card #id])+ 慢 3-7x;关思考后 DSL 稳定。
         // agent 主要任务是改画布(结构化输出),问答够用即可,取舍值得。非思考端点 no-op。
-        { system: AGENT_SYSTEM_PROMPT, user: userPrompt, maxTokens: 4096, structuredOutput: true },
+        { system: AGENT_SYSTEM_PROMPT, user: userPrompt, maxTokens: 4096, structuredOutput: true, timeoutMs: 60_000 },
         (chunk) => {
           acc += chunk
           setMessages((prev) => {
