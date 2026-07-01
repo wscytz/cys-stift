@@ -366,11 +366,11 @@ describe('CardService', () => {
     })
     const stored = service.get(c.id)
     // 非有限值兜底:x/y/z → 0, w → 默认 240;有限值(h:100)原样保留。
-    expect(stored?.canvasPosition.x).toBe(0)
-    expect(stored?.canvasPosition.y).toBe(0)
-    expect(stored?.canvasPosition.w).toBe(240)
-    expect(stored?.canvasPosition.h).toBe(100)
-    expect(stored?.canvasPosition.z).toBe(0)
+    expect(stored?.canvasPosition?.x).toBe(0)
+    expect(stored?.canvasPosition?.y).toBe(0)
+    expect(stored?.canvasPosition?.w).toBe(240)
+    expect(stored?.canvasPosition?.h).toBe(100)
+    expect(stored?.canvasPosition?.z).toBe(0)
   })
 })
 
