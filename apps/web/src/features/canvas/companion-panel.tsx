@@ -257,7 +257,16 @@ export function CanvasCompanionPanel({
             display: collapsed ? 'none' : undefined,
           }}
         >
-          <CompanionChat host={host} service={service} canvasId={canvasId} getCardTitle={getCardTitle} />
+          {/* key={canvasId}:切画布时重挂载 → lazy init 重跑 loadChatHistory,加载新画布历史。
+              否则 CompanionChat 跨画布保持挂载(Batch 3 让 chat tab 不随折叠卸载),切画布后
+              仍显示旧画布历史 + 新消息存新 canvasId key(数据错位)。 */}
+          <CompanionChat
+            key={canvasId}
+            host={host}
+            service={service}
+            canvasId={canvasId}
+            getCardTitle={getCardTitle}
+          />
         </div>
       )}
 

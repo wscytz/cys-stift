@@ -38,13 +38,18 @@ export function loadChatHistory(canvasId: CanvasId): PersistedChatMessage[] {
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
     // 宽松校验:只留形如 { role, content } 的项,丢弃畸形数据(防坏数据炸 UI)。
-    return parsed.filter(
+    const filtered = parsed.filter(
       (m): m is PersistedChatMessage =>
         m != null &&
         typeof m === 'object' &&
         (m.role === 'user' || m.role === 'assistant') &&
         typeof m.content === 'string',
     )
+    // 流式 flag 复活守卫:若上次保存发生在流式中途(debounce 400ms 可能在 streaming:true
+    // 时触发),persisted 会带 streaming:true。reload 后那条消息会永远显示流式光标 ▋
+    // (stream 早已随页面卸载而死)。加载时把 streaming:true 清为 false —— 持久化的
+    // streaming 永远是陈旧的;无该字段的消息不动(保 round-trip 形状)。
+    return filtered.map((m) => (m.streaming === true ? { ...m, streaming: false } : m))
   } catch {
     return []
   }

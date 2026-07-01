@@ -90,11 +90,24 @@ describe('saveChatHistory', () => {
     }
   })
 
-  it('persists dslBlocks and streaming flags', () => {
+  it('persists dslBlocks; streaming flag is normalized to false on load(防流式 flag 复活)', () => {
     const withDsl: PersistedChatMessage[] = [
       { role: 'assistant', content: '...', dslBlocks: ['x'], streaming: true },
     ]
     saveChatHistory(CID, withDsl)
-    expect(loadChatHistory(CID)).toEqual(withDsl)
+    // dslBlocks round-trip 保留;streaming 强制 false —— 持久化的 streaming 永远陈旧
+    // (保存可能发生在流式中途,reload 后 stream 已死,不该再显示流式光标)。
+    expect(loadChatHistory(CID)).toEqual([
+      { role: 'assistant', content: '...', dslBlocks: ['x'], streaming: false },
+    ])
+  })
+
+  it('多个消息中混有 streaming:true → 全部清为 false', () => {
+    saveChatHistory(CID, [
+      { role: 'user', content: 'q' },
+      { role: 'assistant', content: 'a', streaming: true },
+    ])
+    const loaded = loadChatHistory(CID)
+    expect(loaded.every((m) => m.streaming !== true)).toBe(true)
   })
 })
