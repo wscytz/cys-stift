@@ -244,7 +244,24 @@ export function CanvasCompanionPanel({
         </button>
       </div>
 
-      {!collapsed && (
+      {/* body:chat tab 始终挂载(折叠/切 tab 仅 display:none),保住对话状态 +
+          流式 + 滚动位;discover tab 无状态,折叠时直接不渲染(省一帧)。 */}
+      {host && tab === 'chat' && (
+        <div
+          className="cv-companion__body"
+          role="tabpanel"
+          style={{
+            maxHeight: BODY_MAX_HEIGHT,
+            overflowY: 'auto',
+            padding: 'var(--space-1)',
+            display: collapsed ? 'none' : undefined,
+          }}
+        >
+          <CompanionChat host={host} service={service} canvasId={canvasId} getCardTitle={getCardTitle} />
+        </div>
+      )}
+
+      {!collapsed && tab !== 'chat' && (
         <div
           className="cv-companion__body"
           role="tabpanel"
@@ -254,11 +271,7 @@ export function CanvasCompanionPanel({
             padding: 'var(--space-1)',
           }}
         >
-          {tab === 'chat' ? (
-            host ? (
-              <CompanionChat host={host} service={service} canvasId={canvasId} getCardTitle={getCardTitle} />
-            ) : null
-          ) : insights.length === 0 ? (
+          {insights.length === 0 ? (
             <p style={mutedTextStyle}>
               {t('canvas.companion.empty')}
             </p>

@@ -287,7 +287,7 @@ function Thumb({ elements, label }: { elements: CanvasElement[]; label: string }
 }
 
 const styles = `
-.ac { border: var(--border-hairline); border-radius: var(--radius-sm); padding: var(--space-2); margin: var(--space-2) 0; background: var(--color-white); }
+.ac { border: var(--border-hairline); border-radius: var(--radius-sm); padding: var(--space-2); margin: var(--space-2) 0; background: var(--color-white); max-width: 100%; box-sizing: border-box; min-width: 0; }
 .ac--error { border-color: var(--color-red); }
 .ac__title { margin: 0 0 var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); }
 .ac__diff { display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-2); }
@@ -299,9 +299,9 @@ const styles = `
 .ac__group-items { margin: 0; padding: 0 0 0 var(--space-2); list-style: none; }
 .ac__group-items li { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
 .ac__nochange { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
-.ac__thumbs { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+.ac__thumbs { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); overflow-x: auto; flex-wrap: nowrap; min-width: 0; }
 .ac__thumb { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.ac__thumb-canvas { border: var(--border-hairline); background: var(--color-soft, var(--color-gray-soft)); }
+.ac__thumb-canvas { border: var(--border-hairline); background: var(--color-soft, var(--color-gray-soft)); max-width: 100%; height: auto; display: block; flex-shrink: 0; }
 .ac__thumb-label { font-family: var(--font-mono); font-size: 10px; color: var(--color-gray); text-transform: uppercase; letter-spacing: 0.08em; }
 .ac__arrow { color: var(--color-gray); font-family: var(--font-mono); }
 .ac__edit { width: 100%; font-family: var(--font-mono); font-size: var(--font-size-xs); border: var(--border-hairline); padding: var(--space-1); border-radius: var(--radius-sm); resize: vertical; margin-bottom: var(--space-2); }

@@ -14,7 +14,7 @@
  * R2:沿用 /ask —— buildAgentUserPrompt 内 serializeCardsForAI allowlist(不含 deviceId/
  * apiKey/软删卡);snapshotCanvas 只几何/关系/shape 描述符。本组件不新增 AI 数据路径。
  */
-import { useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Card, CanvasId, CardId, CardService } from '@cys-stift/domain'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
@@ -32,15 +32,9 @@ import {
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { AgentConfirmCard } from '@/features/ai/agent-confirm-card'
 import { CardDetailModal } from '@/features/card/card-detail'
+import { loadChatHistory, saveChatHistory, type PersistedChatMessage } from './companion-chat-history'
 
-interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-  /** assistant 消息里提取的 DSL 块(供确认门渲染)。 */
-  dslBlocks?: string[]
-  /** 流式进行中标记。 */
-  streaming?: boolean
-}
+interface ChatMessage extends PersistedChatMessage {}
 
 const MAX_HISTORY = 20
 
@@ -57,12 +51,37 @@ export function CompanionChat({
 }) {
   const { t } = useI18n()
   const router = useRouter()
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  // 初始从 localStorage 读取(防重新载入 / crash 丢历史);per-canvas 隔离。
+  // loadChatHistory 是 SSR-safe + try/catch,不会抛。lazy init 只跑一次。
+  const [messages, setMessages] = useState<ChatMessage[]>(() => loadChatHistory(canvasId))
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [detailCard, setDetailCard] = useState<Card | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // 历史持久化:debounce ~400ms 写入,避免每个流式 token 都打 localStorage。
+  // 镜像 graph-canvas 的 writeView throttle 范式(setTimeout + ref 单飞)。
+  // 卸载时若仍有 pending 写入,同步 flush 一次(防最后一条丢)。
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
+  useEffect(() => {
+    if (saveTimerRef.current) return // 已有 pending 写入,等它跑(覆盖最新 messages)
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null
+      saveChatHistory(canvasId, messagesRef.current)
+    }, 400)
+  }, [messages, canvasId])
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = null
+        saveChatHistory(canvasId, messagesRef.current) // flush 最后一次
+      }
+    }
+  }, [canvasId])
 
   const aiReady = isAIReady(getCurrentAI())
 
