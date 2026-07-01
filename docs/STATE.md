@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.40.0。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.43.0。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 
@@ -110,22 +110,25 @@
 
 - **捕获**:全局快捷键 + Mini Input + 文件拖拽 + `.cystift` 文件拖回恢复
 - **inbox**:多媒介编辑(链接/代码/引用/媒体)+ 草稿自动保存 + 发送到画布
-- **canvas**:自研 Canvas 2D 自由画布(6 active kind:card/arrow/freedraw/text/rect/frame)+ 多画布 CRUD + 视图持久化 + 关系箭头(straight/curve/elbow + 手绘识别)+ 工具栏(选择/笔/橡皮/文本/连接)+ AI 排版(配 AI 才显,未配走引导卡)+ 导出(图片 SVG/PNG + Markdown + DSL 二级菜单)+ Outline/Minimap/全局缩略图三态 + 双链 [[]] 自动建箭头 + DSL 模态编辑器(转义)+ **对齐分布 9 操作**(选中 ≥2)+ **画布模板**(4 预设 + 自建/导入)+ **AI 工作流模板**(聚类/关系/大纲)+ **自动布局**(dagre 分层,⇅ 按钮)+ **焦点模式**(⌘. 隐 chrome)+ **frame 双击重命名** + minimap 可拖拽
-- **graph**:全局图谱 `/graph` —— 语义三维签名力导向图(d3-force),跨画布消费已物化的双链/关系 arrow
+- **canvas**:自研 Canvas 2D 自由画布(6 active kind:card/arrow/freedraw/text/rect/frame)+ 多画布 CRUD + 视图持久化 + 关系箭头(straight/curve/elbow + 手绘识别)+ 工具栏(选择/笔/橡皮/文本/连接)+ AI 排版(配 AI 才显,未配走引导卡)+ 导出(图片 SVG/PNG + Markdown + DSL 二级菜单)+ Outline/Minimap/全局缩略图三态 + 双链 [[]] 自动建箭头 + DSL 模态编辑器(转义)+ **对齐分布 9 操作**(选中 ≥2)+ **画布模板**(4 预设 + 自建/导入)+ **AI 工作流模板**(聚类/关系/大纲)+ **整理范式**(策略:思维导图/流程图/网格/紧凑 × 方向 TB/LR/RL/BT × 间距,默认 mindmap/TB)+ **焦点模式**(⌘. 隐 chrome)+ **frame 双击重命名** + minimap 可拖拽 + **关系箭头高倍放大不再消失**(端点解析脱离视锥剔除)
+- **graph**:全局图谱 `/graph` —— 语义三维签名力导向图(d3-force),跨画布消费已物化的双链/关系 arrow + **缩放条**(−/slider/+/reset)+ 触摸板 pinch=缩放/双指=平移(不再误缩放)+ 删卡不灰屏 + 卡详情 action 行 sticky 常驻
 - **archive**:网格/时间轴 + 多选批量 + 详情 Modal
 - **trash**:软删恢复
 - **search**:全文检索(title 1.5x 权重 + body 摘要 + pinned 前置)
 - **命令面板**:⌘K 跳转项 + 卡片搜索 + **最近编辑跳转**(空 query 显 updatedAt 前 8,点卡智能开卡:在画布跳画布定位+开详情,否则开详情)
 - **标签**:10 色固定调色板,卡片标签 + 过滤 + **标签墙 `/tags`**(标签云 + 卡网格)
 - **关系网络**:块引用 `((标题))` 嵌入(embeds 关系)+ 详情建/删关系(relation-picker)+ 跨画布 backlinks(useGlobalEdges 聚合所有画布)+ **智能关系推荐**(graph 详情页「建议关联」,本地零 AI 四信号打分 + 可选「AI 再找找」语义粗筛,一键即建)+ **AI 对话 agent**(`/ask` 页:对话提需求 → AI 输出 cys-dsl 块 → 确认门 before/after 缩略图 + 变更摘要 → 应用/拒绝;RAG 引用卡片;改任意目标画布)
-- **AI 伴侣面板**:画布常驻 AI 浮面板(rail ✨ 开关,发现/对话两 tab,折叠+tab 持久)—— 发现 tab 本地预筛零成本常驻(重复/可关联/孤立卡)+ 选中定位/建立关联/AI 深挖三动作;对话 tab = /ask agent 上画布(live host 应用 + 确认门 + 引用点开),非破坏性默认开
+- **AI 伴侣面板**:画布常驻 AI 浮面板(rail ✨ 开关,发现/对话两 tab,折叠+tab 持久)—— 发现 tab 本地预筛零成本常驻(重复/可关联/孤立卡)+ 选中定位/建立关联/AI 深挖三动作;对话 tab = /ask agent 上画布(live host 应用 + 确认门 + 引用点开)+ **历史持久化**(per-canvas localStorage,折叠/reload 不丢)+ 缩略图窄面板横向滚不溢出,非破坏性默认开
+- **AI 排版**:诚实反馈(apply 前后位移对比 → "重排 N 张平均 Xpx" / "AI 认为已合理未改动")+ 主动重排 prompt + 拓宽思考抑制(deepseek 镜像/model 名)+ 60s 超时
+- **版本号**:单一可信源(`scripts/gen-version.mjs` 读 root package.json → version.ts + 同步 tauri.conf),主菜单 + 首页实时显示
 - **settings**:快捷键自定义 + 导入/导出 + 暗色主题 + AI provider 配置 + **实验室区**(vision/autoCurate/autoTag/autoCapture/agentToolCalling 五个实验室,默认关,LAB_REGISTRY 注册表 + useLabEnabled 守卫 + 确认门;分层判据见 ai-labs-strategy spec)
 
 ## 下一步
 
 > **当前阶段:打磨期(2026-06-26 起)** — 主线 + P10 + UI/a11y/鲁棒三轮 + AI门槛/记录栏/canvas-UI 自适应批 全完成。
 > 判断"这一步该不该做"先读 **[`docs/development/polish-phase.md`](development/polish-phase.md)**(打磨 vs 修缝判据 + 反馈驱动流程 + 退出标准),而非"还有没有缝可修"。
-> 燃料 = 你手测的真实反馈(backlog A,v0.40 打磨批 + v0.41 批 1-4 全部落地,见下)。
+> 燃料 = 你手测的真实反馈(backlog A,v0.40 打磨批 + v0.41 批 1-4 + v0.43 手测六批全部落地,见下)。
+- **v0.43 手测反馈六批打磨(2026-07-01)**:v0.42 打包后手测反馈一轮,6 batch subagent-driven。① **关系箭头高倍放大消失**(renderElements 视锥剔除后 visible 列表当端点解析集,端点 card 离屏被剔 → arrowEndpoints 解析不到;解耦画什么 vs 解析用什么,增 `allForResolution` 传全集 +5 测);② **图谱 4 bug**(删卡灰屏竞态 cleanup 不置 null+rAF / 触摸板 ctrlKey 分流 pinch=缩放双指=平移 + wheel-math 纯函数 17 测 / 缩放条 GraphZoomBar forwardRef / 卡详情 action 行 sticky);③ **伴侣对话 tab 留面板内修**(缩略图 overflow-x:auto / 历史 per-canvas localStorage +10 测 / 折叠非破坏性 display:none);④ **AI 排版 robustness**(拓宽思考抑制 isDeepSeekEndpoint baseUrl 或 model / 主动重排 prompt / 诚实反馈 summarizeMovement 三分支 +10 测 / 60s 超时 + maxTokens hint)—— 头号"从来没改过布局"根因三合一;⑤ **版本号单一源**(gen-version.mjs → version.ts + 同步 tauri,AppMenu+首页显示,bump 0.43.0);⑥ **整理范式**(strategy mindmap/flow/grid/pack × direction TB/LR/RL/BT × gap,默认 mindmap/TB,新 organize-popover +23 矩阵测)。canvas-engine 473 / web 1024 全绿;**源码 tsc 零错**(23 lint 全在 __tests__ 裸色名 fixture 基线);build exit 0;.app+.dmg(5.8M)打包。**未 push**(本地领先远程 6 commit)。详见 changelog。
 - **画布 AI 伴侣面板 · Plan B(2026-06-30,对话 tab)**:Plan A 发现 tab 的对话半边。= /ask agent 上画布,操作 **live host**(替代 /ask temp host + applyOpsAndPersist)。`AgentConfirmCard` 加可选 `liveHost?` prop:有则 preview 克隆 live 元素 + Apply 走 `applyLayout(liveHost)` 单 undo(靠画布页 bindCardWriteback + freeform binding 持久化,不调 applyOpsAndPersist 免双写);无则 /ask 原 temp 路径字节不变(/ask 不回归)。新 `companion-chat.tsx`:消息流 + 输入 + 流式(RAG `service.listAll` + `snapshotCanvas(liveHost)` 上下文 + `streamText` structuredOutput:true 关思考 + `extractDslBlocks`)+ `[card #id]` 引用点开 `CardDetailModal` + DSL 确认门(传 liveHost)+ 未配 AI → AiSetupCard。多轮沿用 /ask 实际行为(每轮发新问题+新鲜 RAG/snapshot,history 仅 UI;真多轮留 agentToolCallingLab)。抽 `makeOnCardCreate` factory(live/temp 共用,镜像 canvas-host-builder)。**画布 AI 伴侣面板(发现+对话)完整闭合**。subagent TDD(T1 AgentConfirmCard liveHost+6 测 / T2 CompanionChat / T3 接线)+ T4 主会话收尾。web 956(+6)/ build exit 0 / tsc 零新增。spec 同 Plan A。
 - **画布 AI 伴侣面板 · Plan A(2026-06-30,发现 tab)**:v0.40 反馈"AI 感知不强"根因 = 8 个 live AI 功能**散+被动+藏**。新增画布常驻 AI 浮面板 `<CanvasCompanionPanel>`(镜像 OutlinePanel,rail ✨ 开关,发现/对话两 tab,折叠+激活 tab 持久),让 AI 在核心流程"看得见"。**发现 tab**:本地预筛零成本常驻(`discoverInsights` 纯函数,复用 `findDuplicateGroups` + `recommendRelations` 四信号,三类 duplicate/relation/orphan + 去重/封顶/>50 卡标签+标题剪枝)+ 三动作(选中定位居中 / 建立关联 host.batch 单 undo,duplicate 星形·relation 单箭头·orphan 无 / AI 深挖按需 allowlist 回填 note)。**非破坏性**(只建议+逐条确认)→ **默认开、非 lab**(不经 LAB_REGISTRY/useLabEnabled)。R2:本地零外发,AI 深挖过 `serializeCardsForAI` + 反向断言无 deviceId/dataUrl;`structuredOutput:true` 关 DeepSeek 思考。subagent TDD(T1 发现引擎+18 测/T2 面板 shell/T3 建立关联/T4 AI 深挖+6 测)+ T5 主会话收尾(T1 review 修了 pruneCandidates 标签 `.value` 匹配 bug —— 对象恒等致 >50 卡大画布标签关系失效,补剪枝路径测试)。spec `docs/specs/2026-06-30-canvas-companion-panel-design.md`。web 950(+24)/ build exit 0 / tsc 零新增。
 - **v0.41 批 4(2026-06-30,P2 打磨,11 条全做)**:① **freedraw 单点不建幽灵元素**(points<2 丢弃,免 w=h=0 不可选元素进持久化);② **eraser 线段擦**(快速拖拽 lastPoint→当前点采样 4px/步封顶 8,防跳过细线);③ **connect 模式 card 可连暗示**(renderNow 给可连元素画淡虚线轮廓,教育新用户);④ **textarea 跟随 view**(编辑中 onViewChange 触发 tick 重算 left/top,pan/zoom 不再飘);⑤ **空文本提交 toast**(info 提示,unmount cleanup silent);⑥ **outline/minimap 折叠态持久**(localStorage);⑦ **UI 机械批**(focus-visible 统一 + disabled opacity 0.55→0.5 + panel 裸 px→token + home-sep/cv-focus-exit 对比度 + mini-input backdrop color-mix 暗色)。canvas-engine 468 / web 926 全绿;lint exit 0;build exit 0。**v0.41 全 24 条 backlog 闭合。**详见 changelog。

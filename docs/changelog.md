@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-07-01 · v0.43 · polish-round-handtest(手测反馈六批打磨)
+
+v0.42 手测反馈一轮(用户原话"接下来就是打磨,打磨,值得打磨的很多")。6 batch,subagent-driven 逐批 review + 验证门。根因全部 file:line 级确认(4 Explore + 精读)。
+
+**Batch 1 — 关系箭头高倍放大消失(确认真 bug)**:`renderElements` 把**视锥剔除后的 visible 列表**同时当端点解析集 → 关系箭头本身不被剔除,但端点 card 在高倍放大两端点离屏时被剔除 → `arrowEndpoints` find 不到 from/to → `drawElement if(!from||!to) break` → 箭头不画。修:解耦"画什么"与"端点解析用什么"——`renderElements` 增 `allForResolution` 参(默认=toDraw 向后兼容),adapter `renderNow` 传 `getSortedElements()`(全集)。SVG 导出等不剔除场景传同一全集两次。+5 回归测试(含向后兼容)。canvas-engine 468→473。
+
+**Batch 2 — 图谱页 4 bug**:① **删卡间歇变灰**(effect1 cleanup `handleRef=null` 在新 handle 赋值前的窗口期 render 早返回不重绘 → 灰屏,交互即恢复;改 cleanup 只 stop 本次 handle 不置 null + rAF 双保险);② **触摸板缩放手势难受**(onWheel 不分 ctrlKey,pinch 和双指平移都误缩放;改 ctrlKey 分流:pinch/Ctrl+wheel=锚点缩放+clamp delta,双指/mouse wheel=平移;抽 `wheel-math.ts` 纯函数 `clampZoom/normalizeWheelDelta/clampDelta/zoomFactor` +17 测);③ **缩放条**(GraphCanvas forwardRef 暴露 `zoomBy/zoomTo/resetView` + 提升 zoom 为 React state;新 `graph-zoom-bar.tsx` Bauhaus `[−][━━●━━][+][reset]`+百分比,page 持有 zoom state);④ **点卡"笔记 2026"被遮**(graph 页 modal 传 canEditRelations+globalEdges 致 backlinks+建议区+AI 按钮堆叠,body 内容超 fold 底部 action 行不可见;`.cd__actions` 改 `position:sticky;bottom:0`+白底+顶 hairline,通用受益)。i18n 5 zoom 键。
+
+**Batch 3 — 伴侣对话 tab(留面板内修好)**:① **缩略图跃出对话框**(`.ac` 无 max-width、`.ac__thumbs` 无 overflow,窄面板横向溢出;加 `max-width:100%`+`box-sizing`+`overflow-x:auto`+`flex-shrink:0`,缩略图横向滚而非溢出,`/ask` 同受益);② **历史持久化**(messages 原纯 React state,collapse/reload 丢;抽 `companion-chat-history.ts` 纯函数 `chatHistoryKey/loadChatHistory/saveChatHistory` per-canvas localStorage,debounce 400ms 写+unmount flush,quota/SSR/脏数据兜底 +10 测);③ **折叠非破坏性**(原 `{!collapsed && ...}` 卸载整个 body 含 CompanionChat;改 chat tab 保持挂载 `display:none` 切显隐,保 scroll+in-flight 流式)。
+
+**Batch 4 — AI 排版 robustness(头号问题"从来没改过布局",三合一根因)**:快照已确认带坐标,故非 AI 看不到位置。① **思考抑制太窄**(`isDeepSeek` 只匹配 `deepseek.com` 域名,火山/SiliconFlow 镜像不匹配 → 思考吃光 4096 token → DSL 截断 → 0 ops → 静默;抽 `isDeepSeekEndpoint(baseUrl, model)` 纯函数,baseUrl 或 model 名含 deepseek 即发 `thinking:disabled` +8 provider 测);② **保守 prompt**(原"keep changes minimal / 不动 well-placed"→ AI 照抄原坐标 → applied>0 但卡没动;重写为"主动重排"语义:聚类分组+网格/DAG 对齐+消除重叠+铺满画布,铁律保留 update-only/不建新关系箭头/每卡一条 UPDATE);③ **诚实反馈**(原 toast 分不清"真重排"vs"坐标原样吐回";新纯函数 `summarizeMovement(before,after)` 算欧氏位移,handleAILayout apply 前后快照→三分支:applied=0 / moved>0 success「重排 N 张平均 Xpx」/ moved=0 info「AI 认为当前布局已合理,未改动」——这就是"没变"的诚实解释 +10 测);④ **超时+maxTokens 意识**(AIRequest 加 `timeoutMs?`,重型 DSL 任务 layout/cluster/ask/companion 传 60s 防截断;设置面板 maxTokens 输入下加 hint「留空=默认:卡动作 1024;排版/对话固定 4096」)。
+
+**Batch 5 — 版本号单一可信源 + 主菜单显示**:版本原散落且不一致(tauri 0.42 / root package 0.39.1 / 首页硬编 v0.40.0 / AppMenu 无版本)。新 `scripts/gen-version.mjs`(零依赖 ESM,镜像 gen-state 风格)读 root package.json version → 写 `apps/web/src/lib/version.ts` + 同步 tauri.conf.json,幂等。挂 web `predev`/`prebuild` 钩子(Tauri beforeBuildCommand 连带)。version.ts 入库(免 fresh clone tsc 红)+ build 覆盖。AppMenu 显示 `v0.43.0`(mono/xs/gray);首页 footer 硬编改 import。bump 0.43.0。
+
+**Batch 6 — 整理范式(策略+方向+间距)**:dagre 自动布局原写死 `rankdir:'TB'` 无选择 → "没有默认方向"。`AutoLayoutOptions` 扩 `strategy`(mindmap/flow/grid/pack)+ `direction`(TB/LR/RL/BT)+ `gap`。mindmap/flow 走 dagre(rankdir=direction,mindmap ranksep gap×1.5 / flow gap×2);grid 确定性网格(ceil(sqrt(n)) 列,TB 行优先/LR 列优先/BT 垂直镜像/RL 水平镜像);pack 紧凑网格(gap×0.5+居中)。默认 mindmap/TB/gap60 = 明确默认方向。新 `organize-popover.tsx`(策略 4 段+方向 4 按钮+间距 slider+应用,复用 `cv-rail__menu` chrome);"自动布局"按钮改"整理"。i18n `canvas.organize.*` 全键(中英)。+23 矩阵测试。设计取舍:grid/pack 按元素 `id` 排序(CanvasElement 无 title 字段,保持 computeAutoLayout 纯签名;要按标题排需传 resolver,本轮不做)。
+
+**验证**:canvas-engine 473 / web 1024(81 files,+新测 76 净增)全绿;**源码 tsc 零错误**(23 lint 错误全在 10 个 `__tests__/` fixture 裸色名 tags 老基线,零新增);web build exit 0;`.app` + `cys-stift_0.43.0_aarch64.dmg`(5.8M)打包成功。6 commit(B1 8a035c2 / B2 585e070 / B3 e53a8a2 / B4 21d9d89 / B5 4c13f07 / B6 56f0f4e)。**未 push**(本地 main 领先远程 6)。手测待办:箭头高倍放大 / 图谱删卡+触摸板+缩放条+卡详情 action 行 / 对话历史+缩略图+折叠 / AI 排版诚实 toast / 主菜单+首页版本 / 整理四策略×四方向。
+
+---
+
 ## 2026-06-30 · v0.42 · canvas-companion-panel-plan-b(画布 AI 伴侣面板 · 对话 tab)
 
 Plan A(发现 tab)的对话半边。= /ask agent 上画布,操作 **live host**(替代 /ask 的 temp host + `applyOpsAndPersist`)。spec 同 Plan A(§4)。plan `docs/plans/2026-06-30-canvas-companion-panel-plan-b.md`。
