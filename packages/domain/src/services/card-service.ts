@@ -198,9 +198,24 @@ export class CardService {
   moveToCanvas(id: CardId, position: CanvasPosition): void {
     const card = this.repo.getById(id)
     if (!card) return
+    // 数值有限性守卫(防 NaN/Infinity 进 localStorage → JSON.stringify 变 null →
+    // reload 后 null.toFixed() 崩)。与 auto-layout/organize-popover 的 finiteRound
+    // 同族防御;w/h 兜底默认卡尺寸 240×120,其余兜底 0。
+    const safePos: CanvasPosition = {
+      ...position,
+      x: Number.isFinite(position.x) ? position.x : 0,
+      y: Number.isFinite(position.y) ? position.y : 0,
+      w: Number.isFinite(position.w) ? position.w : 240,
+      h: Number.isFinite(position.h) ? position.h : 120,
+      z: Number.isFinite(position.z) ? position.z : 0,
+      // rotation 条件守:原 position 无 rotation 时不强加(保 toEqual 形状);有值则守有限。
+      ...(position.rotation !== undefined
+        ? { rotation: Number.isFinite(position.rotation) ? position.rotation : 0 }
+        : {}),
+    }
     this.repo.update({
       ...card,
-      canvasPosition: position,
+      canvasPosition: safePos,
       updatedAt: new Date(),
     })
   }

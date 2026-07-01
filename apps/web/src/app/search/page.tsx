@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useDeferredValue, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Toolbar, Tag } from '@cys-stift/ui'
 import type { Card, SearchResult } from '@cys-stift/domain'
@@ -33,8 +33,10 @@ export default function SearchPage() {
     : null
 
   const allCards = useMemo(() => service.listAll(), [snap, service])
+  // useDeferredValue:input 保持即时响应,搜索计算退到空闲帧 —— 500 卡时不阻塞每次按键。
+  const deferred = useDeferredValue(query)
   const results = useMemo(() => {
-    const matched = searchCards(allCards, query)
+    const matched = searchCards(allCards, deferred)
     // G1 (v0.25.1): lift pinned matches to the front. We preserve the
     // score ordering within each group (pinned first, then unpinned).
     const pinned: typeof matched = []
@@ -44,7 +46,7 @@ export default function SearchPage() {
       else rest.push(r)
     }
     return [...pinned, ...rest]
-  }, [allCards, query])
+  }, [allCards, deferred])
 
   return (
     <main id="main" tabIndex={-1} className="page">

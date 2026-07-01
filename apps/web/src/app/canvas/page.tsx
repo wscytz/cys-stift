@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -135,9 +135,11 @@ export default function CanvasPage() {
   const [overviewOpen, setOverviewOpen] = useState(false)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; px: number; py: number } | null>(null)
 
-  const onCanvas = service
-    .listOnCanvas(activeCanvasId)
-    .filter((c) => !c.archived && !c.deletedAt).length
+  // useMemo:snap/画布变化才重算(listOnCanvas + filter 是 2 次 O(n),无 memo 每 render 重算)。
+  const onCanvas = useMemo(
+    () => service.listOnCanvas(activeCanvasId).filter((c) => !c.archived && !c.deletedAt).length,
+    [service, activeCanvasId, snap],
+  )
 
   const toggleSnap = useCallback(() => {
     const adapter = handle.current.adapter

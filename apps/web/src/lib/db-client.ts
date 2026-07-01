@@ -27,6 +27,13 @@ function loadSnapshot(): Snapshot {
       c.createdAt = new Date(c.createdAt)
       c.updatedAt = new Date(c.updatedAt)
       c.deletedAt = c.deletedAt ? new Date(c.deletedAt) : undefined
+      // 数组字段防御性归一化(导入坏数据/旧版迁移/解析异常):非数组 → 空数组,
+      // 防后续渲染 .map 崩(tags 非数组时 card-detail (card.tags ?? []).map 仍炸)。
+      if (!Array.isArray(c.tags)) c.tags = []
+      if (c.media != null && !Array.isArray(c.media)) c.media = []
+      if (c.links != null && !Array.isArray(c.links)) c.links = []
+      if (c.codeSnippets != null && !Array.isArray(c.codeSnippets)) c.codeSnippets = []
+      if (c.quotes != null && !Array.isArray(c.quotes)) c.quotes = []
     }
     return parsed
   } catch {
