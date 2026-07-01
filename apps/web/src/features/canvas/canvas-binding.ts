@@ -167,63 +167,7 @@ export function bindCardWriteback(
     if (pending.size > 0) scheduleFlush()
   })
 
-  // undo/redo desync 修复(v0.38.0):
-  // 引擎 undo 恢复 host 元素走 applyWithoutEcho(设计上抑制 onUserChange 以避免
-  // 回写 echo 循环),所以上面那段 onUserChange(removed) → removeFromCanvas 的
-  // 逆操作不会被触发:Delete 清了 DB canvasPosition,Undo 把卡元素放回 host,
-  // 但 DB 仍无 canvasPosition → 下一次 syncCardsToEditor(任何 snap 改动 / 切回
-  // 画布)算 wantedIds 时不含此卡 → 再次把卡从 host 移除。用户「Undo 找回卡」
-  // 视觉回弹一瞬又消失,心智被打破(卡可从 inbox 找回,非数据丢失,但体验回退)。
-  //
-  // 解法:监听 onHistoryChange(pushUndo / undo / redo 都触发),对每个仍在 host
-  // 里的 *card* 元素,若 DB canvasPosition 缺失或指向别处,用 host 元素几何把它
-  // move 回本画布。全程包在 applyWithoutEcho 内(repo.update → notify →
-  // syncCardsToEditor 的 host 写不再触发 onUserChange,避免 echo 循环)。
-  // 仅 card:freeform(text/freedraw/arrow/rect)有自己的持久化(freeform store),
-  // 不走 DB canvasPosition。幂等:DB 已在本画布则跳过,正常编辑(pushUndo 也触发
-  // onHistoryChange)只是一次廉价 no-op 扫描。
-  const reconcileHistory = () => {
-    host.applyWithoutEcho(() => {
-      for (const el of host.getElements()) {
-        if (el.kind !== 'card') continue
-        const cardId = el.id as CardId
-        const card = service.get(cardId)
-        // 卡不在 DB(新建未落库 / 已真正删除)→ 跳过。
-        if (!card) continue
-        // eraser card 模式 softDelete 后 undo:host 恢复了卡元素,但 DB deletedAt 仍设。
-        // restore 找回(清 deletedAt),让卡回到画布而非留在回收桶。
-        // (redo 重新删除的不完美是预存限制,与 Delete 键 redo 同源,不新增问题。)
-        if (card.deletedAt) {
-          service.restore(cardId)
-        }
-        // 归档的卡不应回到画布(用户主动归档,非 eraser)。
-        if (card.archived) continue
-        const pos = card.canvasPosition
-        if (pos?.canvasId === canvasId) continue // 已一致:幂等 no-op
-        // DB 无 canvasPosition(被 Delete 清掉,undo 刚恢复 host 元素)或指向别画布
-        // (跨画布 undo 边界,理论少见)→ 用 host 元素几何落回本画布。
-        const z = pos?.z ?? 0
-        service.moveToCanvas(cardId, elementToCardPosition(el, canvasId, z))
-      }
-      // ── DB → host 方向(修撤销卡复活):DB 有本画布的卡但 host 没有 ──
-      // 触发场景:undo 把卡从 host 撤掉,但 DB 仍 canvasPosition@本画布(undo 走
-      // applyWithoutEcho,onUserChange 不触发,writeback 没清 DB)→ 不处理的话下次
-      // syncCardsToEditor 读 DB wantedIds 含此卡 → upsert 回 host → 幽灵卡复活。
-      // 解法:反向差集 → removeFromCanvas 回 inbox。与上面 moveToCanvas(host 有 DB 无)
-      // 配对:undo = remove,redo = move 回,闭环幂等。归档/软删卡跳过(归档卡本就不
-      // 在 host;软删卡 deletedAt 已设,listOnCanvas 是否含取决于 repo,统一跳过)。
-      const hostCardIds = new Set(
-        host.getElements().filter((e) => e.kind === 'card').map((e) => e.id),
-      )
-      for (const card of service.listOnCanvas(canvasId)) {
-        if (card.deletedAt || card.archived) continue
-        if (!hostCardIds.has(String(card.id))) {
-          service.removeFromCanvas(card.id)
-        }
-      }
-    })
-  }
-  const unsubHistory = host.onHistoryChange?.(reconcileHistory) ?? (() => {})
+  const unsubHistory = host.onHistoryChange?.(() => reconcileCanvasHistory(host, service, canvasId)) ?? (() => {})
 
   // Review fix (v0.37.0): flush synchronously before unsubscribing so a card
   // dragged then immediately followed by a canvas switch / route change / tab
@@ -340,4 +284,74 @@ export function createCardOnCanvas(
   const card = service.create({ title: opts.title, source, canvasPosition: pos })
   addCardShape(host, card)
   return card
+}
+
+/**
+ * undo/redo 后的双向差集(reconcile):把「host 卡元素 ↔ service 卡片」拉回一致。
+ *
+ * undo/redo desync 根因(v0.38.0):引擎 undo 恢复 host 元素走 applyWithoutEcho
+ * (设计上抑制 onUserChange 以避免回写 echo 循环),所以 onUserChange(removed) →
+ * removeFromCanvas 的逆操作不会被触发:Delete 清了 DB canvasPosition,Undo 把卡
+ * 元素放回 host,但 DB 仍无 canvasPosition → 下一次 syncCardsToEditor(任何 snap
+ * 改动 / 切回画布)算 wantedIds 时不含此卡 → 再次把卡从 host 移除。用户「Undo 找回
+ * 卡」视觉回弹一瞬又消失,心智被打破(卡可从 inbox 找回,非数据丢失,但体验回退)。
+ *
+ * 本函数做两个方向的差集(全程包在 applyWithoutEcho 内,repo.update → notify →
+ * syncCardsToEditor 的 host 写不再触发 onUserChange,避免 echo 循环):
+ *
+ *   1. host → DB:对每个仍在 host 里的 *card* 元素,若 DB canvasPosition 缺失或指向
+ *      别处,用 host 元素几何把它 move 回本画布;若卡是软删状态(eraser card 模式
+ *      softDelete 后 undo),先 restore。归档卡跳过(用户主动归档,非 eraser)。
+ *      仅 card:freeform(text/freedraw/arrow/rect)有自己的持久化,不走 DB canvasPosition。
+ *   2. DB → host(修撤销卡复活):DB 有本画布的卡但 host 没有 → removeFromCanvas
+ *      回 inbox。触发场景:undo 把卡从 host 撤掉,但 DB 仍 canvasPosition@本画布
+ *      (undo 走 applyWithoutEcho,onUserChange 不触发,writeback 没清 DB)→ 不处理
+ *      的话下次 syncCardsToEditor 读 DB wantedIds 含此卡 → upsert 回 host → 幽灵卡复活。
+ *
+ * 与上面 moveToCanvas(host 有 DB 无)配对:undo = remove,redo = move 回,闭环幂等。
+ * 归档/软删卡在两个方向都跳过(归档卡本就不在 host;软删卡 deletedAt 已设,
+ * listOnCanvas 是否含取决于 repo,统一跳过)。正常编辑(pushUndo 也触发
+ * onHistoryChange)只是一次廉价 no-op 扫描(DB 已在本画布则 continue)。
+ *
+ * 由 bindCardWriteback 订阅 onHistoryChange 时调用(pushUndo / undo / redo 都触发)。
+ */
+export function reconcileCanvasHistory(
+  host: CanvasHost,
+  service: CardService,
+  canvasId: CanvasId,
+): void {
+  host.applyWithoutEcho(() => {
+    // ── host → DB 方向:对每个 host 里的 card 元素,把 DB canvasPosition 拉回本画布 ──
+    for (const el of host.getElements()) {
+      if (el.kind !== 'card') continue
+      const cardId = el.id as CardId
+      const card = service.get(cardId)
+      // 卡不在 DB(新建未落库 / 已真正删除)→ 跳过。
+      if (!card) continue
+      // eraser card 模式 softDelete 后 undo:host 恢复了卡元素,但 DB deletedAt 仍设。
+      // restore 找回(清 deletedAt),让卡回到画布而非留在回收桶。
+      // (redo 重新删除的不完美是预存限制,与 Delete 键 redo 同源,不新增问题。)
+      if (card.deletedAt) {
+        service.restore(cardId)
+      }
+      // 归档的卡不应回到画布(用户主动归档,非 eraser)。
+      if (card.archived) continue
+      const pos = card.canvasPosition
+      if (pos?.canvasId === canvasId) continue // 已一致:幂等 no-op
+      // DB 无 canvasPosition(被 Delete 清掉,undo 刚恢复 host 元素)或指向别画布
+      // (跨画布 undo 边界,理论少见)→ 用 host 元素几何落回本画布。
+      const z = pos?.z ?? 0
+      service.moveToCanvas(cardId, elementToCardPosition(el, canvasId, z))
+    }
+    // ── DB → host 方向(修撤销卡复活):DB 有本画布的卡但 host 没有 → removeFromCanvas ──
+    const hostCardIds = new Set(
+      host.getElements().filter((e) => e.kind === 'card').map((e) => e.id),
+    )
+    for (const card of service.listOnCanvas(canvasId)) {
+      if (card.deletedAt || card.archived) continue
+      if (!hostCardIds.has(String(card.id))) {
+        service.removeFromCanvas(card.id)
+      }
+    }
+  })
 }

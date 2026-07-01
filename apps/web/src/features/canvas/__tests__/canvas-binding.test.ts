@@ -7,6 +7,7 @@ import {
   bindCardWriteback,
   syncCardsToEditor,
   createCardOnCanvas,
+  reconcileCanvasHistory,
 } from '../canvas-binding'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
 import type { CanvasId, Card, CardId, CardService, CanvasPosition } from '@cys-stift/domain'
@@ -430,6 +431,308 @@ describe('reconcileHistory — undo removes orphan DB card (reverse diff)', () =
     expect(svc.removeFromCanvas).not.toHaveBeenCalled()
 
     unbind()
+  })
+})
+
+/**
+ * reconcileCanvasHistory(R4 抽出的纯函数):undo/redo 后的双向差集,把「host 卡元素 ↔
+ * service 卡片」拉回一致。这里直接测纯函数(不经 bindCardWriteback / fireHistoryChange),
+ * 精确设置 host 元素与 DB 卡片状态,覆盖两个方向的差集核心分支。
+ *
+ *   host → DB:卡在 host,DB canvasPosition 缺失/指向别画布/软删 → moveToCanvas / restore。
+ *   DB → host:卡在 DB(canvasPosition@本画布)但 host 无 → removeFromCanvas(撤销卡复活)。
+ */
+function makeHostMock(elements: import('@cys-stift/canvas-engine').CanvasElement[]): {
+  host: import('@cys-stift/canvas-engine').CanvasHost
+} {
+  let els = elements
+  const host = {
+    getElements: vi.fn(() => els),
+    getElement: vi.fn((id: string) => els.find((e) => e.id === id)),
+    upsert: vi.fn(),
+    remove: vi.fn(),
+    // 真实行为:applyWithoutEcho 同步执行 fn。纯函数全程包在它里面。
+    applyWithoutEcho: vi.fn((fn: () => void) => fn()),
+    onUserChange: vi.fn(() => () => {}),
+    onHistoryChange: vi.fn(() => () => {}),
+  } as unknown as import('@cys-stift/canvas-engine').CanvasHost
+  return { host }
+}
+
+function makeCardLike(overrides: Omit<Partial<Card>, 'id'> & { id: string }): Card {
+  return {
+    title: overrides.id,
+    body: '',
+    type: 'note',
+    media: [],
+    links: [],
+    codeSnippets: [],
+    quotes: [],
+    tags: [],
+    source: { kind: 'manual', deviceId: 'dev' } as never,
+    capturedAt: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    pinned: false,
+    archived: false,
+    ...overrides,
+    id: overrides.id as unknown as CardId,
+  } as Card
+}
+
+describe('reconcileCanvasHistory (pure): host → DB direction', () => {
+  it('undo card-delete: host has the card but DB canvasPosition was cleared → moveToCanvas restores it onto this canvas', () => {
+    const canvasId = 'canvas-1' as unknown as CanvasId
+    // undo 后:host 元素回来了,DB canvasPosition 被 Delete 清空(仍非归档非软删)。
+    const card = makeCardLike({ id: 'c1', canvasPosition: undefined })
+    const hostEls: import('@cys-stift/canvas-engine').CanvasElement[] = [{ id: 'c1', kind: 'card', x: 80, y: 90, w: 240, h: 120, rotation: 0 }]
+    const { host } = makeHostMock(hostEls)
+    const moveToCanvas = vi.fn()
+    const svc = {
+      get: vi.fn(() => card),
+      listOnCanvas: vi.fn(() => []),
+      moveToCanvas,
+      removeFromCanvas: vi.fn(),
+      restore: vi.fn(),
+    } as unknown as CardService
+
+    reconcileCanvasHistory(host, svc, canvasId)
+
+    // DB 无 canvasPosition → 用 host 元素几何落回本画布(z 回退到 0)。
+    expect(moveToCanvas).toHaveBeenCalledTimes(1)
+    expect(moveToCanvas).toHaveBeenCalledWith(
+      'c1',
+      expect.objectContaining({ canvasId: 'canvas-1', x: 80, y: 90, z: 0 }),
+    )
+    expect(svc.removeFromCanvas).not.toHaveBeenCalled()
+    expect(svc.restore).not.toHaveBeenCalled()
+  })
+
+  it('undo card-move: host has the card but DB canvasPosition points at another canvas → move it back to this canvas', () => {
+    const canvasId = 'canvas-1' as unknown as CanvasId
+    // 跨画布 undo 边界:host 里有元素,DB 记录它在别的画布。
+    const card = makeCardLike({
+      id: 'c2',
+      canvasPosition: {
+        canvasId: 'canvas-OTHER' as unknown as CanvasId,
+        x: 0,
+        y: 0,
+        w: 240,
+        h: 120,
+        z: 9,
+        rotation: 0,
+      },
+    })
+    const hostEls: import('@cys-stift/canvas-engine').CanvasElement[] = [{ id: 'c2', kind: 'card', x: 10, y: 20, w: 240, h: 120, rotation: 0 }]
+    const { host } = makeHostMock(hostEls)
+    const moveToCanvas = vi.fn()
+    const svc = {
+      get: vi.fn(() => card),
+      listOnCanvas: vi.fn(() => []),
+      moveToCanvas,
+      removeFromCanvas: vi.fn(),
+      restore: vi.fn(),
+    } as unknown as CardService
+
+    reconcileCanvasHistory(host, svc, canvasId)
+
+    // 指向别画布也算「不一致」→ 用 host 几何落回本画布,且保留原 z。
+    expect(moveToCanvas).toHaveBeenCalledWith(
+      'c2',
+      expect.objectContaining({ canvasId: 'canvas-1', x: 10, y: 20, z: 9 }),
+    )
+  })
+
+  it('idempotent: DB canvasPosition already on this canvas → no moveToCanvas / removeFromCanvas (normal edit no-op)', () => {
+    const canvasId = 'canvas-1' as unknown as CanvasId
+    const card = makeCardLike({
+      id: 'c3',
+      canvasPosition: {
+        canvasId,
+        x: 5,
+        y: 6,
+        w: 240,
+        h: 120,
+        z: 1,
+        rotation: 0,
+      },
+    })
+    const hostEls: import('@cys-stift/canvas-engine').CanvasElement[] = [{ id: 'c3', kind: 'card', x: 5, y: 6, w: 240, h: 120, rotation: 0 }]
+    const { host } = makeHostMock(hostEls)
+    const svc = {
+      get: vi.fn(() => card),
+      listOnCanvas: vi.fn(() => [card]),
+      moveToCanvas: vi.fn(),
+      removeFromCanvas: vi.fn(),
+      restore: vi.fn(),
+    } as unknown as CardService
+
+    reconcileCanvasHistory(host, svc, canvasId)
+
+    expect(svc.moveToCanvas).not.toHaveBeenCalled()
+    expect(svc.removeFromCanvas).not.toHaveBeenCalled()
+    expect(svc.restore).not.toHaveBeenCalled()
+  })
+
+  it('undo after eraser softDelete: host restored the element but DB deletedAt still set → restore then moveToCanvas', () => {
+    const canvasId = 'canvas-1' as unknown as CanvasId
+    // eraser card 模式 softDelete 后 undo:host 恢复元素,DB deletedAt 仍设、canvasPosition 被清。
+    const card = makeCardLike({ id: 'c4', deletedAt: new Date(), canvasPosition: undefined })
+    const hostEls: import('@cys-stift/canvas-engine').CanvasElement[] = [{ id: 'c4', kind: 'card', x: 1, y: 2, w: 240, h: 120, rotation: 0 }]
+    const { host } = makeHostMock(hostEls)
+    const restore = vi.fn()
+    const moveToCanvas = vi.fn()
+    const svc = {
+      get: vi.fn(() => card),
+      listOnCanvas: vi.fn(() => []),
+      moveToCanvas,
+      removeFromCanvas: vi.fn(),
+      restore,
+    } as unknown as CardService
+
+    reconcileCanvasHistory(host, svc, canvasId)
+
+    expect(restore).toHaveBeenCalledWith('c4')
+    expect(moveToCanvas).toHaveBeenCalledWith(
+      'c4',
+      expect.objectContaining({ canvasId: 'canvas-1' }),
+    )
+  })
+
+  it('skips archived cards in host → DB direction (user archived, not eraser)', () => {
+    const canvasId = 'canvas-1' as unknown as CanvasId
+    const card = makeCardLike({ id: 'c5', archived: true, canvasPosition: undefined })
+    const hostEls: import('@cys-stift/canvas-engine').CanvasElement[] = [{ id: 'c5', kind: 'card', x: 0, y: 0, w: 240, h: 120, rotation: 0 }]
+    const { host } = makeHostMock(hostEls)
+    const svc = {
+      get: vi.fn(() => card),
+      listOnCanvas: vi.fn(() => []),
+      moveToCanvas: vi.fn(),
+      removeFromCanvas: vi.fn(),
+      restore: vi.fn(),
+    } as unknown as CardService
+
+    reconcileCanvasHistory(host, svc, canvasId)
+
+    expect(svc.moveToCanvas).not.toHaveBeenCalled()
+    expect(svc.restore).not.toHaveBeenCalled()
+  })
+
+  it('skips non-card elements (freeform text/freedraw/arrow/rect have their own persistence)', () => {
+    const canvasId = 'canvas-1' as unknown as CanvasId
+    const hostEls: import('@cys-stift/canvas-engine').CanvasElement[] = [
+      { id: 'f1', kind: 'text', x: 0, y: 0, w: 100, h: 50, rotation: 0 },
+      { id: 'f2', kind: 'freedraw', x: 0, y: 0, w: 100, h: 50, rotation: 0 },
+    ]
+    const { host } = makeHostMock(hostEls)
+    const svc = {
+      get: vi.fn(() => null),
+      listOnCanvas: vi.fn(() => []),
+      moveToCanvas: vi.fn(),
+      removeFromCanvas: vi.fn(),
+      restore: vi.fn(),
+    } as unknown as CardService
+
+    reconcileCanvasHistory(host, svc, canvasId)
+
+    expect(svc.get).not.toHaveBeenCalled()
+    expect(svc.moveToCanvas).not.toHaveBeenCalled()
+  })
+})
+
+describe('reconcileCanvasHistory (pure): DB → host direction (reverse diff)', () => {
+  it('redo / ghost-revival: DB has card on this canvas but host does not → removeFromCanvas (back to inbox)', () => {
+    const canvasId = 'canvas-1' as unknown as CanvasId
+    // undo 把卡从 host 撤掉,DB 仍记录在本画布 → 反向差集把它清回 inbox,堵幽灵复活。
+    const card = makeCardLike({
+      id: 'g1',
+      canvasPosition: { canvasId, x: 0, y: 0, w: 240, h: 120, z: 0, rotation: 0 },
+    })
+    const { host } = makeHostMock([]) // host 空:host 没有这张卡
+    const removeFromCanvas = vi.fn()
+    const svc = {
+      get: vi.fn(() => card),
+      listOnCanvas: vi.fn(() => [card]),
+      moveToCanvas: vi.fn(),
+      removeFromCanvas,
+      restore: vi.fn(),
+    } as unknown as CardService
+
+    reconcileCanvasHistory(host, svc, canvasId)
+
+    expect(removeFromCanvas).toHaveBeenCalledWith('g1')
+  })
+
+  it('reverse diff skips archived cards (not on host, but archived by intent)', () => {
+    const canvasId = 'canvas-1' as unknown as CanvasId
+    const card = makeCardLike({
+      id: 'g2',
+      archived: true,
+      canvasPosition: { canvasId, x: 0, y: 0, w: 240, h: 120, z: 0, rotation: 0 },
+    })
+    const { host } = makeHostMock([])
+    const svc = {
+      get: vi.fn(() => card),
+      listOnCanvas: vi.fn(() => [card]),
+      moveToCanvas: vi.fn(),
+      removeFromCanvas: vi.fn(),
+      restore: vi.fn(),
+    } as unknown as CardService
+
+    reconcileCanvasHistory(host, svc, canvasId)
+
+    expect(svc.removeFromCanvas).not.toHaveBeenCalled()
+  })
+
+  it('reverse diff skips soft-deleted cards', () => {
+    const canvasId = 'canvas-1' as unknown as CanvasId
+    const card = makeCardLike({
+      id: 'g3',
+      deletedAt: new Date(),
+      canvasPosition: { canvasId, x: 0, y: 0, w: 240, h: 120, z: 0, rotation: 0 },
+    })
+    const { host } = makeHostMock([])
+    const svc = {
+      get: vi.fn(() => card),
+      listOnCanvas: vi.fn(() => [card]),
+      moveToCanvas: vi.fn(),
+      removeFromCanvas: vi.fn(),
+      restore: vi.fn(),
+    } as unknown as CardService
+
+    reconcileCanvasHistory(host, svc, canvasId)
+
+    expect(svc.removeFromCanvas).not.toHaveBeenCalled()
+  })
+})
+
+describe('reconcileCanvasHistory (pure): wraps both directions in a single applyWithoutEcho', () => {
+  it('calls applyWithoutEcho exactly once (echo suppression boundary)', () => {
+    const canvasId = 'canvas-1' as unknown as CanvasId
+    let applyCount = 0
+    const host = {
+      getElements: vi.fn(() => [] as import('@cys-stift/canvas-engine').CanvasElement[]),
+      getElement: vi.fn(() => undefined),
+      upsert: vi.fn(),
+      remove: vi.fn(),
+      applyWithoutEcho: vi.fn((fn: () => void) => {
+        applyCount++
+        fn()
+      }),
+      onUserChange: vi.fn(() => () => {}),
+      onHistoryChange: vi.fn(() => () => {}),
+    } as unknown as import('@cys-stift/canvas-engine').CanvasHost
+    const svc = {
+      get: vi.fn(() => null),
+      listOnCanvas: vi.fn(() => []),
+      moveToCanvas: vi.fn(),
+      removeFromCanvas: vi.fn(),
+      restore: vi.fn(),
+    } as unknown as CardService
+
+    reconcileCanvasHistory(host, svc, canvasId)
+
+    expect(applyCount).toBe(1)
   })
 })
 
