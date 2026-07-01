@@ -46,6 +46,7 @@ const PAYLOAD: CystiftPayload = {
       links: [],
       codeSnippets: [],
       quotes: [],
+      tags: [],
       source: { kind: 'manual', deviceId: 'dev' } as never,
       capturedAt: new Date('2026-06-21T00:00:00Z'),
       createdAt: new Date('2026-06-21T00:00:00Z'),

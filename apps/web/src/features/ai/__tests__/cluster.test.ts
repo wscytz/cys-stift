@@ -60,7 +60,7 @@ describe('buildClusterUserPrompt', () => {
 
   it('never includes media.dataUrl', () => {
     const card = fakeCard('1', 'X')
-    card.media = [{ assetId: 'a1', order: 0, kind: 'image', dataUrl: 'data:image/png;base64,BIGSECRET' }]
+    ;(card as any).media = [{ assetId: 'a1', order: 0, kind: 'image', dataUrl: 'data:image/png;base64,BIGSECRET' }]
     const prompt = buildClusterUserPrompt([card])
     expect(prompt).not.toContain('BIGSECRET')
     expect(prompt).not.toContain('dataUrl')

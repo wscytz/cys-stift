@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Card } from '@cys-stift/domain'
-import type { AIConfig, AIProviderId } from '../types'
+import type { AIConfig, ProviderId } from '../types'
 import type { AIAction } from '../prompts'
 
 // Mock streamText BEFORE importing the module under test.
@@ -11,7 +11,7 @@ vi.mock('../stream-text', () => ({ streamText: mockStreamText }))
 let runAIAction: typeof import('../ai-actions').runAIAction
 
 const FAKE_CFG: AIConfig = {
-  provider: 'openai' as AIProviderId,
+  provider: 'openai' as ProviderId,
   enabled: true,
   model: 'gpt-4',
   apiKey: 'sk-fake-key-should-not-leak',

@@ -22,6 +22,7 @@ function card(title: string, body = ''): Card {
     links: [],
     codeSnippets: [],
     quotes: [],
+    tags: [],
     source: { kind: 'manual', deviceId: 'dev' } as never,
     capturedAt: new Date(),
     createdAt: new Date(),

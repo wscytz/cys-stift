@@ -14,6 +14,7 @@ function card(id: string, title: string, body = ''): Card {
     links: [],
     codeSnippets: [],
     quotes: [],
+    tags: [],
     source: { kind: 'manual', deviceId: 'd' } as never,
     capturedAt: new Date(),
     createdAt: new Date(),

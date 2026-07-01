@@ -84,7 +84,7 @@ describe('serializeCard — frontmatter', () => {
 
   it('emits `color: <token>` only when color is set', () => {
     expect(serializeCard(makeCard())).not.toMatch(/^color:/m)
-    expect(serializeCard(makeCard({ color: 'var(--color-red)' }))).toContain('color: var(--color-red)')
+    expect(serializeCard(makeCard({ color: 'red' }))).toContain('color: red')
   })
 })
 
@@ -290,7 +290,7 @@ describe('serializeCard — integration', () => {
     putImageAsset('ma-1')
     const card = makeCard({
       pinned: true,
-      color: 'var(--color-blue)',
+      color: 'blue',
       media: [{ assetId: 'ma-1' as unknown as MediaAssetId, order: 0, caption: 'pic' }],
       links: [{ url: 'https://e.com', title: 'E', fetchedAt: new Date('2026-06-01T00:00:00.000Z') }],
       codeSnippets: [{ language: 'ts', code: '1+1' }],

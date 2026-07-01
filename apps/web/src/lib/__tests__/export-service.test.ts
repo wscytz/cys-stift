@@ -420,7 +420,7 @@ describe('export → import round-trip (no data loss)', () => {
       codeSnippets: [{ language: 'ts', code: 'const x = 1', caption: 'c' }],
       quotes: [{ text: 'hi\nbye', attribution: 'a', sourceUrl: 'https://e.com/q' }],
       tags: [{ value: 't', color: 'var(--color-blue)' }],
-      color: 'var(--color-red)',
+      color: 'red',
     })
     seedStores({ cards: [card] })
 
@@ -430,6 +430,7 @@ describe('export → import round-trip (no data loss)', () => {
     expect(result.ok).toBe(true)
 
     const restored = (JSON.parse(window.localStorage.getItem(CARDS_KEY)!) as { cards: Card[] }).cards[0]
+    if (!restored) throw new Error('test setup: restored card missing')
     // Date fields (capturedAt/createdAt/updatedAt, links[].fetchedAt) survive
     // as ISO strings through the JSON round-trip — compare the stored shape.
     const stored = asStored(card)

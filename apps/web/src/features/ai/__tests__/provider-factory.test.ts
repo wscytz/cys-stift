@@ -15,7 +15,7 @@ describe('AIProviderFactory', () => {
   })
 
   it('registers all 3 providers on first call', () => {
-    expect(aiProviderFactory.list().sort()).toEqual([
+    expect([...aiProviderFactory.list()].sort()).toEqual([
       'anthropic',
       'ollama',
       'openai',
@@ -24,7 +24,7 @@ describe('AIProviderFactory', () => {
 
   it('register is idempotent (second call is a no-op)', () => {
     registerDefaultProviders()
-    expect(aiProviderFactory.list().sort()).toEqual([
+    expect([...aiProviderFactory.list()].sort()).toEqual([
       'anthropic',
       'ollama',
       'openai',

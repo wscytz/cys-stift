@@ -105,8 +105,8 @@ describe('card-detail fix premises (CardService contract)', () => {
     it('round-trips title, body, and tags when all three are in the patch', () => {
       const c = service.create({ title: 'orig', source: dummySource })
       const tags: TagRef[] = [
-        { value: 'bug-c', color: 'red' },
-        { value: 'canvas', color: 'blue' },
+        { value: 'bug-c', color: 'var(--color-red)' },
+        { value: 'canvas', color: 'var(--color-blue)' },
       ]
       // This is the shape the canvas CardDetailModal emits:
       //   onSave({ title, body, tags })
@@ -136,7 +136,7 @@ describe('card-detail fix premises (CardService contract)', () => {
       const patch = {
         title: 'edited title',
         body: 'edited body',
-        tags: [{ value: 'should-persist', color: 'red' }] as TagRef[],
+        tags: [{ value: 'should-persist', color: 'var(--color-red)' }] as TagRef[],
       }
       // Buggy shape (what the fix removed): only title+body.
       service.update(c.id, { title: patch.title, body: patch.body })

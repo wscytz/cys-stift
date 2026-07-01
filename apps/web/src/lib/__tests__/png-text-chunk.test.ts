@@ -48,7 +48,7 @@ describe('png-text-chunk roundtrip', () => {
     // IEND type bytes still present at the tail (last 8 bytes: type+CRC,
     // preceded by 4-byte zero length).
     const tail = png.subarray(png.length - 8)
-    expect(String.fromCharCode(tail[0], tail[1], tail[2], tail[3])).toBe('IEND')
+    expect(String.fromCharCode(...tail.subarray(0, 4))).toBe('IEND')
   })
 })
 
@@ -59,7 +59,7 @@ describe('payload encode/decode (Unicode-safe via the tEXt chunk)', () => {
     // Encoded form is ASCII-safe (safe inside a Latin-1 tEXt chunk).
     expect(() => encodeURIComponent(encoded)).not.toThrow()
     const png = writePngTextChunk(minimalPng(), 'cystift', encoded)
-    const back = decodePayload(readPngTextChunk(png, 'cystift'))
+    const back = decodePayload(readPngTextChunk(png, 'cystift') ?? '')
     expect(back).toEqual(payload)
   })
 
@@ -74,6 +74,6 @@ describe('payload encode/decode (Unicode-safe via the tEXt chunk)', () => {
       readPngTextChunk(png, 'cystift') ?? '',
     )
     expect(back?.cards.length).toBe(50)
-    expect(back?.cards[49].id).toBe(49)
+    expect(back?.cards[49]?.id).toBe(49)
   })
 })
