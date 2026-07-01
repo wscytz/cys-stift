@@ -13,8 +13,8 @@
 > 新会话 / `/clear` 后先读 `docs/STATE.md`(版本里程碑 + 当前能力 + 下一步 + 已知 debt)。
 > 历史变更见 `docs/changelog.md`(newest-first)。
 
-- 完整进度：`docs/STATE.md`(当前状态) + `docs/changelog.md`(历史) + `docs/development/polish-phase.md`(打磨判据/流程) + `docs/user/README.md`（用户指南）+ `docs/user/privacy.md`（**AI 隐私必读**）；`docs/development/roadmap.md` 是 Phase 7-9 **已完成**的历史档
-- 任务流程参考：`docs/archive/ralph/README.md`（已归档，见下）
+- 完整进度：`docs/STATE.md`(当前状态) + `docs/changelog.md`(历史) + 🔒 `docs/development/polish-phase.md`(私有,打磨判据/流程) + `docs/user/README.md`（用户指南）+ `docs/user/privacy.md`（**AI 隐私必读**）；🔒 `docs/development/roadmap.md`(私有)是 Phase 7-9 **已完成**的历史档
+- 任务流程参考：🔒 `docs/archive/ralph/README.md`（私有,已归档,见下）
 
 ## 技术栈（不可重新选型）
 
@@ -39,26 +39,28 @@
 
 ## 关键文件位置
 
+> **过程文档已迁移至私有仓库 `cys-stift-docs`(2026-07-01)。** 本仓库(public)只留用户向文档(STATE/changelog/user/setup/tokens/architecture-overview)。下表标 🔒 的在私有仓库 —— 本地需并排 clone `cys-stift-docs` 才能读。详见 [`docs/INTERNAL-DOCS.md`](docs/INTERNAL-DOCS.md)。
+
 | 想知道什么 | 看哪里 |
 |---|---|
-| 产品与引擎定位 / 优先级框架(方向迷茫先读) | `docs/product-and-engine.md` |
-| 整体设计 / 数据模型 / 路线图 | `docs/specs/2026-06-19-cys-stift-design.md` |
-| 当前 phase 的实现计划 | `docs/plans/` |
-| Ralph 任务指南 + compact/clear 规则 | `docs/archive/ralph/README.md`（已归档） |
-| 架构决策记录 | `docs/adr/` |
+| 产品与引擎定位 / 优先级框架(方向迷茫先读) | 🔒 `docs/product-and-engine.md`(私有) |
+| 整体设计 / 数据模型 / 路线图 | 🔒 `docs/specs/2026-06-19-cys-stift-design.md`(私有,五轮审查定稿,不可修改) |
+| 当前 phase 的实现计划 | 🔒 `docs/plans/`(私有) |
+| Ralph 任务指南 + compact/clear 规则 | 🔒 `docs/archive/ralph/README.md`(私有,已归档) |
+| 架构决策记录 | 🔒 `docs/adr/`(私有) |
 | 设计 token 规则 | `docs/design/tokens.md` |
-| 跨模型记忆 | `docs/decisions/INDEX.md` |
+| 跨模型记忆 | 🔒 `docs/decisions/INDEX.md`(私有) |
 | 阶段变更历史 | `docs/changelog.md` |
 | 开发环境搭建 | `docs/development/setup.md` |
-| 依赖清单（装了什么） | `docs/development/dependencies.md` |
-| 验证门 + 提交纪律（改完代码照这跑） | `docs/development/definition-of-done.md` |
-| 长效验收（发布手测 + 守卫脚本 + 月度审计） | `docs/development/acceptance-plan.md` |
-| UI 设计系统（颜色/间距/尺寸/排版/分层规范） | `docs/design/design-system.md` + `docs/design/interaction-language.md`（交互态）|
+| 依赖清单（装了什么） | 🔒 `docs/development/dependencies.md`(私有) |
+| 验证门 + 提交纪律（改完代码照这跑） | 🔒 `docs/development/definition-of-done.md`(私有) |
+| 长效验收（发布手测 + 守卫脚本 + 月度审计） | 🔒 `docs/development/acceptance-plan.md`(私有) |
+| UI 设计系统（颜色/间距/尺寸/排版/分层规范） | 🔒 `docs/design/design-system.md` + `docs/design/interaction-language.md`(私有,交互态)|
 
 ## 验证命令（改完代码就跑）
 
 > **完整验证门 + 判据**（web lint 基线、产品门、提交纪律）见
-> [`docs/development/definition-of-done.md`](docs/development/definition-of-done.md)。简版：
+> 🔒 `docs/development/definition-of-done.md`（私有仓库 cys-stift-docs）。简版：
 
 ```bash
 pnpm -r test                  # 全包 vitest（domain / db / canvas-engine / web）

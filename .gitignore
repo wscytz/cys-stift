@@ -79,3 +79,22 @@ docs/superpowers/
 docs/design/screenshots/
 docs/screenshots/
 
+
+# 过程文档已迁移至私有仓库 cys-stift-docs(2026-07-01)
+# 用户向文档(STATE/changelog/user/setup/tokens/architecture-overview)留本仓库;
+# 过程思考(specs/adr/audit/decisions/plans/development 内部/design 内部等)
+# 见 https://github.com/wscytz/cys-stift-docs(private)。
+docs/specs/
+docs/adr/
+docs/audit/
+docs/product-and-engine.md
+docs/reference.md
+# development/ 只跟踪 setup.md,其余过程文档不进 public
+docs/development/*
+!docs/development/setup.md
+# design/ 只跟踪 tokens.md
+docs/design/*
+!docs/design/tokens.md
+# architecture/ 只跟踪 overview.md
+docs/architecture/*
+!docs/architecture/overview.md

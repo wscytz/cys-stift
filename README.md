@@ -68,14 +68,13 @@ cys-stift/
 
 | 你想知道什么 | 看哪里 |
 |---|---|
-| 整体设计 / 数据模型 / 路线图 | [`docs/specs/2026-06-19-cys-stift-design.md`](./docs/specs/2026-06-19-cys-stift-design.md) |
-| 当前阶段的实现计划 | [`docs/plans/`](./docs/plans/) |
 | 架构总览 | [`docs/architecture/overview.md`](./docs/architecture/overview.md) |
-| 为什么这样设计 | [`docs/adr/`](./docs/adr/) |
 | 设计 token / 包豪斯规则 | [`docs/design/tokens.md`](./docs/design/tokens.md) |
 | 如何搭建开发环境 | [`docs/development/setup.md`](./docs/development/setup.md) |
-| 跨会话上下文 | [`docs/memory/`](./docs/memory/) |
+| 用户指南 / 隐私说明 | [`docs/user/`](./docs/user/) |
+| 当前状态 / 版本里程碑 | [`docs/STATE.md`](./docs/STATE.md) |
 | 阶段变更历史 | [`docs/changelog.md`](./docs/changelog.md) |
+| 内部过程文档(设计思考/计划/决策) | 已迁移至私有仓库,见 [`docs/INTERNAL-DOCS.md`](./docs/INTERNAL-DOCS.md) |
 
 ---
 
