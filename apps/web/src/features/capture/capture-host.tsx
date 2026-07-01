@@ -246,11 +246,17 @@ export function CaptureHost() {
     invokeUpdateShortcut(captureShortcutToAccelerator(sc))
   }, [sc.modKey, sc.shift, sc.code])
 
-  // Register the web sink on mount. Other sinks (Phase 6.5g MenuCaptureSink,
+  // Register the web sinks on mount. Other sinks (Phase 6.5g MenuCaptureSink,
   // Phase 8 TauriCaptureSink) can also register against the same registry.
   // The `cancelled` flag guards both dynamic imports: if the host unmounts
   // before an import resolves, we skip registering instead of leaking a
   // phantom sink that the cleanup (already run) can't remove.
+  //
+  // 'manual' kind 也在这里注册(与 shortcut/menubar 同范式)。它不归 inbox
+  // 单页:archive/timeline/详情等页也用 { kind: 'manual' } 作为 fallback
+  // 提交路径(CreateCardForm / AI append-new 等)。sink 生命周期绑在全局 host
+  // 上,跨页行为一致;之前绑 inbox 页时,离开 inbox 后这类 submit 只能落到
+  // fallbackService。register 用 Map.set 去重,host 卸载时统一 unregister。
   useEffect(() => {
     let cancelled = false
     // Fallback first: if a submit arrives before the dynamic-import
@@ -264,10 +270,15 @@ export function CaptureHost() {
       if (cancelled) return
       captureSinkRegistry.register('menubar', new MenuCaptureSink(service))
     })
+    void import('./capture-sink').then(({ WebCaptureSink }) => {
+      if (cancelled) return
+      captureSinkRegistry.register('manual', new WebCaptureSink(service))
+    })
     return () => {
       cancelled = true
       captureSinkRegistry.unregister('shortcut')
       captureSinkRegistry.unregister('menubar')
+      captureSinkRegistry.unregister('manual')
     }
   }, [service])
 
