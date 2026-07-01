@@ -585,7 +585,11 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         const dsl = serializeCanvas(selected)
         navigator.clipboard?.writeText(dsl).then(() => {
           pushToast({ kind: 'success', message: t('canvas.copyDslOk', { n: String(selected.length) }) })
-        }).catch(() => {})
+        }).catch(() => {
+          // 剪贴板写失败(权限拒/非安全上下文)别静默 —— 否则用户看到无 toast 以为已复制,
+          // 切去粘贴才发现是旧内容(与 dsl-dialog copy() 的 catch 同范式)。
+          pushToast({ kind: 'error', message: t('canvas.dslCopyFail') })
+        })
         return
       }
       // ⌘. / Ctrl+. 切换焦点模式(隐藏所有 chrome,只留画布)。独立于下面的
@@ -1374,7 +1378,10 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           setCtxMenu(null)
         }}
         onPasteDsl={() => {
-          navigator.clipboard?.readText().then((text) => applyDslFromText(text ?? '')).catch(() => {})
+          navigator.clipboard?.readText().then((text) => applyDslFromText(text ?? '')).catch(() => {
+            // 读取失败(权限拒/空剪贴板)给反馈 —— 否则右键粘贴 DSL 无任何提示,用户不知为何没粘。
+            pushToast({ kind: 'info', message: t('canvas.pasteDslReadFail') })
+          })
         }}
         onFitView={() => zoomBy('fit')}
       />

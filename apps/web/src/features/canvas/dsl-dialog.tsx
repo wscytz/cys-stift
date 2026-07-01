@@ -133,7 +133,7 @@ export function DslDialog({
     if (!host) return
     const selectedIds = host.getSelectedIds()
     if (selectedIds.length === 0) {
-      pushToast({ kind: 'info', message: '请先选中元素' })
+      pushToast({ kind: 'info', message: t('canvas.dslSelectFirst') })
       return
     }
     const allElements = host.getElements()
@@ -141,7 +141,7 @@ export function DslDialog({
     const dsl = serializeCanvas(selectedElements)
     try {
       await navigator.clipboard.writeText(dsl)
-      pushToast({ kind: 'success', message: `已复制 ${selectedIds.length} 个元素的 DSL` })
+      pushToast({ kind: 'success', message: t('canvas.copyDslOk', { n: String(selectedIds.length) }) })
     } catch {
       pushToast({ kind: 'error', message: t('canvas.dslCopyFail') })
     }

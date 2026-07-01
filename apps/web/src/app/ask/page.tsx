@@ -251,9 +251,15 @@ export default function AskPage() {
                 rows={1}
                 disabled={busy}
               />
-              <Button variant="primary" onClick={() => void send()} disabled={busy || !input.trim()}>
-                {busy ? t('ask.thinking') : t('ask.send')}
-              </Button>
+              {busy ? (
+                <Button variant="ghost" onClick={() => abortRef.current?.abort()}>
+                  {t('ask.stop')}
+                </Button>
+              ) : (
+                <Button variant="primary" onClick={() => void send()} disabled={!input.trim()}>
+                  {t('ask.send')}
+                </Button>
+              )}
             </div>
           </div>
         )}

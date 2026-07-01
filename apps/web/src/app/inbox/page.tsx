@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { BauhausMotif, Button, Card as UICard, Tag, Toolbar } from '@cys-stift/ui'
+import { BauhausMotif, Button, Card as UICard, Modal, Tag, Toolbar } from '@cys-stift/ui'
 import type { Card, CardId } from '@cys-stift/domain'
 import { findDuplicateGroups, type DuplicateGroup } from '@cys-stift/domain'
 import { CreateCardForm } from './create-card-form'
@@ -31,6 +31,9 @@ export default function InboxPage() {
   const [detail, setDetail] = useState<Card | null>(null)
   // 批量多选(P12 UX 打磨):checkbox 选中卡片,底部动作栏批量归档/移到画布/删除。
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  // 批量删除确认门(与 archive.batch 一致):点删除先弹 Modal 确认,防误删多张。
+  // softDelete 可从 /trash 恢复,但误删多张要逐张找回,确认门值得。
+  const [confirmDeleteIds, setConfirmDeleteIds] = useState<string[] | null>(null)
   const toggleSelect = useCallback((id: string) => {
     setSelected((prev) => {
       const next = new Set(prev)
@@ -162,9 +165,15 @@ export default function InboxPage() {
       ),
     })
   }
-  const batchDelete = () => {
-    const n = selectedArr.length
-    for (const id of selectedArr) service.softDelete(id as CardId)
+  const requestBatchDelete = () => {
+    if (selectedArr.length === 0) return
+    setConfirmDeleteIds(selectedArr)
+  }
+  const confirmBatchDelete = () => {
+    if (!confirmDeleteIds) return
+    const n = confirmDeleteIds.length
+    for (const id of confirmDeleteIds) service.softDelete(id as CardId)
+    setConfirmDeleteIds(null)
     clearSelection()
     pushToast({
       kind: 'success',
@@ -390,7 +399,7 @@ export default function InboxPage() {
               {t('inbox.batch.sendToCanvas')}
             </button>
           )}
-          <button type="button" className="batch-bar__btn batch-bar__btn--danger" onClick={batchDelete}>
+          <button type="button" className="batch-bar__btn batch-bar__btn--danger" onClick={requestBatchDelete}>
             {t('inbox.batch.delete')}
           </button>
           <span className="batch-bar__spacer" />
@@ -401,6 +410,26 @@ export default function InboxPage() {
             {t('inbox.batch.cancel')}
           </button>
         </div>
+      )}
+
+      {confirmDeleteIds && (
+        <Modal
+          open
+          onClose={() => setConfirmDeleteIds(null)}
+          title={t('inbox.batch.deleteConfirmTitle', { n: confirmDeleteIds.length })}
+        >
+          <p className="confirm__body">
+            {t('inbox.batch.deleteConfirmBody', { n: confirmDeleteIds.length })}
+          </p>
+          <div className="confirm__actions">
+            <Button variant="ghost" onClick={() => setConfirmDeleteIds(null)}>
+              {t('common.cancel')}
+            </Button>
+            <Button variant="danger" onClick={confirmBatchDelete}>
+              {t('inbox.batch.deleteConfirmAction', { n: confirmDeleteIds.length })}
+            </Button>
+          </div>
+        </Modal>
       )}
 
       {effectiveDetail && (
@@ -571,6 +600,8 @@ const styles = `
 .batch-bar__btn--danger:hover { background: var(--color-red); border-color: var(--color-red); }
 .batch-bar__spacer { width: var(--space-3); }
 .batch-bar__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.confirm__body { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
+.confirm__actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-2); }
 .tile__main {
   flex: 1; display: flex; width: 100%;
   background: transparent; border: 0; padding: 0; text-align: left;
