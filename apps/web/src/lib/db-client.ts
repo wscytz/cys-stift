@@ -178,6 +178,9 @@ const cardRepo = {
     if (!persist()) {
       _cards = prev
       notifyQuota()
+      // 镜像 insert:抛 StorageQuotaError 让 CardService.write 捕获返失败值
+      // (null/false),不返幻影状态。此前不抛 → CardService.update 照返 next → reload 丢编辑。
+      throw new StorageQuotaError()
     }
   },
   delete(id: CardId) {
@@ -186,6 +189,7 @@ const cardRepo = {
     if (!persist()) {
       _cards = prev
       notifyQuota()
+      throw new StorageQuotaError()
     }
   },
   getById(id: CardId) {

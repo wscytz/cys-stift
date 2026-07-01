@@ -397,3 +397,50 @@ describe('saveSnapshot QuotaExceeded 防护', () => {
     expect(all.map((c) => c.id)).toEqual(['base-1'])
   })
 })
+
+describe('db-client — update/delete throw StorageQuotaError on quota failure', () => {
+  // quota-update-fix:配额满时 update/delete 必须抛(镜像 insert),让 CardService.write
+  // 捕获返失败值。此前只回滚+notifyQuota 不抛 → CardService.update 返幻影 next → reload 丢编辑。
+  it('update throws + rolls back to prev on quota failure', async () => {
+    const { __test__ } = await import('../db-client')
+    // vi.resetModules() 下,顶部静态 import 的 StorageQuotaError 与 db-client 动态
+    // import 的不是同一 class 实例 → instanceof 失败。动态 import 取同周期实例。
+    const { StorageQuotaError } = await import('@cys-stift/domain')
+    const { cardRepo } = __test__
+    const orig = makeCard({ id: toCardId('q-1'), title: 'orig' })
+    window.localStorage.setItem(STORAGE_KEY, serializeCards([orig]))
+    rehydrateCards()
+    expect(cardRepo.getById(toCardId('q-1'))!.title).toBe('orig')
+
+    const quotaErr = new DOMException('quota exceeded', 'QuotaExceededError')
+    // jsdom localStorage.setItem 在 Storage.prototype 上、实例不可写,
+    // vi.spyOn(window.localStorage,...) 拦不到 —— 必须 spy Storage.prototype。
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw quotaErr
+    })
+
+    const edited = makeCard({ id: toCardId('q-1'), title: 'edited' })
+    expect(() => cardRepo.update(edited)).toThrow(StorageQuotaError)
+    // 内存已回滚到 prev:getById 读到 orig(不是 edited)
+    expect(cardRepo.getById(toCardId('q-1'))!.title).toBe('orig')
+  })
+
+  it('delete throws + rolls back on quota failure', async () => {
+    const { __test__ } = await import('../db-client')
+    const { StorageQuotaError } = await import('@cys-stift/domain')
+    const { cardRepo } = __test__
+    const orig = makeCard({ id: toCardId('q-2'), title: 'orig' })
+    window.localStorage.setItem(STORAGE_KEY, serializeCards([orig]))
+    rehydrateCards()
+    expect(cardRepo.getById(toCardId('q-2'))).not.toBeNull()
+
+    const quotaErr = new DOMException('quota exceeded', 'QuotaExceededError')
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw quotaErr
+    })
+
+    expect(() => cardRepo.delete(toCardId('q-2'))).toThrow(StorageQuotaError)
+    // 回滚:卡仍在(未删)
+    expect(cardRepo.getById(toCardId('q-2'))).not.toBeNull()
+  })
+})
