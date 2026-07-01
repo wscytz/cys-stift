@@ -106,18 +106,22 @@ export default function AskPage() {
       const canvasSnapshot = formatCanvasSnapshot(snapshotCanvas(host, service, targetCanvasId))
       const userPrompt = buildAgentUserPrompt(question, allCards, canvasSnapshot)
 
-      const apiMessages = [
-        ...history,
-        { role: 'user' as const, content: userPrompt },
-      ]
-
       let acc = ''
       const result = await streamText(
         cfg,
         // structuredOutput:对 DeepSeek 等思考端点关思考。实测思考模式下 DSL
         // 格式不稳定(reuse #id 而非 [card #id])+ 慢 3-7x;关思考后 DSL 稳定。
         // agent 主要任务是改画布(结构化输出),问答够用即可,取舍值得。非思考端点 no-op。
-        { system: AGENT_SYSTEM_PROMPT, user: userPrompt, maxTokens: 4096, structuredOutput: true, timeoutMs: 60_000 },
+        {
+          system: AGENT_SYSTEM_PROMPT,
+          user: userPrompt,
+          // 多轮记忆:透传历史 user/assistant(纯问答) + 当前 userPrompt(含 RAG)。
+          // provider 拼成 [system, ...history, {user: userPrompt}]。原 apiMessages 构造后 void 致每轮零样本。
+          messages: history.length > 0 ? [...history, { role: 'user' as const, content: userPrompt }] : undefined,
+          maxTokens: 4096,
+          structuredOutput: true,
+          timeoutMs: 60_000,
+        },
         (chunk) => {
           acc += chunk
           setMessages((prev) => {
@@ -135,7 +139,6 @@ export default function AskPage() {
         next[next.length - 1] = { role: 'assistant', content: final, dslBlocks, streaming: false }
         return next
       })
-      void apiMessages // history 已透传(streamText 单 system+user 调用;多轮靠 messages 累积在下次拼)
     } catch (e) {
       if ((e as Error).name === 'AbortError') {
         pushToast({ kind: 'info', message: t('ai.error', { error: 'cancelled' }) })

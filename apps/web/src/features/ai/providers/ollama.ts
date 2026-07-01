@@ -35,10 +35,12 @@ export function createOllamaProvider(cfg: OllamaConfig): AIProvider {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: cfg.model,
-          messages: [
-            { role: 'system', content: req.system },
-            { role: 'user', content: req.user },
-          ],
+          messages: req.messages
+            ? [{ role: 'system', content: req.system }, ...req.messages]
+            : [
+                { role: 'system', content: req.system },
+                { role: 'user', content: req.user },
+              ],
           stream: true,
           options: {
             num_predict: req.maxTokens ?? 1024,

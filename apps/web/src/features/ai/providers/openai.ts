@@ -52,10 +52,12 @@ export function createOpenAIProvider(cfg: OpenAIConfig): AIProvider {
         },
         body: JSON.stringify({
           model: cfg.model,
-          messages: [
-            { role: 'system', content: req.system },
-            { role: 'user', content: req.user },
-          ],
+          messages: req.messages
+            ? [{ role: 'system', content: req.system }, ...req.messages]
+            : [
+                { role: 'system', content: req.system },
+                { role: 'user', content: req.user },
+              ],
           max_tokens: req.maxTokens ?? 1024,
           temperature: req.temperature ?? 0.7,
           stream: true,

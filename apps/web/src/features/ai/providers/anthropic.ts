@@ -39,7 +39,7 @@ export function createAnthropicProvider(cfg: AnthropicConfig): AIProvider {
         body: JSON.stringify({
           model: cfg.model,
           system: req.system,
-          messages: [{ role: 'user', content: req.user }],
+          messages: req.messages ?? [{ role: 'user', content: req.user }],
           max_tokens: req.maxTokens ?? 1024,
           temperature: req.temperature ?? 0.7,
           stream: true,

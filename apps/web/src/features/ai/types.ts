@@ -17,6 +17,12 @@ export type ProviderId = 'openai' | 'anthropic' | 'ollama'
 export interface AIRequest {
   system: string
   user: string
+  /**
+   * 多轮对话历史(可选)。提供时 provider 用 [system, ...messages] 替代单轮 system+user ——
+   * 让 AI 有上下文记忆(/ask agent 的多轮)。role 仅 user/assistant(system 走 req.system 顶级)。
+   * 不提供时(卡片动作/排版/cluster 等单轮任务)保持 system+user 向后兼容。
+   */
+  messages?: { role: 'user' | 'assistant'; content: string }[]
   model?: string
   maxTokens?: number
   temperature?: number
