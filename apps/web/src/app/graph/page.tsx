@@ -56,6 +56,13 @@ export default function GraphPage() {
 
   const filtered = useMemo(() => filterGraph(nodes, edges, filter), [nodes, edges, filter])
 
+  // 传 CardDetailModal 的边:过滤 from/to 指向已删卡的边(nodes 已滤 deletedAt,用 nodeIds 兜底)。
+  // 图谱内 filterGraph 兜底,但 globalEdges 直传 modal 会泄露已删卡关系到 backlinks(G7)。
+  const liveEdges = useMemo(() => {
+    const nodeIds = new Set(nodes.map((n) => n.id))
+    return edges.filter((e) => nodeIds.has(e.from) && nodeIds.has(e.to))
+  }, [edges, nodes])
+
   // 点节点弹 modal。
   const cardById = useMemo(() => {
     const m = new Map<CardId, Card>()
@@ -128,7 +135,7 @@ export default function GraphPage() {
           onClose={() => setDetail(null)}
           // BR-T5 — 注入全局边 + 卡标题查询,让详情里显示跨画布 backlinks 区。
           // onJumpToCard 第一版:关闭 modal(图谱内高亮节点留 2b)。
-          globalEdges={edges}
+          globalEdges={liveEdges}
           getCardTitle={(id) => service.get(id as CardId)?.title}
           onJumpToCard={() => setDetail(null)}
           // RB-T3 — graph 页有 useGlobalEdges + service.listAll,放开详情页建/删关系。
