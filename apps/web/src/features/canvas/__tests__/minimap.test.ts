@@ -81,13 +81,22 @@ describe('viewportRect', () => {
     expect(r).toEqual({ x: 0, y: 0, w: 800, h: 600 })
   })
 
-  it('zoom=2 halves dimensions; pan maps to page via /zoom', () => {
+  it('zoom=2 halves dimensions; pan maps to page via −pan/zoom (符号修)', () => {
     const v: CanvasView = { ...baseView, zoom: 2, panX: 10, panY: 20 }
     const r = viewportRect(v, HOST)
-    expect(r.x).toBe(5) // 10/2
-    expect(r.y).toBe(10) // 20/2
+    // 页坐标 = (screen − pan) / zoom = −pan/zoom(渲染 transform 是 translate(pan) scale(zoom))。
+    // 此前本测试断言 +5/+10(符号反,与实现的旧 bug 同向)—— 鸟瞰图方框镜像 bug 的根因。
+    expect(r.x).toBe(-5) // −10/2
+    expect(r.y).toBe(-10) // −20/2
     expect(r.w).toBe(400) // 800/2
     expect(r.h).toBe(300) // 600/2
+  })
+
+  it('pan(100,200) zoom 1 → 页原点 (−100, −200)(对齐引擎 viewportBounds)', () => {
+    const v: CanvasView = { ...baseView, zoom: 1, panX: 100, panY: 200 }
+    const r = viewportRect(v, HOST)
+    expect(r.x).toBe(-100)
+    expect(r.y).toBe(-200)
   })
 
   it('zoom=0.5 doubles dimensions', () => {

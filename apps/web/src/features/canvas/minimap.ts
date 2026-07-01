@@ -6,7 +6,7 @@
  * 不依赖引擎逻辑,只用 CanvasElement 的 {x,y,w,h}(通用 AABB)。
  */
 import type { CanvasElement, CanvasView } from '@cys-stift/canvas-engine'
-import { elementCenter, normalizeBox } from '@cys-stift/canvas-engine'
+import { elementCenter, normalizeBox, viewportBounds } from '@cys-stift/canvas-engine'
 
 export interface MinimapProjection {
   /** 页坐标 → minimap 坐标的缩放(minimap px / 页 px)。 */
@@ -80,20 +80,19 @@ export function computeMinimapProjection(
 
 /**
  * 当前视口(view + host canvas css 尺寸)→ 页坐标可见矩形。
- * 视口左上角屏幕坐标 = (panX, panY);页坐标 = screen / zoom。
- * 宽高 = hostSize / zoom。
+ * 视口左上角屏幕坐标 = (panX, panY);页坐标 = (screen − pan) / zoom = −panX/zoom。
+ *
+ * 委托引擎正解 `viewportBounds`(bounds.ts):render transform 是
+ * `translate(panX,panY) scale(zoom)`,故页坐标 = (screen − pan) / zoom,屏幕原点对应
+ * 页坐标 −panX/zoom(负号)。此前本函数误写 `+panX/zoom`(符号反),pan=0 时碰巧对,
+ * 一平移视口方框就镜像到画布另一侧(鸟瞰图方框 bug,2026-07-01 修)。直接复用引擎
+ * 单一实现,杜绝本函数与 culling/SVG 导出再分叉。
  */
 export function viewportRect(
   view: CanvasView,
   hostSize: { w: number; h: number },
 ): { x: number; y: number; w: number; h: number } {
-  const zoom = view.zoom || 1
-  return {
-    x: view.panX / zoom,
-    y: view.panY / zoom,
-    w: hostSize.w / zoom,
-    h: hostSize.h / zoom,
-  }
+  return viewportBounds(view, hostSize.w, hostSize.h)
 }
 
 /**
