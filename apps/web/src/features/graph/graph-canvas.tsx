@@ -501,7 +501,7 @@ function drawNode(
   if (isHover) {
     ctx.beginPath()
     ctx.arc(cx, cy, NODE_R + 4, 0, Math.PI * 2)
-    ctx.strokeStyle = readToken('--color-red', '#dc2626')
+    ctx.strokeStyle = readToken('--color-red', '#d40000')
     ctx.lineWidth = 1.5
     ctx.stroke()
   }

@@ -71,7 +71,7 @@ export function elementsToSvg(
   const bg = opts.background ? tokenResolver('--color-white', '#ffffff') : 'transparent'
   const cardFill = tokenResolver('--color-white', '#ffffff')
   const cardStroke = tokenResolver('--color-gray', '#e2e8f0')
-  const textCol = tokenResolver('--color-black', '#0f172a')
+  const textCol = tokenResolver('--color-black', '#0a0a0a')
   const grayCol = tokenResolver('--color-gray', '#64748b')
   const yellow = tokenResolver('--color-yellow', '#eab308')
   const fontBody = tokenResolver('--font-body', 'Inter, sans-serif')

@@ -592,9 +592,12 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         })
         return
       }
-      // ⌘. / Ctrl+. 切换焦点模式(隐藏所有 chrome,只留画布)。独立于下面的
-      // 工具键,需在 modal 让位前处理吗?— 不需要:modal 开时也不该切焦点,
-      // 放下方 modal 让位之后即可。但要在 input/textarea 让位前(编辑态按 ⌘. 不切)。
+      // 模态打开时画布快捷键全部让位(CardDetailModal/DSL/Export/Diff/Overview/Shortcut),
+      // 否则模态里按 +/g/v 等会在背后偷改画布视图/工具。⌘. 焦点模式也在让位之列 ——
+      // 否则 modal 里按 ⌘. 会切焦点,关闭 modal 后画布意外进入焦点模式。
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return
+      // ⌘. / Ctrl+. 切换焦点模式(隐藏所有 chrome,只留画布)。在 modal 守卫之后,
+      // input/textarea 让位之前(编辑态按 ⌘. 不切)。
       if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key === '.') {
         const tgt = e.target as HTMLElement | null
         if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return
@@ -602,9 +605,6 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         setFocusMode((m) => !m)
         return
       }
-      // 模态打开时画布快捷键全部让位(CardDetailModal/DSL/Export/Diff/Overview/Shortcut),
-      // 否则模态里按 +/g/v 等会在背后偷改画布视图/工具。
-      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return
       const tgt = e.target as HTMLElement | null
       if (tgt) {
         const tag = tgt.tagName

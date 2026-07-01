@@ -123,7 +123,7 @@ function drawElement(
       ctx.font = `10px ${tokenResolver('--font-mono', 'monospace')}`
       ctx.fillText(info.type.toUpperCase(), el.x + pad, el.y + pad)
       // title(content 字体:用户卡片标题,带中文系统回退,Canvas ctx.font 按串内顺序回退)。
-      ctx.fillStyle = tokenResolver('--color-black', '#0f172a')
+      ctx.fillStyle = tokenResolver('--color-black', '#0a0a0a')
       ctx.font = `500 15px ${tokenResolver('--font-content', 'Inter, "PingFang SC", "Microsoft YaHei UI", sans-serif')}`
       ctx.fillText(info.title || '(untitled)', el.x + pad, el.y + pad + 16)
       // body(3 行截断,content 字体:用户输入正文,中文回退同 title)
@@ -300,7 +300,7 @@ export function colorOf(c: string | undefined, tokenResolver: TokenResolver = do
     white: '--color-white',
     black: '--color-black',
   }
-  return tokenResolver(tokenFor[c ?? 'black'] ?? '--color-black', '#0f172a')
+  return tokenResolver(tokenFor[c ?? 'black'] ?? '--color-black', '#0a0a0a')
 }
 
 /**

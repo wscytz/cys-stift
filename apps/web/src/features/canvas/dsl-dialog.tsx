@@ -234,7 +234,7 @@ export function DslDialog({
           onClick={copySelected}
           disabled={!host || host.getSelectedIds().length === 0}
         >
-          复制选中
+          {t('canvas.dslCopySelected')}
         </Button>
         <Button variant="ghost" onClick={copyAsPrompt}>{t('canvas.dslCopyAsPrompt')}</Button>
         <Button variant="ghost" onClick={download}>{t('canvas.dslDownload')}</Button>

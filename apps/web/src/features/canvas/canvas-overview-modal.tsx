@@ -61,6 +61,16 @@ export function CanvasOverviewModal({
     force((n) => n + 1)
   }, [open])
 
+  // Esc 关闭(Modal 组件本身不处理 Esc,由父组件负责 —— 与 DslDialog 同范式)。
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
   const draw = () => {
     const cvs = canvasRef.current
     const ctx = cvs?.getContext('2d')

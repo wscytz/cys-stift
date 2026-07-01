@@ -390,7 +390,7 @@ const styles = `
   cursor: pointer;
   border-bottom: 2px solid transparent;
 }
-.tab--active { color: var(--color-black); border-bottom-color: var(--color-blue); }
+.tab--active { color: var(--color-black); border-bottom-color: var(--color-red); font-weight: 600; }
 .tab:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tab-sep { width: 1px; height: 24px; background: var(--color-gray-soft); margin: 0 var(--space-1); }
 

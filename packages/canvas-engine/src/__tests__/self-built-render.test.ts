@@ -422,7 +422,7 @@ describe('tokenResolver 注入(引擎解耦)', () => {
   it('默认 tokenResolver = domTokenResolver(不传参数行为不变)', () => {
     expect(domTokenResolver('--color-nonexistent-token', '#deadbe')).toBe('#deadbe') // jsdom 无此 CSS 变量 → fallback
     // 不传 tokenResolver 调 colorOf 也走默认 = domTokenResolver → jsdom 无 --color-blue 变量
-    // → 走 colorOf 内部定义的 fallback '#0f172a'(注意:不是 #1d4ed8,那是 drawSelectionOutlines 的 fallback)。
-    expect(colorOf('blue')).toBe('#0f172a')
+    // → 走 colorOf 内部定义的 fallback '#0a0a0a'(= --color-black token 值;注意:不是 #1d4ed8,那是 drawSelectionOutlines 的 fallback)。
+    expect(colorOf('blue')).toBe('#0a0a0a')
   })
 })

@@ -262,7 +262,7 @@ const styles = `
 .cmd { display: flex; flex-direction: column; gap: var(--space-2); }
 .cmd__input {
   width: 100%; height: 40px; padding: 0 var(--space-2);
-  font-family: var(--font-body); font-size: var(--font-size-md);
+  font-family: var(--font-body); font-size: var(--font-size-base);
   border: var(--border-hairline); border-radius: var(--radius-sm);
   background: var(--color-white); color: var(--color-black);
   outline: none;

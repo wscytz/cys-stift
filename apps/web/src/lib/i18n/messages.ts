@@ -310,6 +310,7 @@ export const messages = {
   'canvas.copyDslOk': { zh: '已复制 {n} 个元素的 DSL(⌘V 粘贴还原)', en: 'Copied {n} element(s) as DSL (⌘V to paste)' },
   'canvas.pasteDslReadFail': { zh: '无法读取剪贴板', en: 'Could not read clipboard' },
   'canvas.dslSelectFirst': { zh: '请先选中元素', en: 'Select elements first' },
+  'canvas.dslCopySelected': { zh: '复制选中', en: 'Copy selected' },
   'canvas.inboxPasteCreated': { zh: '已在画布创建 {n} 张卡(去 /canvas 查看)', en: 'Created {n} card(s) on canvas (see /canvas)' },
   'canvas.inboxPasteGuide': { zh: '画布几何 DSL(rect/text/arrow)请在 /canvas 页粘贴', en: 'Canvas-shape DSL (rect/text/arrow) works on the /canvas page' },
 

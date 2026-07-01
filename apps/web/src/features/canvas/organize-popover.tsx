@@ -16,7 +16,7 @@
  * popover 专属类名 cv-organize__(panel|section|label|grid|seg|range|apply)见 page.tsx styles。
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useI18n } from '@/lib/i18n'
 import { computeAutoLayout } from './auto-layout'
@@ -45,6 +45,16 @@ export function OrganizePopover({ pos, host, onFit, onClose, toast }: Props) {
   const [strategy, setStrategy] = useState<OrganizeStrategy>('mindmap')
   const [direction, setDirection] = useState<OrganizeDirection>('TB')
   const [gap, setGap] = useState(60)
+
+  // Esc 关闭(组件注释承诺"Esc 关闭"但原代码漏了 —— 补 keydown,与 Overview/DslDialog 同范式)。
+  useEffect(() => {
+    if (!pos) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [pos, onClose])
 
   const apply = () => {
     if (!host) return
