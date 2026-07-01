@@ -78,6 +78,18 @@ export function buildCystiftPayload(
  * on load. Callers with a host (e.g. the export-restore flow) pass it to
  * restore full geometry directly.
  */
+
+/** 把 JSON 解码后的「日期-ish」值还原成 Date;非真实日期返回 undefined
+ *  (.cystift 卡片带 ISO 字符串;损坏/缺失字段 → undefined → CardService.create
+ *  兜底 now)。纯函数,可单测。 */
+function coerceDate(v: unknown): Date | undefined {
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? undefined : v
+  if (typeof v === 'string' || typeof v === 'number') {
+    const d = new Date(v)
+    return Number.isNaN(d.getTime()) ? undefined : d
+  }
+  return undefined
+}
 export async function restoreCystiftPayload(
   payload: CystiftPayload,
   service: CardService,
@@ -113,6 +125,14 @@ export async function restoreCystiftPayload(
       links: Array.isArray(card.links) ? card.links : [],
       codeSnippets: Array.isArray(card.codeSnippets) ? card.codeSnippets : [],
       quotes: Array.isArray(card.quotes) ? card.quotes : [],
+      // R2 往返全字段:此前 safeCard 白名单漏 tags/pinned/archived/capturedAt/createdAt,
+      // 且 service.create(CreateCardInput) 也没这些字段 → 置顶+标签+归档卡往返变空白卡。
+      // 逐字段守卫后透传给 service.create(它现在认这些可选元数据)。
+      tags: Array.isArray(card.tags) ? card.tags : [],
+      pinned: typeof card.pinned === 'boolean' ? card.pinned : false,
+      archived: typeof card.archived === 'boolean' ? card.archived : false,
+      capturedAt: coerceDate(card.capturedAt),
+      createdAt: coerceDate(card.createdAt),
     }
     const oldId = String(card.id)
     // H2: cardRepo.insert 现在在配额满时抛 StorageQuotaError。restore 是
@@ -128,11 +148,16 @@ export async function restoreCystiftPayload(
         links: safeCard.links,
         codeSnippets: safeCard.codeSnippets,
         quotes: safeCard.quotes,
+        tags: safeCard.tags,
         source: card.source,
         color: card.color,
         canvasPosition: card.canvasPosition
           ? { ...card.canvasPosition, canvasId: newCanvasId }
           : undefined,
+        pinned: safeCard.pinned,
+        archived: safeCard.archived,
+        capturedAt: safeCard.capturedAt,
+        createdAt: safeCard.createdAt,
       })
     } catch {
       break // 配额满:停止恢复后续卡片,保留已恢复的部分

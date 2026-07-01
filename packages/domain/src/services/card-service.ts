@@ -45,6 +45,13 @@ export interface CreateCardInput {
   quotes?: Quote[]
   color?: Card['color']
   tags?: TagRef[]
+  /** 导入/恢复用元数据 —— 从备份(.cystift / JSON 导出)重建一张卡时带上,
+   *  让往返保留生命周期标志 + 源时间戳。新建捕获不传 → 走下方默认值。
+   *  不传时 pinned/archived=false、capturedAt/createdAt=now,与历史行为一致。 */
+  pinned?: boolean
+  archived?: boolean
+  capturedAt?: Date
+  createdAt?: Date
 }
 
 export interface UpdateCardPatch {
@@ -75,14 +82,14 @@ export class CardService {
       codeSnippets: input.codeSnippets ?? [],
       quotes: input.quotes ?? [],
       source: input.source,
-      capturedAt: now,
-      createdAt: now,
+      capturedAt: input.capturedAt ?? now,
+      createdAt: input.createdAt ?? now,
       updatedAt: now,
       canvasPosition: input.canvasPosition,
       color: input.color,
       tags: input.tags ?? [],
-      pinned: false,
-      archived: false,
+      pinned: input.pinned ?? false,
+      archived: input.archived ?? false,
     }
     this.repo.insert(card)
     return card
@@ -108,14 +115,14 @@ export class CardService {
       codeSnippets: input.codeSnippets ?? [],
       quotes: input.quotes ?? [],
       source: input.source,
-      capturedAt: now,
-      createdAt: now,
+      capturedAt: input.capturedAt ?? now,
+      createdAt: input.createdAt ?? now,
       updatedAt: now,
       canvasPosition: input.canvasPosition,
       color: input.color,
       tags: input.tags ?? [],
-      pinned: false,
-      archived: false,
+      pinned: input.pinned ?? false,
+      archived: input.archived ?? false,
     }
     this.repo.insert(card)
     return card

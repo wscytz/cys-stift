@@ -217,3 +217,85 @@ describe('.cystift restore — canvas creation failure (Bug 2)', () => {
     expect((host as { upsert: ReturnType<typeof vi.fn> }).upsert).not.toHaveBeenCalled()
   })
 })
+
+// R2 回归(2026-07-01):.cystift 往返此前丢 pinned/archived/tags/capturedAt ——
+// safeCard 白名单漏这些字段 + service.create(CreateCardInput) 也没元数据入口 →
+// 置顶/标签/归档卡往返变空白卡。现在 safeCard 全字段守卫 + create 认可选元数据。
+describe('.cystift restore — roundtrip preserves card metadata (R2)', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.unstubAllGlobals()
+    noOpfs()
+    window.localStorage.clear()
+  })
+
+  it('restores pinned/archived/tags/capturedAt onto the new card (not blank)', async () => {
+    const createdInputs: Record<string, unknown>[] = []
+    let n = 0
+    const service = {
+      listOnCanvas: () => [] as never[],
+      create: (c: Record<string, unknown>) => {
+        n += 1
+        createdInputs.push(c)
+        return { id: `new-${n}`, ...c } as never
+      },
+    } as never
+
+    const capturedAt = new Date('2026-06-21T00:00:00Z')
+    const payload: CystiftPayload = {
+      ...PAYLOAD,
+      cards: [
+        {
+          ...(PAYLOAD.cards[0] as object),
+          id: 'card-1' as never,
+          pinned: true,
+          archived: true,
+          tags: [{ value: '重要', color: 'var(--color-red)' }],
+          capturedAt,
+        } as never,
+      ],
+    }
+
+    const newId = await restoreCystiftPayload(payload, service, undefined)
+    expect(newId).not.toBeNull()
+    expect(createdInputs).toHaveLength(1)
+    // R2: 此前这些字段全丢 → 往返变空白卡。
+    expect(createdInputs[0]?.pinned).toBe(true)
+    expect(createdInputs[0]?.archived).toBe(true)
+    expect(createdInputs[0]?.tags).toEqual([
+      { value: '重要', color: 'var(--color-red)' },
+    ])
+    expect(createdInputs[0]?.capturedAt).toEqual(capturedAt)
+  })
+
+  it('coerces ISO-string timestamps from JSON decode into Date', async () => {
+    // .cystift 经 encodePayload(JSON)往返后 Date 变成 ISO 字符串 —— coerceDate
+    // 必须还原成 Date,否则 CardService 拿到字符串当 Date 用会炸。
+    const createdInputs: Record<string, unknown>[] = []
+    let n = 0
+    const service = {
+      listOnCanvas: () => [] as never[],
+      create: (c: Record<string, unknown>) => {
+        n += 1
+        createdInputs.push(c)
+        return { id: `new-${n}`, ...c } as never
+      },
+    } as never
+
+    const payload = {
+      ...PAYLOAD,
+      cards: [
+        {
+          ...(PAYLOAD.cards[0] as object),
+          id: 'card-1' as never,
+          capturedAt: '2026-06-21T00:00:00Z', // string —— 模拟 JSON 解码
+        },
+      ],
+    } as unknown as CystiftPayload
+
+    await restoreCystiftPayload(payload, service, undefined)
+    const capturedAt = createdInputs[0]?.capturedAt
+    expect(capturedAt).toBeInstanceOf(Date)
+    expect((capturedAt as Date).toISOString()).toBe('2026-06-21T00:00:00.000Z')
+  })
+})

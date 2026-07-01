@@ -251,6 +251,35 @@ describe('CardService', () => {
     expect(c.tags[0]?.color).toBe('var(--color-red)')
   })
 
+  it('preserves import metadata (pinned/archived/capturedAt/createdAt) when supplied', () => {
+    // R2: .cystift / JSON 导出往返 —— create 带可选元数据时如实保留,而非硬编码默认。
+    const capturedAt = new Date('2026-06-21T00:00:00Z')
+    const createdAt = new Date('2026-06-22T00:00:00Z')
+    const card = service.create({
+      title: '导入卡',
+      source: dummySource,
+      pinned: true,
+      archived: true,
+      capturedAt,
+      createdAt,
+    })
+    expect(card.pinned).toBe(true)
+    expect(card.archived).toBe(true)
+    expect(card.capturedAt).toEqual(capturedAt)
+    expect(card.createdAt).toEqual(createdAt)
+    // updatedAt 始终是 now(恢复事件),不透传源卡的 updatedAt。
+    expect(card.updatedAt.getTime()).toBeGreaterThanOrEqual(createdAt.getTime())
+  })
+
+  it('defaults lifecycle/timestamps when metadata absent (backward compat)', () => {
+    const before = Date.now()
+    const card = service.create({ title: 'fresh', source: dummySource })
+    expect(card.pinned).toBe(false)
+    expect(card.archived).toBe(false)
+    expect(card.capturedAt.getTime()).toBeGreaterThanOrEqual(before)
+    expect(card.createdAt.getTime()).toBeGreaterThanOrEqual(before)
+  })
+
   it('addTag adds a new tag with a random palette color', () => {
     const c = service.create({ title: 'a', source: dummySource })
     const updated = service.addTag(c.id, 'urgent')
