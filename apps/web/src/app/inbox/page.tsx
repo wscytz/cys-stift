@@ -124,12 +124,18 @@ export default function InboxPage() {
         const y = posMatch ? Number(posMatch[2]) : 0
         const w = sizeMatch ? Number(sizeMatch[1]) : 240
         const h = sizeMatch ? Number(sizeMatch[2]) : 120
-        service.createWithId(id, {
-          title: '',
-          source: { kind: 'manual', deviceId: 'web' } as never,
-          canvasPosition: { canvasId: DEFAULT_CANVAS_ID, x, y, w, h, z: 0, rotation: 0 },
-        })
-        created++
+        try {
+          service.createWithId(id, {
+            title: '',
+            source: { kind: 'manual', deviceId: DEVICE_ID },
+            canvasPosition: { canvasId: DEFAULT_CANVAS_ID, x, y, w, h, z: 0, rotation: 0 },
+          })
+          created++
+        } catch {
+          // 配额满:createWithId 内 repo.insert 已 notifyQuota 弹 toast + throw。
+          // break 不续建(原无 catch 会冒泡炸 paste effect + 静默丢后续行)。
+          break
+        }
       }
       if (created > 0) {
         pushToast({ kind: 'success', message: t('canvas.inboxPasteCreated', { n: String(created) }) })
@@ -184,6 +190,10 @@ export default function InboxPage() {
   const batchSendToCanvas = () => {
     const n = selectedArr.length
     const targetCanvasId = canvasesSnap.activeCanvasId ?? DEFAULT_CANVAS_ID
+    // 算 baseZ = 已有卡 max(z)+1,批量卡用 baseZ+i(原 z:i 从 0 起,与已有卡 z 堆叠;
+    // single 路径 onSendToCanvas 正确算 nextZ,此处对齐)。
+    const existing = service.listOnCanvas(targetCanvasId)
+    const baseZ = existing.length === 0 ? 0 : Math.max(...existing.map((c) => c.canvasPosition?.z ?? 0)) + 1
     selectedArr.forEach((id, i) => {
       service.moveToCanvas(id as CardId, {
         canvasId: targetCanvasId,
@@ -191,7 +201,7 @@ export default function InboxPage() {
         y: 100 + (i % 5) * 40,
         w: 200,
         h: 80,
-        z: i,
+        z: baseZ + i,
       })
     })
     clearSelection()

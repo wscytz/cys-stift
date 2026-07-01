@@ -162,17 +162,18 @@ export default function AskPage() {
     void msgIdx
   }
   const onRejected = async (msgIdx: number) => {
-    // 拒绝:自动发一条「用户拒绝了,换方案」让 AI 继续。
+    // 拒绝:在被拒消息后插一条「换方案」给 AI 上下文(不截断后续对话 ——
+    // 原 slice(0,msgIdx+1) 会丢这条之后的所有消息)。不自动 send(让用户决定续聊,
+    // AgentConfirmCard 内部已显示已拒绝态)。
     const rejectMsg: ChatMessage = {
       role: 'user',
       content: `（我拒绝了上面的提议,请换一个方案。当前画布状态未变。）`,
     }
     setMessages((prev) => {
       const next = [...prev]
-      // 标记该确认门已拒绝(避免重复点)
-      return [...next.slice(0, msgIdx + 1), rejectMsg]
+      next.splice(msgIdx + 1, 0, rejectMsg)
+      return next
     })
-    setInput('请换个方案')
   }
 
   const liveDetail = detailCard ? (service.get(detailCard.id) ?? null) : null
