@@ -20,15 +20,6 @@ import { pushToast } from '@/lib/toast-store'
 export type AIActionKind = 'layout' | 'cluster' | 'outline'
 
 /**
- * runAI 封装的返回信号:
- *  - 'not-ready':AI 未就绪(已由 runAI 内部触发 onNotReady 回调,runFn 未跑)。
- *    handler 通常不关心返回值,但保留信号便于需要时分支。
- *  - 'busy':已有 action 在跑,本次被防重复点击跳过。
- *  - 'done':runFn 已执行完(无论内部是否成功;异常已在 catch 内 toast)。
- */
-export type RunAIResult = 'not-ready' | 'busy' | 'done'
-
-/**
  * @param onNotReady AI 未就绪时的回调(由 page 提供,通常是 setShowAiSetup(true))。
  *                   统一三个 handler 都走这一条「未就绪 → 弹 AiSetupCard」路径。
  */
@@ -54,18 +45,17 @@ export function useAIAction(onNotReady: () => void) {
     async (
       kind: AIActionKind,
       runFn: (ready: AIConfig, signal: AbortSignal) => Promise<void>,
-    ): Promise<RunAIResult> => {
+    ): Promise<void> => {
       // 防重复点击:已在跑则忽略(审计 M5)。
-      if (aiBusy) return 'busy'
+      if (aiBusy) return
       // AI 就绪守卫(统一就绪检查):未配置/禁用/缺 key → 交给 page 弹引导,
-      // 不静默 no-op。这一步是 R3 抽 hook 的核心价值 —— 三 handler 走同一条
-      // 就绪路径,防第 4 个 handler 又漏(正是 A3 cluster 当年的根因)。
-      // 注:shouldShowAiSetupForLayout(cfg) ⟺ !isAIReady(cfg),三 handler 原本
-      // 分别用这两个写法但语义完全等价,此处统一成 isAIReady 一个闸门。
+      // 不静默 no-op。R3 核心:就绪检查集中在此 —— 之前三 handler 各写一份等价
+      // 检查,复制粘贴时易漏(A3 cluster 当年就漏了中间一段)。现在 runFn 只在
+      // ready 时被调,第 4 个 handler 无法再漏。
       const cfg = getCurrentAI()
       if (!isAIReady(cfg)) {
         onNotReady()
-        return 'not-ready'
+        return
       }
       // isAIReady 为 true ⟺ cfg 非空;断言给 TS,使 runFn 的 ready 参数非 null。
       const ready = cfg as AIConfig
@@ -84,7 +74,6 @@ export function useAIAction(onNotReady: () => void) {
         setAiBusy(null)
         aiAbortRef.current = null
       }
-      return 'done'
     },
     [aiBusy, t, onNotReady],
   )
