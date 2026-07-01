@@ -20,7 +20,7 @@ import { ShortcutHelpDialog } from '@/features/canvas/shortcut-help-dialog'
 import { DiffDialog } from '@/features/canvas/diff-dialog'
 import { applyLayout } from '@/features/canvas/apply-layout'
 import { summarizeMovement } from '@/features/canvas/layout-movement'
-import { computeAutoLayout } from '@/features/canvas/auto-layout'
+import { OrganizePopover } from '@/features/canvas/organize-popover'
 import { canvasToMarkdown, markdownFileName } from '@/features/canvas/canvas-to-markdown'
 import { RelationPanel } from '@/features/canvas/relation-panel'
 import { FreedrawPanel } from '@/features/canvas/freedraw-panel'
@@ -269,41 +269,29 @@ export default function CanvasPage() {
     })
   }, [])
 
-  // 自动布局(Batch A / 方向 1):选中≥2 卡 → 布局选中;否则全画布所有 card。
-  // dagre 跑分层布局,坐标 batch upsert(保留各 card w/h/rotation),单 undo 步。
-  // freeform 元素(text/rect/frame)不参与,toast 明示。布局后 fit 让用户看到全貌。
-  const handleAutoLayout = useCallback(() => {
-    const adapter = handle.current.adapter
-    if (!adapter) return
-    const elements = adapter.getElements()
-    const selectedIds = adapter.getSelectedIds()
-    const selectedCards = selectedIds
-      .map((id) => adapter.getElement(id))
-      .filter((el): el is CanvasElement => !!el && el.kind === 'card')
-    // 选中≥2 → 局部;否则全画布 card。
-    const targetIds = selectedCards.length >= 2 ? new Set(selectedCards.map((c) => c.id)) : undefined
-    const positions = computeAutoLayout(elements, { targetIds })
-    if (positions.size === 0) {
-      pushToast({ kind: 'info', message: t('canvas.autoLayoutTooFew') })
+  // 整理范式(Batch 6):顶栏「整理」按钮的 popover——策略×方向×间距。
+  // popover 经 portal 渲染到 body(逃离 toolbar overflow),fixed 定位贴 trigger 下方。
+  const [organizeOpen, setOrganizeOpen] = useState(false)
+  const organizeTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const [organizePos, setOrganizePos] = useState<{ left: number; top: number } | null>(null)
+  useLayoutEffect(() => {
+    if (!organizeOpen) {
+      setOrganizePos(null)
       return
     }
-    adapter.batch(() => {
-      for (const [id, pos] of positions) {
-        const existing = adapter.getElement(id)
-        if (existing) adapter.upsert({ ...existing, x: pos.x, y: pos.y })
-      }
-    })
-    const freeformCount = elements.filter((e) => e.kind !== 'card' && e.kind !== 'arrow').length
-    pushToast({
-      kind: 'success',
-      message:
-        freeformCount > 0
-          ? t('canvas.autoLayoutDonePartial', { n: String(positions.size) })
-          : t('canvas.autoLayoutDone', { n: String(positions.size) }),
-    })
-    // fit 让用户立即看到布局全貌(下一个 tick,等 upsert 落渲染)。
-    setTimeout(() => zoomBy('fit'), 0)
-  }, [t, zoomBy])
+    const measure = () => {
+      const el = organizeTriggerRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      // popover 宽 ~220;左对齐 trigger 左沿(顶栏在上方,popover 往下展开)。
+      const left = Math.max(8, Math.min(rect.left, window.innerWidth - 240))
+      const top = rect.bottom + 6
+      setOrganizePos((prev) => (prev && prev.left === left && prev.top === top ? prev : { left, top }))
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [organizeOpen])
 
   const onEraseCard = useCallback((cardId: string) => {
     service.softDelete(cardId as CardId)
@@ -1067,14 +1055,17 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         <SnapToggle mode={snapMode} onToggle={toggleSnap} disabled={!adapterReady} />
         <span className="tb-divider" aria-hidden="true" />
         <ZoomGroup adapterReady={adapterReady} onZoom={zoomBy} />
-        {/* 自动布局(Batch A):选中≥2 卡布局选中,否则全画布。dagre 分层,单 undo 步。 */}
+        {/* 整理范式(Batch 6):顶栏「整理」按钮 → popover(策略×方向×间距)。
+            替代旧的「自动布局」直触。popover 内应用按钮走 computeAutoLayout。 */}
         <button
           type="button"
           className="tb-btn"
           disabled={!adapterReady}
-          onClick={handleAutoLayout}
-          aria-label={t('canvas.autoLayout')}
-          title={t('canvas.autoLayout')}
+          onClick={() => setOrganizeOpen((o) => !o)}
+          aria-label={t('canvas.organize.title')}
+          aria-expanded={organizeOpen}
+          title={t('canvas.organize.title')}
+          ref={organizeTriggerRef}
         >
           <span className="tb-btn__icon" aria-hidden="true"><CanvasIcon name="auto-layout" /></span>
         </button>
@@ -1088,6 +1079,15 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           </>
         )}
       </Toolbar>
+      )}
+      {organizeOpen && (
+        <OrganizePopover
+          pos={organizePos}
+          host={handle.current.adapter}
+          onFit={() => zoomBy('fit')}
+          onClose={() => setOrganizeOpen(false)}
+          toast={pushToast}
+        />
       )}
 
       <div className={`cv-host cv-host--${tool}`} onContextMenu={(e) => {
@@ -1889,6 +1889,54 @@ const styles = `
 .cv-ctx-backdrop { position: fixed; inset: 0; z-index: 99; cursor: default; }
 .cv-ctx-menu { position: fixed; z-index: 100; }
 .cv-ctx-input { position: fixed; z-index: 100; width: 200px; }
+
+/* ── 整理范式(Batch 6):顶栏「整理」popover ───────────────────────
+   复用 cv-rail__menu 的包豪斯 chrome(2px 黑边 + 4px 硬阴影),宽 220,竖排三段。
+   策略/方向用 2×2 分段按钮(active=黄),间距用 range 滑杆 + 数字读数,底应用按钮。
+   z-index 与 cv-rail__menu 同层(26,backdrop 25)。 */
+.cv-organize__panel { min-width: 220px; padding: var(--space-2); gap: var(--space-2); }
+.cv-organize__section { display: flex; flex-direction: column; gap: var(--space-1); }
+.cv-organize__label {
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  color: var(--color-gray); letter-spacing: 0.04em; text-transform: uppercase;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.cv-organize__gap-val { font-family: var(--font-mono); color: var(--color-black); text-transform: none; }
+.cv-organize__grid { display: grid; gap: 2px; }
+.cv-organize__grid--2x2 { grid-template-columns: 1fr 1fr; }
+.cv-organize__seg {
+  padding: var(--space-1) var(--space-1); min-height: 32px;
+  background: var(--color-white); border: 2px solid var(--color-black); border-radius: var(--radius-sm);
+  font-family: var(--font-body); font-size: var(--font-size-xs); color: var(--color-black);
+  cursor: pointer; text-align: center; line-height: 1;
+}
+.cv-organize__seg:hover:not(.cv-organize__seg--active) { background: var(--color-gray-soft); }
+.cv-organize__seg--active { background: var(--color-yellow); border-color: var(--color-black); }
+.cv-organize__seg:focus-visible { outline: 2px solid var(--color-red); outline-offset: 1px; }
+.cv-organize__range {
+  width: 100%; height: 4px; background: var(--color-black); border-radius: 2px;
+  appearance: none; -webkit-appearance: none; cursor: pointer;
+}
+.cv-organize__range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px; background: var(--color-yellow);
+  border: 2px solid var(--color-black); border-radius: var(--radius-sm); cursor: pointer;
+}
+.cv-organize__range::-moz-range-thumb {
+  width: 16px; height: 16px; background: var(--color-yellow);
+  border: 2px solid var(--color-black); border-radius: var(--radius-sm); cursor: pointer;
+}
+.cv-organize__range:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.cv-organize__apply {
+  margin-top: 2px; padding: var(--space-1) var(--space-2); min-height: 36px;
+  background: var(--color-black); color: var(--color-white);
+  border: 2px solid var(--color-black); border-radius: var(--radius-sm);
+  font-family: var(--font-body); font-size: var(--font-size-sm); font-weight: 600;
+  cursor: pointer; line-height: 1;
+}
+.cv-organize__apply:hover:not(:disabled) { background: var(--color-red); border-color: var(--color-red); }
+.cv-organize__apply:disabled { opacity: 0.5; cursor: not-allowed; }
+.cv-organize__apply:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 
 /* ── P1 响应式断点 ───────────────────────────────────────────────
    画布页此前零 @media;窄 Tauri 窗口下顶栏静默溢出、rail 占掉画布宽度。
