@@ -288,6 +288,7 @@ export default function AskPage() {
           onSave={(patch) => {
             const updated = service.update(effectiveDetail.id, patch)
             if (updated) setDetailCard(updated)
+            return updated != null
           }}
           onTogglePin={() => {
             const updated = service.update(effectiveDetail.id, { pinned: !effectiveDetail.pinned })

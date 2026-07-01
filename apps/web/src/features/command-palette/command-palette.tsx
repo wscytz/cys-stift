@@ -242,6 +242,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
           onSave={(patch) => {
             const updated = service.update(detail.id, patch)
             if (updated) setDetail(updated)
+            return updated != null
           }}
           onTogglePin={() => {
             const updated = service.update(detail.id, { pinned: !detail.pinned })

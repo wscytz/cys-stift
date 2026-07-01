@@ -316,6 +316,7 @@ export default function ArchivePage() {
           onSave={(patch) => {
             const updated = service.update(effectiveDetail.card.id, patch)
             if (updated) setDetail({ card: updated })
+            return updated != null
           }}
           onTogglePin={() => {
             const updated = service.update(effectiveDetail.card.id, {

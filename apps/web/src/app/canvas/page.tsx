@@ -1215,6 +1215,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
                 pushToast({ kind: 'info', message: t('canvas.embedLinked', { created: String(emb.created), removed: String(emb.removed) }) })
               }
             }
+            return updated != null
           }}
           onArchive={() => {
             service.archive(effectiveDetail.card.id)

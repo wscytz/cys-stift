@@ -435,6 +435,7 @@ export default function InboxPage() {
           onSave={(patch) => {
             const updated = service.update(effectiveDetail.id, patch)
             if (updated) setDetail(updated)
+            return updated != null
           }}
           onTogglePin={() => {
             const updated = service.update(effectiveDetail.id, { pinned: !effectiveDetail.pinned })

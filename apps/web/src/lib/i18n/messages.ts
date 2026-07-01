@@ -110,6 +110,7 @@ export const messages = {
   'card.detail.untitledCard': { zh: '（无标题）', en: '(untitled)' },
   'card.detail.backlinkJumpIn': { zh: '跳转到这张卡（它指向当前卡）', en: 'Jump to this card (it points here)' },
   'card.detail.backlinkJumpOut': { zh: '跳转到这张卡（当前卡指向它）', en: 'Jump to this card (pointed to from here)' },
+  'card.saveFailedQuota': { zh: '保存失败——存储空间已满，请清理后重试', en: 'Save failed — storage full, please free space and retry' },
   'card.detail.code': { zh: '代码', en: 'Code' },
   'card.detail.quotes': { zh: '引用', en: 'Quotes' },
   'card.detail.edit': { zh: '编辑', en: 'Edit' },

@@ -122,7 +122,7 @@ export interface CardDetailModalProps {
    *  has no canvasPosition. softDelete shows the built-in confirm. */
   actions: CardDetailAction[]
   onClose: () => void
-  onSave: (patch: CardDetailSavePatch) => void
+  onSave: (patch: CardDetailSavePatch) => boolean
   onArchive?: () => void
   onUnarchive?: () => void
   onSendToCanvas?: () => void
@@ -409,7 +409,7 @@ export function CardDetailModal({
   const handleSave = () => {
     if (!title.trim()) return
     startTransition(() => {
-      onSave({
+      const ok = onSave({
         title: title.trim(),
         body,
         media: media,
@@ -418,7 +418,8 @@ export function CardDetailModal({
         quotes: draftQuotesToPayload(quotes),
         tags,
       })
-      setMode('view')
+      if (ok) setMode('view')
+      else pushToast({ kind: 'error', message: t('card.saveFailedQuota') })
     })
   }
 
@@ -938,7 +939,7 @@ export function CardDetailModal({
                 // other field comes from the COMPONENT's current edit state,
                 // NOT the card prop snapshot. Payload converters
                 // (draftLinksToPayload etc.) are existing helpers in this file.
-                onSave({
+                const ok = onSave({
                   title: title.trim() || card.title,
                   body,
                   media,
@@ -949,6 +950,7 @@ export function CardDetailModal({
                 })
                 setBody(body)
                 setAiView(null)
+                if (!ok) pushToast({ kind: 'error', message: t('card.saveFailedQuota') })
               }}
               onAppendNew={(c) => {
                 if (onAIAppendNew) {
