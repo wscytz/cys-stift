@@ -9,23 +9,40 @@
  *  - nodes/edges props 变化时重建 simulation
  *  - hover 状态变化触发一次重绘(淡化非邻居)
  *
- * view(zoom/panX/panY)、drag 上下文用 ref(高频变化,不走 state)。
+ * view(zoom/panX/panY)、drag 上下文用 ref(高频,不走 state);zoom 单独镜像到
+ * React state 供父组件(GraphZoomBar)读取/显示 —— 走 applyView 统一更新。
  * 坐标系:screen → graph 为 graphX = (screenX - panX) / zoom。
+ *
+ * 暴露 imperative 句柄(GraphCanvasHandle):zoomBy / zoomTo / resetView,
+ * 供 GraphZoomBar 的按钮/滑块调用。zoom 变化也通过 onZoomChange 回调上报。
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react'
 import { readToken } from '@cys-stift/canvas-engine'
 import type { CardType } from '@cys-stift/domain'
 import { graphViewStore } from '@/lib/graph-view-store'
 import type { GraphEdge, GraphNode } from './aggregate-edges'
 import { createGraphSimulation, type PositionedNode, type SimulationHandle } from './graph-layout'
+import {
+  clampZoom,
+  clampDelta,
+  normalizeWheelDelta,
+  zoomFactor,
+  MIN_ZOOM,
+  MAX_ZOOM,
+} from './wheel-math'
 
 const NODE_R = 10
 const EDGE_WIDTH = 1.5
-const MIN_ZOOM = 0.2
-const MAX_ZOOM = 4
 
-/** 视图变换(高频,走 ref)。 */
+/** 视图变换(高频,走 ref;zoom 另镜像到 state)。 */
 interface View {
   zoom: number
   panX: number
@@ -41,13 +58,28 @@ interface DragState {
   moved: boolean
 }
 
+/** 暴露给 GraphZoomBar / 父组件的 imperative 句柄。 */
+export interface GraphCanvasHandle {
+  /** 按因子缩放(以画布中心为锚点)。factor>1 放大,<1 缩小。 */
+  zoomBy: (factor: number) => void
+  /** 缩放到指定 zoom(以画布中心为锚点)。 */
+  zoomTo: (z: number) => void
+  /** 重置视口:zoom=1,pan 居中于画布中心。 */
+  resetView: () => void
+}
+
 interface GraphCanvasProps {
   nodes: GraphNode[]
   edges: GraphEdge[]
   onNodeClick?: (id: string) => void
+  /** zoom 变化时回调(供父组件镜像 zoom state 给 GraphZoomBar)。 */
+  onZoomChange?: (zoom: number) => void
 }
 
-export function GraphCanvas({ nodes, edges, onNodeClick }: GraphCanvasProps) {
+export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(function GraphCanvas(
+  { nodes, edges, onNodeClick, onZoomChange },
+  ref,
+) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const handleRef = useRef<SimulationHandle | null>(null)
   // mount 时从 store 恢复上次视口(无则默认)。
@@ -56,6 +88,13 @@ export function GraphCanvas({ nodes, edges, onNodeClick }: GraphCanvasProps) {
   /** 平移(空白拖)上下文,与节点拖拽互斥。 */
   const panRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null)
   const [hover, setHover] = useState<string | null>(null)
+  // zoom 镜像到 React state:供父组件读 + GraphZoomBar 显示。applyView 内同步。
+  const [zoom, setZoomState] = useState(viewRef.current.zoom)
+  // onZoomChange 闭包最新引用(避免 effect 依赖它导致事件监听重建)。
+  const onZoomChangeRef = useRef(onZoomChange)
+  useEffect(() => {
+    onZoomChangeRef.current = onZoomChange
+  })
 
   /**
    * 绘一帧:模块级纯函数读 canvas/nodes/edges/view/hover。
@@ -142,7 +181,75 @@ export function GraphCanvas({ nodes, edges, onNodeClick }: GraphCanvasProps) {
     }, 200)
   }, [])
 
+  /**
+   * 统一 view 更新:改 viewRef → 同步 zoom state → 重绘 → 回写 store。
+   * 所有改 view 的路径(wheel / pan / imperative zoom)都走这里,保证 zoom state
+   * 与 GraphZoomBar 同步。patch 可含 zoom/panX/panY 任意子集。
+   */
+  const applyView = useCallback(
+    (patch: Partial<View>) => {
+      if (patch.zoom !== undefined) viewRef.current.zoom = patch.zoom
+      if (patch.panX !== undefined) viewRef.current.panX = patch.panX
+      if (patch.panY !== undefined) viewRef.current.panY = patch.panY
+      setZoomState(viewRef.current.zoom)
+      onZoomChangeRef.current?.(viewRef.current.zoom)
+      render()
+      writeView()
+    },
+    [render, writeView],
+  )
+
+  /** 以指定 screen 锚点为中心按 factor 缩放(锚点 graph 坐标缩放前后不变)。 */
+  const zoomAt = useCallback(
+    (factor: number, screenX: number, screenY: number) => {
+      const view = viewRef.current
+      const nextZoom = clampZoom(view.zoom * factor)
+      view.panX = screenX - ((screenX - view.panX) / view.zoom) * nextZoom
+      view.panY = screenY - ((screenY - view.panY) / view.zoom) * nextZoom
+      view.zoom = nextZoom
+      applyView({})
+    },
+    [applyView],
+  )
+
+  // ── imperative 句柄:zoomBy / zoomTo / resetView(供 GraphZoomBar)──
+  useImperativeHandle(
+    ref,
+    () => ({
+      /** 以画布中心为锚点按 factor 缩放。 */
+      zoomBy: (factor: number) => {
+        const canvas = canvasRef.current
+        const cx = canvas ? canvas.clientWidth / 2 : 0
+        const cy = canvas ? canvas.clientHeight / 2 : 0
+        zoomAt(factor, cx, cy)
+      },
+      /** 缩放到指定 zoom(画布中心锚点)。 */
+      zoomTo: (z: number) => {
+        const canvas = canvasRef.current
+        const cx = canvas ? canvas.clientWidth / 2 : 0
+        const cy = canvas ? canvas.clientHeight / 2 : 0
+        const target = clampZoom(z)
+        const view = viewRef.current
+        const factor = target / view.zoom
+        zoomAt(factor, cx, cy)
+      },
+      /** 重置:zoom=1,pan 居中于画布中心(graph 原点对中)。 */
+      resetView: () => {
+        const canvas = canvasRef.current
+        const cx = canvas ? canvas.clientWidth / 2 : 0
+        const cy = canvas ? canvas.clientHeight / 2 : 0
+        applyView({ zoom: 1, panX: cx, panY: cy })
+      },
+    }),
+    [applyView, zoomAt],
+  )
+
   // ── useEffect 1:建/重建 simulation(nodes/edges 依赖)──
+  // BUG-2a 修复:effect cleanup 不再清空 handleRef.current。React 在跑新 effect body 前
+  // 先跑旧 effect 的 cleanup —— 若 cleanup 把 handleRef 置 null,这窗口里任何 render()
+  // 调用都因 `if (!handle) return` 早退 → 画布灰掉,直到下次交互触发重绘(切屏恢复的现象)。
+  // 现在让 handleRef 始终指向一个有效(可能已 stop 的)handle;effect body 直接覆盖赋值。
+  // 组件整体卸载时组件本身已销毁,stale ref 无害。
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -171,11 +278,13 @@ export function GraphCanvas({ nodes, edges, onNodeClick }: GraphCanvasProps) {
     })
     handle.restart()
     render() // 首帧
+    // BUG-2a 兜底:下一帧再绘一次,确保新 simulation 首帧一定落下(防 render 与布局竞态)。
+    requestAnimationFrame(render)
     // 清掉已不存在的节点缓存(节点删除后淘汰旧坐标)。
     graphViewStore.prunePositions(new Set(nodes.map((n) => n.id)))
     return () => {
+      // 注意:不碰 handleRef.current —— 见上面 BUG-2a 注释。只 stop 捕获到的局部 handle。
       handle.stop()
-      handleRef.current = null
       if (writeTickTimer) clearTimeout(writeTickTimer)
     }
     // nodes/edges 是数组引用;父组件换实例即重建。render 闭包随 edges/hover 更新由 onTick 间接读到最新。
@@ -242,10 +351,11 @@ export function GraphCanvas({ nodes, edges, onNodeClick }: GraphCanvasProps) {
       }
       const pan = panRef.current
       if (pan) {
-        viewRef.current.panX = pan.panX + (screenX - pan.startX)
-        viewRef.current.panY = pan.panY + (screenY - pan.startY)
-        render()
-        writeView()
+        // 空白拖平移:走 applyView 同步 zoom state(虽然 pan 不改 zoom,保持一致路径)。
+        applyView({
+          panX: pan.panX + (screenX - pan.startX),
+          panY: pan.panY + (screenY - pan.startY),
+        })
         return
       }
       // 无拖拽:更新 hover。
@@ -288,21 +398,25 @@ export function GraphCanvas({ nodes, edges, onNodeClick }: GraphCanvasProps) {
       }
     }
 
-    // 滚轮缩放:以鼠标位置为锚点(锚点 screen 坐标缩放后不变)。
+    // 滚轮:分支 ctrlKey(触摸板 pinch / Ctrl+滚轮 → 缩放)vs 普通(触摸板两指拖 / 鼠标滚轮 → 平移)。
+    // BUG-2b:此前所有 wheel 都缩放,触摸板两指平移被误当缩放,体感很差。
+    // 现在分两条路径,且 pinch 流做 delta 钳位避免巨大跳变。
     const onWheel = (ev: WheelEvent) => {
       ev.preventDefault()
       const rect = canvas.getBoundingClientRect()
       const screenX = ev.clientX - rect.left
       const screenY = ev.clientY - rect.top
-      const view = viewRef.current
-      // graph 坐标在缩放前后保持:graphX = (screenX - panX') / zoom' = (screenX - panX) / zoom。
-      const factor = Math.exp(-ev.deltaY * 0.001)
-      const nextZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, view.zoom * factor))
-      view.panX = screenX - ((screenX - view.panX) / view.zoom) * nextZoom
-      view.panY = screenY - ((screenY - view.panY) / view.zoom) * nextZoom
-      view.zoom = nextZoom
-      render()
-      writeView()
+      if (ev.ctrlKey) {
+        // pinch-to-zoom(触摸板捏合)或 Ctrl+滚轮:缩放。以光标为锚点。
+        const dy = clampDelta(ev.deltaY)
+        zoomAt(zoomFactor(dy), screenX, screenY)
+      } else {
+        // 触摸板两指拖 / 鼠标滚轮:平移。按 deltaMode 归一(deltaMode=1 行 ×16)。
+        const sx = normalizeWheelDelta(ev.deltaX, ev.deltaMode)
+        const sy = normalizeWheelDelta(ev.deltaY, ev.deltaMode)
+        const view = viewRef.current
+        applyView({ panX: view.panX - sx, panY: view.panY - sy })
+      }
     }
 
     canvas.addEventListener('pointerdown', onPointerDown)
@@ -316,7 +430,12 @@ export function GraphCanvas({ nodes, edges, onNodeClick }: GraphCanvasProps) {
       canvas.removeEventListener('wheel', onWheel)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [render, onNodeClick, writeView])
+  }, [render, onNodeClick, applyView])
+
+  // zoom 镜像对外(供父组件 GraphZoomBar 读);初始 mount 也上报一次。
+  useEffect(() => {
+    onZoomChangeRef.current?.(zoom)
+  }, [zoom])
 
   return (
     <canvas
@@ -325,7 +444,7 @@ export function GraphCanvas({ nodes, edges, onNodeClick }: GraphCanvasProps) {
       style={{ width: '100%', height: '100%', display: 'block', touchAction: 'none', cursor: 'crosshair' }}
     />
   )
-}
+})
 
 // ── 模块级绘制工具 ──────────────────────────────────────────────────────────
 
@@ -451,3 +570,6 @@ function drawArrowhead(ctx: CanvasRenderingContext2D, fromX: number, fromY: numb
   ctx.fill()
   ctx.restore()
 }
+
+// re-export 常量供外部(GraphZoomBar 的 range min/max)引用,避免硬编码漂移。
+export { MIN_ZOOM, MAX_ZOOM }

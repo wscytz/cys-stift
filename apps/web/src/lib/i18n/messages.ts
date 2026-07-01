@@ -142,6 +142,11 @@ export const messages = {
   'graph.filter.tag': { zh: '标签', en: 'Tag' },
   'graph.filter.type': { zh: '类型', en: 'Type' },
   'graph.fit': { zh: '适配', en: 'Fit' },
+  'graph.zoom.barLabel': { zh: '缩放控制', en: 'Zoom controls' },
+  'graph.zoom.in': { zh: '放大', en: 'Zoom in' },
+  'graph.zoom.out': { zh: '缩小', en: 'Zoom out' },
+  'graph.zoom.reset': { zh: '复位', en: 'Reset' },
+  'graph.zoom.slider': { zh: '缩放级别', en: 'Zoom level' },
 
   /* ── Canvas ── */
   'canvas.crumb': { zh: '画布', en: 'canvas' },

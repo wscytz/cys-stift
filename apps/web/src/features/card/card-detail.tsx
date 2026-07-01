@@ -1080,7 +1080,18 @@ const styles = `
 }
 .cd__textarea:focus { border-bottom-color: var(--color-red); }
 .cd__file { font-family: var(--font-mono); font-size: var(--font-size-sm); margin-top: var(--space-1); }
-.cd__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+.cd__actions {
+  display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center;
+  /* BUG-2d — action 行常驻:sticky 到 modal body(滚动容器)底部,白底 + 顶部细线,
+     内容多时按钮永远可见/可达(此前底部按钮滚出视口,用户以为「被遮住」)。
+     通用收益:所有用 CardDetailModal 的入口(graph/inbox/archive)都吃到。 */
+  position: sticky;
+  bottom: 0;
+  padding: var(--space-2) 0 0;
+  background: var(--color-white);
+  border-top: var(--border-hairline);
+  z-index: 1;
+}
 .cd__spacer { flex: 1; }
 /* AI action marker: mono » glyph replacing the ✨ emoji (Bauhaus type
    system has no emoji; the » renders consistently across OSes). */

@@ -8,14 +8,15 @@
  *
  * 静态导出:无 'use server' / API route;数据全走客户端 store。
  */
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Toolbar } from '@cys-stift/ui'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
 import { PageLoading } from '@/components/page-loading'
 import { CardDetailModal } from '@/features/card/card-detail'
-import { GraphCanvas } from '@/features/graph/graph-canvas'
+import { GraphCanvas, type GraphCanvasHandle } from '@/features/graph/graph-canvas'
+import { GraphZoomBar } from '@/features/graph/graph-zoom-bar'
 import { GraphFilters } from '@/features/graph/graph-filters'
 import {
   cardsToNodes,
@@ -63,6 +64,10 @@ export default function GraphPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snap, service])
   const [detail, setDetail] = useState<Card | null>(null)
+  // BUG-2c — 缩放条:zoom state 提升到页面,GraphCanvas 通过 onZoomChange 上报,
+  // GraphZoomBar 读 zoom + 调 imperative 句柄(graphRef.zoomBy/zoomTo/resetView)。
+  const graphRef = useRef<GraphCanvasHandle>(null)
+  const [zoom, setZoom] = useState(1)
   // BUG-1 fix: detail 是 local state,跨 tab 软删/归档后 useDb re-render 但 detail 不清
   // → modal 残留幽灵卡。从 store 实时取卡 + 过滤软删,变 null 则 modal 自动卸载
   // (与 canvas page effectiveDetail 同口径)。
@@ -97,12 +102,20 @@ export default function GraphPage() {
         ) : (
           <div className="graph-canvas-wrap">
             <GraphCanvas
+              ref={graphRef}
               nodes={filtered.nodes}
               edges={filtered.edges}
               onNodeClick={(id) => {
                 const card = cardById.get(id as CardId)
                 if (card) setDetail(card)
               }}
+              onZoomChange={setZoom}
+            />
+            <GraphZoomBar
+              zoom={zoom}
+              onZoomBy={(factor) => graphRef.current?.zoomBy(factor)}
+              onZoomTo={(z) => graphRef.current?.zoomTo(z)}
+              onReset={() => graphRef.current?.resetView()}
             />
           </div>
         )}
@@ -146,6 +159,7 @@ export default function GraphPage() {
 const styles = `
 .page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
 .graph-canvas-wrap {
+  position: relative; /* BUG-2c:GraphZoomBar 绝对定位锚到本容器右下 */
   margin-top: var(--space-3);
   height: calc(100vh - 220px);
   min-height: 400px;
