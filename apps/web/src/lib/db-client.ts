@@ -6,6 +6,7 @@ import {
   type Card,
   type CardId,
   type CanvasId,
+  StorageQuotaError,
 } from '@cys-stift/domain'
 
 // ── Storage adapter (localStorage on web; Tauri fs in Phase 6/8) ─────────────
@@ -83,19 +84,8 @@ function notifyQuota(): void {
   for (const cb of _quotaSubscribers) cb()
 }
 
-/**
- * StorageQuotaError — insert 抛这个错时表示卡片未持久化(配额满 / 隐私模式)。
- * 调用方(CardService.create → CaptureSink.submit)据此 reject promise,让
- * capture 链路把"保存失败"暴露给用户(而非静默吞掉导致数据丢失)。H2 fix:
- * 之前 insert 只回滚内存 + notifyQuota,不抛错 → fromCapture 照常返回卡片
- * → sink resolve 成功 → MiniInput 清空草稿 → 用户文字彻底丢失。
- */
-export class StorageQuotaError extends Error {
-  constructor(message = 'storage quota exceeded — card not persisted') {
-    super(message)
-    this.name = 'StorageQuotaError'
-  }
-}
+/** StorageQuotaError 现定义在 domain(packages/domain/src/errors.ts)——CardRepository
+ *  契约的失败模式,domain 的 CardService 要 instanceof 捕获。此处 import 用于抛。 */
 
 /** 订阅配额写入失败事件(卡片操作无法持久化时触发)。返回取消订阅。 */
 export function onQuotaExceeded(cb: QuotaCallback): () => void {

@@ -25,3 +25,4 @@ export {
   type DuplicateGroup,
 } from './services/duplicate-detect'
 export { TAG_COLORS } from './types'
+export { StorageQuotaError } from './errors'
