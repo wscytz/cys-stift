@@ -9,6 +9,7 @@ import { useI18n } from '@/lib/i18n'
 import { pushToast } from '@/lib/toast-store'
 import { StorageMeter } from '@/components/storage-meter'
 import { AISettingsPanel } from '@/features/settings/ai-settings-panel'
+import { SampleExportPanel } from '@/features/settings/sample-export-panel'
 import { LabToggle } from '@/features/ai/lab-toggle'
 import { LAB_REGISTRY } from '@/features/ai/labs-registry'
 import {
@@ -190,6 +191,8 @@ export default function SettingsPage() {
         </section>
 
         <AISettingsPanel />
+
+        <SampleExportPanel />
 
         {/* 实验室 / Labs — 附加能力,默认全关。开启 = 用户显式接受附加风险。
             从 LAB_REGISTRY 渲染;每个 lab 走确认门(不可撤销风险让步);关闭直接生效。
