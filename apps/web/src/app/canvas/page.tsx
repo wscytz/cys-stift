@@ -35,6 +35,7 @@ import { syncEmbedArrows, resolveCardByTitle } from '@/features/canvas/embed-lin
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { serializeCanvas } from '@/features/ai/canvas-dsl'
 import { parseDsl, parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
+import { retryUntilValid, buildDslCorrection } from '@/features/ai/retry-until-valid'
 import { TemplatePicker, type TemplateChoice } from '@/features/canvas/template-picker'
 import { allTemplates, saveCustomTemplate, addCustomTemplate } from '@/lib/canvas-templates'
 import { streamText } from '@/features/ai/stream-text'
@@ -371,22 +372,28 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       // structuredOutput:对 DeepSeek 等思考端点发 thinking:disabled,省 token 防截断
       // (实测:关思考后 17 行完整输出 vs 思考下 0 行截断)。非思考端点 no-op。
       // timeoutMs:60s — 排版产出长(每卡一行 DSL,卡多时超 30s 默认会被截断)。
-      const result = await streamText(ready, { system: systemPrompt, user: userPrompt, maxTokens: 4096, structuredOutput: true, timeoutMs: 60_000 }, () => {}, signal)
-      if (!result?.content) {
+      const r = await retryUntilValid({
+        initialMessages: [{ role: 'user', content: userPrompt }],
+        produce: (messages) =>
+          streamText(ready, { system: systemPrompt, user: userPrompt, messages, maxTokens: 4096, structuredOutput: true, timeoutMs: 60_000 }, () => {}, signal)
+            .then((x) => x?.content ?? ''),
+        parse: (text) => {
+          const { ops, errors } = parseDslWithDiagnostics(text)
+          return { ok: ops.length > 0, errors }
+        },
+        buildCorrection: buildDslCorrection,
+      })
+      if (!r.text) {
         pushToast({ kind: 'info', message: t('canvas.aiLayoutEmpty') })
         return
       }
-      // 用诊断版解析:ops 空 + 有 errors → 模型输出了「[ 开头但格式错」的行(格式偏差 /
-      // 思考截断)。给用户具体反馈而非一句「未生效」(转义核心卖点的信任:不静默失败)。
-      const { ops, errors } = parseDslWithDiagnostics(result.content)
+      // 重试闭环后重 parse:r.accepted=true → ops>0 走 apply;accepted=false(重试预算尽)
+      // → 诚实告知已重试 N 次仍失败(新文案,区别于单次 parseFail)。
+      const { ops } = parseDslWithDiagnostics(r.text)
       if (ops.length === 0) {
-        // errors 非空 = 模型确实输出了类 DSL 行但解析失败 → 格式问题(非空输出)。
-        // errors 空 = 模型根本没输出 [ 行(纯散文/空) → 用 Empty 文案。
         pushToast({
           kind: 'info',
-          message: errors.length > 0
-            ? t('canvas.aiLayoutParseFail', { n: String(errors.length) })
-            : t('canvas.aiLayoutEmpty'),
+          message: t('canvas.aiLayoutRetryFailed', { n: String(r.attempts) }),
         })
         return
       }
@@ -413,7 +420,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       const { applied } = applyLayout(adapter, ops)
       // 捕获样本:canvas 排版 apply(无 confirm card,独立记)。开关关时 addSample 内部 no-op。
       addSample(
-        { id: genSampleId(), ts: Date.now(), kind: 'dsl', source: 'canvasLayout', context: formatted, aiOutput: result.content, outcome: 'applied', targetCanvasId: activeCanvasId },
+        { id: genSampleId(), ts: Date.now(), kind: 'dsl', source: 'canvasLayout', context: formatted, aiOutput: r.text, outcome: 'applied', targetCanvasId: activeCanvasId },
         settingsStore.get().aiSampleCapture,
       )
       const after = snapshotPositions()

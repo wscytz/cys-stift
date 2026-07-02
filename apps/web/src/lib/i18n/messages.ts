@@ -763,6 +763,7 @@ export const messages = {
   'canvas.aiLayoutNoneApplied': { zh: 'AI 排版未生效(卡片/端点缺失)', en: 'AI layout had no effect (missing card/endpoint)' },
   'canvas.aiLayoutParseFail': { zh: 'AI 输出了 {n} 行但格式无法解析(可能是模型用思考模式截断/格式偏差)。再试一次或换个非思考模型。', en: 'AI output {n} lines but none parsed (thinking model may truncate / format drift). Retry or use a non-thinking model.' },
   'canvas.aiLayoutEmpty': { zh: 'AI 未返回有效排版', en: 'AI returned no valid layout' },
+  'canvas.aiLayoutRetryFailed': { zh: 'AI 输出格式未通过(重试 {n} 次仍失败)', en: 'AI output format invalid (failed after {n} retries)' },
   'canvas.aiLayoutMoved': { zh: 'AI 重排了 {moved} 张卡(平均 {avgPx}px)', en: 'AI reorganized {moved} cards (avg {avgPx}px)' },
   'canvas.aiLayoutUnchanged': { zh: 'AI 认为当前布局已合理,未改动', en: 'AI considers the current layout reasonable — no change' },
   'canvas.aiSetupTitle': { zh: '启用 AI 自动排版', en: 'Enable AI auto-layout' },
