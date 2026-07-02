@@ -7,7 +7,10 @@ import {
   getSampleCount,
   genSampleId,
   type Sample,
+  type DslSample,
+  type QaSample,
 } from '../sample-store'
+import { DSL_VERSION } from '../dsl-grammar'
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -37,7 +40,7 @@ describe('loadSamples', () => {
   })
   it('round-trips samples added by addSample', () => {
     addSample(dsl, true)
-    expect(loadSamples()).toEqual([dsl])
+    expect(loadSamples()).toEqual([{ ...dsl, dslVersion: DSL_VERSION }])
   })
   it('returns empty on corrupt JSON', () => {
     window.localStorage.setItem(SAMPLES_KEY, '{not json')
@@ -110,5 +113,27 @@ describe('genSampleId', () => {
     const b = genSampleId()
     expect(a).toBeTruthy()
     expect(a).not.toBe(b)
+  })
+})
+
+describe('sample-store dslVersion', () => {
+  it('addSample stamps dslVersion = DSL_VERSION', () => {
+    const s: DslSample = {
+      id: 's1', ts: 1000, source: 'ask', kind: 'dsl', outcome: 'applied',
+      context: 'ctx', aiOutput: '[card #a]',
+    }
+    expect(addSample(s, true)).toBe(true)
+    const loaded = loadSamples()
+    expect(loaded[0]?.dslVersion).toBe(DSL_VERSION)
+  })
+
+  it('old sample without dslVersion loads as undefined (no backfill)', () => {
+    const oldQa: QaSample = {
+      id: 'old', ts: 1, source: 'ask', kind: 'qa', outcome: 'answered',
+      context: 'c', aiOutput: 'a',
+    }
+    window.localStorage.setItem(SAMPLES_KEY, JSON.stringify([oldQa]))
+    const loaded = loadSamples()
+    expect(loaded[0]?.dslVersion).toBeUndefined()
   })
 })

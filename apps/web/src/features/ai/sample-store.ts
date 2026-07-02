@@ -10,6 +10,8 @@
  *
  * 纯函数不调 Date.now() —— ts 由调用方传(可测)。genSampleId 用 crypto.randomUUID 兜底。
  */
+import { DSL_VERSION } from './dsl-grammar'
+
 export interface BaseSample {
   id: string
   ts: number
@@ -19,6 +21,8 @@ export interface BaseSample {
   aiOutput: string
   editedOutput?: string
   targetCanvasId?: string
+  /** 生成此样本时的 cys-dsl 语法版号(来自 DSL_VERSION)。旧样本无此字段 → undefined。 */
+  dslVersion?: number
 }
 export interface DslSample extends BaseSample {
   kind: 'dsl'
@@ -67,7 +71,8 @@ export function addSample(s: Sample, enabled: boolean | undefined): boolean {
   if (enabled === false) return false
   if (typeof window === 'undefined') return false
   try {
-    const next = [...loadSamples(), s].slice(-CAP)
+    const stamped = { ...s, dslVersion: DSL_VERSION }
+    const next = [...loadSamples(), stamped].slice(-CAP)
     window.localStorage.setItem(SAMPLES_KEY, JSON.stringify(next))
     return true
   } catch {
