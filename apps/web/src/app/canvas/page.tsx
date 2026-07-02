@@ -35,6 +35,7 @@ import { syncEmbedArrows, resolveCardByTitle } from '@/features/canvas/embed-lin
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { serializeCanvas } from '@/features/ai/canvas-dsl'
 import { parseDsl, parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
+import { DSL_GRAMMAR_REFERENCE } from '@/features/ai/dsl-grammar'
 import { retryUntilValid, buildDslCorrection } from '@/features/ai/retry-until-valid'
 import { TemplatePicker, type TemplateChoice } from '@/features/canvas/template-picker'
 import { allTemplates, saveCustomTemplate, addCustomTemplate } from '@/lib/canvas-templates'
@@ -352,20 +353,21 @@ export default function CanvasPage() {
       const snap = snapshotCanvas(adapter, service, activeCanvasId)
       const formatted = formatCanvasSnapshot(snap)
 
-      const systemPrompt =
-        'You are an active canvas layout organizer. The user clicked "AI layout" because they WANT the canvas reorganized — do not preserve the current layout unless it is already a clean, non-overlapping arrangement. Read each card\'s current position (provided in the snapshot) and substantially REPOSITION cards into a readable, well-spaced layout: group semantically related cards (by title keywords / tags) into clusters, align cards into a clear grid or DAG flow with consistent column widths, and ELIMINATE all overlap (no two cards may overlap). Use the full canvas: spread cards out with comfortable spacing (cards ~240x120, gap ~40-60px between neighbors). It IS expected and correct to substantially move cards from their current positions. You may reposition/resize cards and change colors; refine existing arrow relation signatures (dash style + arrowhead) where appropriate. IRON RULES (never break): (1) Cards are UPDATE-only — never create or delete cards; card content comes from the inbox. Reuse each existing #id to UPDATE. (2) Output one UPDATE directive for EVERY input card (reuse its #id) — never omit a card. (3) Do NOT create new relation arrows — only refine signatures of existing arrows (from/to are kept). (4) Free arrows (no from/to) keep their bbox. (5) Colors limited to blue/red/black/grey/yellow. Output DSL directives ONLY: one per line, each starting with "[", no markdown fences (no ```), no explanations, no preamble.'
+      const systemPrompt = `${DSL_GRAMMAR_REFERENCE}
+
+You are an active canvas layout organizer. The user clicked "AI layout" because they WANT the canvas reorganized — do not preserve the current layout unless it is already a clean, non-overlapping arrangement. Read each card's current position (provided in the snapshot) and substantially REPOSITION cards into a readable, well-spaced layout: group semantically related cards (by title keywords / tags) into clusters, align cards into a clear grid or DAG flow with consistent column widths, and ELIMINATE all overlap (no two cards may overlap). Use the full canvas: spread cards out with comfortable spacing (cards ~240x120, gap ~40-60px between neighbors). It IS expected and correct to substantially move cards from their current positions. You may reposition/resize cards and change colors; refine existing arrow relation signatures (dash style + arrowhead) where appropriate. IRON RULES (never break): (1) Cards are UPDATE-only — never create or delete cards; card content comes from the inbox. Reuse each existing #id to UPDATE. (2) Output one UPDATE directive for EVERY input card (reuse its #id) — never omit a card. (3) Do NOT create new relation arrows — only refine signatures of existing arrows (from/to are kept). (4) Free arrows (no from/to) keep their bbox. Output DSL directives ONLY: one per line, each starting with "[", no markdown fences (no \`\`\`), no explanations, no preamble.`
 
       const userPrompt = `Reorganize this canvas into a clean, non-overlapping, well-spaced layout. Group related cards into clusters, align into a readable grid/DAG flow, and spread cards out across the canvas. Substantially reposition cards that are overlapping, cramped, or scattered — do not just nudge them.
 
 ${formatted}
 
 Output DSL (one directive per line):
-[card #id] @pos(x, y) @size(w, h) @color(blue|red|black|grey|yellow)
+[card #id] @pos(x, y) @size(w, h) @color(c)
 [rect #id] @pos(x, y) @size(w, h) @color(c)
 [text #id] @pos(x, y) @text("...") @color(c)
 [arrow #id] from #a to #b @label("...") @color(c) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none)
 [arrow #id] @pos(x, y) @size(w, h) @color(c) @dash(...) @arrowhead(...)   (free arrow: no from/to; w/h may be negative for direction)
-Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbox kept for free arrows); cards are update-only — output one UPDATE per input card; colors limited to blue/red/black/grey/yellow; do NOT create new relation arrows.`
+Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbox kept for free arrows); cards are update-only — output one UPDATE per input card; do NOT create new relation arrows.`
 
       // maxTokens 提到 4096:排版 DSL 需要完整结构化输出,默认 1024 对思考模式模型
       // (DeepSeek-v4-pro 等)不够 —— 思考吃掉大半,DSL 还没输出完就被截断 → 解析 0 条。

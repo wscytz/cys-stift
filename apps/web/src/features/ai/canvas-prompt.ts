@@ -9,20 +9,7 @@
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import type { CanvasId, CardService } from '@cys-stift/domain'
 import { snapshotCanvas, formatCanvasSnapshot } from './canvas-snapshot'
-
-const GRAMMAR = `Canvas DSL grammar (one element per line):
-  [card #id] @pos(x, y) @size(w, h) @color(red|yellow|blue|black|white|gray|grey)
-  [rect #id] @pos(x, y) @size(w, h) @color(c)
-  [text #id] @pos(x, y) @text("...") @color(c)
-  [frame #id] @pos(x, y) @size(w, h) @text("title") @color(c)   # themed group/section container
-  [arrow #id] from #a to #b @label("...") @color(c) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none)
-  [arrow #id] @pos(x, y) @size(w, h) @color(c)   # free arrow (no from/to)
-  # arrow route (optional, to bend or elbow around obstacles):
-  #   @route(curve) @curve(cx,cy)                 # smooth quadratic curve via one control point
-  #   @route(elbow) @elbow(x,y;x,y)               # 1-2 corner points (semicolon-separated)
-  #   (omit @route for a straight line)
-Rules: card is update-only (content comes from elsewhere, you may reposition but not create orphan cards);
-  lines starting with # are comments and ignored; colors are the 6 Bauhaus tokens only.`
+import { DSL_GRAMMAR_REFERENCE as GRAMMAR } from './dsl-grammar'
 
 export function buildCanvasPrompt(
   host: CanvasHost,

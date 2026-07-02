@@ -21,6 +21,7 @@ import { pushToast } from '@/lib/toast-store'
 import { serializeCanvasReadable, serializeCanvas } from '../ai/canvas-dsl'
 import { parseDslWithDiagnostics, type DslDiagnostic } from '../ai/dsl-parser'
 import { buildCanvasPrompt } from '../ai/canvas-prompt'
+import { DSL_GRAMMAR_REFERENCE } from '../ai/dsl-grammar'
 import { applyLayout } from './apply-layout'
 
 export function DslDialog({
@@ -188,11 +189,7 @@ export function DslDialog({
       <details className="dsl-syntax">
         <summary className="mono-label mono-label--wide">{t('canvas.dslSyntaxTitle')}</summary>
         <p className="dsl-syntax__body">{t('canvas.dslSyntaxBody')}</p>
-        <pre className="dsl-syntax__code">{`[card #id] @pos(x, y) @size(w, h) @color(blue|red|black|grey|yellow)
-[rect #id] @pos(x, y) @size(w, h) @color(c)
-[text #id] @pos(x, y) @text("...") @color(c)
-[arrow #id] from #a to #b @label("...") @color(c) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none)
-[arrow #id] @pos(x, y) @size(w, h) @color(c)   # ${t('canvas.dslSyntaxFreeArrow')}`}</pre>
+        <pre className="dsl-syntax__code">{DSL_GRAMMAR_REFERENCE}</pre>
       </details>
       <textarea
         className="dsl-text"
