@@ -272,7 +272,9 @@ const styles = `
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Fix ②: 长标题换行到第 2 行(原 nowrap+ellipsis 砍成一行看不全),>2 行才省略。 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 `
