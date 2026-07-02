@@ -8,8 +8,8 @@
  *  - context 读 live host(snapshotCanvas(host))而非 temp host;
  *  - DSL 确认门传 liveHost={host},Apply 走 applyLayout(host) 单 undo(靠画布页 writeback 持久化)。
  *
- * 多轮:沿用 /ask 实际行为 —— 每轮发新问题 + 新鲜 RAG/snapshot;messages 仅 UI 历史,
- * 不重发 transcript(真多轮 deferred)。
+ * 多轮:沿用 /ask 实际行为 —— 每轮发新问题 + 新鲜 RAG/snapshot;同时把最近
+ * MAX_HISTORY 条对话作为 messages 发给 AI,让它有上下文(镜像 ask/page.tsx)。
  *
  * R2:沿用 /ask —— buildAgentUserPrompt 内 serializeCardsForAI allowlist(不含 deviceId/
  * apiKey/软删卡);snapshotCanvas 只几何/关系/shape 描述符。本组件不新增 AI 数据路径。
@@ -34,11 +34,11 @@ import {
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { AgentConfirmCard } from '@/features/ai/agent-confirm-card'
 import { CardDetailModal } from '@/features/card/card-detail'
-import { loadChatHistory, saveChatHistory, type PersistedChatMessage } from './companion-chat-history'
+import { loadConversation, saveConversation, type PersistedConversationMessage } from '@/lib/conversation-store'
 import { addSample, genSampleId } from '@/features/ai/sample-store'
 import { settingsStore } from '@/lib/settings-store'
 
-interface ChatMessage extends PersistedChatMessage {
+interface ChatMessage extends PersistedConversationMessage {
   /** 捕获样本用:该 assistant 消息对应的 userPrompt(RAG+snapshot) + question。send 时存。 */
   sampleContext?: { question: string; context: string }
 }
@@ -59,8 +59,8 @@ export function CompanionChat({
   const { t } = useI18n()
   const router = useRouter()
   // 初始从 localStorage 读取(防重新载入 / crash 丢历史);per-canvas 隔离。
-  // loadChatHistory 是 SSR-safe + try/catch,不会抛。lazy init 只跑一次。
-  const [messages, setMessages] = useState<ChatMessage[]>(() => loadChatHistory(canvasId))
+  // loadConversation 是 SSR-safe + try/catch,不会抛。lazy init 只跑一次。
+  const [messages, setMessages] = useState<ChatMessage[]>(() => loadConversation(canvasId))
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [detailCard, setDetailCard] = useState<Card | null>(null)
@@ -77,7 +77,7 @@ export function CompanionChat({
     if (saveTimerRef.current) return // 已有 pending 写入,等它跑(覆盖最新 messages)
     saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null
-      saveChatHistory(canvasId, messagesRef.current)
+      saveConversation(canvasId, messagesRef.current)
     }, 400)
   }, [messages, canvasId])
   useEffect(() => {
@@ -85,7 +85,7 @@ export function CompanionChat({
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current)
         saveTimerRef.current = null
-        saveChatHistory(canvasId, messagesRef.current) // flush 最后一次
+        saveConversation(canvasId, messagesRef.current) // flush 最后一次
       }
     }
   }, [canvasId])
@@ -99,7 +99,11 @@ export function CompanionChat({
     setInput('')
     setBusy(true)
 
-    // 截断老消息(超 MAX_HISTORY 丢最早);history 仅 UI,不重发 transcript。
+    // 截断老消息(超 MAX_HISTORY 丢最早);history 发给 AI 让它有上下文。
+    const history = messages.slice(-MAX_HISTORY).map((m) => ({
+      role: m.role,
+      content: m.content,
+    }))
     const userMsg: ChatMessage = { role: 'user', content: question }
     const asstMsg: ChatMessage = { role: 'assistant', content: '', streaming: true }
     setMessages((prev) => [...prev.slice(-MAX_HISTORY), userMsg, asstMsg])
@@ -114,7 +118,9 @@ export function CompanionChat({
 
       let acc = ''
       const r = await retryUntilValid({
-        initialMessages: [{ role: 'user' as const, content: userPrompt }],
+        initialMessages: history.length > 0
+          ? [...history, { role: 'user' as const, content: userPrompt }]
+          : [{ role: 'user' as const, content: userPrompt }],
         produce: (messages, attempt) => {
           if (attempt > 0) {
             // 重试:清 acc,显「重新生成中…」占位;onDelta 静默(不流中间版)。
