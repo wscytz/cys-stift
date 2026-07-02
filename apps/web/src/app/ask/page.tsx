@@ -41,22 +41,13 @@ import {
   extractCardRefs,
 } from '@/features/ai/agent-prompt'
 import { AgentConfirmCard } from '@/features/ai/agent-confirm-card'
-import { loadAskHistory, saveAskHistory, clearAskHistory } from '@/features/ai/ask-history'
+import { loadConversation, saveConversation, clearConversation, type PersistedConversationMessage } from '@/lib/conversation-store'
 import { buildCanvasHostForCanvas } from '@/features/canvas/canvas-host-builder'
 import { pushToast } from '@/lib/toast-store'
 import { addSample, genSampleId } from '@/features/ai/sample-store'
 import { settingsStore } from '@/lib/settings-store'
 
-interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-  /** assistant 消息里提取的 DSL 块(供确认门渲染)。 */
-  dslBlocks?: string[]
-  /** 流式进行中标记。 */
-  streaming?: boolean
-  /** 发送时的目标画布快照 —— 确认门的「应用」必须落到 AI 分析时的画布,
-   *  而非用户事后切换的实时 state(否则切画布后应用旧提议会落到错画布)。 */
-  targetCanvasId?: CanvasId
+interface ChatMessage extends PersistedConversationMessage {
   /** 捕获样本用:该 assistant 消息对应的 userPrompt(RAG+snapshot) + question。send 时存。 */
   sampleContext?: { question: string; context: string }
 }
@@ -68,10 +59,13 @@ export default function AskPage() {
   const router = useRouter()
   const { service, ready } = useDb()
   const { snapshot: canvasesSnap } = useCanvases()
-  const [messages, setMessages] = useState<ChatMessage[]>(() => loadAskHistory())
+  // 对话按 targetCanvasId 隔离 —— 每个画布有自己的上下文(per-canvas localStorage key)。
+  // targetCanvasId 先声明:messages 的 lazy init 引用它作为 conversation key。
+  const [targetCanvasId, setTargetCanvasId] = useState<CanvasId>(DEFAULT_CANVAS_ID)
+  // 初始从 localStorage 读取;切画布时 reload(见下方 effect)。lazy init 只跑一次。
+  const [messages, setMessages] = useState<ChatMessage[]>(() => loadConversation(targetCanvasId))
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
-  const [targetCanvasId, setTargetCanvasId] = useState<CanvasId>(DEFAULT_CANVAS_ID)
   const [detailCard, setDetailCard] = useState<Card | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -88,8 +82,24 @@ export default function AskPage() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages])
 
+  // 切画布时 reload 对话(per-canvas key 隔离)。
+  // 用 ref 跳过首次运行(lazy init 已在 useState 里加载了,避免 mount 双载)。
+  // 同时 abort 任何在飞的 stream —— 切画布后旧 stream 属于旧画布,不应写入新画布的 messages
+  // (abort 后 send 的 catch 会看到新 messages 列表,但 loadConversation 清了 streaming flag,
+  // 所以 catch 的 if-last-streaming 分支不命中,no-op)。
+  const skipReloadRef = useRef(true)
+  useEffect(() => {
+    if (skipReloadRef.current) {
+      skipReloadRef.current = false
+      return
+    }
+    abortRef.current?.abort()
+    setMessages(loadConversation(targetCanvasId))
+  }, [targetCanvasId])
+
   // 历史持久化:debounce ~400ms 写入,避免每个流式 token 都打 localStorage。
   // 镜像 companion-chat.tsx 的 setTimeout + ref 单飞范式。卸载时 flush 最后一次。
+  // 写入按当前 targetCanvasId 隔离(切画布后新 messages 自动归新画布 key)。
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const messagesRef = useRef(messages)
   messagesRef.current = messages
@@ -97,18 +107,18 @@ export default function AskPage() {
     if (saveTimerRef.current) return // 已有 pending 写入,等它跑(覆盖最新 messages)
     saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null
-      saveAskHistory(messagesRef.current)
+      saveConversation(targetCanvasId, messagesRef.current)
     }, 400)
-  }, [messages])
+  }, [messages, targetCanvasId])
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current)
         saveTimerRef.current = null
-        saveAskHistory(messagesRef.current) // flush 最后一次
+        saveConversation(targetCanvasId, messagesRef.current) // flush 最后一次
       }
     }
-  }, [])
+  }, [targetCanvasId])
 
   const send = async () => {
     const question = input.trim()
@@ -123,7 +133,7 @@ export default function AskPage() {
       content: m.content,
     }))
     const userMsg: ChatMessage = { role: 'user', content: question }
-    const asstMsg: ChatMessage = { role: 'assistant', content: '', streaming: true, targetCanvasId }
+    const asstMsg: ChatMessage = { role: 'assistant', content: '', streaming: true }
     setMessages((prev) => [...prev, userMsg, asstMsg])
 
     const ac = new AbortController()
@@ -195,7 +205,7 @@ export default function AskPage() {
       }
       setMessages((prev) => {
         const next = [...prev]
-        next[next.length - 1] = { role: 'assistant', content: final, dslBlocks, streaming: false, targetCanvasId, sampleContext: { question, context: userPrompt } }
+        next[next.length - 1] = { role: 'assistant', content: final, dslBlocks, streaming: false, sampleContext: { question, context: userPrompt } }
         return next
       })
     } catch (e) {
@@ -241,7 +251,7 @@ export default function AskPage() {
   const handleClear = () => {
     const n = messages.length
     setMessages([])
-    clearAskHistory()
+    clearConversation(targetCanvasId)
     if (n > 0) pushToast({ kind: 'info', message: t('ask.cleared', { n: String(n) }) })
   }
 
@@ -298,7 +308,7 @@ export default function AskPage() {
                     content={m.content}
                     streaming={m.streaming}
                     dslBlocks={m.dslBlocks}
-                    targetCanvasId={m.targetCanvasId ?? targetCanvasId}
+                    targetCanvasId={targetCanvasId}
                     service={service}
                     getCardTitle={(id) => service.get(id as CardId)?.title ?? id}
                     onCardRefClick={(id) => {
@@ -307,7 +317,7 @@ export default function AskPage() {
                     }}
                     onApplied={() => onApplied(i)}
                     onRejected={() => { void onRejected(i) }}
-                    sampleContext={m.sampleContext ? { source: 'ask', question: m.sampleContext.question, context: m.sampleContext.context, targetCanvasId: m.targetCanvasId ?? targetCanvasId } : undefined}
+                    sampleContext={m.sampleContext ? { source: 'ask', question: m.sampleContext.question, context: m.sampleContext.context, targetCanvasId } : undefined}
                   />
                 </div>
               ))}
