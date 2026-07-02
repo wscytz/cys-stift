@@ -67,7 +67,15 @@ export interface AIProvider {
   ): Promise<{ ok: boolean; latencyMs?: number; error?: string }>
 }
 
-export interface AIConfig {
+/**
+ * AIProfile — 一份完整的 provider 配置(多 profile 模型)。比 AIConfig 多 id/name
+ * 用于 profile 列表标识 + 用户可改名。存于 Settings.profiles[]。
+ */
+export interface AIProfile {
+  /** 稳定 id(genProfileId 生成)。activeProfileId 指向它。 */
+  id: string
+  /** 用户可改名;默认 provider 大写名。 */
+  name: string
   provider: ProviderId
   apiKey: string
   baseUrl: string
@@ -77,6 +85,24 @@ export interface AIConfig {
   temperature?: number
   /** Optional max output tokens override (Task 2 default applies when unset). */
   maxTokens?: number
+}
+
+/**
+ * AIConfig — identity-less 的运行时配置形态(供 providers/isAIReady/testConnection 等
+ * 消费)。AIProfile 是其超集,故 getCurrentAI() 返 AIProfile 可直接传给要 AIConfig 的函数。
+ * 既有 AIConfig 消费者(providers/workflows/fixtures)零改。
+ */
+export type AIConfig = Omit<AIProfile, 'id' | 'name'>
+
+/**
+ * 生成 profile id。crypto.randomUUID 优先;SSR/老浏览器兜底。
+ * 不用 Date.now 单独(碰撞风险)+ random 后缀。
+ */
+export function genProfileId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
 }
 
 /** Maker closure — factory stores these, not instances, because each
