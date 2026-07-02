@@ -252,10 +252,12 @@ function Thumb({ elements, label }: { elements: CanvasElement[]; label: string }
     const W = cv.width, H = cv.height
     ctx.clearRect(0, 0, W, H)
     if (elements.length === 0) return
-    // 算 bbox 范围 → 投影到缩略图。
+    // 算 bbox 范围 → 投影到缩略图。关系箭头(有 from/to)不贡献自己的 bbox ——
+    // 其几何来自两端点卡,而卡已在 bbox 内;若把 arrow 的 el.x(端点编码,常 0)算进去,
+    // 会把 minX/minY 拉到 0 缩小投影。
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
     for (const el of elements) {
-      const x = el.kind === 'arrow' && el.from && el.to ? el.x : el.x
+      if (el.kind === 'arrow' && el.from && el.to) continue
       minX = Math.min(minX, el.x); minY = Math.min(minY, el.y)
       maxX = Math.max(maxX, el.x + (el.w || 0)); maxY = Math.max(maxY, el.y + (el.h || 0))
     }
@@ -269,7 +271,18 @@ function Thumb({ elements, label }: { elements: CanvasElement[]; label: string }
       ctx.fillStyle = el.kind === 'card' ? readToken('--color-black-soft', 'rgba(10,10,10,0.08)') : 'transparent'
       ctx.lineWidth = 1
       if (el.kind === 'arrow' && el.from && el.to) {
-        // 关系箭头:不画(x/y=0),缩略图里看不到线段;跳过。
+        // 关系箭头:按 from/to 卡中心画红线(x/y 是端点编码,非 bbox,不能当矩形画)。
+        const from = elements.find((e) => e.id === el.from)
+        const to = elements.find((e) => e.id === el.to)
+        if (!from || !to) continue // 悬空 arrow(端点缺)→ skip
+        const fx = (from.x + (from.w || 20) / 2) * s + ox
+        const fy = (from.y + (from.h || 20) / 2) * s + oy
+        const tx = (to.x + (to.w || 20) / 2) * s + ox
+        const ty = (to.y + (to.h || 20) / 2) * s + oy
+        ctx.beginPath()
+        ctx.moveTo(fx, fy)
+        ctx.lineTo(tx, ty)
+        ctx.stroke()
         continue
       }
       const x = el.x * s + ox, y = el.y * s + oy
