@@ -17,18 +17,10 @@
  * Legacy kinds (ellipse/line/note/image) are NOT serialized — they're not in
  * the active set. freedraw emits position only; its point sequence stays in the
  * engine store (R2: hand-draw is vector; also keeps point data out of AI view).
+ * Canonical single source: ./dsl-grammar.ts (DSL_KINDS / DSL_COLORS / DSL_GRAMMAR_REFERENCE).
  */
 import type { CanvasElement } from '@cys-stift/canvas-engine'
-
-/** Kinds the DSL serializes. Legacy kinds are skipped. */
-const DSL_KINDS: ReadonlySet<string> = new Set([
-  'card',
-  'rect',
-  'frame',
-  'text',
-  'arrow',
-  'freedraw',
-])
+import { DSL_KINDS } from './dsl-grammar'
 
 /**
  * Serialize the canvas's active elements to a text block the AI can read.
@@ -36,7 +28,7 @@ const DSL_KINDS: ReadonlySet<string> = new Set([
  */
 export function serializeCanvas(elements: CanvasElement[]): string {
   return elements
-    .filter((e) => DSL_KINDS.has(e.kind))
+    .filter((e) => (DSL_KINDS as readonly string[]).includes(e.kind))
     .map(serializeElement)
     .filter(Boolean)
     .join('\n')
