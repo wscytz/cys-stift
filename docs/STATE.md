@@ -138,11 +138,12 @@
 
 #### 短期(下一轮)
 
-> **2026-07-02 本轮进度(已 commit + push 到 56c17f0,未 bump 版本号,待统一手测):**
-> ✅ #1 标题可读性 / #2(a)+(d) AI 持久+缩略图箭头 / #3 图谱复位 fit / #4 卡删审计(扎实,窄 gap 延后) / (f) AI 多 profile P1 / #6 AI 交互样本导出 / (c1) DSL 重试闭环。
-> ⏳ 待做:(c2) prompt 加固(有重试后 YAGNI 延后)/(e) /ask 入口需用户澄清 /(f) P2 能力维度(per-profile vision/labs/思考)。
-> ⏳ 待办:统一手测上面这批 + bump v0.45.0 + push。手测项见各 commit message。
-> ⚠️ v0.44.0 的多 profile 有 **v1→v2 settings migration**,重点测旧配置用户 reload 后 /ask 仍可用。
+> **2026-07-02 进度:**
+> - 已 push 到 56c17f0(未 bump,待手测):#1 标题 / #2(a)+(d) AI 持久+缩略图箭头 / #3 图谱复位 / #4 卡删审计 / (f) 多 profile P1 / #6 样本导出 / (c1) DSL 重试闭环。
+> - 本地新增(未 push,`262a6fb..7515ef5`):**#12 DSL 共享语法模块 + 版号** — 新建 `features/ai/dsl-grammar.ts` 作单一源(`DSL_VERSION=1` / `DSL_KINDS` / `DSL_COLORS` / `DSL_GRAMMAR_REFERENCE`),5 处 prompt/help 收口 import 它(不再各抄一份),parser/serializer 搬 KINDS+sync 锁测试防漂移,样本记 `dslVersion`。顺带修 agent/layout prompt 漏 `white` 的颜色漂移。**为 (c2) prompt 加固铺路:改 prompt 届时只改 REFERENCE 一处 + bump 版号,5 处自动联动。**
+> ⏳ 待做:(c2) prompt 加固(现改 REFERENCE 一处即联动)/(e) /ask 入口需用户澄清 /(f) P2 能力维度(per-profile vision/labs/思考)。
+> ⏳ 待办:统一手测 + bump v0.45.0 + push。手测项见各 commit message。
+> ⚠️ v0.44.0 多 profile 有 **v1→v2 settings migration**,重点测旧配置 reload 后 /ask 仍可用。
 
 1. **UI 收件箱/时间线卡片修 + 设计语言一贯性**(用户 2026-07-01 反馈 + 07-02 一贯性)— ① inbox `tile` 的 `tile__pin`(右上 ★)/`tile__select`(左上 ☑)绝对定位,title 无避让区 → 长 title 被遮挡;② timeline 复用 `ArchiveCardTile`(同 `.tile`),inbox page 与 archive-card-tile 各有一份 `.tile` CSS 不同步,先 diff 两份定权威源;③ 缝修完后做一轮一贯性扫描(tile/按钮/间距/色/字体跨页一致)+ 人性化小毛病批。属 UI 缝,可能不必走全套 brainstorm。
 2. **AI 可用性集群**(用户 2026-07-02 手测主线,"能用但不太对,遵循能力要做好,不是瞎动")— 见 `v043-handtest-round2` 记忆。子项:(a) **⚠️ 对话记忆**:R1 `3ae76a3` 加了 /ask 多轮历史但用户感觉没记忆 → 先验证 provider 真发 history + 澄清"记忆"指同对话上下文还是跨 session 历史读取(/ask reload 丢,只 companion 做了 localStorage);(b) **指令遵循/不瞎动**:DSL 输出守规矩(格式/id/约束),靠 prompt 结构化 + DSL 校验 + 错误反馈重试;(c) **基础设施完善**:DSL 校验器 / prompt schema / 反馈循环"已有的要完善";(d) **DSL 预览可视性**:AgentConfirmCard before/after 缩略图要让人看懂 AI 要干嘛;(e) **/ask 入口逻辑**:测"进入只能首页"的路由行为;(f) **provider 选择 UX**:OpenAI/Anthropic/Ollama 配置易用。**AI 不建卡是方向对,不动。**
