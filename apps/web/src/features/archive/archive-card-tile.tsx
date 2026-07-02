@@ -225,6 +225,9 @@ const styles = `
   gap: var(--space-2);
   min-width: 0;
 }
+/* Fix ①: tile 变体标题避让角标带(★/☑ 在 top:space-1 + 28px,底边 y=36)。
+   仅 .tile 命中(特异性 0,2,0 > base 0,1,0);.row 变体的 .tile__body 无角标,保持 24。 */
+.tile .tile__body { padding-top: var(--space-5); }
 .tile__title {
   margin: 0;
   font-family: var(--font-content);

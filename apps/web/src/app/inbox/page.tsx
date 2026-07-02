@@ -606,7 +606,7 @@ const styles = `
 .tile__main:active { transform: translate(2px, 2px); box-shadow: none; }
 .tile__main:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tile__bar { width: 8px; flex-shrink: 0; background: var(--color-red); }
-.tile__body { flex: 1; padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+.tile__body { flex: 1; padding: var(--space-5) var(--space-3) var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
 .tile__title {
   margin: 0;
   font-family: var(--font-content);
