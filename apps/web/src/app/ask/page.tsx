@@ -23,7 +23,7 @@ import Link from 'next/link'
 import { BauhausMotif, Card as UICard, Tag, Toolbar, Button } from '@cys-stift/ui'
 import type { Card, CardId, CanvasId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
-import { useCanvases } from '@/lib/canvas-store'
+import { canvasStore, useCanvases } from '@/lib/canvas-store'
 import { useI18n } from '@/lib/i18n'
 import { PageLoading } from '@/components/page-loading'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
@@ -54,6 +54,13 @@ interface ChatMessage extends PersistedConversationMessage {
 
 const MAX_HISTORY = 20
 
+/**
+ * Sentinel value for the 「➕ 新画布」 option in the canvas-select.
+ * Selecting it triggers canvasStore.create + binds the conversation to
+ * the new canvas (Task 4: 新建即出生).
+ */
+const NEW_CANVAS_SENTINEL = '__new__'
+
 export default function AskPage() {
   const { t } = useI18n()
   const router = useRouter()
@@ -69,6 +76,9 @@ export default function AskPage() {
   const [detailCard, setDetailCard] = useState<Card | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  // Track canvases created from /ask's picker (Task 4). Populated on create;
+  // Task 5 will use this set to auto-clean empty ask-created canvases.
+  const askCreatedRef = useRef<Set<CanvasId>>(new Set())
 
   const aiReady = isAIReady(getCurrentAI())
   const canvasNameById = useMemo(() => {
@@ -265,16 +275,32 @@ export default function AskPage() {
         <span className="crumb-sep">/</span>
         <h1 className="crumb crumb--here">{t('ask.crumb')}</h1>
         <span className="crumb-spacer" />
-        {/* 目标画布下拉 */}
+        {/* 目标画布下拉 + ➕ 新建即出生(Task 4) */}
         <select
           className="ask__canvas-select"
           value={String(targetCanvasId)}
-          onChange={(e) => setTargetCanvasId(e.target.value as CanvasId)}
+          onChange={(e) => {
+            const v = e.target.value
+            if (v === NEW_CANVAS_SENTINEL) {
+              // 新建即出生:立即创建画布并绑定对话。新 canvas 出现在 canvasesSnap
+              // (useCanvases 订阅 notify),select re-render 后自动选中新 id。
+              const id = canvasStore.create(
+                t('ask.newCanvasName', { n: canvasesSnap.canvases.length + 1 }),
+              )
+              if (id) {
+                askCreatedRef.current.add(id)
+                setTargetCanvasId(id)
+              }
+            } else {
+              setTargetCanvasId(v as CanvasId)
+            }
+          }}
           aria-label={t('ask.targetCanvas')}
         >
           {canvasesSnap.canvases.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
+          <option value={NEW_CANVAS_SENTINEL}>➕ {t('ask.newCanvas')}</option>
         </select>
         {messages.length > 0 && (
           <Button variant="ghost" onClick={handleClear}>{t('ask.clear')}</Button>

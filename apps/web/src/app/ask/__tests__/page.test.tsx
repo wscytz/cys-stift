@@ -118,8 +118,33 @@ const CANVASES = [
     updatedAt: '1970-01-01T00:00:00.000Z',
   },
 ]
+// Stateful mock state: canvasStore.create mutates canvasesState; useCanvases
+// re-reads it. The vi.mock factory closures below capture these bindings by
+// reference, so they see updated values when reassigning canvasesState.
+// `let` (not `const`) so beforeEach can reset to a fresh copy per test.
+let canvasesState: typeof CANVASES = []
+const createMock = vi.fn((name: string): CanvasId => {
+  const id = `cv-new-${canvasesState.length}` as CanvasId
+  canvasesState = [
+    ...canvasesState,
+    {
+      id,
+      name,
+      workspaceId: 'ws',
+      view: {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+  ]
+  return id
+})
 vi.mock('@/lib/canvas-store', () => ({
-  useCanvases: () => ({ snapshot: { canvases: CANVASES, activeCanvasId: CV_A }, ready: true }),
+  // Closures read canvasesState/createMock lazily — safe even though the
+  // vi.mock is hoisted above the let/const (TDZ only errors on access at
+  // factory-run time, and these inner fns are called much later, during
+  // a React render or event handler, after the lets are initialized).
+  useCanvases: () => ({ snapshot: { canvases: canvasesState, activeCanvasId: CV_A }, ready: true }),
+  canvasStore: { create: (name: string) => createMock(name) },
 }))
 
 import AskPage from '../page'
@@ -174,6 +199,12 @@ async function typeAndSend(host: HTMLDivElement, text: string) {
   })
 }
 
+// Reset stateful mock state before each test (both Task 3 and Task 4 suites).
+beforeEach(() => {
+  canvasesState = [...CANVASES]
+  createMock.mockClear()
+})
+
 describe('/ask page — per-canvas conversation store (Task 3)', () => {
   beforeEach(() => {
     window.localStorage.clear()
@@ -227,6 +258,57 @@ describe('/ask page — per-canvas conversation store (Task 3)', () => {
     }
     // And NOT written to the legacy global key.
     expect(window.localStorage.getItem('cys-stift.ask-chat.v1')).toBeNull()
+    unmount()
+  })
+})
+
+describe('/ask page — new canvas from picker (Task 4: 新建即出生)', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    streamTextMock.mockReset()
+    streamTextMock.mockResolvedValue({ content: 'plain answer' })
+  })
+
+  it('canvas-select offers a ➕ new-canvas option (sentinel __new__)', () => {
+    const { host, unmount } = render(<AskPage />)
+    const select = host.querySelector('select.ask__canvas-select') as HTMLSelectElement
+    const opts = Array.from(select.options)
+    const newOpt = opts.find((o) => o.value === '__new__')
+    expect(newOpt).toBeDefined()
+    // Label starts with ➕
+    expect(newOpt!.textContent ?? '').toMatch(/^\s*➕/)
+    unmount()
+  })
+
+  it('selecting the sentinel calls canvasStore.create once and binds conversation to the new id', async () => {
+    const { host, unmount } = render(<AskPage />)
+    const select = host.querySelector('select.ask__canvas-select') as HTMLSelectElement
+
+    // Before: 2 canvases, no create called.
+    expect(createMock).not.toHaveBeenCalled()
+    expect(select.options.length).toBe(3) // CV_A + CV_B + sentinel
+
+    await switchCanvas(host, '__new__')
+
+    // create called exactly once.
+    expect(createMock).toHaveBeenCalledTimes(1)
+    // The new canvas id is returned and select now shows it as the current value.
+    const newId = createMock.mock.results[0]!.value as CanvasId
+    expect(newId).toBeTruthy()
+    expect(select.value).toBe(String(newId))
+    // The new canvas now appears in the option list (no more sentinel).
+    const opts = Array.from(select.options)
+    expect(opts.some((o) => o.value === String(newId))).toBe(true)
+    expect(opts.find((o) => o.value === '__new__')).toBeDefined() // sentinel still present
+    expect(select.options.length).toBe(4) // CV_A + CV_B + new + sentinel
+    unmount()
+  })
+
+  it('the created canvas default name uses ask.newCanvasName with {n} = count + 1', async () => {
+    const { host, unmount } = render(<AskPage />)
+    await switchCanvas(host, '__new__')
+    // createMock called with the i18n key (the i18n mock returns the key as-is).
+    expect(createMock).toHaveBeenCalledWith('ask.newCanvasName')
     unmount()
   })
 })
