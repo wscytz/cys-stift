@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import type { AIProfile } from '../settings-store'
 
 // ── Hook testing note ───────────────────────────────────────────────────────
 // useSettings (the React hook) is NOT tested here.
@@ -7,7 +8,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 // hook is a thin wrapper over useSyncExternalStore + the store API exercised
 // below.
 
-const STORAGE_KEY = 'cys-stift.settings.v1'
+const STORAGE_KEY = 'cys-stift.settings.v2'
 
 let store: typeof import('../settings-store').settingsStore
 
@@ -23,7 +24,8 @@ describe('settingsStore.get — defaults', () => {
     expect(s.captureShortcut).toEqual({ modKey: 'meta', shift: true, code: 'Space' })
     expect(s.theme).toBe('system')
     expect(s.locale).toBe('zh')
-    expect(s.ai).toBeNull()
+    expect(s.profiles).toEqual([])
+    expect(s.activeProfileId).toBeNull()
   })
 })
 
@@ -80,34 +82,6 @@ describe('settingsStore.updateTheme', () => {
   })
 })
 
-describe('settingsStore.updateAISettings (M3)', () => {
-  it('seeds defaults from scratch when ai is null', () => {
-    store.updateAISettings({ apiKey: 'sk-test' })
-    const ai = store.get().ai
-    expect(ai).not.toBeNull()
-    expect(ai!.provider).toBe('openai') // default
-    expect(ai!.apiKey).toBe('sk-test') // patched
-    expect(ai!.baseUrl).toBe('https://api.openai.com/v1') // default
-    expect(ai!.enabled).toBe(false) // default
-  })
-
-  it('merges a partial patch onto an existing config', () => {
-    store.updateAISettings({ apiKey: 'sk-one' })
-    store.updateAISettings({ enabled: true })
-    const ai = store.get().ai
-    expect(ai!.apiKey).toBe('sk-one') // preserved
-    expect(ai!.enabled).toBe(true) // patched
-  })
-
-  it('persists ai config to localStorage', () => {
-    store.updateAISettings({ provider: 'anthropic', apiKey: 'k', model: 'claude-3-5-sonnet', baseUrl: 'https://api.anthropic.com' })
-    const parsed = JSON.parse(
-      window.localStorage.getItem(STORAGE_KEY)!,
-    ) as { settings: { ai: { provider: string } } }
-    expect(parsed.settings.ai.provider).toBe('anthropic')
-  })
-})
-
 describe('settingsStore.subscribe', () => {
   it('notifies subscribers on a change and returns an unsubscribe', () => {
     const cb = vi.fn()
@@ -147,7 +121,8 @@ describe('settingsStore — corrupt / invalid localStorage', () => {
           captureShortcut: { modKey: 'meta', shift: true, code: 'Space' },
           theme: 'neon', // invalid
           locale: 'zh',
-          ai: null,
+          profiles: [],
+          activeProfileId: null,
         },
       }),
     )
@@ -162,7 +137,8 @@ describe('settingsStore — corrupt / invalid localStorage', () => {
           captureShortcut: { modKey: 'banana', shift: true, code: 'Space' },
           theme: 'light',
           locale: 'en',
-          ai: null,
+          profiles: [],
+          activeProfileId: null,
         },
       }),
     )
@@ -171,7 +147,7 @@ describe('settingsStore — corrupt / invalid localStorage', () => {
     expect(s.captureShortcut.modKey).toBe('meta')
   })
 
-  it('falls back to defaults when ai config fails validation', () => {
+  it('falls back to defaults when profiles contains an invalid profile', () => {
     window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -179,15 +155,16 @@ describe('settingsStore — corrupt / invalid localStorage', () => {
           captureShortcut: { modKey: 'meta', shift: true, code: 'Space' },
           theme: 'light',
           locale: 'en',
-          ai: { provider: 'evilcorp', apiKey: 'x', baseUrl: 'not-a-url', model: 'm', enabled: true },
+          profiles: [{ id: 'p1', provider: 'evilcorp', apiKey: 'x', baseUrl: 'not-a-url', model: 'm', enabled: true }],
+          activeProfileId: 'p1',
         },
       }),
     )
-    // Bad ai → whole settings rejected.
+    // Bad profile → whole settings rejected.
     expect(store.get().locale).toBe('zh') // default locale, not 'en'
   })
 
-  it('accepts a settings object missing the ai field (back-compat)', () => {
+  it('accepts a valid v2 settings object (profiles empty + null active)', () => {
     window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -195,17 +172,16 @@ describe('settingsStore — corrupt / invalid localStorage', () => {
           captureShortcut: { modKey: 'meta', shift: true, code: 'Space' },
           theme: 'dark',
           locale: 'en',
-          // no ai field — treated as ai: null
+          profiles: [],
+          activeProfileId: null,
         },
       }),
     )
     const s = store.get()
     expect(s.theme).toBe('dark')
     expect(s.locale).toBe('en')
-    // isValid accepts a missing-ai object (`if (!('ai' in o)) return true`),
-    // but it does NOT normalise the field to null — so the rehydrated object
-    // simply omits `ai`. Callers treat both null and undefined as "no AI".
-    expect(s.ai).toBeFalsy()
+    expect(s.profiles).toEqual([])
+    expect(s.activeProfileId).toBeNull()
   })
 })
 
@@ -223,7 +199,9 @@ describe('settingsStore — SSR safety', () => {
       expect(() => ssrStore.update({ theme: 'dark' })).not.toThrow()
       expect(() => ssrStore.updateLocale('en')).not.toThrow()
       expect(() => ssrStore.updateTheme('dark')).not.toThrow()
-      expect(() => ssrStore.updateAISettings({ apiKey: 'x' })).not.toThrow()
+      expect(() => ssrStore.upsertProfile({
+        id: 'p1', name: 'OpenAI', provider: 'openai', apiKey: 'x', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', enabled: false,
+      })).not.toThrow()
     } finally {
       globalThis.window = originalWindow
     }
@@ -325,16 +303,18 @@ describe('settingsStore — quota exceeded (rollback + notify)', () => {
     }
   })
 
-  it('rolls back updateAISettings + fires quota when persist fails', () => {
+  it('rolls back upsertProfile + fires quota when persist fails', () => {
     const restore = simulateQuota()
     try {
       let quotaFired = false
       const unsub = onQuotaExceeded(() => {
         quotaFired = true
       })
-      store.updateAISettings({ apiKey: 'sk-test' })
+      store.upsertProfile({
+        id: 'p1', name: 'OpenAI', provider: 'openai', apiKey: 'sk-test', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', enabled: false,
+      })
       unsub()
-      expect(store.get().ai).toBeNull()
+      expect(store.get().profiles).toEqual([])
       expect(quotaFired).toBe(true)
     } finally {
       restore()
@@ -382,5 +362,95 @@ describe('settingsStore — quota exceeded (rollback + notify)', () => {
     unsub()
     expect(seen.length).toBe(1)
     expect(seen[0]!.theme).toBe('dark')
+  })
+})
+
+describe('settingsStore — multi-profile CRUD', () => {
+  const profile = (id: string, provider: 'openai' | 'anthropic' | 'ollama' = 'openai'): AIProfile => ({
+    id,
+    name: provider === 'openai' ? 'OpenAI' : provider === 'anthropic' ? 'Anthropic' : 'Ollama',
+    provider,
+    apiKey: 'k-' + id,
+    baseUrl: 'https://api.openai.com/v1',
+    model: 'gpt-4o-mini',
+    enabled: false,
+  })
+
+  it('upsertProfile adds a new profile', () => {
+    store.upsertProfile(profile('p1'))
+    const s = store.get()
+    expect(s.profiles).toHaveLength(1)
+    expect(s.profiles[0]!.id).toBe('p1')
+  })
+
+  it('upsertProfile replaces by id', () => {
+    store.upsertProfile(profile('p1'))
+    store.upsertProfile({ ...profile('p1'), apiKey: 'changed' })
+    expect(store.get().profiles[0]!.apiKey).toBe('changed')
+    expect(store.get().profiles).toHaveLength(1)
+  })
+
+  it('setActiveProfile sets activeProfileId', () => {
+    store.upsertProfile(profile('p1'))
+    store.setActiveProfile('p1')
+    expect(store.get().activeProfileId).toBe('p1')
+  })
+
+  it('deleteProfile auto-switches active to the first remaining (or null)', () => {
+    store.upsertProfile(profile('p1'))
+    store.upsertProfile(profile('p2', 'anthropic'))
+    store.setActiveProfile('p1')
+    store.deleteProfile('p1')
+    const s = store.get()
+    expect(s.profiles.map((p) => p.id)).toEqual(['p2'])
+    expect(s.activeProfileId).toBe('p2') // 自动切第一个剩余
+  })
+
+  it('deleteProfile of the last profile → activeProfileId null', () => {
+    store.upsertProfile(profile('p1'))
+    store.setActiveProfile('p1')
+    store.deleteProfile('p1')
+    expect(store.get().profiles).toEqual([])
+    expect(store.get().activeProfileId).toBeNull()
+  })
+})
+
+describe('settingsStore — v1→v2 migration', () => {
+  it('migrates a legacy v1 payload (settings.ai) into profiles[0] + active', async () => {
+    window.localStorage.setItem(
+      'cys-stift.settings.v1',
+      JSON.stringify({
+        settings: {
+          captureShortcut: { modKey: 'meta', shift: true, code: 'Space' },
+          theme: 'system',
+          locale: 'zh',
+          ai: { provider: 'anthropic', apiKey: 'sk-ant-x', baseUrl: 'https://api.anthropic.com', model: 'claude-haiku-4-5', enabled: true },
+          seenCaptureHint: false,
+        },
+      }),
+    )
+    vi.resetModules()
+    const store2 = (await import('../settings-store')).settingsStore
+    const s = store2.get()
+    expect(s.profiles).toHaveLength(1)
+    expect(s.profiles[0]!.provider).toBe('anthropic')
+    expect(s.profiles[0]!.apiKey).toBe('sk-ant-x')
+    expect(s.profiles[0]!.name).toBe('Anthropic')
+    expect(typeof s.profiles[0]!.id).toBe('string')
+    expect(s.activeProfileId).toBe(s.profiles[0]!.id)
+    // 迁移后写入 v2 key(不再读 v1)。
+    expect(window.localStorage.getItem('cys-stift.settings.v2')).not.toBeNull()
+  })
+
+  it('v1 with no ai → empty profiles + null active', async () => {
+    window.localStorage.setItem(
+      'cys-stift.settings.v1',
+      JSON.stringify({ settings: { captureShortcut: { modKey: 'meta', shift: true, code: 'Space' }, theme: 'system', locale: 'zh', seenCaptureHint: false } }),
+    )
+    vi.resetModules()
+    const store2 = (await import('../settings-store')).settingsStore
+    const s = store2.get()
+    expect(s.profiles).toEqual([])
+    expect(s.activeProfileId).toBeNull()
   })
 })

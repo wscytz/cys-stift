@@ -16,19 +16,19 @@
 
 import { useEffect } from 'react'
 import { useSettings } from '@/lib/settings-store'
-import type { AIConfig } from './types'
+import type { AIProfile } from './types'
 import { getDefaultProviderDefaults } from './providers'
 
-let _cachedAI: AIConfig | null | undefined = undefined
+let _cachedAI: AIProfile | null | undefined = undefined
 
-export function getCurrentAI(): AIConfig | null {
+export function getCurrentAI(): AIProfile | null {
   return _cachedAI === undefined ? null : _cachedAI
 }
 
 /** True iff AI is usable right now: configured + enabled + has a baseUrl
  *  + (if the provider needs a key) a non-empty apiKey. null = not ready.
  *  This is the single gate for "show AiActionMenu vs AiSetupCard". */
-export function isAIReady(cfg: AIConfig | null): boolean {
+export function isAIReady(cfg: AIProfile | null): boolean {
   if (!cfg || !cfg.enabled) return false
   if (cfg.baseUrl.length === 0) return false
   const def = getDefaultProviderDefaults(cfg.provider)
@@ -42,11 +42,12 @@ export function isAIReady(cfg: AIConfig | null): boolean {
 export function AIProviderSync() {
   const { settings } = useSettings()
   useEffect(() => {
-    _cachedAI = settings.ai
+    const active = settings.profiles.find((p) => p.id === settings.activeProfileId) ?? null
+    _cachedAI = active
     return () => {
       _cachedAI = undefined
     }
-  }, [settings.ai])
+  }, [settings.profiles, settings.activeProfileId])
   return null
 }
 
@@ -54,7 +55,8 @@ export function AIProviderSync() {
  *  card-detail footer uses it to gate the AI buttons on/off). */
 export function useAIEnabled(): boolean {
   const { settings } = useSettings()
-  return Boolean(settings.ai?.enabled)
+  const active = settings.profiles.find((p) => p.id === settings.activeProfileId) ?? null
+  return Boolean(active?.enabled)
 }
 
 /** 实验室 vision 开关(代码层守卫入口)。false 时 vision 路径完全不可达——

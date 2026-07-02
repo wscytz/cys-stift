@@ -88,7 +88,7 @@ describe('theme — persists through settingsStore', () => {
     const { settingsStore } = await import('../settings-store')
     settingsStore.updateTheme('dark')
     // Confirm it landed in localStorage under the settings envelope.
-    const raw = window.localStorage.getItem('cys-stift.settings.v1')
+    const raw = window.localStorage.getItem('cys-stift.settings.v2')
     expect(JSON.parse(raw!).settings.theme).toBe('dark')
 
     vi.resetModules()
@@ -99,7 +99,7 @@ describe('theme — persists through settingsStore', () => {
 
 describe('theme — bad / corrupt data', () => {
   it('falls back to "system" (→ resolved light/dark) on corrupt settings JSON', async () => {
-    window.localStorage.setItem('cys-stift.settings.v1', '{ totally not json')
+    window.localStorage.setItem('cys-stift.settings.v2', '{ totally not json')
     // settingsStore falls back to defaults (theme: 'system'); with no
     // matchMedia override in jsdom, resolveTheme('system') → light here.
     const { settingsStore } = await import('../settings-store')
@@ -110,13 +110,14 @@ describe('theme — bad / corrupt data', () => {
 
   it('falls back to defaults on an invalid theme value', async () => {
     window.localStorage.setItem(
-      'cys-stift.settings.v1',
+      'cys-stift.settings.v2',
       JSON.stringify({
         settings: {
           captureShortcut: { modKey: 'meta', shift: true, code: 'Space' },
           theme: 'neon', // invalid
           locale: 'zh',
-          ai: null,
+          profiles: [],
+          activeProfileId: null,
         },
       }),
     )

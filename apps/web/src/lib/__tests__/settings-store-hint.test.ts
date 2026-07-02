@@ -23,20 +23,21 @@ describe('settings-store — seenCaptureHint', () => {
   it('markCaptureHintSeen sets seenCaptureHint true and persists', () => {
     settingsStore.markCaptureHintSeen()
     expect(settingsStore.get().seenCaptureHint).toBe(true)
-    const raw = window.localStorage.getItem('cys-stift.settings.v1')
+    const raw = window.localStorage.getItem('cys-stift.settings.v2')
     expect(raw).toContain('"seenCaptureHint":true')
   })
 
   it('a store loaded from an OLD payload (no seenCaptureHint) back-fills false', async () => {
     // Simulate a pre-flag localStorage payload (no seenCaptureHint field).
     window.localStorage.setItem(
-      'cys-stift.settings.v1',
+      'cys-stift.settings.v2',
       JSON.stringify({
         settings: {
           captureShortcut: { modKey: 'meta', shift: true, code: 'Space' },
           theme: 'system',
           locale: 'zh',
-          ai: null,
+          profiles: [],
+          activeProfileId: null,
         },
       }),
     )

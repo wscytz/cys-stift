@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { getDefaultProviderDefaults } from '../providers'
 import { isAIReady } from '../ai-settings-provider'
-import type { AIConfig } from '../types'
+import type { AIProfile } from '../types'
 
 describe('getDefaultProviderDefaults — new fields', () => {
   it.each(['openai', 'anthropic', 'ollama'] as const)(
@@ -19,7 +19,9 @@ describe('getDefaultProviderDefaults — new fields', () => {
 })
 
 describe('isAIReady', () => {
-  const base: AIConfig = {
+  const base: AIProfile = {
+    id: 'p1',
+    name: 'OpenAI',
     provider: 'openai',
     apiKey: 'sk-x',
     baseUrl: 'https://api.openai.com/v1',
@@ -42,7 +44,9 @@ describe('isAIReady', () => {
     expect(isAIReady(base)).toBe(true)
   })
   it('ollama (no key needed) with empty key but enabled + baseUrl → true', () => {
-    const ollama: AIConfig = {
+    const ollama: AIProfile = {
+      id: 'p2',
+      name: 'Ollama',
       provider: 'ollama',
       apiKey: '',
       baseUrl: 'http://localhost:11434',
