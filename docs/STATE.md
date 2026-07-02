@@ -158,12 +158,19 @@
 
 > 用户 2026-07-02 提 + 提供深度研究报告(`/Users/jinxunuo/Downloads/cy's Stift 手绘(freedraw)处理方案深度研究报告.docx`,已读)。
 > 方向 = **本地优先 + 渐进式识别 + AI 可协作**(选中 → 建议 → 确认,非破坏性)。开工走 brainstorm → spec → plan。
+> 交互 = v1 沿用 FreedrawPanel「转为箭头」模式(**选中单手绘 → 识别按钮 → 多选项 → 预览确认**,`host.batch` 单 undo);**拉框批量识别 = v2**。
 
-- **P0 基础优化(零依赖,1-2 周,无脑做)**:RDP 点简化 + 三阶贝塞尔拟合 + 差值坐标编码 + 容错增强。收益:本地 freeform(OPFS)+ `.cystift` 序列化体积 −70%+、渲染质感提升、为识别铺路。纯算法,贴合 canvas-engine 零依赖原则。
-- **P1 识别(2-4 周)**:① 在**已有 `$1 Recognizer`**(+ `classifyFreedraw` / `freedrawToArrow`)上加几何规则分类器(粗分文字/图形/涂鸦,做 OCR 预筛选)+ 更多模板;② 接 **PaddleOCR v6 Tiny**(1.5MB,onnxruntime-web,懒加载 Worker + WASM/WebGPU);③ 统一"识别建议"交互([转箭头/矩形/文字/保持] → 预览确认 → 应用/撤销)。
-- **P2/P3**:$N 多笔画 / PaleoSketch 美化 / 在线笔迹时序模型 / QuickDraw 语义分类 —— 看反馈,远期可选。
+- **P0 基础优化(零依赖,纯算法,无脑做)**:RDP 点简化(store-time **保角变体**,插在 `commitFreedraw`)+ 三阶贝塞尔拟合 + 容错增强。收益:本地 freeform(OPFS)+ `.cystift` 序列化体积 −70%+、渲染质感提升、为识别铺路。**差值坐标编码缓**(改序列化格式风险 > RDP 后的边际收益)。**顺手加固**:加 `freedrawPointsOf` 类型化访问器作唯一 sanctioned reader,防未来新 AI 功能 naive 直读 `meta.points` 泄漏 R2。
+- **P1 图形识别(纯算法,低风险)**:在**已有 `$1 Recognizer`**(+ `classifyFreedraw` / `freedrawToArrow`)上加几何规则分类器 + 更多模板;扩 `freedrawToRect/ToCircle/ToTriangle` 纯函数 + 识别建议选择器([转箭头/矩形/圆/三角/保持] → 预览确认)。**不含文字**($1 对点密度天然鲁棒 —— 内部重采样到 64,RDP 后识别不变)。
 
-> ⚠️ **校正(报告 vs 现状)**:报告称"DSL 点阵膨胀 → AI 难理解",后者**已不成立** —— R2 铁律下 freedraw 点序列**从不进 AI DSL**,AI 早只看 shape 描述符(`snapshotCanvas` 已实装)。故 RDP/差值优化的是**本地存储 + 渲染 + `.cystift`**,非 AI 理解度。PaddleOCR 集成前先做**可行性 spike**(onnxruntime-web 在 Tauri webview 跑通),别只看模型 1.5MB。
+> ⚠️ **校正(报告 vs 现状,2026-07-02 spike 验证)**:
+> 1. 报告称"DSL 点阵膨胀 → AI 难理解"**已不成立** —— R2 铁律下 freedraw 点序列**从不进 AI DSL**,AI 早只看 shape 描述符(`snapshotCanvas` 已实装)。故 RDP 优化的是**本地存储 + 渲染 + `.cystift`**,非 AI 理解度。
+> 2. **OCR(手写文字识别)defer 到远期** —— spike 实测:PaddleOCR 速度够(冷载 0.47s / 推理 0.13s)、印刷+书法字体完美,但**手写 freedraw 真实场景不稳**(描的 "hello"→"holle"、单字 "天"→"A");且**无现成 ONNX 小模型**(报告说的 1.5MB Tiny 不存在,paddle 格式 139-177MB),onnxruntime-web 浏览器路径卡在模型格式转换。**等模型迭代 / 设施合适(浏览器可跑的轻量 ONNX OCR + 手写准确率达标)再考虑**。v1 文字识别不做,不阻塞图形识别。
+
+#### 远期
+
+> (原远期项:安卓适配 / 引擎独立化 / 训练大模型 / 电子书 pad —— 见下)
+> **+ 手写文字识别(OCR)**:PaddleOCR/ONNX 路径 defer 待条件成熟(见上 spike 校正)。等浏览器可跑的轻量 OCR 模型 + 手写准确率达标再做;v1 freedraw 不含文字。
 
 #### 中期
 
