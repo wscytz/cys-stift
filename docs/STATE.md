@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.43.0。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.44.0。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 
@@ -33,6 +33,7 @@
 | **v0.39.0** | **自审修复(minimap 拖拽 clamp / B1 孤儿卡卡死 / 模板空 DSL 误导)+ 版本号对齐 + 文档同步** | v0.39.0 |
 | **v0.39.1** | **Windows 适配:字体分层(--font-content)+ JetBrains Mono 自托管 + color-scheme + native 控件(checkbox/select/number/滚动条)Bauhaus 全量自绘 + 快捷键按平台显示** | v0.39.1 |
 | **v0.40.0** | **智能关系推荐(本地+AI)+ DeepSeek 思考模式适配(structuredOutput)+ AI 对话 agent /ask(Claude Code 式 DSL 提议+确认门)+ AI 实验室分层基础设施(LAB_REGISTRY+useLabEnabled+LabToggle)** | v0.40.0 |
+| **v0.44.0** | **第二轮手测反馈批:卡片标题可读性(遮挡避让+timeline 2-line clamp)+ /ask 对话 reload 持久(封顶100+清空键)+ AgentConfirmCard 缩略图补关系箭头 + 图谱复位 fit-to-nodes(computeFitView)+ AI provider 多 profile + active 选择(Phase 1:profiles[]/activeProfileId/v1→v2 migration/store CRUD/面板重写)** | v0.44.0 |
 
 > v0.18–v0.21 版本号在历史中跳过(从 v0.17.0 直接进 v0.22.0),非缺失。
 > **v0.27.1-review-hardening 无独立 tag** — 该轮 hardening(rehydrateCards / parseCardsRaw / geometry reconcile / M1 label)的工作被折进 v0.31.0 重构(refactor v0.31.0-p1.2/p1.3,见 `docs/decisions/2026-06-21-v0.27.1-review-hardening.md`)。
