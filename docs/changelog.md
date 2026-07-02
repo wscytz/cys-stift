@@ -5,6 +5,23 @@
 
 ---
 
+## 2026-07-02 · v0.45.0 · dsl-grammar-single-source(DSL 语法单一源 + 版本号)
+
+cys-dsl 语法原先散落 7 处(2 代码:parser 正则 + serializer;5 文案:agent / layout×2 / canvas-prompt / dsl-dialog 各手抄一份指令清单 + 颜色),加一个新指令要改 7 处,且颜色已漂移(agent + layout 只列 5 色漏 `white`)。本轮收口 + 挂版号,为 (c2) prompt 加固做联动准备。
+
+- **新建 `features/ai/dsl-grammar.ts` 单一可信源**:`DSL_VERSION=1`(整数,独立于 app 产品版)、`DSL_KINDS`(6 种)、`DSL_COLORS`(Bauhaus-6:`red/yellow/blue/black/white/gray`)+ `DSL_COLOR_ALIASES`(`grey`→`gray`)、`DSL_GRAMMAR_REFERENCE`(规范文字描述,以原 canvas-prompt GRAMMAR 为基底 + 版号行;故意不含 `[freedraw]`——AI 不该产手绘)。
+- **5 处 prompt/help 收口** import REFERENCE(canvas-prompt / agent-prompt / canvas page layout system+userPrompt / dsl-dialog 语法帮助),站点专属约束(IRON RULES / create-vs-update / fence 契约)留内联。**顺带修颜色漂移**:agent + layout prompt 现在拿到正确 6 色(含 `white`)。
+- **serializer 收口**:`canvas-dsl.ts` 本地 `DSL_KINDS` 搬到 dsl-grammar 改 import;parser 正则逻辑留原处(不强求从结构化数据生成——过度工程),COLOR_RE + 种类分派加注释指向单一源。
+- **sync 锁测试**(`dsl-sync.test.ts`,15 用例):parser 识别的种类 == `DSL_KINDS`、接受的颜色 == `DSL_COLORS ∪ aliases`——加指令/颜色忘了同步 parser 时变红。
+- **样本记 `dslVersion`**:`sample-store` 给每条 AI 交互样本盖戳 `dslVersion: DSL_VERSION`(非 mutation,spread);旧样本无字段读 `undefined`(不回填——缺失比伪装诚实)。导出 JSON 自带版号,方便判断旧语料是否过期。
+- **c2 联动 payoff**:以后 prompt 加固 = 改 `DSL_GRAMMAR_REFERENCE` 一处 + 按规则 bump `DSL_VERSION`,5 个 prompt + 新样本自动带新语法 + 新版号。
+
+**执行**:subagent-driven(每 task 一个 subagent + 独立 task-reviewer + opus final review,Ready to merge 0 Critical/Important)。4 task + 验证门。**验证**:web lint 0 错 / 1114 测试全过 / build exit 0。6 commit(`262a6fb..7e3c664`)。
+
+> 本版亦含 v0.44 开发期合入但未单列 changelog 的批次(多 profile P1 / AI 交互样本导出 / DSL 重试闭环 / 标题可读性 / /ask 持久 / 缩略图箭头 / 图谱复位 fit / 卡删审计——详见 STATE 版本表 v0.44.0 行)。
+
+---
+
 ## 2026-07-01 · v0.43 · polish-round-handtest(手测反馈六批打磨)
 
 v0.42 手测反馈一轮(用户原话"接下来就是打磨,打磨,值得打磨的很多")。6 batch,subagent-driven 逐批 review + 验证门。根因全部 file:line 级确认(4 Explore + 精读)。

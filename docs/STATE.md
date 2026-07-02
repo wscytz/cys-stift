@@ -34,6 +34,7 @@
 | **v0.39.1** | **Windows 适配:字体分层(--font-content)+ JetBrains Mono 自托管 + color-scheme + native 控件(checkbox/select/number/滚动条)Bauhaus 全量自绘 + 快捷键按平台显示** | v0.39.1 |
 | **v0.40.0** | **智能关系推荐(本地+AI)+ DeepSeek 思考模式适配(structuredOutput)+ AI 对话 agent /ask(Claude Code 式 DSL 提议+确认门)+ AI 实验室分层基础设施(LAB_REGISTRY+useLabEnabled+LabToggle)** | v0.40.0 |
 | **v0.44.0** | **第二轮手测反馈批:卡片标题可读性(遮挡避让+timeline 2-line clamp)+ /ask 对话 reload 持久(封顶100+清空键)+ AgentConfirmCard 缩略图补关系箭头 + 图谱复位 fit-to-nodes(computeFitView)+ AI provider 多 profile + active 选择(Phase 1:profiles[]/activeProfileId/v1→v2 migration/store CRUD/面板重写)** | v0.44.0 |
+| **v0.45.0** | **DSL 语法单一源 + 版本号:新建 `dsl-grammar.ts`(`DSL_VERSION=1`/`DSL_KINDS`/`DSL_COLORS`/`DSL_GRAMMAR_REFERENCE`),5 处 prompt/help 收口 import(不再各抄一份),serializer 搬 KINDS,sync 锁测试防漂移,样本记 `dslVersion`;顺带修 agent/layout prompt 漏 `white` 颜色漂移;为 (c2) prompt 加固铺路(改 REFERENCE 一处即联动)** | v0.45.0 |
 
 > v0.18–v0.21 版本号在历史中跳过(从 v0.17.0 直接进 v0.22.0),非缺失。
 > **v0.27.1-review-hardening 无独立 tag** — 该轮 hardening(rehydrateCards / parseCardsRaw / geometry reconcile / M1 label)的工作被折进 v0.31.0 重构(refactor v0.31.0-p1.2/p1.3,见 `docs/decisions/2026-06-21-v0.27.1-review-hardening.md`)。
@@ -138,12 +139,11 @@
 
 #### 短期(下一轮)
 
-> **2026-07-02 进度:**
-> - 已 push 到 56c17f0(未 bump,待手测):#1 标题 / #2(a)+(d) AI 持久+缩略图箭头 / #3 图谱复位 / #4 卡删审计 / (f) 多 profile P1 / #6 样本导出 / (c1) DSL 重试闭环。
-> - 本地新增(未 push,`262a6fb..7515ef5`):**#12 DSL 共享语法模块 + 版号** — 新建 `features/ai/dsl-grammar.ts` 作单一源(`DSL_VERSION=1` / `DSL_KINDS` / `DSL_COLORS` / `DSL_GRAMMAR_REFERENCE`),5 处 prompt/help 收口 import 它(不再各抄一份),serializer 搬 KINDS(import)+ sync 锁测试覆盖 parser 防漂移,样本记 `dslVersion`。顺带修 agent/layout prompt 漏 `white` 的颜色漂移。**为 (c2) prompt 加固铺路:改 prompt 届时只改 REFERENCE 一处 + bump 版号,5 处自动联动。**
-> ⏳ 待做:(c2) prompt 加固(现改 REFERENCE 一处即联动)/(e) /ask 入口需用户澄清 /(f) P2 能力维度(per-profile vision/labs/思考)。
-> ⏳ 待办:统一手测 + bump v0.45.0 + push。手测项见各 commit message。
-> ⚠️ v0.44.0 多 profile 有 **v1→v2 settings migration**,重点测旧配置 reload 后 /ask 仍可用。
+> **2026-07-02 进度(已 bump v0.45.0 + push):**
+> - v0.44 批次(先期 push 56c17f0):#1 标题 / #2(a)+(d) AI 持久+缩略图箭头 / #3 图谱复位 / #4 卡删审计 / (f) 多 profile P1 / #6 样本导出 / (c1) DSL 重试闭环。
+> - **v0.45.0(本次 push,`262a6fb..7e3c664`)**:#12 DSL 共享语法模块 + 版号 —— 新建 `dsl-grammar.ts` 单一源(`DSL_VERSION=1`/KINDS/COLORS/REFERENCE),5 处 prompt/help 收口 import,serializer 搬 KINDS + sync 锁测试防漂移,样本记 dslVersion;顺带修 agent/layout prompt 漏 `white` 漂移;为 (c2) 联动铺路。
+> ⏳ 待做:(c2) prompt 加固(改 REFERENCE 一处即联动)/(e) /ask 入口需用户澄清 /(f) P2 能力维度(per-profile vision/labs/思考)。
+> ⚠️ 手测重点:v0.44 多 profile 有 **v1→v2 settings migration**(旧配置 reload 后 /ask 仍可用);v0.45 改了 AI 看到的 prompt(收口 + 修 white),留意 /ask + 排版 + 对话表现。
 
 1. **UI 收件箱/时间线卡片修 + 设计语言一贯性**(用户 2026-07-01 反馈 + 07-02 一贯性)— ① inbox `tile` 的 `tile__pin`(右上 ★)/`tile__select`(左上 ☑)绝对定位,title 无避让区 → 长 title 被遮挡;② timeline 复用 `ArchiveCardTile`(同 `.tile`),inbox page 与 archive-card-tile 各有一份 `.tile` CSS 不同步,先 diff 两份定权威源;③ 缝修完后做一轮一贯性扫描(tile/按钮/间距/色/字体跨页一致)+ 人性化小毛病批。属 UI 缝,可能不必走全套 brainstorm。
 2. **AI 可用性集群**(用户 2026-07-02 手测主线,"能用但不太对,遵循能力要做好,不是瞎动")— 见 `v043-handtest-round2` 记忆。子项:(a) **⚠️ 对话记忆**:R1 `3ae76a3` 加了 /ask 多轮历史但用户感觉没记忆 → 先验证 provider 真发 history + 澄清"记忆"指同对话上下文还是跨 session 历史读取(/ask reload 丢,只 companion 做了 localStorage);(b) **指令遵循/不瞎动**:DSL 输出守规矩(格式/id/约束),靠 prompt 结构化 + DSL 校验 + 错误反馈重试;(c) **基础设施完善**:DSL 校验器 / prompt schema / 反馈循环"已有的要完善";(d) **DSL 预览可视性**:AgentConfirmCard before/after 缩略图要让人看懂 AI 要干嘛;(e) **/ask 入口逻辑**:测"进入只能首页"的路由行为;(f) **provider 选择 UX**:OpenAI/Anthropic/Ollama 配置易用。**AI 不建卡是方向对,不动。**
