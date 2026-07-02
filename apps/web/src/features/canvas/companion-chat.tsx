@@ -22,6 +22,8 @@ import { useI18n } from '@/lib/i18n'
 import { pushToast } from '@/lib/toast-store'
 import { isAIReady, getCurrentAI } from '@/features/ai/ai-settings-provider'
 import { streamText } from '@/features/ai/stream-text'
+import { retryUntilValid, buildDslCorrection } from '@/features/ai/retry-until-valid'
+import { parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
 import { AiSetupCard } from '@/features/ai/ai-setup-card'
 import {
   AGENT_SYSTEM_PROMPT,
@@ -111,24 +113,57 @@ export function CompanionChat({
       const userPrompt = buildAgentUserPrompt(question, allCards, canvasSnapshot)
 
       let acc = ''
-      const result = await streamText(
-        cfg,
-        // structuredOutput:对 DeepSeek 思考端点关思考(实测 DSL 稳定);非思考端点 no-op。
-        { system: AGENT_SYSTEM_PROMPT, user: userPrompt, maxTokens: 4096, structuredOutput: true, timeoutMs: 60_000 },
-        (chunk) => {
-          acc += chunk
-          setMessages((prev) => {
-            const next = [...prev]
-            const last = next[next.length - 1]
-            if (last && last.role === 'assistant') {
-              next[next.length - 1] = { ...last, content: acc, streaming: true }
-            }
-            return next
-          })
+      const r = await retryUntilValid({
+        initialMessages: [{ role: 'user' as const, content: userPrompt }],
+        produce: (messages, attempt) => {
+          if (attempt > 0) {
+            // 重试:清 acc,显「重新生成中…」占位;onDelta 静默(不流中间版)。
+            acc = ''
+            setMessages((prev) => {
+              const next = [...prev]
+              const last = next[next.length - 1]
+              if (last && last.role === 'assistant') {
+                next[next.length - 1] = { ...last, content: t('ask.retrying'), streaming: true }
+              }
+              return next
+            })
+          }
+          const onDelta =
+            attempt === 0
+              ? (chunk: string) => {
+                  acc += chunk
+                  setMessages((prev) => {
+                    const next = [...prev]
+                    const last = next[next.length - 1]
+                    if (last && last.role === 'assistant') {
+                      next[next.length - 1] = { ...last, content: acc, streaming: true }
+                    }
+                    return next
+                  })
+                }
+              : () => {}
+          // structuredOutput:对 DeepSeek 思考端点关思考(实测 DSL 稳定);非思考端点 no-op。
+          // user 字段类型必填(provider 在有 messages 时忽略 user,但 AIRequest 类型需要)。
+          return streamText(
+            cfg,
+            { system: AGENT_SYSTEM_PROMPT, user: userPrompt, messages, maxTokens: 4096, structuredOutput: true, timeoutMs: 60_000 },
+            onDelta,
+            ac.signal,
+          ).then((x) => x?.content ?? '')
         },
-        ac.signal,
-      )
-      const final = result?.content ?? acc
+        parse: (text) => {
+          // 有 dsl 块且全坏才重试;无块(Q&A)或部分好 → 接受。
+          const blocks = extractDslBlocks(text)
+          if (blocks.length === 0) return { ok: true, errors: [] }
+          const parsed = blocks.map((b) => parseDslWithDiagnostics(b))
+          const allBad = parsed.every((p) => p.errors.length > 0 && p.ops.length === 0)
+          return allBad
+            ? { ok: false, errors: parsed.flatMap((p) => p.errors) }
+            : { ok: true, errors: [] }
+        },
+        buildCorrection: buildDslCorrection,
+      })
+      const final = r.text
       const dslBlocks = extractDslBlocks(final)
       // Q&A 捕获:无 DSL 块 = 纯问答,记 qa 样本。开关关时 addSample 内部 no-op。
       if (dslBlocks.length === 0) {

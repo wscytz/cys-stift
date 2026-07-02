@@ -401,6 +401,7 @@ export const messages = {
   'ask.clear': { zh: '清空对话', en: 'Clear chat' },
   'ask.cleared': { zh: '已清空 {n} 条对话', en: 'Cleared {n} messages' },
   'ask.thinking': { zh: '思考中…', en: 'Thinking…' },
+  'ask.retrying': { zh: '🔄 输出格式有误,重新生成中…', en: '🔄 Output format error, regenerating…' },
   'agent.proposeTitle': { zh: 'AI 提议改动画布「{canvas}」', en: 'AI proposes canvas edits: {canvas}' },
   'agent.appliedTitle': { zh: '已应用 ✓', en: 'Applied ✓' },
   'agent.apply': { zh: '应用', en: 'Apply' },

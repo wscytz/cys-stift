@@ -31,6 +31,8 @@ import { CardDetailModal } from '@/features/card/card-detail'
 import { AiSetupCard } from '@/features/ai/ai-setup-card'
 import { isAIReady, getCurrentAI } from '@/features/ai/ai-settings-provider'
 import { streamText } from '@/features/ai/stream-text'
+import { retryUntilValid, buildDslCorrection } from '@/features/ai/retry-until-valid'
+import { parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import {
   AGENT_SYSTEM_PROMPT,
@@ -134,32 +136,55 @@ export default function AskPage() {
       const userPrompt = buildAgentUserPrompt(question, allCards, canvasSnapshot)
 
       let acc = ''
-      const result = await streamText(
-        cfg,
-        // structuredOutput:对 DeepSeek 等思考端点关思考。实测思考模式下 DSL
-        // 格式不稳定(reuse #id 而非 [card #id])+ 慢 3-7x;关思考后 DSL 稳定。
-        // agent 主要任务是改画布(结构化输出),问答够用即可,取舍值得。非思考端点 no-op。
-        {
-          system: AGENT_SYSTEM_PROMPT,
-          user: userPrompt,
-          // 多轮记忆:透传历史 user/assistant(纯问答) + 当前 userPrompt(含 RAG)。
-          // provider 拼成 [system, ...history, {user: userPrompt}]。原 apiMessages 构造后 void 致每轮零样本。
-          messages: history.length > 0 ? [...history, { role: 'user' as const, content: userPrompt }] : undefined,
-          maxTokens: 4096,
-          structuredOutput: true,
-          timeoutMs: 60_000,
+      const r = await retryUntilValid({
+        initialMessages: history.length > 0
+          ? [...history, { role: 'user' as const, content: userPrompt }]
+          : [{ role: 'user' as const, content: userPrompt }],
+        produce: (messages, attempt) => {
+          if (attempt > 0) {
+            // 重试:清 acc,显「重新生成中…」占位;onDelta 静默(不流中间版)。
+            acc = ''
+            setMessages((prev) => {
+              const next = [...prev]
+              next[next.length - 1] = { ...next[next.length - 1]!, content: t('ask.retrying'), streaming: true }
+              return next
+            })
+          }
+          const onDelta =
+            attempt === 0
+              ? (chunk: string) => {
+                  acc += chunk
+                  setMessages((prev) => {
+                    const next = [...prev]
+                    next[next.length - 1] = { ...next[next.length - 1]!, content: acc, streaming: true }
+                    return next
+                  })
+                }
+              : () => {}
+          // structuredOutput:对 DeepSeek 等思考端点关思考。实测思考模式下 DSL
+          // 格式不稳定(reuse #id 而非 [card #id])+ 慢 3-7x;关思考后 DSL 稳定。
+          // agent 主要任务是改画布(结构化输出),问答够用即可,取舍值得。非思考端点 no-op。
+          // user 字段类型必填(provider 在有 messages 时忽略 user,但 AIRequest 类型需要)。
+          return streamText(
+            cfg,
+            { system: AGENT_SYSTEM_PROMPT, user: userPrompt, messages, maxTokens: 4096, structuredOutput: true, timeoutMs: 60_000 },
+            onDelta,
+            ac.signal,
+          ).then((x) => x?.content ?? '')
         },
-        (chunk) => {
-          acc += chunk
-          setMessages((prev) => {
-            const next = [...prev]
-            next[next.length - 1] = { ...next[next.length - 1]!, content: acc, streaming: true }
-            return next
-          })
+        parse: (text) => {
+          // 有 dsl 块且全坏才重试;无块(Q&A)或部分好 → 接受。
+          const blocks = extractDslBlocks(text)
+          if (blocks.length === 0) return { ok: true, errors: [] }
+          const parsed = blocks.map((b) => parseDslWithDiagnostics(b))
+          const allBad = parsed.every((p) => p.errors.length > 0 && p.ops.length === 0)
+          return allBad
+            ? { ok: false, errors: parsed.flatMap((p) => p.errors) }
+            : { ok: true, errors: [] }
         },
-        ac.signal,
-      )
-      const final = result?.content ?? acc
+        buildCorrection: buildDslCorrection,
+      })
+      const final = r.text
       const dslBlocks = extractDslBlocks(final)
       // Q&A 捕获:无 DSL 块 = 纯问答,记 qa 样本。开关关时 addSample 内部 no-op。
       if (dslBlocks.length === 0) {
