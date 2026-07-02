@@ -13,6 +13,7 @@ import { useI18n } from '@/lib/i18n'
 import { VERSION } from '@/lib/version'
 import { isMac as detectIsMac } from '@/lib/platform'
 import { CaptureHint } from '@/features/capture/capture-hint'
+import { CaptureSampleHint } from '@/components/capture-sample-hint'
 
 export default function HomePage() {
   const { t } = useI18n()
@@ -20,6 +21,7 @@ export default function HomePage() {
   return (
     <main id="main" tabIndex={-1} className="home">
       <CaptureHint />
+      <CaptureSampleHint />
       <header className="home__bar" aria-hidden="true" />
       <section className="home__content">
         <p className="home__eyebrow">{t('home.eyebrow')}</p>

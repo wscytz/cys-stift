@@ -642,6 +642,20 @@ export const messages = {
   'settings.aiOllamaNoKey': { zh: '无需 API key', en: 'No API key needed' },
   'settings.aiRegionLabel': { zh: 'AI · 可选', en: 'AI · optional' },
 
+  /* ── AI 交互样本(本地累积 + opt-in 导出)── */
+  'samples.title': { zh: 'AI 交互样本', en: 'AI interaction samples' },
+  'samples.lede': { zh: '本地累积 AI 交互(提议/问答)供导出或调优,不上传任何数据。', en: 'Locally accumulate AI interactions (proposals/Q&A) for export or tuning — nothing uploaded.' },
+  'samples.enable': { zh: '累积样本', en: 'Accumulate samples' },
+  'samples.count': { zh: '已累积 {n} 条', en: '{n} samples accumulated' },
+  'samples.export': { zh: '导出 JSON', en: 'Export JSON' },
+  'samples.exported': { zh: '已导出 {n} 条样本', en: 'Exported {n} samples' },
+  'samples.clear': { zh: '清空', en: 'Clear' },
+  'samples.cleared': { zh: '已清空样本', en: 'Samples cleared' },
+  'samples.hint.title': { zh: 'AI 交互样本', en: 'AI interaction samples' },
+  'samples.hint.body': { zh: '我们在本地记录 AI 交互样本供你导出或调优,不上传任何数据。可在设置关闭。', en: 'We locally record AI interaction samples for your export/tuning — nothing is uploaded. You can turn it off in Settings.' },
+  'samples.hint.ack': { zh: '知道了', en: 'Got it' },
+  'samples.hint.turnOff': { zh: '关闭记录', en: 'Turn off' },
+
   /* ── Storage meter (v0.26.3) ── */
   'storage.title': { zh: '本地存储', en: 'Local storage' },
   'storage.usedOf': { zh: '已用 {used} / {total}', en: '{used} of {total} used' },
