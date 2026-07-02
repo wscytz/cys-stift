@@ -398,6 +398,8 @@ export const messages = {
   'ask.empty': { zh: '问任何问题,或让 AI 帮你整理画布。基于你的卡片回答,改画布需你确认。', en: 'Ask anything, or have AI tidy your canvas. Answers cite your cards; canvas edits need your confirmation.' },
   'ask.send': { zh: '发送', en: 'Send' },
   'ask.stop': { zh: '停止', en: 'Stop' },
+  'ask.clear': { zh: '清空对话', en: 'Clear chat' },
+  'ask.cleared': { zh: '已清空 {n} 条对话', en: 'Cleared {n} messages' },
   'ask.thinking': { zh: '思考中…', en: 'Thinking…' },
   'agent.proposeTitle': { zh: 'AI 提议改动画布「{canvas}」', en: 'AI proposes canvas edits: {canvas}' },
   'agent.appliedTitle': { zh: '已应用 ✓', en: 'Applied ✓' },

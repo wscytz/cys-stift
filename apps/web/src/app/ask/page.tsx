@@ -39,6 +39,7 @@ import {
   extractCardRefs,
 } from '@/features/ai/agent-prompt'
 import { AgentConfirmCard } from '@/features/ai/agent-confirm-card'
+import { loadAskHistory, saveAskHistory, clearAskHistory } from '@/features/ai/ask-history'
 import { buildCanvasHostForCanvas } from '@/features/canvas/canvas-host-builder'
 import { pushToast } from '@/lib/toast-store'
 
@@ -61,7 +62,7 @@ export default function AskPage() {
   const router = useRouter()
   const { service, ready } = useDb()
   const { snapshot: canvasesSnap } = useCanvases()
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>(() => loadAskHistory())
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [targetCanvasId, setTargetCanvasId] = useState<CanvasId>(DEFAULT_CANVAS_ID)
@@ -80,6 +81,28 @@ export default function AskPage() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages])
+
+  // 历史持久化:debounce ~400ms 写入,避免每个流式 token 都打 localStorage。
+  // 镜像 companion-chat.tsx 的 setTimeout + ref 单飞范式。卸载时 flush 最后一次。
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
+  useEffect(() => {
+    if (saveTimerRef.current) return // 已有 pending 写入,等它跑(覆盖最新 messages)
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null
+      saveAskHistory(messagesRef.current)
+    }, 400)
+  }, [messages])
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = null
+        saveAskHistory(messagesRef.current) // flush 最后一次
+      }
+    }
+  }, [])
 
   const send = async () => {
     const question = input.trim()
@@ -179,6 +202,13 @@ export default function AskPage() {
     })
   }
 
+  const handleClear = () => {
+    const n = messages.length
+    setMessages([])
+    clearAskHistory()
+    if (n > 0) pushToast({ kind: 'info', message: t('ask.cleared', { n: String(n) }) })
+  }
+
   const liveDetail = detailCard ? (service.get(detailCard.id) ?? null) : null
   const effectiveDetail = liveDetail && !liveDetail.deletedAt ? liveDetail : null
 
@@ -200,6 +230,9 @@ export default function AskPage() {
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
+        {messages.length > 0 && (
+          <Button variant="ghost" onClick={handleClear}>{t('ask.clear')}</Button>
+        )}
       </Toolbar>
 
       <div className="page-content page-content--wide">
