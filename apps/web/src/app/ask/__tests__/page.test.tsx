@@ -68,6 +68,8 @@ vi.mock('@/lib/db-client', () => ({
   useDb: () => ({
     service: {
       listAll: () => [],
+      // Task 5 sweep calls listOnCanvas; delegate to controllable mock.
+      listOnCanvas: (id: CanvasId) => listOnCanvasMock(id),
       get: () => undefined,
       update: () => undefined,
       softDelete: () => undefined,
@@ -94,6 +96,23 @@ vi.mock('@/features/card/card-detail', () => ({ CardDetailModal: () => null }))
 vi.mock('@/features/ai/ai-setup-card', () => ({ AiSetupCard: () => null }))
 vi.mock('@/features/canvas/canvas-host-builder', () => ({
   buildCanvasHostForCanvas: async () => ({ host: {} }),
+}))
+
+// --- Task 5 sweep mocks: canvasFreeformStore + delete + listOnCanvas ---
+// Declared before canvas-store / canvas-freeform-store vi.mock factories that
+// close over them lazily (same pattern as createMock above). These are module
+// level so beforeEach can reset per test.
+const deleteMock = vi.fn((_id: CanvasId): boolean => true)
+const listOnCanvasMock = vi.fn((_id: CanvasId): unknown[] => [])
+const freeformLoadMock = vi.fn(
+  async (_id: CanvasId): Promise<unknown> => null,
+)
+
+vi.mock('@/lib/canvas-freeform-store', () => ({
+  canvasFreeformStore: {
+    load: (id: CanvasId) => freeformLoadMock(id),
+    remove: async () => undefined,
+  },
 }))
 
 // --- Controlled canvases for the select ---
@@ -144,7 +163,11 @@ vi.mock('@/lib/canvas-store', () => ({
   // factory-run time, and these inner fns are called much later, during
   // a React render or event handler, after the lets are initialized).
   useCanvases: () => ({ snapshot: { canvases: canvasesState, activeCanvasId: CV_A }, ready: true }),
-  canvasStore: { create: (name: string) => createMock(name) },
+  canvasStore: {
+    create: (name: string) => createMock(name),
+    // Task 5 sweep calls delete; delegate to controllable mock.
+    delete: (id: CanvasId) => deleteMock(id),
+  },
 }))
 
 import AskPage from '../page'
@@ -199,10 +222,14 @@ async function typeAndSend(host: HTMLDivElement, text: string) {
   })
 }
 
-// Reset stateful mock state before each test (both Task 3 and Task 4 suites).
+// Reset stateful mock state before each test (all suites).
 beforeEach(() => {
   canvasesState = [...CANVASES]
   createMock.mockClear()
+  // Task 5 sweep mocks — reset to "empty" defaults each test.
+  deleteMock.mockClear()
+  listOnCanvasMock.mockReturnValue([])
+  freeformLoadMock.mockResolvedValue(null)
 })
 
 describe('/ask page — per-canvas conversation store (Task 3)', () => {
@@ -310,5 +337,97 @@ describe('/ask page — new canvas from picker (Task 4: 新建即出生)', () =>
     // createMock called with the i18n key (the i18n mock returns the key as-is).
     expect(createMock).toHaveBeenCalledWith('ask.newCanvasName')
     unmount()
+  })
+})
+
+describe('/ask page — unmount sweep of empty ask-created canvases (Task 5)', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    streamTextMock.mockReset()
+    streamTextMock.mockResolvedValue({ content: 'plain answer' })
+    // Sweep defaults: all-empty (the criterion for deletion).
+    listOnCanvasMock.mockReturnValue([])
+    freeformLoadMock.mockResolvedValue(null)
+  })
+
+  /**
+   * Helper: flush the async fire-and-forget sweep after unmount.
+   * The sweep runs as an async IIFE from the cleanup; vi.waitFor polls
+   * until the assertion passes (or times out).
+   */
+  async function flushSweep() {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10))
+    })
+  }
+
+  it('truly-empty ask-created canvas (no cards / no conv / no freeform) → deleted on unmount', async () => {
+    const { host, unmount } = render(<AskPage />)
+    await switchCanvas(host, '__new__')
+    const newId = createMock.mock.results[0]!.value as CanvasId
+
+    // Unmount triggers the sweep cleanup.
+    await act(async () => {
+      unmount()
+    })
+    await act(async () => {
+      await vi.waitFor(() => expect(deleteMock).toHaveBeenCalledTimes(1))
+    })
+    expect(deleteMock).toHaveBeenCalledWith(newId)
+  })
+
+  it('ask-created canvas WITH a conversation message → NOT deleted', async () => {
+    const { host, unmount } = render(<AskPage />)
+    await switchCanvas(host, '__new__')
+    const newId = createMock.mock.results[0]!.value as CanvasId
+    // Simulate a persisted conversation for this canvas.
+    saveConversation(newId, [{ role: 'user', content: 'hello' }])
+
+    await act(async () => {
+      unmount()
+    })
+    await flushSweep()
+    expect(deleteMock).not.toHaveBeenCalled()
+  })
+
+  it('ask-created canvas WITH cards on canvas → NOT deleted', async () => {
+    const { host, unmount } = render(<AskPage />)
+    await switchCanvas(host, '__new__')
+    const newId = createMock.mock.results[0]!.value as CanvasId
+    listOnCanvasMock.mockReturnValue([
+      { id: 'card-1', title: 'has a card' },
+    ])
+
+    await act(async () => {
+      unmount()
+    })
+    await flushSweep()
+    expect(deleteMock).not.toHaveBeenCalled()
+  })
+
+  it('ask-created canvas WITH freeform elements → NOT deleted', async () => {
+    const { host, unmount } = render(<AskPage />)
+    await switchCanvas(host, '__new__')
+    freeformLoadMock.mockResolvedValue({
+      v: 1,
+      app: 'cys-stift',
+      elements: [{ kind: 'text', id: 't1' }],
+    })
+
+    await act(async () => {
+      unmount()
+    })
+    await flushSweep()
+    expect(deleteMock).not.toHaveBeenCalled()
+  })
+
+  it('non-ask-created canvas (default canvas) is never swept', async () => {
+    const { host, unmount } = render(<AskPage />)
+    // Don't create a canvas via ➕; just unmount.
+    await act(async () => {
+      unmount()
+    })
+    await flushSweep()
+    expect(deleteMock).not.toHaveBeenCalled()
   })
 })

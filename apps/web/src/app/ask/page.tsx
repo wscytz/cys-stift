@@ -42,6 +42,7 @@ import {
 } from '@/features/ai/agent-prompt'
 import { AgentConfirmCard } from '@/features/ai/agent-confirm-card'
 import { loadConversation, saveConversation, clearConversation, type PersistedConversationMessage } from '@/lib/conversation-store'
+import { canvasFreeformStore } from '@/lib/canvas-freeform-store'
 import { buildCanvasHostForCanvas } from '@/features/canvas/canvas-host-builder'
 import { pushToast } from '@/lib/toast-store'
 import { addSample, genSampleId } from '@/features/ai/sample-store'
@@ -77,8 +78,39 @@ export default function AskPage() {
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   // Track canvases created from /ask's picker (Task 4). Populated on create;
-  // Task 5 will use this set to auto-clean empty ask-created canvases.
+  // Task 5 uses this set to auto-clean empty ask-created canvases on unmount.
   const askCreatedRef = useRef<Set<CanvasId>>(new Set())
+
+  // Task 5: sweep truly-empty ask-created canvases on unmount.
+  //
+  // canvasStore.delete is a HARD permanent delete (no trash), so the criterion
+  // is airtight: ALL THREE must be empty — no cards on canvas, no conversation
+  // messages, no freeform elements. ANY content → keep.
+  //
+  // The sweep is an async fire-and-forget from the cleanup (freeform load is
+  // async via OPFS). StrictMode dev double-invoke is safe: the emptiness re-check
+  // is idempotent and canvasStore.delete no-ops on already-deleted/missing ids.
+  useEffect(() => {
+    return () => {
+      const ids = askCreatedRef.current
+      if (ids.size === 0) return
+      void (async () => {
+        for (const id of ids) {
+          const cards = service.listOnCanvas(id)
+          if (cards.length > 0) continue
+          const conv = loadConversation(id)
+          if (conv.length > 0) continue
+          const freeform = await canvasFreeformStore.load(id)
+          if ((freeform?.elements?.length ?? 0) > 0) continue
+          canvasStore.delete(id)
+        }
+      })()
+    }
+    // Mount-once: askCreatedRef is a stable ref; service is useMemo-stable
+    // (useDb creates one CardService per component lifetime); canvasStore /
+    // canvasFreeformStore / loadConversation are stable module singletons.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const aiReady = isAIReady(getCurrentAI())
   const canvasNameById = useMemo(() => {
