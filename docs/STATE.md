@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.44.0。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.46.0。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 
@@ -35,6 +35,7 @@
 | **v0.40.0** | **智能关系推荐(本地+AI)+ DeepSeek 思考模式适配(structuredOutput)+ AI 对话 agent /ask(Claude Code 式 DSL 提议+确认门)+ AI 实验室分层基础设施(LAB_REGISTRY+useLabEnabled+LabToggle)** | v0.40.0 |
 | **v0.44.0** | **第二轮手测反馈批:卡片标题可读性(遮挡避让+timeline 2-line clamp)+ /ask 对话 reload 持久(封顶100+清空键)+ AgentConfirmCard 缩略图补关系箭头 + 图谱复位 fit-to-nodes(computeFitView)+ AI provider 多 profile + active 选择(Phase 1:profiles[]/activeProfileId/v1→v2 migration/store CRUD/面板重写)** | v0.44.0 |
 | **v0.45.0** | **DSL 语法单一源 + 版本号:新建 `dsl-grammar.ts`(`DSL_VERSION=1`/`DSL_KINDS`/`DSL_COLORS`/`DSL_GRAMMAR_REFERENCE`),5 处 prompt/help 收口 import(不再各抄一份),serializer 搬 KINDS,sync 锁测试防漂移,样本记 `dslVersion`;顺带修 agent/layout prompt 漏 `white` 颜色漂移;为 (c2) prompt 加固铺路(改 REFERENCE 一处即联动)** | v0.45.0 |
+| **v0.46.0** | **统一 AI 对话(/ask 全屏 + companion 打通):新建 `conversation-store.ts`(per-canvas,canvasId 为 key)+ companion 发 history(修"AI 说没上下文")+ /ask ➕新建画布(新建即出生)+ 空画布兜底清(三真空才硬删)+ 旧 companion/ask history lazy 迁移;subagent-driven 6 task,T3 响应/T5 数据安全 opus review;web 1129 测试** | v0.46.0 |
 
 > v0.18–v0.21 版本号在历史中跳过(从 v0.17.0 直接进 v0.22.0),非缺失。
 > **v0.27.1-review-hardening 无独立 tag** — 该轮 hardening(rehydrateCards / parseCardsRaw / geometry reconcile / M1 label)的工作被折进 v0.31.0 重构(refactor v0.31.0-p1.2/p1.3,见 `docs/decisions/2026-06-21-v0.27.1-review-hardening.md`)。
@@ -152,6 +153,17 @@
 4. **(c2) prompt 加固** — 现已便宜:v0.45 单一源后,改 `DSL_GRAMMAR_REFERENCE` 一处 + 按规则 bump `DSL_VERSION`,5 个 prompt 联动(增删指令种类/属性/颜色才 bump,纯措辞不改)。
 5. ~~**(e) /ask 入口**~~ ✅ **已落地 v0.46**(unified-ai-conversation:/ask 全屏 + companion 数据/历史互通,全屏=创造 / 悬浮=修改整理;原 `ask-entry-fullscreen-companion-idea` 记忆的 idea 已实现)。
 6. **(f) P2 能力维度** — per-profile vision/labs/思考模式开关;deferred 到 profile 体系稳定后。
+
+#### 下一阶段(规划中):手绘(freedraw)规范化转化
+
+> 用户 2026-07-02 提 + 提供深度研究报告(`/Users/jinxunuo/Downloads/cy's Stift 手绘(freedraw)处理方案深度研究报告.docx`,已读)。
+> 方向 = **本地优先 + 渐进式识别 + AI 可协作**(选中 → 建议 → 确认,非破坏性)。开工走 brainstorm → spec → plan。
+
+- **P0 基础优化(零依赖,1-2 周,无脑做)**:RDP 点简化 + 三阶贝塞尔拟合 + 差值坐标编码 + 容错增强。收益:本地 freeform(OPFS)+ `.cystift` 序列化体积 −70%+、渲染质感提升、为识别铺路。纯算法,贴合 canvas-engine 零依赖原则。
+- **P1 识别(2-4 周)**:① 在**已有 `$1 Recognizer`**(+ `classifyFreedraw` / `freedrawToArrow`)上加几何规则分类器(粗分文字/图形/涂鸦,做 OCR 预筛选)+ 更多模板;② 接 **PaddleOCR v6 Tiny**(1.5MB,onnxruntime-web,懒加载 Worker + WASM/WebGPU);③ 统一"识别建议"交互([转箭头/矩形/文字/保持] → 预览确认 → 应用/撤销)。
+- **P2/P3**:$N 多笔画 / PaleoSketch 美化 / 在线笔迹时序模型 / QuickDraw 语义分类 —— 看反馈,远期可选。
+
+> ⚠️ **校正(报告 vs 现状)**:报告称"DSL 点阵膨胀 → AI 难理解",后者**已不成立** —— R2 铁律下 freedraw 点序列**从不进 AI DSL**,AI 早只看 shape 描述符(`snapshotCanvas` 已实装)。故 RDP/差值优化的是**本地存储 + 渲染 + `.cystift`**,非 AI 理解度。PaddleOCR 集成前先做**可行性 spike**(onnxruntime-web 在 Tauri webview 跑通),别只看模型 1.5MB。
 
 #### 中期
 
