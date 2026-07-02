@@ -75,6 +75,9 @@ export interface Settings {
      *  不可预测 + 多轮外发:token 不可控。 */
     agentToolCallingLab?: boolean
   }
+  /** AI 交互样本累积开关。undefined=默认开(首提判定用);false=显式关(addSample 不写)。
+   *  独立字段(非 labs):工具性本地累积,非"附加能力风险"。不出本机(R2 兼容)。 */
+  aiSampleCapture?: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -146,6 +149,7 @@ function isValid(v: unknown): v is Settings {
       if (k in l && typeof l[k] !== 'boolean') return false
     }
   }
+  if ('aiSampleCapture' in o && o.aiSampleCapture !== undefined && typeof o.aiSampleCapture !== 'boolean') return false
   return true
 }
 
