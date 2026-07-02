@@ -42,6 +42,8 @@ import { AgentConfirmCard } from '@/features/ai/agent-confirm-card'
 import { loadAskHistory, saveAskHistory, clearAskHistory } from '@/features/ai/ask-history'
 import { buildCanvasHostForCanvas } from '@/features/canvas/canvas-host-builder'
 import { pushToast } from '@/lib/toast-store'
+import { addSample, genSampleId } from '@/features/ai/sample-store'
+import { settingsStore } from '@/lib/settings-store'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -53,6 +55,8 @@ interface ChatMessage {
   /** 发送时的目标画布快照 —— 确认门的「应用」必须落到 AI 分析时的画布,
    *  而非用户事后切换的实时 state(否则切画布后应用旧提议会落到错画布)。 */
   targetCanvasId?: CanvasId
+  /** 捕获样本用:该 assistant 消息对应的 userPrompt(RAG+snapshot) + question。send 时存。 */
+  sampleContext?: { question: string; context: string }
 }
 
 const MAX_HISTORY = 20
@@ -157,9 +161,16 @@ export default function AskPage() {
       )
       const final = result?.content ?? acc
       const dslBlocks = extractDslBlocks(final)
+      // Q&A 捕获:无 DSL 块 = 纯问答,记 qa 样本。开关关时 addSample 内部 no-op。
+      if (dslBlocks.length === 0) {
+        addSample(
+          { id: genSampleId(), ts: Date.now(), kind: 'qa', source: 'ask', question, context: userPrompt, aiOutput: final, outcome: 'answered', targetCanvasId },
+          settingsStore.get().aiSampleCapture,
+        )
+      }
       setMessages((prev) => {
         const next = [...prev]
-        next[next.length - 1] = { role: 'assistant', content: final, dslBlocks, streaming: false }
+        next[next.length - 1] = { role: 'assistant', content: final, dslBlocks, streaming: false, targetCanvasId, sampleContext: { question, context: userPrompt } }
         return next
       })
     } catch (e) {
@@ -271,6 +282,7 @@ export default function AskPage() {
                     }}
                     onApplied={() => onApplied(i)}
                     onRejected={() => { void onRejected(i) }}
+                    sampleContext={m.sampleContext ? { source: 'ask', question: m.sampleContext.question, context: m.sampleContext.context, targetCanvasId: m.targetCanvasId ?? targetCanvasId } : undefined}
                   />
                 </div>
               ))}
@@ -350,6 +362,7 @@ function MessageContent({
   onCardRefClick,
   onApplied,
   onRejected,
+  sampleContext,
 }: {
   content: string
   streaming?: boolean
@@ -360,6 +373,7 @@ function MessageContent({
   onCardRefClick: (id: string) => void
   onApplied: () => void
   onRejected: () => void
+  sampleContext?: { source: 'ask' | 'companion'; question?: string; context: string; targetCanvasId?: string }
 }) {
   // 把 [card #id] 渲染成可点链接。简化:按引用分段。
   const refs = useMemo(() => new Set(extractCardRefs(content)), [content])
@@ -408,6 +422,7 @@ function MessageContent({
           service={service}
           onApplied={() => onApplied()}
           onRejected={() => onRejected()}
+          sampleContext={sampleContext ? { source: 'ask', question: sampleContext.question, context: sampleContext.context, targetCanvasId } : undefined}
         />
       ))}
     </div>

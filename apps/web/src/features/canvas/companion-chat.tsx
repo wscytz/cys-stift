@@ -33,8 +33,13 @@ import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snaps
 import { AgentConfirmCard } from '@/features/ai/agent-confirm-card'
 import { CardDetailModal } from '@/features/card/card-detail'
 import { loadChatHistory, saveChatHistory, type PersistedChatMessage } from './companion-chat-history'
+import { addSample, genSampleId } from '@/features/ai/sample-store'
+import { settingsStore } from '@/lib/settings-store'
 
-interface ChatMessage extends PersistedChatMessage {}
+interface ChatMessage extends PersistedChatMessage {
+  /** 捕获样本用:该 assistant 消息对应的 userPrompt(RAG+snapshot) + question。send 时存。 */
+  sampleContext?: { question: string; context: string }
+}
 
 const MAX_HISTORY = 20
 
@@ -125,11 +130,18 @@ export function CompanionChat({
       )
       const final = result?.content ?? acc
       const dslBlocks = extractDslBlocks(final)
+      // Q&A 捕获:无 DSL 块 = 纯问答,记 qa 样本。开关关时 addSample 内部 no-op。
+      if (dslBlocks.length === 0) {
+        addSample(
+          { id: genSampleId(), ts: Date.now(), kind: 'qa', source: 'companion', question, context: userPrompt, aiOutput: final, outcome: 'answered', targetCanvasId: canvasId },
+          settingsStore.get().aiSampleCapture,
+        )
+      }
       setMessages((prev) => {
         const next = [...prev]
         const last = next[next.length - 1]
         if (last && last.role === 'assistant') {
-          next[next.length - 1] = { role: 'assistant', content: final, dslBlocks, streaming: false }
+          next[next.length - 1] = { role: 'assistant', content: final, dslBlocks, streaming: false, sampleContext: { question, context: userPrompt } }
         }
         return next
       })
@@ -198,6 +210,7 @@ export function CompanionChat({
               }}
               onApplied={() => { /* useDb 订阅自动 re-render;确认门内部已切 applied 态 */ }}
               onRejected={() => { void onRejected(i) }}
+              sampleContext={m.sampleContext ? { source: 'companion', question: m.sampleContext.question, context: m.sampleContext.context, targetCanvasId: canvasId } : undefined}
             />
           </div>
         ))}
@@ -273,6 +286,7 @@ function MessageContent({
   onCardRefClick,
   onApplied,
   onRejected,
+  sampleContext,
 }: {
   content: string
   streaming?: boolean
@@ -284,6 +298,7 @@ function MessageContent({
   onCardRefClick: (id: string) => void
   onApplied: () => void
   onRejected: () => void
+  sampleContext?: { source: 'ask' | 'companion'; question?: string; context: string; targetCanvasId?: string }
 }) {
   const refs = useMemo(() => new Set(extractCardRefs(content)), [content])
   const parts = useMemo(() => {
@@ -333,6 +348,7 @@ function MessageContent({
           liveHost={host}
           onApplied={() => onApplied()}
           onRejected={() => onRejected()}
+          sampleContext={sampleContext ? { source: 'companion', question: sampleContext.question, context: sampleContext.context, targetCanvasId: canvasId } : undefined}
         />
       ))}
     </div>

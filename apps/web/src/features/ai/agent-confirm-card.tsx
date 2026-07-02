@@ -28,6 +28,8 @@ import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
 import { buildCanvasHostForCanvas, applyOpsAndPersist } from '@/features/canvas/canvas-host-builder'
 import { useI18n } from '@/lib/i18n'
 import { pushToast } from '@/lib/toast-store'
+import { addSample, genSampleId } from './sample-store'
+import { settingsStore } from '@/lib/settings-store'
 
 interface Props {
   dsl: string
@@ -38,6 +40,8 @@ interface Props {
   liveHost?: CanvasHost
   onApplied: (result: { applied: number; cardsUpdated: number; cardsCreated: number }) => void
   onRejected: () => void
+  /** 捕获样本用上下文(透传自调用方 /ask + companion)。有则在 apply/reject 时记样本。 */
+  sampleContext?: { source: 'ask' | 'companion'; question?: string; context: string; targetCanvasId?: string }
 }
 
 type Phase = 'confirming' | 'applying' | 'applied' | 'error'
@@ -64,7 +68,7 @@ export function makeOnCardCreate(canvasId: CanvasId, service: CardService) {
   }
 }
 
-export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApplied, onRejected }: Props) {
+export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApplied, onRejected, sampleContext }: Props) {
   const { t } = useI18n()
   const [phase, setPhase] = useState<Phase>('confirming')
   const [editing, setEditing] = useState(false)
@@ -113,6 +117,25 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
     return diffCanvasSnapshots(beforeState, afterState)
   }, [beforeState, afterState])
 
+  const recordReject = () => {
+    // 拒绝路径捕获(parseError 态 + confirming 态共用)。开关关时 addSample 内部 no-op。
+    if (!sampleContext) return
+    addSample(
+      {
+        id: genSampleId(),
+        ts: Date.now(),
+        kind: 'dsl',
+        source: sampleContext.source,
+        question: sampleContext.question,
+        context: sampleContext.context,
+        aiOutput: dsl,
+        outcome: 'rejected',
+        targetCanvasId: sampleContext.targetCanvasId,
+      },
+      settingsStore.get().aiSampleCapture,
+    )
+  }
+
   const handleApply = async () => {
     if (preview.kind !== 'ok' || !afterState) return
     setPhase('applying')
@@ -130,6 +153,25 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
         res = { applied: p.applied, cardsUpdated: p.cardsUpdated, cardsCreated: p.cardsCreated }
       }
       setPhase('applied')
+      // 捕获样本:apply/apply_edited。开关关时 addSample 内部 no-op。
+      if (sampleContext) {
+        const edited = editing && editedDsl && editedDsl !== dsl
+        addSample(
+          {
+            id: genSampleId(),
+            ts: Date.now(),
+            kind: 'dsl',
+            source: sampleContext.source,
+            question: sampleContext.question,
+            context: sampleContext.context,
+            aiOutput: dsl,
+            editedOutput: edited ? editedDsl : undefined,
+            outcome: edited ? 'applied_edited' : 'applied',
+            targetCanvasId: sampleContext.targetCanvasId,
+          },
+          settingsStore.get().aiSampleCapture,
+        )
+      }
       pushToast({
         kind: 'success',
         message: t('agent.applied', {
@@ -154,7 +196,7 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
             <li key={e.line}>L{e.line}: {e.text}</li>
           ))}
         </ul>
-        <Button variant="ghost" onClick={onRejected}>{t('agent.retry')}</Button>
+        <Button variant="ghost" onClick={() => { recordReject(); onRejected() }}>{t('agent.retry')}</Button>
         <style>{styles}</style>
       </div>
     )
@@ -211,7 +253,7 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
             {phase === 'applying' ? t('agent.applying') : t('agent.apply')}
           </Button>
           <Button variant="ghost" onClick={() => setEditing((v) => !v)}>{t('agent.edit')}</Button>
-          <Button variant="ghost" onClick={onRejected}>{t('agent.reject')}</Button>
+          <Button variant="ghost" onClick={() => { recordReject(); onRejected() }}>{t('agent.reject')}</Button>
         </div>
       )}
 

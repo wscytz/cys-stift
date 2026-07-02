@@ -48,6 +48,8 @@ import {
 import { useAIEnabled } from '@/features/ai/ai-settings-provider'
 import { AiSetupCard } from '@/features/ai/ai-setup-card'
 import { useAIAction } from '@/features/ai/use-ai-action'
+import { addSample, genSampleId } from '@/features/ai/sample-store'
+import { settingsStore } from '@/lib/settings-store'
 import { pushToast } from '@/lib/toast-store'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import {
@@ -409,6 +411,11 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       }
       const before = snapshotPositions()
       const { applied } = applyLayout(adapter, ops)
+      // 捕获样本:canvas 排版 apply(无 confirm card,独立记)。开关关时 addSample 内部 no-op。
+      addSample(
+        { id: genSampleId(), ts: Date.now(), kind: 'dsl', source: 'canvasLayout', context: formatted, aiOutput: result.content, outcome: 'applied', targetCanvasId: activeCanvasId },
+        settingsStore.get().aiSampleCapture,
+      )
       const after = snapshotPositions()
       const summary = summarizeMovement(before, after)
       // 三分支(替换旧 applied/skipped 双分支):
