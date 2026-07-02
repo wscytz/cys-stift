@@ -137,21 +137,25 @@
 
 #### 短期(下一轮)
 
-1. **UI 收件箱/时间线卡片修**(用户 2026-07-01 反馈)— ① inbox `tile` 的 `tile__pin`(右上 ★)/`tile__select`(左上 ☑)绝对定位,title 无避让区 → 长 title 被遮挡;② timeline 复用 `ArchiveCardTile`(同 `.tile`),inbox page 与 archive-card-tile 各有一份 `.tile` CSS 不同步,先 diff 两份定权威源。属 UI 缝,可能不必走全套 brainstorm。
-2. **LOW backlog triage**(ux-audit-backlog 记忆)— 性能(getElements 热路径缓存 / 列表虚拟化 / graph 每帧重绘)/ a11y(画布键盘 / Modal closeLabel i18n)/ 边缘(多 tab 覆写 / 模板 prompt / K4 grey / K6 freeform 跨页)/ 视觉(box-shadow token / select dark mode / elements-to-svg fallback)。HIGH 已清零(配额 update 假成功 `2055a05` + .cystift 往返 `e2b7e9b`),非数据信任核心,按价值/风险挑批。
+1. **UI 收件箱/时间线卡片修 + 设计语言一贯性**(用户 2026-07-01 反馈 + 07-02 一贯性)— ① inbox `tile` 的 `tile__pin`(右上 ★)/`tile__select`(左上 ☑)绝对定位,title 无避让区 → 长 title 被遮挡;② timeline 复用 `ArchiveCardTile`(同 `.tile`),inbox page 与 archive-card-tile 各有一份 `.tile` CSS 不同步,先 diff 两份定权威源;③ 缝修完后做一轮一贯性扫描(tile/按钮/间距/色/字体跨页一致)+ 人性化小毛病批。属 UI 缝,可能不必走全套 brainstorm。
+2. **AI 可用性集群**(用户 2026-07-02 手测主线,"能用但不太对,遵循能力要做好,不是瞎动")— 见 `v043-handtest-round2` 记忆。子项:(a) **⚠️ 对话记忆**:R1 `3ae76a3` 加了 /ask 多轮历史但用户感觉没记忆 → 先验证 provider 真发 history + 澄清"记忆"指同对话上下文还是跨 session 历史读取(/ask reload 丢,只 companion 做了 localStorage);(b) **指令遵循/不瞎动**:DSL 输出守规矩(格式/id/约束),靠 prompt 结构化 + DSL 校验 + 错误反馈重试;(c) **基础设施完善**:DSL 校验器 / prompt schema / 反馈循环"已有的要完善";(d) **DSL 预览可视性**:AgentConfirmCard before/after 缩略图要让人看懂 AI 要干嘛;(e) **/ask 入口逻辑**:测"进入只能首页"的路由行为;(f) **provider 选择 UX**:OpenAI/Anthropic/Ollama 配置易用。**AI 不建卡是方向对,不动。**
+3. **图谱复位智能化**(用户 2026-07-02)— reset 改 fit-to-nodes(算节点 bbox 居中 + 适配缩放),当前 reset 回默认视口致"乱飘";更智能=记忆上次视图/跟随选中。看 GraphCanvas resetView + graph-view-store。
+4. **卡片删除逻辑**(用户 2026-07-02)— 审删除时关系箭头/backlinks/块引用处理;软删 vs 硬删语义;删后引用卡表现。引擎层 InMemoryHost remove 级联已修(B1 `db09fa2`),DB+详情层要审。
+5. **LOW backlog triage**(ux-audit-backlog 记忆)— 性能 / a11y / 边缘 / 视觉,HIGH 已清零,按价值挑批。
 
 #### 中期
 
-3. **画板适配**(用户 2026-07-01 指定)— 响应式(窄屏/平板/companion 360px 溢出、AppMenu 9 导航)+ 移动端触摸手势(pinch 缩放/双指平移/长按)+ 高分屏 DPI。画布引擎已用 Pointer Events(236 处,统一鼠标/触摸/笔),交互层理论可复用;工时在手势语义 + UI 响应式 + 性能验证。**开工走 brainstorming 一次一问定范围**。桌面+移动都受益,纯正向。
+6. **画板适配**(用户 2026-07-01 指定)— 响应式(窄屏/平板/companion 360px 溢出、AppMenu 9 导航)+ 移动端触摸手势(pinch 缩放/双指平移/长按)+ 高分屏 DPI。画布引擎已用 Pointer Events(236 处,统一鼠标/触摸/笔),交互层理论可复用;工时在手势语义 + UI 响应式 + 性能验证。**开工走 brainstorming 一次一问定范围**。桌面+移动都受益,纯正向。
 
 #### 远期
 
-4. **安卓适配**(用户 2026-07-01 评估后定远期)— Tauri 2.1.1 已支持安卓;架构友好(web 数据层 localStorage+OPFS 不依赖 better-sqlite3;Pointer Events 统一输入;Tauri API 有 `__TAURI__` 守卫降级)。难点:触摸手势语义 / 桌面专属功能降级(全局快捷键/菜单栏/托盘)/ 安卓构建链首次配置(NDK+JDK,Mac 可 cross-compile)/ WebView Canvas 性能 / OPFS 版本差异。**是画板适配(中期 #3)的自然延伸** —— 响应式+触摸做完后,上安卓构建链验证能跑,再补性能调优。
-5. **画布引擎独立化**(北极星)— canvas-engine 可剥离成独立包/项目(canvas-engine-extractable 记忆);待真实使用验证后再推 npm/demo 站。
+7. **安卓适配**(用户 2026-07-01 评估后定远期)— Tauri 2.1.1 已支持安卓;架构友好(web 数据层 localStorage+OPFS 不依赖 better-sqlite3;Pointer Events 统一输入;Tauri API 有 `__TAURI__` 守卫降级)。难点:触摸手势语义 / 桌面专属功能降级(全局快捷键/菜单栏/托盘)/ 安卓构建链首次配置(NDK+JDK,Mac 可 cross-compile)/ WebView Canvas 性能 / OPFS 版本差异。**是画板适配(中期 #6)的自然延伸** —— 响应式+触摸做完后,上安卓构建链验证能跑,再补性能调优。
+8. **画布引擎独立化**(北极星)— canvas-engine 可剥离成独立包/项目(canvas-engine-extractable 记忆);待真实使用验证后再推 npm/demo 站。
 
 #### 更远远期
 
-6. **电子书 pad**(用户 2026-07-01 提,最远)— 文石 Boox 等安卓系电子书走安卓适配路径可直接装 APK;但 E-Ink 屏 Canvas 2D 残影严重,要全屏刷新策略 + 砍 animation/transition(画布 80ms transition/流式光标闪烁全是 E-Ink 敌人),是单独一类适配,比安卓本身难。Kindle 封闭系统不考虑。**依赖安卓适配先落地**。
+9. **训练大模型适配**(用户 2026-07-02 提)— fine-tune 一个模型 for cy's Stift 的 DSL 生成 + 指令遵循。依赖:先积累真实 DSL 交互数据(现无数据收集;R2 隐私铁律本地优先,训练用用户主动导出数据)。
+10. **电子书 pad**(用户 2026-07-01 提,最远)— 文石 Boox 等安卓系电子书走安卓适配路径可直接装 APK;但 E-Ink 屏 Canvas 2D 残影严重,要全屏刷新策略 + 砍 animation/transition(画布 80ms transition/流式光标闪烁全是 E-Ink 敌人),是单独一类适配,比安卓本身难。Kindle 封闭系统不考虑。**依赖安卓适配先落地**。
 
 - **v0.43 手测反馈六批打磨(2026-07-01)**:v0.42 打包后手测反馈一轮,6 batch subagent-driven。① **关系箭头高倍放大消失**(renderElements 视锥剔除后 visible 列表当端点解析集,端点 card 离屏被剔 → arrowEndpoints 解析不到;解耦画什么 vs 解析用什么,增 `allForResolution` 传全集 +5 测);② **图谱 4 bug**(删卡灰屏竞态 cleanup 不置 null+rAF / 触摸板 ctrlKey 分流 pinch=缩放双指=平移 + wheel-math 纯函数 17 测 / 缩放条 GraphZoomBar forwardRef / 卡详情 action 行 sticky);③ **伴侣对话 tab 留面板内修**(缩略图 overflow-x:auto / 历史 per-canvas localStorage +10 测 / 折叠非破坏性 display:none);④ **AI 排版 robustness**(拓宽思考抑制 isDeepSeekEndpoint baseUrl 或 model / 主动重排 prompt / 诚实反馈 summarizeMovement 三分支 +10 测 / 60s 超时 + maxTokens hint)—— 头号"从来没改过布局"根因三合一;⑤ **版本号单一源**(gen-version.mjs → version.ts + 同步 tauri,AppMenu+首页显示,bump 0.43.0);⑥ **整理范式**(strategy mindmap/flow/grid/pack × direction TB/LR/RL/BT × gap,默认 mindmap/TB,新 organize-popover +23 矩阵测)。canvas-engine 473 / web 1037 全绿;**源码 tsc 零错**(23 lint 全在 __tests__ 裸色名 fixture 基线);build exit 0;.app+.dmg(5.8M)打包。**未 push**(本地领先远程 3 commit:自查续修 2 + docs 1,等用户确认)。详见 changelog。
 - **画布 AI 伴侣面板 · Plan B(2026-06-30,对话 tab)**:Plan A 发现 tab 的对话半边。= /ask agent 上画布,操作 **live host**(替代 /ask temp host + applyOpsAndPersist)。`AgentConfirmCard` 加可选 `liveHost?` prop:有则 preview 克隆 live 元素 + Apply 走 `applyLayout(liveHost)` 单 undo(靠画布页 bindCardWriteback + freeform binding 持久化,不调 applyOpsAndPersist 免双写);无则 /ask 原 temp 路径字节不变(/ask 不回归)。新 `companion-chat.tsx`:消息流 + 输入 + 流式(RAG `service.listAll` + `snapshotCanvas(liveHost)` 上下文 + `streamText` structuredOutput:true 关思考 + `extractDslBlocks`)+ `[card #id]` 引用点开 `CardDetailModal` + DSL 确认门(传 liveHost)+ 未配 AI → AiSetupCard。多轮沿用 /ask 实际行为(每轮发新问题+新鲜 RAG/snapshot,history 仅 UI;真多轮留 agentToolCallingLab)。抽 `makeOnCardCreate` factory(live/temp 共用,镜像 canvas-host-builder)。**画布 AI 伴侣面板(发现+对话)完整闭合**。subagent TDD(T1 AgentConfirmCard liveHost+6 测 / T2 CompanionChat / T3 接线)+ T4 主会话收尾。web 956(+6)/ build exit 0 / tsc 零新增。spec 同 Plan A。
