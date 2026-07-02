@@ -140,7 +140,7 @@
 
 > **2026-07-02 进度:**
 > - 已 push 到 56c17f0(未 bump,待手测):#1 标题 / #2(a)+(d) AI 持久+缩略图箭头 / #3 图谱复位 / #4 卡删审计 / (f) 多 profile P1 / #6 样本导出 / (c1) DSL 重试闭环。
-> - 本地新增(未 push,`262a6fb..7515ef5`):**#12 DSL 共享语法模块 + 版号** — 新建 `features/ai/dsl-grammar.ts` 作单一源(`DSL_VERSION=1` / `DSL_KINDS` / `DSL_COLORS` / `DSL_GRAMMAR_REFERENCE`),5 处 prompt/help 收口 import 它(不再各抄一份),parser/serializer 搬 KINDS+sync 锁测试防漂移,样本记 `dslVersion`。顺带修 agent/layout prompt 漏 `white` 的颜色漂移。**为 (c2) prompt 加固铺路:改 prompt 届时只改 REFERENCE 一处 + bump 版号,5 处自动联动。**
+> - 本地新增(未 push,`262a6fb..7515ef5`):**#12 DSL 共享语法模块 + 版号** — 新建 `features/ai/dsl-grammar.ts` 作单一源(`DSL_VERSION=1` / `DSL_KINDS` / `DSL_COLORS` / `DSL_GRAMMAR_REFERENCE`),5 处 prompt/help 收口 import 它(不再各抄一份),serializer 搬 KINDS(import)+ sync 锁测试覆盖 parser 防漂移,样本记 `dslVersion`。顺带修 agent/layout prompt 漏 `white` 的颜色漂移。**为 (c2) prompt 加固铺路:改 prompt 届时只改 REFERENCE 一处 + bump 版号,5 处自动联动。**
 > ⏳ 待做:(c2) prompt 加固(现改 REFERENCE 一处即联动)/(e) /ask 入口需用户澄清 /(f) P2 能力维度(per-profile vision/labs/思考)。
 > ⏳ 待办:统一手测 + bump v0.45.0 + push。手测项见各 commit message。
 > ⚠️ v0.44.0 多 profile 有 **v1→v2 settings migration**,重点测旧配置 reload 后 /ask 仍可用。
