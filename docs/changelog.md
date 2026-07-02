@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-07-02 · v0.46.0 · unified-ai-conversation（/ask 全屏 + companion 对话打通）
+
+战略(用户 2026-07-02 定调):「AI 对话页面应该打通」。落地:/ask 全屏 + companion 悬浮**共享同一段 per-canvas 对话**;全屏=创造(看所有画布 + ➕新建),悬浮=修改整理(当前画布)。
+
+- **统一 per-canvas 对话 store**(新 `lib/conversation-store.ts`,泛化自旧 companion-chat-history):key `cys-stift.conversation.<canvasId>.v2`;SSR/quota/streaming 守卫齐;**lazy 迁移**旧 companion v1(per-canvas 直接搬)+ 旧 /ask 全局(按 targetCanvasId 拆到各画布,无 target 的归 DEFAULT_CANVAS_ID);idempotent + 不丢数据。/ask 与 companion 读写同一段对话;消息体去 targetCanvasId(store key 即 canvasId)。
+- **companion 发 history**(修"AI 说没上下文"):镜像 /ask,把历史拼进 `initialMessages` 发给 provider(`{role,content}` only,无 dslBlocks);每轮仍重 snapshot 当前画布塞进新 user 消息,保 live 状态新鲜。切画布-during-stream 走 abort 防串台(opus review 验证响应正确)。
+- **/ask 全屏 = 画布对话全屏版**:画布切换器切对话;加「➕新画布」选项 → **新建即出生**(`canvasStore.create` → 拿 id → 绑对话,AI 提议实时 apply 到真画布;空画布兜底清——退出时若三真空:无 cards + 无 freeform + 无 conversation → 硬删。`canvasStore.delete` 是永久删,故准则 airtight,opus review 确认无数据丢失路径)。
+- 删旧 `companion-chat-history.ts` + `ask-history.ts`(逻辑搬进 conversation-store,迁移读旧 key 字符串内联,不依赖旧模块)。
+
+**执行**:subagent-driven(每 task 一 implementer + 独立 reviewer;Task 3 响应敏感 / Task 5 数据安全用 opus review)。6 task + 全量验证门。**验证**:web 1129 测试全过 / 5 包 tsc 零错 / build exit 0。commits `da4cd9b..96ec4e7` + 本收尾。
+
+---
+
 ## 2026-07-02 · v0.45.0 · dsl-grammar-single-source(DSL 语法单一源 + 版本号)
 
 cys-dsl 语法原先散落 7 处(2 代码:parser 正则 + serializer;5 文案:agent / layout×2 / canvas-prompt / dsl-dialog 各手抄一份指令清单 + 颜色),加一个新指令要改 7 处,且颜色已漂移(agent + layout 只列 5 色漏 `white`)。本轮收口 + 挂版号,为 (c2) prompt 加固做联动准备。

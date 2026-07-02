@@ -119,8 +119,8 @@
 - **search**:全文检索(title 1.5x 权重 + body 摘要 + pinned 前置)
 - **命令面板**:⌘K 跳转项 + 卡片搜索 + **最近编辑跳转**(空 query 显 updatedAt 前 8,点卡智能开卡:在画布跳画布定位+开详情,否则开详情)
 - **标签**:10 色固定调色板,卡片标签 + 过滤 + **标签墙 `/tags`**(标签云 + 卡网格)
-- **关系网络**:块引用 `((标题))` 嵌入(embeds 关系)+ 详情建/删关系(relation-picker)+ 跨画布 backlinks(useGlobalEdges 聚合所有画布)+ **智能关系推荐**(graph 详情页「建议关联」,本地零 AI 四信号打分 + 可选「AI 再找找」语义粗筛,一键即建)+ **AI 对话 agent**(`/ask` 页:对话提需求 → AI 输出 cys-dsl 块 → 确认门 before/after 缩略图 + 变更摘要 → 应用/拒绝;RAG 引用卡片;改任意目标画布)
-- **AI 伴侣面板**:画布常驻 AI 浮面板(rail ✨ 开关,发现/对话两 tab,折叠+tab 持久)—— 发现 tab 本地预筛零成本常驻(重复/可关联/孤立卡)+ 选中定位/建立关联/AI 深挖三动作;对话 tab = /ask agent 上画布(live host 应用 + 确认门 + 引用点开)+ **历史持久化**(per-canvas localStorage,折叠/reload 不丢)+ 缩略图窄面板横向滚不溢出,非破坏性默认开
+- **关系网络**:块引用 `((标题))` 嵌入(embeds 关系)+ 详情建/删关系(relation-picker)+ 跨画布 backlinks(useGlobalEdges 聚合所有画布)+ **智能关系推荐**(graph 详情页「建议关联」,本地零 AI 四信号打分 + 可选「AI 再找找」语义粗筛,一键即建)+ **AI 对话 agent**(`/ask` 页:对话提需求 → AI 输出 cys-dsl 块 → 确认门 before/after 缩略图 + 变更摘要 → 应用/拒绝;RAG 引用卡片;改任意目标画布)+ **v0.46 对话打通**(/ask 全屏 + companion 共享 per-canvas 对话 store;全屏可切所有画布 + ➕新建画布「新建即出生」)
+- **AI 伴侣面板**:画布常驻 AI 浮面板(rail ✨ 开关,发现/对话两 tab,折叠+tab 持久)—— 发现 tab 本地预筛零成本常驻(重复/可关联/孤立卡)+ 选中定位/建立关联/AI 深挖三动作;对话 tab = /ask agent 上画布(live host 应用 + 确认门 + 引用点开)+ **历史持久化 + v0.46 现发给 AI**(不再"没上下文";与 /ask 共享同一段 per-canvas 对话)+ 缩略图窄面板横向滚不溢出,非破坏性默认开
 - **AI 排版**:诚实反馈(apply 前后位移对比 → "重排 N 张平均 Xpx" / "AI 认为已合理未改动")+ 主动重排 prompt + 拓宽思考抑制(deepseek 镜像/model 名)+ 60s 超时
 - **版本号**:单一可信源(`scripts/gen-version.mjs` 读 root package.json → version.ts + 同步 tauri.conf),主菜单 + 首页实时显示
 - **settings**:快捷键自定义 + 导入/导出 + 暗色主题 + AI provider 配置 + **实验室区**(vision/autoCurate/autoTag/autoCapture/agentToolCalling 五个实验室,默认关,LAB_REGISTRY 注册表 + useLabEnabled 守卫 + 确认门;分层判据见 ai-labs-strategy spec)
@@ -142,14 +142,15 @@
 > **2026-07-02 进度(已 bump v0.45.0 + push):**
 > - v0.44 批次已落地(先期 push `56c17f0`):标题可读性(遮挡避让+timeline clamp,老 #1①②)/ 图谱复位 fit-to-nodes(老 #3)/ 卡删审计(老 #4)/ AI 交互样本导出(老 #6)/ (c1) DSL 重试闭环 / (f) 多 profile P1。
 > - **v0.45.0 已落地(`262a6fb..7e3c664`)**:DSL 语法单一源(`dsl-grammar.ts` 的 `DSL_VERSION=1`/KINDS/COLORS/REFERENCE),5 处 prompt/help 收口 import + sync 锁测试 + 样本记 dslVersion;顺带修 agent/layout prompt 漏 `white` 漂移;为 (c2) 联动铺路。
+> - **v0.46.0 已落地(`da4cd9b..96ec4e7`)**:AI 对话打通 —— /ask + companion 共享 per-canvas 对话 store + companion 发 history(修"没上下文")+ /ask ➕新建画布(新建即出生)+ 空画布兜底清;旧 companion/ask history lazy 迁移。详见 changelog。
 > - **清单已缩短**:图谱复位 / 卡删审计 / 样本导出 三项 v0.44 已落地 → 移出;AI 集群用户暂不测 → 暂停(见 #2)。
 > ⚠️ **手测未做**(v0.44/v0.45 两版都没手测就 push):v0.44 多 profile 有 **v1→v2 settings migration**(旧配置 reload 后 /ask 仍可用);v0.45 改了 AI 看到的 prompt(收口+修 white),留意 /ask + 排版 + 对话表现。
 
 1. **UI 一贯性扫描**(老 #1 的 ③;①②标题遮挡/timeline 已在 v0.44 修)— 缝修完后做一轮跨页一贯性扫描(tile/按钮/间距/色/字体跨页一致)+ 人性化小毛病批。属 UI 缝,可能不必走全套 brainstorm。
-2. **AI 可用性集群** ⏸️ **暂停**(用户 2026-07-02:暂不测 AI,待产品方向定后再议)— 原见 `v043-handtest-round2` 记忆。子项备忘:(a) 对话记忆(先验证 provider 真发 history,再澄清"记忆"指同对话上下文还是跨 session)/(b) 指令遵循不瞎动(prompt 结构化+DSL 校验+错误反馈重试)/(c) 基础设施(DSL 校验器/prompt schema/反馈循环)/(d) DSL 预览可视性/(e) /ask 入口路由/(f) provider 配置 UX。**AI 不建卡是方向对,不动。**
+2. **AI 可用性集群** — **部分落地,余项暂停**(用户暂不测 AI):(a) 对话记忆 ✅ v0.46(companion 发 history,代码验证 provider 真发;跨 session 历史靠 conversation-store reload 持久);(e) /ask 入口 ✅ v0.46(对话打通,/ask 全屏=创造 / companion=修改整理,见 unified-ai-conversation spec)。余项暂停:(b) 指令遵循/(c) DSL 校验器等基础设施/(d) 预览可视性/(f) provider UX。原清单见 `v043-handtest-round2` 记忆。**AI 不建卡是方向对,不动。**
 3. **LOW backlog triage**(`ux-audit-backlog` 记忆)— 性能 / a11y / 边缘 / 视觉,HIGH 已清零,按价值挑批。
 4. **(c2) prompt 加固** — 现已便宜:v0.45 单一源后,改 `DSL_GRAMMAR_REFERENCE` 一处 + 按规则 bump `DSL_VERSION`,5 个 prompt 联动(增删指令种类/属性/颜色才 bump,纯措辞不改)。
-5. **(e) /ask 入口** — 待用户澄清(全屏 ask ↔ 悬浮伴侣数据/历史互通 idea,见 `ask-entry-fullscreen-companion-idea` 记忆;全屏=创造为主,悬浮=修改整理为主)。
+5. ~~**(e) /ask 入口**~~ ✅ **已落地 v0.46**(unified-ai-conversation:/ask 全屏 + companion 数据/历史互通,全屏=创造 / 悬浮=修改整理;原 `ask-entry-fullscreen-companion-idea` 记忆的 idea 已实现)。
 6. **(f) P2 能力维度** — per-profile vision/labs/思考模式开关;deferred 到 profile 体系稳定后。
 
 #### 中期

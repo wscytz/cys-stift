@@ -11,8 +11,9 @@
  * - streaming 复活守卫:持久化的 streaming:true 永远陈旧(reload 后 stream 已死),
  *   加载时清为 false。
  *
- * Task 2/3 会把 companion-chat.tsx + ask/page.tsx 切到这个 store;
- * 本文件是 additive-only —— 不删除旧 companion-chat-history.ts / ask-history.ts。
+ * Task 2/3 已把 companion-chat.tsx + ask/page.tsx 切到这个 store,并删除了旧
+ * companion-chat-history.ts / ask-history.ts(本 store 的 migrateLegacy 直接读
+ * 旧 key 字符串,不依赖旧模块)。
  */
 import type { CanvasId } from '@cys-stift/domain'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
