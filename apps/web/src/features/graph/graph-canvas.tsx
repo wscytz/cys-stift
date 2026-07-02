@@ -38,6 +38,7 @@ import {
   MIN_ZOOM,
   MAX_ZOOM,
 } from './wheel-math'
+import { computeFitView } from './fit-view'
 
 const NODE_R = 10
 const EDGE_WIDTH = 1.5
@@ -233,12 +234,15 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
         const factor = target / view.zoom
         zoomAt(factor, cx, cy)
       },
-      /** 重置:zoom=1,pan 居中于画布中心(graph 原点对中)。 */
+      /** 复位:fit-to-nodes —— 所有节点 bbox 居中塞进画布、适配缩放。
+       *  旧实现把图谱原点对到屏幕中心,节点簇在图谱 (w/2,h/2) 被双偏移推出屏(「乱飘」)。 */
       resetView: () => {
         const canvas = canvasRef.current
-        const cx = canvas ? canvas.clientWidth / 2 : 0
-        const cy = canvas ? canvas.clientHeight / 2 : 0
-        applyView({ zoom: 1, panX: cx, panY: cy })
+        if (!canvas) return
+        const positioned = handleRef.current?.nodes ?? []
+        const fit = computeFitView(positioned, canvas.clientWidth, canvas.clientHeight)
+        if (!fit) return // 无节点 → no-op
+        applyView(fit)
       },
     }),
     [applyView, zoomAt],
