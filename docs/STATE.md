@@ -143,6 +143,7 @@
 3. **图谱复位智能化**(用户 2026-07-02)— reset 改 fit-to-nodes(算节点 bbox 居中 + 适配缩放),当前 reset 回默认视口致"乱飘";更智能=记忆上次视图/跟随选中。看 GraphCanvas resetView + graph-view-store。
 4. **卡片删除逻辑**(用户 2026-07-02)— 审删除时关系箭头/backlinks/块引用处理;软删 vs 硬删语义;删后引用卡表现。引擎层 InMemoryHost remove 级联已修(B1 `db09fa2`),DB+详情层要审。
 5. **LOW backlog triage**(ux-audit-backlog 记忆)— 性能 / a11y / 边缘 / 视觉,HIGH 已清零,按价值挑批。
+6. **AI 交互样本(本地累积 + opt-in 导出)**(用户 2026-07-02 提,提为短期)— 本地静默累积 AI DSL 交互样本(用户意图上下文 → AI 提议 DSL → 用户编辑/应用/拒绝),不外发(零隐私);提供一键 opt-in 导出为 JSON 语料。**一鱼三吃**:① 自用训练语料(fine-tune 前置);② AI 调优验证(看模型实际输出 vs 用户修正,反推 prompt/重试改进);③ 未来用户研究/论文的数据基础。命名避开"训练数据/遥测"监视感,用"交互样本/corpus"。**先做这个,再回 (c1) 重试闭环**(导出能直接验证重试效果)。
 
 #### 中期
 
@@ -155,7 +156,7 @@
 
 #### 更远远期
 
-9. **训练大模型适配**(用户 2026-07-02 提)— fine-tune 一个模型 for cy's Stift 的 DSL 生成 + 指令遵循。依赖:先积累真实 DSL 交互数据(现无数据收集;R2 隐私铁律本地优先,训练用用户主动导出数据)。
+9. **训练大模型适配**(用户 2026-07-02 提)— fine-tune 一个模型 for cy's Stift 的 DSL 生成 + 指令遵循。依赖:先积累真实 DSL 交互数据(短期 #6 本地累积 + opt-in 导出;R2 隐私铁律本地优先,训练用用户主动导出数据)。**研究分叉**(2026-07-02 议):① 文本微调(小 LLM → DSL,本地 Ollama 跑,卖点是本地/隐私/延迟 vs 云大模型);② **任务专用模型(Paddle 式)**,如画布截图→理解布局→DSL/编辑建议的 vision 任务 —— 与已搭骨架未接线的 vision lab 接上。论文角度:local-first 知识工具 + 端上专用模型 + 重试闭环 baseline,有对照实验空间;**用户研究**(找人测:专用模型 vs prompt+重试 在遵循度/延迟/体验上)是正的 evaluation。**先 prompt+重试跑到天花板 + 语料攒够再定走哪条**。
 10. **电子书 pad**(用户 2026-07-01 提,最远)— 文石 Boox 等安卓系电子书走安卓适配路径可直接装 APK;但 E-Ink 屏 Canvas 2D 残影严重,要全屏刷新策略 + 砍 animation/transition(画布 80ms transition/流式光标闪烁全是 E-Ink 敌人),是单独一类适配,比安卓本身难。Kindle 封闭系统不考虑。**依赖安卓适配先落地**。
 
 - **v0.43 手测反馈六批打磨(2026-07-01)**:v0.42 打包后手测反馈一轮,6 batch subagent-driven。① **关系箭头高倍放大消失**(renderElements 视锥剔除后 visible 列表当端点解析集,端点 card 离屏被剔 → arrowEndpoints 解析不到;解耦画什么 vs 解析用什么,增 `allForResolution` 传全集 +5 测);② **图谱 4 bug**(删卡灰屏竞态 cleanup 不置 null+rAF / 触摸板 ctrlKey 分流 pinch=缩放双指=平移 + wheel-math 纯函数 17 测 / 缩放条 GraphZoomBar forwardRef / 卡详情 action 行 sticky);③ **伴侣对话 tab 留面板内修**(缩略图 overflow-x:auto / 历史 per-canvas localStorage +10 测 / 折叠非破坏性 display:none);④ **AI 排版 robustness**(拓宽思考抑制 isDeepSeekEndpoint baseUrl 或 model / 主动重排 prompt / 诚实反馈 summarizeMovement 三分支 +10 测 / 60s 超时 + maxTokens hint)—— 头号"从来没改过布局"根因三合一;⑤ **版本号单一源**(gen-version.mjs → version.ts + 同步 tauri,AppMenu+首页显示,bump 0.43.0);⑥ **整理范式**(strategy mindmap/flow/grid/pack × direction TB/LR/RL/BT × gap,默认 mindmap/TB,新 organize-popover +23 矩阵测)。canvas-engine 473 / web 1037 全绿;**源码 tsc 零错**(23 lint 全在 __tests__ 裸色名 fixture 基线);build exit 0;.app+.dmg(5.8M)打包。**未 push**(本地领先远程 3 commit:自查续修 2 + docs 1,等用户确认)。详见 changelog。
