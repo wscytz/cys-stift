@@ -36,7 +36,7 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "cy's Stift",
-  description: '本地优先的灵感画布。灵感 3 秒记，画布上慢慢养。',
+  description: '本地优先的灵感画布。你的灵感，在画布上生长。',
 }
 
 export default function RootLayout({

@@ -38,7 +38,7 @@ export const messages = {
   /* ── Home page ── */
   'home.eyebrow': { zh: 'phase 0 · scaffold', en: 'phase 0 · scaffold' },
   'home.title': { zh: 'cy\'s Stift', en: "cy's Stift" },
-  'home.tagline': { zh: '灵感 3 秒记，画布上慢慢养。', en: 'Capture inspiration in 3 seconds, cultivate it on canvas.' },
+  'home.tagline': { zh: '你的灵感，在画布上生长。', en: 'Your inspiration, growing on the canvas.' },
   'home.hint.mac': { zh: '⌘⇧Space anywhere', en: '⌘⇧Space anywhere' },
   'home.hint.win': { zh: 'Ctrl+⇧+Space anywhere', en: 'Ctrl+⇧+Space anywhere' },
   'home.feature.capture.title': { zh: 'Capture', en: 'Capture' },

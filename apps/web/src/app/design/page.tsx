@@ -85,7 +85,7 @@ export default function DesignPage() {
             <div className="type">
               <div className="type__row">
                 <code className="type__role">display</code>
-                <p className="type__display">灵感 3 秒记</p>
+                <p className="type__display">你的灵感，在画布上生长</p>
               </div>
               <div className="type__row">
                 <code className="type__role">body</code>
