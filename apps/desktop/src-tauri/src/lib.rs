@@ -13,17 +13,24 @@
 // 命令:用户在设置页改快捷键后,前端 invoke 它 → 注销旧快捷键、注册新的,
 // 使桌面全局热键跟随用户配置(此前 Rust 写死,web 可改但不联动 = 功能断裂)。
 
+#[cfg(desktop)]
 use tauri::{Emitter, Manager};
+#[cfg(desktop)]
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 /// 当前已注册的快捷键 accelerator。update_shortcut 时先注销它再注册新的。
 /// 用 Mutex 保护(invoke 跨线程);初始 = 默认快捷键。
+// global-shortcut 是桌面专属(安卓无系统全局热键概念),整套守 cfg(desktop)。
+#[cfg(desktop)]
 static CURRENT_SHORTCUT: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 
+/// 默认快捷键(仅桌面注册;安卓无系统全局热键概念)。
+#[cfg(desktop)]
 const DEFAULT_SHORTCUT: &str = "CmdOrCtrl+Shift+Space";
 
 /// 注册一个快捷键:注销当前(若有)、注册新的、更新 CURRENT_SHORTCUT。
 /// 失败 emit `global-shortcut-error`。返回 Ok(()) 让前端知道成功。
+#[cfg(desktop)]
 fn rebind_shortcut(app: &tauri::AppHandle, accelerator: &str) -> Result<(), String> {
     let gs = app.global_shortcut();
     let mut current = CURRENT_SHORTCUT.lock().map_err(|e| e.to_string())?;
@@ -52,6 +59,7 @@ fn rebind_shortcut(app: &tauri::AppHandle, accelerator: &str) -> Result<(), Stri
     }
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 fn update_shortcut(app: tauri::AppHandle, accelerator: String) -> Result<(), String> {
     rebind_shortcut(&app, &accelerator)
@@ -60,7 +68,9 @@ fn update_shortcut(app: tauri::AppHandle, accelerator: String) -> Result<(), Str
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![update_shortcut])
+        .invoke_handler(tauri::generate_handler![
+            #[cfg(desktop)] update_shortcut,
+        ])
         .setup(|app| {
             #[cfg(desktop)]
             {
@@ -101,6 +111,10 @@ pub fn run() {
                     }
                 }
             }
+            // mobile: setup 参数 app 在 #[cfg(desktop)] 块内才用,这里显式标记
+            // unused 避免移动端 unused_variables warning(桌面端此行被 cfg 排除)。
+            #[cfg(not(desktop))]
+            let _ = app;
             Ok(())
         })
         .run(tauri::generate_context!())
