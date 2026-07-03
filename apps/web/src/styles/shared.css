@@ -172,3 +172,18 @@
 .mono--xs { font-size: var(--font-size-xs); }
 
 /* Button variants 已迁移到 @cys-stift/ui <Button>(2026-07-03 下线 .btn-ghost/.btn-primary/.btn-danger;全仓 .tsx 零 .btn-* 调用)。 */
+
+/* 折叠 ▸/▾ 按钮(companion / outline / minimap 三处共用;从 inline style 抽全局类以支持 :focus-visible)。 */
+.cv-chrome-toggle {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  line-height: 1;
+  padding: 0 var(--space-1);
+  background: transparent;
+  color: var(--color-black);
+  border: none;
+  cursor: pointer;
+}
+.cv-chrome-toggle:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+/* companion tab 按钮(选中态走 inline 动态值;此处只锚 :focus-visible)。 */
+.cv-companion-tab:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }

@@ -328,6 +328,7 @@ export function Minimap({
         </span>
         <button
           type="button"
+          className="cv-chrome-toggle"
           onClick={() => {
             // 拖拽刚结束(pointerup 后浏览器仍 fire click)→ 吞掉,不折叠
             if (justDraggedRef.current) { justDraggedRef.current = false; return }
@@ -338,16 +339,6 @@ export function Minimap({
           aria-label={collapseLabel}
           aria-expanded={!collapsed}
           title={collapseLabel}
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 'var(--font-size-xs)',
-            lineHeight: 1,
-            padding: '0 var(--space-1)',
-            background: 'transparent',
-            color: 'var(--color-black)',
-            border: 'none',
-            cursor: 'pointer',
-          }}
         >
           {collapsed ? '▸' : '▾'}
         </button>

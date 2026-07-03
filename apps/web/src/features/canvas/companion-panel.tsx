@@ -196,6 +196,7 @@ export function CanvasCompanionPanel({
             <button
               key={tb}
               type="button"
+              className="cv-companion-tab"
               role="tab"
               aria-selected={tab === tb}
               onClick={() => {
@@ -221,6 +222,7 @@ export function CanvasCompanionPanel({
         </div>
         <button
           type="button"
+          className="cv-chrome-toggle"
           onClick={() => {
             const next = !collapsed
             setCollapsed(next)
@@ -229,16 +231,6 @@ export function CanvasCompanionPanel({
           aria-label={collapseLabel}
           aria-expanded={!collapsed}
           title={collapseLabel}
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 'var(--font-size-xs)',
-            lineHeight: 1,
-            padding: '0 var(--space-1)',
-            background: 'transparent',
-            color: 'var(--color-black)',
-            border: 'none',
-            cursor: 'pointer',
-          }}
         >
           {collapsed ? '▸' : '▾'}
         </button>

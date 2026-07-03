@@ -142,6 +142,7 @@ export function OutlinePanel({
         </span>
         <button
           type="button"
+          className="cv-chrome-toggle"
           onClick={() => {
             const next = !collapsed
             setCollapsed(next)
@@ -150,16 +151,6 @@ export function OutlinePanel({
           aria-label={collapseLabel}
           aria-expanded={!collapsed}
           title={collapseLabel}
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 'var(--font-size-xs)',
-            lineHeight: 1,
-            padding: '0 var(--space-1)',
-            background: 'transparent',
-            color: 'var(--color-black)',
-            border: 'none',
-            cursor: 'pointer',
-          }}
         >
           {collapsed ? '▸' : '▾'}
         </button>
