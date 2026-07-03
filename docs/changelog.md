@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-07-03 · v0.50.0 · android-runtime-adapt（安卓运行时适配 + 全平台打包）
+
+v0.49 构建链打通后的**运行时适配**:桌面专属 UI 在安卓优雅降级 + 全端打包 v0.50.0。
+
+- **platform.ts 加 isMobile/isDesktop**(`apps/web/src/lib/platform.ts`):userAgent 检测(`android|iphone|ipad|ipod`),SSR 安全(isMobile 返 false / isDesktop 返 true),首次缓存。显示/gating 用(键盘逻辑仍 `metaKey||ctrlKey` 双兼容,不依赖平台)。
+- **桌面专属 UI 移动端隐藏**:设置页全局快捷键配置段(`settings/page.tsx`)+ 首页 ⌘/^ 捕获提示块(`app/page.tsx`)用 `isDesktop()` 守卫隐藏 —— 安卓无系统全局热键概念(`invoke update_shortcut` 在安卓 error → catch no-op,不崩)。capture 功能本身仍可用(经 AppMenu / inbox)。
+- **全平台打包 v0.50.0**:macOS `.app`/`.dmg`(`pnpm tauri build`,unsigned 本地可跑)+ Android `.apk` arm64(`tauri android build`)。Windows 走 CI(Mac 不能 cross-compile Windows,缺 llvm-rc)。
+
+**未做**:Android release 签名 keystore(发布分发用)/ 安卓实机测试 / WebView Canvas 性能 + OPFS 版本差异调优。capture-host 全局快捷键监听在安卓 listen 成功但 plugin 未注册 → 永不触发(无害 no-op)。
+
+---
+
 ## 2026-07-03 · android-build-chain（安卓构建链打通）
 
 STATE 远期 #8 第一步「能 build 出 .apk 验证构建链」。Tauri 2 Android 工具链首次配置(macOS,~2.2GB,均免 sudo):brew `openjdk@17`(formula,temurin cask 是 .pkg 要 sudo 避开)+ `android-commandlinetools`(cask)+ sdkmanager(NDK 27.0.12077973 + platform-tools + android-34 + build-tools;34.0.0)+ rustup 4 android targets。
