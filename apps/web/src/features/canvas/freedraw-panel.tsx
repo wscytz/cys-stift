@@ -21,6 +21,7 @@ import {
   duplicateFreedraw,
   freedrawPointsOf,
   freedrawToArrow,
+  freedrawToRect,
   detectArrowRoute,
   recognizeShape,
   type FreedrawKind,
@@ -123,6 +124,19 @@ export function FreedrawPanel({
     host.setSelectedIds([arrow.id])
   }
 
+  // ④ 转矩形:闭合装饰形(圈/框)或 $1 认出 rect → 一键转真 rect(bbox 对齐,单步可 undo)。
+  // 「保持为手绘」= 不点任何转换(隐式);故无显式 keep 按钮。
+  const canToRect = shape === 'rect' || (kind === 'decoration' && confidence >= 0.5)
+  const toRect = () => {
+    const rect = freedrawToRect(freedrawEl, `rect-${shortId()}`)
+    if (!rect) return
+    host.batch(() => {
+      host.remove(freedrawEl.id)
+      host.upsert(rect)
+    })
+    host.setSelectedIds([rect.id])
+  }
+
   return (
     <div
       ref={panelRef}
@@ -147,6 +161,16 @@ export function FreedrawPanel({
           title={t(toArrowKey)}
         >
           {t(toArrowKey)}
+        </button>
+      )}
+      {canToRect && (
+        <button
+          type="button"
+          className="cv-freedraw__btn"
+          onClick={toRect}
+          title={t('freedraw.toRect')}
+        >
+          {t('freedraw.toRect')}
         </button>
       )}
       <button

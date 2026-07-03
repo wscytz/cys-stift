@@ -797,6 +797,7 @@ export const messages = {
   'freedraw.toArrow': { zh: '转为箭头', en: 'Convert to arrow' },
   'freedraw.toCurveArrow': { zh: '转为曲线箭头', en: 'Convert to curved arrow' },
   'freedraw.toElbowArrow': { zh: '转为折线箭头', en: 'Convert to elbow arrow' },
+  'freedraw.toRect': { zh: '转为矩形', en: 'Convert to rectangle' },
 } as const
 
 export type MessageKey = keyof typeof messages
