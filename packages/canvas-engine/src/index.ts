@@ -64,6 +64,9 @@ export { commitFreedraw, bboxOf, translateFreedraw, scaleFreedrawToBox, freedraw
 export { smoothBezierSegments, buildSmoothPath } from './smooth-path'
 export type { BezierSegment } from './smooth-path'
 
+// ── freedraw → 规则图形转换(镜像 freedrawToArrow)──────────────────────────────
+export { freedrawToRect } from './freedraw-convert'
+
 // ── freedraw 语义识别(本地几何启发式;手绘点序列 R2 隐私,不外泄,不走 AI) ──────
 export {
   classifyFreedraw,
