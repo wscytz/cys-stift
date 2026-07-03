@@ -93,6 +93,13 @@ export function Minimap({
       : { w: 0, h: 0 }
     if (hostSize.w <= 0 || hostSize.h <= 0) return
 
+    // DPR 适配(照搬 graph-canvas:110-118):物理像素按 dpr 放大,setTransform 缩回,绘制用 MINIMAP_W/H 逻辑坐标(retina 防糊)。setTransform 在最外层一次设,save/restore 视口框包裹不变。
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
+    const pw = Math.round(MINIMAP_W * dpr)
+    const ph = Math.round(MINIMAP_H * dpr)
+    if (mini.width !== pw || mini.height !== ph) { mini.width = pw; mini.height = ph }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+
     const elements = host.getElements()
     const view = host.getView()
     const proj = computeMinimapProjection(elements, { w: MINIMAP_W, h: MINIMAP_H })

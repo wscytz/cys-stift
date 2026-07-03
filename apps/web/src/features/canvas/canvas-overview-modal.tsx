@@ -75,6 +75,12 @@ export function CanvasOverviewModal({
     const cvs = canvasRef.current
     const ctx = cvs?.getContext('2d')
     if (!host || !cvs || !ctx) return
+    // DPR 适配(照搬 graph-canvas:110-118):物理像素按 dpr 放大,setTransform 缩回,绘制用 OVERVIEW_W/H 逻辑坐标(retina 防糊)。
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
+    const pw = Math.round(OVERVIEW_W * dpr)
+    const ph = Math.round(OVERVIEW_H * dpr)
+    if (cvs.width !== pw || cvs.height !== ph) { cvs.width = pw; cvs.height = ph }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     const hostSize = canvasEl
       ? { w: canvasEl.clientWidth, h: canvasEl.clientHeight }
       : { w: 0, h: 0 }
