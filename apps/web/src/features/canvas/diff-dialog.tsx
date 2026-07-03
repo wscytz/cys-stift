@@ -43,7 +43,7 @@ export function DiffDialog({
   const isEmpty = diff && diff.added.length === 0 && diff.removed.length === 0 && diff.changed.length === 0
 
   return (
-    <Modal open={open} onClose={onClose} title={t('canvas.diffTitle')}>
+    <Modal open={open} onClose={onClose} title={t('canvas.diffTitle')} closeLabel={t('common.close')}>
       <p className="diff-lede">{t('canvas.diffLede')}</p>
       {!host?.getHistory ? (
         <p className="diff-empty">{t('canvas.diffUnavailable')}</p>

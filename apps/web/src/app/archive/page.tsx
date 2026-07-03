@@ -278,6 +278,7 @@ export default function ArchivePage() {
           open
           onClose={handleCancelBatchSoftDelete}
           title={t('archive.batchDeleteConfirmTitleN', { n: confirmBatchDelete.length })}
+          closeLabel={t('common.close')}
         >
           <p className="confirm__body">
             <strong>

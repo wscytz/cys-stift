@@ -86,6 +86,7 @@ export default function TrashPage() {
           setDeleteConfirmText('')
         }}
         title={t('trash.deleteForeverTitle')}
+        closeLabel={t('common.close')}
       >
         {confirmingCard && (
           <>

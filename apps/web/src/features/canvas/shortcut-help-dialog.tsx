@@ -77,7 +77,7 @@ export function ShortcutHelpDialog({
   ]
 
   return (
-    <Modal open={open} onClose={onClose} title={t('canvas.shortcuts')}>
+    <Modal open={open} onClose={onClose} title={t('canvas.shortcuts')} closeLabel={t('common.close')}>
       <div className="sc-groups">
         {groups.map((g) => (
           <section key={g.title} className="sc-group">

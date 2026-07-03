@@ -316,6 +316,7 @@ export default function SettingsPage() {
         open={pendingFile !== null}
         onClose={() => setPendingFile(null)}
         title={t('settings.importConfirmTitle')}
+        closeLabel={t('common.close')}
       >
         <p className="set__confirm-body">{t('settings.importConfirmBody')}</p>
         <div className="set__confirm-actions">

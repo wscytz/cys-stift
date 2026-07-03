@@ -143,7 +143,7 @@ export function ExportDialog({
   const transparentAvailable = format !== 'jpeg' && format !== 'markdown'
 
   return (
-    <Modal open={open} onClose={onClose} title={t('canvas.exportTitle')}>
+    <Modal open={open} onClose={onClose} title={t('canvas.exportTitle')} closeLabel={t('common.close')}>
       <p className="exp-lede">{t('canvas.exportLede')}</p>
 
       {/* Format */}

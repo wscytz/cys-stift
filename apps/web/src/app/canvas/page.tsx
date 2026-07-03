@@ -1157,7 +1157,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         )}
       </div>
 
-      <Modal open={creatingName !== null} onClose={() => setCreatingName(null)} title={t('canvas.newModalTitle')}>
+      <Modal open={creatingName !== null} onClose={() => setCreatingName(null)} title={t('canvas.newModalTitle')} closeLabel={t('common.close')}>
         <p className="confirm__body">{t('canvas.newModalBody')}</p>
         <input
           autoFocus className="cinput" value={creatingName ?? ''}
@@ -1175,7 +1175,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         </div>
       </Modal>
 
-      <Modal open={confirmDeleteId !== null} onClose={() => { setConfirmDeleteId(null); setDeleteConfirmText('') }} title={t('canvas.deleteModalTitle')}>
+      <Modal open={confirmDeleteId !== null} onClose={() => { setConfirmDeleteId(null); setDeleteConfirmText('') }} title={t('canvas.deleteModalTitle')} closeLabel={t('common.close')}>
         <p className="confirm__body">
           {cardCountOnTarget > 0
             ? t('canvas.deleteModalBodyCards', { name: canvases.find((c) => c.id === confirmDeleteId)?.name ?? '', n: cardCountOnTarget })
@@ -1310,7 +1310,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         canvasEl={canvasElRef.current}
       />
 
-      <Modal open={showAiSetup} onClose={() => setShowAiSetup(false)} title={t('canvas.aiSetupTitle')}>
+      <Modal open={showAiSetup} onClose={() => setShowAiSetup(false)} title={t('canvas.aiSetupTitle')} closeLabel={t('common.close')}>
         <AiSetupCard
           onGoToSettings={() => {
             setShowAiSetup(false)

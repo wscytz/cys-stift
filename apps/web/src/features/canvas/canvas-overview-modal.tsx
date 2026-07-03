@@ -141,7 +141,7 @@ export function CanvasOverviewModal({
   const empty = host === null
 
   return (
-    <Modal open={open} onClose={onClose} title={t('canvas.overview')}>
+    <Modal open={open} onClose={onClose} title={t('canvas.overview')} closeLabel={t('common.close')}>
       <p className="cv-overview__lede">{t('canvas.overviewLede')}</p>
       {empty ? (
         <p className="cv-overview__empty">{t('canvas.overviewEmpty')}</p>

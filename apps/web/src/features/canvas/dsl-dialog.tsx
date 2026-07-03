@@ -184,7 +184,7 @@ export function DslDialog({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={t('canvas.dslTitle')}>
+    <Modal open={open} onClose={onClose} title={t('canvas.dslTitle')} closeLabel={t('common.close')}>
       <p className="dsl-lede">{t('canvas.dslLede')}</p>
       <details className="dsl-syntax">
         <summary className="mono-label mono-label--wide">{t('canvas.dslSyntaxTitle')}</summary>

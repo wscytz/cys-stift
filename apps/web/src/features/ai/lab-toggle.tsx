@@ -59,6 +59,7 @@ export function LabToggle({
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
         title={t(meta.confirmTitleKey)}
+        closeLabel={t('common.close')}
       >
         <p className="set__lab-confirm-body">{t(meta.confirmBodyKey)}</p>
         <div className="set__lab-confirm-actions">

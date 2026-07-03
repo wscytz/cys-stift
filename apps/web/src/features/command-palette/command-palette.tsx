@@ -145,7 +145,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
   return (
     <>
-      <Modal open={open && !showDetail} onClose={onClose} title={t('cmd.title')}>
+      <Modal open={open && !showDetail} onClose={onClose} title={t('cmd.title')} closeLabel={t('common.close')}>
         <div className="cmd">
           <input
             ref={inputRef}

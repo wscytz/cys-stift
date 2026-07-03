@@ -412,6 +412,7 @@ export default function InboxPage() {
           open
           onClose={() => setConfirmDeleteIds(null)}
           title={t('inbox.batch.deleteConfirmTitle', { n: confirmDeleteIds.length })}
+          closeLabel={t('common.close')}
         >
           <p className="confirm__body">
             {t('inbox.batch.deleteConfirmBody', { n: confirmDeleteIds.length })}

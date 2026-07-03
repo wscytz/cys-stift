@@ -452,6 +452,7 @@ export function CardDetailModal({
         open
         onClose={onClose}
         title={mode === 'edit' ? t('card.detail.title') : card.title || t('card.untitled')}
+        closeLabel={t('common.close')}
       >
         <div className="cd" ref={dialogRef}>
           {mode === 'view' ? (
@@ -970,6 +971,7 @@ export function CardDetailModal({
         open={confirmDelete}
         onClose={() => setConfirmDelete(false)}
         title={t('card.detail.deleteConfirmTitle')}
+        closeLabel={t('common.close')}
       >
         <p className="cd__confirm">
           {t('card.detail.deleteConfirmBody')}
@@ -998,6 +1000,7 @@ export function CardDetailModal({
           open
           onClose={() => setPickerOpen(false)}
           title={t('relation.add')}
+          closeLabel={t('common.close')}
         >
           <RelationPicker
             currentCardId={String(card.id)}
