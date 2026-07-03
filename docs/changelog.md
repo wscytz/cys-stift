@@ -5,6 +5,23 @@
 
 ---
 
+## 2026-07-03 · v0.49.0 · touch-gestures-tablet（触摸手势·画板适配第二阶段）
+
+画板适配第二阶段(代码层)。三路审计发现多点 touchstart 双指 pinch 全项目零实现 + 画布无多指跟踪。用户定:画布双指(pinch/pan)+ 触摸目标 44px。手势分工:**单指元素 / 双指画布**(Figma/Procreate 范式)。**桌面+鼠标零回归**。
+
+- **多指跟踪 + pinch/pan**(`packages/canvas-engine/src/self-built-adapter.ts`):加 `activePointers: Map<pointerId,{x,y}>` + `pinch` 态。pointerdown set / move update / up·cancel delete;`size>=2` 进 `startPinch`(中断单指 + 记基线)。`updatePinch`:双指距离比 → zoom(中点锚,复用 onWheel zoom-to-cursor 数学)+ 中点位移 → pan。zoom 钳 [0.1,8]。单指(size<2)现状不变。
+- **单指-双指切换**:第二指落 → `startPinch` 调 `clearInteractionState`(中断 drag/freedraw/connect 等);任一指抬 → 退 pinch 回 idle(不续单指 drag,防误操作)。
+- **touch-action:none 核查**:主画布(self-canvas)+ graph + dev + minimap + overview **均已有 touch-action:none**(v0.48 更早),核查通过无代码改。viewport 不禁 pinch 保 WCAG(v0.48),画布局部 touch-action 禁浏览器默认。
+- **触摸目标 44px(平板态)**:`@media(max-width:1023px)` inbox/archive tile 角标 `.tile__pin`/`.tile__select` 28→44px(WCAG)。`.cv-rail__btn` 已 44 不动。桌面密度不变。
+
+**实现**:subagent-driven(T1 pinch sonnet / T2 切换测 haiku / T4 44px haiku,每 task controller review diff)。**验证**:canvas-engine 511(+2 pinch)+ web 1138 零回归;lint 0;build exit 0。commits `7311547..46410af` + 本收尾。
+
+**风险(impl 验)**:pinch 精度(触摸抖动 → 先无平滑测,抖再加);graph 双指 pinch defer(只 touch-action,画布为主)。
+
+**不做**:长按/双击/旋转 / 安卓链 / 触摸目标桌面态 / graph 双指 pinch(defer)。
+
+---
+
 ## 2026-07-03 · v0.48.0 · responsive-layout-tablet（响应式布局·画板适配第一阶段）
 
 画板适配第一阶段(代码层)。三路 UI 审计发现响应式债(AppMenu 溢出/companion 360 钉死/canvas 断点散/断点不统一)。用户定:响应式(v0.48)→触摸(v0.49)→安卓链。本轮系统化全组件,**桌面(≥1024)零回归**。
