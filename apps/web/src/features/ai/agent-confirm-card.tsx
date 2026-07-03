@@ -310,7 +310,7 @@ function Thumb({ elements, label }: { elements: CanvasElement[]; label: string }
     const ox = pad - minX * s, oy = pad - minY * s
     for (const el of elements) {
       ctx.strokeStyle = el.kind === 'card' ? readToken('--color-black', '#0a0a0a') : el.kind === 'arrow' ? readToken('--color-red', '#d40000') : readToken('--color-gray', '#6b6b6b')
-      ctx.fillStyle = el.kind === 'card' ? readToken('--color-black-soft', 'rgba(10,10,10,0.08)') : 'transparent'
+      ctx.fillStyle = el.kind === 'card' ? readToken('--color-white-soft', '#ffffff') : 'transparent'
       ctx.lineWidth = 1
       if (el.kind === 'arrow' && el.from && el.to) {
         // 关系箭头:按 from/to 卡中心画红线(x/y 是端点编码,非 bbox,不能当矩形画)。
@@ -356,7 +356,7 @@ const styles = `
 .ac__nochange { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
 .ac__thumbs { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); overflow-x: auto; flex-wrap: nowrap; min-width: 0; }
 .ac__thumb { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.ac__thumb-canvas { border: var(--border-hairline); background: var(--color-soft, var(--color-gray-soft)); max-width: 100%; height: auto; display: block; flex-shrink: 0; }
+.ac__thumb-canvas { border: var(--border-hairline); background: var(--color-gray-soft); max-width: 100%; height: auto; display: block; flex-shrink: 0; }
 .ac__thumb-label { font-family: var(--font-mono); font-size: 10px; color: var(--color-gray); text-transform: uppercase; letter-spacing: 0.08em; }
 .ac__arrow { color: var(--color-gray); font-family: var(--font-mono); }
 .ac__edit { width: 100%; font-family: var(--font-mono); font-size: var(--font-size-xs); border: var(--border-hairline); padding: var(--space-1); border-radius: var(--radius-sm); resize: vertical; margin-bottom: var(--space-2); }
