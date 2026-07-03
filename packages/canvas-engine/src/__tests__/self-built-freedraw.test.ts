@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bboxOf, commitFreedraw, translateFreedraw, scaleFreedrawToBox } from '../self-built-freedraw'
+import { bboxOf, commitFreedraw, translateFreedraw, scaleFreedrawToBox, freedrawPointsOf } from '../self-built-freedraw'
 import type { CanvasElement } from '../canvas-host'
 
 function fd(points: [number, number][], box?: { x: number; y: number; w: number; h: number }): CanvasElement {
@@ -43,6 +43,52 @@ describe('commitFreedraw', () => {
     pts.push([5, 5])
     expect((el.meta as { points: [number, number][] }).points).toHaveLength(1)
     expect((el.meta as { points: [number, number][] }).points).toEqual([[1, 1]])
+  })
+  it('store-time RDP:密集共线点简化到首尾', () => {
+    // 100 个共线点 → commit 后只存首尾 2 个
+    const pts: [number, number][] = Array.from({ length: 100 }, (_, i) => [i, 0] as [number, number])
+    const el = commitFreedraw('f5', pts)
+    const stored = (el.meta as { points: [number, number][] }).points
+    expect(stored).toEqual([[0, 0], [99, 0]])
+  })
+  it('store-time RDP:折角笔画保留折角', () => {
+    // L 形密集采样,折角 (50, 0) 必须在 commit 后的点里(detectArrowRoute 靠它)
+    const pts: [number, number][] = []
+    for (let x = 0; x <= 50; x += 5) pts.push([x, 0])
+    for (let y = 5; y <= 50; y += 5) pts.push([50, y])
+    const el = commitFreedraw('f6', pts)
+    const stored = (el.meta as { points: [number, number][] }).points
+    expect(stored).toContainEqual([50, 0])
+    expect(stored.length).toBeLessThan(pts.length)
+  })
+  it('store-time RDP:bbox 与存储点严格一致(从简化点算)', () => {
+    // 简化后 bbox 必须正好包住存储的点,不漂移
+    const pts: [number, number][] = Array.from({ length: 50 }, (_, i) => [i * 2, 0] as [number, number])
+    const el = commitFreedraw('f7', pts)
+    const stored = (el.meta as { points: [number, number][] }).points
+    expect(el.x).toBe(Math.min(...stored.map((p) => p[0])))
+    expect(el.y).toBe(Math.min(...stored.map((p) => p[1])))
+    expect(el.w).toBe(Math.max(...stored.map((p) => p[0])) - el.x)
+    expect(el.h).toBe(Math.max(...stored.map((p) => p[1])) - el.y)
+  })
+})
+
+describe('freedrawPointsOf', () => {
+  it('freedraw 元素 → 返回点数组', () => {
+    const el: CanvasElement = { id: 'f', kind: 'freedraw', x: 0, y: 0, w: 0, h: 0, rotation: 0, meta: { points: [[1, 2], [3, 4]] } }
+    expect(freedrawPointsOf(el)).toEqual([[1, 2], [3, 4]])
+  })
+  it('非 freedraw → null', () => {
+    const el: CanvasElement = { id: 'c', kind: 'card', x: 0, y: 0, w: 1, h: 1, rotation: 0 }
+    expect(freedrawPointsOf(el)).toBeNull()
+  })
+  it('freedraw 但无 meta.points → null', () => {
+    const el: CanvasElement = { id: 'f', kind: 'freedraw', x: 0, y: 0, w: 0, h: 0, rotation: 0 }
+    expect(freedrawPointsOf(el)).toBeNull()
+  })
+  it('freedraw 但 points 为空数组 → null', () => {
+    const el: CanvasElement = { id: 'f', kind: 'freedraw', x: 0, y: 0, w: 0, h: 0, rotation: 0, meta: { points: [] } }
+    expect(freedrawPointsOf(el)).toBeNull()
   })
 })
 

@@ -1,11 +1,15 @@
 
 import type { CanvasElement } from './canvas-host'
+import { simplifyPoints } from './rdp'
 
 /**
  * freedraw(手绘)纯函数:点序列 → bbox + CanvasElement。
  * 点序列是页坐标绝对值 [x,y][](向量,R2);x/y/w/h 为 bbox(commit 时算)。
  * 这些函数不挂 DOM、无引擎副作用,可独立单测。
  */
+
+/** store-time RDP 简化容差(px):高倍放大仍保视觉保真,存档/undo 栈显著瘦身。 */
+const RDP_EPSILON = 1.5
 
 /** 点序列的最小包围盒(最小角 + 尺寸)。空集 → 0 bbox。 */
 export function bboxOf(points: [number, number][]): {
@@ -28,13 +32,16 @@ export function bboxOf(points: [number, number][]): {
   return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
 }
 
-/** 把一条笔画 commit 成 freedraw CanvasElement(bbox 由点序列算,点进 meta.points)。 */
+/** 把一条笔画 commit 成 freedraw CanvasElement(bbox 由点序列算,点进 meta.points)。
+ *  store-time 跑保角 RDP 简化:存的是简化后的点 + 对应 bbox,下游全部消费方自动受益。 */
 export function commitFreedraw(
   id: string,
   points: [number, number][],
   color?: string,
 ): CanvasElement {
-  const { x, y, w, h } = bboxOf(points)
+  // 保角简化(首尾 + 折角必留,收共线/抖动点)。返回全新深拷贝数组(不持调用方引用)。
+  const simplified = simplifyPoints(points, RDP_EPSILON)
+  const { x, y, w, h } = bboxOf(simplified)
   const el: CanvasElement = {
     id,
     kind: 'freedraw',
@@ -43,9 +50,8 @@ export function commitFreedraw(
     w,
     h,
     rotation: 0,
-    // 深拷贝点序列(每点成对也拷):否则元素持调用方数组引用,调用方原地改 / push
-    // 会污染元素(undo 快照 + 渲染都会读到错数据)。
-    meta: { points: points.map((p) => [...p] as [number, number]) },
+    // simplified 已是深拷贝(simplifyPoints 每点成对新建);直接存,不再二次拷贝。
+    meta: { points: simplified },
   }
   if (color !== undefined) el.color = color
   return el
@@ -101,8 +107,8 @@ export function scaleFreedrawToBox(
   }
 }
 
-/** 取 freedraw 的点序列;非 freedraw / 无点 → null。 */
-function freedrawPointsOf(el: CanvasElement): [number, number][] | null {
+/** 取 freedraw 的点序列(唯一 sanctioned reader,R2 加固);非 freedraw / 无点 / 空点 → null。 */
+export function freedrawPointsOf(el: CanvasElement): [number, number][] | null {
   if (el.kind !== 'freedraw') return null
   const pts = (el.meta as { points?: unknown } | undefined)?.points
   if (!Array.isArray(pts) || pts.length === 0) return null

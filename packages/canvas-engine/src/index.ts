@@ -60,7 +60,7 @@ export { elementsToSvg } from './elements-to-svg'
 export type { ElementsToSvgOptions } from './elements-to-svg'
 
 // ── freedraw(手绘) ──────────────────────────────────────────────────────────
-export { commitFreedraw, bboxOf, translateFreedraw, scaleFreedrawToBox } from './self-built-freedraw'
+export { commitFreedraw, bboxOf, translateFreedraw, scaleFreedrawToBox, freedrawPointsOf } from './self-built-freedraw'
 
 // ── freedraw 语义识别(本地几何启发式;手绘点序列 R2 隐私,不外泄,不走 AI) ──────
 export {
