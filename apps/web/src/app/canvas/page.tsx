@@ -393,6 +393,11 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       // → 诚实告知已重试 N 次仍失败(新文案,区别于单次 parseFail)。
       const { ops } = parseDslWithDiagnostics(r.text)
       if (ops.length === 0) {
+        // 失败样本采集(c2):retry 耗尽仍 parse 失败 → 记 parse_failed。最值钱的调优数据。开关关时 no-op。
+        addSample(
+          { id: genSampleId(), ts: Date.now(), kind: 'dsl', source: 'canvasLayout', context: formatted, aiOutput: r.text, outcome: 'parse_failed', attempts: r.attempts, parseErrors: r.lastErrors, targetCanvasId: activeCanvasId },
+          settingsStore.get().aiSampleCapture,
+        )
         pushToast({
           kind: 'info',
           message: t('canvas.aiLayoutRetryFailed', { n: String(r.attempts) }),

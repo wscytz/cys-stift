@@ -169,6 +169,14 @@ export function CompanionChat({
         },
         buildCorrection: buildDslCorrection,
       })
+      // 失败样本采集(c2):retry 耗尽仍 parse 失败 → 记 parse_failed(坏输出+错误+尝试数)。
+      // 失败案例是最值钱的调优/训练数据。开关关时 addSample 内部 no-op。
+      if (!r.accepted) {
+        addSample(
+          { id: genSampleId(), ts: Date.now(), kind: 'dsl', source: 'companion', question, context: userPrompt, aiOutput: r.text, outcome: 'parse_failed', attempts: r.attempts, parseErrors: r.lastErrors, targetCanvasId: canvasId },
+          settingsStore.get().aiSampleCapture,
+        )
+      }
       const final = r.text
       const dslBlocks = extractDslBlocks(final)
       // Q&A 捕获:无 DSL 块 = 纯问答,记 qa 样本。开关关时 addSample 内部 no-op。

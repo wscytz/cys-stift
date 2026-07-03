@@ -28,6 +28,21 @@ const dsl: Sample = {
   targetCanvasId: 'cv-1',
 }
 
+/** retry 耗尽仍 parse 失败的样本(c2 失败采集):坏输出 + 尝试数 + 错误。 */
+const dslFailed: Sample = {
+  id: 'sf1',
+  ts: 2000,
+  source: 'ask',
+  question: '把所有卡排成思维导图',
+  context: '[RAG block]',
+  aiOutput: '```cys-dsl\n[crad #a]\n```', // 坏 DSL(拼写错 kind)
+  outcome: 'parse_failed',
+  kind: 'dsl',
+  attempts: 3,
+  parseErrors: [{ line: 1, text: '[crad #a]', message: 'unrecognized element kind' }],
+  targetCanvasId: 'cv-1',
+}
+
 describe('SAMPLES_KEY', () => {
   it('is the versioned samples key', () => {
     expect(SAMPLES_KEY).toBe('cys-stift.ai-samples.v1')
@@ -41,6 +56,18 @@ describe('loadSamples', () => {
   it('round-trips samples added by addSample', () => {
     addSample(dsl, true)
     expect(loadSamples()).toEqual([{ ...dsl, dslVersion: DSL_VERSION }])
+  })
+  it('round-trips parse_failed 样本(attempts + parseErrors 保留 + 盖 dslVersion)', () => {
+    addSample(dslFailed, true)
+    const got = loadSamples()
+    expect(got).toHaveLength(1)
+    expect(got[0]!.kind).toBe('dsl')
+    expect(got[0]!.outcome).toBe('parse_failed')
+    expect((got[0] as DslSample).attempts).toBe(3)
+    expect((got[0] as DslSample).parseErrors).toEqual([
+      { line: 1, text: '[crad #a]', message: 'unrecognized element kind' },
+    ])
+    expect(got[0]!.dslVersion).toBe(DSL_VERSION)
   })
   it('returns empty on corrupt JSON', () => {
     window.localStorage.setItem(SAMPLES_KEY, '{not json')

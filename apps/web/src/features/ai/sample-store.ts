@@ -26,7 +26,11 @@ export interface BaseSample {
 }
 export interface DslSample extends BaseSample {
   kind: 'dsl'
-  outcome: 'applied' | 'applied_edited' | 'rejected'
+  outcome: 'applied' | 'applied_edited' | 'rejected' | 'parse_failed'
+  /** retry 耗尽仍 parse 失败时的尝试次数(仅 parse_failed 有意义)。 */
+  attempts?: number
+  /** parse 失败的结构化错误(仅 parse_failed;前 8 条,DslDiagnostic 形状)。 */
+  parseErrors?: Array<{ line: number; text: string; message: string }>
 }
 export interface QaSample extends BaseSample {
   kind: 'qa'
