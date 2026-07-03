@@ -43,6 +43,10 @@
   /* Surfaces — keep one extra off-page colour for both schemes. */
   --color-page-bg: var(--color-white);
   --color-page-fg: var(--color-black);
+
+  /* Scrim — semi-transparent overlay for modal/drawer backdrops (e.g. AppMenu
+     <1024 drawer). CSS-only (not a 7th primary; a derived surface alpha). */
+  --color-scrim: rgba(10, 10, 10, 0.25);
 }
 
 /*

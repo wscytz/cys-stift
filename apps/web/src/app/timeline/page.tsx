@@ -101,7 +101,7 @@ export default function TimelinePage() {
           <PageLoading />
         ) : sorted.length === 0 ? (
           <UICard>
-            <div className="empty">
+            <div className="page-empty">
               <BauhausMotif />
               <p className="eyebrow">{t('timeline.crumb')}</p>
               <h2 className="display-title display-title--lg">
@@ -228,7 +228,6 @@ const styles = `
 }
 .tl__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 
-.empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) 0; }
 `
 
 /** 日内 pinned 稳定分区置顶(保捕获序,和 inbox pinFirst / archive G2 一致)。 */

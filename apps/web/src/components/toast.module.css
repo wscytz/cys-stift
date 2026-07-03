@@ -50,7 +50,7 @@
 
 .toast__close:focus-visible {
   outline: 2px solid var(--color-red);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
 .toast__action {
@@ -75,8 +75,8 @@
 }
 
 .toast__action:focus-visible {
-  outline: 2px solid var(--color-blue);
-  outline-offset: 1px;
+  outline: 2px solid var(--color-red);
+  outline-offset: 2px;
 }
 
 .toast--info {

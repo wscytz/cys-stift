@@ -115,5 +115,4 @@ const styles = `
   background-size: 3px 3px, 3px 3px; background-repeat: no-repeat;
 }
 .graph-filters__select:focus-visible { outline: 2px solid var(--color-red); outline-offset: 1px; }
-:root[data-theme='dark'] .graph-filters__select { background-color: var(--color-black); color: var(--color-white); border-color: var(--color-white); }
 `

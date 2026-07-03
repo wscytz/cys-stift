@@ -173,7 +173,7 @@ function EmptyState() {
   const { t } = useI18n()
   return (
     <UICard>
-      <div className="empty">
+      <div className="page-empty">
         <BauhausMotif variant="overlap" size={160} />
         <p className="eyebrow">{t('trash.crumb')}</p>
         <h2 className="display-title display-title--lg">{t('trash.empty')}</h2>
@@ -206,17 +206,14 @@ const styles = `
   padding: 0 var(--space-2) var(--space-2);
 }
 
-.empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) 0; }
 
-.confirm__body { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
-.confirm__body + .confirm__body { margin-top: var(--space-1); }
 .confirm__type {
   display: block; width: 100%; margin-top: var(--space-2);
   padding: var(--space-1) var(--space-2);
   font-family: var(--font-mono); font-size: var(--font-size-sm);
   border: var(--border-hairline); border-radius: var(--radius-sm);
-  background: var(--color-white); color: var(--color-black); outline: none;
+  background: var(--color-white); color: var(--color-black);
 }
-.confirm__type:focus { border-color: var(--color-red); }
+.confirm__type:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .confirm__actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-2); }
 `

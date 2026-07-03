@@ -72,9 +72,9 @@ export function elementsToSvg(
   // 2. 颜色(tokenResolver 解析具体值;SVG 无 CSS 变量上下文)。
   const bg = opts.background ? tokenResolver('--color-white', '#ffffff') : 'transparent'
   const cardFill = tokenResolver('--color-white', '#ffffff')
-  const cardStroke = tokenResolver('--color-gray', '#e2e8f0')
+  const cardStroke = tokenResolver('--color-gray', '#d9d9d9')
   const textCol = tokenResolver('--color-black', '#0a0a0a')
-  const grayCol = tokenResolver('--color-gray', '#64748b')
+  const grayCol = tokenResolver('--color-gray', '#666666')
   const yellow = tokenResolver('--color-yellow', '#eab308')
   const fontBody = tokenResolver('--font-body', 'Inter, sans-serif')
   const fontDisplay = tokenResolver('--font-display', 'Inter, sans-serif')

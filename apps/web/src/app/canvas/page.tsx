@@ -1735,7 +1735,7 @@ const styles = `
 .tb-tool--sub .tb-tool__icon { font-size: var(--font-size-sm); }
 .tb-tool--sub .tb-tool__label { font-size: var(--font-size-xs); }
 .tb-tool:hover:not(:disabled):not(.tb-tool--active) { background: var(--color-gray-soft); border-color: var(--color-gray); }
-.tb-tool:active:not(:disabled) { transform: scale(0.94); }
+.tb-tool:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none; }
 .tb-tool:disabled { opacity: 0.5; cursor: not-allowed; }
 .tb-tool:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tb-snap { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.16em; text-transform: uppercase; background: var(--color-white); color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
@@ -1744,7 +1744,7 @@ const styles = `
 /* P1 #6: 5 个工具按钮(↖✎⌫T⇄)补 hover,与 .tb-icon-btn 对齐;排除激活态
    (--snap 黑底)与 SnapToggle 的 --snap/--free 文字按钮,避免抢激活态视觉。 */
 .tb-snap:hover:not(:disabled):not(.tb-snap--snap):not(.tb-snap--free):not(.tb-snap--toggle) { background: var(--color-gray-soft); }
-.tb-snap:active:not(:disabled) { transform: scale(0.94); }
+.tb-snap:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none; }
 .tb-snap:disabled { opacity: 0.5; cursor: not-allowed; }
 .tb-snap:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 /* SnapToggle 默认显示文字 label,glyph 隐藏;≤900px 反转(见响应式断点)。 */
@@ -1753,7 +1753,7 @@ const styles = `
 .tb-icon-btn { display: inline-flex; align-items: center; justify-content: center; height: 32px; min-width: 32px; padding: 0 var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.12em; text-transform: uppercase; background: transparent; color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
 .tb-icon-btn--fit { padding: 0 var(--space-3); }
 .tb-icon-btn:hover { background: var(--color-black); color: var(--color-white); }
-.tb-icon-btn:active:not(:disabled) { transform: scale(0.92); }
+.tb-icon-btn:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none; }
 .tb-icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .tb-icon-btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 /* 对齐工具条:选中≥2 卡时出现。复用 .tb-icon-btn 视觉;组容器内联排布。 */
@@ -1772,23 +1772,19 @@ const styles = `
   background-position: calc(100% - 14px) calc(50% - 2px), calc(100% - 10px) calc(50% - 2px);
   background-size: 4px 4px, 4px 4px; background-repeat: no-repeat;
 }
-:root[data-theme='dark'] .cselect { background-color: var(--color-black); color: var(--color-white); border-color: var(--color-white); }
 .cselect:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cselect-edit { height: 32px; width: 32px; background: transparent; color: var(--color-gray); border: 0; cursor: pointer; font-size: var(--font-size-base); }
 .cselect-edit:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .crename { height: 32px; padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-sm); border: var(--border-hairline); border-radius: var(--radius-sm); outline: none; min-width: 200px; }
 .cinput { display: block; width: 100%; height: 32px; margin-top: var(--space-2); padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-base); border: var(--border-hairline); border-radius: var(--radius-sm); outline: none; }
-.confirm__body { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
-.confirm__body + .confirm__body { margin-top: var(--space-1); }
 .confirm__type {
   display: block; width: 100%; margin-top: var(--space-2);
   padding: var(--space-1) var(--space-2);
   font-family: var(--font-mono); font-size: var(--font-size-sm);
   border: var(--border-hairline); border-radius: var(--radius-sm);
-  background: var(--color-white); color: var(--color-black); outline: none;
+  background: var(--color-white); color: var(--color-black);
 }
-.confirm__type:focus { border-color: var(--color-red); }
-.confirm__actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-2); }
+.confirm__type:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cv-rail {
   /* z-index scale (canvas chrome):
      0  canvas content
@@ -1824,7 +1820,7 @@ const styles = `
 /* 设计语言:hover=浅灰底(轻提示),active(按下)=黄底黑边+缩放(触感),
    pressed(持续选中)=黄底黑边(Bauhaus 黄黑强调色,表示「这个开着/在用」)。 */
 .cv-rail__btn:hover:not(:disabled) { background: var(--color-gray-soft); }
-.cv-rail__btn:active:not(:disabled) { background: var(--color-yellow); border-color: var(--color-black); transform: scale(0.96); }
+.cv-rail__btn:active:not(:disabled) { background: var(--color-yellow); border-color: var(--color-black); transform: translate(2px, 2px); box-shadow: none; }
 .cv-rail__btn--pressed { background: var(--color-yellow); border-color: var(--color-black); color: var(--color-black); }
 .cv-rail__btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .cv-rail__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: -2px; }
@@ -1851,7 +1847,7 @@ const styles = `
 }
 .cv-rail__menu-item:hover:not(:disabled) { background: var(--color-yellow); }
 .cv-rail__menu-item:disabled { opacity: 0.5; cursor: not-allowed; }
-.cv-rail__menu-item:focus-visible { outline: 2px solid var(--color-red); outline-offset: 1px; }
+.cv-rail__menu-item:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cv-ctx-backdrop { position: fixed; inset: 0; z-index: 99; cursor: default; }
 .cv-ctx-menu { position: fixed; z-index: 100; }
 .cv-ctx-input { position: fixed; z-index: 100; width: 200px; }
@@ -1878,7 +1874,7 @@ const styles = `
 }
 .cv-organize__seg:hover:not(.cv-organize__seg--active) { background: var(--color-gray-soft); }
 .cv-organize__seg--active { background: var(--color-yellow); border-color: var(--color-black); }
-.cv-organize__seg:focus-visible { outline: 2px solid var(--color-red); outline-offset: 1px; }
+.cv-organize__seg:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cv-organize__range {
   width: 100%; height: 4px; background: var(--color-black); border-radius: 2px;
   appearance: none; -webkit-appearance: none; cursor: pointer;
@@ -1901,7 +1897,7 @@ const styles = `
   cursor: pointer; line-height: 1;
 }
 .cv-organize__apply:hover:not(:disabled) { box-shadow: 2px 2px 0 0 var(--color-red); }
-.cv-organize__apply:active:not(:disabled) { transform: translate(1px, 1px); box-shadow: none; }
+.cv-organize__apply:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none; }
 .cv-organize__apply:disabled { opacity: 0.5; cursor: not-allowed; }
 .cv-organize__apply:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 

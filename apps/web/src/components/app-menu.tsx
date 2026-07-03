@@ -196,7 +196,7 @@ const styles = `
   cursor: pointer;
 }
 .app-menu__capture:hover { box-shadow: 2px 2px 0 0 var(--color-black); }
-.app-menu__capture:active { transform: translate(1px, 1px); box-shadow: none; }
+.app-menu__capture:active { transform: translate(2px, 2px); box-shadow: none; }
 .app-menu__capture:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 
 /* 汉堡按钮(<1024 显;桌面不 render) */
@@ -218,7 +218,7 @@ const styles = `
   position: fixed;
   inset: 0;
   top: var(--app-menu-height, 69px);
-  background: rgba(10, 10, 10, 0.25);
+  background: var(--color-scrim);
   border: none;
   padding: 0;
   cursor: default;

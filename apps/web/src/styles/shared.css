@@ -173,6 +173,19 @@
 
 /* Button variants 已迁移到 @cys-stift/ui <Button>(2026-07-03 下线 .btn-ghost/.btn-primary/.btn-danger;全仓 .tsx 零 .btn-* 调用)。 */
 
+/* ── 13. Confirm dialog body / actions (shared across inbox/archive/trash/canvas) ─
+ * Pull confirm modal text + button row out of per-page <style> into one place.
+ * .confirm__body + .confirm__body handles stacked body lines (trash/canvas). */
+.confirm__body { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
+.confirm__body + .confirm__body { margin-top: var(--space-1); }
+.confirm__actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-2); }
+
+/* ── 14. Page empty state (shared across inbox/archive/ask/trash/tags/timeline) ─
+ * Flex column, left-aligned, 8px-grid gap + vertical padding. Dev pages and
+ * structurally different empties (single muted line, etc.) keep their own local
+ * rules — only the standard "column of title + lede" empty state lives here. */
+.page-empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) 0; }
+
 /* 折叠 ▸/▾ 按钮(companion / outline / minimap 三处共用;从 inline style 抽全局类以支持 :focus-visible)。 */
 .cv-chrome-toggle {
   font-family: var(--font-mono);

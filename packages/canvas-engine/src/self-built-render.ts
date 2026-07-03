@@ -102,14 +102,14 @@ function drawElement(
       ctx.roundRect(el.x, el.y, el.w, el.h, 4)
       ctx.fillStyle = tokenResolver('--color-white', '#ffffff')
       ctx.fill()
-      ctx.strokeStyle = tokenResolver('--color-gray', '#e2e8f0')
+      ctx.strokeStyle = tokenResolver('--color-gray', '#d9d9d9')
       ctx.lineWidth = 1
       ctx.stroke()
       // 内容(对齐 card-shape-util:类型标 mono 灰 + title display + body 3 行)
       const pad = 10
       ctx.textBaseline = 'top'
       if (!info) {
-        ctx.fillStyle = tokenResolver('--color-gray', '#94a3b8')
+        ctx.fillStyle = tokenResolver('--color-gray', '#666666')
         ctx.font = `12px ${tokenResolver('--font-mono', 'monospace')}`
         ctx.fillText('(untitled)', el.x + pad, el.y + pad)
         break
@@ -121,7 +121,7 @@ function drawElement(
         ctx.fillText('★', el.x + el.w - 18, el.y + 6)
       }
       // 类型标(mono 灰 大写)
-      ctx.fillStyle = tokenResolver('--color-gray', '#64748b')
+      ctx.fillStyle = tokenResolver('--color-gray', '#666666')
       ctx.font = `10px ${tokenResolver('--font-mono', 'monospace')}`
       ctx.fillText(info.type.toUpperCase(), el.x + pad, el.y + pad)
       // title(content 字体:用户卡片标题,带中文系统回退,Canvas ctx.font 按串内顺序回退)。

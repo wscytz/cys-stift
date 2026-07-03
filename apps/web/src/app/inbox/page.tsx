@@ -597,8 +597,6 @@ const styles = `
 .batch-bar__btn--danger:hover { background: var(--color-red); border-color: var(--color-red); }
 .batch-bar__spacer { width: var(--space-3); }
 .batch-bar__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-.confirm__body { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
-.confirm__actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-2); }
 .tile__main {
   flex: 1; display: flex; width: 100%;
   background: transparent; border: 0; padding: 0; text-align: left;
@@ -619,8 +617,6 @@ const styles = `
 .tile__preview { margin: 0; color: var(--color-black-soft); font-size: var(--font-size-sm); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .tile__meta { display: flex; gap: var(--space-1); align-items: center; margin-top: auto; flex-wrap: wrap; }
 .tile__time { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); margin-left: auto; }
-
-.empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) 0; }
 
 @media (max-width: 1023px) {
   .tile__pin, .tile__select { width: 44px; height: 44px; }
@@ -704,7 +700,7 @@ function EmptyState({ view }: { view: View }) {
   const { t } = useI18n()
   return (
     <UICard>
-      <div className="empty">
+      <div className="page-empty">
         <BauhausMotif variant="overlap" size={160} />
         <p className="eyebrow">{t('inbox.crumb')}</p>
         <h2 className="display-title display-title--lg">

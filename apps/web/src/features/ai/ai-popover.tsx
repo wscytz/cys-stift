@@ -185,7 +185,7 @@ const styles = `
   cursor: pointer;
 }
 .ai-popover__btn:hover:not(:disabled) { box-shadow: 2px 2px 0 0 var(--color-red); }
-.ai-popover__btn:active:not(:disabled) { transform: translate(1px, 1px); box-shadow: none; }
+.ai-popover__btn:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none; }
 .ai-popover__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .ai-popover__btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .ai-popover__btn--primary { background: var(--color-black); color: var(--color-white); }

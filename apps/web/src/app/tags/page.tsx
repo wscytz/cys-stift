@@ -73,7 +73,7 @@ function EmptyState() {
   const { t } = useI18n()
   return (
     <UICard>
-      <div className="empty">
+      <div className="page-empty">
         <BauhausMotif variant="overlap" size={160} />
         <p className="eyebrow">{t('tags.title')}</p>
         <h2 className="display-title display-title--lg">{t('tags.empty')}</h2>
@@ -84,5 +84,4 @@ function EmptyState() {
 
 const styles = `
 .page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
-.empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) 0; }
 `

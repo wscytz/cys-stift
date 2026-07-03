@@ -366,7 +366,7 @@ function EmptyState() {
   const { t } = useI18n()
   return (
     <UICard>
-      <div className="empty">
+      <div className="page-empty">
         <BauhausMotif variant="overlap" size={160} />
         <p className="eyebrow">{t('archive.crumb')}</p>
         <h2 className="display-title display-title--lg">{t('archive.empty')}</h2>
@@ -405,8 +405,6 @@ const styles = `
   gap: var(--space-3) var(--space-4);
 }
 
-.empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) 0; }
-
 /* Batch bar — mirrors inbox's .batch-bar (white card + 2px black border +
    hard 4px black offset shadow + uppercase mono buttons). Keeps the
    archive floater's existing fixed bottom-center positioning. */
@@ -436,7 +434,5 @@ const styles = `
 .batch-bar__spacer { width: var(--space-3); }
 .batch-bar__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 
-.confirm__body { margin: 0; color: var(--color-black-soft); line-height: 1.5; }
 .confirm__link { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; }
-.confirm__actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-2); }
 `
