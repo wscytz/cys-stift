@@ -230,9 +230,9 @@ export default function SettingsPage() {
             />
             {t('settings.exportIncludeDeleted')}
           </label>
-          <button
+          <Button
+            variant="primary"
             type="button"
-            className="btn-primary"
             onClick={async () => {
               try {
                 const includeDeleted = settings.export?.includeDeleted ?? true
@@ -265,7 +265,7 @@ export default function SettingsPage() {
             }}
           >
             {t('settings.exportJson')}
-          </button>
+          </Button>
           <div className="set__import">
             <label className="mono-label">
               {t('settings.importJson')}

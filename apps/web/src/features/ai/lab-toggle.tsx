@@ -9,7 +9,7 @@
  * 代码层守卫在调用方(useLabEnabled),这里只管设置层的开关 + 确认门 UI。
  */
 import { useState } from 'react'
-import { Modal } from '@cys-stift/ui'
+import { Modal, Button } from '@cys-stift/ui'
 import { useI18n } from '@/lib/i18n'
 import { settingsStore } from '@/lib/settings-store'
 import { LAB_REGISTRY, type LabId } from './labs-registry'
@@ -62,12 +62,12 @@ export function LabToggle({
       >
         <p className="set__lab-confirm-body">{t(meta.confirmBodyKey)}</p>
         <div className="set__lab-confirm-actions">
-          <button type="button" className="btn-ghost" onClick={() => setConfirmOpen(false)}>
+          <Button variant="ghost" type="button" onClick={() => setConfirmOpen(false)}>
             {t('common.cancel')}
-          </button>
-          <button type="button" className="btn-primary" onClick={confirmEnable}>
+          </Button>
+          <Button variant="primary" type="button" onClick={confirmEnable}>
             {t(meta.confirmActionKey)}
-          </button>
+          </Button>
         </div>
       </Modal>
     </>

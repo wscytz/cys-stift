@@ -171,48 +171,4 @@
 }
 .mono--xs { font-size: var(--font-size-xs); }
 
-/* ── 13. Button base variants (referenced by page-level components) ──────────── */
-.btn-ghost {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  background: transparent;
-  color: var(--color-black);
-  border: var(--border-hairline);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-.btn-ghost:hover:not(:disabled) { box-shadow: 2px 2px 0 0 var(--color-black); }
-.btn-ghost:disabled { opacity: 0.55; cursor: not-allowed; }
-
-.btn-primary {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  background: var(--color-black);
-  color: var(--color-white);
-  border: var(--border-hairline);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-.btn-primary:hover:not(:disabled) { box-shadow: 2px 2px 0 0 var(--color-red); }
-.btn-primary:active { transform: translate(1px, 1px); box-shadow: none; }
-.btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
-
-.btn-danger {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  background: var(--color-white);
-  color: var(--color-red);
-  border: var(--border-hairline);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-.btn-danger:hover { box-shadow: 2px 2px 0 0 var(--color-red); }
+/* Button variants 已迁移到 @cys-stift/ui <Button>(2026-07-03 下线 .btn-ghost/.btn-primary/.btn-danger;全仓 .tsx 零 .btn-* 调用)。 */
