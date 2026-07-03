@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-07-03 · ui-consistency-polish（跨页 UI 一致性 + tile 结构债清除）
+
+STATE 短期 #1（跨页 UI 一致性扫描）+ #3（LOW triage）合并执行。审计出 10 条 🔥 高价值快赢 + 大件确认，分两批落地：
+
+- **批 A（9 条，`735fbc1`）**：select dark-mode 去重（全局一条，删 3 处本地）/ confirm__type focus bug → focus-visible + outline ring / confirm+empty 抽 shared（`.confirm__body`/`.actions`/`.page-empty`，删 6 文件本地）/ canvas `:active` scale→translate（4 处对齐配方）/ `:active` translate 1px→2px（对齐 Button 权威 2px）/ toast 焦点环 blue→red + offset 1→2 / `outline-offset` 非标→2px（保留 canvas `cv-rail__btn` 刻意 -2px 内嵌）/ canvas-engine 灰色 fallback hex → Bauhaus token 字面值（`#d9d9d9`/`#666666`）/ app-menu scrim rgba → `--color-scrim` token（CSS-only，非第 7 原色）。web 1138 + canvas-engine 513 零回归。
+- **批 B（tile 合并，`130a996`）**：头号结构债 —— inbox + archive-card-tile 两份 `.tile` CSS（~85% 重合）合并到 `shared.css §15` 共享 chrome。bar 红（inbox 默认）/ 蓝（`.tile--bar-blue` modifier，archive-family tile+row variant）/ 黄（`.tile--pinned` 赢）；active 统一 `.tile__main`（主体 button）；状态优先级统一 pinned 赢（原 inbox selected 赢 / archive pinned 赢 **打架**）。删 archive 每 tile 实例的 `<style>` 注入（100 卡 = 100 重复 `<style>` 标签）。行为改进：archive active 收窄到主体 button（角标不抖）。web 1138 + build 零回归。
+
+**大件确认（不本轮）**：性能（`getElements` 缓存 / 列表虚拟化，规模相关，当前不显现）/ a11y（画布/graph 键盘操作 H4/H5）/ box-shadow ~33 处 token 化（多数有意强调色，`--shadow-*` 用 currentColor 无法覆盖彩色需求，ROI 低）。
+
+---
+
 ## 2026-07-03 · v0.50.0 · android-runtime-adapt（安卓运行时适配 + 全平台打包）
 
 v0.49 构建链打通后的**运行时适配**:桌面专属 UI 在安卓优雅降级 + 全端打包 v0.50.0。
