@@ -277,4 +277,8 @@ const styles = `
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
+
+@media (max-width: 1023px) {
+  .tile__pin, .tile__select { width: 44px; height: 44px; }
+}
 `

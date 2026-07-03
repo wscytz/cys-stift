@@ -620,6 +620,10 @@ const styles = `
 .tile__time { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); margin-left: auto; }
 
 .empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) 0; }
+
+@media (max-width: 1023px) {
+  .tile__pin, .tile__select { width: 44px; height: 44px; }
+}
 `
 
 // ── Subcomponents ──────────────────────────────────────────────────────────
