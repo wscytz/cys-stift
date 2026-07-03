@@ -959,15 +959,37 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
   const wbCard = wbCardId
     ? snap.cards.find((c) => c.id === wbCardId) ?? null
     : null
-  // 存卡 + 同步画布形状(镜像 CardDetailModal onSave L1209-1210;wiki/embed
-  // 同步走 modal 那条路,工作台只管存 + 形状)。
+  // 存卡 + 同步画布形状 + wikilink/embed 箭头(镜像 CardDetailModal onSave L1241-1275)。
+  // 工作台是富内容编辑器,modal 关着时 ((标题))/[[标题]] 的箭头同步必须在这里做,
+  // 否则 dock 里编辑 embed/wikilink 不出、不删箭头。
   const wbSave = useCallback(
     (patch: { title: string; body: string; tags: TagRef[] }) => {
       if (!wbCardId) return
       const updated = service.update(wbCardId as CardId, patch)
       if (updated && handle.current.adapter) updateCardShape(handle.current.adapter, updated)
+      // F7 wikilink + BR-T5 embed 同步(只在 body 变时;同 modal 口径)。
+      if (updated && handle.current.adapter && patch.body !== undefined) {
+        const wl = syncWikiLinkArrows({
+          host: handle.current.adapter,
+          getCardTitle: (id) => service.get(id as CardId)?.title,
+          sourceCardId: wbCardId as CardId,
+          body: patch.body,
+        })
+        if (wl.created > 0 || wl.removed > 0) {
+          pushToast({ kind: 'info', message: t('canvas.wikiLinked', { created: String(wl.created), removed: String(wl.removed) }) })
+        }
+        const emb = syncEmbedArrows({
+          host: handle.current.adapter,
+          getCardTitle: (id) => service.get(id as CardId)?.title,
+          sourceCardId: wbCardId as CardId,
+          body: patch.body,
+        })
+        if (emb.created > 0 || emb.removed > 0) {
+          pushToast({ kind: 'info', message: t('canvas.embedLinked', { created: String(emb.created), removed: String(emb.removed) }) })
+        }
+      }
     },
-    [wbCardId, service],
+    [wbCardId, service, t],
   )
 
   return (
