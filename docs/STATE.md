@@ -151,7 +151,7 @@
 1. **UI 一贯性扫描**(老 #1 的 ③;①②标题遮挡/timeline 已在 v0.44 修)— 缝修完后做一轮跨页一贯性扫描(tile/按钮/间距/色/字体跨页一致)+ 人性化小毛病批。属 UI 缝,可能不必走全套 brainstorm。
 2. **AI 可用性集群** — **部分落地,余项暂停**(用户暂不测 AI):(a) 对话记忆 ✅ v0.46(companion 发 history,代码验证 provider 真发;跨 session 历史靠 conversation-store reload 持久);(e) /ask 入口 ✅ v0.46(对话打通,/ask 全屏=创造 / companion=修改整理,见 unified-ai-conversation spec)。余项暂停:(b) 指令遵循/(c) DSL 校验器等基础设施/(d) 预览可视性/(f) provider UX。原清单见 `v043-handtest-round2` 记忆。**AI 不建卡是方向对,不动。**
 3. **LOW backlog triage**(`ux-audit-backlog` 记忆)— 性能 / a11y / 边缘 / 视觉,HIGH 已清零,按价值挑批。
-4. **(c2) prompt 加固** — 现已便宜:v0.45 单一源后,改 `DSL_GRAMMAR_REFERENCE` 一处 + 按规则 bump `DSL_VERSION`,5 个 prompt 联动(增删指令种类/属性/颜色才 bump,纯措辞不改)。
+4. **(c2) prompt 加固** — 现已便宜:v0.45 单一源后,改 `DSL_GRAMMAR_REFERENCE` 一处 + 按规则 bump `DSL_VERSION`,5 个 prompt 联动(增删指令种类/属性/颜色才 bump,纯措辞不改)。**失败样本采集已落地(2026-07-03,`5c4a4a5`)**:retry 耗尽记 `parse_failed` 样本(坏输出+错误+尝试数)进 sample-store,设置页可导出 → c2 现在有真实数据驱动,等攒一批失败案例后再针对性改 prompt。**RAG few-shot 不做**(用户心理阴影,见 `rag-deferred-user-averse` 记忆)。另:公开仓新增 `docs/ai-direction.md`(AI 方向文档,product-brief 姊妹篇)。
 5. ~~**(e) /ask 入口**~~ ✅ **已落地 v0.46**(unified-ai-conversation:/ask 全屏 + companion 数据/历史互通,全屏=创造 / 悬浮=修改整理;原 `ask-entry-fullscreen-companion-idea` 记忆的 idea 已实现)。
 6. **(f) P2 能力维度** — per-profile vision/labs/思考模式开关;deferred 到 profile 体系稳定后。
 
