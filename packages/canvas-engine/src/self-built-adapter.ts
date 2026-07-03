@@ -45,6 +45,10 @@ export class SelfBuiltAdapter implements CanvasHost {
     fromPanX: number
     fromPanY: number
   } | null = null
+  /** 多指跟踪(触摸双指 pinch/pan);pointerId → 屏幕坐标(相对 canvas)。 */
+  private activePointers = new Map<number, { x: number; y: number }>()
+  /** 双指 pinch 态(相对增量)。null = 非双指。 */
+  private pinch: { lastDist: number; lastMid: { x: number; y: number } } | null = null
   private pointerHandlers: {
     down: (e: PointerEvent) => void
     move: (e: PointerEvent) => void
@@ -550,6 +554,46 @@ export class SelfBuiltAdapter implements CanvasHost {
     this.coalescing = false
   }
 
+  /** 计算当前双指几何(两指距离 + 中点)。不足两指 → null。
+   *  Map 迭代序 = 插入序,故 vals[0]/[1] 稳定对应先落的两指。 */
+  private twoFingerGeometry(): { dist: number; mid: { x: number; y: number } } | null {
+    if (this.activePointers.size < 2) return null
+    const vals = [...this.activePointers.values()]
+    const p1 = vals[0]!, p2 = vals[1]!
+    return {
+      dist: Math.hypot(p2.x - p1.x, p2.y - p1.y),
+      mid: { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 },
+    }
+  }
+
+  /** 进入双指 pinch:清一切进行中的单指交互(drag/connect/erase/...),
+   *  以当前两指距离+中点为基线。后续 updatePinch 用相对增量。 */
+  private startPinch(): void {
+    const geo = this.twoFingerGeometry()
+    if (!geo) return
+    this.clearInteractionState()
+    this.pinch = { lastDist: geo.dist, lastMid: geo.mid }
+  }
+
+  /** 双指移动:相对增量 zoom(以中点为锚)+ 中点位移 pan。
+   *  zoom-to-cursor 锚点 = 中点;pan = 中点屏幕位移 + 缩放补偿。 */
+  private updatePinch(): void {
+    if (!this.pinch) return
+    const geo = this.twoFingerGeometry()
+    if (!geo) return
+    const factor = geo.dist / this.pinch.lastDist
+    const nextZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, this.view.zoom * factor))
+    const pageX = (geo.mid.x - this.view.panX) / this.view.zoom
+    const pageY = (geo.mid.y - this.view.panY) / this.view.zoom
+    let panX = geo.mid.x - pageX * nextZoom
+    let panY = geo.mid.y - pageY * nextZoom
+    panX += geo.mid.x - this.pinch.lastMid.x
+    panY += geo.mid.y - this.pinch.lastMid.y
+    this.setView({ ...this.view, zoom: nextZoom, panX, panY })
+    this.pinch.lastDist = geo.dist
+    this.pinch.lastMid = geo.mid
+  }
+
   /** 用快照替换所有元素(不进栈、不触发 onUserChange)。 */
   private restore(snapshot: CanvasElement[]): void {
     // R1.4:恢复元素前先清交互状态——undo/redo 可能在 drag/connect 中途触发,残留的
@@ -583,6 +627,13 @@ export class SelfBuiltAdapter implements CanvasHost {
       const rect = this.canvas.getBoundingClientRect()
       const sx = e.clientX - rect.left
       const sy = e.clientY - rect.top
+      // 多指跟踪:第二指落下 → 进 pinch(清单指交互态)。text/eraser/freedraw/connect
+      // 单指语义在 size<2 时照常走;第二指一到即接管,单指手势让位(对齐 tldraw/Figma)。
+      this.activePointers.set(e.pointerId, { x: sx, y: sy })
+      if (this.activePointers.size >= 2) {
+        this.startPinch()
+        return
+      }
       const p = screenToPage(this.view, sx, sy)
       // eraser 模式:点中元素即删 + 进入连续擦除态(按住拖拽擦过路径上的元素)。
       // remove() 自动 pushUndo + 级联清悬空箭头 + emitUser + scheduleRender。
@@ -741,6 +792,12 @@ export class SelfBuiltAdapter implements CanvasHost {
       const rect = this.canvas.getBoundingClientRect()
       const sx = e.clientX - rect.left
       const sy = e.clientY - rect.top
+      // 更新当前指位置;pinch 中 → 用相对增量 zoom/pan 并 return(不让单指态介入)。
+      this.activePointers.set(e.pointerId, { x: sx, y: sy })
+      if (this.pinch) {
+        this.updatePinch()
+        return
+      }
       if (this.erasing) {
         // 连续擦除:拖拽路径上每命中一个新元素就删(lastId 防同点重复 remove)。
         // 走 eraseAt 以遵守当前 eraserMode(text/card/all 的命中过滤 + card 进回收桶)。
@@ -882,6 +939,14 @@ export class SelfBuiltAdapter implements CanvasHost {
     }
     const onUp = (e: PointerEvent) => {
       this.coalescing = false // 任何交互结束 → 关闭 coalescing(drag/resize 的连续 upsert 批到此为止)
+      // 双指中一指抬起 → 退 pinch(pinch 期间已 clearInteractionState,单指态本就空,
+      // 直接 return 不走下方 erasing/connecting/... 清理)。activePointers 仍留另一指,
+      // 它若继续移动不再触发 pinch(单指),避免误 drag/pan。
+      this.activePointers.delete(e.pointerId)
+      if (this.pinch && this.activePointers.size < 2) {
+        this.pinch = null
+        return
+      }
       if (this.erasing) {
         this.erasing = null
         try {
@@ -997,6 +1062,12 @@ export class SelfBuiltAdapter implements CanvasHost {
     // 可能建出错箭头或落空致预览突消(v0.40 手测反馈"拖到一半消失")。connect 走丢弃路径:
     // 直接清 connecting,不 hitTest、不建箭头(取消即取消)。
     const onCancel = (e: PointerEvent) => {
+      // 双指中一指被系统中断 → 退 pinch(不 return;后续 connecting/currentStroke 丢弃
+      // 语义照常,activePointers 已 delete)。onUp 末尾的 delete 对已删 key 是 no-op。
+      this.activePointers.delete(e.pointerId)
+      if (this.pinch && this.activePointers.size < 2) {
+        this.pinch = null
+      }
       // connect:系统中断不在坏坐标判定(v0.40),直接丢弃。
       if (this.connecting) {
         this.connecting = null
