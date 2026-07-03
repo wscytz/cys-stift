@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.46.0。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.47.0。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 
@@ -36,6 +36,7 @@
 | **v0.44.0** | **第二轮手测反馈批:卡片标题可读性(遮挡避让+timeline 2-line clamp)+ /ask 对话 reload 持久(封顶100+清空键)+ AgentConfirmCard 缩略图补关系箭头 + 图谱复位 fit-to-nodes(computeFitView)+ AI provider 多 profile + active 选择(Phase 1:profiles[]/activeProfileId/v1→v2 migration/store CRUD/面板重写)** | v0.44.0 |
 | **v0.45.0** | **DSL 语法单一源 + 版本号:新建 `dsl-grammar.ts`(`DSL_VERSION=1`/`DSL_KINDS`/`DSL_COLORS`/`DSL_GRAMMAR_REFERENCE`),5 处 prompt/help 收口 import(不再各抄一份),serializer 搬 KINDS,sync 锁测试防漂移,样本记 `dslVersion`;顺带修 agent/layout prompt 漏 `white` 颜色漂移;为 (c2) prompt 加固铺路(改 REFERENCE 一处即联动)** | v0.45.0 |
 | **v0.46.0** | **统一 AI 对话(/ask 全屏 + companion 打通):新建 `conversation-store.ts`(per-canvas,canvasId 为 key)+ companion 发 history(修"AI 说没上下文")+ /ask ➕新建画布(新建即出生)+ 空画布兜底清(三真空才硬删)+ 旧 companion/ask history lazy 迁移;subagent-driven 6 task,T3 响应/T5 数据安全 opus review;web 1129 测试** | v0.46.0 |
+| **v0.47.0** | **手绘(freedraw)规范化转化 v1:store-time **保角 RDP** 点简化(插 `commitFreedraw`,首尾+折角锚定)+ **Catmull-Rom 贝塞尔平滑**(render/SVG 同源 `smoothBezierSegments`,五视图一致,minimap 保留折线)+ `freedrawPointsOf` 唯一 sanctioned reader(R2 加固,收敛 6 处裸 `meta.points` 直读)+ **转矩形**(`freedrawToRect`,chooser 扩 [转箭头/矩形/保持],沿 `host.batch` 单 undo 模式);triangle/circle defer(引擎无 active ellipse/triangle kind,加 kind 是五视图连锁,守 YAGNI);OCR 远期。canvas-engine 509 + web 1132 测试** | v0.47.0 |
 
 > v0.18–v0.21 版本号在历史中跳过(从 v0.17.0 直接进 v0.22.0),非缺失。
 > **v0.27.1-review-hardening 无独立 tag** — 该轮 hardening(rehydrateCards / parseCardsRaw / geometry reconcile / M1 label)的工作被折进 v0.31.0 重构(refactor v0.31.0-p1.2/p1.3,见 `docs/decisions/2026-06-21-v0.27.1-review-hardening.md`)。
@@ -113,7 +114,7 @@
 
 - **捕获**:全局快捷键 + Mini Input + 文件拖拽 + `.cystift` 文件拖回恢复
 - **inbox**:多媒介编辑(链接/代码/引用/媒体)+ 草稿自动保存 + 发送到画布
-- **canvas**:自研 Canvas 2D 自由画布(6 active kind:card/arrow/freedraw/text/rect/frame)+ 多画布 CRUD + 视图持久化 + 关系箭头(straight/curve/elbow + 手绘识别)+ 工具栏(选择/笔/橡皮/文本/连接)+ AI 排版(配 AI 才显,未配走引导卡)+ 导出(图片 SVG/PNG + Markdown + DSL 二级菜单)+ Outline/Minimap/全局缩略图三态 + 双链 [[]] 自动建箭头 + DSL 模态编辑器(转义)+ **对齐分布 9 操作**(选中 ≥2)+ **画布模板**(4 预设 + 自建/导入)+ **AI 工作流模板**(聚类/关系/大纲)+ **整理范式**(策略:思维导图/流程图/网格/紧凑 × 方向 TB/LR/RL/BT × 间距,默认 mindmap/TB)+ **焦点模式**(⌘. 隐 chrome)+ **frame 双击重命名** + minimap 可拖拽 + **关系箭头高倍放大不再消失**(端点解析脱离视锥剔除)
+- **canvas**:自研 Canvas 2D 自由画布(6 active kind:card/arrow/freedraw/text/rect/frame)+ 多画布 CRUD + 视图持久化 + 关系箭头(straight/curve/elbow + 手绘识别)+ 工具栏(选择/笔/橡皮/文本/连接)+ AI 排版(配 AI 才显,未配走引导卡)+ 导出(图片 SVG/PNG + Markdown + DSL 二级菜单)+ Outline/Minimap/全局缩略图三态 + 双链 [[]] 自动建箭头 + DSL 模态编辑器(转义)+ **对齐分布 9 操作**(选中 ≥2)+ **画布模板**(4 预设 + 自建/导入)+ **AI 工作流模板**(聚类/关系/大纲)+ **整理范式**(策略:思维导图/流程图/网格/紧凑 × 方向 TB/LR/RL/BT × 间距,默认 mindmap/TB)+ **焦点模式**(⌘. 隐 chrome)+ **frame 双击重命名** + minimap 可拖拽 + **关系箭头高倍放大不再消失**(端点解析脱离视锥剔除)+ **手绘规范化 v1**(store-time 保角 RDP 简化 + 贝塞尔平滑 render/SVG 同源 + 转 arrow/rect chooser)
 - **graph**:全局图谱 `/graph` —— 语义三维签名力导向图(d3-force),跨画布消费已物化的双链/关系 arrow + **缩放条**(−/slider/+/reset)+ 触摸板 pinch=缩放/双指=平移(不再误缩放)+ 删卡不灰屏 + 卡详情 action 行 sticky 常驻 + **加关系实时刷新**(freeform store 订阅通道)
 - **archive**:网格/时间轴 + 多选批量 + 详情 Modal
 - **trash**:软删恢复
@@ -154,14 +155,17 @@
 5. ~~**(e) /ask 入口**~~ ✅ **已落地 v0.46**(unified-ai-conversation:/ask 全屏 + companion 数据/历史互通,全屏=创造 / 悬浮=修改整理;原 `ask-entry-fullscreen-companion-idea` 记忆的 idea 已实现)。
 6. **(f) P2 能力维度** — per-profile vision/labs/思考模式开关;deferred 到 profile 体系稳定后。
 
-#### 下一阶段(规划中):手绘(freedraw)规范化转化
+#### ✅ 已落地(v0.47.0):手绘(freedraw)规范化转化 v1
 
-> 用户 2026-07-02 提 + 提供深度研究报告(`/Users/jinxunuo/Downloads/cy's Stift 手绘(freedraw)处理方案深度研究报告.docx`,已读)。
-> 方向 = **本地优先 + 渐进式识别 + AI 可协作**(选中 → 建议 → 确认,非破坏性)。开工走 brainstorm → spec → plan。
-> 交互 = v1 沿用 FreedrawPanel「转为箭头」模式(**选中单手绘 → 识别按钮 → 多选项 → 预览确认**,`host.batch` 单 undo);**拉框批量识别 = v2**。
+> 用户 2026-07-02 提 + 深度研究报告 + 技术筛选 subagent + PaddleOCR spike。v1 = **P0 基础优化 + P1 图形识别(箭头/矩形)**。OCR defer 远期(spike 实证)。
 
-- **P0 基础优化(零依赖,纯算法,无脑做)**:RDP 点简化(store-time **保角变体**,插在 `commitFreedraw`)+ 三阶贝塞尔拟合 + 容错增强。收益:本地 freeform(OPFS)+ `.cystift` 序列化体积 −70%+、渲染质感提升、为识别铺路。**差值坐标编码缓**(改序列化格式风险 > RDP 后的边际收益)。**顺手加固**:加 `freedrawPointsOf` 类型化访问器作唯一 sanctioned reader,防未来新 AI 功能 naive 直读 `meta.points` 泄漏 R2。
-- **P1 图形识别(纯算法,低风险)**:在**已有 `$1 Recognizer`**(+ `classifyFreedraw` / `freedrawToArrow`)上加几何规则分类器 + 更多模板;扩 `freedrawToRect/ToCircle/ToTriangle` 纯函数 + 识别建议选择器([转箭头/矩形/圆/三角/保持] → 预览确认)。**不含文字**($1 对点密度天然鲁棒 —— 内部重采样到 64,RDP 后识别不变)。
+- **P0 基础优化(已落地)**:
+  - **保角 RDP**(`packages/canvas-engine/src/rdp.ts`):store-time 在 `commitFreedraw` 简化点序列。两阶段 —— 折角锚定(方向角突变 > 30° 的点作锚,复用 `detectArrowRoute` 抗抖策略)+ 分段 Douglas-Peucker。首尾 + 折角必留,收共线/抖动点。bbox 从简化点算(严格一致,不漂移)。收益:存储/undo 栈/`.cystift` 瘦身,下游全受益。
+  - **Catmull-Rom 贝塞尔平滑**(`smooth-path.ts`):`smoothBezierSegments` 核心段数据 + `buildSmoothPath` SVG d;render(`ctx.bezierCurveTo`)与 SVG(`<path d>`)同源 → 五视图一致。minimap 保留折线(perf)。过每个点;折角微圆(手绘自然,符合 v1 意图)。
+  - **`freedrawPointsOf` R2 加固**:导出作唯一 sanctioned reader,收敛 6 处裸 `meta.points` 直读(render/svg/minimap/classify/panel/snapshot);删重复 `freedrawPoints`。
+- **P1 图形识别(部分落地)**:`freedrawToRect`(镜像 `freedrawToArrow`,读 bbox → rect,保留 color)+ FreedrawPanel chooser 扩 [转箭头/矩形/保持](置信度门控:arrow≥0.6 / decoration 闭合≥0.5;`host.batch` 单 undo + `setSelectedIds`)。**$1 对点密度鲁棒**(内部重采样 64),RDP 后识别不变 —— 回归测覆盖(L/Z 折角 + 直线 commit 后 detectArrowRoute 仍正确)。
+- **⚠️ trade-off(已知,可接受)**:RDP 降低点密度 → `detectArrowRoute` 折角检测变粗;鲁棒负载点(L 形 90°、直线)不受影响,极平滑弧理论可能被判 elbow(spec「简化不可逆」语义内)。
+- **defer(未进 v1)**:**triangle / circle** —— 引擎无 active ellipse/triangle kind(`render` 无 `case 'ellipse'` → 画布不可见);加 kind 是五视图连锁大改,守 YAGNI,留待「shape kinds」专项。**拉框批量识别** = v2。**几何规则分类器**(spec 决策 5)= P1.5。**OCR** = 远期。**差值坐标编码** = 缓。
 
 > ⚠️ **校正(报告 vs 现状,2026-07-02 spike 验证)**:
 > 1. 报告称"DSL 点阵膨胀 → AI 难理解"**已不成立** —— R2 铁律下 freedraw 点序列**从不进 AI DSL**,AI 早只看 shape 描述符(`snapshotCanvas` 已实装)。故 RDP 优化的是**本地存储 + 渲染 + `.cystift`**,非 AI 理解度。

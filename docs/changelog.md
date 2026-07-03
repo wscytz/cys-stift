@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-07-03 · v0.47.0 · freedraw-normalization-v1（手绘规范化转化）
+
+用户 2026-07-02 提 + 深度研究报告 + 技术筛选 subagent + PaddleOCR spike。v1 = **P0 基础优化 + P1 图形识别(箭头/矩形)**;OCR defer 远期(spike 实证手写不稳 + 无浏览器可跑 ONNX 小模型)。
+
+- **保角 RDP 点简化**(`packages/canvas-engine/src/rdp.ts`,新):store-time 插在 `commitFreedraw`。两阶段 —— 折角锚定(方向角突变 > 30° 的点作锚,复用 `detectArrowRoute` 抗抖 `MIN_SEGMENT` 策略)+ 分段 Douglas-Peucker。首尾 + 折角必留,收共线/抖动点。bbox 从简化点算(严格一致,不漂移)。零依赖纯函数 + 11 单测。简化不可逆(.cystift 存简化点),对画布工具可接受(草图非法证笔迹)。
+- **Catmull-Rom 贝塞尔平滑**(`smooth-path.ts`,新):`smoothBezierSegments` 核心段数据 + `buildSmoothPath` SVG d。render(`ctx.bezierCurveTo`)与 SVG(`<path d>`)消费同一份段数据 → **五视图一致**。过每个点;折角微圆(手绘自然)。minimap 保留折线(perf,鸟瞰不需平滑)。11 单测 + render/svg 改线。
+- **`freedrawPointsOf` R2 加固**:导出作唯一 sanctioned reader(self-built-freedraw),收敛 6 处裸 `meta.points` 直读(render/svg/minimap/classify/panel/snapshot);删重复 `freedrawPoints`(classify)。R2 边界仍由各序列化器"省略"维持,访问器让"想读点"只有一个受控入口。
+- **转矩形 + chooser**(`freedraw-convert.ts`,新):`freedrawToRect` 镜像 `freedrawToArrow`(读 bbox → rect,保留 color,新 id)。FreedrawPanel 现 [转箭头 / 转矩形 / 复制],置信度门控(arrow≥0.6 / decoration 闭合≥0.5),沿 `host.batch(remove+upsert)` 单 undo + `setSelectedIds` 模式。「保持」= 不点转换(隐式)。
+- **回归保护**:`$1` 内部重采样到 64 → 对 RDP 点密度鲁棒;新测覆盖 commit(RDP)→ detectArrowRoute 仍正确识别 L/Z 折角(elbow)+ 直线(straight)。已知 trade-off:极平滑弧 RDP 后理论可能判 elbow(spec「简化不可逆」语义内,可接受)。
+
+**defer(未进 v1)**:triangle / circle(引擎无 active ellipse/triangle kind,`render` 无 `case 'ellipse'` → 画布不可见;加 kind 是五视图连锁大改,守 YAGNI,留「shape kinds」专项);拉框批量识别 = v2;几何规则分类器 = P1.5;OCR = 远期;差值坐标编码 = 缓。
+
+**执行**:轻量 inline TDD(引擎纯函数 + 测试,不走全套 subagent 仪式;险活 RDP×detectArrowRoute 自验 + 末尾整体)。**验证**:canvas-engine 509 + web 1132 测试全过 / 5 包 tsc 零错 / build exit 0。commits `502ce4e..ad6c381` + 本收尾。
+
+---
+
 ## 2026-07-02 · v0.46.0 · unified-ai-conversation（/ask 全屏 + companion 对话打通）
 
 战略(用户 2026-07-02 定调):「AI 对话页面应该打通」。落地:/ask 全屏 + companion 悬浮**共享同一段 per-canvas 对话**;全屏=创造(看所有画布 + ➕新建),悬浮=修改整理(当前画布)。
