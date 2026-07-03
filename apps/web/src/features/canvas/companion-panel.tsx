@@ -16,6 +16,7 @@ import type { CanvasId, CardService } from '@cys-stift/domain'
 import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
 import { settingsStore } from '@/lib/settings-store'
+import { useMatchMedia } from '@/lib/use-match-media'
 import { getCurrentAI, isAIReady } from '@/features/ai/ai-settings-provider'
 import { streamText } from '@/features/ai/stream-text'
 import { pushToast } from '@/lib/toast-store'
@@ -67,6 +68,7 @@ export function CanvasCompanionPanel({
 }) {
   const { t } = useI18n()
   const [collapsed, setCollapsed] = useState(loadCollapsed)
+  const isNarrow = useMatchMedia('(max-width: 1023px)')
   const [tab, setTab] = useState<Tab>(loadTab)
   // host 变更触发重算 + 重渲染 —— 镜像 OutlinePanel 的 force 范式(它也没把 force 进 deps)。
   const [, force] = useState(0)
@@ -165,6 +167,16 @@ export function CanvasCompanionPanel({
   const collapseLabel = collapsed ? t('canvas.companion.expand') : t('canvas.companion.collapse')
 
   return (
+    <>
+      {isNarrow && !collapsed && (
+        <button
+          type="button"
+          className="cv-companion__backdrop"
+          aria-hidden="true"
+          tabIndex={-1}
+          onClick={() => setCollapsed(true)}
+        />
+      )}
     <div
       className="cv-companion"
       role="group"
@@ -173,7 +185,7 @@ export function CanvasCompanionPanel({
         position: 'absolute',
         right: 'var(--space-1)',
         top: 'calc(var(--app-menu-height) + 3px)',
-        width: PANEL_WIDTH,
+        width: isNarrow ? 'min(360px, calc(100vw - 60px))' : PANEL_WIDTH,
         zIndex: 30,
         background: 'var(--color-white)',
         border: '2px solid var(--color-black)',
@@ -383,6 +395,7 @@ export function CanvasCompanionPanel({
 
       <style>{styles}</style>
     </div>
+    </>
   )
 }
 
@@ -414,5 +427,15 @@ const styles = `
   outline-offset: 2px;
 }
 .cv-companion__body::-webkit-scrollbar { width: 6px; }
+.cv-companion__backdrop {
+  position: fixed;
+  inset: 0;
+  top: var(--app-menu-height, 69px);
+  background: rgba(10, 10, 10, 0.25);
+  border: none;
+  padding: 0;
+  cursor: default;
+  z-index: 29;
+}
 .cv-companion__body::-webkit-scrollbar-thumb { background: var(--color-gray); border-radius: 3px; }
 `
