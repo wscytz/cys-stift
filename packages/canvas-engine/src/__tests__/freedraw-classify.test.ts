@@ -5,6 +5,7 @@ import {
   freedrawToArrow,
   detectArrowRoute,
 } from '../freedraw-classify'
+import { commitFreedraw, freedrawPointsOf } from '../self-built-freedraw'
 import type { CanvasElement } from '../canvas-host'
 
 // ── 造笔迹 ─────────────────────────────────────────────────────────────────────
@@ -197,6 +198,35 @@ describe('detectArrowRoute', () => {
 
   it('点序列 <3 → straight(退化)', () => {
     expect(detectArrowRoute([[0, 0], [10, 10]])).toEqual({ kind: 'straight' })
+  })
+})
+
+// ── 回归:commitFreedraw 的 store-time RDP 不破形态识别(保角设计负载点)──────
+//   detectArrowRoute 靠折角;RDP 必须保留真折角,否则「转 elbow 箭头」会坏。
+//   L 形(90° ≫ 45° 阈值)是鲁棒负载点;直线退化也必稳。
+
+describe('回归:RDP 简化后 detectArrowRoute 仍正确识别', () => {
+  it('L 形笔画 commit(RDP)后仍识别为 elbow(折角保留)', () => {
+    const dense: [number, number][] = []
+    for (let i = 0; i <= 10; i++) dense.push([i * 5, 0])
+    for (let i = 1; i <= 8; i++) dense.push([50, i * 10])
+    const simplified = freedrawPointsOf(commitFreedraw('f', dense))!
+    expect(simplified.length).toBeLessThan(dense.length) // 确实简化了
+    expect(detectArrowRoute(simplified).kind).toBe('elbow')
+  })
+
+  it('Z 形两折角笔画 commit(RDP)后仍识别为 elbow', () => {
+    const dense: [number, number][] = []
+    for (let i = 0; i <= 8; i++) dense.push([i * 5, 0])
+    for (let i = 1; i <= 8; i++) dense.push([40, i * 5])
+    for (let i = 1; i <= 8; i++) dense.push([40 + i * 5, 40])
+    const simplified = freedrawPointsOf(commitFreedraw('f', dense))!
+    expect(detectArrowRoute(simplified).kind).toBe('elbow')
+  })
+
+  it('直线笔画 commit(RDP)后仍识别为 straight', () => {
+    const simplified = freedrawPointsOf(commitFreedraw('f', line(0, 0, 100, 0)))!
+    expect(detectArrowRoute(simplified).kind).toBe('straight')
   })
 })
 

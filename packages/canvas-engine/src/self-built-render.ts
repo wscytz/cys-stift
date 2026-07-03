@@ -3,6 +3,7 @@ import type { CanvasElement, CanvasView } from './canvas-host'
 import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments, arrowHeadAngle, autoElbowPath, cardObstacles } from './self-built-arrow'
 import { normalizeBox } from './bounds'
 import { freedrawPointsOf } from './self-built-freedraw'
+import { smoothBezierSegments } from './smooth-path'
 /**
  * 纯渲染函数:把元素画到 ctx 上,带相机(pan/zoom)变换。
  * - 先 clearRect 整个画布(背景色)。
@@ -189,7 +190,9 @@ function drawElement(
       }
       ctx.beginPath()
       ctx.moveTo(pts[0]![0], pts[0]![1])
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i]![0], pts[i]![1])
+      // Catmull-Rom 平滑贝塞尔(与 SVG 导出同源 smoothBezierSegments → 五视图一致)。
+      const segs = smoothBezierSegments(pts)
+      for (const s of segs) ctx.bezierCurveTo(s.cp1[0], s.cp1[1], s.cp2[0], s.cp2[1], s.p1[0], s.p1[1])
       ctx.strokeStyle = colorOf(el.color, tokenResolver)
       ctx.lineWidth = 2
       ctx.stroke()

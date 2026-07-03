@@ -18,6 +18,8 @@ function mockCtx() {
     rect: (x: number, y: number, w: number, h: number) => calls.push(`rect(${x},${y},${w},${h})`),
     moveTo: (x: number, y: number) => calls.push(`moveTo(${x},${y})`),
     lineTo: (x: number, y: number) => calls.push(`lineTo(${x},${y})`),
+    bezierCurveTo: (cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number) =>
+      calls.push(`bezierCurveTo(${cp1x},${cp1y},${cp2x},${cp2y},${x},${y})`),
     arc: (x: number, y: number, r: number, start: number, end: number) => calls.push(`arc(${x},${y},${r},${start},${end})`),
     setLineDash: (arr: number[]) => calls.push(`setLineDash(${arr.join(',')})`),
     strokeRect: (x: number, y: number, w: number, h: number) => calls.push(`strokeRect(${x},${y},${w},${h})`),
@@ -76,7 +78,7 @@ describe('renderElements', () => {
     expect(() => renderElements(ctx, els, view, 800, 600, () => null, '#0f172a')).not.toThrow()
   })
 
-  it('draws a freedraw stroke as a polyline', () => {
+  it('draws a freedraw stroke as a smoothed bézier (not a bare polyline)', () => {
     const ctx = mockCtx()
     const els = [
       {
@@ -85,9 +87,10 @@ describe('renderElements', () => {
       },
     ] as unknown as CanvasElement[]
     renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => null, '#ffffff')
+    // 平滑:moveTo 首点 + 2 段 bezierCurveTo(3 点 → 2 段),不再用 lineTo 连折线。
     expect(ctx._calls).toContain('moveTo(10,10)')
-    expect(ctx._calls).toContain('lineTo(40,50)')
-    expect(ctx._calls).toContain('lineTo(10,50)')
+    expect(ctx._calls.filter((c) => c.startsWith('bezierCurveTo')).length).toBe(2)
+    expect(ctx._calls.some((c) => c.startsWith('lineTo'))).toBe(false)
   })
 
   it('freedraw with no points draws nothing (no throw)', () => {

@@ -61,6 +61,8 @@ export type { ElementsToSvgOptions } from './elements-to-svg'
 
 // ── freedraw(手绘) ──────────────────────────────────────────────────────────
 export { commitFreedraw, bboxOf, translateFreedraw, scaleFreedrawToBox, freedrawPointsOf } from './self-built-freedraw'
+export { smoothBezierSegments, buildSmoothPath } from './smooth-path'
+export type { BezierSegment } from './smooth-path'
 
 // ── freedraw 语义识别(本地几何启发式;手绘点序列 R2 隐私,不外泄,不走 AI) ──────
 export {

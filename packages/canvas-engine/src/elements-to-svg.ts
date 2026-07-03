@@ -5,6 +5,7 @@ import { colorOf, domTokenResolver, type TokenResolver } from './self-built-rend
 import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments, arrowHeadAngle, autoElbowPath, cardObstacles } from './self-built-arrow'
 import { unionBounds, expandBounds, normalizeBox, type Bounds } from './bounds'
 import { freedrawPointsOf } from './self-built-freedraw'
+import { buildSmoothPath } from './smooth-path'
 
 /** SVG 无 ctx.measureText,用字符宽度估算软换行(近似实时渲染 wrapLines 的视觉)。
  *  CJK/全角(code≥0x1100)按字号(12px),latin 按约 0.58 字号(7px)。
@@ -153,7 +154,9 @@ function elementToSvg(
         // arc 圆点两视图一致)。点坐标是绝对页坐标,SVG 加 dx/dy 偏移。
         return `<circle cx="${pts[0]![0] + dx}" cy="${pts[0]![1] + dy}" r="2" fill="${colorOf(el.color, tokenResolver)}"/>`
       }
-      const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]! + dx} ${p[1]! + dy}`).join(' ')
+      // Catmull-Rom 平滑贝塞尔 d(与实时渲染同源 buildSmoothPath → 五视图一致)。点加 dx/dy 偏移。
+      const offset = pts.map((p) => [p[0]! + dx, p[1]! + dy] as [number, number])
+      const d = buildSmoothPath(offset)
       return `<path d="${d}" fill="none" stroke="${colorOf(el.color, tokenResolver)}" stroke-width="2"/>`
     }
     case 'text': {
