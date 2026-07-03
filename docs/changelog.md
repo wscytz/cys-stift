@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-07-04 · workbench-editor（工作台 dock 编辑器 + 富 Markdown foundation）
+
+「大卡扶正」简化版第一阶段：富 Markdown + 工作台 dock 编辑器。spec 见私有仓 `cys-stift-docs/docs/superpowers/specs/2026-07-03-workbench-richmarkdown-design.md`，计划见 `cys-stift-docs/docs/superpowers/plans/2026-07-04-workbench-editor.md`。简化定调：**不引入新卡类型、不做 AI 角色卡**——"大"由内容撑。
+
+- **D1 富 Markdown**（`56dbe81`）：`MarkdownBody` 接 `remark-gfm`（表格 / 任务列表 / 删除线 / 自动链接）。单点改 → 弹窗 / 工作台 / `((标题))` embed 全受益。`sanitizeSchema` 扩 `defaultSchema` 放行 table/del/checkbox + GFM className，保 XSS 防护。6 例测试。
+- **D6 lucide 图标 hub**（`413db34`）：`workbench-icons.tsx`（mirror `canvas-icons` 模式，strokeWidth 1.5）。删 legacy 死代码 `canvas-icon.tsx`（单数）。
+- **D3 工具栏编辑器**（`a62e186` + `76777cf`）：路线 A = markdown 源 + lucide 工具栏（11 动作）+ MarkdownBody split 预览（分屏/源码/预览）。`insertMarkdown` 纯函数（wrap/prefix/insert，14 测试，无 DOM 可测）。保 markdown 源可移植（非 WYSIWYG）。
+- **D2 工作台 dock 面板**（`d82ec0b`）：附在选中卡外侧（与弹窗并存）。弹窗加「展开工作台」按钮 → `workbenchStore.open` + 关弹窗 → panel dock 右栏（`.cv-dock` flex，宽 `clamp(320,32vw,460)`，画布主区让空间）。收起 → close。画布本地面板，无新路由（静态导出友好）。autosave 防抖 500ms + 收起 flush 防丢。`workbench-store`（useSyncExternalStore 单例，非持久）。
+- **wbSave 同步补丁**（`8eb0c3c`）：review 发现 wbSave 只做 update+shape，缺 modal 的 wikilink/embed 箭头同步 → 补 `syncWikiLinkArrows` + `syncEmbedArrows`（镜像 modal onSave）。dock 里编辑 `((标题))`/`[[标题]]` 现在同步画布箭头。
+
+web lint 0 / test 1179（+35 新）/ build exit 0。未 push（本地 main，等用户醒）。
+
+**不在本轮**（后续计划）：D4 卡片库侧栏（A+C + 分类切换器画布/类型/标签 + 多选标签 + 已固定置顶 + 收件箱）/ D5 标签管理页（/tags 升级）。延后：rehype-highlight（要 Bauhaus 语法主题）/ DSL wikilink 显式化 + 内容版本（下一大任务）。版本号待 D4/D5 落再 tag。
+
+---
+
 ## 2026-07-03 · ui-consistency-polish（跨页 UI 一致性 + tile 结构债清除）
 
 STATE 短期 #1（跨页 UI 一致性扫描）+ #3（LOW triage）合并执行。审计出 10 条 🔥 高价值快赢 + 大件确认，分两批落地：
