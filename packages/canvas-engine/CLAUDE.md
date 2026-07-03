@@ -26,11 +26,18 @@ src/
 ├── self-built-text.ts           measureText / textEditKeyAction
 ├── self-built-hittest.ts        screenToPage / hitTest
 ├── self-built-arrow.ts          箭头几何(端点 / dash / arrowhead)+ 边界框辅助
-├── self-built-freedraw.ts       commitFreedraw / bboxOf
+├── rdp.ts                       保角 RDP 点简化(simplifyPoints;commitFreedraw store-time 调,点序列 R2 本地不外发)
+├── self-built-freedraw.ts       commitFreedraw / bboxOf / freedrawPointsOf(R2 唯一 sanctioned reader)/ translateFreedraw / scaleFreedrawToBox
+├── smooth-path.ts               Catmull-Rom 贝塞尔平滑(smoothBezierSegments / buildSmoothPath;render+SVG 同源)
+├── freedraw-convert.ts          freedrawToRect(转矩形,镜像 freedrawToArrow)
+├── freedraw-classify.ts         classifyFreedraw(本地启发式)/ freedrawToArrow / detectArrowRoute / duplicateFreedraw
+├── gesture-recognizer.ts        $1 手势识别器(Wobbrock UIST 2007;本地模板匹配,点序列不外发)
+├── gesture-templates.ts         circle/rect/triangle/check 模板 + recognizeShape
 ├── self-built-resize.ts         handleAtPoint / resizeGeometry
 ├── self-built-marquee.ts        marqueeSelect
 ├── self-built-keyboard.ts       arrowKeyDelta / selectAllIds / parseKeyboardAction
 ├── bounds.ts                    unionBounds / expandBounds / Bounds(通用 AABB 几何)
 ├── elements-to-svg.ts           CanvasElement[] → SVG(对齐渲染视觉)
+├── align-distribute.ts          applyAlign(对齐/分布/等大,选中多元素 → patch Map)
 └── __tests__/                   vitest 覆盖(契约 + 各纯函数)
 ```
