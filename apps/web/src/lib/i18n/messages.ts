@@ -684,6 +684,8 @@ export const messages = {
   /* ── Common ── */
   'common.home': { zh: '首页', en: 'home' },
   'common.cancel': { zh: '取消', en: 'Cancel' },
+  'common.close': { zh: '关闭', en: 'Close' },
+  'common.menu': { zh: '菜单', en: 'Menu' },
   'common.ok': { zh: '确定', en: 'OK' },
   'common.loading': { zh: '读取中…', en: 'Loading…' },
   'common.dismiss': { zh: '关闭', en: 'Dismiss' },

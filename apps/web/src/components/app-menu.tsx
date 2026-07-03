@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { CAPTURE_OPEN_EVENT } from '@/features/capture/capture-host'
@@ -14,15 +14,20 @@ import { onQuotaExceeded as onSettingsQuota } from '@/lib/settings-store'
 import { onQuotaExceeded as onCanvasViewQuota } from '@/lib/canvas-view-store'
 import { pushToast } from '@/lib/toast-store'
 import { VERSION } from '@/lib/version'
+import { useMatchMedia } from '@/lib/use-match-media'
 
 /**
- * AppMenu — global top menu bar (v0.22.3-i18n-restore).
- * i18n bilingual + ZH/EN switcher + 4px red brand stripe
- * (Part B1/B2 of i18n-bugfixes decision; unified to red 2026-06-25).
+ * AppMenu — global top menu bar.
+ *
+ * 响应式(v0.48):≥1024 横向导航(现状);<1024 平板态收成 ☰ 汉堡抽屉
+ * (entries 变竖向覆盖列表 + backdrop 点关闭),version/sep 藏。useMatchMedia
+ * 读断点,open state 控抽屉;路由切换 / 回桌面自动关。
  */
 export function AppMenu() {
   const pathname = usePathname() ?? '/'
   const { t } = useI18n()
+  const isNarrow = useMatchMedia('(max-width: 1023px)')
+  const [open, setOpen] = useState(false)
 
   // 审计 H1 + R2.3/2.4 + quota-silence fix:所有非 React store(db-client /
   // media-store / canvas-freeform-store / canvas-store / settings-store /
@@ -44,6 +49,14 @@ export function AppMenu() {
       unsubs.forEach((u) => u())
     }
   }, [t])
+
+  // 路由切换关抽屉(点导航后)+ 回桌面关(防残留)。
+  useEffect(() => {
+    setOpen(false)
+  }, [pathname])
+  useEffect(() => {
+    if (isNarrow === false) setOpen(false)
+  }, [isNarrow])
 
   const onCaptureClick = () => {
     window.dispatchEvent(new CustomEvent(CAPTURE_OPEN_EVENT))
@@ -69,14 +82,21 @@ export function AppMenu() {
       <Link href="/" className="app-menu__brand">
         {t('brand.name')}
       </Link>
-      <span className="app-menu__version" aria-label="app version">v{VERSION}</span>
-      <span className="app-menu__sep" aria-hidden="true">/</span>
-      <div className="app-menu__entries">
+      {!isNarrow && (
+        <>
+          <span className="app-menu__version" aria-label="app version">v{VERSION}</span>
+          <span className="app-menu__sep" aria-hidden="true">/</span>
+        </>
+      )}
+      <div
+        className={`app-menu__entries${isNarrow && open ? ' app-menu__entries--open' : ''}`}
+      >
         {entries.map((e) => (
           <Link
             key={e.key}
             href={e.href}
             className={`app-menu__link ${activeKey === e.key ? 'app-menu__link--active' : ''}`}
+            onClick={() => setOpen(false)}
           >
             {t(e.key)}
           </Link>
@@ -86,6 +106,26 @@ export function AppMenu() {
       <button type="button" className="app-menu__capture" onClick={onCaptureClick}>
         {t('nav.capture')}
       </button>
+      {isNarrow && (
+        <button
+          type="button"
+          className="app-menu__burger"
+          aria-expanded={open}
+          aria-label={open ? t('common.close') : t('common.menu')}
+          onClick={() => setOpen((o) => !o)}
+        >
+          {open ? '✕' : '☰'}
+        </button>
+      )}
+      {isNarrow && open && (
+        <button
+          type="button"
+          className="app-menu__backdrop"
+          aria-hidden="true"
+          tabIndex={-1}
+          onClick={() => setOpen(false)}
+        />
+      )}
       <style>{styles}</style>
     </nav>
   )
@@ -158,4 +198,63 @@ const styles = `
 .app-menu__capture:hover { box-shadow: 2px 2px 0 0 var(--color-black); }
 .app-menu__capture:active { transform: translate(1px, 1px); box-shadow: none; }
 .app-menu__capture:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+
+/* 汉堡按钮(<1024 显;桌面不 render) */
+.app-menu__burger {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  background: transparent;
+  color: var(--color-black);
+  border: none;
+  cursor: pointer;
+  padding: 0 var(--space-1);
+  line-height: 1;
+}
+.app-menu__burger:hover { color: var(--color-red); }
+.app-menu__burger:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+
+/* 抽屉 backdrop(open 时 render;<1024) */
+.app-menu__backdrop {
+  position: fixed;
+  inset: 0;
+  top: var(--app-menu-height, 69px);
+  background: rgba(10, 10, 10, 0.25);
+  border: none;
+  padding: 0;
+  cursor: default;
+  z-index: 39;
+}
+
+/* <1024:entries 变竖向覆盖抽屉(--open 控显隐) */
+@media (max-width: 1023px) {
+  .app-menu__entries {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    background: var(--color-white);
+    border-bottom: var(--border-hairline);
+    box-shadow: 4px 4px 0 0 var(--color-black);
+    padding: var(--space-2) var(--space-4);
+    gap: var(--space-1);
+    transform: translateY(-8px);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 120ms ease-out, opacity 120ms ease-out;
+    z-index: 40;
+  }
+  .app-menu__entries--open {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* 竖向抽屉里 active 用左条而非下划线 */
+  .app-menu__link--active {
+    border-bottom: none;
+    border-left: 3px solid var(--color-black);
+    padding-left: var(--space-2);
+  }
+}
 `
