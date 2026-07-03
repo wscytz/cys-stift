@@ -37,6 +37,7 @@
 | **v0.45.0** | **DSL 语法单一源 + 版本号:新建 `dsl-grammar.ts`(`DSL_VERSION=1`/`DSL_KINDS`/`DSL_COLORS`/`DSL_GRAMMAR_REFERENCE`),5 处 prompt/help 收口 import(不再各抄一份),serializer 搬 KINDS,sync 锁测试防漂移,样本记 `dslVersion`;顺带修 agent/layout prompt 漏 `white` 颜色漂移;为 (c2) prompt 加固铺路(改 REFERENCE 一处即联动)** | v0.45.0 |
 | **v0.46.0** | **统一 AI 对话(/ask 全屏 + companion 打通):新建 `conversation-store.ts`(per-canvas,canvasId 为 key)+ companion 发 history(修"AI 说没上下文")+ /ask ➕新建画布(新建即出生)+ 空画布兜底清(三真空才硬删)+ 旧 companion/ask history lazy 迁移;subagent-driven 6 task,T3 响应/T5 数据安全 opus review;web 1129 测试** | v0.46.0 |
 | **v0.47.0** | **手绘(freedraw)规范化转化 v1:store-time **保角 RDP** 点简化(插 `commitFreedraw`,首尾+折角锚定)+ **Catmull-Rom 贝塞尔平滑**(render/SVG 同源 `smoothBezierSegments`,五视图一致,minimap 保留折线)+ `freedrawPointsOf` 唯一 sanctioned reader(R2 加固,收敛 6 处裸 `meta.points` 直读)+ **转矩形**(`freedrawToRect`,chooser 扩 [转箭头/矩形/保持],沿 `host.batch` 单 undo 模式);triangle/circle defer(引擎无 active ellipse/triangle kind,加 kind 是五视图连锁,守 YAGNI);OCR 远期。canvas-engine 509 + web 1132 测试** | v0.47.0 |
+| **v0.48.0** | **响应式布局(画板适配第一阶段,代码层):断点统一 768/1024 + viewport meta(不禁 pinch 保 WCAG)+ body overflow-x + AppMenu <1024 汉堡抽屉(useMatchMedia/useSyncExternalStore)+ companion <1024 覆盖+backdrop + canvas toolbar 断点归一;桌面(≥1024)零回归。触摸(v0.49)/安卓链后续。web 1138 测试** | v0.48.0 |
 
 > v0.18–v0.21 版本号在历史中跳过(从 v0.17.0 直接进 v0.22.0),非缺失。
 > **v0.27.1-review-hardening 无独立 tag** — 该轮 hardening(rehydrateCards / parseCardsRaw / geometry reconcile / M1 label)的工作被折进 v0.31.0 重构(refactor v0.31.0-p1.2/p1.3,见 `docs/decisions/2026-06-21-v0.27.1-review-hardening.md`)。

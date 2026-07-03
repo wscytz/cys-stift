@@ -5,6 +5,25 @@
 
 ---
 
+## 2026-07-03 · v0.48.0 · responsive-layout-tablet（响应式布局·画板适配第一阶段）
+
+画板适配第一阶段(代码层)。三路 UI 审计发现响应式债(AppMenu 溢出/companion 360 钉死/canvas 断点散/断点不统一)。用户定:响应式(v0.48)→触摸(v0.49)→安卓链。本轮系统化全组件,**桌面(≥1024)零回归**。
+
+- **断点统一**:`tokens.css` 约定 bp-sm 768 / bp-md 1024(@media 不能用 var)。全仓归一:720(4 处)→768;canvas 960→1024/900→768。1280 是 max-width 非断点保留。
+- **全局壳**:`layout.tsx` 加 viewport(device-width/initialScale,**不禁 pinch** 保 WCAG 1.4.4;画布 pinch 留 v0.49 `touch-action:none`)。`globals.css` 加 `overflow-x:hidden`。
+- **useMatchMedia hook**(新):`useSyncExternalStore` 订阅 matchMedia(SSR false 默认桌面,hydration 纠正;Safari 老 API 兜底)。5 单测。
+- **AppMenu <1024 汉堡抽屉**:9 导航项无图标(Explore 发现)→ ☰ 抽屉(竖向覆盖+backdrop+动画);路由切换/回桌面自动关。加 common.menu/close i18n。桌面零变化。
+- **companion <1024 覆盖**:展开 width 收 `min(360px,100vw-60)` + backdrop(点关闭=折叠)。默认折叠(只 rail ✨)现状已满足。桌面不变。
+- **canvas toolbar**:断点块注释更新 + 裸 px token 化(4px→--space-0.5、32px→--space-4)。
+
+**实现发现**:spec 原写 AppMenu"折叠图标",实现确认无图标 → 改汉堡抽屉(用户定)。spec 已同步(私有仓)。
+
+**验证**:lint 0 / build exit 0(20 页)/ test 1138(+5)零回归。commits `b2d2319..3336ac3` + 本收尾。
+
+**不做**:触摸(v0.49)/安卓链/手机完整/companion 深度抽屉=v2。
+
+---
+
 ## 2026-07-03 · v0.47.0 · freedraw-normalization-v1（手绘规范化转化）
 
 用户 2026-07-02 提 + 深度研究报告 + 技术筛选 subagent + PaddleOCR spike。v1 = **P0 基础优化 + P1 图形识别(箭头/矩形)**;OCR defer 远期(spike 实证手写不稳 + 无浏览器可跑 ONNX 小模型)。
