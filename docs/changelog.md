@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-07-03 · android-build-chain（安卓构建链打通）
+
+STATE 远期 #8 第一步「能 build 出 .apk 验证构建链」。Tauri 2 Android 工具链首次配置(macOS,~2.2GB,均免 sudo):brew `openjdk@17`(formula,temurin cask 是 .pkg 要 sudo 避开)+ `android-commandlinetools`(cask)+ sdkmanager(NDK 27.0.12077973 + platform-tools + android-34 + build-tools;34.0.0)+ rustup 4 android targets。
+
+- **lib.rs `cfg(desktop)` 守卫**:`tauri-plugin-global-shortcut` 是 desktop-only —— 顶层 `use GlobalShortcutExt` / `rebind_shortcut` / `update_shortcut` / `CURRENT_SHORTCUT` / `DEFAULT_SHORTCUT` 全守 `cfg(desktop)`(安卓编译时 trait 不存在,E0599/E0432)。`invoke_handler` 用 `generate_handler![#[cfg(desktop)] update_shortcut]`(Tauri 命令守卫惯用法)。`setup` 参数 mobile unused 清。`lib.rs` 早有 `#[cfg_attr(mobile, tauri::mobile_entry_point)]`,mobile-ready。
+- **scripts/setup-android-env.sh**:JDK/SDK/NDK env 的 source 脚本(每 shell source;长期写 ~/.zshrc)。
+- **gen/android**:`tauri android init` 生成(gitignored);identifier `com.cys-stift.desktop` → Android package `com.cys_stift.desktop`(hyphen 自动转下划线,minSdk 24 平板合适)。
+- **首次 apk**:`pnpm tauri android build --debug --target aarch64` → `app-universal-debug.apk`(arm64-v8a,118M 含 debug 符号)。`--target` 限 ABI(aarch64/armv7/i686/x86_64),安卓平板 arm64 主流。4 rust targets 齐可编全 ABI。
+
+**未做(运行时适配,build 后)**:全局快捷键设置段在安卓 platform 守卫隐藏(`invoke update_shortcut` 安卓 error,前端 catch no-op 不崩但 UI 应藏)/ release 签名 keystore / WebView Canvas 性能 + OPFS 版本差异调优 / 实机测试。iPad/iOS 不做(用户定,走安卓 .apk)。详见 `docs/development/setup.md` §5。
+
+---
+
 ## 2026-07-03 · v0.49.1 · touch-gestures-patch（pinch 指针捕获修复）
 
 v0.49.0 触摸手势的 post-release patch。final whole-branch review 抓到一个 **Important 真 bug** + 3 Minor,全修(`8655cf3`,post-v0.49.0-tag 已 push)。

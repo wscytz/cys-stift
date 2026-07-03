@@ -185,7 +185,7 @@
 
 #### 远期
 
-8. **安卓适配**(用户 2026-07-01 评估后定远期)— Tauri 已支持安卓;架构友好(web 数据层 localStorage+OPFS 不依赖 better-sqlite3;Pointer Events 统一输入;Tauri API 有 `__TAURI__` 守卫降级)。难点:触摸手势语义 / 桌面专属功能降级(全局快捷键/菜单栏/托盘)/ 安卓构建链首次配置(NDK+JDK,Mac 可 cross-compile)/ WebView Canvas 性能 / OPFS 版本差异。**是画板适配(中期 #7)的自然延伸** —— 响应式+触摸做完后,上安卓构建链验证能跑,再补性能调优。
+8. **安卓适配**(用户 2026-07-01 定远期;**2026-07-03 构建链已通**)— Tauri 2 Android。**构建链打通**:JDK 17 / SDK / NDK 27 / 4 rust android targets 装好(brew 免 sudo,~2.2GB),lib.rs global-shortcut `cfg(desktop)` 守卫,`tauri android init` + `build --debug --target aarch64` 出 `app-universal-debug.apk`(arm64-v8a,118M debug)。详见 `setup.md` §5 + changelog `android-build-chain`。**待续(运行时适配)**:全局快捷键设置段 platform 守卫隐藏 / release 签名 keystore / WebView Canvas 性能 + OPFS 版本差异调优 / 实机测试。iPad/iOS 不做(用户定)。是画板适配(中期 #7:响应式 v0.48 + 触摸 v0.49 已落地)的自然延伸。
 9. **画布引擎独立化**(北极星)— canvas-engine 可剥离成独立包/项目(`canvas-engine-extractable` 记忆);待真实使用验证后再推 npm/demo 站。
 
 #### 更远远期

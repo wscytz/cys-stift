@@ -92,3 +92,52 @@ pnpm tauri dev
 - **大小写**：仓库目录全小写，Windows 不敏感但 mac/Linux 敏感，**统一小写**最稳
 - **行尾**：仓库强制 LF，不要让 IDE 改 CRLF
 - **Tauri 编译**：各自平台编译各自产物，CI 用 GitHub Actions 双平台构建（Phase 8 引入）
+
+---
+
+## 5. Android（平板，可选）
+
+> Tauri 2 支持 Android（v0.49+ 构建链打通）。架构友好：web 数据层 localStorage+OPFS 不依赖 better-sqlite3；Pointer Events 统一输入；`__TAURI__` 守卫已就位；桌面专属的 global-shortcut 已 `cfg(desktop)` 守卫。
+
+### 一次性工具链（macOS，~2.2GB，均免 sudo）
+
+```bash
+# JDK 17（formula；temurin cask 是 .pkg 要 sudo 密码，避开）
+brew install openjdk@17
+# Android SDK cmdline-tools（提供 sdkmanager / adb）
+brew install --cask android-commandlinetools
+# SDK 组件（NDK 27 + platform-tools + android-34 + build-tools）
+yes | sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;27.0.12077973"
+# Rust 4 个 android targets（国内 rust-static 慢可配 RUSTUP_DIST_SERVER 镜像）
+rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+```
+
+### 环境变量（每个跑 tauri android 的 shell 都要有）
+
+```bash
+source scripts/setup-android-env.sh   # 设 JAVA_HOME / ANDROID_HOME / NDK_HOME / PATH
+```
+
+长期用把同样的 export 写进 `~/.zshrc`。脚本里是 Mac Homebrew 路径（`JAVA_HOME=/opt/homebrew/opt/openjdk@17`、`ANDROID_HOME=/opt/homebrew/share/android-commandlinetools`、`NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973`）。
+
+### 初始化 + 构建
+
+```bash
+pnpm tauri android init                            # 生成 gen/android（gitignored）
+pnpm tauri android build --debug --target aarch64  # 出 apk（arm64-v8a，安卓平板主流）
+```
+
+产物：`apps/desktop/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk`（debug 含符号 ~118M；release 小得多）。
+
+`--target` 限 ABI（`aarch64`/`armv7`/`i686`/`x86_64`）。安卓平板绝大多数 arm64，`aarch64` 即可装；加 `armv7` 覆盖老设备；`x86_64` 主要模拟器用（下载慢，非平板可跳）。
+
+### 装到设备
+
+```bash
+adb install -r <apk 路径>   # USB 调试连平板
+```
+
+### 已知（构建链已通，运行时适配待续）
+
+- 全局快捷键是桌面概念（已 `cfg(desktop)` 守卫，安卓不注册）；设置页的快捷键配置段在安卓应 platform 守卫隐藏（目前 `invoke update_shortcut` 在安卓会 error，前端 catch no-op 不崩，但 UI 该隐藏）。
+- release 分发需签名 keystore（见 Tauri Android signing 文档）。
