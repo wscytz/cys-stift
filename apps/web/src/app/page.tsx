@@ -11,7 +11,7 @@
 import Link from 'next/link'
 import { useI18n } from '@/lib/i18n'
 import { VERSION } from '@/lib/version'
-import { isMac as detectIsMac } from '@/lib/platform'
+import { isMac as detectIsMac, isDesktop } from '@/lib/platform'
 import { CaptureHint } from '@/features/capture/capture-hint'
 import { CaptureSampleHint } from '@/components/capture-sample-hint'
 
@@ -48,11 +48,13 @@ export default function HomePage() {
           </div>
         </dl>
         <nav className="home__nav" aria-label={t('nav.homeNav')}>
+          {isDesktop() && (
           <div className="home__capture" aria-label="Quick capture">
             <div className="home__capture-arrow" aria-hidden="true">{isMac ? '⌘' : '^'}</div>
             <div className="home__capture-label">{t('home.feature.capture.title')}</div>
             <div className="home__capture-note">{isMac ? t('home.hint.mac') : t('home.hint.win')}</div>
           </div>
+          )}
           <Link href="/inbox" className="home__nav-link">
             <span className="home__nav-arrow" aria-hidden="true">→</span>
             <span className="home__nav-label">{t('home.feature.inbox.title')}</span>

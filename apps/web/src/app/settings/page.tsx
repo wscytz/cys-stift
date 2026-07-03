@@ -6,6 +6,7 @@ import { Toolbar, Modal, Button } from '@cys-stift/ui'
 import { settingsStore, useSettings } from '@/lib/settings-store'
 import { rehydrateCards } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
+import { isDesktop } from '@/lib/platform'
 import { pushToast } from '@/lib/toast-store'
 import { StorageMeter } from '@/components/storage-meter'
 import { AISettingsPanel } from '@/features/settings/ai-settings-panel'
@@ -130,6 +131,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {isDesktop() && (
         <section className="section">
           <h2 className="section__h">{t('settings.captureShortcut')}</h2>
           <p className="section__lede">{t('settings.captureShortcutLede')}</p>
@@ -189,6 +191,7 @@ export default function SettingsPage() {
           </p>
           <p className="mono mono--xs">{t('settings.captureHint')}</p>
         </section>
+        )}
 
         <AISettingsPanel />
 
