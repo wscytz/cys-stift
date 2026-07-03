@@ -632,6 +632,9 @@ export class SelfBuiltAdapter implements CanvasHost {
       this.activePointers.set(e.pointerId, { x: sx, y: sy })
       if (this.activePointers.size >= 2) {
         this.startPinch()
+        // 第二指也要捕获:canvas 不填满视口(toolbar/rail/companion 占位),不捕获则
+        // 第二指漂出 canvas 边界后 pointermove 不达 → activePointers 陈旧 → pinch 坏。
+        try { this.canvas.setPointerCapture(e.pointerId) } catch { /* jsdom 无 setPointerCapture */ }
         return
       }
       const p = screenToPage(this.view, sx, sy)

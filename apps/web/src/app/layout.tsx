@@ -40,7 +40,7 @@ export const metadata: Metadata = {
 }
 
 // viewport:device-width + initialScale 1。不禁 pinch(保 WCAG 1.4.4 文字缩放无障碍);
-// 画布 pinch 冲突由 v0.49 在 <canvas> 加 touch-action:none 局部解决。
+// 画布已设 touch-action:none(self-canvas/graph,防浏览器默认触摸抢 pinch;viewport 不禁 pinch 保 WCAG)。
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,

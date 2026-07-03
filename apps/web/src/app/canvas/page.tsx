@@ -1907,16 +1907,16 @@ const styles = `
 
 /* ── 响应式断点(约定值见 tokens.css:bp-sm 768 / bp-md 1024)─────
    画布页窄 Tauri 窗口 / 平板适配:顶栏溢出 + rail 占画布宽度。
-   - ≤1024px(bp-md,平板横/窄桌面):rail 收成纯图标,按钮缩到 40×40(rail 按钮标准尺寸,非 token),腾回画布宽度(图标靠 tooltip 仍可辨)。
-   - ≤768px(bp-sm,平板竖):顶栏 SnapToggle 与 ZoomGroup 的 Fit 文字收掉,顶栏靠 toolbar overflow-x:auto 兜底不再横向滚。
+   - ≤1023px(bp-md,平板横/窄桌面):rail 收成纯图标,按钮缩到 40×40(rail 按钮标准尺寸,非 token),腾回画布宽度(图标靠 tooltip 仍可辨)。
+   - ≤767px(bp-sm,平板竖):顶栏 SnapToggle 与 ZoomGroup 的 Fit 文字收掉,顶栏靠 toolbar overflow-x:auto 兜底不再横向滚。
    ─────────────────────────────────────────────────────────────── */
-@media (max-width: 1024px) {
+@media (max-width: 1023px) {
   .cv-rail { padding: var(--space-0.5); }
   .cv-rail__btn { width: 40px; min-height: 40px; gap: 0; padding: var(--space-0.5) 0; }
   .cv-rail__btn-label { display: none; }
   .cv-rail__sep { width: var(--space-4); margin: var(--space-0.5) 0; }
 }
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   /* SnapToggle:文字隐藏、改符号按钮,保留 aria-pressed + title。 */
   .tb-snap--toggle .tb-snap__label { display: none; }
   .tb-snap--toggle { min-width: var(--space-4); padding: 0 var(--space-2); }
