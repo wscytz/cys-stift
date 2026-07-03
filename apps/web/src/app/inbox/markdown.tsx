@@ -1,7 +1,8 @@
 'use client'
 
 import ReactMarkdown from 'react-markdown'
-import rehypeSanitize from 'rehype-sanitize'
+import remarkGfm from 'remark-gfm'
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import { useI18n } from '@/lib/i18n'
 
 /**
@@ -24,10 +25,45 @@ import { useI18n } from '@/lib/i18n'
  *   - resolveEmbed is optional: callers that don't pass it keep the legacy
  *     behavior where `((标题))` is treated as plain text. This preserves
  *     backward compatibility for all existing MarkdownBody call sites.
+ *
+ * 富 Markdown (D1, 2026-07-03 workbench spec):
+ *   - remark-gfm 解锁 GFM 表格 / 任务列表 / 删除线 / 自动链接。
+ *   - sanitizeSchema 在 defaultSchema 上放行 GFM 的 table/del + 任务列表 checkbox
+ *     input + GFM 注入的 className(task-list-item / contains-task-list),好让任务项
+ *     去掉默认红方块项目符号。代码高亮(rehype-highlight + Bauhaus 语法主题)延后单独做。
  */
 export interface EmbedSegment {
   type: 'text' | 'embed'
   value: string
+}
+
+/**
+ * GFM-aware sanitize schema:在 defaultSchema 上放行 GFM 元素。
+ * - tagNames:+ del / table 族
+ * - attributes:ul/li 放行 className(GFM 任务列表类);input 仅放行 checkbox
+ *   (GFM 任务列表产 `<input type=checkbox disabled>`)
+ * highlight 的 code/span className 不在此放行 —— 高亮插件会在 sanitize 之后注入,
+ * 本就不过 sanitize(留到加高亮时再处理)。
+ */
+const sanitizeSchema = {
+  ...defaultSchema,
+  tagNames: [
+    ...(defaultSchema.tagNames ?? []),
+    'del',
+    'table',
+    'thead',
+    'tbody',
+    'tfoot',
+    'tr',
+    'th',
+    'td',
+  ],
+  attributes: {
+    ...defaultSchema.attributes,
+    ul: ['className'],
+    li: ['className'],
+    input: [['type', 'checkbox'], 'disabled', 'checked'],
+  },
 }
 
 /** 切分 source 成 text/embed 段。空串 → 空数组。纯函数。 */
@@ -50,7 +86,8 @@ export function splitEmbeds(source: string): EmbedSegment[] {
 function MarkdownBlock({ source }: { source: string }) {
   return (
     <ReactMarkdown
-      rehypePlugins={[rehypeSanitize]}
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={[[rehypeSanitize, sanitizeSchema]]}
       components={{
         a: ({ href, children, ...rest }) => {
           const safeHref =
@@ -202,6 +239,36 @@ const styles = `
   color: var(--color-black);
 }
 .md hr { border: 0; border-top: var(--border-hairline); margin: var(--space-3) 0; }
+/* GFM(D1 富 Markdown):表格 / 任务列表 / 删除线 */
+.md del { color: var(--color-gray); }
+.md table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-sm);
+}
+.md th, .md td {
+  border: var(--border-hairline);
+  padding: var(--space-1) var(--space-2);
+  text-align: left;
+  vertical-align: top;
+}
+.md th {
+  background: var(--color-blue);
+  color: var(--color-white);
+  font-weight: 600;
+}
+/* GFM 任务列表:去掉默认红方块项目符号,checkbox 走 accent-color */
+.md ul.contains-task-list { padding-left: var(--space-2); }
+.md li.task-list-item { padding-left: 0; list-style: none; }
+.md li.task-list-item::before { content: none; }
+.md input[type="checkbox"] {
+  width: 1em;
+  height: 1em;
+  vertical-align: middle;
+  margin-right: var(--space-1);
+  accent-color: var(--color-blue);
+}
 .md-embed {
   border-left: 2px solid var(--color-yellow);
   padding-left: var(--space-2);
