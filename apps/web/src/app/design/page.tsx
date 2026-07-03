@@ -353,7 +353,7 @@ const styles = `
 .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-3); }
 .hint { color: var(--color-gray); font-family: var(--font-mono); font-size: var(--font-size-xs); margin: 0; }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .design__grid { grid-template-columns: 1fr; }
   .design__nav { position: static; }
 }

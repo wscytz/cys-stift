@@ -10,6 +10,11 @@
  * `<html>` in our root layout, see apps/web layout.tsx).
  */
 
+/* ── Responsive breakpoints(约定值;@media 不能用 var(),全仓 @media 统一这两个数字)──
+   bp-sm: 768px  平板竖屏 / 大手机横(画板适配下限)
+   bp-md: 1024px 平板横屏 / 窄桌面(≥1024 = 桌面默认态,无需 @media)
+*/
+
 :root,
 [data-theme='light'] {
   /* Color tokens */

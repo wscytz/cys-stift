@@ -285,7 +285,7 @@ const styles = `
   color: var(--color-red); text-transform: lowercase; letter-spacing: 0.04em;
 }
 .mi-hint--primary { color: var(--color-red); font-weight: 700; }
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .mi-backdrop { padding-top: 12vh; }
   .mi-frame { width: calc(100vw - var(--space-4)); }
 }

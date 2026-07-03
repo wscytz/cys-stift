@@ -1911,13 +1911,13 @@ const styles = `
    - ≤960px:rail 收成纯图标,按钮缩到 40×40,腾回画布宽度(图标靠 tooltip 仍可辨)。
    - ≤900px:顶栏 SnapToggle 与 ZoomGroup 的 Fit 文字收掉,800px 顶栏不再横向滚。
    ─────────────────────────────────────────────────────────────── */
-@media (max-width: 960px) {
+@media (max-width: 1024px) {
   .cv-rail { padding: 4px; }
   .cv-rail__btn { width: 40px; min-height: 40px; gap: 0; padding: 4px 0; }
   .cv-rail__btn-label { display: none; }
   .cv-rail__sep { width: 32px; margin: 4px 0; }
 }
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   /* SnapToggle:文字隐藏、改符号按钮,保留 aria-pressed + title。 */
   .tb-snap--toggle .tb-snap__label { display: none; }
   .tb-snap--toggle { min-width: 32px; padding: 0 var(--space-2); }

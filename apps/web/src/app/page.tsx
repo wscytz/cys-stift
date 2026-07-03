@@ -225,7 +225,7 @@ export default function HomePage() {
           letter-spacing: 0.12em;
           text-align: right;
         }
-        @media (max-width: 720px) {
+        @media (max-width: 768px) {
           .home__capture-note { display: none; }
           .home__capture { grid-template-columns: 48px 1fr; }
         }
@@ -272,7 +272,7 @@ export default function HomePage() {
           color: var(--color-gray);
           text-align: right;
         }
-        @media (max-width: 720px) {
+        @media (max-width: 768px) {
           .home__nav-link { grid-template-columns: 48px 1fr; }
           .home__nav-note { grid-column: 1 / -1; text-align: left; }
         }
