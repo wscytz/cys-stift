@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Space_Grotesk, Inter, JetBrains_Mono } from 'next/font/google'
 import '../styles/globals.css'
 import { CaptureHost } from '@/features/capture/capture-host'
@@ -37,6 +37,13 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "cy's Stift",
   description: '本地优先的灵感画布。你的灵感，在画布上生长。',
+}
+
+// viewport:device-width + initialScale 1。不禁 pinch(保 WCAG 1.4.4 文字缩放无障碍);
+// 画布 pinch 冲突由 v0.49 在 <canvas> 加 touch-action:none 局部解决。
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
 }
 
 export default function RootLayout({

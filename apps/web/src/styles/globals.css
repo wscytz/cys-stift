@@ -27,6 +27,7 @@ body {
   font-size: var(--font-size-base);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden; /* 响应式兜底:AppMenu 等窄屏溢出不再撑出整页横向滚动 */
 }
 
 /* Bauhaus 滚动条(v0.39.1 跨平台适配):硬色块、无圆角、无渐变,贴合 6 原色气质。
