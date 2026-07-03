@@ -67,7 +67,10 @@ export function SampleExportPanel() {
         .sep__label { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); }
         .sep__count { margin: 0 var(--space-3) var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-sm); color: var(--color-black); }
         .sep__actions { display: flex; gap: var(--space-2); margin: 0 var(--space-3); }
-        .sep__btn { padding: var(--space-2) var(--space-3); border: var(--border-thick); background: var(--color-white); color: var(--color-black); font-family: var(--font-display); cursor: pointer; }
+        .sep__btn { padding: var(--space-2) var(--space-3); border: var(--border-thick); border-radius: var(--radius-sm); background: var(--color-white); color: var(--color-black); font-family: var(--font-display); cursor: pointer; }
+        .sep__btn:hover:not(:disabled) { box-shadow: 2px 2px 0 0 var(--color-red); }
+        .sep__btn:active:not(:disabled) { transform: translate(1px, 1px); box-shadow: none; }
+        .sep__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
         .sep__btn:disabled { opacity: 0.5; cursor: not-allowed; }
       `}</style>
     </section>
