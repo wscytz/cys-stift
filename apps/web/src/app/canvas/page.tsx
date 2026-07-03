@@ -1900,7 +1900,8 @@ const styles = `
   font-family: var(--font-body); font-size: var(--font-size-sm); font-weight: 600;
   cursor: pointer; line-height: 1;
 }
-.cv-organize__apply:hover:not(:disabled) { background: var(--color-red); border-color: var(--color-red); }
+.cv-organize__apply:hover:not(:disabled) { box-shadow: 2px 2px 0 0 var(--color-red); }
+.cv-organize__apply:active:not(:disabled) { transform: translate(1px, 1px); box-shadow: none; }
 .cv-organize__apply:disabled { opacity: 0.5; cursor: not-allowed; }
 .cv-organize__apply:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 

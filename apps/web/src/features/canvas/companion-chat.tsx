@@ -491,7 +491,7 @@ const styles = `
 .cc-chat__card-ref:hover { opacity: 0.7; }
 .cc-chat__cursor { animation: cc-chat-blink 1s steps(2) infinite; }
 @keyframes cc-chat-blink { 50% { opacity: 0; } }
-.cc-chat__send:focus-visible { outline: 2px solid var(--color-blue); outline-offset: 2px; }
+.cc-chat__send:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cc-chat__send:disabled { opacity: 0.5; cursor: default; }
 .cc-chat__input:focus-visible { outline: 2px solid var(--color-red); outline-offset: 1px; }
 `
