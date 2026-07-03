@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-07-03 · v0.49.1 · touch-gestures-patch（pinch 指针捕获修复）
+
+v0.49.0 触摸手势的 post-release patch。final whole-branch review 抓到一个 **Important 真 bug** + 3 Minor,全修(`8655cf3`,post-v0.49.0-tag 已 push)。
+
+- **pinch 第二指指针捕获(Important)**:`onDown` 第二指落下进 pinch 时,只对**第一指** `setPointerCapture` 了,第二指没捕获 → 用户双指 pinch 时第二指若漂出 canvas 区域(顶栏/侧栏/companion)就收不到 pointermove → `activePointers` 陈旧 → pinch 数学坏。修:`size>=2` 分支对**当前** pointerId 也 `setPointerCapture`(try/catch,某些 pointer 不可捕)。这是 v0.49 headline 功能的真 bug,patch 发布合理。
+- **canvas 断点 off-by-one(Minor)**:`@media 960/900` 与 AppMenu/companion 的 `max-width:1023px`(≥1024=桌面)约定差一。归一:960→1023(rail 收图标)/ 900→767(文字隐藏),与其他响应式断点一致。
+- **pinch 测试补齐(Minor)**:加纯双指 pan(距离恒定)+ 抬指退出 pinch 两测。canvas-engine 511→513。
+- **layout 注释(Minor)**:`viewport` 注释误称 `touch-action:none` 是 v0.49 加(实际 v0.48 更早已在所有 canvas 入口),改准。
+
+**验证**:canvas-engine 513 / web 1138;lint 0;build exit 0。
+
+---
+
 ## 2026-07-03 · v0.49.0 · touch-gestures-tablet（触摸手势·画板适配第二阶段）
 
 画板适配第二阶段(代码层)。三路审计发现多点 touchstart 双指 pinch 全项目零实现 + 画布无多指跟踪。用户定:画布双指(pinch/pan)+ 触摸目标 44px。手势分工:**单指元素 / 双指画布**(Figma/Procreate 范式)。**桌面+鼠标零回归**。
