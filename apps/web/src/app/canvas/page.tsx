@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import type { CanvasId, Card, CardId } from '@cys-stift/domain'
+import type { CanvasId, Card, CardId, TagRef } from '@cys-stift/domain'
 import { SelfBuiltAdapter, applyAlign, elementCenter, unionBounds, normalizeBox, screenToPage } from '@cys-stift/canvas-engine'
 import type { AlignOp, CanvasElement } from '@cys-stift/canvas-engine'
 import { Button, Modal, Toolbar } from '@cys-stift/ui'
@@ -13,6 +13,8 @@ import { useI18n } from '@/lib/i18n'
 import { SelfCanvas, type SelfCanvasHandle } from '@/features/canvas/self-canvas'
 import { CanvasIcon, CanvasBusyIcon, type CanvasIconName } from '@/features/canvas/canvas-icons'
 import { CardDetailModal } from '@/features/canvas/card-detail-modal'
+import { WorkbenchPanel } from '@/features/canvas/workbench-panel'
+import { useWorkbench, workbenchStore } from '@/lib/workbench-store'
 import { ExportDialog } from '@/features/canvas/export-dialog'
 import { DslDialog } from '@/features/canvas/dsl-dialog'
 import { CanvasOverviewModal } from '@/features/canvas/canvas-overview-modal'
@@ -72,7 +74,8 @@ import { canvasViewStore } from '@/lib/canvas-view-store'
 export default function CanvasPage() {
   const { t } = useI18n()
   const { snap, service, ready } = useDb()
-  void snap
+  // T5:工作台 dock 状态(开/关 + 当前 cardId)。非持久(关画布/刷新即重置)。
+  const { cardId: wbCardId } = useWorkbench()
   const pathname = usePathname()
   const handle = useRef<SelfCanvasHandle>({ adapter: null })
   // adapter 就绪态抬进 state(ref 赋值不触发 re-render,否则冷启动/切画布后
@@ -951,6 +954,22 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       ? { card: liveDetailCard }
       : null
 
+  // T5:工作台 dock 的当前卡 —— 从 snap 反应式取(随编辑/别处改动更新),
+  // 找不到或已软删 → null(不渲染 panel)。与 effectiveDetail 同口径(过滤 deletedAt)。
+  const wbCard = wbCardId
+    ? snap.cards.find((c) => c.id === wbCardId) ?? null
+    : null
+  // 存卡 + 同步画布形状(镜像 CardDetailModal onSave L1209-1210;wiki/embed
+  // 同步走 modal 那条路,工作台只管存 + 形状)。
+  const wbSave = useCallback(
+    (patch: { title: string; body: string; tags: TagRef[] }) => {
+      if (!wbCardId) return
+      const updated = service.update(wbCardId as CardId, patch)
+      if (updated && handle.current.adapter) updateCardShape(handle.current.adapter, updated)
+    },
+    [wbCardId, service],
+  )
+
   return (
     <main id="main" tabIndex={-1} className={`page${focusMode ? ' page--focus' : ''}`}>
       <h1 className="sr-only">{t('canvas.crumb')}</h1>
@@ -1052,6 +1071,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         />
       )}
 
+      <div className="cv-dock">
       <div className={`cv-host cv-host--${tool}`} onContextMenu={(e) => {
         e.preventDefault()
         const adapter = handle.current.adapter
@@ -1156,6 +1176,18 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           </button>
         )}
       </div>
+      {/* T5:工作台 dock 右栏 —— 卡片详情弹窗「展开工作台」打开;收起 → workbenchStore.close。
+          flex dock:cv-host(flex:1) + 本栏(clamp 宽)。卡找不到/已删 → 不渲染。 */}
+      {wbCardId && wbCard && !wbCard.deletedAt && (
+        <aside className="cv-dock__panel" aria-label={t('canvas.workbench.expand')}>
+          <WorkbenchPanel
+            card={wbCard}
+            onSave={wbSave}
+            onClose={() => workbenchStore.close()}
+          />
+        </aside>
+      )}
+      </div>
 
       <Modal open={creatingName !== null} onClose={() => setCreatingName(null)} title={t('canvas.newModalTitle')} closeLabel={t('common.close')}>
         <p className="confirm__body">{t('canvas.newModalBody')}</p>
@@ -1201,6 +1233,11 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         <CardDetailModal
           card={effectiveDetail.card}
           onClose={() => setDetail(null)}
+          onExpand={() => {
+            // T5:展开工作台 dock 编辑同一张卡 + 关掉 modal(dock 接管编辑)。
+            workbenchStore.open(effectiveDetail.card.id)
+            setDetail(null)
+          }}
           onSave={(patch) => {
             // Bug C fix: previously only title + body were persisted, which
             // silently dropped tag edits (and would drop any other field the
@@ -1679,6 +1716,17 @@ const styles = `
 .cv-focus-exit:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 /* 根据当前工具显示不同光标 — 让用户知道正在用 select/freedraw/eraser/text/connect 哪种模式 */
 .cv-host { position: relative; flex: 1; min-height: 0; }
+/* T5:工作台 dock 容器 —— flex 行,画布主区(flex:1) + 工作台右栏。
+   工作台关时只有 cv-host,正常铺满;开时 cv-host 让出右栏宽度。 */
+.cv-dock { display: flex; flex: 1; min-height: 0; }
+.cv-dock__panel {
+  flex: 0 0 auto;
+  width: clamp(320px, 32vw, 460px);
+  min-height: 0;
+  border-left: var(--border-thick);
+  background: var(--color-white);
+  overflow: hidden;
+}
 /* 橡皮光标:SVG 圆圈(28px),让用户看清擦除范围。其他工具保持 crosshair/text/cell。 */
 .cv-host--eraser canvas {
   cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'><circle cx='14' cy='14' r='11' fill='none' stroke='black' stroke-width='2'/><circle cx='14' cy='14' r='11' fill='none' stroke='white' stroke-width='1' stroke-dasharray='2,2'/></svg>") 14 14, crosshair;

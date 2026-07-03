@@ -19,6 +19,7 @@ import { safeHref } from '@/lib/safe-href'
 import { typeKeyOf } from '@/lib/type-label'
 import { findBacklinks } from './backlinks'
 import { resolveCardByTitle } from './embed-links'
+import { WorkbenchIcon } from './workbench-icons'
 import { useDb } from '@/lib/db-client'
 import { useGlobalEdges } from '@/features/graph/use-global-edges'
 import type { MessageKey } from '@/lib/i18n/messages'
@@ -35,6 +36,7 @@ export function CardDetailModal({
   host,
   getCardTitle,
   onJumpToCard,
+  onExpand,
 }: {
   card: Card
   onClose: () => void
@@ -49,6 +51,8 @@ export function CardDetailModal({
   getCardTitle?: (id: string) => string | undefined
   /** 点 backlink 跳转到对方卡:选中 + 居中(由 page 接 host.setView + setSelectedIds)。 */
   onJumpToCard?: (cardId: string) => void
+  /** T5:展开工作台 dock 编辑同一张卡(画布页传;其它调用方不传 → 不显按钮)。 */
+  onExpand?: () => void
 }) {
   const { t } = useI18n()
   // BR-T5 — 块引用嵌入:((标题)) → 目标卡 body/title。useDb 拿 service 解析,
@@ -272,6 +276,17 @@ export function CardDetailModal({
             {mode === 'view' ? (
               <>
                 <Button onClick={() => setMode('edit')}>{t('card.detail.edit')}</Button>
+                {/* T5:展开工作台 dock(画布页 onExpand;不传 → 不显)。 */}
+                {onExpand && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => onExpand()}
+                    style={{ gap: 'var(--space-1)' }}
+                  >
+                    <WorkbenchIcon name="expand" size={16} />
+                    {t('canvas.workbench.expand')}
+                  </Button>
+                )}
                 {card.archived ? (
                   <Button variant="secondary" onClick={onUnarchive}>
                     {t('card.detail.unarchive')}

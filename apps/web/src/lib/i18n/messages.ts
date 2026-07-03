@@ -787,6 +787,8 @@ export const messages = {
   'ai.workflow.outlineEmpty': { zh: 'AI 未返回内容', en: 'AI returned empty' },
   'ai.workflow.outlineTooFew': { zh: '卡片太少,无需总结', en: 'Too few cards to summarize' },
   'canvas.rail.aiWorkflow': { zh: '工作流', en: 'Workflow' },
+  /* ── Workbench dock (T5: 画布右侧 dock 编辑同一张卡) ── */
+  'canvas.workbench.expand': { zh: '展开工作台', en: 'Open in workbench' },
   'freedraw.title': { zh: '手绘', en: 'Sketch' },
   'freedraw.looksArrow': { zh: '看起来像箭头', en: 'Looks like an arrow' },
   'freedraw.looksDecoration': { zh: '看起来像装饰', en: 'Looks like decoration' },
