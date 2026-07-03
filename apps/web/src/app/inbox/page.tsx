@@ -533,45 +533,9 @@ const styles = `
   gap: var(--space-3) var(--space-4);
 }
 
-.tile {
-  position: relative;
-  display: flex;
-  text-align: left;
-  background: var(--color-white);
-  border: var(--border-hairline);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  min-height: 160px;
-  transition: transform 80ms ease-out, box-shadow 80ms ease-out, border-color 80ms ease-out;
-  box-shadow: var(--shadow-sm);
-  font-family: var(--font-body);
-  color: var(--color-black);
-}
-.tile:hover { box-shadow: var(--shadow-md); }
-.tile--pinned { outline: 2px solid var(--color-yellow); outline-offset: -1px; }
-.tile--pinned .tile__bar { background: var(--color-yellow); }
-.tile--selected { outline: 2px solid var(--color-blue); outline-offset: -1px; }
-.tile__pin {
-  position: absolute; top: var(--space-1); right: var(--space-1); z-index: 2;
-  width: 28px; height: 28px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--color-white); border: var(--border-hairline); border-radius: var(--radius-sm);
-  font-size: var(--font-size-base); line-height: 1; color: var(--color-gray);
-  cursor: pointer; padding: 0;
-}
-.tile__pin:hover { color: var(--color-yellow); }
-.tile__pin:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-.tile__select {
-  position: absolute; top: var(--space-1); left: var(--space-1); z-index: 2;
-  width: 28px; height: 28px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--color-white); border: var(--border-hairline); border-radius: var(--radius-sm);
-  font-family: var(--font-mono); font-size: var(--font-size-base); line-height: 1;
-  color: var(--color-white); cursor: pointer; padding: 0;
-}
-.tile__select[aria-pressed="true"] { background: var(--color-blue); border-color: var(--color-blue); color: var(--color-white); }
-.tile__select:hover:not([aria-pressed="true"]) { border-color: var(--color-blue); color: var(--color-blue); }
-.tile__select:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+/* tile 共享视觉 chrome 在 shared.css §15(2026-07-03 合并:原 inbox 红条 +
+   archive 蓝条同构,~85% 重合;inbox 走默认 red bar,archive 加 .tile--bar-blue,
+   pinned 走 yellow 赢;状态优先级统一:pinned 赢;active 统一到 .tile__main)。 */
 .batch-bar {
   position: fixed; left: 50%; bottom: var(--space-4); transform: translateX(-50%);
   z-index: 30;
@@ -597,30 +561,6 @@ const styles = `
 .batch-bar__btn--danger:hover { background: var(--color-red); border-color: var(--color-red); }
 .batch-bar__spacer { width: var(--space-3); }
 .batch-bar__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-.tile__main {
-  flex: 1; display: flex; width: 100%;
-  background: transparent; border: 0; padding: 0; text-align: left;
-  cursor: pointer; color: inherit; font: inherit;
-}
-.tile__main:active { transform: translate(2px, 2px); box-shadow: none; }
-.tile__main:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-.tile__bar { width: 8px; flex-shrink: 0; background: var(--color-red); }
-.tile__body { flex: 1; min-width: 0; padding: var(--space-5) var(--space-3) var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
-.tile__title {
-  margin: 0;
-  font-family: var(--font-content);
-  font-size: var(--font-size-lg);
-  font-weight: 500;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-}
-.tile__preview { margin: 0; color: var(--color-black-soft); font-size: var(--font-size-sm); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.tile__meta { display: flex; gap: var(--space-1); align-items: center; margin-top: auto; flex-wrap: wrap; }
-.tile__time { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); margin-left: auto; }
-
-@media (max-width: 1023px) {
-  .tile__pin, .tile__select { width: 44px; height: 44px; }
-}
 `
 
 // ── Subcomponents ──────────────────────────────────────────────────────────

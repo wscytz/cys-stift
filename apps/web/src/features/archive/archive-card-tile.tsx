@@ -65,6 +65,9 @@ export function ArchiveCardTile({
   const titleText = card.title || t('card.untitled')
   const cls = [
     variant === 'tile' ? 'tile' : 'row',
+    // archive-family 走 blue bar(tile + row 两种 variant 都加;inbox 默认 red,
+    // 见 shared.css §15)。trash / search / tags / timeline 都经此组件 → 都蓝条。
+    'tile--bar-blue',
     selected ? 'tile--selected' : '',
     disabled ? 'tile--disabled' : '',
     // R2 (v0.25.1): don't show the pinned visual on disabled tiles (e.g.
@@ -141,144 +144,11 @@ export function ArchiveCardTile({
           {inner}
         </button>
       )}
-      <style>{styles}</style>
     </div>
   )
 }
 
-const styles = `
-.tile, .row {
-  position: relative;
-  display: flex;
-  text-align: left;
-  background: var(--color-white);
-  border: var(--border-hairline);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  overflow: hidden;
-  color: var(--color-black);
-  font-family: var(--font-body);
-  transition: transform 80ms ease-out, box-shadow 80ms ease-out, border-color 80ms ease-out;
-  box-shadow: var(--shadow-sm);
-}
-.tile { min-height: 160px; }
-/* R4 (v0.25.1): state via outline (not border-width) so toggling
-   pinned/selected doesn't reflow the grid. Default keeps the 1px
-   hairline; the 2px outline overlays it (outline-offset -1px). Pinned
-   is declared last so it wins the shared outline property when both
-   states apply. */
-.tile--selected { outline: 2px solid var(--color-blue); outline-offset: -1px; }
-.tile--pinned { outline: 2px solid var(--color-yellow); outline-offset: -1px; }
-.tile--pinned .tile__bar { background: var(--color-yellow); }
-.tile--disabled { cursor: default; }
-.tile--disabled:hover { box-shadow: var(--shadow-sm); }
-.tile__pin {
-  position: absolute; top: var(--space-1); right: var(--space-1); z-index: 2;
-  width: 28px; height: 28px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--color-white); border: var(--border-hairline); border-radius: var(--radius-sm);
-  font-size: var(--font-size-base); line-height: 1; color: var(--color-gray);
-  cursor: pointer; padding: 0;
-}
-.tile__pin:hover { color: var(--color-yellow); }
-.tile__pin:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-.tile:hover, .row:hover { box-shadow: var(--shadow-md); }
-.tile:active, .row:active { transform: translate(2px, 2px); box-shadow: none; }
-
-/* Select affordance — mirrors inbox's .tile__select (square, outline-only
-   when unselected; fills BLUE with ✓ when selected). Keeps visual parity
-   with the inbox grid's batch-select indicator. */
-.tile__select {
-  position: absolute; top: var(--space-1); left: var(--space-1); z-index: 2;
-  width: 28px; height: 28px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--color-white); border: var(--border-hairline); border-radius: var(--radius-sm);
-  font-family: var(--font-mono); font-size: var(--font-size-base); line-height: 1;
-  color: var(--color-white); cursor: pointer; padding: 0;
-}
-.tile__select[aria-pressed="true"] { background: var(--color-blue); border-color: var(--color-blue); color: var(--color-white); }
-.tile__select:hover:not([aria-pressed="true"]) { border-color: var(--color-blue); color: var(--color-blue); }
-.tile__select:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-
-.tile__main {
-  flex: 1;
-  display: flex;
-  background: transparent;
-  border: 0;
-  padding: 0;
-  text-align: left;
-  cursor: pointer;
-  color: inherit;
-  font: inherit;
-}
-.tile__main:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-.tile__bar {
-  width: 8px;
-  flex-shrink: 0;
-  background: var(--color-blue);
-}
-.tile__body {
-  flex: 1;
-  padding: var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-}
-/* Fix ①: tile 变体标题避让角标带(★/☑ 在 top:space-1 + 28px,底边 y=36)。
-   仅 .tile 命中(特异性 0,2,0 > base 0,1,0);.row 变体的 .tile__body 无角标,保持 24。 */
-.tile .tile__body { padding-top: var(--space-5); }
-.tile__title {
-  margin: 0;
-  font-family: var(--font-content);
-  font-size: var(--font-size-lg);
-  font-weight: 500;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-}
-.tile__preview {
-  margin: 0;
-  color: var(--color-black-soft);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.tile__meta {
-  display: flex;
-  gap: var(--space-1);
-  align-items: center;
-  margin-top: auto;
-  flex-wrap: wrap;
-}
-.tile__time {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  color: var(--color-gray);
-  margin-left: auto;
-}
-
-/* Row variant (timeline) */
-.row { min-height: 56px; }
-.row__title {
-  margin: 0;
-  font-family: var(--font-content);
-  font-size: var(--font-size-base);
-  font-weight: 500;
-  line-height: 1.4;
-  letter-spacing: -0.005em;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  /* Fix ②: 长标题换行到第 2 行(原 nowrap+ellipsis 砍成一行看不全),>2 行才省略。 */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-@media (max-width: 1023px) {
-  .tile__pin, .tile__select { width: 44px; height: 44px; }
-}
-`
+/* tile 共享视觉 chrome 在 shared.css §15(2026-07-03 合并:archive 注入每实例
+   <style> 的 ~135 行 inline CSS 已删,~85% 与 inbox 重合;archive 加
+   .tile--bar-blue modifier → blue bar,pinned → yellow 赢;active 统一到
+   .tile__main button,角标(select/pin)不再随点击抖动)。 */

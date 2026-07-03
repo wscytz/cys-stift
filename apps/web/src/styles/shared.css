@@ -200,3 +200,130 @@
 .cv-chrome-toggle:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 /* companion tab 按钮(选中态走 inline 动态值;此处只锚 :focus-visible)。 */
 .cv-companion-tab:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+
+/* ── 15. Card tile (inbox red bar / archive-family blue bar shared) ──────────
+ * inbox .tile 默认 red bar;archive-family 加 .tile--bar-blue;
+ * .tile--pinned bar→yellow 赢。结构:.tile 是 div,内含 .tile__select/
+ * .tile__pin 角标 button + .tile__main 主体 button(两者同构,只共享视觉 chrome)。
+ * 状态优先级统一:pinned 赢(声明在后)。active 统一到 .tile__main(主体 button),
+ * 不再 translate 整个 div —— 这样 select/pin 角标不会在点击时抖动。 */
+.tile, .row {
+  position: relative;
+  display: flex;
+  text-align: left;
+  background: var(--color-white);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  overflow: hidden;
+  color: var(--color-black);
+  font-family: var(--font-body);
+  transition: transform 80ms ease-out, box-shadow 80ms ease-out, border-color 80ms ease-out;
+  box-shadow: var(--shadow-sm);
+}
+.tile { min-height: 160px; }
+.tile:hover, .row:hover { box-shadow: var(--shadow-md); }
+.tile--disabled { cursor: default; }
+.tile--disabled:hover { box-shadow: var(--shadow-sm); }
+/* state via outline (no reflow). selected 先、pinned 后 → pinned 赢(统一,与 archive 注释一致)。 */
+.tile--selected { outline: 2px solid var(--color-blue); outline-offset: -1px; }
+.tile--pinned { outline: 2px solid var(--color-yellow); outline-offset: -1px; }
+.tile__pin {
+  position: absolute; top: var(--space-1); right: var(--space-1); z-index: 2;
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--color-white); border: var(--border-hairline); border-radius: var(--radius-sm);
+  font-size: var(--font-size-base); line-height: 1; color: var(--color-gray);
+  cursor: pointer; padding: 0;
+}
+.tile__pin:hover { color: var(--color-yellow); }
+.tile__pin:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.tile__select {
+  position: absolute; top: var(--space-1); left: var(--space-1); z-index: 2;
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--color-white); border: var(--border-hairline); border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: var(--font-size-base); line-height: 1;
+  color: var(--color-white); cursor: pointer; padding: 0;
+}
+.tile__select[aria-pressed="true"] { background: var(--color-blue); border-color: var(--color-blue); color: var(--color-white); }
+.tile__select:hover:not([aria-pressed="true"]) { border-color: var(--color-blue); color: var(--color-blue); }
+.tile__select:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.tile__main {
+  flex: 1;
+  display: flex;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.tile__main:active { transform: translate(2px, 2px); box-shadow: none; }
+.tile__main:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.tile__bar { width: 8px; flex-shrink: 0; background: var(--color-red); }
+.tile--bar-blue .tile__bar { background: var(--color-blue); }
+.tile--pinned .tile__bar { background: var(--color-yellow); }
+.tile__body {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+/* tile 变体标题避让角标带(★/☑ 在 top:space-1 + 28px,底边 y=36)。
+   仅 .tile 命中(特异性 0,2,0 > base 0,1,0);.row 变体的 .tile__body 无角标,保持默认 padding。 */
+.tile .tile__body { padding-top: var(--space-5); }
+.tile__title {
+  margin: 0;
+  font-family: var(--font-content);
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.tile__preview {
+  margin: 0;
+  color: var(--color-black-soft);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tile__meta {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+  margin-top: auto;
+  flex-wrap: wrap;
+}
+.tile__time {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-gray);
+  margin-left: auto;
+}
+/* Row variant (timeline) */
+.row { min-height: 56px; }
+.row__title {
+  margin: 0;
+  font-family: var(--font-content);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: -0.005em;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+@media (max-width: 1023px) {
+  .tile__pin, .tile__select { width: 44px; height: 44px; }
+}
