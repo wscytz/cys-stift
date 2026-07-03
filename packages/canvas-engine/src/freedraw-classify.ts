@@ -1,6 +1,6 @@
 
 import type { CanvasElement } from './canvas-host'
-import { bboxOf } from './self-built-freedraw'
+import { bboxOf, freedrawPointsOf } from './self-built-freedraw'
 
 /**
  * freedraw 语义识别(本地几何启发式,2026-06-23)。
@@ -60,16 +60,6 @@ function pathLength(points: [number, number][]): number {
     total += dist(points[i - 1]!, points[i]!)
   }
   return total
-}
-
-/**
- * 提取点序列(freedraw 的 meta.points)。非 freedraw / 无点 → null。
- */
-export function freedrawPoints(el: CanvasElement): [number, number][] | null {
-  if (el.kind !== 'freedraw') return null
-  const pts = (el.meta as { points?: unknown } | undefined)?.points
-  if (!Array.isArray(pts) || pts.length === 0) return null
-  return pts as [number, number][]
 }
 
 /**
@@ -146,7 +136,7 @@ export function duplicateFreedraw(
   dx: number,
   dy: number,
 ): CanvasElement | null {
-  const pts = freedrawPoints(el)
+  const pts = freedrawPointsOf(el)
   if (!pts) return null
   const moved = pts.map(([x, y]) => [x + dx, y + dy] as [number, number])
   return {
@@ -175,7 +165,7 @@ export function duplicateFreedraw(
  * 非 freedraw / 点序列 <2 → null。纯函数,不改原元素。点序列是 R2 隐私,全程本地。
  */
 export function freedrawToArrow(el: CanvasElement, newId: string): CanvasElement | null {
-  const pts = freedrawPoints(el)
+  const pts = freedrawPointsOf(el)
   if (!pts || pts.length < 2) return null
   const start = pts[0]!
   const end = pts[pts.length - 1]!

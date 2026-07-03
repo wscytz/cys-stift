@@ -2,6 +2,7 @@
 import type { CanvasElement, CanvasView } from './canvas-host'
 import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments, arrowHeadAngle, autoElbowPath, cardObstacles } from './self-built-arrow'
 import { normalizeBox } from './bounds'
+import { freedrawPointsOf } from './self-built-freedraw'
 /**
  * 纯渲染函数:把元素画到 ctx 上,带相机(pan/zoom)变换。
  * - 先 clearRect 整个画布(背景色)。
@@ -175,7 +176,7 @@ function drawElement(
       break
     }
     case 'freedraw': {
-      const pts = (el.meta?.points as [number, number][] | undefined) ?? []
+      const pts = freedrawPointsOf(el) ?? []
       if (pts.length === 0) break
       if (pts.length === 1) {
         // 单点 freedraw:只 moveTo 无 lineTo → stroke() 画不出东西 = 不可见幽灵。

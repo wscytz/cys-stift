@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   classifyFreedraw,
   duplicateFreedraw,
-  freedrawPoints,
   freedrawToArrow,
   detectArrowRoute,
 } from '../freedraw-classify'
@@ -93,20 +92,6 @@ describe('classifyFreedraw', () => {
     const small = classifyFreedraw(circle(0, 0, 10))
     const big = classifyFreedraw(circle(0, 0, 100))
     expect(small.kind).toBe(big.kind)
-  })
-})
-
-// ── freedrawPoints ──────────────────────────────────────────────────────────
-
-describe('freedrawPoints', () => {
-  it('取出 freedraw 的点序列', () => {
-    expect(freedrawPoints(freedrawEl([[1, 2], [3, 4]]))).toEqual([[1, 2], [3, 4]])
-  })
-  it('非 freedraw → null', () => {
-    expect(freedrawPoints({ id: 'c', kind: 'card', x: 0, y: 0, w: 1, h: 1, rotation: 0 })).toBeNull()
-  })
-  it('freedraw 无点 → null', () => {
-    expect(freedrawPoints({ id: 'f', kind: 'freedraw', x: 0, y: 0, w: 0, h: 0, rotation: 0, meta: {} })).toBeNull()
   })
 })
 

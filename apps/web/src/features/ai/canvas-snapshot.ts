@@ -20,7 +20,7 @@
  */
 import type { CanvasId, CardId, CardService } from '@cys-stift/domain'
 import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
-import { classifyFreedraw, recognizeShape, freedrawPoints } from '@cys-stift/canvas-engine'
+import { classifyFreedraw, recognizeShape, freedrawPointsOf } from '@cys-stift/canvas-engine'
 import { serializeElement } from './canvas-dsl'
 
 // ── Shape interfaces ─────────────────────────────────────────────────────────
@@ -138,7 +138,7 @@ export function snapshotCanvas(
         // canvas-engine; any failure degrades to position-only (no throw).
         const fs: Extract<FreeShape, { kind: 'freedraw' }> = { kind: 'freedraw', id: el.id, x, y }
         try {
-          const pts = freedrawPoints(el)
+          const pts = freedrawPointsOf(el)
           if (pts && pts.length > 0) {
             const classify = classifyFreedraw(pts)
             if (classify.kind === 'arrow') {

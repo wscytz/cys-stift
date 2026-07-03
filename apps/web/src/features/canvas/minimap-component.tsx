@@ -14,7 +14,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
-import { readToken, colorOf, arrowEndpoints } from '@cys-stift/canvas-engine'
+import { readToken, colorOf, arrowEndpoints, freedrawPointsOf } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
 import {
   computeMinimapProjection,
@@ -491,7 +491,7 @@ export function drawElementMark(
   // freedraw:真实点序列(绝对页坐标)→ 折线(与 elements-to-svg.ts:111 同源访问)。
   // 纯本地渲染(画用户自己的点在自己的小地图),不进任何 AI/snapshot 路径。
   if (el.kind === 'freedraw') {
-    const pts = (el.meta?.points as [number, number][] | undefined) ?? []
+    const pts = freedrawPointsOf(el) ?? []
     if (pts.length >= 2) {
       ctx.save()
       ctx.strokeStyle = colorOf(el.color)

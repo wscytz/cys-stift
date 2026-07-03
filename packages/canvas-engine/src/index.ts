@@ -66,7 +66,6 @@ export { commitFreedraw, bboxOf, translateFreedraw, scaleFreedrawToBox, freedraw
 export {
   classifyFreedraw,
   duplicateFreedraw,
-  freedrawPoints,
   freedrawToArrow,
   detectArrowRoute,
 } from './freedraw-classify'

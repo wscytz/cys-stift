@@ -19,7 +19,7 @@ import { useClampedPanelPosition, FLOATING_PANEL_OFFSET } from './panel-position
 import {
   classifyFreedraw,
   duplicateFreedraw,
-  freedrawPoints,
+  freedrawPointsOf,
   freedrawToArrow,
   detectArrowRoute,
   recognizeShape,
@@ -76,7 +76,7 @@ export function FreedrawPanel({
   if (sel.length !== 1) return null
   if (!freedrawEl) return null
 
-  const points = freedrawPoints(freedrawEl)
+  const points = freedrawPointsOf(freedrawEl)
   if (!points) return null
   const { kind, confidence } = classifyFreedraw(points)
 
