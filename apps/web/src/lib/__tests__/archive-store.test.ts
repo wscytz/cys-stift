@@ -1,0 +1,67 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import type { ArchivePayload } from '../archive-store'
+
+// OPFS + localStorage mock(镜像 freeform-store 测试范式)
+//
+// 注:brief 原始测试代码每个 it 共用顶层 `import { archiveStore }`,
+// 但 beforeEach 只 localStorage.clear() 不 vi.resetModules() →
+// archive-store 的模块级 _indexCache / _version / _subs 跨 it 泄漏,
+// 导致「listMeta 倒序」看到 [4,3,2,1] 而非 [2,1] 等失败。
+// 镜像 canvas-freeform-store.test.ts 的范式:每 it 重新 dynamic import,
+// 保证 fresh module state。同时 Test 1 直接 mock Date.now 保证严格递增
+// (millisecond 粒度下连续两次 Date.now 可能同值,导致 toBeGreaterThan flake)。
+function makePayload(tag: string): ArchivePayload {
+  return { cards: [], mediaAssets: {}, /* 其余 optional 略 */ } as unknown as ArchivePayload
+}
+
+beforeEach(() => {
+  vi.resetModules()
+  localStorage.clear()
+  vi.restoreAllMocks()
+})
+
+describe('archive-store CRUD', () => {
+  it('append 单调递增 archiveVersion + 返回 meta', async () => {
+    const { archiveStore } = await import('../archive-store')
+    let now = 1_000_000
+    vi.spyOn(Date, 'now').mockImplementation(() => (now += 100))
+    const m1 = await archiveStore.append('manual', 'a', makePayload('1'), '0.0.0')
+    const m2 = await archiveStore.append('manual', 'b', makePayload('2'), '0.0.0')
+    expect(m1.archiveVersion).toBe(1)
+    expect(m2.archiveVersion).toBe(2)
+    expect(m2.createdAt).toBeGreaterThan(m1.createdAt)
+  })
+
+  it('listMeta 倒序(新版在前)', async () => {
+    const { archiveStore } = await import('../archive-store')
+    await archiveStore.append('manual', 'a', makePayload('1'), '0.0.0')
+    await archiveStore.append('manual', 'b', makePayload('2'), '0.0.0')
+    const list = archiveStore.listMeta()
+    expect(list.map((m) => m.archiveVersion)).toEqual([2, 1])
+  })
+
+  it('loadPayload 命中 / 未知 version 返回 null', async () => {
+    const { archiveStore } = await import('../archive-store')
+    await archiveStore.append('manual', 'a', makePayload('1'), '0.0.0')
+    const p = await archiveStore.loadPayload(1)
+    expect(p?.cards).toEqual([])
+    expect(await archiveStore.loadPayload(999)).toBeNull()
+  })
+
+  it('subscribe 在 append 后通知 + getVersion 递增', async () => {
+    const { archiveStore } = await import('../archive-store')
+    let notified = 0
+    const unsub = archiveStore.subscribe(() => { notified++ })
+    const v0 = archiveStore.getVersion()
+    await archiveStore.append('manual', 'a', makePayload('1'), '0.0.0')
+    expect(notified).toBe(1)
+    expect(archiveStore.getVersion()).toBeGreaterThan(v0)
+    unsub()
+  })
+
+  it('SSR 安全:window 未定义时 append/​listMeta/​loadPayload 不炸', async () => {
+    // (由 typeof window 守卫覆盖;jsdom 测试环境窗口存在,此条作为契约记录)
+    const { archiveStore } = await import('../archive-store')
+    expect(typeof archiveStore.listMeta()).toBe('object')
+  })
+})
