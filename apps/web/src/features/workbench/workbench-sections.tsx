@@ -32,9 +32,11 @@ export function WorkbenchSections({
     return m
   }, [snapshot.canvases])
 
+  const { pinned, rest } = useMemo(() => extractPinned(cards), [cards])
+
   const sections = useMemo(
     () =>
-      groupForMode(mode, cards, {
+      groupForMode(mode, rest, {
         canvasNames,
         inboxLabel: t('workbench.inbox'),
         unknownCanvasLabel: t('workbench.unknownCanvas'),
@@ -42,18 +44,38 @@ export function WorkbenchSections({
         selectedTags: [], // 子任务 4:tag 模式接入多选 chip
         tagColors: new Map(),
       }),
-    [mode, cards, canvasNames, t],
+    [mode, rest, canvasNames, t],
   )
 
   // 手风琴:展开的 section key(null = 全折叠)。默认展开第一个分区。
   const [expanded, setExpanded] = useState<string | null>(sections[0]?.key ?? null)
 
-  if (sections.length === 0) {
+  if (rest.length === 0 && pinned.length === 0) {
     return <div className="wb__no-match">{t('workbench.noSections')}</div>
   }
 
   return (
     <div className="wb__sections">
+      {pinned.length > 0 && (
+        <section className="wb__sec wb__sec--pinned">
+          <div className="wb__pinnedhd">
+            <span className="wb__pinicon" aria-hidden="true">★</span>
+            <span className="wb__seclbl">{t('workbench.pinned')}</span>
+            <span className="wb__seccnt">{pinned.length}</span>
+          </div>
+          <ul className="wb__rows wb__rows--pinned">
+            {pinned.map((c) => (
+              <li key={c.id} className="wb__row">
+                <span className="wb__rb" style={{ background: 'var(--color-yellow)' }} aria-hidden="true" />
+                <div className="wb__rowtext">
+                  <div className="wb__rowtitle">{c.title || c.body.slice(0, 40) || c.id}</div>
+                  <div className="wb__rowpreview">{c.body.slice(0, 60)}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {sections.map((s) => (
         <WorkbenchSectionRow
           key={s.key}
@@ -130,6 +152,14 @@ const styles = `
 .wb__sections { display: flex; flex-direction: column; }
 .wb__sec { border-top: 1.5px solid var(--color-black); }
 .wb__sec:first-child { border-top: 0; }
+/* 已固定置顶区(跨模式常驻最顶,黄底) */
+.wb__sec--pinned { background: var(--color-yellow-soft); }
+.wb__pinnedhd {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+}
+.wb__pinicon { color: var(--color-yellow); font-size: var(--font-size-sm); }
+.wb__rows--pinned { padding-bottom: var(--space-1); }
 .wb__sec--inbox .wb__sechd,
 .wb__sec--inbox .wb__rows { border-left: 0; }
 .wb__sec--inbox .wb__deck { border-style: dashed; border-width: 1.5px; border-color: var(--color-gray); margin-left: var(--space-2); margin-right: var(--space-2); }

@@ -19,8 +19,8 @@ vi.mock('@/lib/i18n', () => ({
   }),
 }))
 
-function mk(id: string, opts: { canvasId?: string; title?: string } = {}): Card {
-  const { canvasId, title = id } = opts
+function mk(id: string, opts: { canvasId?: string; title?: string; pinned?: boolean } = {}): Card {
+  const { canvasId, title = id, pinned = false } = opts
   return {
     id,
     title,
@@ -30,7 +30,7 @@ function mk(id: string, opts: { canvasId?: string; title?: string } = {}): Card 
     createdAt: new Date(),
     updatedAt: new Date(),
     tags: [],
-    pinned: false,
+    pinned,
     archived: false,
     canvasPosition: canvasId
       ? { canvasId: canvasId as CanvasId, x: 0, y: 0, w: 100, h: 100, z: 0 }
@@ -132,5 +132,42 @@ describe('WorkbenchSections — canvas 模式 + 手风琴', () => {
     act(() => (headers[1]! as HTMLButtonElement).click())
     expect(headers[0]!.getAttribute('aria-expanded')).toBe('false')
     expect(headers[1]!.getAttribute('aria-expanded')).toBe('true')
+  })
+})
+
+describe('WorkbenchSections — 已固定置顶区(子任务3)', () => {
+  it('pinned 卡提到置顶区,不进收件箱分组', () => {
+    const cards = [mk('1', { pinned: true }), mk('2', { pinned: false })]
+    const { host } = render(<WorkbenchSections cards={cards} mode="canvas" />)
+    // 置顶区在,且在收件箱分区之前
+    const pinnedSec = host.querySelector('.wb__sec--pinned')
+    expect(pinnedSec).toBeTruthy()
+    expect(pinnedSec!.querySelector('.wb__rowtitle')!.textContent).toContain('1')
+    // 置顶区是第一个 section
+    const allSecs = host.querySelectorAll(':scope > .wb__sections > .wb__sec, .wb__sec')
+    expect(allSecs[0]).toBe(pinnedSec)
+    // 收件箱分区只含卡 2
+    const inboxSec = host.querySelector('.wb__sec--inbox')
+    expect(inboxSec!.querySelector('.wb__rowtitle')!.textContent).toContain('2')
+  })
+
+  it('无 pinned 卡 → 不渲染置顶区', () => {
+    const { host } = render(<WorkbenchSections cards={[mk('1')]} mode="canvas" />)
+    expect(host.querySelector('.wb__sec--pinned')).toBeNull()
+  })
+
+  it('置顶区常驻展开(不进手风琴,无 aria-expanded)', () => {
+    const { host } = render(<WorkbenchSections cards={[mk('1', { pinned: true })]} mode="canvas" />)
+    const pinnedSec = host.querySelector('.wb__sec--pinned')!
+    // 置顶区表头是 div 不是 button(不可折叠)
+    expect(pinnedSec.querySelector('button.wb__sechd')).toBeNull()
+    expect(pinnedSec.querySelector('.wb__rows--pinned')).toBeTruthy()
+  })
+
+  it('置顶区计数 = pinned 卡数', () => {
+    const cards = [mk('1', { pinned: true }), mk('2', { pinned: true }), mk('3', { pinned: false })]
+    const { host } = render(<WorkbenchSections cards={cards} mode="canvas" />)
+    const cnt = host.querySelector('.wb__sec--pinned .wb__seccnt')!
+    expect(cnt.textContent).toBe('2')
   })
 })
