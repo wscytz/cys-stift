@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseDsl, parseDslWithDiagnostics, type DslOp } from '../dsl-parser'
+import { DSL_MAX_TEXT_LEN } from '../dsl-grammar'
 
 describe('parseDsl', () => {
   it('parses a card positioning directive', () => {
@@ -478,5 +479,50 @@ describe('COLOR_RE Bauhaus 6 色', () => {
         expect(ops[0].color).toBeUndefined()
       }
     }
+  })
+})
+
+// ── @text/@label 长度上限(STATE 缺口⑩,防 AI 超长 DoS)──────────────────────
+describe('@text/@label 长度上限 (DSL_MAX_TEXT_LEN)', () => {
+  it('超长 @text 静默截断到上限(不报错)', () => {
+    const long = 'x'.repeat(500)
+    const ops = parseDsl(`[text #t1] @pos(0,0) @text("${long}")`)
+    expect(ops).toHaveLength(1)
+    const op = ops[0]!
+    if (op.type !== 'free' || op.shape !== 'text') throw new Error('expected free:text')
+    expect(op.text).toHaveLength(DSL_MAX_TEXT_LEN)
+    expect(op.text).toBe('x'.repeat(DSL_MAX_TEXT_LEN))
+  })
+
+  it('超长 @label 静默截断到上限', () => {
+    const long = 'y'.repeat(500)
+    const ops = parseDsl(`[arrow #a1] from #a to #b @label("${long}")`)
+    expect(ops).toHaveLength(1)
+    const op = ops[0]!
+    if (op.type !== 'arrow') throw new Error('expected arrow op')
+    expect(op.label).toHaveLength(DSL_MAX_TEXT_LEN)
+  })
+
+  it('超长 @text 不产生 diagnostic(parser robust:静默截断,不记 error)', () => {
+    const long = 'x'.repeat(500)
+    const { ops, errors } = parseDslWithDiagnostics(`[text #t1] @pos(0,0) @text("${long}")`)
+    expect(errors).toEqual([])
+    expect(ops).toHaveLength(1)
+  })
+
+  it('恰好等于上限不截断(边界)', () => {
+    const exact = 'x'.repeat(DSL_MAX_TEXT_LEN)
+    const ops = parseDsl(`[text #t1] @pos(0,0) @text("${exact}")`)
+    const op = ops[0]!
+    if (op.type !== 'free' || op.shape !== 'text') throw new Error('expected free:text')
+    expect(op.text).toHaveLength(DSL_MAX_TEXT_LEN)
+    expect(op.text).toBe(exact)
+  })
+
+  it('短文本不受影响', () => {
+    const ops = parseDsl('[text #t1] @pos(0,0) @text("hello")')
+    const op = ops[0]!
+    if (op.type !== 'free' || op.shape !== 'text') throw new Error('expected free:text')
+    expect(op.text).toBe('hello')
   })
 })
