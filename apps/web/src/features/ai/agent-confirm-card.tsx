@@ -30,6 +30,9 @@ import { useI18n } from '@/lib/i18n'
 import { pushToast } from '@/lib/toast-store'
 import { addSample, genSampleId } from './sample-store'
 import { settingsStore } from '@/lib/settings-store'
+import { archiveStore } from '@/lib/archive-store'
+import { buildArchivePayload } from '@/lib/build-archive-payload'
+import { VERSION } from '@/lib/version'
 
 interface Props {
   dsl: string
@@ -153,6 +156,13 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
         res = { applied: p.applied, cardsUpdated: p.cardsUpdated, cardsCreated: p.cardsCreated }
       }
       setPhase('applied')
+      // T5:风险 op 存档 —— agent apply 成功(res.applied > 0)后落档(b 类,
+      // fire-and-forget,不阻塞 UI;append 失败 console.warn 不影响用户流程)。
+      if (res.applied > 0) {
+        void buildArchivePayload()
+          .then((p) => archiveStore.append('ai-agent', `agent: ${dsl.split('\n').filter(Boolean).length} 行`, p, VERSION))
+          .catch((err) => console.warn('[archive] ai-agent append failed', err))
+      }
       // 捕获样本:apply/apply_edited。开关关时 addSample 内部 no-op。
       if (sampleContext) {
         const edited = editing && editedDsl && editedDsl !== dsl

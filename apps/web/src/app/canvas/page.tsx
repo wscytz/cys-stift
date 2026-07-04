@@ -55,6 +55,9 @@ import { useAIAction } from '@/features/ai/use-ai-action'
 import { addSample, genSampleId } from '@/features/ai/sample-store'
 import { settingsStore } from '@/lib/settings-store'
 import { pushToast } from '@/lib/toast-store'
+import { archiveStore } from '@/lib/archive-store'
+import { buildArchivePayload } from '@/lib/build-archive-payload'
+import { VERSION } from '@/lib/version'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import {
   addCardShape,
@@ -428,6 +431,13 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       }
       const before = snapshotPositions()
       const { applied } = applyLayout(adapter, ops)
+      // T5:风险 op 存档 —— apply 成功(applied > 0)后落档(b 类,fire-and-forget,
+      // 不阻塞 UI;append 失败 console.warn 不影响用户流程)。
+      if (applied > 0) {
+        void buildArchivePayload()
+          .then((p) => archiveStore.append('ai-layout', `AI 重排 ${applied} 张`, p, VERSION))
+          .catch((err) => console.warn('[archive] ai-layout append failed', err))
+      }
       // 捕获样本:canvas 排版 apply(无 confirm card,独立记)。开关关时 addSample 内部 no-op。
       addSample(
         { id: genSampleId(), ts: Date.now(), kind: 'dsl', source: 'canvasLayout', context: formatted, aiOutput: r.text, outcome: 'applied', targetCanvasId: activeCanvasId },
@@ -499,6 +509,13 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         return
       }
       const res = applyClusters(adapter, clusters, service, activeCanvasId)
+      // T5:风险 op 存档 —— cluster apply 成功(新建至少一条关系箭头)后落档。
+      // fire-and-forget;失败 console.warn 不影响用户流程。
+      if (res.arrowsCreated > 0) {
+        void buildArchivePayload()
+          .then((p) => archiveStore.append('cluster', `cluster: ${clusters.length} 组`, p, VERSION))
+          .catch((err) => console.warn('[archive] cluster append failed', err))
+      }
       pushToast({
         kind: res.arrowsCreated > 0 ? 'success' : 'info',
         message:

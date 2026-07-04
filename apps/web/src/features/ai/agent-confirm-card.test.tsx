@@ -62,6 +62,25 @@ vi.mock('@/features/canvas/canvas-host-builder', () => ({
     applyOpsAndPersistSpy(...args),
 }))
 
+// ── T5 mock archive-store + build-archive-payload: spy append,断言风险 op 触发 ──
+const archiveAppendSpy = vi.fn().mockResolvedValue({ archiveVersion: 1 })
+vi.mock('@/lib/archive-store', () => ({
+  archiveStore: {
+    append: (...args: unknown[]) => archiveAppendSpy(...args),
+    subscribe: () => () => {},
+    getVersion: () => 0,
+    listMeta: () => [],
+    loadPayload: () => Promise.resolve(null),
+    ensureReleaseRecord: () => Promise.resolve(),
+  },
+}))
+vi.mock('@/lib/build-archive-payload', () => ({
+  buildArchivePayload: vi.fn().mockResolvedValue({ cards: [], mediaAssets: {} }),
+}))
+
+// 真版本号(VERSION from @/lib/version,import 后断言 append 第 4 参数用)。
+import { VERSION } from '@/lib/version'
+
 import {
   AgentConfirmCard,
   makeOnCardCreate,
@@ -298,6 +317,116 @@ describe('AgentConfirmCard — /ask temp 模式(无 liveHost,不回归)', () => 
     expect(onApplied.mock.calls[0]![0]).toMatchObject({
       applied: 1, cardsUpdated: 0, cardsCreated: 0,
     })
+
+    unmount()
+  })
+})
+
+// ───────────────────────────────────────────────────────────────────
+// T5:风险 op 存档触发(ai-agent)。断言:
+//   - live 模式 apply 成功(applyLayout applied>0)→ archiveStore.append 被调,
+//     trigger='ai-agent', note 形如 'agent: N 行', appVersion=VERSION。
+//   - 失败路径(applyOpsAndPersist 抛错)→ archiveStore.append 不调。
+// 注:live 模式 applied=0 在 agent-confirm-card 极难触发(preview 0 ops 时按钮
+// disabled)。「applied=0 不打档」语义在 dsl-dialog 测试覆盖。
+describe('AgentConfirmCard — T5 archive trigger (ai-agent)', () => {
+  it('live 模式 apply 成功 → append 被调,trigger=ai-agent + 真版本号', async () => {
+    archiveAppendSpy.mockClear()
+    const { host: mockHost } = makeMockHost({ elements: emptyEls() })
+    const { service } = makeMockService()
+    applyOpsAndPersistSpy.mockResolvedValue({
+      applied: 0, skipped: 0, cardsCreated: 0, cardsUpdated: 0, freeformChanged: 0,
+    })
+
+    // rect DSL → applyLayout applied=1(live host upsert 成功计 1)。
+    const dsl = '[rect #r1] @pos(100,200) @size(300,400)'
+    const { host: domHost, unmount } = mount(
+      <AgentConfirmCard
+        dsl={dsl}
+        targetCanvasId={'canvas-live' as never}
+        service={service}
+        liveHost={mockHost}
+        onApplied={() => {}}
+        onRejected={() => {}}
+      />,
+    )
+    await act(async () => { await flushMicro() })
+
+    const applyBtn = byText(domHost, /^应用$|^Apply$/)!
+    expect(applyBtn.disabled).toBe(false)
+    await act(async () => { applyBtn.click() })
+    // buildArchivePayload().then(...) 是 microtask;flush 后 append 被调。
+    await act(async () => { await flushMicro() })
+
+    expect(archiveAppendSpy).toHaveBeenCalledTimes(1)
+    const [trigger, note, , appVersion] = archiveAppendSpy.mock.calls[0]!
+    expect(trigger).toBe('ai-agent')
+    expect(note).toMatch(/^agent: \d+ 行$/)
+    expect(appVersion).toBe(VERSION)
+
+    unmount()
+  })
+
+  it('temp 模式(/ask)apply 成功(applied>0)→ append 也被调', async () => {
+    archiveAppendSpy.mockClear()
+    const { service } = makeMockService()
+    buildCanvasHostForCanvasSpy.mockResolvedValue({
+      host: { getElements: () => [] },
+      before: [],
+    })
+    applyOpsAndPersistSpy.mockResolvedValue({
+      applied: 2, skipped: 0, cardsCreated: 0, cardsUpdated: 1, freeformChanged: 1,
+    })
+
+    const dsl = '[rect #a] @pos(0,0) @size(10,10)\n[rect #b] @pos(20,20) @size(10,10)'
+    const { host: domHost, unmount } = mount(
+      <AgentConfirmCard
+        dsl={dsl}
+        targetCanvasId={'canvas-ask' as never}
+        service={service}
+        onApplied={() => {}}
+        onRejected={() => {}}
+      />,
+    )
+    await act(async () => { await flushMicro() })
+    const applyBtn = byText(domHost, /^应用$|^Apply$/)!
+    await act(async () => { applyBtn.click() })
+    await act(async () => { await flushMicro() })
+
+    expect(archiveAppendSpy).toHaveBeenCalledTimes(1)
+    expect(archiveAppendSpy.mock.calls[0]![0]).toBe('ai-agent')
+    // 2 行 DSL → note 'agent: 2 行'
+    expect(archiveAppendSpy.mock.calls[0]![1]).toBe('agent: 2 行')
+
+    unmount()
+  })
+
+  it('temp 模式 apply 失败(applyOpsAndPersist reject)→ append 不调', async () => {
+    archiveAppendSpy.mockClear()
+    const { service } = makeMockService()
+    buildCanvasHostForCanvasSpy.mockResolvedValue({
+      host: { getElements: () => [] },
+      before: [],
+    })
+    applyOpsAndPersistSpy.mockRejectedValue(new Error('persist boom'))
+
+    const dsl = '[rect #r1] @pos(10,10) @size(50,50)'
+    const { host: domHost, unmount } = mount(
+      <AgentConfirmCard
+        dsl={dsl}
+        targetCanvasId={'canvas-ask' as never}
+        service={service}
+        onApplied={() => {}}
+        onRejected={() => {}}
+      />,
+    )
+    await act(async () => { await flushMicro() })
+    const applyBtn = byText(domHost, /^应用$|^Apply$/)!
+    await act(async () => { applyBtn.click() })
+    await act(async () => { await flushMicro() })
+
+    // 失败路径:phase 转 'error',archive 不调。
+    expect(archiveAppendSpy).not.toHaveBeenCalled()
 
     unmount()
   })

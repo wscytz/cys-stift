@@ -23,6 +23,9 @@ import { parseDslWithDiagnostics, type DslDiagnostic } from '../ai/dsl-parser'
 import { buildCanvasPrompt } from '../ai/canvas-prompt'
 import { DSL_GRAMMAR_REFERENCE } from '../ai/dsl-grammar'
 import { applyLayout } from './apply-layout'
+import { archiveStore } from '@/lib/archive-store'
+import { buildArchivePayload } from '@/lib/build-archive-payload'
+import { VERSION } from '@/lib/version'
 
 export function DslDialog({
   open,
@@ -101,6 +104,11 @@ export function DslDialog({
     // 合并新应用的 hash 到现有集合触发状态更新
     if (applied > 0) {
       setAppliedHashes(new Set(appliedHashes))
+      // T5:风险 op 存档 —— DSL apply 成功(applied > 0)后落档(b 类,fire-and-forget,
+      // 不阻塞 UI;apply 是同步函数,用 .then() 链接 append)。
+      void buildArchivePayload()
+        .then((p) => archiveStore.append('dsl-apply', `DSL apply ${applied}${skipped ? ` (skipped ${skipped})` : ''}`, p, VERSION))
+        .catch((err) => console.warn('[archive] dsl-apply append failed', err))
     }
     // 重序列化:apply 后画布变了,文本同步,防重复 Apply 造副本(create 类 op 幂等失效)。
     // host 是同引用 + host.batch 原地变更,上面填充 text 的 useEffect([open,host,service])
