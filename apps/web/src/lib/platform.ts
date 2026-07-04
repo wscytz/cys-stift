@@ -31,11 +31,6 @@ export function isMac(): boolean {
   return _cached
 }
 
-/** 修饰键符号:macOS = ⌘,其他 = Ctrl。显示用。 */
-export function modSymbol(): string {
-  return isMac() ? '⌘' : 'Ctrl'
-}
-
 /**
  * 是否移动端 WebView(安卓/iOS)。用于隐藏桌面专属 UI(系统全局快捷键配置、
  * ⌘/^ 提示等 —— 安卓无系统全局热键概念)。userAgent 检测(显示/gating 用,

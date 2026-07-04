@@ -24,7 +24,7 @@ import { Button, Input } from '@cys-stift/ui'
 import { draftStore, useDraft, isDraftPersistOk } from '@/lib/draft-store'
 import { useDebouncedCallback } from '@/lib/use-debounced-callback'
 import { useI18n } from '@/lib/i18n'
-import { isMac } from '@/lib/platform'
+import { useIsMac } from '@/lib/use-platform'
 
 interface CaptureDraftPayload {
   title: string
@@ -42,6 +42,9 @@ export interface MiniInputProps {
 
 export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
   const { t } = useI18n()
+  // 修饰键符号渲染走 hook(非 render 时直读 isMac):SSG 构建期 isMac=false,
+  // mac 客户端首帧=true,直读会 hydration mismatch。pre-mount=false 与 SSG 一致。
+  const isMacVal = useIsMac()
   const { draft, ready } = useDraft<CaptureDraftPayload>('capture')
   const restored = ready && draft ? draft.payload : null
   const [title, setTitle] = useState('')
@@ -204,7 +207,7 @@ if (
         </div>
         <div className="mi-actions">
           <strong className="mi-hint mi-hint--primary" data-testid="mini-submit-hint">
-            {isMac() ? '⌘↩' : 'Ctrl+Enter'} {t('card.detail.save')} · esc {t('card.detail.cancel')}
+            {isMacVal ? '⌘↩' : 'Ctrl+Enter'} {t('card.detail.save')} · esc {t('card.detail.cancel')}
           </strong>
           {persistFailed && (
             <span className="mi-warn" role="alert">{t('draft.persistFailed')}</span>

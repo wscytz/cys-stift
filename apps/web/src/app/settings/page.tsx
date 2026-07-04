@@ -6,7 +6,7 @@ import { Toolbar, Modal, Button } from '@cys-stift/ui'
 import { settingsStore, useSettings } from '@/lib/settings-store'
 import { rehydrateCards } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
-import { isDesktop } from '@/lib/platform'
+import { useIsDesktop } from '@/lib/use-platform'
 import { pushToast } from '@/lib/toast-store'
 import { StorageMeter } from '@/components/storage-meter'
 import { AISettingsPanel } from '@/features/settings/ai-settings-panel'
@@ -29,6 +29,10 @@ import {
 export default function SettingsPage() {
   const { t, locale, setLocale } = useI18n()
   const { settings, ready } = useSettings()
+  // isDesktop 走 hook(非 render 直读):SSG 期 isDesktop=true、安卓客户端首帧
+  // =false,直读会 hydration mismatch(capture 快捷键配置段闪现又消失)。pre-mount
+  // =true 与 SSG 一致;移动端整段隐藏(无系统全局热键概念)。
+  const isDesktopVal = useIsDesktop()
   const sc = settings.captureShortcut
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
@@ -131,7 +135,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {isDesktop() && (
+        {isDesktopVal && (
         <section className="section">
           <h2 className="section__h">{t('settings.captureShortcut')}</h2>
           <p className="section__lede">{t('settings.captureShortcutLede')}</p>

@@ -12,6 +12,7 @@ import { useCanvases } from '@/lib/canvas-store'
 import { captureSinkRegistry } from '@/features/capture/capture-sink'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
+import { useIsMobile } from '@/lib/use-platform'
 import { PageLoading } from '@/components/page-loading'
 import { typeKeyOf } from '@/lib/type-label'
 import { getDeviceId } from '@/lib/device-id'
@@ -638,6 +639,8 @@ function CardTile({
 
 function EmptyState({ view }: { view: View }) {
   const { t } = useI18n()
+  // 移动端无系统全局热键;inbox.empty.hint 文案写死 ⌘⇧Space,触屏设备上误导 → 隐藏。
+  const isMobile = useIsMobile()
   return (
     <UICard>
       <div className="page-empty">
@@ -649,7 +652,7 @@ function EmptyState({ view }: { view: View }) {
         <p className="empty__lede">
           {view === 'inbox' ? t('inbox.empty.lede') : t('inbox.empty.ledeArchived')}
         </p>
-        {view === 'inbox' && (
+        {view === 'inbox' && !isMobile && (
           <p className="empty__lede">{t('inbox.empty.hint')}</p>
         )}
       </div>

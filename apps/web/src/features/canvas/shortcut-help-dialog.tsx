@@ -8,7 +8,7 @@
 import { useEffect } from 'react'
 import { Modal } from '@cys-stift/ui'
 import { useI18n } from '@/lib/i18n'
-import { modSymbol, isMac } from '@/lib/platform'
+import { useIsMac } from '@/lib/use-platform'
 
 export function ShortcutHelpDialog({
   open,
@@ -18,6 +18,10 @@ export function ShortcutHelpDialog({
   onClose: () => void
 }) {
   const { t } = useI18n()
+  // 修饰键符号走 hook(非 render 直读 isMac):SSG 期 isMac=false、mac 客户端首帧
+  // =true,直读会 hydration mismatch。pre-mount=false 与 SSG 一致。
+  const isMacVal = useIsMac()
+  const mod = isMacVal ? '⌘' : 'Ctrl'
 
   useEffect(() => {
     if (!open) return
@@ -32,7 +36,6 @@ export function ShortcutHelpDialog({
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  const mod = modSymbol()
   const groups: { title: string; rows: [string, string][] }[] = [
     {
       title: t('canvas.shortcutsTools'),
@@ -59,7 +62,7 @@ export function ShortcutHelpDialog({
         ['Esc', t('canvas.scEscape')],
         ['Delete / ⌫', t('canvas.scDelete')],
         [`${mod}+Z`, t('canvas.scUndo')],
-        [`${mod}+Shift+Z${isMac() ? '' : ' / Ctrl+Y'}`, t('canvas.scRedo')],
+        [`${mod}+Shift+Z${isMacVal ? '' : ' / Ctrl+Y'}`, t('canvas.scRedo')],
         [`${mod}+A`, t('canvas.scSelectAll')],
       ],
     },
@@ -72,7 +75,7 @@ export function ShortcutHelpDialog({
     },
     {
       title: t('canvas.shortcutsGlobal'),
-      rows: [[isMac() ? '⌘⇧Space' : 'Ctrl+Shift+Space', t('capture.shortcutHelp')]],
+      rows: [[isMacVal ? '⌘⇧Space' : 'Ctrl+Shift+Space', t('capture.shortcutHelp')]],
     },
   ]
 

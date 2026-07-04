@@ -7,11 +7,16 @@
  */
 import { useSettings, settingsStore } from '@/lib/settings-store'
 import { useI18n } from '@/lib/i18n'
+import { useIsMobile } from '@/lib/use-platform'
 
 export function CaptureHint() {
   const { settings, ready } = useSettings()
   const { t } = useI18n()
+  const isMobile = useIsMobile()
   if (!ready || settings.seenCaptureHint) return null
+  // 移动端无系统全局热键(安卓/iOS 无 Cmd+Shift+Space 概念;桌面壳的 global-shortcut
+  // 仅 cfg(desktop) 注册)。文案 capture.hint 写死 ⌘⇧Space,在触屏设备上误导 → 移动端整条隐藏。
+  if (isMobile) return null
   return (
     <div className="capture-hint" data-testid="capture-hint" role="status">
       <span className="capture-hint__text">{t('capture.hint')}</span>
