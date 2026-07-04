@@ -10,6 +10,7 @@ import { I18nProvider } from '@/lib/i18n'
 import { SearchShortcut } from '@/components/search-shortcut'
 import { ErrorTrace } from '@/components/error-trace'
 import { AIProviderSync } from '@/features/ai/ai-settings-provider'
+import { ArchiveReleaseGate } from '@/features/archive/archive-release-gate'
 import { SkipLink } from '@/components/skip-link'
 import { RouteFocus } from '@/components/route-focus'
 
@@ -77,6 +78,7 @@ export default function RootLayout({
           <AppMenu />
           {children}
           <AIProviderSync />
+          <ArchiveReleaseGate />
           <ThemeBoot />
           <CaptureHost />
           <FileDropHandler />

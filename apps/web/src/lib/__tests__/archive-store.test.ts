@@ -101,3 +101,52 @@ describe('archive-store retention', () => {
     expect(list.filter((m) => m.trigger === 'dsl-apply')).toHaveLength(100)
   })
 })
+
+describe('archive-store ensureReleaseRecord', () => {
+  // 注:buildPayload 走回调注入 → 测试直接 mock,无需 import build-archive-payload
+  function readIndexLastAppVersion(): string | null {
+    const raw = window.localStorage.getItem('cys-stift.archive-index.v1')
+    if (!raw) return null
+    return (JSON.parse(raw) as { lastAppVersion: string | null }).lastAppVersion
+  }
+
+  it('首次(prev === null):只记 lastAppVersion,不落档', async () => {
+    const { archiveStore } = await import('../archive-store')
+    const buildPayload = vi.fn(async () => makePayload('first'))
+    await archiveStore.ensureReleaseRecord('1.0.0', buildPayload)
+    // 不调 buildPayload(首启不落档,免空 payload 浪费)
+    expect(buildPayload).not.toHaveBeenCalled()
+    // lastAppVersion 已记
+    expect(readIndexLastAppVersion()).toBe('1.0.0')
+    // 无 entry
+    expect(archiveStore.listMeta()).toEqual([])
+  })
+
+  it('版本变化(prev !== cur):调 buildPayload + append release 档', async () => {
+    const { archiveStore } = await import('../archive-store')
+    // 先用首次调用设 baseline(不打档)
+    await archiveStore.ensureReleaseRecord('1.0.0', vi.fn(async () => makePayload('first')))
+    // 版本变化触发 release
+    const builtPayload = makePayload('release-v2')
+    const buildPayload = vi.fn(async () => builtPayload)
+    await archiveStore.ensureReleaseRecord('2.0.0', buildPayload)
+    expect(buildPayload).toHaveBeenCalledTimes(1)
+    const list = archiveStore.listMeta()
+    expect(list).toHaveLength(1)
+    expect(list[0]?.trigger).toBe('release')
+    expect(list[0]?.appVersion).toBe('2.0.0')
+    expect(list[0]?.note).toBe('boot 1.0.0→2.0.0')
+    // lastAppVersion 已更新
+    expect(readIndexLastAppVersion()).toBe('2.0.0')
+  })
+
+  it('版本同(no-op):不调 buildPayload,不新增 entry', async () => {
+    const { archiveStore } = await import('../archive-store')
+    await archiveStore.ensureReleaseRecord('1.0.0', vi.fn(async () => makePayload('first')))
+    const before = archiveStore.listMeta().length
+    const buildPayload = vi.fn(async () => makePayload('same'))
+    await archiveStore.ensureReleaseRecord('1.0.0', buildPayload)
+    expect(buildPayload).not.toHaveBeenCalled()
+    expect(archiveStore.listMeta().length).toBe(before)
+  })
+})

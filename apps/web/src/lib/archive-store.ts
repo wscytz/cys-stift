@@ -230,22 +230,39 @@ export const archiveStore = {
     return lsLoadPayload(version)
   },
 
-  /** 由 ArchiveReleaseGate(T4)在 app 启动调一次。版本变 → 追加 release 档。幂等(index.lastAppVersion 守卫)。 */
-  async ensureReleaseRecord(appVersion: string): Promise<void> {
+  /**
+   * 由 ArchiveReleaseGate(T4)在 app 启动调一次。版本变(prev !== cur)→ 追加
+   * release 档;首次(prev === null)只记 lastAppVersion,不打档(避免空 app
+   * 首启一条空档);版本同 → no-op。幂等(index.lastAppVersion 守卫)。
+   *
+   * buildPayload 走回调注入(不在 store 直接 import build-archive-payload),
+   * 既解耦 store ↔ payload-builder,也便于测试 mock。
+   *
+   * lastAppVersion 持久化时序:idx.lastAppVersion 在 append **之前**赋值,append
+   * 内 persistIndex 的是同一 idx 引用 → lastAppVersion 与新 entry 同盘落,不漂移。
+   * 首 prev=null 分支单独 persistIndex(idx) 落 lastAppVersion。
+   */
+  async ensureReleaseRecord(
+    appVersion: string,
+    buildPayload: () => Promise<ArchivePayload>,
+  ): Promise<void> {
     if (typeof window === 'undefined') return
     await loadIndex()
     const idx = _indexCache ?? emptyIndex()
     if (idx.lastAppVersion === appVersion) return
     const prev = idx.lastAppVersion
     idx.lastAppVersion = appVersion
-    _indexCache = idx
-    // release 档的 payload = 当前全量(T3 的 buildArchivePayload 在 T4 接线时传入)
-    //   T1 阶段 ensureReleaseRecord 暂用空 payload 占位,T4 改为真 payload。
-    await persistIndex(idx)
-    if (prev !== null) {
-      // 首次(无 prev)只记 lastAppVersion,不打档(避免空 app 首启一条空档);
-      // prev→cur 变化才打 release 档(真 payload 在 T4 注入)
+    if (prev === null) {
+      // 首次:只记 lastAppVersion,不打档(避免空 app 首启一条空档)。
+      // 不 notify:listMeta() 未变(无新 entry),无对外可观测状态变化。
+      _indexCache = idx
+      await persistIndex(idx)
+      return
     }
-    notify()
+    // prev → cur 变化:打 release 档(真全量 payload,由调用方注入)
+    const payload = await buildPayload()
+    _indexCache = idx
+    await this.append('release', `boot ${prev}→${appVersion}`, payload, appVersion)
+    // append 内已 persistIndex + notify;lastAppVersion 已在 idx 上 append 前 set
   },
 }
