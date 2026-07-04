@@ -32,7 +32,7 @@ import { CanvasCompanionPanel } from '@/features/canvas/companion-panel'
 import { autoRelate } from '@/features/canvas/auto-relate'
 import { CanvasContextMenu } from '@/features/canvas/canvas-context-menu'
 import { CanvasEmptyMotif } from '@/features/canvas/canvas-empty-motif'
-import { syncWikiLinkArrows, syncAllWikiLinks } from '@/features/canvas/wiki-links'
+import { syncWikiLinkArrows, syncAllWikiLinks, resyncWikiLinksForTitleChange } from '@/features/canvas/wiki-links'
 import { syncEmbedArrows, resolveCardByTitle } from '@/features/canvas/embed-links'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { serializeCanvas } from '@/features/ai/canvas-dsl'
@@ -1007,6 +1007,9 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
   const wbSave = useCallback(
     (patch: { title: string; body: string; tags: TagRef[] }) => {
       if (!wbCardId) return
+      // D2 双链标题重命名追踪:捕获 oldTitle(update 前),title 真变时调
+      // resyncWikiLinksForTitleChange 让引用旧/新标题的卡 re-sync wikilink 箭头。
+      const oldTitle = service.get(wbCardId as CardId)?.title
       const updated = service.update(wbCardId as CardId, patch)
       if (updated && handle.current.adapter) updateCardShape(handle.current.adapter, updated)
       // F7 wikilink + BR-T5 embed 同步(只在 body 变时;同 modal 口径)。
@@ -1029,6 +1032,21 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         if (emb.created > 0 || emb.removed > 0) {
           pushToast({ kind: 'info', message: t('canvas.embedLinked', { created: String(emb.created), removed: String(emb.removed) }) })
         }
+      }
+      // D2 标题重命名追踪:title 真变 → 画布上所有 body 含 [[oldTitle]]/[[newTitle]] 的卡 re-sync
+      if (updated && handle.current.adapter && oldTitle !== undefined && patch.title !== oldTitle) {
+        const canvasCardIds = handle.current.adapter
+          .getElements()
+          .filter((e) => e.kind === 'card')
+          .map((e) => e.id)
+        resyncWikiLinksForTitleChange({
+          host: handle.current.adapter!,
+          getCardTitle: (id) => service.get(id as CardId)?.title,
+          getCardBody: (id) => service.get(id as CardId)?.body,
+          canvasCardIds,
+          oldTitle,
+          newTitle: patch.title,
+        })
       }
     },
     [wbCardId, service, t],
@@ -1307,6 +1325,9 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
             // silently dropped tag edits (and would drop any other field the
             // modal collects if it grows). Spread the full patch through so
             // title/body/tags all reach service.update (mirrors inbox's onSave).
+            // D2 双链标题重命名追踪:捕获 oldTitle(update 前),title 真变时调
+            // resyncWikiLinksForTitleChange 让引用旧/新标题的卡 re-sync wikilink 箭头。
+            const oldTitle = service.get(effectiveDetail.card.id)?.title
             const updated = service.update(effectiveDetail.card.id, patch)
             if (updated && handle.current.adapter) updateCardShape(handle.current.adapter, updated)
             if (updated) setDetail({ card: updated })
@@ -1336,6 +1357,21 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
               if (emb.created > 0 || emb.removed > 0) {
                 pushToast({ kind: 'info', message: t('canvas.embedLinked', { created: String(emb.created), removed: String(emb.removed) }) })
               }
+            }
+            // D2 标题重命名追踪:title 真变 → 画布上所有 body 含 [[oldTitle]]/[[newTitle]] 的卡 re-sync
+            if (updated && handle.current.adapter && oldTitle !== undefined && patch.title !== undefined && patch.title !== oldTitle) {
+              const canvasCardIds = handle.current.adapter
+                .getElements()
+                .filter((e) => e.kind === 'card')
+                .map((e) => e.id)
+              resyncWikiLinksForTitleChange({
+                host: handle.current.adapter!,
+                getCardTitle: (id) => service.get(id as CardId)?.title,
+                getCardBody: (id) => service.get(id as CardId)?.body,
+                canvasCardIds,
+                oldTitle,
+                newTitle: patch.title,
+              })
             }
             return updated != null
           }}

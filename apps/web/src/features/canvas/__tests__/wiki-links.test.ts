@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
 import {
   extractWikiLinks,
+  resyncWikiLinksForTitleChange,
   syncAllWikiLinks,
   syncWikiLinkArrows,
 } from '../wiki-links'
@@ -571,5 +572,225 @@ describe('syncAllWikiLinks', () => {
     expect(second.removed).toBe(0)
     // 箭头不重复
     expect(host.getElements().filter((e) => e.kind === 'arrow')).toHaveLength(1)
+  })
+})
+
+describe('resyncWikiLinksForTitleChange', () => {
+  it('(a) card with [[oldTitle]] in body → re-synced: stale arrow to renamed card removed', () => {
+    // 场景:卡 R 从 "oldTitle" 改名到 "newTitle"。卡 X body 有 [[oldTitle]]。
+    // 改名前 X 已有 wikilink arrow X→R(因 R 曾叫 "oldTitle")。
+    // resync 后:R 现在 title="newTitle",X 的 body [[oldTitle]] 不再匹配任何卡
+    // → X→R 的 stale wikilink arrow 应被删除。
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'r')
+    addCard(host, 'x')
+    // 改名后的 R:title="newTitle"(oldTitle="oldTitle")
+    const titles: Record<string, string> = { r: 'newTitle', x: 'X' }
+    // 预置 X→R wikilink arrow(改名前 R 还叫 oldTitle 时建的)
+    addWikiLinkArrow(host, 'x', 'r')
+    const bodies: Record<string, string> = { x: 'see [[oldTitle]]' }
+
+    const res = resyncWikiLinksForTitleChange({
+      host,
+      getCardTitle: (id) => titles[id],
+      getCardBody: (id) => bodies[id] ?? '',
+      canvasCardIds: ['r', 'x'],
+      oldTitle: 'oldTitle',
+      newTitle: 'newTitle',
+    })
+
+    // X 被 re-sync → 它的 stale arrow 被删
+    expect(res.removed).toBe(1)
+    expect(res.created).toBe(0)
+    const wikiArrows = host.getElements().filter((e) => e.kind === 'arrow' && e.meta?.wikilink === true)
+    expect(wikiArrows).toHaveLength(0)
+  })
+
+  it('(b) card with [[newTitle]] in body → re-synced: new arrow created to renamed card', () => {
+    // 场景:卡 R 从 "oldTitle" 改名到 "newTitle"。卡 Y body 有 [[newTitle]]。
+    // 改名前 Y 没箭头([[newTitle]] 找不到匹配)。
+    // resync 后:R 现在 title="newTitle",Y 的 [[newTitle]] 匹配 R → 建 Y→R。
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'r')
+    addCard(host, 'y')
+    const titles: Record<string, string> = { r: 'newTitle', y: 'Y' }
+    const bodies: Record<string, string> = { y: 'see [[newTitle]]' }
+
+    const res = resyncWikiLinksForTitleChange({
+      host,
+      getCardTitle: (id) => titles[id],
+      getCardBody: (id) => bodies[id] ?? '',
+      canvasCardIds: ['r', 'y'],
+      oldTitle: 'oldTitle',
+      newTitle: 'newTitle',
+    })
+
+    expect(res.created).toBe(1)
+    expect(res.removed).toBe(0)
+    const wikiArrows = host.getElements().filter((e) => e.kind === 'arrow' && e.meta?.wikilink === true)
+    expect(wikiArrows).toHaveLength(1)
+    expect(wikiArrows[0]!.from).toBe('y')
+    expect(wikiArrows[0]!.to).toBe('r')
+  })
+
+  it('(c) card with neither oldTitle nor newTitle in body → NOT re-synced (skipped)', () => {
+    // 卡 Z body 有 [[unrelated]],既不含 oldTitle 也不含 newTitle → 应被 filter 跳过。
+    // 验证:即便 Z 有 stale wikilink arrow,也不应被触碰(因为 Z 未被 re-sync)。
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'r')
+    addCard(host, 'z')
+    const titles: Record<string, string> = { r: 'newTitle', z: 'Z' }
+    const bodies: Record<string, string> = { z: 'see [[unrelated]]' }
+    // Z 的 stale arrow(不是 R,是别的卡 'other')— resync 不应碰它
+    const staleId = addWikiLinkArrow(host, 'z', 'r')
+
+    resyncWikiLinksForTitleChange({
+      host,
+      getCardTitle: (id) => titles[id],
+      getCardBody: (id) => bodies[id] ?? '',
+      canvasCardIds: ['r', 'z'],
+      oldTitle: 'oldTitle',
+      newTitle: 'newTitle',
+    })
+
+    // Z 被 skip → 它的 stale wikilink arrow 应仍在(若 Z 被 re-sync,
+    // [[unrelated]] 不匹配任何卡,这条 arrow 会被删——所以箭头还在 = Z 被 skip)
+    expect(host.getElement(staleId)).toBeDefined()
+  })
+
+  it('(d) wraps all per-card re-syncs in a single outer host.batch (single undo step)', () => {
+    // 多个受影响卡:即便内部 syncWikiLinkArrows 各自 batch,外层只推一次 undo 快照。
+    // 验证:整个 resync 后,单次 host.undo() 应把所有新建箭头全清掉(证明只推了 1 步)。
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'r')
+    addCard(host, 'y1')
+    addCard(host, 'y2')
+    const titles: Record<string, string> = { r: 'newTitle', y1: 'Y1', y2: 'Y2' }
+    const bodies: Record<string, string> = {
+      y1: '[[newTitle]]',
+      y2: '[[newTitle]]',
+    }
+    const arrowsBefore = host.getElements().filter((e) => e.kind === 'arrow').length
+
+    resyncWikiLinksForTitleChange({
+      host,
+      getCardTitle: (id) => titles[id],
+      getCardBody: (id) => bodies[id] ?? '',
+      canvasCardIds: ['r', 'y1', 'y2'],
+      oldTitle: 'oldTitle',
+      newTitle: 'newTitle',
+    })
+
+    // 2 条 wikilink 箭头建出
+    const arrowsAfter = host.getElements().filter((e) => e.kind === 'arrow').length
+    expect(arrowsAfter - arrowsBefore).toBe(2)
+
+    // 单次 undo 应恢复到 resync 之前(证明只推了 1 步 undo 快照)
+    host.undo()
+    const arrowsAfterUndo = host.getElements().filter((e) => e.kind === 'arrow').length
+    expect(arrowsAfterUndo).toBe(arrowsBefore)
+  })
+
+  it('(e) summed counts correct across multiple affected cards', () => {
+    // Y1 有 [[newTitle]] → 建 1;Y2 有 [[oldTitle]] + 预置 stale arrow → 删 1。
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'r')
+    addCard(host, 'y1')
+    addCard(host, 'y2')
+    addWikiLinkArrow(host, 'y2', 'r') // stale(改名前 R="oldTitle",Y2=[[oldTitle]] 建的)
+    const titles: Record<string, string> = { r: 'newTitle', y1: 'Y1', y2: 'Y2' }
+    const bodies: Record<string, string> = {
+      y1: '[[newTitle]]',
+      y2: '[[oldTitle]]',
+    }
+
+    const res = resyncWikiLinksForTitleChange({
+      host,
+      getCardTitle: (id) => titles[id],
+      getCardBody: (id) => bodies[id] ?? '',
+      canvasCardIds: ['r', 'y1', 'y2'],
+      oldTitle: 'oldTitle',
+      newTitle: 'newTitle',
+    })
+
+    expect(res.created).toBe(1) // Y1
+    expect(res.removed).toBe(1) // Y2
+  })
+
+  it('(f) empty/whitespace titles → no-op (returns zeros, no batch)', () => {
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'r')
+    addCard(host, 'y')
+    const titles: Record<string, string> = { r: '', y: 'Y' }
+    const bodies: Record<string, string> = { y: '[[]]' }
+
+    let batchCalls = 0
+    const realBatch = host.batch.bind(host)
+    host.batch = (fn: () => void) => {
+      batchCalls++
+      realBatch(fn)
+    }
+
+    const res = resyncWikiLinksForTitleChange({
+      host,
+      getCardTitle: (id) => titles[id],
+      getCardBody: (id) => bodies[id] ?? '',
+      canvasCardIds: ['r', 'y'],
+      oldTitle: '   ',
+      newTitle: '   ',
+    })
+
+    expect(res.created).toBe(0)
+    expect(res.removed).toBe(0)
+    expect(batchCalls).toBe(0)
+  })
+
+  it('empty canvasCardIds → {0,0} no-op', () => {
+    const host = new InMemoryCanvasHost()
+
+    let batchCalls = 0
+    const realBatch = host.batch.bind(host)
+    host.batch = (fn: () => void) => {
+      batchCalls++
+      realBatch(fn)
+    }
+
+    const res = resyncWikiLinksForTitleChange({
+      host,
+      getCardTitle: () => undefined,
+      getCardBody: () => undefined,
+      canvasCardIds: [],
+      oldTitle: 'A',
+      newTitle: 'B',
+    })
+
+    expect(res.created).toBe(0)
+    expect(res.removed).toBe(0)
+    expect(batchCalls).toBe(0)
+  })
+
+  it('filter is case-insensitive (matches syncWikiLinkArrows matching)', () => {
+    // body 有 [[OLD]](大写),oldTitle="old"(小写)→ filter 应捕获(小写比较)。
+    // 验证方式:预置一条 stale wikilink arrow Y→R(R 改名前="old" 建的);
+    // resync 后 Y 被 re-sync → [[OLD]] 不再匹配任何卡(R 现在="new")→ stale arrow 被删。
+    // 若 filter 大小写敏感,Y 会被 skip,stale arrow 仍在。
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'r')
+    addCard(host, 'y')
+    const titles: Record<string, string> = { r: 'newTitle', y: 'Y' }
+    const bodies: Record<string, string> = { y: 'see [[OLD]]' }
+    const staleId = addWikiLinkArrow(host, 'y', 'r')
+
+    resyncWikiLinksForTitleChange({
+      host,
+      getCardTitle: (id) => titles[id],
+      getCardBody: (id) => bodies[id] ?? '',
+      canvasCardIds: ['r', 'y'],
+      oldTitle: 'old',
+      newTitle: 'newTitle',
+    })
+
+    // Y 被 re-sync(因 filter 大小写不敏感)→ stale arrow 被删
+    expect(host.getElement(staleId)).toBeUndefined()
   })
 })

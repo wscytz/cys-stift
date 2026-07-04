@@ -216,6 +216,94 @@ export function syncAllWikiLinks(params: SyncAllWikiLinksParams): SyncWikiLinkAr
   return { created, removed }
 }
 
+export interface ResyncWikiLinksForTitleChangeParams {
+  /** CanvasHost(upsert/remove/batch/getElements)。 */
+  host: CanvasHost
+  /** 卡标题查询(从 CardService)。返回 undefined 表示该 id 无卡。 */
+  getCardTitle: (cardId: string) => string | undefined
+  /** 卡正文查询(从 CardService)。返回 undefined 视作空 body。 */
+  getCardBody: (cardId: string) => string | undefined
+  /** 当前画布上需要检查的卡 id 列表(典型 = host.getElements() filter kind==='card')。 */
+  canvasCardIds: string[]
+  /** 改名前的旧标题。 */
+  oldTitle: string
+  /** 改名后的新标题。 */
+  newTitle: string
+}
+
+/**
+ * 卡标题重命名后,re-sync 受影响卡的双链箭头(spec D2)。
+ *
+ * 触发场景:卡 R 从 "oldTitle" 改名为 "newTitle"。引用 R 的卡分两类:
+ *  - body 含 `[[oldTitle]]`:R 改名前匹配 R,R 改名后不再匹配 → 这些卡的 wikilink
+ *    arrow 可能 stale(指向 R 但 body 已不匹配),需 re-sync 清理。
+ *  - body 含 `[[newTitle]]`:R 改名前不匹配(找不到),R 改名后匹配 R → 这些卡可能
+ *    需要新建 wikilink arrow 到 R,需 re-sync 建立。
+ *
+ * 策略:
+ *  1. 用 `extractWikiLinks(body)` 提取每卡的 wikilink 列表(纯函数,与匹配一致)。
+ *  2. filter 到 body 的 links 含 oldTitle 或 newTitle 的卡(大小写不敏感比较,
+ *     与 syncWikiLinkArrows 的 title→id 匹配口径一致)。
+ *  3. 对每个受影响卡调 syncWikiLinkArrows(它自己做 diff,复用既有逻辑)。
+ *  4. 单外层 host.batch(单 undo 步)。嵌套 batch 不重复推快照,与 syncAllWikiLinks 同款契约。
+ *
+ * 返回各受影响卡 created/removed 的总和。
+ *
+ * **何时调**:CardDetailModal.onSave / wbSave 检测到 title 真变(oldTitle !== newTitle)
+ * 时调。同 title 重保存不触发。
+ *
+ * **空/whitespace 标题**:oldTitle.trim() 与 newTitle.trim() 都为空 → no-op(无可比对物)。
+ * **空 canvasCardIds**:直接 return {0,0},不调 batch。
+ *
+ * **与 saved 卡自身 syncWikiLinkArrows 的关系**:saved 卡的 body 里若有 `[[oldTitle]]`
+ * 或 `[[newTitle]]`,它也会被本函数 re-sync(它的自引用可能匹配/失配)。这不会和
+ * onSave 已调的 per-card syncWikiLinkArrows 冲突——diff 是幂等的(第二次跑无变化)。
+ */
+export function resyncWikiLinksForTitleChange(
+  params: ResyncWikiLinksForTitleChangeParams,
+): SyncWikiLinkArrowsResult {
+  const { host, getCardTitle, getCardBody, canvasCardIds, oldTitle, newTitle } = params
+
+  // 空 canvasCardIds 或 双空 title → no-op
+  const oldKey = oldTitle.trim().toLowerCase()
+  const newKey = newTitle.trim().toLowerCase()
+  if (canvasCardIds.length === 0) return { created: 0, removed: 0 }
+  if (!oldKey && !newKey) return { created: 0, removed: 0 }
+
+  // 预 filter:body 含 [[oldTitle]] 或 [[newTitle]] 的卡(用 extractWikiLinks 做规范化,
+  // 大小写不敏感比较,与 syncWikiLinkArrows 的 title→id 匹配口径一致)。
+  const affectedIds: string[] = []
+  for (const cardId of canvasCardIds) {
+    const body = getCardBody(cardId) ?? ''
+    const links = extractWikiLinks(body)
+    const hit = links.some((l) => {
+      const k = l.toLowerCase()
+      return k === oldKey || k === newKey
+    })
+    if (hit) affectedIds.push(cardId)
+  }
+
+  if (affectedIds.length === 0) return { created: 0, removed: 0 }
+
+  let created = 0
+  let removed = 0
+  host.batch(() => {
+    for (const cardId of affectedIds) {
+      const body = getCardBody(cardId) ?? ''
+      const r = syncWikiLinkArrows({
+        host,
+        getCardTitle,
+        sourceCardId: cardId,
+        body,
+      })
+      created += r.created
+      removed += r.removed
+    }
+  })
+
+  return { created, removed }
+}
+
 /** 箭头 id 生成(与 auto-relate 同款;browser/vitest jsdom 都有 crypto.randomUUID)。 */
 function genId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
