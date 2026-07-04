@@ -130,6 +130,7 @@
 | v0.51.0 | chore: bump v0.51.0（工作台三件套：编辑器+标签管理+库页 D4） | v0.51.0 |
 | v0.52.0 | release: v0.52.0 内容版本/开发存档(archive-versioning) | v0.52.0 |
 | v0.53.0 | release: v0.53.0 wikilink 显式化(@wikilink + 跨画布 + 模糊 + 重命名 + lo… | v0.53.0 |
+| v0.53.1 | release: v0.53.1 安卓运行时验证修复(rustls panic + hydration + 平台检测 SS… | v0.53.1 |
 <!-- gen-state:end -->
 
 ## 当前能力(用户视角)
