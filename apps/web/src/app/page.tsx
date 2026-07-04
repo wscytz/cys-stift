@@ -8,6 +8,7 @@
  * launched from anywhere.
  * Phase 7 adds the Archive entry (blue region stripe).
  */
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useI18n } from '@/lib/i18n'
 import { VERSION } from '@/lib/version'
@@ -17,7 +18,14 @@ import { CaptureSampleHint } from '@/components/capture-sample-hint'
 
 export default function HomePage() {
   const { t } = useI18n()
-  const isMac = detectIsMac()
+  // 平台检测放 useEffect(navigator/window 客户端才有)。pre-mount 默认 false,
+  // 让 SSG 构建期 HTML 与客户端首帧一致 —— 否则 hydration mismatch,dev 弹错误遮罩。
+  const [isMac, setIsMac] = useState(false)
+  const [showCapture, setShowCapture] = useState(false)
+  useEffect(() => {
+    setIsMac(detectIsMac())
+    setShowCapture(isDesktop())
+  }, [])
   return (
     <main id="main" tabIndex={-1} className="home">
       <CaptureHint />
@@ -48,7 +56,7 @@ export default function HomePage() {
           </div>
         </dl>
         <nav className="home__nav" aria-label={t('nav.homeNav')}>
-          {isDesktop() && (
+          {showCapture && (
           <div className="home__capture" aria-label="Quick capture">
             <div className="home__capture-arrow" aria-hidden="true">{isMac ? '⌘' : '^'}</div>
             <div className="home__capture-label">{t('home.feature.capture.title')}</div>
