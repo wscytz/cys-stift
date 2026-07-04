@@ -32,7 +32,7 @@ import { CanvasCompanionPanel } from '@/features/canvas/companion-panel'
 import { autoRelate } from '@/features/canvas/auto-relate'
 import { CanvasContextMenu } from '@/features/canvas/canvas-context-menu'
 import { CanvasEmptyMotif } from '@/features/canvas/canvas-empty-motif'
-import { syncWikiLinkArrows } from '@/features/canvas/wiki-links'
+import { syncWikiLinkArrows, syncAllWikiLinks } from '@/features/canvas/wiki-links'
 import { syncEmbedArrows, resolveCardByTitle } from '@/features/canvas/embed-links'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { serializeCanvas } from '@/features/ai/canvas-dsl'
@@ -953,6 +953,31 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       })
     })
     pushToast({ kind: 'success', message: t('canvas.template.applied', { name: tplName === 'blank' ? '' : tplName }) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adapter])
+
+  // #5 初次 load 批量同步(D5):adapter ready 后(SelfCanvas 已 loadCardsIntoEditor
+  // + attachCanvasFreeformPersistence),debounce 200ms 再跑全量 syncAllWikiLinks。
+  // debounce 给 freeform 异步 load .then 留时间(wikilink arrow 持久化在 freeform
+  // store,load 未完时 sync 会把已存的箭头当不存在重复建)。typical OPFS/LS 读 <50ms,
+  // 200ms 留足缓冲。per-card edit 由 syncWikiLinkArrows 自己处理,这里只管 hydrate。
+  useEffect(() => {
+    if (!adapter) return
+    const adapterLocal = adapter
+    const timer = setTimeout(() => {
+      const cardIds = adapterLocal
+        .getElements()
+        .filter((e) => e.kind === 'card')
+        .map((e) => e.id)
+      if (cardIds.length === 0) return
+      syncAllWikiLinks({
+        host: adapterLocal,
+        getCardTitle: (id) => service.get(id as CardId)?.title,
+        getCardBody: (id) => service.get(id as CardId)?.body,
+        canvasCardIds: cardIds,
+      })
+    }, 200)
+    return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adapter])
 

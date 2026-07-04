@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
-import { extractWikiLinks, syncWikiLinkArrows } from '../wiki-links'
+import {
+  extractWikiLinks,
+  syncAllWikiLinks,
+  syncWikiLinkArrows,
+} from '../wiki-links'
 import type { CanvasElement } from '@cys-stift/canvas-engine'
 
 /** 给 host 塞一个 card 元素(让目标卡在画布上可见,且 from/to 解析得到)。 */
@@ -414,5 +418,158 @@ describe('syncWikiLinkArrows', () => {
     })
     expect(r.created).toBe(0)
     expect(r.removed).toBe(0)
+  })
+})
+
+describe('syncAllWikiLinks', () => {
+  it('iterates all canvasCardIds, syncing each card (multi-card aggregation)', () => {
+    // 两张卡互相双链:a[[B]] + b[[A]] → 各建一条 wikilink arrow。
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'a')
+    addCard(host, 'b')
+    const titles: Record<string, string> = { a: 'A', b: 'B' }
+    const bodies: Record<string, string> = { a: 'see [[B]]', b: 'see [[A]]' }
+
+    const r = syncAllWikiLinks({
+      host,
+      getCardTitle: (id) => titles[id],
+      getCardBody: (id) => bodies[id],
+      canvasCardIds: ['a', 'b'],
+    })
+
+    // 每卡各建 1 条 → 合计 2
+    expect(r.created).toBe(2)
+    expect(r.removed).toBe(0)
+    const arrows = host.getElements().filter((e) => e.kind === 'arrow')
+    expect(arrows).toHaveLength(2)
+    const targets = arrows.map((a) => `${a.from}->${a.to}`).sort()
+    expect(targets).toEqual(['a->b', 'b->a'])
+  })
+
+  it('summed counts correct across create + remove', () => {
+    // 预置一条 stale wikilink arrow(src→old),source body 已不含 [[Old]] → 应删 1;
+    // 同时 src body 含 [[New]] → 应建 1。合计 created=1, removed=1。
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'src')
+    addCard(host, 'old')
+    addCard(host, 'new')
+    addWikiLinkArrow(host, 'src', 'old') // stale
+    const titles: Record<string, string> = { src: 'S', old: 'Old', new: 'New' }
+    const bodies: Record<string, string> = { src: 'see [[New]]', old: '', new: '' }
+
+    const r = syncAllWikiLinks({
+      host,
+      getCardTitle: (id) => titles[id],
+      getCardBody: (id) => bodies[id],
+      canvasCardIds: ['src', 'old', 'new'],
+    })
+
+    expect(r.created).toBe(1)
+    expect(r.removed).toBe(1)
+  })
+
+  it('wraps all per-card syncs in a single outer host.batch (single undo step)', () => {
+    // 3 张卡 + 多个 wikilink 目标;即便内部 syncWikiLinkArrows 各自调 batch,
+    // 外层 syncAllWikiLinks 应只推一次 undo 快照(嵌套 batch 不重复推)。
+    // 验证:整个 syncAllWikiLinks 后,单次 host.undo() 应把所有新建箭头全清掉。
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'a')
+    addCard(host, 'b')
+    addCard(host, 'c')
+    const titles: Record<string, string> = { a: 'A', b: 'B', c: 'C' }
+    const bodies: Record<string, string> = {
+      a: '[[B]] [[C]]', // 建 2
+      b: '[[A]]', // 建 1
+      c: '', // 无
+    }
+    const arrowsBefore = host.getElements().filter((e) => e.kind === 'arrow').length
+
+    syncAllWikiLinks({
+      host,
+      getCardTitle: (id) => titles[id],
+      getCardBody: (id) => bodies[id],
+      canvasCardIds: ['a', 'b', 'c'],
+    })
+
+    // 3 条 wikilink 箭头建出
+    const arrowsAfter = host.getElements().filter((e) => e.kind === 'arrow').length
+    expect(arrowsAfter - arrowsBefore).toBe(3)
+
+    // 单次 undo 应恢复到 syncAll 之前(证明只推了 1 步 undo 快照)
+    host.undo()
+    const arrowsAfterUndo = host.getElements().filter((e) => e.kind === 'arrow').length
+    expect(arrowsAfterUndo).toBe(arrowsBefore)
+  })
+
+  it('empty canvasCardIds → {created:0, removed:0} no-op', () => {
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'src')
+    addWikiLinkArrow(host, 'src', 'tgt') // 已有 stale 箭头
+    const titles: Record<string, string> = { src: 'S' }
+    const bodies: Record<string, string> = { src: '[[T]]' }
+
+    let batchCalls = 0
+    const realBatch = host.batch.bind(host)
+    host.batch = (fn: () => void) => {
+      batchCalls++
+      realBatch(fn)
+    }
+
+    const r = syncAllWikiLinks({
+      host,
+      getCardTitle: (id) => titles[id],
+      getCardBody: (id) => bodies[id],
+      canvasCardIds: [], // 空
+    })
+
+    expect(r.created).toBe(0)
+    expect(r.removed).toBe(0)
+    // 即便空列表也应 no-op:不应调 batch(无可 sync 之物)
+    expect(batchCalls).toBe(0)
+    // 已有箭头不动(因为根本没跑 sync)
+    expect(host.getElements().filter((e) => e.kind === 'arrow')).toHaveLength(1)
+  })
+
+  it('skips cardIds whose getCardBody returns undefined (no throw)', () => {
+    // 卡被删 / body 缺失时不应炸;undefined 视作空 body。
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'a')
+    addCard(host, 'b')
+    const titles: Record<string, string> = { a: 'A', b: 'B' }
+
+    const r = syncAllWikiLinks({
+      host,
+      getCardTitle: (id) => titles[id],
+      getCardBody: () => undefined, // 全 undefined
+      canvasCardIds: ['a', 'b'],
+    })
+
+    expect(r.created).toBe(0)
+    expect(r.removed).toBe(0)
+  })
+
+  it('does not double-sync: respects existing wikilink arrows (idempotent)', () => {
+    // 第一次跑建箭头;立刻再跑应 no-op(diff 已平衡)。
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'src')
+    addCard(host, 'tgt')
+    const titles: Record<string, string> = { src: 'S', tgt: 'T' }
+    const bodies: Record<string, string> = { src: '[[T]]', tgt: '' }
+
+    const opts = {
+      host,
+      getCardTitle: (id: string) => titles[id],
+      getCardBody: (id: string) => bodies[id],
+      canvasCardIds: ['src', 'tgt'] as string[],
+    }
+
+    const first = syncAllWikiLinks(opts)
+    expect(first.created).toBe(1)
+
+    const second = syncAllWikiLinks(opts)
+    expect(second.created).toBe(0)
+    expect(second.removed).toBe(0)
+    // 箭头不重复
+    expect(host.getElements().filter((e) => e.kind === 'arrow')).toHaveLength(1)
   })
 })

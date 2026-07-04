@@ -164,6 +164,58 @@ export function syncWikiLinkArrows(params: SyncWikiLinkArrowsParams): SyncWikiLi
   return { created, removed }
 }
 
+export interface SyncAllWikiLinksParams {
+  /** CanvasHost(upsert/remove/batch/getElements)。 */
+  host: CanvasHost
+  /** 卡标题查询(从 CardService)。返回 undefined 表示该 id 无卡。 */
+  getCardTitle: (cardId: string) => string | undefined
+  /** 卡正文查询(从 CardService)。返回 undefined 表示该卡 body 缺失(跳过,不抛)。 */
+  getCardBody: (cardId: string) => string | undefined
+  /** 当前画布上需要 sync 的卡 id 列表(典型 = host.getElements() filter kind==='card')。 */
+  canvasCardIds: string[]
+}
+
+/**
+ * 批量同步多张卡的双链箭头(canvas hydrate 用)。
+ *
+ * 策略:遍历 canvasCardIds,每卡调 syncWikiLinkArrows(复用单卡 diff 逻辑),
+ * 合一个**外层 host.batch**(单 undo 步)。嵌套 batch 不重复推快照(in-memory-host
+ * 的 wasCoalescing 门控 + SelfBuiltAdapter 同款契约),所以即便内部每卡各自 batch,
+ * 最终 undo 历史只多 1 步。
+ *
+ * 计数为各卡 created/removed 的总和。
+ *
+ * **何时调**:canvas hydrate 完成后(adapter ready + freeform load 完成,卡 id 稳定),
+ * debounce 200ms 调一次(避免 hydrate race)。不在每次卡编辑时调(那是 syncWikiLinkArrows
+ * 的 per-card 职责,见 CardDetailModal.onSave / wbSave)。
+ *
+ * **空列表**:canvasCardIds=[] 直接 return {0,0},不调 batch(no-op)。
+ */
+export function syncAllWikiLinks(params: SyncAllWikiLinksParams): SyncWikiLinkArrowsResult {
+  const { host, getCardTitle, getCardBody, canvasCardIds } = params
+
+  if (canvasCardIds.length === 0) return { created: 0, removed: 0 }
+
+  let created = 0
+  let removed = 0
+  host.batch(() => {
+    for (const cardId of canvasCardIds) {
+      const body = getCardBody(cardId)
+      if (body === undefined) continue // 卡被删 / body 缺失:跳过不抛
+      const r = syncWikiLinkArrows({
+        host,
+        getCardTitle,
+        sourceCardId: cardId,
+        body,
+      })
+      created += r.created
+      removed += r.removed
+    }
+  })
+
+  return { created, removed }
+}
+
 /** 箭头 id 生成(与 auto-relate 同款;browser/vitest jsdom 都有 crypto.randomUUID)。 */
 function genId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
