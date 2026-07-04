@@ -18,9 +18,13 @@ import { groupForMode, extractPinned, type WorkbenchSection } from './workbench-
 export function WorkbenchSections({
   cards,
   mode,
+  selectedTags = [],
+  tagColors = new Map<string, string>(),
 }: {
   cards: Card[]
   mode: WorkbenchModeId
+  selectedTags?: string[]
+  tagColors?: Map<string, string>
 }) {
   const { t } = useI18n()
   const { snapshot } = useCanvases()
@@ -41,10 +45,10 @@ export function WorkbenchSections({
         inboxLabel: t('workbench.inbox'),
         unknownCanvasLabel: t('workbench.unknownCanvas'),
         otherLabel: t('workbench.other'),
-        selectedTags: [], // 子任务 4:tag 模式接入多选 chip
-        tagColors: new Map(),
+        selectedTags,
+        tagColors,
       }),
-    [mode, rest, canvasNames, t],
+    [mode, rest, canvasNames, t, selectedTags, tagColors],
   )
 
   // 手风琴:展开的 section key(null = 全折叠)。默认展开第一个分区。

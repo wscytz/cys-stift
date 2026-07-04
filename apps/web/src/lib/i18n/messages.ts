@@ -789,6 +789,8 @@ export const messages = {
   'workbench.other': { zh: '其他', en: 'Other' },
   'workbench.noSections': { zh: '没有可显示的分区。', en: 'No sections to show.' },
   'workbench.pinned': { zh: '已固定', en: 'Pinned' },
+  'workbench.noTags': { zh: '这些卡片还没有标签。', en: 'These cards have no tags yet.' },
+  'workbench.selectTagHint': { zh: '选择标签来按标签分组(可多选,任一匹配)。', en: 'Select tags to group by (multi-select, any match).' },
   /* ── AI Layout (P7) ── */
   'canvas.aiLayout': { zh: 'AI 排版', en: 'AI layout' },
   'canvas.aiRunning': { zh: '运行中…', en: 'Running…' },
