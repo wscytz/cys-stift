@@ -5,6 +5,21 @@
 
 ---
 
+## 2026-07-04 · tag-management（/tags 升级为标签管理页，D5）
+
+工作台 spec D5。/tags 从标签墙（展示）升级为管理表。
+
+- **tag-ops 纯函数**：aggregateTags（聚合+多数色+count 降序）/ renameTag / recolorTag / deleteTag / mergeTag / mergeTagsInto（多源一次性合并，避免 pairwise 顺序覆盖）。无副作用可单测。
+- **TagManagement 组件**：改名（点标签名行内编辑）/ 改色（10 色 popover）/ 删（单行去标，卡保留）/ 合并（勾 ≥2 → 选 target → 一次性合）。受控（cards + onApplyChanges）。
+- **/tags 页接 TagManagement**：变更经 `service.update({tags})` 偏更新落库，snap 反应式刷新。
+- lucide 加 trash 图标；i18n 加 tags.* 管理键 11 个（中英）。
+
+web test 1200（+21 新）/ lint 0 / build 0。未 push。
+
+**后续**：D4 卡片库侧栏（待形态决策：当前工作台是窄 dock 编辑器，库侧栏要更宽的面板——是扩宽 dock 还是另开入口，该用户拍板）。rehype-highlight 延后。
+
+---
+
 ## 2026-07-04 · workbench-editor（工作台 dock 编辑器 + 富 Markdown foundation）
 
 「大卡扶正」简化版第一阶段：富 Markdown + 工作台 dock 编辑器。spec 见私有仓 `cys-stift-docs/docs/superpowers/specs/2026-07-03-workbench-richmarkdown-design.md`，计划见 `cys-stift-docs/docs/superpowers/plans/2026-07-04-workbench-editor.md`。简化定调：**不引入新卡类型、不做 AI 角色卡**——"大"由内容撑。
