@@ -25,6 +25,7 @@ export const messages = {
   'nav.homeNav': { zh: '主页导航', en: 'Home navigation' },
   'nav.tags': { zh: '标签', en: 'Tags' },
   'nav.workbench': { zh: '工作台', en: 'Workbench' },
+  'nav.devArchive': { zh: '存档', en: 'Archive Log' },
 
   /* ── Command palette (P3-T1) ── */
   'cmd.title': { zh: '命令面板', en: 'Command palette' },

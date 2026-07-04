@@ -41,6 +41,7 @@
 | **v0.49.0** | **触摸手势(画板适配第二阶段,代码层):SelfBuiltAdapter 多指跟踪(activePointers Map)+ 双指 pinch zoom(中点锚,复用 onWheel 数学)+ 双指中点 pan + 单指-双指切换(startPinch 调 clearInteractionState)+ touch-action:none 核查(主画布/graph/辅助 canvas 均已有)+ 触摸目标 44px(平板态 inbox/archive tile 角标);单指元素/双指画布(Figma/Procreate 范式);桌面+鼠标零回归。canvas-engine 511 + web 1138 测试** | v0.49.0 |
 | **v0.49.1** | **触摸手势 patch:pinch 第二指 `setPointerCapture`(v0.49 headline 真 bug — 第二指漂出 canvas 收不到 move → pinch 坏)+ canvas 断点 off-by-one 归一(960/900→1023/767)+ 纯 pan/抬指退 pinch 2 测 + layout 注释。canvas-engine 513 + web 1138** | v0.49.1 |
 | **v0.50.0** | **安卓运行时适配 + 全平台打包:platform.ts 加 isMobile/isDesktop(userAgent,SSR 安全);设置页全局快捷键配置段 + 首页 ⌘/^ 捕获提示块移动端隐藏(安卓无系统全局热键;capture 仍可用经 AppMenu/inbox);capture-host __TAURI__ catch(invoke 安卓 no-op 不崩)。macOS .app/.dmg + Android .apk(arm64)打包;Windows 走 CI。web 1138 test 零回归。** | v0.50.0 |
+| **v0.52.0** | **内容版本/开发存档:archive-store(OPFS two-tier index+payload)+ release/风险 op/手动 触发 + /dev/archive 查档+导出 JSON + 分层 retention(b cap 100,a/c 永久)** | v0.52.0 |
 
 > v0.18–v0.21 版本号在历史中跳过(从 v0.17.0 直接进 v0.22.0),非缺失。
 > **v0.27.1-review-hardening 无独立 tag** — 该轮 hardening(rehydrateCards / parseCardsRaw / geometry reconcile / M1 label)的工作被折进 v0.31.0 重构(refactor v0.31.0-p1.2/p1.3,见 `docs/decisions/2026-06-21-v0.27.1-review-hardening.md`)。
@@ -141,6 +142,7 @@
 - **AI 伴侣面板**:画布常驻 AI 浮面板(rail ✨ 开关,发现/对话两 tab,折叠+tab 持久)—— 发现 tab 本地预筛零成本常驻(重复/可关联/孤立卡)+ 选中定位/建立关联/AI 深挖三动作;对话 tab = /ask agent 上画布(live host 应用 + 确认门 + 引用点开)+ **历史持久化 + v0.46 现发给 AI**(不再"没上下文";与 /ask 共享同一段 per-canvas 对话)+ 缩略图窄面板横向滚不溢出,非破坏性默认开
 - **AI 排版**:诚实反馈(apply 前后位移对比 → "重排 N 张平均 Xpx" / "AI 认为已合理未改动")+ 主动重排 prompt + 拓宽思考抑制(deepseek 镜像/model 名)+ 60s 超时
 - **版本号**:单一可信源(`scripts/gen-version.mjs` 读 root package.json → version.ts + 同步 tauri.conf),主菜单 + 首页实时显示
+- **开发存档**(dev 工具,非用户向):release/风险 op/手动 checkpoint 落 OPFS 全量快照(版号区分,mediaAssets 剥 dataUrl),`/dev/archive` 列表+浏览+导出 JSON 外部 diff(查错误)+ release 自修自查;分层 retention(风险 op cap 100 FIFO,release/手动永久)
 - **settings**:快捷键自定义 + 导入/导出 + 暗色主题 + AI provider 配置 + **实验室区**(vision/autoCurate/autoTag/autoCapture/agentToolCalling 五个实验室,默认关,LAB_REGISTRY 注册表 + useLabEnabled 守卫 + 确认门;分层判据见 ai-labs-strategy spec)
 
 ## 下一步

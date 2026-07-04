@@ -5,6 +5,25 @@
 
 ---
 
+## 2026-07-04 · v0.52.0 · archive-versioning（内容版本/开发存档）
+
+给 cy 一个**本地开发存档系统** —— 在 release / 风险 op / 手动 checkpoint 时刻自动落全量状态快照(OPFS,带版号),供查档 / 查错误 / release 自修自查。spec:`cys-stift-docs/docs/superpowers/specs/2026-07-04-archive-versioning-design.md`;plan:`cys-stift-docs/docs/superpowers/plans/2026-07-04-archive-versioning.md`。7 task subagent-driven(T1-T6 已落地 `bf37a72..a7002b2`,T7 本轮)。
+
+- **archive-store**(T1+T2,`apps/web/src/lib/archive-store.ts`):two-tier OPFS+LS(镜像 `canvas-freeform-store` 范式)—— index 文件持 entries meta(轻常驻)+ per-version payload 文件(按需读);`append` / `listMeta` / `loadPayload` / `subscribe` / `getVersion` / `ensureReleaseRecord`;useSyncExternalStore 响应式。retention 分层(spec D6):b 类(风险 op)超 `ARCHIVE_RISKY_CAP=100` FIFO 丢最旧,a(release)+ c(手动)永久留。
+- **buildArchivePayload**(T3,`apps/web/src/lib/build-archive-payload.ts`):复用 `buildExportPayload`(全量含 cards/canvases/freeform/settings/drafts/canvasView),多一步遍历 `mediaAssets` 剥 `dataUrl` 只留元数据(控总量);drift lock 测试防 payload 形漂移。
+- **触发**(spec D2):
+  - **a. release**(T4,`features/archive/archive-release-gate.tsx`):空渲染组件挂 `app/layout.tsx`,boot 时 `lastAppVersion !== VERSION` → `appendArchive('release', ...)`;首次开打基线。幂等(index 守卫)。
+  - **b. 风险 op**(T5,4 站点):AI layout / cluster(`app/canvas/page.tsx` handleAILayout + handleAICluster apply 成功后)/ DSL apply(`features/canvas/dsl-dialog.tsx` applied>0 后)/ agent applyOps(`features/ai/agent-confirm-card.tsx` phase 'applied' 后)—— 都在 host.batch 成功提交后调,失败不打档。
+  - **c. 手动**(T6,`/dev/archive` 页「打存档点」按钮 + note 输入)。
+- **`/dev/archive` 页**(T6,`app/dev/archive/`):列表(版号倒序 + trigger 色标:Bauhaus token,release 黄/风险 op 蓝/手动灰 + appVersion + note)+ 只读浏览(卡片数,不做完整 CanvasHost 渲染 spec defer)+ 每条导出 JSON(文件名 `cys-stift-archive-v{v}-{trigger}-{ts}.json`,外部 diff 查错误)+ 手动 checkpoint。**ships in static export**(`/dev/*` 在 `output: 'export'` 下进静态产物,build 实测 `/dev/archive` 2.21 kB)。
+- **AppMenu 入口**(T7):加「存档」链接 → `/dev/archive`(底部低频区,`--dev` modifier 降对比度低调放,dev 工具非用户向)。
+- **R2 隐私**:存档 100% 本地(OPFS/localStorage),绝不外发 AI;AI 路径不碰 archive-store。
+- **defer(spec 非目标)**:应用内 diff(MVP 用导出 JSON + 外部 diff 替代)/ 回滚 / 完整画布渲染浏览 / 连续 autosave / 用户向版本 UI / migration 触发(全仓无集中 migration runner,release 触发已覆盖版本边界;若日后重大 migration 手动调 append)。
+
+web test 1269 / lint 0 / build exit 0。tag `v0.52.0`(local,未 push)。
+
+---
+
 ## 2026-07-04 · v0.51.0 · workbench-trio（工作台三件套：编辑器 + 标签管理 + 库页 D4）
 
 「大卡扶正」工作台线**收官**——三件套齐 + 富 Markdown 代码高亮 + DSL 防护。cc + zcode 协作：cc ship D1-D3/D5/D6 + 工作台 dock，zcode PR day1（rehype-highlight + Bauhaus 主题 + DSL `@text` 上限）+ day2（D4 `/workbench` 卡片库页，形态 (ii) 另开入口），cc 验+合并 main（`dd47924` / `daa8fbe`），bump v0.51.0 + tag。

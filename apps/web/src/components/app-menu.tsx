@@ -62,7 +62,7 @@ export function AppMenu() {
     window.dispatchEvent(new CustomEvent(CAPTURE_OPEN_EVENT))
   }
 
-  const entries: { href: string; key: MessageKey }[] = [
+  const entries: { href: string; key: MessageKey; dev?: boolean }[] = [
     { href: '/inbox', key: 'nav.inbox' },
     { href: '/canvas', key: 'nav.canvas' },
     { href: '/workbench', key: 'nav.workbench' },
@@ -73,6 +73,8 @@ export function AppMenu() {
     { href: '/search', key: 'nav.search' },
     { href: '/trash', key: 'nav.trash' },
     { href: '/settings', key: 'nav.settings' },
+    // dev 工具:低调放底部,--dev modifier 降对比度(spec D7 入口;dev-only)。
+    { href: '/dev/archive', key: 'nav.devArchive', dev: true },
   ]
 
   const activeKey = entries.find((e) => pathname.startsWith(e.href))?.key
@@ -96,7 +98,7 @@ export function AppMenu() {
           <Link
             key={e.key}
             href={e.href}
-            className={`app-menu__link ${activeKey === e.key ? 'app-menu__link--active' : ''}`}
+            className={`app-menu__link ${activeKey === e.key ? 'app-menu__link--active' : ''} ${e.dev ? 'app-menu__link--dev' : ''}`}
             onClick={() => setOpen(false)}
           >
             {t(e.key)}
@@ -182,6 +184,10 @@ const styles = `
 .app-menu__link:hover { color: var(--color-black); background: var(--color-gray-soft); }
 .app-menu__link:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .app-menu__link--active { color: var(--color-black); border-bottom: 2px solid var(--color-black); }
+/* dev 工具入口(存档等):降对比度低调放,active/hover 恢复正常显眼 */
+.app-menu__link--dev { opacity: 0.55; font-size: var(--font-size-xs); }
+.app-menu__link--dev:hover,
+.app-menu__link--dev.app-menu__link--active { opacity: 1; }
 .app-menu__spacer { flex: 1; }
 .app-menu__capture {
   font-family: var(--font-mono);
