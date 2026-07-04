@@ -18,3 +18,11 @@ tauri = { version = "2.1.1", features = [] }
 tauri-plugin-global-shortcut = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
+# Android 无 native-tls 后端,Tauri 的间接依赖 reqwest 走 rustls,且 reqwest 默认
+# rustls-no-provider(无 crypto provider)。启动建 reqwest Client 会 panic
+# "No rustls crypto provider is configured" → app 闪退。装 ring provider
+# (见 lib.rs::run 启动时 install_default)修复。桌面用 native-tls 不受影响。
+# 用 ring 而非 aws_lc_rs:ring 纯 Rust+cc 免 cmake;aws_lc_rs 需 cmake(本机未装)。
+[target.'cfg(target_os = "android")'.dependencies]
+rustls = { version = "0.23", default-features = false, features = ["std", "ring"] }

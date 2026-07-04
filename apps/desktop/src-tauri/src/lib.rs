@@ -67,6 +67,15 @@ fn update_shortcut(app: tauri::AppHandle, accelerator: String) -> Result<(), Str
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Android: Tauri 的间接依赖 reqwest 用 rustls 且默认无 crypto provider
+    // (rustls-no-provider)。启动建 reqwest Client 时会 panic
+    // ("No rustls crypto provider is configured") → app 闪退。先装 ring provider。
+    // 桌面用 native-tls(macOS Secure Transport),不受影响、不触发此块。
+    #[cfg(target_os = "android")]
+    {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    }
+
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             #[cfg(desktop)] update_shortcut,
