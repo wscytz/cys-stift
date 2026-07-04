@@ -20,11 +20,14 @@ export function WorkbenchSections({
   mode,
   selectedTags = [],
   tagColors = new Map<string, string>(),
+  onOpenCard,
 }: {
   cards: Card[]
   mode: WorkbenchModeId
   selectedTags?: string[]
   tagColors?: Map<string, string>
+  /** 行点击:打开卡(库本身不编辑,跳画布 dock 接管)。子任务 5。 */
+  onOpenCard: (card: Card) => void
 }) {
   const { t } = useI18n()
   const { snapshot } = useCanvases()
@@ -69,7 +72,19 @@ export function WorkbenchSections({
           </div>
           <ul className="wb__rows wb__rows--pinned">
             {pinned.map((c) => (
-              <li key={c.id} className="wb__row">
+              <li
+                key={c.id}
+                className="wb__row"
+                role="button"
+                tabIndex={0}
+                onClick={() => onOpenCard(c)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onOpenCard(c)
+                  }
+                }}
+              >
                 <span className="wb__rb" style={{ background: 'var(--color-yellow)' }} aria-hidden="true" />
                 <div className="wb__rowtext">
                   <div className="wb__rowtitle">{c.title || c.body.slice(0, 40) || c.id}</div>
@@ -86,6 +101,7 @@ export function WorkbenchSections({
           section={s}
           expanded={expanded === s.key}
           onToggle={() => setExpanded(expanded === s.key ? null : s.key)}
+          onOpenCard={onOpenCard}
         />
       ))}
       <style>{styles}</style>
@@ -98,10 +114,12 @@ function WorkbenchSectionRow({
   section,
   expanded,
   onToggle,
+  onOpenCard,
 }: {
   section: WorkbenchSection
   expanded: boolean
   onToggle: () => void
+  onOpenCard: (card: Card) => void
 }) {
   const preview3 = section.cards.slice(0, 3)
   return (
@@ -122,7 +140,19 @@ function WorkbenchSectionRow({
       {expanded ? (
         <ul className="wb__rows">
           {section.cards.map((c) => (
-            <li key={c.id} className="wb__row">
+            <li
+              key={c.id}
+              className="wb__row"
+              role="button"
+              tabIndex={0}
+              onClick={() => onOpenCard(c)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onOpenCard(c)
+                }
+              }}
+            >
               <span className="wb__rb" style={{ background: section.colorBar }} aria-hidden="true" />
               <div className="wb__rowtext">
                 <div className="wb__rowtitle">{c.title || c.body.slice(0, 40) || c.id}</div>
@@ -187,8 +217,10 @@ const styles = `
 .wb__row {
   display: flex; align-items: center; gap: var(--space-2);
   padding: var(--space-1) var(--space-3) var(--space-1) var(--space-4);
+  cursor: pointer;
 }
 .wb__row:hover { background: var(--color-gray-soft); }
+.wb__row:focus-visible { outline: 2px solid var(--color-red); outline-offset: -2px; }
 .wb__rb { width: 4px; height: 26px; flex-shrink: 0; }
 .wb__rowtext { min-width: 0; }
 .wb__rowtitle {

@@ -46,6 +46,8 @@ vi.mock('@/lib/canvas-store', () => ({
   }),
 }))
 
+const noop = vi.fn()
+
 function render(el: React.ReactElement) {
   const host = document.createElement('div')
   document.body.appendChild(host)
@@ -66,20 +68,20 @@ function render(el: React.ReactElement) {
 
 describe('WorkbenchSections — canvas 模式 + 手风琴', () => {
   it('无 canvasPosition 的卡 → 收件箱分区(isInbox 样式)', () => {
-    const { host } = render(<WorkbenchSections cards={[mk('1')]} mode="canvas" />)
+    const { host } = render(<WorkbenchSections cards={[mk('1')]} mode="canvas" onOpenCard={noop} />)
     expect(host.querySelector('.wb__sec--inbox')).toBeTruthy()
     expect(host.querySelector('.wb__seclbl')!.textContent).toContain('workbench.inbox')
   })
 
   it('默认展开第一个分区(aria-expanded=true)', () => {
-    const { host } = render(<WorkbenchSections cards={[mk('1'), mk('2')]} mode="canvas" />)
+    const { host } = render(<WorkbenchSections cards={[mk('1'), mk('2')]} mode="canvas" onOpenCard={noop} />)
     const headers = host.querySelectorAll('.wb__sechd')
     expect(headers.length).toBe(1)
     expect(headers[0]!.getAttribute('aria-expanded')).toBe('true')
   })
 
   it('点击表头 → 折叠(aria-expanded 变 false),再点展开', () => {
-    const { host } = render(<WorkbenchSections cards={[mk('1')]} mode="canvas" />)
+    const { host } = render(<WorkbenchSections cards={[mk('1')]} mode="canvas" onOpenCard={noop} />)
     const hd = host.querySelector('.wb__sechd') as HTMLButtonElement
     expect(hd.getAttribute('aria-expanded')).toBe('true')
     act(() => hd.click())
@@ -89,7 +91,7 @@ describe('WorkbenchSections — canvas 模式 + 手风琴', () => {
   })
 
   it('展开态显示行列表(.wb__rows),折叠态显示卡组堆叠(.wb__deck)', () => {
-    const { host } = render(<WorkbenchSections cards={[mk('1'), mk('2')]} mode="canvas" />)
+    const { host } = render(<WorkbenchSections cards={[mk('1'), mk('2')]} mode="canvas" onOpenCard={noop} />)
     // 默认展开 → rows 在,deck 不在
     expect(host.querySelector('.wb__rows')).toBeTruthy()
     expect(host.querySelector('.wb__deck')).toBeNull()
@@ -102,7 +104,7 @@ describe('WorkbenchSections — canvas 模式 + 手风琴', () => {
 
   it('折叠态卡组堆叠最多 3 张(A 视觉)', () => {
     const cards = [mk('1'), mk('2'), mk('3'), mk('4'), mk('5')]
-    const { host } = render(<WorkbenchSections cards={cards} mode="canvas" />)
+    const { host } = render(<WorkbenchSections cards={cards} mode="canvas" onOpenCard={noop} />)
     // 先折叠
     const hd = host.querySelector('.wb__sechd') as HTMLButtonElement
     act(() => hd.click())
@@ -112,7 +114,7 @@ describe('WorkbenchSections — canvas 模式 + 手风琴', () => {
 
   it('展开态行列表显示全部卡(色条 + 标题)', () => {
     const cards = [mk('a-卡'), mk('b-卡')]
-    const { host } = render(<WorkbenchSections cards={cards} mode="canvas" />)
+    const { host } = render(<WorkbenchSections cards={cards} mode="canvas" onOpenCard={noop} />)
     const rows = host.querySelectorAll('.wb__row')
     expect(rows.length).toBe(2)
     expect(rows[0]!.querySelector('.wb__rowtitle')!.textContent).toContain('a-卡')
@@ -122,7 +124,7 @@ describe('WorkbenchSections — canvas 模式 + 手风琴', () => {
   it('多个分区:点击第二个,第一个折叠(手风琴 = 同时只一区展开)', () => {
     // 2 张卡:1 有 canvasPosition(但画布列表空 → 未知画布分区)+ 1 无(收件箱)
     const cards = [mk('1', { canvasId: 'ghost' }), mk('2')]
-    const { host } = render(<WorkbenchSections cards={cards} mode="canvas" />)
+    const { host } = render(<WorkbenchSections cards={cards} mode="canvas" onOpenCard={noop} />)
     const headers = host.querySelectorAll('.wb__sechd')
     expect(headers.length).toBe(2)
     // 默认第一个(未知画布)展开
@@ -138,7 +140,7 @@ describe('WorkbenchSections — canvas 模式 + 手风琴', () => {
 describe('WorkbenchSections — 已固定置顶区(子任务3)', () => {
   it('pinned 卡提到置顶区,不进收件箱分组', () => {
     const cards = [mk('1', { pinned: true }), mk('2', { pinned: false })]
-    const { host } = render(<WorkbenchSections cards={cards} mode="canvas" />)
+    const { host } = render(<WorkbenchSections cards={cards} mode="canvas" onOpenCard={noop} />)
     // 置顶区在,且在收件箱分区之前
     const pinnedSec = host.querySelector('.wb__sec--pinned')
     expect(pinnedSec).toBeTruthy()
@@ -152,12 +154,12 @@ describe('WorkbenchSections — 已固定置顶区(子任务3)', () => {
   })
 
   it('无 pinned 卡 → 不渲染置顶区', () => {
-    const { host } = render(<WorkbenchSections cards={[mk('1')]} mode="canvas" />)
+    const { host } = render(<WorkbenchSections cards={[mk('1')]} mode="canvas" onOpenCard={noop} />)
     expect(host.querySelector('.wb__sec--pinned')).toBeNull()
   })
 
   it('置顶区常驻展开(不进手风琴,无 aria-expanded)', () => {
-    const { host } = render(<WorkbenchSections cards={[mk('1', { pinned: true })]} mode="canvas" />)
+    const { host } = render(<WorkbenchSections cards={[mk('1', { pinned: true })]} mode="canvas" onOpenCard={noop} />)
     const pinnedSec = host.querySelector('.wb__sec--pinned')!
     // 置顶区表头是 div 不是 button(不可折叠)
     expect(pinnedSec.querySelector('button.wb__sechd')).toBeNull()
@@ -166,7 +168,7 @@ describe('WorkbenchSections — 已固定置顶区(子任务3)', () => {
 
   it('置顶区计数 = pinned 卡数', () => {
     const cards = [mk('1', { pinned: true }), mk('2', { pinned: true }), mk('3', { pinned: false })]
-    const { host } = render(<WorkbenchSections cards={cards} mode="canvas" />)
+    const { host } = render(<WorkbenchSections cards={cards} mode="canvas" onOpenCard={noop} />)
     const cnt = host.querySelector('.wb__sec--pinned .wb__seccnt')!
     expect(cnt.textContent).toBe('2')
   })

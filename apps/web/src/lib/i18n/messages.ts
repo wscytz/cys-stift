@@ -791,6 +791,7 @@ export const messages = {
   'workbench.pinned': { zh: '已固定', en: 'Pinned' },
   'workbench.noTags': { zh: '这些卡片还没有标签。', en: 'These cards have no tags yet.' },
   'workbench.selectTagHint': { zh: '选择标签来按标签分组(可多选,任一匹配)。', en: 'Select tags to group by (multi-select, any match).' },
+  'workbench.notOnCanvas': { zh: '这张卡还没上画布,已跳转收件箱。', en: 'This card is not on a canvas. Jumped to inbox.' },
   /* ── AI Layout (P7) ── */
   'canvas.aiLayout': { zh: 'AI 排版', en: 'AI layout' },
   'canvas.aiRunning': { zh: '运行中…', en: 'Running…' },

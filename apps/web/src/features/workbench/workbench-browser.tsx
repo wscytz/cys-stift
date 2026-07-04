@@ -1,8 +1,11 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Card } from '@cys-stift/domain'
 import { useI18n } from '@/lib/i18n'
+import { workbenchStore } from '@/lib/workbench-store'
+import { pushToast } from '@/lib/toast-store'
 import { aggregateTags } from '@/features/tags/tag-ops'
 import {
   DEFAULT_WORKBENCH_MODE,
@@ -19,12 +22,30 @@ import { WorkbenchSections } from './workbench-sections'
  *
  * 搜索跨模式:对 title/body 做大小写不敏感包含匹配,过滤后的 cards 再进分区。
  * 标签模式:多选 chip(任一匹配),复用 D5 aggregateTags 拉标签列表。
+ *
+ * 行点击(子任务 5):有 canvasPosition → workbenchStore.open + push /canvas(dock 接管编辑);
+ * 无 canvasPosition → toast「未上画布」+ push /inbox(收件箱区卡本就未上画布,去 inbox 更顺)。
  */
 export function WorkbenchBrowser({ cards }: { cards: Card[] }) {
   const { t } = useI18n()
+  const router = useRouter()
   const [mode, setMode] = useState<WorkbenchModeId>(DEFAULT_WORKBENCH_MODE)
   const [query, setQuery] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
+
+  const onOpenCard = useCallback(
+    (card: Card) => {
+      if (card.canvasPosition) {
+        workbenchStore.open(card.id)
+        router.push('/canvas')
+      } else {
+        // 收件箱区/未上画布的卡 → 提示 + 去 inbox(库本身不编辑)
+        pushToast({ kind: 'info', message: t('workbench.notOnCanvas') })
+        router.push('/inbox')
+      }
+    },
+    [router, t],
+  )
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -114,6 +135,7 @@ export function WorkbenchBrowser({ cards }: { cards: Card[] }) {
           mode={mode}
           selectedTags={selectedTags}
           tagColors={tagColors}
+          onOpenCard={onOpenCard}
         />
       )}
 

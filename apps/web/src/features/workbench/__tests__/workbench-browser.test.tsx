@@ -3,7 +3,7 @@
  * 子任务 2-4 会替换 placeholder 为真实分组(这些测试届时调整)。
  * react-dom/client + act(policy)。i18n mock。
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Card, TagColor, TagRef } from '@cys-stift/domain'
@@ -28,11 +28,34 @@ vi.mock('@/lib/canvas-store', () => ({
   }),
 }))
 
+// 子任务 5 行点击链路:mock router + workbenchStore + toast,断言调用参数。
+// vi.hoisted 让 mock 函数与 vi.mock 同步提升(factory 内能安全引用)。
+const { pushMock, openMock, toastMock } = vi.hoisted(() => ({
+  pushMock: vi.fn(),
+  openMock: vi.fn(),
+  toastMock: vi.fn(),
+}))
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: pushMock }),
+}))
+vi.mock('@/lib/workbench-store', () => ({
+  workbenchStore: { open: openMock },
+}))
+vi.mock('@/lib/toast-store', () => ({
+  pushToast: (t: { kind: string; message: string }) => toastMock(t),
+}))
+
 function mk(
   id: string,
-  opts: { title?: string; body?: string; type?: Card['type']; tags?: Array<[string, TagColor]> } = {},
+  opts: {
+    title?: string
+    body?: string
+    type?: Card['type']
+    tags?: Array<[string, TagColor]>
+    canvasId?: string
+  } = {},
 ): Card {
-  const { title = id, body = '', type = 'note', tags = [] } = opts
+  const { title = id, body = '', type = 'note', tags = [], canvasId } = opts
   return {
     id,
     title,
@@ -44,6 +67,9 @@ function mk(
     tags: tags.map(([value, color]) => ({ value, color } as TagRef)),
     pinned: false,
     archived: false,
+    canvasPosition: canvasId
+      ? ({ canvasId, x: 0, y: 0, w: 100, h: 100, z: 0 } as Card['canvasPosition'])
+      : undefined,
   } as unknown as Card
 }
 
@@ -73,6 +99,12 @@ function setInputValue(input: HTMLInputElement, text: string) {
 }
 
 describe('WorkbenchBrowser shell (子任务1)', () => {
+  beforeEach(() => {
+    pushMock.mockClear()
+    openMock.mockClear()
+    toastMock.mockClear()
+  })
+
   it('渲染搜索框 + 3 个模式 tab', () => {
     const { host } = render(<WorkbenchBrowser cards={[mk('1', { title: 'a' })]} />)
     expect(host.querySelector('.wb__search-input')).toBeTruthy()
@@ -195,5 +227,40 @@ describe('WorkbenchBrowser shell (子任务1)', () => {
       ;(host.querySelectorAll('.wb__mode')[2]! as HTMLButtonElement).click()
     })
     expect(host.querySelector('.wb__tagempty')).toBeTruthy()
+  })
+
+  // ── 子任务 5:行点击链路 ──
+  it('行点击(有 canvasPosition)→ workbenchStore.open + push /canvas', () => {
+    const cards = [mk('1', { canvasId: 'c1' })]
+    const { host } = render(<WorkbenchBrowser cards={cards} />)
+    // canvas 模式:有 canvasPosition 但画布列表空 → 未知画布分区(非收件箱),默认展开
+    const row = host.querySelector('.wb__row') as HTMLLIElement
+    expect(row).toBeTruthy()
+    act(() => row.click())
+    expect(openMock).toHaveBeenCalledWith('1')
+    expect(pushMock).toHaveBeenCalledWith('/canvas')
+    expect(toastMock).not.toHaveBeenCalled()
+  })
+
+  it('行点击(无 canvasPosition,收件箱卡)→ toast 提示 + push /inbox,不 open', () => {
+    const cards = [mk('1')] // 无 canvasId → 收件箱
+    const { host } = render(<WorkbenchBrowser cards={cards} />)
+    const row = host.querySelector('.wb__row') as HTMLLIElement
+    expect(row).toBeTruthy()
+    act(() => row.click())
+    expect(openMock).not.toHaveBeenCalled()
+    expect(pushMock).toHaveBeenCalledWith('/inbox')
+    expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ kind: 'info' }))
+  })
+
+  it('行键盘 Enter 触发等同点击(无障碍)', () => {
+    const cards = [mk('1', { canvasId: 'c1' })]
+    const { host } = render(<WorkbenchBrowser cards={cards} />)
+    const row = host.querySelector('.wb__row') as HTMLLIElement
+    act(() => {
+      row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+    expect(openMock).toHaveBeenCalledWith('1')
+    expect(pushMock).toHaveBeenCalledWith('/canvas')
   })
 })
