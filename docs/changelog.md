@@ -5,6 +5,21 @@
 
 ---
 
+## 2026-07-04 · v0.51.0 · workbench-trio（工作台三件套：编辑器 + 标签管理 + 库页 D4）
+
+「大卡扶正」工作台线**收官**——三件套齐 + 富 Markdown 代码高亮 + DSL 防护。cc + zcode 协作：cc ship D1-D3/D5/D6 + 工作台 dock，zcode PR day1（rehype-highlight + Bauhaus 主题 + DSL `@text` 上限）+ day2（D4 `/workbench` 卡片库页，形态 (ii) 另开入口），cc 验+合并 main（`dd47924` / `daa8fbe`），bump v0.51.0 + tag。
+
+- **富 Markdown**：remark-gfm（表格/任务/删除线）+ rehype-highlight（Bauhaus 语法主题，黑底避 blue）。
+- **工作台 dock 编辑器（D2）**：弹窗「展开」→ dock 右栏，lucide 工具栏 + split 预览，autosave + 收起 flush。
+- **卡片库页 `/workbench`（D4，形态 ii）**：分类切换器（画布/类型/标签，数据驱动可扩展）+ A 折叠/C 展开手风琴 + 已固定置顶 + 收件箱 + 搜索，点卡 `workbenchStore.open` + 跳 dock 编辑。
+- **标签管理 `/tags`（D5）**：改名/改色/删/多源合并（tag-ops 纯函数 + mergeTagsInto）。
+- **DSL `@text/@label` 长度上限 200**（防 AI 超长 DoS，STATE ⑩）。
+- **lucide 图标 hub（D6）**。
+
+web test 1244 / lint 0 / build exit 0。
+
+---
+
 ## 2026-07-04 · workbench-browser（D4 卡片库页 `/workbench`，形态 (ii) 另开入口）
 
 工作台 spec D4。形态决策:**窄 dock 单卡编辑器(D2)保留;库侧栏独立成全屏 `/workbench` 页**(不扩宽 dock)。库 = 浏览/整理面,点卡跳回画布 dock 编辑(库本身不编辑)。

@@ -112,6 +112,18 @@
 | v0.33.1-ai-context | feat(v0.33.1): P6 AI context — allowlist + canvas snapshot + … | v0.33.1-ai-context |
 | v0.33.2-ai-layout | feat(v0.33.2): P7 AI layout — canvas toolbar button + applyLa… | v0.33.2-ai-layout |
 | v0.36.0-search | feat(v0.36.0): P11 search enhancement — scored search + tags … | v0.36.0-search |
+| v0.37.0 | docs(README): license section TBD → GPL-3.0-or-later | v0.37.0 |
+| v0.38.0 | fix(canvas): B1 跳转孤儿卡卡死 + 模板空 DSL 误导反馈 + 首页版本号 v0.38 | v0.38.0 |
+| v0.39.0 | chore: bump 版本 0.38.0 → 0.39.0(自审修复 + 文档同步) | v0.39.0 |
+| v0.39.1 | chore: bump 版本 0.39.0 → 0.39.1(Windows 适配:字体分层+native 控件 Bauh… | v0.39.1 |
+| v0.45.0 | chore(release): v0.45.0 — DSL 语法单一源 + 版本号 | v0.45.0 |
+| v0.46.0 | chore: v0.46.0 wrap-up — STATE/changelog + version bump (0.45… | v0.46.0 |
+| v0.47.0 | docs+chore: freedraw v1 wrap-up — STATE/changelog v0.47.0 + v… | v0.47.0 |
+| v0.48.0 | release: v0.48.0 responsive layout (tablet) | v0.48.0 |
+| v0.49.0 | release: v0.49.0 touch gestures (tablet) | v0.49.0 |
+| v0.49.1 | release: v0.49.1 touch gestures patch (pinch pointer capture) | v0.49.1 |
+| v0.50.0 | release: v0.50.0 安卓运行时适配 + 全平台打包 | v0.50.0 |
+| v0.51.0 | chore: bump v0.51.0（工作台三件套：编辑器+标签管理+库页 D4） | v0.51.0 |
 <!-- gen-state:end -->
 
 ## 当前能力(用户视角)
