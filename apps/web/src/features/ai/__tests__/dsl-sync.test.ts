@@ -49,3 +49,44 @@ describe('parser color acceptance == DSL_COLORS ∪ aliases', () => {
     expect(ops[0]!.color).toBeUndefined()
   })
 })
+
+/** parser 识别 @wikilink 标记(锁住 wikilink arrow 的显式 DSL 属性)。 */
+describe('parser recognizes @wikilink on arrows', () => {
+  it('sets op.wikilink === true when @wikilink is present on a relation arrow', () => {
+    const { ops, errors } = parseDslWithDiagnostics(
+      '[arrow #a1] from #x to #y @wikilink',
+    )
+    expect(errors).toEqual([])
+    expect(ops[0]).toBeDefined()
+    expect(ops[0]!.type).toBe('arrow')
+    expect((ops[0] as { wikilink?: boolean }).wikilink).toBe(true)
+  })
+
+  it('sets op.wikilink === undefined when @wikilink is absent', () => {
+    const { ops, errors } = parseDslWithDiagnostics(
+      '[arrow #a1] from #x to #y',
+    )
+    expect(errors).toEqual([])
+    expect(ops[0]).toBeDefined()
+    expect(ops[0]!.type).toBe('arrow')
+    expect((ops[0] as { wikilink?: boolean }).wikilink).toBeUndefined()
+  })
+
+  it('sets op.wikilink === true on free arrows too (parser fills uniformly)', () => {
+    const { ops, errors } = parseDslWithDiagnostics(
+      '[arrow #fa1] @pos(0,0) @size(10,20) @wikilink',
+    )
+    expect(errors).toEqual([])
+    expect(ops[0]).toBeDefined()
+    expect(ops[0]!.type).toBe('arrow')
+    expect((ops[0] as { wikilink?: boolean }).wikilink).toBe(true)
+  })
+
+  it('does not treat @wikilinkXYZ as the marker (word boundary required)', () => {
+    const { ops } = parseDslWithDiagnostics(
+      '[arrow #a1] from #x to #y @wikilinkXYZ',
+    )
+    expect(ops[0]).toBeDefined()
+    expect((ops[0] as { wikilink?: boolean }).wikilink).toBeUndefined()
+  })
+})

@@ -95,6 +95,10 @@ export type DslArrowOp = {
   route?: 'straight' | 'curve' | 'elbow'
   /** 折线折点(1-2 个,绝对页坐标)。route='elbow' 时用。 */
   elbow?: { x: number; y: number }[]
+  /** 显式 wikilink 标记:仅 meta.wikilink===true 的箭头序列化时 emit `@wikilink`。
+   *  区分自动建(wikilink)箭头与手动 references 箭头,让标记在 DSL round-trip 中存活。
+   *  应用时(applyArrowOp)→ host 元素 meta.wikilink=true。 */
+  wikilink?: boolean
 }
 
 export type DslOp = DslCardOp | DslFreeOp | DslArrowOp
@@ -147,6 +151,10 @@ const CURVE_RE = /@curve\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)/
 const ROUTE_RE = /@route\((straight|curve|elbow)\)/
 /** 折点:@elbow(x,y;x,y) — 分号分隔 1-2 个折点(均支持负坐标)。 */
 const ELBOW_RE = /@elbow\(([^)]+)\)/
+
+/** @wikilink 显式标记:仅 meta.wikilink===true 的箭头 emit。`@wikilinkXYZ` 不匹配
+ *  (单词边界 \b 防前缀误命中)。parser 在 arrow 分支(关系 + 自由)统一填 wikilink。 */
+const WIKILINK_RE = /@wikilink\b/
 
 function extractId(text: string): string | null {
   const m = text.match(ID_RE)
@@ -314,6 +322,7 @@ export function parseDslWithDiagnostics(dslText: string): {
           curve: extractCurve(line),
           route: extractRoute(line),
           elbow: extractElbow(line),
+          wikilink: WIKILINK_RE.test(line) || undefined,
         })
       } else {
         // 自由箭头:无 from/to,需 pos + size(w/h 可负,编码线段方向)
@@ -344,6 +353,7 @@ export function parseDslWithDiagnostics(dslText: string): {
           curve: extractCurve(line),
           route: extractRoute(line),
           elbow: extractElbow(line),
+          wikilink: WIKILINK_RE.test(line) || undefined,
         })
       }
       continue

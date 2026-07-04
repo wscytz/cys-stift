@@ -220,6 +220,48 @@ describe('serializeCanvas — arrow route (curve/elbow)', () => {
     ])
     expect(out).not.toContain('@route')
   })
+
+  // ── @wikilink 显式标记(仅 meta.wikilink===true 时 emit)──
+
+  it('emits @wikilink when arrow.meta.wikilink is true (relation arrow)', () => {
+    const out = serializeCanvas([
+      {
+        id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0,
+        from: 'c1', to: 'c2', text: 'references', color: 'blue', dash: 'dashed', arrowhead: 'none',
+        meta: { wikilink: true },
+      },
+    ])
+    expect(out).toContain('@wikilink')
+    // @wikilink 出现在 sig 末尾(after @arrowhead/@route/@elbow)。
+    expect(out).toMatch(/@arrowhead\(none\) @wikilink$/)
+  })
+
+  it('omits @wikilink when meta.wikilink is absent', () => {
+    const out = serializeCanvas([
+      { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2' },
+    ])
+    expect(out).not.toContain('@wikilink')
+  })
+
+  it('omits @wikilink when meta.wikilink is not exactly true', () => {
+    const out = serializeCanvas([
+      {
+        id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2',
+        meta: { wikilink: 'yes' },
+      },
+    ])
+    expect(out).not.toContain('@wikilink')
+  })
+
+  it('emits @wikilink on free arrows too (sig is shared)', () => {
+    const out = serializeCanvas([
+      {
+        id: 'fa1', kind: 'arrow', x: 10, y: 20, w: 100, h: 50, rotation: 0,
+        meta: { wikilink: true },
+      },
+    ])
+    expect(out).toContain('@wikilink')
+  })
 })
 
 describe('canvas DSL round-trip — arrow route', () => {

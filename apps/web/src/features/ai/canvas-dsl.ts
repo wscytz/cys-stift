@@ -98,7 +98,8 @@ export function serializeElement(e: CanvasElement): string {
         (e.arrowhead ? ` @arrowhead(${e.arrowhead})` : '') +
         (e.curve ? ` @curve(${e.curve.cx.toFixed(1)},${e.curve.cy.toFixed(1)})` : '') +
         routeAttr +
-        elbowAttr
+        elbowAttr +
+        (e.meta?.wikilink === true ? ' @wikilink' : '')
       if (e.from && e.to) {
         // Relation arrow: endpoint references.
         return `[arrow #${e.id}] from #${e.from} to #${e.to}${sig}`

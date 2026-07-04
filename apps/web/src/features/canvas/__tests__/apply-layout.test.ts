@@ -510,6 +510,80 @@ describe('applyLayout', () => {
     expect(el.elbow).toEqual([{ x: 30, y: 5 }])
   })
 
+  // ── arrow wikilink meta — DSL symmetry fix (wikilink round-trip) ──
+
+  it('creates a relation arrow with meta.wikilink when op.wikilink is true (create path)', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    host.upsert({ id: 'c2', kind: 'card', x: 50, y: 0, w: 10, h: 10, rotation: 0 })
+    applyLayout(host, [
+      { type: 'arrow', from: 'c1', to: 'c2', wikilink: true },
+    ])
+    const el = host.getElements().find((e) => e.kind === 'arrow')!
+    expect(el.meta?.wikilink).toBe(true)
+  })
+
+  it('updates an existing relation arrow setting meta.wikilink when op.wikilink is true (update path)', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    host.upsert({ id: 'c2', kind: 'card', x: 50, y: 0, w: 10, h: 10, rotation: 0 })
+    // Existing arrow with prior meta (other key) — must be preserved when setting wikilink.
+    host.upsert({
+      id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0,
+      from: 'c1', to: 'c2',
+      meta: { otherKey: 'preserved' },
+    })
+    applyLayout(host, [
+      { type: 'arrow', id: 'a1', from: 'c1', to: 'c2', wikilink: true },
+    ])
+    const el = host.getElement('a1')!
+    expect(el.meta?.wikilink).toBe(true)
+    expect(el.meta?.otherKey).toBe('preserved')
+  })
+
+  it('creates a free arrow with meta.wikilink when op.wikilink is true (free create path)', () => {
+    const host = new InMemoryCanvasHost()
+    applyLayout(host, [
+      {
+        type: 'arrow',
+        from: '',
+        to: '',
+        freeArrow: true,
+        x: 10,
+        y: 20,
+        w: 100,
+        h: 50,
+        wikilink: true,
+      },
+    ])
+    const arrows = host.getElements().filter((e) => e.kind === 'arrow')
+    expect(arrows).toHaveLength(1)
+    expect(arrows[0]!.meta?.wikilink).toBe(true)
+  })
+
+  it('updates a free arrow setting meta.wikilink when op.wikilink is true (free update path)', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({
+      id: 'fa1', kind: 'arrow', x: 0, y: 0, w: 10, h: 10, rotation: 0,
+      meta: { existingMeta: 'keep' },
+    })
+    applyLayout(host, [
+      {
+        type: 'arrow',
+        id: 'fa1',
+        from: '',
+        to: '',
+        freeArrow: true,
+        x: 100,
+        y: 50,
+        wikilink: true,
+      },
+    ])
+    const el = host.getElement('fa1')!
+    expect(el.meta?.wikilink).toBe(true)
+    expect(el.meta?.existingMeta).toBe('keep')
+  })
+
   // ── incremental apply optimization — P1 performance ───────────────────────
 
   it('second apply with same ops applies zero when using appliedHashes', () => {

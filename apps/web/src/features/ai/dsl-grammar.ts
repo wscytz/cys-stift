@@ -11,7 +11,7 @@
  * bump 规则:增删指令种类 / 增删属性 / 改颜色枚举 → bump DSL_VERSION。
  * 纯改 prompt 措辞、改 parser 正则细节(不动语法)→ 不 bump。
  */
-export const DSL_VERSION = 1
+export const DSL_VERSION = 2
 
 /**
  * `@text("...")` / `@label("...")` 值的最大字符数。
@@ -47,11 +47,14 @@ export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one eleme
   [rect #id] @pos(x, y) @size(w, h) @color(c)
   [text #id] @pos(x, y) @text("...") @color(c)
   [frame #id] @pos(x, y) @size(w, h) @text("title") @color(c)   # themed group/section container
-  [arrow #id] from #a to #b @label("...") @color(c) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none)
+  [arrow #id] from #a to #b @label("...") @color(c) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none) [@wikilink]
   [arrow #id] @pos(x, y) @size(w, h) @color(c)   # free arrow (no from/to)
   # arrow route (optional, to bend or elbow around obstacles):
   #   @route(curve) @curve(cx,cy)                 # smooth quadratic curve via one control point
   #   @route(elbow) @elbow(x,y;x,y)               # 1-2 corner points (semicolon-separated)
   #   (omit @route for a straight line)
+  # @wikilink (optional, relation/free arrow): only on wikilink-auto arrows
+  #   (meta.wikilink===true); distinguishes auto-built wikilink arrows from
+  #   manual references arrows so the marker survives DSL round-trip.
 Rules: card is update-only (content comes from elsewhere, you may reposition but not create orphan cards);
   lines starting with # are comments and ignored; colors are the ${DSL_COLORS.length} Bauhaus tokens only.`

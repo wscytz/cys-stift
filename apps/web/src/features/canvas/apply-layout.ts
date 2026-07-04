@@ -221,6 +221,12 @@ function applyFreeOp(host: CanvasHost, op: DslFreeOp): boolean {
 }
 
 function applyArrowOp(host: CanvasHost, op: DslArrowOp): boolean {
+  // wikilink meta 应用:op.wikilink=true → host 元素 meta.wikilink=true。
+  // create 路径:新建时直接带 meta;update 路径:在各自的 existing.meta 上就地合并
+  // (inline 在每个 update 分支,保留 existing.meta 的其他键)。
+  const wikilinkMetaForCreate =
+    op.wikilink === true ? { meta: { wikilink: true } } : {}
+
   // ── 自由箭头:无 from/to,bbox 编码线段(w/h 可负表方向)──
   // 既认显式 freeArrow 标记,也认 from/to 都空串的兜底(防御 parse 端漏标)。
   if (op.freeArrow || (!op.from && !op.to)) {
@@ -244,6 +250,14 @@ function applyArrowOp(host: CanvasHost, op: DslArrowOp): boolean {
           ...(op.curve ? { curve: op.curve } : {}),
           ...(op.route ? { route: op.route } : {}),
           ...(op.elbow ? { elbow: op.elbow } : {}),
+          ...(op.wikilink === true
+            ? {
+                meta: {
+                  ...((existing.meta as Record<string, unknown> | undefined) ?? {}),
+                  wikilink: true,
+                },
+              }
+            : {}),
         })
         return true
       }
@@ -264,6 +278,7 @@ function applyArrowOp(host: CanvasHost, op: DslArrowOp): boolean {
       ...(op.curve ? { curve: op.curve } : {}),
       ...(op.route ? { route: op.route } : {}),
       ...(op.elbow ? { elbow: op.elbow } : {}),
+      ...wikilinkMetaForCreate,
     })
     return true
   }
@@ -285,6 +300,14 @@ function applyArrowOp(host: CanvasHost, op: DslArrowOp): boolean {
         ...(op.curve ? { curve: op.curve } : {}),
         ...(op.route ? { route: op.route } : {}),
         ...(op.elbow ? { elbow: op.elbow } : {}),
+        ...(op.wikilink === true
+          ? {
+              meta: {
+                ...((existing.meta as Record<string, unknown> | undefined) ?? {}),
+                wikilink: true,
+              },
+            }
+          : {}),
       })
       return true
     }
@@ -313,6 +336,7 @@ function applyArrowOp(host: CanvasHost, op: DslArrowOp): boolean {
     ...(op.curve ? { curve: op.curve } : {}),
     ...(op.route ? { route: op.route } : {}),
     ...(op.elbow ? { elbow: op.elbow } : {}),
+    ...wikilinkMetaForCreate,
   })
   return true
 }

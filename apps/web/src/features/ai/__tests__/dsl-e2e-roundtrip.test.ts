@@ -138,6 +138,25 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
     expect(roundtripped).toBe(original)
   })
 
+  it('wikilink arrow e2e round-trip (@wikilink marker survives serialize→parse→apply→re-serialize)', () => {
+    const host = new InMemoryCanvasHost()
+    const { original, roundtripped } = roundTrip(host, [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 },
+      { id: 'c2', kind: 'card', x: 100, y: 0, w: 10, h: 10, rotation: 0 },
+      {
+        id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0,
+        from: 'c1', to: 'c2', text: 'references', color: 'blue', dash: 'dashed', arrowhead: 'none',
+        meta: { wikilink: true },
+      },
+    ])
+    // The @wikilink marker must round-trip losslessly through the full pipeline.
+    expect(original).toContain('@wikilink')
+    expect(roundtripped).toBe(original)
+    // The host's arrow must retain meta.wikilink after apply (re-serializer reads from element.meta).
+    const arrowEl = host.getElement('a1')
+    expect(arrowEl?.meta?.wikilink).toBe(true)
+  })
+
   it('free arrow route=elbow e2e round-trip (bbox + route + elbow byte-equal)', () => {
     const host = new InMemoryCanvasHost()
     const { original, roundtripped } = roundTrip(host, [
