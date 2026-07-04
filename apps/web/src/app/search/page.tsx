@@ -3,12 +3,14 @@
 import { useDeferredValue, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Toolbar, Tag } from '@cys-stift/ui'
-import type { Card, SearchResult } from '@cys-stift/domain'
+import type { Card, CardId, SearchResult } from '@cys-stift/domain'
 import { searchCards, bodySnippet } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
 import { PageLoading } from '@/components/page-loading'
 import { CardDetailModal } from '@/features/card/card-detail'
+import { useGlobalEdges } from '@/features/graph/use-global-edges'
+import { liveEdgesOnly } from '@/features/graph/aggregate-edges'
 import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
 
 /**
@@ -20,6 +22,15 @@ import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
 export default function SearchPage() {
   const { t } = useI18n()
   const { snap, service, ready } = useDb()
+  // 跨画布 backlinks(只读):聚合全局边后过滤端点已软删的(G7 防泄露),传 CardDetailModal
+  // 显示「这张卡和谁有关系」。canEditRelations 不传(默认 false=只读,无 × 删除/+ 添加钮)。
+  const { edges } = useGlobalEdges()
+  const liveEdges = useMemo(
+    () => liveEdgesOnly(edges, service.listAll()),
+    // snap 是 useSyncExternalStore 快照,数据变化才换引用(同 graph 页 liveEdges 口径)。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [edges, snap, service],
+  )
   const [query, setQuery] = useState('')
   const [detail, setDetail] = useState<{ card: Card } | null>(null)
   // BUG-1 fix: detail 是 local state,跨 tab 软删/归档后 useDb re-render 但 detail 不清
@@ -99,6 +110,8 @@ export default function SearchPage() {
       {effectiveDetail && (
         <CardDetailModal
           card={effectiveDetail.card}
+          globalEdges={liveEdges}
+          getCardTitle={(id) => service.get(id as CardId)?.title}
           actions={['archive', 'softDelete', 'sendToCanvas', 'pin']}
           onClose={() => setDetail(null)}
           onSave={(patch) => {

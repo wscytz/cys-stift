@@ -82,3 +82,16 @@ export function cardsToNodes(cards: Card[]): GraphNode[] {
     archived: c.archived,
   }))
 }
+
+/**
+ * 过滤 edges:只留 from/to 都指向**非软删卡**的边。
+ *
+ * `useGlobalEdges` 聚合了所有画布的 arrow(含端点已软删的),直传 CardDetailModal
+ * 会让 backlinks 区泄露已软删卡的关系(G7 —— graph 页用 nodes 兜底做的同件事)。
+ * 非 graph 页(inbox/timeline/archive/search)没有 nodes,统一走本 helper,用
+ * `service.listAll()` 过滤。`String(c.id)` 对齐 GraphEdge.from/to 的 string 类型。
+ */
+export function liveEdgesOnly(edges: GraphEdge[], cards: Card[]): GraphEdge[] {
+  const liveIds = new Set(cards.filter((c) => !c.deletedAt).map((c) => String(c.id)))
+  return edges.filter((e) => liveIds.has(e.from) && liveIds.has(e.to))
+}

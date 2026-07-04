@@ -10,6 +10,8 @@ import { useI18n } from '@/lib/i18n'
 import { PageLoading } from '@/components/page-loading'
 import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
 import { CardDetailModal } from '@/features/card/card-detail'
+import { useGlobalEdges } from '@/features/graph/use-global-edges'
+import { liveEdgesOnly } from '@/features/graph/aggregate-edges'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import { captureSinkRegistry } from '@/features/capture/capture-sink'
 import { getDeviceId } from '@/lib/device-id'
@@ -31,6 +33,15 @@ const DEVICE_ID = getDeviceId()
 export default function TimelinePage() {
   const { t } = useI18n()
   const { snap, service, ready } = useDb()
+  // 跨画布 backlinks(只读):聚合全局边后过滤端点已软删的(G7 防泄露),传 CardDetailModal
+  // 显示「这张卡和谁有关系」。canEditRelations 不传(默认 false=只读,无 × 删除/+ 添加钮)。
+  const { edges } = useGlobalEdges()
+  const liveEdges = useMemo(
+    () => liveEdgesOnly(edges, service.listAll()),
+    // snap 是 useSyncExternalStore 快照,数据变化才换引用(同 graph 页 liveEdges 口径)。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [edges, snap, service],
+  )
   void snap // 订阅快照,数据变化时 re-render
   const { snapshot: canvasesSnap } = useCanvases()
   const [detail, setDetail] = useState<Card | null>(null)
@@ -145,6 +156,8 @@ export default function TimelinePage() {
       {effectiveDetail && (
         <CardDetailModal
           card={effectiveDetail}
+          globalEdges={liveEdges}
+          getCardTitle={(id) => service.get(id as CardId)?.title}
           actions={['archive', 'unarchive', 'sendToCanvas', 'softDelete', 'pin', 'export', 'rewrite', 'summarize', 'translate']}
           onClose={() => setDetail(null)}
           onSave={(patch) => {

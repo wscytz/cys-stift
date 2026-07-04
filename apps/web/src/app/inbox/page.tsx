@@ -7,6 +7,8 @@ import type { Card, CardId } from '@cys-stift/domain'
 import { findDuplicateGroups, type DuplicateGroup } from '@cys-stift/domain'
 import { CreateCardForm } from './create-card-form'
 import { CardDetailModal } from '@/features/card/card-detail'
+import { useGlobalEdges } from '@/features/graph/use-global-edges'
+import { liveEdgesOnly } from '@/features/graph/aggregate-edges'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import { useCanvases } from '@/lib/canvas-store'
 import { captureSinkRegistry } from '@/features/capture/capture-sink'
@@ -25,6 +27,15 @@ const DEVICE_ID = getDeviceId()
 export default function InboxPage() {
   const { t } = useI18n()
   const { snap, service, ready } = useDb()
+  // 跨画布 backlinks(只读):聚合全局边后过滤端点已软删的(G7 防泄露),传 CardDetailModal
+  // 显示「这张卡和谁有关系」。canEditRelations 不传(默认 false=只读,无 × 删除/+ 添加钮)。
+  const { edges } = useGlobalEdges()
+  const liveEdges = useMemo(
+    () => liveEdgesOnly(edges, service.listAll()),
+    // snap 是 useSyncExternalStore 快照,数据变化才换引用(同 graph 页 liveEdges 口径)。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [edges, snap, service],
+  )
   void snap // subscribe to the snapshot so the component re-renders on changes
   const [view, setView] = useState<View>('inbox')
   // Phase archive-detail: detail state simplified — modal owns view/edit
@@ -432,6 +443,8 @@ export default function InboxPage() {
       {effectiveDetail && (
         <CardDetailModal
           card={effectiveDetail}
+          globalEdges={liveEdges}
+          getCardTitle={(id) => service.get(id as CardId)?.title}
           actions={['archive', 'unarchive', 'sendToCanvas', 'softDelete', 'pin', 'export', 'rewrite', 'summarize', 'translate']}
           onClose={() => setDetail(null)}
           onSave={(patch) => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { aggregateEdges, cardsToNodes } from '../aggregate-edges'
+import { aggregateEdges, cardsToNodes, liveEdgesOnly } from '../aggregate-edges'
 import type { Card } from '@cys-stift/domain'
 import type { CanvasFreeformSnapshot } from '@/lib/canvas-freeform-store'
 
@@ -91,5 +91,46 @@ describe('cardsToNodes', () => {
   it('preserves archived + type + title', () => {
     const nodes = cardsToNodes([card({ id: 'c3' as never, title: 'T', type: 'code', archived: true })])
     expect(nodes[0]).toMatchObject({ id: 'c3', title: 'T', type: 'code', archived: true })
+  })
+})
+
+describe('liveEdgesOnly', () => {
+  function card(over: Partial<Card>): Card {
+    return {
+      id: 'x' as never, title: '', body: '', type: 'note', tags: [], links: [],
+      codeSnippets: [], quotes: [], media: [], source: { kind: 'manual', deviceId: 'web' } as never,
+      capturedAt: new Date(), createdAt: new Date(), updatedAt: new Date(), archived: false, pinned: false,
+      ...over,
+    } as Card
+  }
+  function edge(from: string, to: string): unknown {
+    return {
+      from, to,
+      signature: { color: 'black', dash: 'solid', arrowhead: 'none' },
+      relationType: null, isWikilink: false, arrowId: `${from}->${to}`, canvasId: 'c1' as never,
+    }
+  }
+  it('keeps edges whose both endpoints are live (non-deleted) cards', () => {
+    const edges = [edge('a', 'b'), edge('b', 'c')] as never
+    const cards = [card({ id: 'a' as never }), card({ id: 'b' as never }), card({ id: 'c' as never })]
+    expect(liveEdgesOnly(edges as never, cards)).toHaveLength(2)
+  })
+  it('drops edges whose `from` card is soft-deleted (G7 防泄露)', () => {
+    const edges = [edge('a', 'b')] as never
+    const cards = [card({ id: 'a' as never, deletedAt: new Date() }), card({ id: 'b' as never })]
+    expect(liveEdgesOnly(edges as never, cards)).toHaveLength(0)
+  })
+  it('drops edges whose `to` card is soft-deleted', () => {
+    const edges = [edge('a', 'b')] as never
+    const cards = [card({ id: 'a' as never }), card({ id: 'b' as never, deletedAt: new Date() })]
+    expect(liveEdgesOnly(edges as never, cards)).toHaveLength(0)
+  })
+  it('keeps archived (non-deleted) cards — archived ≠ deleted', () => {
+    const edges = [edge('a', 'b')] as never
+    const cards = [card({ id: 'a' as never, archived: true }), card({ id: 'b' as never })]
+    expect(liveEdgesOnly(edges as never, cards)).toHaveLength(1)
+  })
+  it('returns empty for empty edges', () => {
+    expect(liveEdgesOnly([], [card({ id: 'a' as never })])).toHaveLength(0)
   })
 })
