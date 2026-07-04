@@ -41,6 +41,7 @@
 | **v0.49.0** | **触摸手势(画板适配第二阶段,代码层):SelfBuiltAdapter 多指跟踪(activePointers Map)+ 双指 pinch zoom(中点锚,复用 onWheel 数学)+ 双指中点 pan + 单指-双指切换(startPinch 调 clearInteractionState)+ touch-action:none 核查(主画布/graph/辅助 canvas 均已有)+ 触摸目标 44px(平板态 inbox/archive tile 角标);单指元素/双指画布(Figma/Procreate 范式);桌面+鼠标零回归。canvas-engine 511 + web 1138 测试** | v0.49.0 |
 | **v0.49.1** | **触摸手势 patch:pinch 第二指 `setPointerCapture`(v0.49 headline 真 bug — 第二指漂出 canvas 收不到 move → pinch 坏)+ canvas 断点 off-by-one 归一(960/900→1023/767)+ 纯 pan/抬指退 pinch 2 测 + layout 注释。canvas-engine 513 + web 1138** | v0.49.1 |
 | **v0.50.0** | **安卓运行时适配 + 全平台打包:platform.ts 加 isMobile/isDesktop(userAgent,SSR 安全);设置页全局快捷键配置段 + 首页 ⌘/^ 捕获提示块移动端隐藏(安卓无系统全局热键;capture 仍可用经 AppMenu/inbox);capture-host __TAURI__ catch(invoke 安卓 no-op 不崩)。macOS .app/.dmg + Android .apk(arm64)打包;Windows 走 CI。web 1138 test 零回归。** | v0.50.0 |
+| **v0.51.0** | **工作台三件套:富 Markdown 编辑器(toolbar+split preview+remark-gfm+rehype-highlight Bauhaus 主题)+ 标签管理(多选+二级管理页 /tags)+ 库页 D4(/workbench:默认画布/自定义 tag/堆叠分区)+ DSL guard;lucide 图标 hub。** | v0.51.0 |
 | **v0.52.0** | **内容版本/开发存档:archive-store(OPFS two-tier index+payload)+ release/风险 op/手动 触发 + /dev/archive 查档+导出 JSON + 分层 retention(b cap 100,a/c 永久)** | v0.52.0 |
 
 > v0.18–v0.21 版本号在历史中跳过(从 v0.17.0 直接进 v0.22.0),非缺失。
@@ -125,6 +126,7 @@
 | v0.49.1 | release: v0.49.1 touch gestures patch (pinch pointer capture) | v0.49.1 |
 | v0.50.0 | release: v0.50.0 安卓运行时适配 + 全平台打包 | v0.50.0 |
 | v0.51.0 | chore: bump v0.51.0（工作台三件套：编辑器+标签管理+库页 D4） | v0.51.0 |
+| v0.52.0 | release: v0.52.0 内容版本/开发存档(archive-versioning) | v0.52.0 |
 <!-- gen-state:end -->
 
 ## 当前能力(用户视角)
