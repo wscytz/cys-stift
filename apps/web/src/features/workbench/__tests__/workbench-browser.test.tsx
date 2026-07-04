@@ -20,6 +20,14 @@ vi.mock('@/lib/i18n', () => ({
   }),
 }))
 
+// WorkbenchSections 调 useCanvases();mock 成空画布列表(canvas 模式下卡全进收件箱)。
+vi.mock('@/lib/canvas-store', () => ({
+  useCanvases: () => ({
+    snapshot: { canvases: [], activeCanvasId: 'default' },
+    ready: true,
+  }),
+}))
+
 function mk(id: string, title: string, body = ''): Card {
   return {
     id,
@@ -87,14 +95,12 @@ describe('WorkbenchBrowser shell (子任务1)', () => {
     expect(onTab?.textContent).toContain('workbench.mode.type')
   })
 
-  it('placeholder 显示卡片计数(mock t() 把 {n} 替换进 key)', () => {
+  it('有卡 → 渲染分区(WorkbenchSections)', () => {
     const cards = [mk('1', 'a'), mk('2', 'b'), mk('3', 'c')]
     const { host } = render(<WorkbenchBrowser cards={cards} />)
-    const ph = host.querySelector('.wb__placeholder')!
-    // mock t('workbench.count', {n:'3'}) → 'workbench.count' 原文里没 {n},
-    // 但插值 reduce 会把 {n} 替换进值……实测 key 无 {n} 占位 → 返回原文。
-    // 这里只断言 placeholder 存在且含 modeLabel(子任务2 会换成真实分组测试)。
-    expect(ph.textContent).toContain('workbench.modeLabel')
+    // canvas 模式:3 张无 canvasPosition 的卡 → 进收件箱分区
+    expect(host.querySelector('.wb__sections')).toBeTruthy()
+    expect(host.querySelector('.wb__sec--inbox')).toBeTruthy()
   })
 
   it('搜索过滤:title 匹配保留,不匹配隐藏', () => {
@@ -102,15 +108,15 @@ describe('WorkbenchBrowser shell (子任务1)', () => {
     const { host } = render(<WorkbenchBrowser cards={cards} />)
     const input = host.querySelector('.wb__search-input') as HTMLInputElement
     act(() => setInputValue(input, '包豪斯'))
-    // 命中 1 张 → placeholder 仍在(非 noMatch)
-    expect(host.querySelector('.wb__placeholder')).toBeTruthy()
+    // 命中 1 张 → sections 仍在(非 noMatch)
+    expect(host.querySelector('.wb__sections')).toBeTruthy()
   })
 
-  it('搜索无匹配 → 显示 noMatch,placeholder 消失', () => {
+  it('搜索无匹配 → 显示 noMatch,sections 消失', () => {
     const { host } = render(<WorkbenchBrowser cards={[mk('1', 'a')]} />)
     const input = host.querySelector('.wb__search-input') as HTMLInputElement
     act(() => setInputValue(input, 'zzz不存在的'))
     expect(host.querySelector('.wb__no-match')).toBeTruthy()
-    expect(host.querySelector('.wb__placeholder')).toBeNull()
+    expect(host.querySelector('.wb__sections')).toBeNull()
   })
 })

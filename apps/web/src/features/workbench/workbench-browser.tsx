@@ -8,6 +8,7 @@ import {
   WORKBENCH_MODES,
   type WorkbenchModeId,
 } from './workbench-modes'
+import { WorkbenchSections } from './workbench-sections'
 
 /**
  * WorkbenchBrowser — `/workbench` 库主体(搜索 + 分类模式切换器 + 分区列表)。
@@ -64,13 +65,7 @@ export function WorkbenchBrowser({ cards }: { cards: Card[] }) {
       {filtered.length === 0 ? (
         <div className="wb__no-match">{t('workbench.noMatch')}</div>
       ) : (
-        // 子任务 2-4:分类模式分组 + 分区手风琴。当前 placeholder(模式 + 计数)。
-        <div className="wb__placeholder">
-          {t('workbench.modeLabel', {
-            mode: t(WORKBENCH_MODES.find((m) => m.id === mode)!.i18nKey),
-          })}{' '}
-          · {t('workbench.count', { n: String(filtered.length) })}
-        </div>
+        <WorkbenchSections cards={filtered} mode={mode} />
       )}
 
       <style>{styles}</style>
@@ -115,9 +110,5 @@ const styles = `
 .wb__no-match {
   padding: var(--space-4) var(--space-3);
   color: var(--color-gray); font-style: italic; text-align: center;
-}
-.wb__placeholder {
-  padding: var(--space-3);
-  color: var(--color-gray); font-style: italic;
 }
 `

@@ -784,6 +784,10 @@ export const messages = {
   'workbench.mode.type': { zh: '类型', en: 'Type' },
   'workbench.mode.tag': { zh: '标签', en: 'Tag' },
   'workbench.modeLabel': { zh: '模式:{mode}', en: 'Mode: {mode}' },
+  'workbench.inbox': { zh: '收件箱', en: 'Inbox' },
+  'workbench.unknownCanvas': { zh: '(已删画布)', en: '(deleted canvas)' },
+  'workbench.other': { zh: '其他', en: 'Other' },
+  'workbench.noSections': { zh: '没有可显示的分区。', en: 'No sections to show.' },
   /* ── AI Layout (P7) ── */
   'canvas.aiLayout': { zh: 'AI 排版', en: 'AI layout' },
   'canvas.aiRunning': { zh: '运行中…', en: 'Running…' },
