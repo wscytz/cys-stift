@@ -65,6 +65,7 @@ export function AppMenu() {
   const entries: { href: string; key: MessageKey }[] = [
     { href: '/inbox', key: 'nav.inbox' },
     { href: '/canvas', key: 'nav.canvas' },
+    { href: '/workbench', key: 'nav.workbench' },
     { href: '/graph', key: 'nav.graph' },
     { href: '/archive', key: 'nav.archive' },
     { href: '/tags', key: 'nav.tags' },

@@ -5,6 +5,38 @@
 
 ---
 
+## 2026-07-04 · workbench-browser（D4 卡片库页 `/workbench`，形态 (ii) 另开入口）
+
+工作台 spec D4。形态决策:**窄 dock 单卡编辑器(D2)保留;库侧栏独立成全屏 `/workbench` 页**(不扩宽 dock)。库 = 浏览/整理面,点卡跳回画布 dock 编辑(库本身不编辑)。
+
+- **`/workbench` 路由 + 页 shell**:Toolbar + 搜索 + 分类切换器 + empty state。AppMenu 加入口(canvas 后)。静态导出友好(无 `[param]`)。
+- **分类模式(数据驱动,可扩展)**:`workbench-modes.ts` 的 `WORKBENCH_MODES` 数组(画布 default / 类型 / 标签),加模式只改数组。
+- **分组纯函数(`workbench-grouping.ts`,可测)**:groupByCanvas(按 canvasPosition,无 position 进收件箱区 isInbox 灰虚线)/ groupByType(固定色条)/ groupByTag(多选 chip 任一匹配,复用 D5 aggregateTags)/ extractPinned。
+- **手风琴分区(`workbench-sections.tsx`)**:折叠态 = 卡组堆叠(A,3 张硬阴影叠厚度)/ 展开态 = 行列表(C,色条+标题+预览);同时只一区展开。色条循环池(4 色:红黄蓝黑,gray 留收件箱)。
+- **已固定置顶区**:`card.pinned` 提到最顶(黄 `--color-yellow-soft`),跨模式常驻,不进手风琴。
+- **标签模式多选 chip**:aggregateTags 按 count 降序,chip 颜色 = 标签色(选中填充/未选边框);未选 → selectTagHint,无标签 → noTags 提示。
+- **行点击链路(形态 ii 关键)**:有 canvasPosition → `workbenchStore.open(id)` + `router.push('/canvas')`(画布页 useWorkbench 接住,dock 渲染该卡);无 canvasPosition(收件箱卡)→ toast「未上画布」+ push `/inbox`。键盘 Enter/Space 等同点击(无障碍)。
+
+web test 1237(+30 新:grouping 12 + browser 14 + sections 11 - 调整)/ lint 0 / build 0(`/workbench` 6.25kB 静态)。分支 `feature/d2-workbench`(5 commit),PR 待 cc 审。
+
+**给 cc**:点卡 → dock 链路已验证(canvas page `wbCardId && wbCard` 渲染 WorkbenchPanel,跨画布找卡 `snap.cards.find`);色条循环池 4 色,>4 画布绕回。
+
+---
+
+## 2026-07-04 · richmarkdown-highlight + dsl-text-limit（富 Markdown 代码高亮 + DSL 长度上限，D1 收尾）
+
+D1 富 Markdown 收尾 + STATE 缺口⑩。接 cc 派活(详见私有仓 handoff `2026-07-04-cc-to-zcode-tasks.md`)。
+
+- **富 Markdown 代码高亮**:接入 `rehype-highlight@7`,顺序 `[[rehypeSanitize, sanitizeSchema], rehypeHighlight]`(sanitize 先剥 script,highlight 后注入 hljs-*)。**关键**:`defaultSchema.attributes.span=null` 会把 highlight 注入的 `class="hljs-keyword"` 全剥 → sanitizeSchema 显式放行 `code`/`span` 的 `hljs-*` className(`/^hljs-/` 前缀限白,仍防注入)。
+- **Bauhaus 语法主题 CSS**:黑底亮色变体,只用 6 原色 —— keyword/built_in/literal/number→yellow,string→red,comment→gray-soft(`#d9d9d9` 黑底可读),title/function_→white 600,punctuation/operator→gray-soft,attr/variable→white。避免 blue(`#003f7f` 黑底不可读)。
+- **DSL `@text`/`@label` 长度上限(STATE 缺口⑩,防 AI 超长 DoS)**:`dsl-grammar.ts` 加 `DSL_MAX_TEXT_LEN=200` 常量(单一源;不 bump DSL_VERSION,parser 防护非语法变更);`dsl-parser.ts` extractText/extractLabel 解析超长值**静默截断**(不报错不 warn,parser robust)。
+
+web test 1207(+7 新:markdown 高亮 2 + dsl 长度 5)/ lint 0 / build 0。分支 `feature/d1-richmarkdown-dsl-hardening`(2 commit),PR 待 cc 审。
+
+**给 cc**:rehype-highlight 接 sanitize 后是对的,但 defaultSchema span attributes=null 会全剥 hljs class —— 我在 sanitizeSchema 放行了 `hljs-*` 前缀,以后动 sanitizeSchema 别删。DSL 截断选静默(跟 parser graceful 一致)。
+
+---
+
 ## 2026-07-04 · tag-management（/tags 升级为标签管理页，D5）
 
 工作台 spec D5。/tags 从标签墙（展示）升级为管理表。
