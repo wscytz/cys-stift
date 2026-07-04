@@ -13,6 +13,19 @@
  */
 export const DSL_VERSION = 1
 
+/**
+ * `@text("...")` / `@label("...")` 值的最大字符数。
+ *
+ * 防护:AI 输出不可信,可能产超长文本(幻觉 / 错误重复 / token 失控)→ 渲染溢出 / 存储
+ * 膨胀 / 应用卡顿(DoS)。parser 在解析时把超长值**静默截断**到上限(不报错不 warn ——
+ * parser 要 robust,坏一行不该整块丢)。
+ *
+ * 不 bump DSL_VERSION:这是 parser 防护,不改语法形态(语法层面 @text 仍接任意字符串,
+ * 只是 parser 不接受超长)。200 覆盖正常画布标签/文本需求(标签通常 <20 字,文本标题 <50)。
+ * STATE 缺口⑩。
+ */
+export const DSL_MAX_TEXT_LEN = 200
+
 /** 指令种类(parser 识别 + serializer 序列化的集合;freedraw 是透传 no-op)。 */
 export const DSL_KINDS = ['card', 'rect', 'frame', 'text', 'arrow', 'freedraw'] as const
 export type DslKind = (typeof DSL_KINDS)[number]

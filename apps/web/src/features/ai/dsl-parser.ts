@@ -14,6 +14,7 @@
  */
 
 import type { CardId } from '@cys-stift/domain'
+import { DSL_MAX_TEXT_LEN } from './dsl-grammar'
 
 // ── Operation types ──────────────────────────────────────────────────────────
 
@@ -167,14 +168,18 @@ function extractColor(text: string): string | undefined {
 
 function extractLabel(text: string): string | undefined {
   const m = text.match(LABEL_RE)
-  return m?.[1] || undefined
+  const v = m?.[1] || undefined
+  // 防超长 DoS(AI 输出不可信):静默截断,不报错(parser robust)。DSL_MAX_TEXT_LEN 来自 dsl-grammar。
+  return v && v.length > DSL_MAX_TEXT_LEN ? v.slice(0, DSL_MAX_TEXT_LEN) : v
 }
 
 /** Extract + unescape an `@text("...")` value (inverse of serializeCanvas's escapeQuoted). */
 function extractText(text: string): string | undefined {
   const m = text.match(TEXT_RE)
   if (!m) return undefined
-  return m[1]!.replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+  const v = m[1]!.replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+  // 防超长 DoS(AI 输出不可信):静默截断,不报错(parser robust)。DSL_MAX_TEXT_LEN 来自 dsl-grammar。
+  return v.length > DSL_MAX_TEXT_LEN ? v.slice(0, DSL_MAX_TEXT_LEN) : v
 }
 
 function extractSize(text: string): { w: number; h: number } | null {

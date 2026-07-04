@@ -3,6 +3,7 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
+import rehypeHighlight from 'rehype-highlight'
 import { useI18n } from '@/lib/i18n'
 
 /**
@@ -30,7 +31,11 @@ import { useI18n } from '@/lib/i18n'
  *   - remark-gfm 解锁 GFM 表格 / 任务列表 / 删除线 / 自动链接。
  *   - sanitizeSchema 在 defaultSchema 上放行 GFM 的 table/del + 任务列表 checkbox
  *     input + GFM 注入的 className(task-list-item / contains-task-list),好让任务项
- *     去掉默认红方块项目符号。代码高亮(rehype-highlight + Bauhaus 语法主题)延后单独做。
+ *     去掉默认红方块项目符号。
+ *   - rehype-highlight 代码高亮 + Bauhaus 语法主题(D1 收尾)。highlight 接在 sanitize
+ *     之后跑,它注入的 hljs-* class 本不过 sanitize;但 defaultSchema 的
+ *     attributes.span=null 会剥 span 的 class → 高亮 span 全丢。故 sanitizeSchema 显式
+ *     放行 code/span 的 hljs-* className(前缀限白,非任意 class)。
  */
 export interface EmbedSegment {
   type: 'text' | 'embed'
@@ -38,12 +43,13 @@ export interface EmbedSegment {
 }
 
 /**
- * GFM-aware sanitize schema:在 defaultSchema 上放行 GFM 元素。
+ * GFM-aware sanitize schema:在 defaultSchema 上放行 GFM 元素 + 代码高亮 class。
  * - tagNames:+ del / table 族
  * - attributes:ul/li 放行 className(GFM 任务列表类);input 仅放行 checkbox
  *   (GFM 任务列表产 `<input type=checkbox disabled>`)
- * highlight 的 code/span className 不在此放行 —— 高亮插件会在 sanitize 之后注入,
- * 本就不过 sanitize(留到加高亮时再处理)。
+ * - code/span 放行 `hljs-*` className:rehype-highlight 在 sanitize 之后注入
+ *   hljs-keyword/hljs-string 等;defaultSchema 的 attributes.span=null 会把它们剥掉,
+ *   显式放行(限 `hljs-` 前缀,不开放任意 class → 仍防注入)。
  */
 const sanitizeSchema = {
   ...defaultSchema,
@@ -63,6 +69,9 @@ const sanitizeSchema = {
     ul: ['className'],
     li: ['className'],
     input: [['type', 'checkbox'], 'disabled', 'checked'],
+    // hljs-* class 前缀放行(highlight 注入 + Bauhaus 主题选择器依赖)。
+    code: [...(defaultSchema.attributes?.code ?? []), ['className', /^hljs-/]],
+    span: [['className', /^hljs-/]],
   },
 }
 
@@ -87,7 +96,13 @@ function MarkdownBlock({ source }: { source: string }) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
-      rehypePlugins={[[rehypeSanitize, sanitizeSchema]]}
+      rehypePlugins={[
+        // sanitize 必须在 highlight 之前:先把 <script>/javascript: 等剥掉,
+        // 再让 highlight 给幸存的 <code>/<span> 注入 hljs-* class(sanitizeSchema
+        // 已放行 hljs- 前缀,不会被这轮之后的任何处理剥)。
+        [rehypeSanitize, sanitizeSchema],
+        rehypeHighlight,
+      ]}
       components={{
         a: ({ href, children, ...rest }) => {
           const safeHref =
@@ -283,4 +298,23 @@ const styles = `
 }
 .md-embed--missing { color: var(--color-gray); font-style: italic; }
 .md-embed--cycle { color: var(--color-red); font-size: var(--font-size-xs); }
+/* 代码高亮 Bauhaus 语法主题(rehype-highlight 注入 hljs-* class)。
+   代码块 .md pre 始终黑底白字,故用黑底可读的亮色变体,只用 6 原色,避免 blue(#003f7f 黑底不可读)。 */
+.md pre code.hljs { display: block; }
+.md pre .hljs { color: var(--color-white); }
+.md .hljs-keyword,
+.md .hljs-built_in,
+.md .hljs-literal,
+.md .hljs-number { color: var(--color-yellow); }
+.md .hljs-string { color: var(--color-red); }
+.md .hljs-comment { color: var(--color-gray-soft); font-style: italic; }
+.md .hljs-title,
+.md .hljs-title.function_,
+.md .hljs-section { color: var(--color-white); font-weight: 600; }
+.md .hljs-punctuation,
+.md .hljs-operator { color: var(--color-gray-soft); }
+.md .hljs-attr,
+.md .hljs-variable,
+.md .hljs-property,
+.md .hljs-params { color: var(--color-white); }
 `

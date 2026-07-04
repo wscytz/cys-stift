@@ -64,6 +64,25 @@ describe('MarkdownBody — 富 Markdown (remark-gfm)', () => {
     expect(html).not.toContain('alert(1)')
   })
 
+  // ── 代码高亮(rehype-highlight + Bauhaus 语法主题,D1 收尾)──
+  it('代码块高亮生效:JS 关键字被 hljs span 包裹', () => {
+    // highlight 在 sanitize 后注入 hljs-* class;sanitizeSchema 已放行 span 的
+    // hljs- 前缀(defaultSchema.attributes.span=null 否则会全剥)。
+    const md = '```js\nconst x = 1\n```'
+    const html = renderHtml(md)
+    // code 元素拿到 hljs class(language-js 检测成功)
+    expect(html).toMatch(/<code[^>]*class="hljs[^"]*"/)
+    // 内部 span 有 hljs-keyword(const 是关键字)—— 证明高亮真注入了 span 且未被 sanitize 剥
+    expect(html).toContain('hljs-keyword')
+  })
+
+  it('代码高亮不破坏 sanitize:script 在含代码块的文档里仍被剥', () => {
+    // 回归:接入 rehype-highlight 后 sanitize 顺序未变,安全门仍守。
+    const html = renderHtml('<script>alert(1)</script>\n```js\nconst x = 1\n```')
+    expect(html).not.toContain('<script>')
+    expect(html).toContain('hljs-keyword')
+  })
+
   it('空 source 不渲染', () => {
     expect(renderHtml('   ')).toBe('')
   })
