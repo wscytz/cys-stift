@@ -220,8 +220,21 @@ function crossCanvasMetaMatches(
 ): boolean {
   const aCross = arrow.meta?.crossCanvas === true
   if (aCross !== desired.isCrossCanvas) return false
+  // 只有跨画布 desired 才期望 arrow 上有 targetCanvasId;同画布 desired 的 arrow
+  // 只打 {wikilink:true}(无 targetCanvasId),期望 undefined。
+  // 否则 desired.targetCanvasId(=卡所在画布,如 'canvas-self')会和 arrow 上缺失的
+  // 字段(undefined)比较失配 → 每次 sync 都误判 stale → 删旧+建新(arrow id 抖动,
+  // 误导 toast 堆,undo 栈膨胀)。注:同画布 desired 的 targetCanvasId 仍保留(供
+  // crossCanvas=true 路径用),只是不参与同画布比较。
+  // 只有跨画布 desired 才期望 arrow 上有 targetCanvasId;同画布 desired 的 arrow
+  // 只打 {wikilink:true}(无 targetCanvasId),期望 undefined。
+  // 否则 desired.targetCanvasId(=卡所在画布,如 'canvas-self')会和 arrow 上缺失的
+  // 字段(undefined)比较失配 → 每次 sync 都误判 stale → 删旧+建新(arrow id 抖动,
+  // 误导 toast 堆,undo 栈膨胀)。注:同画布 desired 的 targetCanvasId 仍保留(供
+  // crossCanvas=true 路径用),只是不参与同画布比较。
+  const expectedCanvasId = desired.isCrossCanvas ? desired.targetCanvasId : undefined
   const aCanvasId = arrow.meta?.targetCanvasId as string | undefined
-  if (aCanvasId !== desired.targetCanvasId) return false
+  if (aCanvasId !== expectedCanvasId) return false
   // targetTitle 只在 cross-canvas 时存(同画布 plain wikilink 不存);比较时按需。
   const expectedTitle = desired.isCrossCanvas ? desired.bodyTitle : undefined
   const aTitle = arrow.meta?.targetTitle as string | undefined

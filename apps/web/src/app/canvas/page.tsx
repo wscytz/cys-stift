@@ -1070,7 +1070,13 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         })
       }
     },
-    [wbCardId, service, t],
+    // allWikiCandidates(useMemo on snap.cards)+ activeCanvasId 必须入 deps:
+    // 否则 snap.cards / activeCanvasId 变化但 wbCardId/service/t 不变时,wbSave
+    // 保留 stale closure → 工作台保存路径漏掉对新建/改名卡的双链匹配(allCards
+    // 是旧的)。allWikiCandidates 已 memo 化(只在 snap.cards 变时重新分配),
+    // 所以这里不会引入额外重渲染。wbSave 仅作为 prop 传入 WorkbenchDock,
+    // 无 useEffect 消费,加 deps 不会触发渲染循环。
+    [wbCardId, service, t, allWikiCandidates, activeCanvasId],
   )
 
   return (

@@ -469,6 +469,44 @@ describe('syncWikiLinkArrows (cross-canvas, allCards)', () => {
     const a = host.getElements().find((e) => e.kind === 'arrow')!
     expect(a.meta?.crossCanvas).toBeUndefined()
   })
+
+  it('REGRESSION (T5 review Fix 1): same-canvas desired via allCards+currentCanvasId → no churn on re-sync', () => {
+    // 复现条件:传 allCards + currentCanvasId,目标在本画布(同画布 desired)。
+    // 旧 bug:desired.targetCanvasId = 卡所在画布 id(如 'canvas-self'),
+    // 但同画布 wikilink arrow 的 meta 只打 {wikilink:true}(无 targetCanvasId)。
+    // aCanvasId (undefined) !== desired.targetCanvasId ('canvas-self') → 每次失配 → 删旧+建新。
+    // 修后:同画布 desired 期望 arrow 上 targetCanvasId=undefined,不会误判 stale。
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'src')
+    addCard(host, 'tgt')
+    const allCards = [
+      { id: 'src', title: 'S', canvasId: 'canvas-self' },
+      { id: 'tgt', title: 'T', canvasId: 'canvas-self' },
+    ]
+    const opts = {
+      host,
+      getCardTitle: () => undefined,
+      sourceCardId: 'src',
+      body: '[[T]]',
+      allCards,
+      currentCanvasId: 'canvas-self',
+    } as const
+
+    const first = syncWikiLinkArrows(opts)
+    expect(first.created).toBe(1)
+    const arrowAfterFirst = host.getElements().find((e) => e.kind === 'arrow')!
+    expect(arrowAfterFirst.meta?.wikilink).toBe(true)
+    expect(arrowAfterFirst.meta?.crossCanvas).toBeUndefined()
+    expect(arrowAfterFirst.meta?.targetCanvasId).toBeUndefined()
+
+    // 第二次同步:body 没变,期望 no-op(created=0, removed=0,同一 arrow id 保留)。
+    const second = syncWikiLinkArrows(opts)
+    expect(second.created).toBe(0)
+    expect(second.removed).toBe(0)
+    expect(host.getElements().filter((e) => e.kind === 'arrow')).toHaveLength(1)
+    // 同一条 arrow(id 不变)—— churning 会换 id,这里断言 id 稳定。
+    expect(host.getElements().find((e) => e.kind === 'arrow')!.id).toBe(arrowAfterFirst.id)
+  })
 })
 
 describe('syncWikiLinkArrows (dedup race self-heal)', () => {
