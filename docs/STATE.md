@@ -43,6 +43,7 @@
 | **v0.50.0** | **安卓运行时适配 + 全平台打包:platform.ts 加 isMobile/isDesktop(userAgent,SSR 安全);设置页全局快捷键配置段 + 首页 ⌘/^ 捕获提示块移动端隐藏(安卓无系统全局热键;capture 仍可用经 AppMenu/inbox);capture-host __TAURI__ catch(invoke 安卓 no-op 不崩)。macOS .app/.dmg + Android .apk(arm64)打包;Windows 走 CI。web 1138 test 零回归。** | v0.50.0 |
 | **v0.51.0** | **工作台三件套:富 Markdown 编辑器(toolbar+split preview+remark-gfm+rehype-highlight Bauhaus 主题)+ 标签管理(多选+二级管理页 /tags)+ 库页 D4(/workbench:默认画布/自定义 tag/堆叠分区)+ DSL guard;lucide 图标 hub。** | v0.51.0 |
 | **v0.52.0** | **内容版本/开发存档:archive-store(OPFS two-tier index+payload)+ release/风险 op/手动 触发 + /dev/archive 查档+导出 JSON + 分层 retention(b cap 100,a/c 永久)** | v0.52.0 |
+| **v0.53.0** | **wikilink 显式化 5 项:@wikilink DSL 标记(DSL_VERSION 1→2)+ 双链重命名追踪 + 跨画布双链(meta.crossCanvas + portal)+ 模糊匹配(Levenshtein≤2)+ load 批量同步;syncWikiLinkArrows dedup(T2 race 自愈)** | v0.53.0 |
 
 > v0.18–v0.21 版本号在历史中跳过(从 v0.17.0 直接进 v0.22.0),非缺失。
 > **v0.27.1-review-hardening 无独立 tag** — 该轮 hardening(rehydrateCards / parseCardsRaw / geometry reconcile / M1 label)的工作被折进 v0.31.0 重构(refactor v0.31.0-p1.2/p1.3,见 `docs/decisions/2026-06-21-v0.27.1-review-hardening.md`)。
@@ -127,6 +128,7 @@
 | v0.50.0 | release: v0.50.0 安卓运行时适配 + 全平台打包 | v0.50.0 |
 | v0.51.0 | chore: bump v0.51.0（工作台三件套：编辑器+标签管理+库页 D4） | v0.51.0 |
 | v0.52.0 | release: v0.52.0 内容版本/开发存档(archive-versioning) | v0.52.0 |
+| v0.53.0 | release: v0.53.0 wikilink 显式化(@wikilink + 跨画布 + 模糊 + 重命名 + lo… | v0.53.0 |
 <!-- gen-state:end -->
 
 ## 当前能力(用户视角)
@@ -140,7 +142,7 @@
 - **search**:全文检索(title 1.5x 权重 + body 摘要 + pinned 前置)
 - **命令面板**:⌘K 跳转项 + 卡片搜索 + **最近编辑跳转**(空 query 显 updatedAt 前 8,点卡智能开卡:在画布跳画布定位+开详情,否则开详情)
 - **标签**:10 色固定调色板,卡片标签 + 过滤 + **标签墙 `/tags`**(标签云 + 卡网格)
-- **关系网络**:块引用 `((标题))` 嵌入(embeds 关系)+ 详情建/删关系(relation-picker)+ 跨画布 backlinks(useGlobalEdges 聚合所有画布)+ **智能关系推荐**(graph 详情页「建议关联」,本地零 AI 四信号打分 + 可选「AI 再找找」语义粗筛,一键即建)+ **AI 对话 agent**(`/ask` 页:对话提需求 → AI 输出 cys-dsl 块 → 确认门 before/after 缩略图 + 变更摘要 → 应用/拒绝;RAG 引用卡片;改任意目标画布)+ **v0.46 对话打通**(/ask 全屏 + companion 共享 per-canvas 对话 store;全屏可切所有画布 + ➕新建画布「新建即出生」)
+- **关系网络**:块引用 `((标题))` 嵌入(embeds 关系)+ 详情建/删关系(relation-picker)+ 跨画布 backlinks(useGlobalEdges 聚合所有画布)+ **智能关系推荐**(graph 详情页「建议关联」,本地零 AI 四信号打分 + 可选「AI 再找找」语义粗筛,一键即建)+ **AI 对话 agent**(`/ask` 页:对话提需求 → AI 输出 cys-dsl 块 → 确认门 before/after 缩略图 + 变更摘要 → 应用/拒绝;RAG 引用卡片;改任意目标画布)+ **v0.46 对话打通**(/ask 全屏 + companion 共享 per-canvas 对话 store;全屏可切所有画布 + ➕新建画布「新建即出生」)+ **wikilink `[[标题]]` 自动建 references 箭头**(已增强:**跨画布** title→id 全局索引,同画布优先 + 跨画布 fallback;**模糊匹配** Levenshtein≤2 容忍拼写/简写;**重命名追踪** 改标题自动 re-sync 引用旧/新标题的卡;**load 批量同步** hydrate 完跑一次 `syncAllWikiLinks`;**DSL `@wikilink` round-trip** arrow 序列化→parse→apply 不丢 meta.wikilink;跨画布 arrow 在 source 画布画到 portal 点(目标卡右外侧 + 「→ 目标标题 (画布X)」标签))
 - **AI 伴侣面板**:画布常驻 AI 浮面板(rail ✨ 开关,发现/对话两 tab,折叠+tab 持久)—— 发现 tab 本地预筛零成本常驻(重复/可关联/孤立卡)+ 选中定位/建立关联/AI 深挖三动作;对话 tab = /ask agent 上画布(live host 应用 + 确认门 + 引用点开)+ **历史持久化 + v0.46 现发给 AI**(不再"没上下文";与 /ask 共享同一段 per-canvas 对话)+ 缩略图窄面板横向滚不溢出,非破坏性默认开
 - **AI 排版**:诚实反馈(apply 前后位移对比 → "重排 N 张平均 Xpx" / "AI 认为已合理未改动")+ 主动重排 prompt + 拓宽思考抑制(deepseek 镜像/model 名)+ 60s 超时
 - **版本号**:单一可信源(`scripts/gen-version.mjs` 读 root package.json → version.ts + 同步 tauri.conf),主菜单 + 首页实时显示

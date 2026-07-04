@@ -5,6 +5,35 @@
 
 ---
 
+## 2026-07-04 · v0.53.0 · wikilink-explicit（wikilink 显式化 5 项）
+
+STATE 缺口 ⑮ 的 5 项 wikilink 延后,一次性做完(C 范围全 5 项)。spec:`cys-stift-docs/docs/superpowers/specs/2026-07-04-wikilink-explicit-design.md`;plan:`cys-stift-docs/docs/superpowers/plans/2026-07-04-wikilink-explicit.md`。6 task subagent-driven(T1-T5 `c62278d..946314f` shipped,T6 本轮 wrap-up)。
+
+- **D1 / #1 · DSL `@wikilink` 显式标记**(T1,`7b0e742`):核心转义缺口闭合。DSL 文法加 `@wikilink` 属性(仅 arrow,仅 `meta.wikilink===true` 时 emit)。serializer(`canvas-dsl.ts`)emit + parser(`dsl-parser.ts` 的 `DslArrowOp.wikilink?: boolean` + `WIKILINK_RE`)+ apply(`apply-layout.ts` create/update 路径写 `meta: { wikilink: true }`)+ grammar(`dsl-grammar.ts` 的 `DSL_VERSION 1 → 2` + REFERENCE arrow 行注释)。**核心卖点"转义"对 wikilink arrow 现在双向无损**:serialize→parse→apply→re-serialize 不丢 meta.wikilink。round-trip 测试扩 wikilink arrow case。
+- **D2 / #2 · 双链标题重命名追踪**(T2,`33fb317`):卡标题变更时,引用旧/新标题的 wikilink 自动跟上。新 `resyncWikiLinksForTitleChange(host, service, {oldTitle, newTitle})`(`wiki-links.ts`,纯函数)—— 遍历画布卡,filter body 含 `[[oldTitle]]` 或 `[[newTitle]]`,各跑 `syncWikiLinkArrows`,合一个 batch。canvas page 的 `wbSave` save 路径在 title 变更后调用(已有 wiring 基础上扩展)。**幂等**:只在 title 真变时触发。
+- **D3 / #3 · 跨画布双链**(T3,`29c7787`)— **⚠️ 自主决策-产品+设计,待用户复核**:wikilink 匹配扩到所有画布的卡(此前 per-canvas 是有意设计)。设计取最简:跨画布 wikilink = source 画布上的 arrow,`to` 指向跨画布卡 id + `meta.wikilink:true` + `meta.crossCanvas:true`。**渲染 portal**:`arrowEndpoints`(canvas-engine)+ self-built-render arrow 分支 —— to 卡不在 host 时画到 source 卡右边缘外固定偏移(portal 点)+ label 标「→ 目标标题 (画布X)」(i18n)。**匹配**:`syncWikiLinkArrows` 的 title→id 索引扩到所有画布卡(CardService.listAll + canvasPosition),同画布优先 + 跨画布 fallback。**用户复核点**:要不要跨画布?portal 渲染 OK?(否决项:不建 arrow 改 badge,模型分裂,否决)。
+- **D4 / #4 · 模糊匹配**(T4,`a2869b5`)— **⚠️ 自主决策-产品,待用户复核**:放宽匹配,容忍拼写/简写。新 `matchWikiLinkTitle(title, candidates): string | undefined`(`wiki-links.ts`,纯函数,可单测)—— 精确(大小写不敏感)优先;精确无匹配 → 归一化(去空格/标点/lowercase)后 **Levenshtein 距离 ≤ 2** fallback(阈值:距离 ≤ 2 且长度 ≥ 3;多匹配取最高分,并列取 id 字典序首)。保守倾向:宁可少链不要误链(无 ≥ 阈值 → 不建)。**用户复核点**:模糊度合适?(太宽/太严)。
+- **D5 / #5 · 初次 load 批量同步**(T5,`b03fd9d`):canvas hydrate 完成后对画布上所有卡跑一次 syncWikiLinkArrows(批量,单 host.batch)。新 `syncAllWikiLinks(host, service, canvasId)`(`wiki-links.ts`)—— 遍历画布卡,每卡 syncWikiLinkArrows,合一个 batch。hydrate 后 200ms 防抖跑(避 hydrate race)。让旧数据(wikilink 写在 sync 上线前)也能在 reload 后追上。
+- **T2 race dedup(顺带修,`a2869b5`)**:`syncWikiLinkArrows` diff 在并发触发(如 D2 rename + D5 load 同跑)时同一 (from,to) 可能建多条 wikilink arrow。dedup 改在 diff 计算时按 (from, to) key 去重建集 —— **T2 race 自愈**(已建的 dup 会在下次 sync 时被 diff 判为多余删掉)。单测固化。
+- **T5 review(`946314f`)**:same-canvas arrow churn(wikilink arrow 不必要的 diff churn)+ wbSave stale closure(RENAMED_FROM 等常量在 closure 里老化)。
+
+### 自主决策汇总(用户考完复核)
+
+- **#3 跨画布**:做了(产品+设计)。复核:要不要跨画布?portal 渲染 OK?(否决项:不建 arrow 改 badge,模型分裂,否决)。
+- **#4 模糊**:做了(保守阈值 Levenshtein≤2)。复核:模糊度合适?(太宽/太严)。
+- #1/#2/#5:纯增强,无产品维度。
+
+### 不做(边界)
+
+- wikilink → AI 主动建(R2 + 现状不变)。
+- wikilink 跨设备同步(本地优先,无云)。
+- wikilink 版本历史(archive 是另一线)。
+- #3 portal 花活(最短出边等,YAGNI)。
+
+web test 1324 / lint 0 / build exit 0。tag `v0.53.0`(local,未 push)。
+
+---
+
 ## 2026-07-04 · v0.52.0 · archive-versioning（内容版本/开发存档）
 
 给 cy 一个**本地开发存档系统** —— 在 release / 风险 op / 手动 checkpoint 时刻自动落全量状态快照(OPFS,带版号),供查档 / 查错误 / release 自修自查。spec:`cys-stift-docs/docs/superpowers/specs/2026-07-04-archive-versioning-design.md`;plan:`cys-stift-docs/docs/superpowers/plans/2026-07-04-archive-versioning.md`。7 task subagent-driven(T1-T6 已落地 `bf37a72..a7002b2`,T7 本轮)。
