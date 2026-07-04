@@ -49,6 +49,12 @@ export function borderPoint(
  *    两个角(起点 (x,y),终点 (x+w, y+h);w/h 可负表方向)。手绘转箭头用这种。
  *
  * 关系箭头任一端元素找不到、且 arrow 自身无尺寸(w=h=0)→ 返 null(不画半截)。
+ *
+ * **Portal(跨画布 wikilink,T5)**:当 from 卡在本画布、to 卡不在(elements 找不到)、
+ * 且 `meta.crossCanvas===true` → 算一个 portal 点 = from 卡右边框外固定偏移(PORTAL_OFFSET)。
+ * 渲染画一条虚线短线到 portal 点,让跨画布 wikilink 在源画布上有视觉存在(模型统一为 arrow)。
+ * 若 to 卡实际回到了本画布(如搬回),即便 meta 标了 crossCanvas 也走正常双端解析
+ * (meta-stale 时渲染仍正确,等 sync 重建)。
  */
 export function arrowEndpoints(
   arrow: CanvasElement,
@@ -64,6 +70,19 @@ export function arrowEndpoints(
       to: borderPoint(tc, toEl.w / 2, toEl.h / 2, fc),
     }
   }
+  // Portal:from 卡在本画布,to 卡不在 + meta.crossCanvas → 算 portal 点。
+  // portal 在 from 卡右边框外 +120px(垂直居中),让短线段从 from 右边伸出去。
+  if (fromEl && !toEl && arrow.meta?.crossCanvas === true) {
+    const fc = elementCenter(fromEl)
+    const portal: Point = {
+      x: fc.x + Math.abs(fromEl.w) / 2 + PORTAL_OFFSET,
+      y: fc.y,
+    }
+    return {
+      from: borderPoint(fc, fromEl.w / 2, fromEl.h / 2, portal),
+      to: portal,
+    }
+  }
   // 自由箭头:无有效 from/to 端元素,但自身 bbox 描述一条线段(w/h 非零)。
   if (arrow.w !== 0 || arrow.h !== 0) {
     return {
@@ -73,6 +92,9 @@ export function arrowEndpoints(
   }
   return { from: null, to: null }
 }
+
+/** Portal 点距 from 卡右边框的水平偏移(T5 跨画布 wikilink 视觉)。YAGNI:固定值,不做「最短出边」。 */
+const PORTAL_OFFSET = 120
 
 /**
  * 连接预览端点:from = fromEl 朝 pointer 的边框交点;to = pointer(预览时指针当临时 to)。

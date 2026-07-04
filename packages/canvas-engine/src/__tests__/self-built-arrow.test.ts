@@ -84,6 +84,63 @@ describe('arrowEndpoints', () => {
     expect(from).toEqual({ x: 100, y: 50 })
     expect(to).toEqual({ x: 100, y: 50 })
   })
+
+  // ── T5: 跨画布 wikilink portal 端点 ──────────────────────────────────
+  // cross-canvas wikilink 的 to 卡不在本画布 host(elements 里找不到),但 meta.crossCanvas
+  // 标记它为 portal arrow → arrowEndpoints 算一个 portal 点(from 卡右边外固定偏移)。
+  describe('cross-canvas portal (meta.crossCanvas)', () => {
+    const cardA = { id: 'ca', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 } as CanvasElement
+
+    it('to not on host + meta.crossCanvas → portal point (from right-mid + offset)', () => {
+      // from 卡 A 中心 (50,50),右边框 x=100。portal = 右边框外 +120 → (220, 50)。
+      // from = A 朝 portal 交点 = 右边框 (100, 50)。to = portal (220, 50)。
+      const arrow = {
+        id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0,
+        from: 'ca', to: 'cb',
+        meta: { wikilink: true, crossCanvas: true, targetTitle: '远卡', targetCanvasId: 'other' },
+      } as CanvasElement
+      const { from, to } = arrowEndpoints(arrow, [cardA]) // 只有 A,B 不在本画布
+      expect(from).toEqual({ x: 100, y: 50 })
+      expect(to).toEqual({ x: 220, y: 50 })
+    })
+
+    it('to not on host + NO meta.crossCanvas → null (legacy: invisible, not a portal)', () => {
+      // 无 crossCanvas 标记的断链 arrow(旧行为)→ 不画。portal 仅 wikilink 跨画布触发。
+      const arrow = {
+        id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0,
+        from: 'ca', to: 'cb',
+      } as CanvasElement
+      const { from, to } = arrowEndpoints(arrow, [cardA])
+      expect(from).toBeNull()
+      expect(to).toBeNull()
+    })
+
+    it('from not on host + meta.crossCanvas → null (no anchor for portal)', () => {
+      // from 卡也缺失 → 无锚点,不画 portal。
+      const arrow = {
+        id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0,
+        from: 'ghost', to: 'cb',
+        meta: { wikilink: true, crossCanvas: true },
+      } as CanvasElement
+      const { from, to } = arrowEndpoints(arrow, [cardA])
+      expect(from).toBeNull()
+      expect(to).toBeNull()
+    })
+
+    it('to on host (same-canvas) + meta.crossCanvas → normal resolution (ignore portal)', () => {
+      // 即便 meta 标了 crossCanvas,若 to 卡实际在 host(已搬回本画布)→ 走正常双端解析。
+      // 这保证 meta-stale 时渲染仍正确(等 sync 重建)。
+      const cardB = { id: 'cb', kind: 'card', x: 200, y: 0, w: 100, h: 100, rotation: 0 } as CanvasElement
+      const arrow = {
+        id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0,
+        from: 'ca', to: 'cb',
+        meta: { wikilink: true, crossCanvas: true },
+      } as CanvasElement
+      const { from, to } = arrowEndpoints(arrow, [cardA, cardB])
+      expect(from).toEqual({ x: 100, y: 50 })
+      expect(to).toEqual({ x: 200, y: 50 })
+    })
+  })
 })
 
 describe('dashPattern — 语义线型', () => {

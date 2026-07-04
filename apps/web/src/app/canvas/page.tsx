@@ -961,6 +961,18 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
   // debounce 给 freeform 异步 load .then 留时间(wikilink arrow 持久化在 freeform
   // store,load 未完时 sync 会把已存的箭头当不存在重复建)。typical OPFS/LS 读 <50ms,
   // 200ms 留足缓冲。per-card edit 由 syncWikiLinkArrows 自己处理,这里只管 hydrate。
+  // T5:allCards 从 snap.cards 取(跨画布候选池),filter 掉 soft-deleted/archived。
+  const allWikiCandidates = useMemo(
+    () =>
+      snap.cards
+        .filter((c) => !c.deletedAt && !c.archived)
+        .map((c) => ({
+          id: c.id as string,
+          title: c.title,
+          canvasId: c.canvasPosition?.canvasId as string | undefined,
+        })),
+    [snap.cards],
+  )
   useEffect(() => {
     if (!adapter) return
     const adapterLocal = adapter
@@ -975,6 +987,9 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         getCardTitle: (id) => service.get(id as CardId)?.title,
         getCardBody: (id) => service.get(id as CardId)?.body,
         canvasCardIds: cardIds,
+        // T5 跨画布双链:候选池 = 所有画布上未删未归档的卡;currentCanvasId 让同画布优先 + crossCanvas 标签。
+        allCards: allWikiCandidates,
+        currentCanvasId: activeCanvasId as string,
       })
     }, 200)
     return () => clearTimeout(timer)
@@ -1019,6 +1034,9 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           getCardTitle: (id) => service.get(id as CardId)?.title,
           sourceCardId: wbCardId as CardId,
           body: patch.body,
+          // T5 跨画布双链:候选池 + 当前画布 id,让 [[远画布卡标题]] 也能匹配。
+          allCards: allWikiCandidates,
+          currentCanvasId: activeCanvasId as string,
         })
         if (wl.created > 0 || wl.removed > 0) {
           pushToast({ kind: 'info', message: t('canvas.wikiLinked', { created: String(wl.created), removed: String(wl.removed) }) })
@@ -1046,6 +1064,9 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           canvasCardIds,
           oldTitle,
           newTitle: patch.title,
+          // T5 跨画布双链:候选池 + 当前画布 id,透传给底层 syncWikiLinkArrows。
+          allCards: allWikiCandidates,
+          currentCanvasId: activeCanvasId as string,
         })
       }
     },
@@ -1339,6 +1360,9 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
                 getCardTitle: (id) => service.get(id as CardId)?.title,
                 sourceCardId: effectiveDetail.card.id,
                 body: patch.body,
+                // T5 跨画布双链:候选池 + 当前画布 id,让 [[远画布卡标题]] 也能匹配。
+                allCards: allWikiCandidates,
+                currentCanvasId: activeCanvasId as string,
               })
               if (created > 0 || removed > 0) {
                 pushToast({ kind: 'info', message: t('canvas.wikiLinked', { created: String(created), removed: String(removed) }) })
@@ -1371,6 +1395,9 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
                 canvasCardIds,
                 oldTitle,
                 newTitle: patch.title,
+                // T5 跨画布双链:候选池 + 当前画布 id,透传给底层 syncWikiLinkArrows。
+                allCards: allWikiCandidates,
+                currentCanvasId: activeCanvasId as string,
               })
             }
             return updated != null

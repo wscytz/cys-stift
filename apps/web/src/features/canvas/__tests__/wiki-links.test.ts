@@ -174,6 +174,71 @@ describe('matchWikiLinkTitle', () => {
   })
 })
 
+describe('matchWikiLinkTitle (cross-canvas, same-canvas preferred)', () => {
+  it('exact: same-canvas hit preferred over cross-canvas hit (both exact)', () => {
+    // 两张精确命中卡:'same'(本画布) + 'other'(跨画布)。
+    // 同画布优先 → 选 'same'(尽管 'other' id 字典序更小)。
+    const candidates = [
+      { id: 'aaa', title: 'Dup', canvasId: 'canvas-other' },
+      { id: 'zzz', title: 'Dup', canvasId: 'canvas-self' },
+    ]
+    expect(matchWikiLinkTitle('Dup', candidates, 'src', 'canvas-self')).toBe('zzz')
+  })
+
+  it('exact: same-canvas preference among multiple same-canvas hits (dict-order)', () => {
+    // 多张同画布精确命中 → 字典序首(同原逻辑)。
+    const candidates = [
+      { id: 'b', title: 'Dup', canvasId: 'canvas-self' },
+      { id: 'a', title: 'Dup', canvasId: 'canvas-self' },
+    ]
+    expect(matchWikiLinkTitle('Dup', candidates, 'src', 'canvas-self')).toBe('a')
+  })
+
+  it('exact: no same-canvas → cross-canvas exact still wins (exact beats fuzzy)', () => {
+    // 精确命中只有跨画布卡 → 仍选它(精确优先于模糊)。
+    const candidates = [{ id: 'x', title: 'Target', canvasId: 'canvas-other' }]
+    expect(matchWikiLinkTitle('Target', candidates, 'src', 'canvas-self')).toBe('x')
+  })
+
+  it('fuzzy: same-canvas preferred among distance-tied fuzzy hits', () => {
+    // 两张模糊并列(distance 1):'same'(本画布) + 'other'(跨画布)。
+    // 同画布优先 → 选 'same'(尽管 'other' id 字典序更小)。
+    const candidates = [
+      { id: 'aaa', title: 'Jones', canvasId: 'canvas-other' },
+      { id: 'zzz', title: 'Jones', canvasId: 'canvas-self' },
+    ]
+    // 查 'Jone' → 两张 distance 1 并列 → 同画布优先 → 'zzz'
+    expect(matchWikiLinkTitle('Jone', candidates, 'src', 'canvas-self')).toBe('zzz')
+  })
+
+  it('fuzzy: smaller distance beats same-canvas (preference is tiebreaker only)', () => {
+    // 同画布卡距离 2,跨画布卡距离 1 → 距离优先(同画布只是并列打破器)。
+    const candidates = [
+      { id: 'near', title: 'Jone', canvasId: 'canvas-other' }, // distance 0 实际
+      { id: 'far', title: 'Joness', canvasId: 'canvas-self' }, // distance 2
+    ]
+    expect(matchWikiLinkTitle('Jone', candidates, 'src', 'canvas-self')).toBe('near')
+  })
+
+  it('no currentCanvasId → no same-canvas preference (backward compat)', () => {
+    // 不传 currentCanvasId → 同画布优先不生效,退回纯字典序(向后兼容)。
+    const candidates = [
+      { id: 'aaa', title: 'Dup', canvasId: 'canvas-other' },
+      { id: 'zzz', title: 'Dup', canvasId: 'canvas-self' },
+    ]
+    expect(matchWikiLinkTitle('Dup', candidates, 'src')).toBe('aaa')
+  })
+
+  it('candidates without canvasId (inbox) never same-canvas preferred', () => {
+    // inbox 卡(canvasId undefined) + 跨画布卡 → 都不是同画布 → 字典序首。
+    const candidates = [
+      { id: 'inbox', title: 'Dup' }, // canvasId undefined
+      { id: 'other', title: 'Dup', canvasId: 'canvas-other' },
+    ]
+    expect(matchWikiLinkTitle('Dup', candidates, 'src', 'canvas-self')).toBe('inbox')
+  })
+})
+
 describe('syncWikiLinkArrows (fuzzy)', () => {
   it('creates arrow when body has typo of an existing card title (fuzzy hit)', () => {
     const host = new InMemoryCanvasHost()
@@ -210,6 +275,199 @@ describe('syncWikiLinkArrows (fuzzy)', () => {
 
     expect(r.created).toBe(0)
     expect(host.getElements().filter((e) => e.kind === 'arrow')).toHaveLength(0)
+  })
+})
+
+describe('syncWikiLinkArrows (cross-canvas, allCards)', () => {
+  it('cross-canvas target → arrow with meta.crossCanvas + targetTitle + targetCanvasId', () => {
+    // src 在 canvas-self,目标卡 'tgt' 在 canvas-other(不在 host)。
+    // allCards 提供跨画布候选 → 建 cross-canvas wikilink arrow。
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'src')
+    // 注意:tgt 故意不 addCard 到 host(它在别的画布,本 host 看不到)
+    const allCards = [
+      { id: 'src', title: '本卡', canvasId: 'canvas-self' },
+      { id: 'tgt', title: '目标卡', canvasId: 'canvas-other' },
+    ]
+
+    const r = syncWikiLinkArrows({
+      host,
+      getCardTitle: () => undefined,
+      sourceCardId: 'src',
+      body: '看 [[目标卡]]',
+      allCards,
+      currentCanvasId: 'canvas-self',
+    })
+
+    expect(r.created).toBe(1)
+    const arrows = host.getElements().filter((e) => e.kind === 'arrow')
+    expect(arrows).toHaveLength(1)
+    const a = arrows[0]!
+    expect(a.from).toBe('src')
+    expect(a.to).toBe('tgt')
+    expect(a.meta?.wikilink).toBe(true)
+    expect(a.meta?.crossCanvas).toBe(true)
+    expect(a.meta?.targetTitle).toBe('目标卡')
+    expect(a.meta?.targetCanvasId).toBe('canvas-other')
+    // references 签名(blue/dashed/none)+ text 含目标标题
+    expect(a.color).toBe('blue')
+    expect(a.dash).toBe('dashed')
+    expect(a.arrowhead).toBe('none')
+    expect(a.text).toContain('目标卡')
+  })
+
+  it('same-canvas target via allCards → no crossCanvas meta (plain wikilink)', () => {
+    // allCards 提供,但目标在本画布 → 普通 wikilink arrow(无 crossCanvas)。
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'src')
+    addCard(host, 'tgt') // 在 host(本画布)
+    const allCards = [
+      { id: 'src', title: 'S', canvasId: 'canvas-self' },
+      { id: 'tgt', title: 'T', canvasId: 'canvas-self' },
+    ]
+
+    const r = syncWikiLinkArrows({
+      host,
+      getCardTitle: (id) => (id === 'src' ? 'S' : id === 'tgt' ? 'T' : undefined),
+      sourceCardId: 'src',
+      body: '[[T]]',
+      allCards,
+      currentCanvasId: 'canvas-self',
+    })
+
+    expect(r.created).toBe(1)
+    const a = host.getElements().find((e) => e.kind === 'arrow')!
+    expect(a.meta?.wikilink).toBe(true)
+    expect(a.meta?.crossCanvas).toBeUndefined()
+    expect(a.text).toBe('references')
+  })
+
+  it('same-canvas preferred over cross-canvas when both match title', () => {
+    // 两张卡都叫 'Dup':一张本画布(tgt-self),一张跨画布(tgt-other)。
+    // 同画布优先 → arrow.to = 'tgt-self'(无 crossCanvas)。
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'src')
+    addCard(host, 'tgt-self')
+    const allCards = [
+      { id: 'src', title: 'S', canvasId: 'canvas-self' },
+      { id: 'tgt-self', title: 'Dup', canvasId: 'canvas-self' },
+      { id: 'tgt-other', title: 'Dup', canvasId: 'canvas-other' },
+    ]
+
+    syncWikiLinkArrows({
+      host,
+      getCardTitle: () => undefined,
+      sourceCardId: 'src',
+      body: '[[Dup]]',
+      allCards,
+      currentCanvasId: 'canvas-self',
+    })
+
+    const a = host.getElements().find((e) => e.kind === 'arrow')!
+    expect(a.to).toBe('tgt-self')
+    expect(a.meta?.crossCanvas).toBeUndefined()
+  })
+
+  it('meta-mismatch: existing crossCanvas arrow, target now same-canvas → recreate', () => {
+    // 预置一条 crossCanvas arrow(to=tgt,meta.crossCanvas=true)。
+    // 现在 tgt 卡搬到了本画布(host 上有)→ 同步应重建为普通 wikilink arrow(去 crossCanvas)。
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'src')
+    addCard(host, 'tgt') // tgt 现在在本画布 host 上
+    host.upsert({
+      id: 'arrow-stale',
+      kind: 'arrow',
+      x: 0, y: 0, w: 0, h: 0, rotation: 0,
+      from: 'src',
+      to: 'tgt',
+      color: 'blue',
+      dash: 'dashed',
+      arrowhead: 'none',
+      text: '→ 旧目标',
+      meta: { wikilink: true, crossCanvas: true, targetTitle: '旧目标', targetCanvasId: 'canvas-other' },
+    })
+
+    const allCards = [
+      { id: 'src', title: 'S', canvasId: 'canvas-self' },
+      { id: 'tgt', title: 'T', canvasId: 'canvas-self' }, // 现在同画布
+    ]
+
+    const r = syncWikiLinkArrows({
+      host,
+      getCardTitle: () => undefined,
+      sourceCardId: 'src',
+      body: '[[T]]',
+      allCards,
+      currentCanvasId: 'canvas-self',
+    })
+
+    // 重建:1 删(旧 crossCanvas)+ 1 建(新普通)
+    expect(r.created).toBe(1)
+    expect(r.removed).toBe(1)
+    expect(host.getElement('arrow-stale')).toBeUndefined()
+    const a = host.getElements().find((e) => e.kind === 'arrow')!
+    expect(a.to).toBe('tgt')
+    expect(a.meta?.crossCanvas).toBeUndefined()
+    expect(a.meta?.wikilink).toBe(true)
+    expect(a.text).toBe('references')
+  })
+
+  it('meta-mismatch: existing same-canvas arrow, target now cross-canvas → recreate', () => {
+    // 反向:预置普通 wikilink arrow,目标卡搬走(从 host 移除,变跨画布)。
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'src')
+    // tgt 不在 host(已搬走)
+    host.upsert({
+      id: 'arrow-old',
+      kind: 'arrow',
+      x: 0, y: 0, w: 0, h: 0, rotation: 0,
+      from: 'src',
+      to: 'tgt',
+      color: 'blue',
+      dash: 'dashed',
+      arrowhead: 'none',
+      text: 'references',
+      meta: { wikilink: true },
+    })
+
+    const allCards = [
+      { id: 'src', title: 'S', canvasId: 'canvas-self' },
+      { id: 'tgt', title: 'T', canvasId: 'canvas-other' }, // 现在跨画布
+    ]
+
+    const r = syncWikiLinkArrows({
+      host,
+      getCardTitle: () => undefined,
+      sourceCardId: 'src',
+      body: '[[T]]',
+      allCards,
+      currentCanvasId: 'canvas-self',
+    })
+
+    expect(r.created).toBe(1)
+    expect(r.removed).toBe(1)
+    const a = host.getElements().find((e) => e.kind === 'arrow')!
+    expect(a.meta?.crossCanvas).toBe(true)
+    expect(a.meta?.targetCanvasId).toBe('canvas-other')
+  })
+
+  it('allCards not provided → backward compat (host-based candidates, same-canvas only)', () => {
+    // 不传 allCards → 退回旧行为:从 host 建 candidate,无 canvasId,无跨画布。
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'src')
+    addCard(host, 'tgt')
+    const titles: Record<string, string> = { src: 'S', tgt: 'T' }
+
+    const r = syncWikiLinkArrows({
+      host,
+      getCardTitle: (id) => titles[id],
+      sourceCardId: 'src',
+      body: '[[T]]',
+    })
+
+    expect(r.created).toBe(1)
+    const a = host.getElements().find((e) => e.kind === 'arrow')!
+    expect(a.meta?.crossCanvas).toBeUndefined()
   })
 })
 

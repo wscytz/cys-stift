@@ -96,18 +96,27 @@ export function levenshtein(a: string, b: string): number {
 export interface WikiLinkCandidate {
   id: string
   title: string
+  /**
+   * 候选卡所在画布 id(T5 跨画布双链)。
+   * - 提供 canvasId 时,与 `matchWikiLinkTitle` 的 `currentCanvasId` 配合实现「同画布优先」。
+   * - undefined 表示该卡不在任何画布(inbox)→ 永不享同画布优先,但仍参与匹配。
+   */
+  canvasId?: string
 }
 
 /**
- * 匹配 wikilink 标题到候选卡 id(spec D4)。
+ * 匹配 wikilink 标题到候选卡 id(spec D4 + D3 跨画布)。
  *
- * 策略(保守,优先精确):
- *  1. **精确(归一化 lowercase+trim)优先**:多个精确命中 → id 字典序首(稳定);
- *     排除 selfId。
+ * 策略(保守,优先精确 + 同画布优先):
+ *  1. **精确(归一化 lowercase+trim)优先**:多个精确命中 → **同画布优先**
+ *     (canvasId === currentCanvasId 的先选);同画布并列 → id 字典序首;排除 selfId。
  *  2. **模糊 fallback(仅当无精确)**:Levenshtein 距离 ≤ 2 且候选标题归一化后
- *     长度 ≥ 3(避免「Jo」「A」等短标题噪声误链)。取距离最小;距离并列取 id 字典序首;
- *     排除 selfId。
+ *     长度 ≥ 3(避免「Jo」「A」等短标题噪声误链)。取距离最小;**距离并列 → 同画布优先**;
+ *     仍并列 → id 字典序首;排除 selfId。
  *  3. **无 ≥ 阈值** → undefined(不硬链——宁可少链,不要误链)。
+ *
+ * 同画布优先仅在「并列(同等匹配质量)」时触发——不跨质量阶(精确永远胜模糊,
+ * 距离更小永远胜距离更大)。currentCanvasId 不传 → 无同画布偏好(向后兼容)。
  *
  * 纯函数,无副作用——可独立单测。
  */
@@ -115,37 +124,55 @@ export function matchWikiLinkTitle(
   title: string,
   candidates: WikiLinkCandidate[],
   selfId: string,
+  currentCanvasId?: string,
 ): string | undefined {
   const target = normalizeTitle(title)
   if (!target) return undefined
 
-  // 1. 精确匹配(归一化后相等)
+  // 同画布优先比较器:currentCanvasId 提供时,canvasId 匹配的排前。
+  const sameCanvasRank = (c: WikiLinkCandidate): number => {
+    if (currentCanvasId === undefined) return 0 // 无偏好
+    return c.canvasId === currentCanvasId ? 0 : 1
+  }
+
+  // 1. 精确匹配(归一化后相等)→ 同画布优先,然后字典序首
   const exactHits = candidates
     .filter((c) => c.id !== selfId && normalizeTitle(c.title) === target)
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .sort((a, b) => {
+      const ra = sameCanvasRank(a)
+      const rb = sameCanvasRank(b)
+      if (ra !== rb) return ra - rb
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+    })
   if (exactHits.length > 0) return exactHits[0]!.id
 
   // 2. 模糊 fallback:距离 ≤ 2 且 长度 ≥ 3
   const FUZZY_MAX_DISTANCE = 2
   const FUZZY_MIN_LEN = 3
 
-  let best: { id: string; distance: number } | undefined
+  const fuzzyHits: { id: string; distance: number; canvasId?: string }[] = []
   for (const c of candidates) {
     if (c.id === selfId) continue
     const norm = normalizeTitle(c.title)
     if (norm.length < FUZZY_MIN_LEN) continue // 短标题噪声跳过
     const distance = levenshtein(target, norm)
     if (distance > FUZZY_MAX_DISTANCE) continue
-    if (
-      !best ||
-      distance < best.distance ||
-      // 距离并列取 id 字典序首
-      (distance === best.distance && c.id < best.id)
-    ) {
-      best = { id: c.id, distance }
-    }
+    fuzzyHits.push({ id: c.id, distance, canvasId: c.canvasId })
   }
-  return best?.id
+  if (fuzzyHits.length > 0) {
+    // 距离最小优先;距离并列 → 同画布优先;仍并列 → id 字典序首
+    fuzzyHits.sort((a, b) => {
+      if (a.distance !== b.distance) return a.distance - b.distance
+      const ra =
+        currentCanvasId !== undefined && a.canvasId === currentCanvasId ? 0 : 1
+      const rb =
+        currentCanvasId !== undefined && b.canvasId === currentCanvasId ? 0 : 1
+      if (ra !== rb) return ra - rb
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+    })
+    return fuzzyHits[0]!.id
+  }
+  return undefined
 }
 
 export interface SyncWikiLinkArrowsParams {
@@ -157,6 +184,49 @@ export interface SyncWikiLinkArrowsParams {
   sourceCardId: string
   /** 本卡当前正文。 */
   body: string
+  /**
+   * (T5 跨画布)所有画布上的候选卡池。提供时 → 用它作为匹配池(走跨画布逻辑);
+   * 不提供 → 退回旧行为,从 host.getElements() 构建同画布候选(向后兼容)。
+   * 每项需带 canvasId 才能识别跨画布;无 canvasId 的项(inbox)参与匹配但不享同画布优先。
+   */
+  allCards?: WikiLinkCandidate[]
+  /**
+   * (T5 跨画布)本卡所在画布 id。与 candidate.canvasId 配合识别「同画布 vs 跨画布」,
+   * 决定 arrow 是否打 `meta.crossCanvas`。不提供 → 永不打 crossCanvas(向后兼容)。
+   */
+  currentCanvasId?: string
+}
+
+/**
+ * 期望的 wikilink arrow 元信息(对应一张目标卡)。
+ * - `bodyTitle`:body 里 `[[bodyTitle]]` 的拼写(原样保留,用于 cross-canvas 渲染 label)。
+ * - `isCrossCanvas`:目标卡不在本画布(canvasId !== currentCanvasId 且两者都定义)。
+ * - `targetCanvasId`:目标卡所在画布 id(undefined = inbox / 未知)。
+ */
+interface DesiredWikiLink {
+  targetId: string
+  bodyTitle: string
+  isCrossCanvas: boolean
+  targetCanvasId: string | undefined
+}
+
+/**
+ * 比较现有 arrow 的 cross-canvas 元信息是否仍匹配期望。
+ * 任一字段不同 → false(需重建)。所有字段相同 → true(保留)。
+ */
+function crossCanvasMetaMatches(
+  arrow: CanvasElement,
+  desired: DesiredWikiLink,
+): boolean {
+  const aCross = arrow.meta?.crossCanvas === true
+  if (aCross !== desired.isCrossCanvas) return false
+  const aCanvasId = arrow.meta?.targetCanvasId as string | undefined
+  if (aCanvasId !== desired.targetCanvasId) return false
+  // targetTitle 只在 cross-canvas 时存(同画布 plain wikilink 不存);比较时按需。
+  const expectedTitle = desired.isCrossCanvas ? desired.bodyTitle : undefined
+  const aTitle = arrow.meta?.targetTitle as string | undefined
+  if (aTitle !== expectedTitle) return false
+  return true
 }
 
 /**
@@ -164,39 +234,67 @@ export interface SyncWikiLinkArrowsParams {
  *  1. 解析 body 提取目标标题
  *  2. 标题→卡 id 用 matchWikiLinkTitle(精确优先;无精确 → Levenshtein ≤ 2 模糊 fallback)
  *  3. 查现有 wikilink arrow:host.getElements() filter arrow && from===source && meta.wikilink===true
- *  4. diff:desired(目标 id 集合) vs existing(现有 arrow 的 to 集合)
- *       - 建 desired - existing(已有的同 to 不重复建)
- *       - 删 existing - desired
+ *  4. diff:desired(目标 id + 期望 cross-canvas 元信息) vs existing(现有 arrow 的 to + meta)
+ *       - 建 desired - existing(已有的同 to 且 meta 匹配的不重复建)
+ *       - 删 existing - desired(to 不再期望)
+ *       - **meta 失配重建**:existing 的 to 仍在 desired,但 crossCanvas/targetCanvasId/
+ *         targetTitle 变了(如卡搬到别的画布)→ 删旧 + 建新(等价于「recreate」)。
  *       - **去重(T2 race 自愈)**:existing 里同一 to 出现 >1 条 wikilink arrow,
  *         只保留 id 字典序首,其余进 toRemove。
  *  5. 整个 diff 包在 host.batch 内(单 undo 步)
  *  6. 返回 {created, removed} 计数
  *
  * **绝不触碰** 手动 references arrow(无 meta.wikilink)——diff 只看 wikilink 标记的箭头。
+ *
+ * **跨画布(T5)**:`allCards` + `currentCanvasId` 提供时,匹配池扩到所有画布的卡,
+ * 跨画布目标 arrow 打 `meta:{wikilink:true, crossCanvas:true, targetTitle, targetCanvasId}`
+ * + text `→ 目标标题`(渲染时 portal 端点用,见 arrowEndpoints)。同画布目标 arrow 不打
+ * crossCanvas,text 仍 `references`。
  */
 export function syncWikiLinkArrows(params: SyncWikiLinkArrowsParams): SyncWikiLinkArrowsResult {
-  const { host, getCardTitle, sourceCardId, body } = params
+  const { host, getCardTitle, sourceCardId, body, allCards, currentCanvasId } = params
 
   // 1. 解析 body 提取目标标题
   const desiredTitles = extractWikiLinks(body)
 
-  // 2. 标题 → 卡 id。匹配范围 = 画布上的 card 元素(host.getElements kind==='card')。
-  //    用 matchWikiLinkTitle(精确优先 + Levenshtein ≤ 2 模糊 fallback)。
-  const cardElements = host.getElements().filter((e) => e.kind === 'card')
-  const candidates: WikiLinkCandidate[] = []
-  for (const el of cardElements) {
-    const title = getCardTitle(el.id)
-    if (title === undefined) continue
-    candidates.push({ id: el.id, title })
+  // 2. 标题 → 卡 id。
+  //    有 allCards → 用它(跨画布候选池,每项已带 title + canvasId)。
+  //    无 allCards → 退回 host.getElements() 同画布候选(向后兼容)。
+  let candidates: WikiLinkCandidate[]
+  if (allCards) {
+    candidates = allCards
+  } else {
+    candidates = []
+    for (const el of host.getElements().filter((e) => e.kind === 'card')) {
+      const title = getCardTitle(el.id)
+      if (title === undefined) continue
+      candidates.push({ id: el.id, title })
+    }
   }
 
-  const desiredTargetIds = new Set<string>()
+  // 3. 匹配标题 → 期望 wikilink 列表(目标 id + cross-canvas 元信息)。
+  //    多个 body 标题命中同一目标卡(如 [[Foo]] 和 [[foo]] 都精确匹配)→ 取首条(bodyTitle 保留首次拼写)。
+  const desiredByTargetId = new Map<string, DesiredWikiLink>()
   for (const title of desiredTitles) {
-    const matchedId = matchWikiLinkTitle(title, candidates, sourceCardId)
-    if (matchedId !== undefined) desiredTargetIds.add(matchedId)
+    const matchedId = matchWikiLinkTitle(title, candidates, sourceCardId, currentCanvasId)
+    if (matchedId === undefined) continue
+    if (desiredByTargetId.has(matchedId)) continue
+    const matched = candidates.find((c) => c.id === matchedId)
+    const matchedCanvasId = matched?.canvasId
+    const isCrossCanvas =
+      currentCanvasId !== undefined &&
+      matchedCanvasId !== undefined &&
+      matchedCanvasId !== currentCanvasId
+    desiredByTargetId.set(matchedId, {
+      targetId: matchedId,
+      bodyTitle: title,
+      isCrossCanvas,
+      targetCanvasId: matchedCanvasId,
+    })
   }
+  const desiredTargetIds = new Set(desiredByTargetId.keys())
 
-  // 3. 查现有 wikilink arrow(from===sourceCardId && meta.wikilink===true)
+  // 4. 查现有 wikilink arrow(from===sourceCardId && meta.wikilink===true)
   const existingWikiArrows: CanvasElement[] = []
   for (const el of host.getElements()) {
     if (el.kind !== 'arrow') continue
@@ -204,16 +302,10 @@ export function syncWikiLinkArrows(params: SyncWikiLinkArrowsParams): SyncWikiLi
     if (el.meta?.wikilink !== true) continue
     existingWikiArrows.push(el)
   }
-  const existingTargets = new Set<string>(
-    existingWikiArrows.map((a) => a.to).filter((to): to is string => to !== undefined),
-  )
 
-  // 4. diff
-  const toCreate: string[] = [] // 目标 id
-  for (const targetId of desiredTargetIds) {
-    if (!existingTargets.has(targetId)) toCreate.push(targetId)
-  }
-  const toRemove: CanvasElement[] = [] // arrow 元素
+  // 5. diff(第 1 轮):目标不再期望 → 删;目标期望但 meta 失配 → 删(等下重建)。
+  const toRemove: CanvasElement[] = []
+  const toRemoveIds = new Set<string>()
   for (const a of existingWikiArrows) {
     if (a.to === undefined) {
       // 无 to 的 wikilink 箭头(异常数据)→ 不删(留给用户/其他流程清理)。
@@ -221,13 +313,21 @@ export function syncWikiLinkArrows(params: SyncWikiLinkArrowsParams): SyncWikiLi
     }
     if (!desiredTargetIds.has(a.to)) {
       toRemove.push(a)
+      toRemoveIds.add(a.id)
+      continue
+    }
+    // to 仍在 desired → 检查 cross-canvas meta 是否仍匹配
+    const desired = desiredByTargetId.get(a.to)!
+    if (!crossCanvasMetaMatches(a, desired)) {
+      toRemove.push(a)
+      toRemoveIds.add(a.id)
     }
   }
 
-  // 4b. 去重(T2 hydrate race 自愈):同一 to 出现 >1 条 wikilink arrow,
+  // 5b. 去重(T2 hydrate race 自愈):同一 to 出现 >1 条 wikilink arrow,
   //     保留 id 字典序首,其余进 toRemove。即便 body 仍 [[that_target]] 也去重
   //     (body 命中 → desiredTargetIds 含该 to → 不会进上面的 toRemove,但仍可能
-  //     有多余副本需要清理——这里覆盖)。
+  //     有多余副本需要清理——这里覆盖)。meta 失配已被 toRemove 收集的不重复加。
   const byTarget = new Map<string, CanvasElement[]>()
   for (const a of existingWikiArrows) {
     if (a.to === undefined) continue
@@ -235,25 +335,37 @@ export function syncWikiLinkArrows(params: SyncWikiLinkArrowsParams): SyncWikiLi
     if (arr) arr.push(a)
     else byTarget.set(a.to, [a])
   }
-  const alreadyRemoved = new Set<string>(toRemove.map((a) => a.id))
   for (const [, arr] of byTarget) {
     if (arr.length <= 1) continue
-    // 字典序排序,保留首,其余删
     const sorted = arr.slice().sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
     for (let i = 1; i < sorted.length; i++) {
-      if (!alreadyRemoved.has(sorted[i]!.id)) {
+      if (!toRemoveIds.has(sorted[i]!.id)) {
         toRemove.push(sorted[i]!)
-        alreadyRemoved.add(sorted[i]!.id)
+        toRemoveIds.add(sorted[i]!.id)
       }
     }
   }
 
-  // 5. 批量应用(单 undo 步)
+  // 6. 算 toCreate = desired - 仍在 host 上的(meta-matched)arrow。
+  //    「仍在」= existingWikiArrows 里该 to 的 arrow 至少有一条未被 toRemove 收。
+  const keptTargets = new Set<string>()
+  for (const a of existingWikiArrows) {
+    if (a.to === undefined) continue
+    if (toRemoveIds.has(a.id)) continue
+    keptTargets.add(a.to)
+  }
+  const toCreate: DesiredWikiLink[] = []
+  for (const [targetId, desired] of desiredByTargetId) {
+    if (!keptTargets.has(targetId)) toCreate.push(desired)
+  }
+
+  // 7. 批量应用(单 undo 步)
   let created = 0
   let removed = 0
   host.batch(() => {
-    for (const targetId of toCreate) {
+    for (const d of toCreate) {
       const arrowId = 'arrow-wikilink-' + genId()
+      const isCross = d.isCrossCanvas
       host.upsert({
         id: arrowId,
         kind: 'arrow',
@@ -263,12 +375,20 @@ export function syncWikiLinkArrows(params: SyncWikiLinkArrowsParams): SyncWikiLi
         h: 0,
         rotation: 0,
         from: sourceCardId,
-        to: targetId,
+        to: d.targetId,
         color: REFERENCES_SIGNATURE.color,
         dash: REFERENCES_SIGNATURE.dash,
         arrowhead: REFERENCES_SIGNATURE.arrowhead,
-        text: REFERENCES_SIGNATURE.text,
-        meta: { wikilink: true },
+        // 跨画布:text 标目标标题(portal 渲染 label);同画布:references(原签名 text)。
+        text: isCross ? `→ ${d.bodyTitle}` : REFERENCES_SIGNATURE.text,
+        meta: isCross
+          ? {
+              wikilink: true,
+              crossCanvas: true,
+              targetTitle: d.bodyTitle,
+              targetCanvasId: d.targetCanvasId,
+            }
+          : { wikilink: true },
       })
       created++
     }
@@ -290,6 +410,10 @@ export interface SyncAllWikiLinksParams {
   getCardBody: (cardId: string) => string | undefined
   /** 当前画布上需要 sync 的卡 id 列表(典型 = host.getElements() filter kind==='card')。 */
   canvasCardIds: string[]
+  /** (T5 跨画布)所有画布候选卡池。透传给 syncWikiLinkArrows。 */
+  allCards?: WikiLinkCandidate[]
+  /** (T5 跨画布)本画布 id。透传给 syncWikiLinkArrows。 */
+  currentCanvasId?: string
 }
 
 /**
@@ -309,7 +433,7 @@ export interface SyncAllWikiLinksParams {
  * **空列表**:canvasCardIds=[] 直接 return {0,0},不调 batch(no-op)。
  */
 export function syncAllWikiLinks(params: SyncAllWikiLinksParams): SyncWikiLinkArrowsResult {
-  const { host, getCardTitle, getCardBody, canvasCardIds } = params
+  const { host, getCardTitle, getCardBody, canvasCardIds, allCards, currentCanvasId } = params
 
   if (canvasCardIds.length === 0) return { created: 0, removed: 0 }
 
@@ -324,6 +448,8 @@ export function syncAllWikiLinks(params: SyncAllWikiLinksParams): SyncWikiLinkAr
         getCardTitle,
         sourceCardId: cardId,
         body,
+        allCards,
+        currentCanvasId,
       })
       created += r.created
       removed += r.removed
@@ -346,6 +472,10 @@ export interface ResyncWikiLinksForTitleChangeParams {
   oldTitle: string
   /** 改名后的新标题。 */
   newTitle: string
+  /** (T5 跨画布)所有画布候选卡池。透传给 syncWikiLinkArrows。 */
+  allCards?: WikiLinkCandidate[]
+  /** (T5 跨画布)本画布 id。透传给 syncWikiLinkArrows。 */
+  currentCanvasId?: string
 }
 
 /**
@@ -379,7 +509,7 @@ export interface ResyncWikiLinksForTitleChangeParams {
 export function resyncWikiLinksForTitleChange(
   params: ResyncWikiLinksForTitleChangeParams,
 ): SyncWikiLinkArrowsResult {
-  const { host, getCardTitle, getCardBody, canvasCardIds, oldTitle, newTitle } = params
+  const { host, getCardTitle, getCardBody, canvasCardIds, oldTitle, newTitle, allCards, currentCanvasId } = params
 
   // 空 canvasCardIds 或 双空 title → no-op
   const oldKey = oldTitle.trim().toLowerCase()
@@ -412,6 +542,8 @@ export function resyncWikiLinksForTitleChange(
         getCardTitle,
         sourceCardId: cardId,
         body,
+        allCards,
+        currentCanvasId,
       })
       created += r.created
       removed += r.removed
