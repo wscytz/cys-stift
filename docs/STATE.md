@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.47.0。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.53.1。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 
@@ -44,6 +44,7 @@
 | **v0.51.0** | **工作台三件套:富 Markdown 编辑器(toolbar+split preview+remark-gfm+rehype-highlight Bauhaus 主题)+ 标签管理(多选+二级管理页 /tags)+ 库页 D4(/workbench:默认画布/自定义 tag/堆叠分区)+ DSL guard;lucide 图标 hub。** | v0.51.0 |
 | **v0.52.0** | **内容版本/开发存档:archive-store(OPFS two-tier index+payload)+ release/风险 op/手动 触发 + /dev/archive 查档+导出 JSON + 分层 retention(b cap 100,a/c 永久)** | v0.52.0 |
 | **v0.53.0** | **wikilink 显式化 5 项:@wikilink DSL 标记(DSL_VERSION 1→2)+ 双链重命名追踪 + 跨画布双链(meta.crossCanvas + portal)+ 模糊匹配(Levenshtein≤2)+ load 批量同步;syncWikiLinkArrows dedup(T2 race 自愈)** | v0.53.0 |
+| **v0.53.1** | **安卓运行时验证修复(首次 emulator 跑暴露 v0.50.0 的运行时隐患):rustls ring provider 修 reqwest 启动 panic(致命闪退)+ 首页平台检测 hydration + 平台检测 SSR-safe hooks 全仓收口(useIsMac/useIsMobile/useIsDesktop,render 直读改 hook)+ CaptureHint/inbox 空状态 ⌘ 提示移动端隐藏;沉淀安卓开发工作流(Studio 仅 AVD/Logcat,构建走终端,阿里云镜像)。web 1330 测试** | v0.53.1 |
 
 > v0.18–v0.21 版本号在历史中跳过(从 v0.17.0 直接进 v0.22.0),非缺失。
 > **v0.27.1-review-hardening 无独立 tag** — 该轮 hardening(rehydrateCards / parseCardsRaw / geometry reconcile / M1 label)的工作被折进 v0.31.0 重构(refactor v0.31.0-p1.2/p1.3,见 `docs/decisions/2026-06-21-v0.27.1-review-hardening.md`)。

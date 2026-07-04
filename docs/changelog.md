@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-07-04 · v0.53.1 · android-runtime-hardening（安卓运行时验证修复）
+
+v0.50.0 落了安卓适配代码(platform.ts isMobile/isDesktop + 移动端 UI 门控 + capture-host `__TAURI__` catch + apk 打包),但**没真机跑过**。本轮首次跑 Android Studio emulator(arm64-v8a Android 14)暴露 3 个运行时隐患,一次性修掉。无新功能,纯加固。
+
+- **rustls ring crypto provider(`c348f72`,致命崩溃修)**:app 装上 emulator 启动即闪退,Rust panic `No rustls crypto provider is configured`。根因:Tauri 的间接依赖 reqwest 走 rustls,且 reqwest 默认 `rustls-no-provider` 特性;安卓无 native-tls 后端(桌面用 macOS Secure Transport 不受影响)→ 启动建 reqwest Client 时 panic。修:Cargo.toml 加 android-only `rustls = { version = "0.23", default-features = false, features = ["std", "ring"] }`,lib.rs `run()` 开头 `rustls::crypto::ring::default_provider().install_default()`。**用 ring 而非 aws_lc_rs**:ring 纯 Rust+cc 免 cmake(本机未装 cmake);aws_lc_rs 需 cmake。
+- **首页平台检测 hydration(`1758fb9`)**:home page render 时直读 `detectIsMac()`/`isDesktop()`,SSG 构建期值(isMac=false / isDesktop=true)与客户端首帧真实值不符 → `Unhandled Runtime Error Hydration failed`。改 useState+useEffect(pre-mount 默认匹配 SSG,effect 纠正)。
+- **平台检测 SSR-safe hooks 全仓收口(`e49fbb5`)**:同类 hydration 隐患扫剩 4 处 render 时直读。新 `lib/use-platform.ts`(`useIsMac`/`useIsMobile`/`useIsDesktop`,pre-mount 默认匹配 SSG,`useIsDesktop = !useIsMobile` 派生)。mini-input / shortcut-help-dialog / settings render 直读改 hook。**CaptureHint 黄横幅 + inbox 空状态 ⌘⇧Space 提示移动端隐藏**(文案写死 ⌘,安卓/iOS 无 Cmd+Shift+Space 概念,桌面 global-shortcut 仅 `cfg(desktop)` 注册 → 触屏上误导,即用户反馈的"弹出 mac 快捷键")。删 `modSymbol()` 死代码。use-platform 单测 8 例(react-dom/client+act)。
+
+### 安卓开发工作流(沉淀,免重踩)
+
+- Studio **只用于** Device Manager(启动 AVD)+ Logcat;**绝不在 Studio 里点 Build/Sync**(launchd 给 GUI app 的 PATH 是 `/usr/bin:/bin` 最小集,不读 `/etc/paths.d` → Gradle daemon 找不到 pnpm/node)。
+- 构建走 **系统 Terminal.app**(载 .zshrc → nvm → 完整 PATH):`source scripts/setup-android-env.sh && pnpm tauri android dev`。该脚本设 `JAVA_HOME=brew JDK 17`(与 Studio 的 JBR 不同 → 不复用 daemon → 全新终端 daemon 带完整 PATH)。
+- `~/.gradle/init.gradle`:阿里云 Maven 镜像(public/google/gradle-plugin)+ 保留 originals 兜底(单镜像 5xx 不级联成全量失败)。
+- Tauri CLI 2.1.0 `android dev` **无** `--target` flag(只有 `build` 有);ABI 按 connected device 自动判。
+- reqwest/rustls 在安卓需手动装 crypto provider(见上 `c348f72`)。
+
+web 1330 测试 / lint 0 / build exit 0。tag `v0.53.1`。
+
+---
+
 ## 2026-07-04 · v0.53.0 · wikilink-explicit（wikilink 显式化 5 项）
 
 STATE 缺口 ⑮ 的 5 项 wikilink 延后,一次性做完(C 范围全 5 项)。spec:`cys-stift-docs/docs/superpowers/specs/2026-07-04-wikilink-explicit-design.md`;plan:`cys-stift-docs/docs/superpowers/plans/2026-07-04-wikilink-explicit.md`。6 task subagent-driven(T1-T5 `c62278d..946314f` shipped,T6 本轮 wrap-up)。
