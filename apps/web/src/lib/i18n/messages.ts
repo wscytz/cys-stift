@@ -24,6 +24,7 @@ export const messages = {
   'nav.capture': { zh: '捕获', en: 'Capture' },
   'nav.homeNav': { zh: '主页导航', en: 'Home navigation' },
   'nav.tags': { zh: '标签', en: 'Tags' },
+  'nav.workbench': { zh: '工作台', en: 'Workbench' },
 
   /* ── Command palette (P3-T1) ── */
   'cmd.title': { zh: '命令面板', en: 'Command palette' },
@@ -772,6 +773,17 @@ export const messages = {
   'tags.recolorTag': { zh: '改色「{value}」', en: 'Recolor "{value}"' },
   'tags.renameTag': { zh: '改名「{value}」', en: 'Rename "{value}"' },
   'tags.deleteTag': { zh: '删标签「{value}」', en: 'Delete tag "{value}"' },
+  /* ── Workbench 库页 (D4) ── */
+  'workbench.title': { zh: '工作台', en: 'Workbench' },
+  'workbench.empty': { zh: '还没有卡片。先捕获一些灵感,再来这里整理。', en: 'No cards yet. Capture some sparks, then organize them here.' },
+  'workbench.count': { zh: '{n} 张', en: '{n} cards' },
+  'workbench.searchPlaceholder': { zh: '搜索卡片…', en: 'Search cards…' },
+  'workbench.noMatch': { zh: '没有匹配的卡片。', en: 'No matching cards.' },
+  'workbench.modesLabel': { zh: '分类方式', en: 'Group by' },
+  'workbench.mode.canvas': { zh: '画布', en: 'Canvas' },
+  'workbench.mode.type': { zh: '类型', en: 'Type' },
+  'workbench.mode.tag': { zh: '标签', en: 'Tag' },
+  'workbench.modeLabel': { zh: '模式:{mode}', en: 'Mode: {mode}' },
   /* ── AI Layout (P7) ── */
   'canvas.aiLayout': { zh: 'AI 排版', en: 'AI layout' },
   'canvas.aiRunning': { zh: '运行中…', en: 'Running…' },
