@@ -100,3 +100,22 @@ export function mergeTag(cards: Card[], source: string, target: TagRef): TagChan
   }
   return out
 }
+
+/**
+ * 多源合并（一次性）：把所有卡的 sources 里任一标签替换为 target（移除全部 sources；
+ * target 不在则加，在则统一用 target.color）。每张受影响卡只产一条 TagChange，
+ * 避免 pairwise 顺序合并互相覆盖（页面 onApplyChanges 一次落库）。
+ */
+export function mergeTagsInto(cards: Card[], sources: string[], target: TagRef): TagChange[] {
+  const srcSet = new Set(sources.filter((s) => s !== target.value))
+  if (srcSet.size === 0) return []
+  const out: TagChange[] = []
+  for (const c of cards) {
+    if (!c.tags?.some((t) => srcSet.has(t.value))) continue
+    const kept = c.tags.filter((t) => !srcSet.has(t.value))
+    const ti = kept.findIndex((t) => t.value === target.value)
+    const tags = ti >= 0 ? kept.map((t, i) => (i === ti ? { ...target } : t)) : [...kept, { ...target }]
+    out.push({ id: c.id, tags })
+  }
+  return out
+}

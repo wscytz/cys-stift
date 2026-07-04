@@ -8,7 +8,7 @@
 import {
   Bold, Italic, Strikethrough, Code, Link2, Heading2,
   List, ListChecks, Quote, Code2, Table,
-  Maximize2, Minimize2, Search, Plus, Pencil,
+  Maximize2, Minimize2, Search, Plus, Pencil, Trash2,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -18,12 +18,12 @@ export type WorkbenchIconName =
   | 'bold' | 'italic' | 'strike' | 'code' | 'link' | 'h2'
   | 'ul' | 'task' | 'quote' | 'codeblock' | 'table'
   // 通用动作
-  | 'expand' | 'collapse' | 'search' | 'plus' | 'pencil'
+  | 'expand' | 'collapse' | 'search' | 'plus' | 'pencil' | 'trash'
 
 const MAP: Record<WorkbenchIconName, LucideIcon> = {
   bold: Bold, italic: Italic, strike: Strikethrough, code: Code, link: Link2, h2: Heading2,
   ul: List, task: ListChecks, quote: Quote, codeblock: Code2, table: Table,
-  expand: Maximize2, collapse: Minimize2, search: Search, plus: Plus, pencil: Pencil,
+  expand: Maximize2, collapse: Minimize2, search: Search, plus: Plus, pencil: Pencil, trash: Trash2,
 }
 
 /** 工作台图标。size 默认跟随 CSS；传 size 覆盖。strokeWidth 默认 1.5。 */

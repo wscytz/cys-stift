@@ -760,6 +760,18 @@ export const messages = {
   'tags.title': { zh: '标签', en: 'Tags' },
   'tags.empty': { zh: '还没有标签。给卡片加标签来按主题组织。', en: 'No tags yet. Tag cards to organize by topic.' },
   'tags.count': { zh: '{n} 张', en: '{n} cards' },
+  /* ── Tags management (D5) ── */
+  'tags.colColor': { zh: '色', en: 'Color' },
+  'tags.colName': { zh: '标签名', en: 'Tag' },
+  'tags.colCount': { zh: '卡数', en: 'Cards' },
+  'tags.colActions': { zh: '操作', en: 'Actions' },
+  'tags.mergeSelected': { zh: '已选 {n} 个', en: '{n} selected' },
+  'tags.mergePickTarget': { zh: '合并到…', en: 'Merge into…' },
+  'tags.mergeAction': { zh: '合并', en: 'Merge' },
+  'tags.selectTag': { zh: '选择「{value}」', en: 'Select "{value}"' },
+  'tags.recolorTag': { zh: '改色「{value}」', en: 'Recolor "{value}"' },
+  'tags.renameTag': { zh: '改名「{value}」', en: 'Rename "{value}"' },
+  'tags.deleteTag': { zh: '删标签「{value}」', en: 'Delete tag "{value}"' },
   /* ── AI Layout (P7) ── */
   'canvas.aiLayout': { zh: 'AI 排版', en: 'AI layout' },
   'canvas.aiRunning': { zh: '运行中…', en: 'Running…' },

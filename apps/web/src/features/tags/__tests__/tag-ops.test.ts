@@ -3,7 +3,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import type { Card, TagColor, TagRef } from '@cys-stift/domain'
-import { aggregateTags, renameTag, recolorTag, deleteTag, mergeTag } from '../tag-ops'
+import { aggregateTags, renameTag, recolorTag, deleteTag, mergeTag, mergeTagsInto } from '../tag-ops'
 
 const RED = 'var(--color-red)' as TagColor
 const BLUE = 'var(--color-blue)' as TagColor
@@ -110,5 +110,32 @@ describe('mergeTag', () => {
     )
     expect(changes).toHaveLength(1)
     expect(changes[0]!.id).toBe('1')
+  })
+})
+
+describe('mergeTagsInto', () => {
+  it('多源一次性合到 target（每受影响卡一条）', () => {
+    const changes = mergeTagsInto(
+      [mk('1', [['a', RED]]), mk('2', [['b', RED], ['c', RED]]), mk('3', [['x', BLUE]])],
+      ['a', 'b', 'c'],
+      { value: 'tgt', color: BLUE },
+    )
+    // 卡 1（a）、卡 2（b,c）受影响；卡 3 无 source 不输出
+    expect(changes).toHaveLength(2)
+    expect(changes.find((c) => c.id === '1')!.tags).toEqual([{ value: 'tgt', color: BLUE }])
+    expect(changes.find((c) => c.id === '2')!.tags).toEqual([{ value: 'tgt', color: BLUE }])
+  })
+
+  it('已有 target：统一 color', () => {
+    const changes = mergeTagsInto(
+      [mk('1', [['src', RED], ['tgt', RED]])],
+      ['src'],
+      { value: 'tgt', color: BLUE },
+    )
+    expect(changes[0]!.tags).toEqual([{ value: 'tgt', color: BLUE }])
+  })
+
+  it('sources 含 target.value 被过滤（无操作或仅 unify）', () => {
+    expect(mergeTagsInto([mk('1', [['tgt', RED]])], ['tgt'], { value: 'tgt', color: BLUE })).toEqual([])
   })
 })

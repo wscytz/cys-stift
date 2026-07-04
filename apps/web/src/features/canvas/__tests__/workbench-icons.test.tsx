@@ -10,7 +10,7 @@ import { WorkbenchIcon, type WorkbenchIconName } from '../workbench-icons'
 const NAMES: WorkbenchIconName[] = [
   'bold', 'italic', 'strike', 'code', 'link', 'h2',
   'ul', 'task', 'quote', 'codeblock', 'table',
-  'expand', 'collapse', 'search', 'plus', 'pencil',
+  'expand', 'collapse', 'search', 'plus', 'pencil', 'trash',
 ]
 
 describe('WorkbenchIcon', () => {
