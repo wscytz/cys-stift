@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
 import {
   extractWikiLinks,
+  matchWikiLinkTitle,
   resyncWikiLinksForTitleChange,
   syncAllWikiLinks,
   syncWikiLinkArrows,
@@ -92,6 +93,235 @@ describe('extractWikiLinks', () => {
 
   it('does not match single brackets', () => {
     expect(extractWikiLinks('[A] 不是双链')).toEqual([])
+  })
+})
+
+describe('matchWikiLinkTitle', () => {
+  it('exact (case-insensitive) wins over fuzzy', () => {
+    const candidates = [
+      { id: 'a', title: 'Jones' },
+      { id: 'b', title: 'Jones Exact' }, // 模糊近邻
+      { id: 'c', title: 'jones' }, // 精确(归一化后 = 'jones')
+    ]
+    // 查 'Jones' → 精确命中(归一化都是 'jones'),多精确取字典序首 = a
+    expect(matchWikiLinkTitle('Jones', candidates, '')).toBe('a')
+  })
+
+  it('exact none → fuzzy (Jone → Jones, distance 1) hits', () => {
+    const candidates = [{ id: 'a', title: 'Jones' }]
+    // 'Jone' vs 'Jones' = 1 次添加,长度 ≥ 3,距离 ≤ 2 → 命中
+    expect(matchWikiLinkTitle('Jone', candidates, '')).toBe('a')
+  })
+
+  it('distance > 2 (Jon → JonathanSmith) → undefined', () => {
+    const candidates = [{ id: 'a', title: 'JonathanSmith' }]
+    // 'Jon' vs 'JonathanSmith' 距离 >> 2 → 不链
+    expect(matchWikiLinkTitle('Jon', candidates, '')).toBeUndefined()
+  })
+
+  it('length < 3 candidates excluded from fuzzy', () => {
+    // 'Jo' 长度 < 3 即便距离小也不参与模糊。
+    // 唯一候选 'Jo'(长度 2)应被排除 → undefined。
+    const candidates = [{ id: 'a', title: 'Jo' }]
+    expect(matchWikiLinkTitle('Joo', candidates, '')).toBeUndefined()
+  })
+
+  it('multiple fuzzy candidates → smallest distance; ties → dict-order first', () => {
+    // 查 'Jone'.候选 'Jones'(dist 1) 和 'Jonex'(dist 1)并列 → 字典序首(id='a')
+    const candidates = [
+      { id: 'b', title: 'Jonex' },
+      { id: 'a', title: 'Jones' },
+    ]
+    expect(matchWikiLinkTitle('Jone', candidates, '')).toBe('a')
+  })
+
+  it('smallest distance wins over larger distance fuzzy', () => {
+    // 查 'Jone'.候选 'Jones'(dist 1) 和 'Joness'(dist 2) → 取距离更小的 'Jones'
+    const candidates = [
+      { id: 'a', title: 'Joness' },
+      { id: 'b', title: 'Jones' },
+    ]
+    expect(matchWikiLinkTitle('Jone', candidates, '')).toBe('b')
+  })
+
+  it('selfId excluded (exact match on self does not return self) → falls to fuzzy', () => {
+    const candidates = [
+      { id: 'self', title: 'Jones' },
+      { id: 'other', title: 'Jonesy' },
+    ]
+    // 查 'Jones' 精确命中 'self',但 selfId='self' 被排除 → 退到模糊,命中 'other'
+    expect(matchWikiLinkTitle('Jones', candidates, 'self')).toBe('other')
+  })
+
+  it('selfId excluded in fuzzy too', () => {
+    const candidates = [{ id: 'self', title: 'Jones' }]
+    // 查 'Jone' 模糊命中 'Jones',但 self 是 'self' → undefined
+    expect(matchWikiLinkTitle('Jone', candidates, 'self')).toBeUndefined()
+  })
+
+  it('empty candidates → undefined', () => {
+    expect(matchWikiLinkTitle('Anything', [], '')).toBeUndefined()
+  })
+
+  it('exact (no fuzzy needed) ignores self only when self matches', () => {
+    // 防回归:self 是精确命中候选之一,但还有其他精确命中。
+    const candidates = [
+      { id: 'self', title: 'Dup' },
+      { id: 'b', title: 'Dup' },
+    ]
+    // 排除 self 后剩 'b' 是精确命中 → 'b'
+    expect(matchWikiLinkTitle('Dup', candidates, 'self')).toBe('b')
+  })
+})
+
+describe('syncWikiLinkArrows (fuzzy)', () => {
+  it('creates arrow when body has typo of an existing card title (fuzzy hit)', () => {
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'src')
+    addCard(host, 'tgt')
+    const titles: Record<string, string> = { src: 'S', tgt: 'Jones' }
+
+    const r = syncWikiLinkArrows({
+      host,
+      getCardTitle: (id) => titles[id],
+      sourceCardId: 'src',
+      body: 'see [[Joens]]', // typo,距离 2(transposition)+ trim
+    })
+
+    expect(r.created).toBe(1)
+    const arrows = host.getElements().filter((e) => e.kind === 'arrow')
+    expect(arrows).toHaveLength(1)
+    expect(arrows[0]!.to).toBe('tgt')
+    expect(arrows[0]!.meta?.wikilink).toBe(true)
+  })
+
+  it('creates no arrow when body link has no close match (undefined)', () => {
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'src')
+    addCard(host, 'tgt')
+    const titles: Record<string, string> = { src: 'S', tgt: 'Jones' }
+
+    const r = syncWikiLinkArrows({
+      host,
+      getCardTitle: (id) => titles[id],
+      sourceCardId: 'src',
+      body: 'see [[XYZ]]', // 无近邻
+    })
+
+    expect(r.created).toBe(0)
+    expect(host.getElements().filter((e) => e.kind === 'arrow')).toHaveLength(0)
+  })
+})
+
+describe('syncWikiLinkArrows (dedup race self-heal)', () => {
+  it('two duplicate wikilink arrows A->B + body [[B]] → exactly one A->B after sync', () => {
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'a')
+    addCard(host, 'b')
+    const titles: Record<string, string> = { a: 'A', b: 'B' }
+
+    // 预置两条 wikilink arrow a->b(模拟 T2 hydrate race 后的重复)
+    const dup1Id = 'arrow-wiki-dup-1-a-b'
+    const dup2Id = 'arrow-wiki-dup-2-a-b'
+    host.upsert({
+      id: dup1Id,
+      kind: 'arrow',
+      x: 0,
+      y: 0,
+      w: 0,
+      h: 0,
+      rotation: 0,
+      from: 'a',
+      to: 'b',
+      color: 'blue',
+      dash: 'dashed',
+      arrowhead: 'none',
+      text: 'references',
+      meta: { wikilink: true },
+    })
+    host.upsert({
+      id: dup2Id,
+      kind: 'arrow',
+      x: 0,
+      y: 0,
+      w: 0,
+      h: 0,
+      rotation: 0,
+      from: 'a',
+      to: 'b',
+      color: 'blue',
+      dash: 'dashed',
+      arrowhead: 'none',
+      text: 'references',
+      meta: { wikilink: true },
+    })
+
+    const r = syncWikiLinkArrows({
+      host,
+      getCardTitle: (id) => titles[id],
+      sourceCardId: 'a',
+      body: 'see [[B]]',
+    })
+
+    // body 含 [[B]] → 期望保留一条;重复的那条应被去重 → removed=1
+    expect(r.created).toBe(0)
+    expect(r.removed).toBe(1)
+    const wikiArrows = host
+      .getElements()
+      .filter((e) => e.kind === 'arrow' && e.meta?.wikilink === true && e.from === 'a' && e.to === 'b')
+    expect(wikiArrows).toHaveLength(1)
+  })
+
+  it('dedup keeps the lowest-id arrow deterministically', () => {
+    const host = new InMemoryCanvasHost()
+    addCard(host, 'a')
+    addCard(host, 'b')
+    const titles: Record<string, string> = { a: 'A', b: 'B' }
+
+    // 注意为字典序:'zzz' > 'aaa'
+    host.upsert({
+      id: 'zzz',
+      kind: 'arrow',
+      x: 0,
+      y: 0,
+      w: 0,
+      h: 0,
+      rotation: 0,
+      from: 'a',
+      to: 'b',
+      color: 'blue',
+      dash: 'dashed',
+      arrowhead: 'none',
+      text: 'references',
+      meta: { wikilink: true },
+    })
+    host.upsert({
+      id: 'aaa',
+      kind: 'arrow',
+      x: 0,
+      y: 0,
+      w: 0,
+      h: 0,
+      rotation: 0,
+      from: 'a',
+      to: 'b',
+      color: 'blue',
+      dash: 'dashed',
+      arrowhead: 'none',
+      text: 'references',
+      meta: { wikilink: true },
+    })
+
+    syncWikiLinkArrows({
+      host,
+      getCardTitle: (id) => titles[id],
+      sourceCardId: 'a',
+      body: 'see [[B]]',
+    })
+
+    // 应保留 'aaa'(字典序首),'zzz' 被删
+    expect(host.getElement('aaa')).toBeDefined()
+    expect(host.getElement('zzz')).toBeUndefined()
   })
 })
 

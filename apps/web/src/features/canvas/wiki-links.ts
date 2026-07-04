@@ -49,6 +49,105 @@ export interface SyncWikiLinkArrowsResult {
   removed: number
 }
 
+/**
+ * 归一化标题用于匹配。trim + lowercase(保守:不做去标点等激进变换,
+ * 避免误把「(备注)」和「备注」当同一卡)。spec D4 明确「保守倾向」。
+ */
+export function normalizeTitle(s: string): string {
+  return s.trim().toLowerCase()
+}
+
+/**
+ * Levenshtein 编辑距离(经典 DP,纯函数)。
+ * 用 full-matrix 实现(二维 DP);标题典型 <50 字,空间可接受。
+ *
+ * 用途:wikilink 模糊匹配的「距离」度量(spec D4)。
+ */
+export function levenshtein(a: string, b: string): number {
+  const m = a.length
+  const n = b.length
+  if (m === 0) return n
+  if (n === 0) return m
+
+  // prev = dp[i-1][*],curr = dp[i][*]
+  let prev = new Array<number>(n + 1)
+  let curr = new Array<number>(n + 1)
+  for (let j = 0; j <= n; j++) prev[j] = j
+
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i
+    const ai = a.charCodeAt(i - 1)
+    for (let j = 1; j <= n; j++) {
+      const cost = ai === b.charCodeAt(j - 1) ? 0 : 1
+      curr[j] = Math.min(
+        prev[j]! + 1, // 删除
+        curr[j - 1]! + 1, // 插入
+        prev[j - 1]! + cost, // 替换(或相等)
+      )
+    }
+    // swap
+    const tmp = prev
+    prev = curr
+    curr = tmp
+  }
+  return prev[n]!
+}
+
+export interface WikiLinkCandidate {
+  id: string
+  title: string
+}
+
+/**
+ * 匹配 wikilink 标题到候选卡 id(spec D4)。
+ *
+ * 策略(保守,优先精确):
+ *  1. **精确(归一化 lowercase+trim)优先**:多个精确命中 → id 字典序首(稳定);
+ *     排除 selfId。
+ *  2. **模糊 fallback(仅当无精确)**:Levenshtein 距离 ≤ 2 且候选标题归一化后
+ *     长度 ≥ 3(避免「Jo」「A」等短标题噪声误链)。取距离最小;距离并列取 id 字典序首;
+ *     排除 selfId。
+ *  3. **无 ≥ 阈值** → undefined(不硬链——宁可少链,不要误链)。
+ *
+ * 纯函数,无副作用——可独立单测。
+ */
+export function matchWikiLinkTitle(
+  title: string,
+  candidates: WikiLinkCandidate[],
+  selfId: string,
+): string | undefined {
+  const target = normalizeTitle(title)
+  if (!target) return undefined
+
+  // 1. 精确匹配(归一化后相等)
+  const exactHits = candidates
+    .filter((c) => c.id !== selfId && normalizeTitle(c.title) === target)
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  if (exactHits.length > 0) return exactHits[0]!.id
+
+  // 2. 模糊 fallback:距离 ≤ 2 且 长度 ≥ 3
+  const FUZZY_MAX_DISTANCE = 2
+  const FUZZY_MIN_LEN = 3
+
+  let best: { id: string; distance: number } | undefined
+  for (const c of candidates) {
+    if (c.id === selfId) continue
+    const norm = normalizeTitle(c.title)
+    if (norm.length < FUZZY_MIN_LEN) continue // 短标题噪声跳过
+    const distance = levenshtein(target, norm)
+    if (distance > FUZZY_MAX_DISTANCE) continue
+    if (
+      !best ||
+      distance < best.distance ||
+      // 距离并列取 id 字典序首
+      (distance === best.distance && c.id < best.id)
+    ) {
+      best = { id: c.id, distance }
+    }
+  }
+  return best?.id
+}
+
 export interface SyncWikiLinkArrowsParams {
   /** CanvasHost(upsert/remove/batch/getElements)。 */
   host: CanvasHost
@@ -63,11 +162,13 @@ export interface SyncWikiLinkArrowsParams {
 /**
  * 同步本卡的双链箭头:
  *  1. 解析 body 提取目标标题
- *  2. 标题→卡 id(精确大小写不敏感匹配;同标题取 id 字典序首;排除本卡自身)
+ *  2. 标题→卡 id 用 matchWikiLinkTitle(精确优先;无精确 → Levenshtein ≤ 2 模糊 fallback)
  *  3. 查现有 wikilink arrow:host.getElements() filter arrow && from===source && meta.wikilink===true
  *  4. diff:desired(目标 id 集合) vs existing(现有 arrow 的 to 集合)
  *       - 建 desired - existing(已有的同 to 不重复建)
  *       - 删 existing - desired
+ *       - **去重(T2 race 自愈)**:existing 里同一 to 出现 >1 条 wikilink arrow,
+ *         只保留 id 字典序首,其余进 toRemove。
  *  5. 整个 diff 包在 host.batch 内(单 undo 步)
  *  6. 返回 {created, removed} 计数
  *
@@ -80,34 +181,19 @@ export function syncWikiLinkArrows(params: SyncWikiLinkArrowsParams): SyncWikiLi
   const desiredTitles = extractWikiLinks(body)
 
   // 2. 标题 → 卡 id。匹配范围 = 画布上的 card 元素(host.getElements kind==='card')。
-  //    精确大小写不敏感匹配;同标题取 id 字典序首(稳定);排除本卡自身。
+  //    用 matchWikiLinkTitle(精确优先 + Levenshtein ≤ 2 模糊 fallback)。
   const cardElements = host.getElements().filter((e) => e.kind === 'card')
-  // 按标题(小写)建倒排:index → 候选 id 列表(排序后取首)
-  const titleToIds = new Map<string, string[]>()
+  const candidates: WikiLinkCandidate[] = []
   for (const el of cardElements) {
     const title = getCardTitle(el.id)
     if (title === undefined) continue
-    const key = title.trim().toLowerCase()
-    if (!key) continue
-    const arr = titleToIds.get(key)
-    if (arr) arr.push(el.id)
-    else titleToIds.set(key, [el.id])
+    candidates.push({ id: el.id, title })
   }
-  for (const arr of titleToIds.values()) arr.sort() // 字典序,保证取首稳定
 
   const desiredTargetIds = new Set<string>()
   for (const title of desiredTitles) {
-    const candidates = titleToIds.get(title.trim().toLowerCase())
-    if (!candidates || candidates.length === 0) continue // 无匹配忽略
-    const first = candidates[0]!
-    if (first === sourceCardId) {
-      // 排除本卡自身:若字典序首恰好是本卡,取下一个(若有)
-      const next = candidates[1]
-      if (!next) continue
-      desiredTargetIds.add(next)
-    } else {
-      desiredTargetIds.add(first)
-    }
+    const matchedId = matchWikiLinkTitle(title, candidates, sourceCardId)
+    if (matchedId !== undefined) desiredTargetIds.add(matchedId)
   }
 
   // 3. 查现有 wikilink arrow(from===sourceCardId && meta.wikilink===true)
@@ -118,7 +204,9 @@ export function syncWikiLinkArrows(params: SyncWikiLinkArrowsParams): SyncWikiLi
     if (el.meta?.wikilink !== true) continue
     existingWikiArrows.push(el)
   }
-  const existingTargets = new Set<string>(existingWikiArrows.map((a) => a.to).filter((to): to is string => to !== undefined))
+  const existingTargets = new Set<string>(
+    existingWikiArrows.map((a) => a.to).filter((to): to is string => to !== undefined),
+  )
 
   // 4. diff
   const toCreate: string[] = [] // 目标 id
@@ -127,8 +215,37 @@ export function syncWikiLinkArrows(params: SyncWikiLinkArrowsParams): SyncWikiLi
   }
   const toRemove: CanvasElement[] = [] // arrow 元素
   for (const a of existingWikiArrows) {
-    if (a.to === undefined) continue // 无 to 的 wikilink 箭头(异常数据),不删
-    if (!desiredTargetIds.has(a.to)) toRemove.push(a)
+    if (a.to === undefined) {
+      // 无 to 的 wikilink 箭头(异常数据)→ 不删(留给用户/其他流程清理)。
+      continue
+    }
+    if (!desiredTargetIds.has(a.to)) {
+      toRemove.push(a)
+    }
+  }
+
+  // 4b. 去重(T2 hydrate race 自愈):同一 to 出现 >1 条 wikilink arrow,
+  //     保留 id 字典序首,其余进 toRemove。即便 body 仍 [[that_target]] 也去重
+  //     (body 命中 → desiredTargetIds 含该 to → 不会进上面的 toRemove,但仍可能
+  //     有多余副本需要清理——这里覆盖)。
+  const byTarget = new Map<string, CanvasElement[]>()
+  for (const a of existingWikiArrows) {
+    if (a.to === undefined) continue
+    const arr = byTarget.get(a.to)
+    if (arr) arr.push(a)
+    else byTarget.set(a.to, [a])
+  }
+  const alreadyRemoved = new Set<string>(toRemove.map((a) => a.id))
+  for (const [, arr] of byTarget) {
+    if (arr.length <= 1) continue
+    // 字典序排序,保留首,其余删
+    const sorted = arr.slice().sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    for (let i = 1; i < sorted.length; i++) {
+      if (!alreadyRemoved.has(sorted[i]!.id)) {
+        toRemove.push(sorted[i]!)
+        alreadyRemoved.add(sorted[i]!.id)
+      }
+    }
   }
 
   // 5. 批量应用(单 undo 步)
