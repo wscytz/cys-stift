@@ -65,3 +65,39 @@ describe('archive-store CRUD', () => {
     expect(typeof archiveStore.listMeta()).toBe('object')
   })
 })
+
+describe('archive-store retention', () => {
+  it('b 类超 cap FIFO 丢旧(+ 删 payload)', async () => {
+    const { archiveStore } = await import('../archive-store')
+    for (let i = 0; i < 101; i++) {
+      await archiveStore.append('dsl-apply', `op${i}`, makePayload(String(i)), '0.0.0')
+    }
+    const list = archiveStore.listMeta()
+    expect(list.filter((m) => m.trigger === 'dsl-apply')).toHaveLength(100)
+    // 最旧的 op0 被丢 → loadPayload(1) === null
+    expect(await archiveStore.loadPayload(1)).toBeNull()
+    // 最新 op100 在,archiveVersion=101
+    expect(list[0]?.archiveVersion).toBe(101)
+  })
+
+  it('release / manual 永久(不计入 b cap)', async () => {
+    const { archiveStore } = await import('../archive-store')
+    await archiveStore.append('release', 'r0', makePayload('r'), '0.0.0')
+    for (let i = 0; i < 101; i++) {
+      await archiveStore.append('manual', `m${i}`, makePayload(String(i)), '0.0.0')
+    }
+    const list = archiveStore.listMeta()
+    expect(list).toHaveLength(102) // 全留,无清扫
+  })
+
+  it('a/c 与 b 混合:只清 b,保留 a/c', async () => {
+    const { archiveStore } = await import('../archive-store')
+    await archiveStore.append('release', 'r', makePayload('r'), '0.0.0')
+    for (let i = 0; i < 101; i++) await archiveStore.append('dsl-apply', `o${i}`, makePayload(String(i)), '0.0.0')
+    await archiveStore.append('manual', 'm', makePayload('m'), '0.0.0')
+    const list = archiveStore.listMeta()
+    expect(list.filter((m) => m.trigger === 'release')).toHaveLength(1)
+    expect(list.filter((m) => m.trigger === 'manual')).toHaveLength(1)
+    expect(list.filter((m) => m.trigger === 'dsl-apply')).toHaveLength(100)
+  })
+})

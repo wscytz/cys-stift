@@ -5,7 +5,7 @@
  *
  * 在 release / 风险 op / 手动 checkpoint 时刻落全量状态快照(OPFS),供查档 / 查错误 /
  * release 自修自查。Two-tier 存储(镜像 canvas-freeform-store 的 OPFS+LS 范式):
- *   - index:cys-stift/archive-index.v1 → { lastAppVersion, entries: ArchiveEntryMeta[] }(无 payload,轻)
+ *   - index:cys-stift/archive-index.v1 → { lastAppVersion, nextVersion, entries: ArchiveEntryMeta[] }(无 payload,轻)
  *   - payload:cys-stift/archive-payload.<version>.v1 → ArchivePayload(per-version)
  * listMeta 读 index(常驻内存缓存);loadPayload 按需读 per-version 文件。
  */
@@ -17,6 +17,12 @@ export type ArchiveTrigger =
   | 'release'
   | 'ai-layout' | 'ai-agent' | 'cluster' | 'dsl-apply'
   | 'manual'
+
+/** 风险 op(b 类)存档封顶;release/migration/manual 永久留。spec D6。 */
+export const ARCHIVE_RISKY_CAP = 100
+const RISKY_TRIGGERS: ReadonlySet<ArchiveTrigger> = new Set([
+  'ai-layout', 'ai-agent', 'cluster', 'dsl-apply',
+])
 
 export interface MediaAssetMeta {
   id: MediaAssetId
@@ -160,6 +166,24 @@ async function removePayload(version: number): Promise<void> {
   try { window.localStorage.removeItem(`${PAYLOAD_LS_PREFIX}${version}.v1`) } catch { /* best-effort */ }
 }
 
+/**
+ * 分层 FIFO 清扫(spec D6):b 类(ai-layout/ai-agent/cluster/dsl-apply)超 ARCHIVE_RISKY_CAP
+ * 时按 archiveVersion 升序丢最旧(删 OPFS payload + LS key),release/manual 永久留。
+ * 在 append 内 persistIndex **之前**调,保证落盘的 index 已剪好。
+ */
+async function applyRetention(idx: ArchiveIndex): Promise<void> {
+  const risky = idx.entries.filter((e) => RISKY_TRIGGERS.has(e.trigger))
+  if (risky.length <= ARCHIVE_RISKY_CAP) return
+  // 按版号升序丢最旧的 risky,直到 <= cap
+  risky.sort((a, b) => a.archiveVersion - b.archiveVersion)
+  const dropCount = risky.length - ARCHIVE_RISKY_CAP
+  const dropVersions = new Set(risky.slice(0, dropCount).map((e) => e.archiveVersion))
+  // 删 payload 文件(OPFS + LS)
+  for (const v of dropVersions) await removePayload(v)
+  // 从 index entries 移除
+  idx.entries = idx.entries.filter((e) => !dropVersions.has(e.archiveVersion))
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 export const archiveStore = {
   subscribe(cb: () => void): () => void {
@@ -193,8 +217,8 @@ export const archiveStore = {
     idx.nextVersion = version + 1
     _indexCache = idx
     await persistPayload(version, payload)
+    await applyRetention(idx) // 分层 FIFO:b 类超 cap 丢旧 + 删 payload;release/manual 永久
     await persistIndex(idx)
-    // T2 在此挂 retention sweep: await applyRetention(idx)
     notify()
     return meta
   },
