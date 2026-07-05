@@ -115,3 +115,119 @@ describe('MinimapPreview', () => {
     }
   })
 })
+
+/**
+ * 拖拽位置 + 持久化(Task 3)。
+ *
+ * jsdom 不做 layout(getBoundingClientRect 默认全 0),所以拖拽测试直接 stub
+ * outer(组件外层 div)和 container(parentElement)的 getBoundingClientRect
+ * 返回真实尺寸,让 clamp 公式能算出非零 left/top。然后 dispatch pointer 事件
+ * 链:header 上 pointerdown → window 上 pointermove + pointerup。最后断言
+ * localStorage 被写入(最可靠的信号 —— 无像素/布局依赖)。
+ */
+describe('MinimapPreview drag', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    // 同主 describe 的 getContext stub(draw() 才不会在 ctx 空检查处早返回)
+    const stubCtx = new Proxy({}, {
+      get: () => () => {},
+      set: () => true,
+    })
+    HTMLCanvasElement.prototype.getContext = function () {
+      return stubCtx
+    } as unknown as HTMLCanvasElement['getContext']
+  })
+
+  /** stub 一个元素的 getBoundingClientRect 返回指定 rect(覆盖默认全 0)。 */
+  function mockRect(el: HTMLElement, rect: Partial<DOMRect>) {
+    el.getBoundingClientRect = () => ({
+      left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0,
+      toJSON: () => ({}),
+      ...rect,
+    }) as DOMRect
+  }
+
+  /** 找到 drag handler 作用的三个元素:header(onPointerDown)/ outer(ref)/ container(parentElement)。 */
+  function findDragElements(r: ReturnType<typeof render>) {
+    const header = r.collapseBtn()!.parentElement as HTMLElement
+    const outer = header.parentElement as HTMLElement
+    const container = outer.parentElement as HTMLElement
+    return { header, outer, container }
+  }
+
+  /** 跑一次 pointerdown(header)→ pointermove(window)→ pointerup(window)的拖拽序列。 */
+  function dragSequence(header: HTMLElement, fromX: number, fromY: number, toX: number, toY: number) {
+    act(() => {
+      header.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true, clientX: fromX, clientY: fromY, pointerId: 1,
+      }))
+      window.dispatchEvent(new PointerEvent('pointermove', {
+        clientX: toX, clientY: toY, pointerId: 1,
+      }))
+      window.dispatchEvent(new PointerEvent('pointerup', {
+        clientX: toX, clientY: toY, pointerId: 1,
+      }))
+    })
+  }
+
+  it('drag (pointerdown + pointermove + pointerup) writes pos to its own localStorage key', () => {
+    const r = render(mockHost())
+    const { header, outer, container } = findDragElements(r)
+    // outer 240×204(展开态:header ~24 + canvas 180)
+    // container 800×600(富余空间让 clamp 不触发,拖拽真实落点)
+    mockRect(outer, { left: 100, top: 100, right: 340, bottom: 304, width: 240, height: 204, x: 100, y: 100 })
+    mockRect(container, { left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600, x: 0, y: 0 })
+
+    dragSequence(header, 110, 110, 150, 150)
+
+    const posRaw = window.localStorage.getItem('cys-stift.workbench-preview-pos.v1')
+    expect(posRaw).not.toBeNull()
+    const pos = JSON.parse(posRaw!) as { left: unknown; top: unknown }
+    // 必须是真数字(null/undefined 算失败 —— 拖拽确实落了位置)
+    expect(typeof pos.left).toBe('number')
+    expect(typeof pos.top).toBe('number')
+    // 数学验证(防 clamp 公式漂移):
+    //   dx = 150 - 110 = 40, dy = 40
+    //   startLeft - contRect.left + dx = 100 - 0 + 40 = 140
+    //   maxLeft = 800 - 240 - 4 = 556, maxTop = 600 - 204 = 396
+    //   → newLeft = 140, newTop = 140(clamp 不触发)
+    expect(pos.left).toBe(140)
+    expect(pos.top).toBe(140)
+    r.unmount()
+  })
+
+  it('drag does NOT pollute the right-bottom Minimap\'s pos key (independent keys)', () => {
+    const r = render(mockHost())
+    const { header, outer, container } = findDragElements(r)
+    mockRect(outer, { left: 100, top: 100, right: 340, bottom: 304, width: 240, height: 204, x: 100, y: 100 })
+    mockRect(container, { left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600, x: 0, y: 0 })
+
+    dragSequence(header, 110, 110, 150, 150)
+
+    expect(window.localStorage.getItem('cys-stift.workbench-preview-pos.v1')).not.toBeNull()
+    // 反向断言:不能写到原 minimap 的位置 key(那是右下小地图的)
+    expect(window.localStorage.getItem('cys-stift.minimap-pos.v1')).toBeNull()
+    r.unmount()
+  })
+
+  it('drag clamps position to container bounds (cannot drag out of viewport)', () => {
+    const r = render(mockHost())
+    const { header, outer, container } = findDragElements(r)
+    // outer 已贴在容器右下角,继续往右下拖 → clamp 到 maxLeft/maxTop
+    mockRect(outer, { left: 556, top: 396, right: 796, bottom: 600, width: 240, height: 204, x: 556, y: 396 })
+    mockRect(container, { left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600, x: 0, y: 0 })
+
+    // 从 outer 左上角拖 100px → 期望被 clamp 到 maxLeft=556, maxTop=396(不动)
+    dragSequence(header, 556, 396, 656, 496)
+
+    const posRaw = window.localStorage.getItem('cys-stift.workbench-preview-pos.v1')
+    expect(posRaw).not.toBeNull()
+    const pos = JSON.parse(posRaw!) as { left: number; top: number }
+    // maxLeft = 800 - 240 - 4 = 556, maxTop = 600 - 204 = 396 → clamp 到这两值
+    expect(pos.left).toBeLessThanOrEqual(556)
+    expect(pos.top).toBeLessThanOrEqual(396)
+    expect(pos.left).toBeGreaterThanOrEqual(0)
+    expect(pos.top).toBeGreaterThanOrEqual(0)
+    r.unmount()
+  })
+})
