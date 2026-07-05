@@ -60,6 +60,7 @@ export function MinimapPreview({ host }: { host: CanvasHost | null }) {
     })
   }, [draw])
 
+  // 订阅 host 变更(视图/用户改动/选区)触发重绘。host 变化时重订阅。
   useEffect(() => {
     if (!host) return
     const unsubs = [
@@ -73,6 +74,14 @@ export function MinimapPreview({ host }: { host: CanvasHost | null }) {
       if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
     }
   }, [host, scheduleDraw])
+
+  // 展开后画布是新挂载的空 canvas,host 事件不会自动触发重绘——这里补一帧。
+  // (订阅 effect 的 deps 是 [host, scheduleDraw],collapsed 翻转两者都不变 →
+  // 没有这一帧,展开后画布会一直空白到下一次 host 事件。同 minimap-component.tsx:162)
+  useEffect(() => {
+    if (!host || collapsed) return
+    scheduleDraw()
+  }, [host, collapsed, scheduleDraw])
 
   // 收起态切换 + 持久(独立 key,不污染正常 minimap)
   const toggleCollapse = () => {
