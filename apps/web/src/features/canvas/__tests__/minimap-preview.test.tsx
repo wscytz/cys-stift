@@ -224,10 +224,50 @@ describe('MinimapPreview drag', () => {
     expect(posRaw).not.toBeNull()
     const pos = JSON.parse(posRaw!) as { left: number; top: number }
     // maxLeft = 800 - 240 - 4 = 556, maxTop = 600 - 204 = 396 → clamp 到这两值
-    expect(pos.left).toBeLessThanOrEqual(556)
-    expect(pos.top).toBeLessThanOrEqual(396)
-    expect(pos.left).toBeGreaterThanOrEqual(0)
-    expect(pos.top).toBeGreaterThanOrEqual(0)
+    // Tightened to exact === (off-by-one guard on clamp formula):
+    //   startLeft - contRect.left + dx = 556 - 0 + 100 = 656 → min(656, 556) = 556
+    //   startTop  - contRect.top  + dy = 396 - 0 + 100 = 496 → min(496, 396) = 396
+    expect(pos.left).toBe(556)
+    expect(pos.top).toBe(396)
+    r.unmount()
+  })
+
+  /**
+   * Regression: drag-then-release-on-collapse-button must NOT toggle collapse.
+   *
+   * Bug (Task 3 review finding): collapse button is a CHILD of the header div
+   * with onPointerDown, not a sibling. User pointerdowns on/near the button,
+   * drifts >3px (dead zone passed → drag fires), releases on the button →
+   * browser synthesizes a `click` on the release target → toggleCollapse fires
+   * → preview collapses unexpectedly. The 3px dead zone only prevents
+   * click-misread-as-drag; it does NOT prevent the inverse (drag-then-release
+   * misread as click). Fix mirrors minimap-component.tsx's justDraggedRef.
+   */
+  it('drag ending on collapse button does NOT collapse (justDraggedRef swallows click)', () => {
+    const r = render(mockHost())
+    const { collapseBtn } = r
+    // 无需 mock rect —— 只验证 click-suppression 逻辑,不验证 clamp。
+    // 但 onHeaderPointerDown 早返回若无 parentElement.getBoundingClientRect,
+    // jsdom 默认全 0 rect 也能跑通 clamp 数学(0-0-4 取 max 0)。
+    act(() => {
+      // pointerdown on the collapse button (child of header → bubbles to onHeaderPointerDown)
+      collapseBtn()!.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true, clientX: 100, clientY: 100, pointerId: 1,
+      }))
+      // pointermove >3px → dead zone cleared → moved=true, justDraggedRef.current=true
+      window.dispatchEvent(new PointerEvent('pointermove', {
+        clientX: 110, clientY: 110, pointerId: 1,
+      }))
+      window.dispatchEvent(new PointerEvent('pointerup', {
+        clientX: 110, clientY: 110, pointerId: 1,
+      }))
+      // jsdom 不自动在 pointerup 后合成 click;显式 dispatch 模拟真实浏览器行为
+      // (release target receives click)。这正是 bug 触发路径。
+      collapseBtn()!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    // 没折叠 → canvas 仍在 + chip 不存在
+    expect(r.canvas()).not.toBeNull()
+    expect(r.chip()).toBeNull()
     r.unmount()
   })
 })

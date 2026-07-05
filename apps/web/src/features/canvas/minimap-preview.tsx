@@ -72,6 +72,12 @@ export function MinimapPreview({ host }: { host: CanvasHost | null }) {
   // 跳过首次 effect 写入(避免初始化 DEFAULT_POS 也写一次 localStorage)。
   // 同 minimap-component.tsx:242 的 wroteInitialRef 范式。
   const wroteInitialPosRef = useRef(false)
+  // 拖拽刚结束(pointerup 后浏览器仍 fire click)→ 吞掉,不折叠。
+  // 镜像 minimap-component.tsx:239 的 justDraggedRef 范式。
+  // 必要性:collapse 按钮是 header div 的 CHILD(不是兄弟),pointerdown 在按钮上
+  // 冒泡到 header → 一旦 >3px 触发拖拽 → pointerup 后浏览器在按钮上合成 click →
+  // toggleCollapse 误折叠。3px dead zone 只防 click→drag 误判,不防 drag→click 反向。
+  const justDraggedRef = useRef(false)
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -140,6 +146,9 @@ export function MinimapPreview({ host }: { host: CanvasHost | null }) {
     if (e.button !== 0) return
     const container = containerRef.current?.parentElement
     if (!container) return
+    // 新一轮 pointerdown:重置 justDraggedRef,确保非拖拽 click 仍能折叠。
+    // (上一轮拖拽若因 pointerup 在按钮外未触发 click,ref 会残留 true。)
+    justDraggedRef.current = false
     const startClientX = e.clientX
     const startClientY = e.clientY
     const box = containerRef.current!.getBoundingClientRect()
@@ -151,6 +160,7 @@ export function MinimapPreview({ host }: { host: CanvasHost | null }) {
       const dy = ev.clientY - startClientY
       if (!moved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return
       moved = true
+      justDraggedRef.current = true
       const contRect = container.getBoundingClientRect()
       // clamp:left ∈ [0, contW - PREVIEW_W - 4], top ∈ [0, contH - boxH]
       // box.height 是展开/收起实际高度(展开 ~204 = header 24 + canvas 180),
@@ -173,6 +183,9 @@ export function MinimapPreview({ host }: { host: CanvasHost | null }) {
 
   // 收起态切换 + 持久(独立 key,不污染正常 minimap)
   const toggleCollapse = () => {
+    // 拖拽刚结束(pointerup 后浏览器仍 fire click)→ 吞掉,不折叠。
+    // 同 minimap-component.tsx:341 的守卫。
+    if (justDraggedRef.current) { justDraggedRef.current = false; return }
     const next = !collapsed
     setCollapsed(next)
     try { window.localStorage.setItem(COLLAPSED_KEY, next ? '1' : '0') } catch { /* quota */ }
