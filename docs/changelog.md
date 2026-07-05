@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-07-05 · v0.56.0 · polish-batch（UI 打磨 + c1 闭合 + 类型逃逸 + 文档对齐）
+
+打包分发版。围绕 deepresearch 赛道缺口结论(转义 DSL = 最窄幸存差异化,AI-native 已被 Heptabase 占)推进 + 健壮性 + 文档对齐。
+
+- **UI 打磨批(10 瑕疵,Explore 审计)**:① **暗色模式代码块反相修复**(HIGH,`tokens.css` 加不翻转的 `--color-code-bg/fg`,markdown/dsl-dialog 代码块始终暗底,不被 dark mode token 翻转成白底);② MarkdownEditor + MinimapPreview i18n 漏键补(18 key);③ `error.tsx` 字面 `\n` 渲染成可见字符修复;④ focus-visible 一致性(crename/cinput + workbench-panel/markdown-editor/workbench-browser 三处 textarea/input 漏网);⑤ WorkbenchPanel 头部按钮 <1024 触摸目标 28→40;⑥ token 漂移(companion backdrop 用 `--color-scrim` / wb 徽章字号用 `--font-size-xs` / wb__deck 单卡 `:only-child` 偏移兜底)。
+- **c1 DSL 重试闭环(已 ship 核对闭合)**:retryUntilValid 共享助手 + canvas/ask/companion 三路径自动重试(错误喂回模型,maxAttempts=3)+ c2 失败样本采集。澄清 user+messages 同传非 bug(provider either/or,user 是 required 兜底)。fast-follow:AIRequest 改 discriminated union(低优)。
+- **类型逃逸修复**:file-drop-handler 删无意义 singleSource 三元(paste kind spread fileCount 产无效 CaptureSource,原 any 掩盖的 latent bug)+ 去 as any;snapshotCanvas/buildCanvasPrompt canvasId 改可选,dsl-dialog 不再构造 `'' as CanvasId` 占位。
+- **文档对齐一轮**:STATE 298→227(砍历史回溯,changelog 有对等);当前能力补工作台+Markdown;user/README 工具栏 8→5 工具(椭圆/rect/arrow 实际走手绘识别)+ 补工作台/Markdown/Timeline/Android;architecture:tldraw→自研、packages/config(不存在)→canvas-engine;tokens gray `#8c8c8c`→`#666666`;changelog 清 11 处过期「未 push」。
+- **deepresearch 赛道缺口报告(private repo docs/research/)**:Heptabase 最重合;**推翻 AI-native 无竞品**(Heptabase 2026.3-6 ship AI Tutor/Agent+CLI);真实空白=转义DSL+完整开源本地优先AI-native Android 组合+移动可编辑;可防守定位="开源+本地优先+画布全状态双向文字+Android 可编辑"组合。
+
+lint 0 / test 1362 / build exit 0。tag `v0.56.0`。
+
+---
+
 ## 2026-07-05 · v0.55.0 · markdown-katex-footnotes（数学公式 + 脚注）
 
 product-idea #4 Markdown 小尾。MarkdownBody 加数学公式 + 脚注;单一渲染器(工作台编辑器预览联动)。TOC 不做(卡片 YAGNI)。spec:`cys-stift-docs/docs/superpowers/specs/2026-07-05-markdown-katex-footnotes-design.md`;plan:`.../plans/2026-07-05-markdown-katex-footnotes.md`。
