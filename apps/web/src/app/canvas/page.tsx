@@ -385,6 +385,9 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       const r = await retryUntilValid({
         initialMessages: [{ role: 'user', content: userPrompt }],
         produce: (messages) =>
+          // 注:user + messages 同传:user 字段在 messages 存在时被 provider 忽略
+          // (types.ts:provider 走 [system, ...messages]),这里仅为满足 AIRequest.user 必填。
+          // 重试时 messages 末尾追加 correction,provider 用 messages 全量,user 死字段不参与。
           streamText(ready, { system: systemPrompt, user: userPrompt, messages, maxTokens: 4096, structuredOutput: true, timeoutMs: 60_000 }, () => {}, signal)
             .then((x) => x?.content ?? ''),
         parse: (text) => {
