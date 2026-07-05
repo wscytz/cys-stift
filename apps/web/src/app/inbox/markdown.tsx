@@ -4,6 +4,8 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import rehypeHighlight from 'rehype-highlight'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
 import { useI18n } from '@/lib/i18n'
 
 /**
@@ -71,7 +73,8 @@ const sanitizeSchema = {
     input: [['type', 'checkbox'], 'disabled', 'checked'],
     // hljs-* class 前缀放行(highlight 注入 + Bauhaus 主题选择器依赖)。
     code: [...(defaultSchema.attributes?.code ?? []), ['className', /^hljs-/]],
-    span: [['className', /^hljs-/]],
+    span: [['className', /^hljs-/], 'math'],   // +inline math class(remark-math);rehype-katex 在 sanitize 之后跑,其输出绕过 sanitize
+    div: [...(defaultSchema.attributes?.div ?? []), 'math'],  // +block math class
   },
 }
 
@@ -95,13 +98,14 @@ export function splitEmbeds(source: string): EmbedSegment[] {
 function MarkdownBlock({ source }: { source: string }) {
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={[remarkGfm, remarkMath]}
       rehypePlugins={[
-        // sanitize 必须在 highlight 之前:先把 <script>/javascript: 等剥掉,
-        // 再让 highlight 给幸存的 <code>/<span> 注入 hljs-* class(sanitizeSchema
-        // 已放行 hljs- 前缀,不会被这轮之后的任何处理剥)。
+        // sanitize 先:剥 script/javascript: 等;放行 span/div 的 math class(remark-math)。
+        // highlight + katex 后注入:产出的 class(hljs-* / katex)是库自身可信输出,
+        // 绕过 sanitize(同现有 highlight 模式)——故无需枚举 mathml 标签。
         [rehypeSanitize, sanitizeSchema],
         rehypeHighlight,
+        rehypeKatex,
       ]}
       components={{
         a: ({ href, children, ...rest }) => {
@@ -317,4 +321,17 @@ const styles = `
 .md .hljs-variable,
 .md .hljs-property,
 .md .hljs-params { color: var(--color-white); }
+/* katex(remark-math + rehype-katex):颜色/字号继承 Bauhaus;display 居中。
+   katex 自带完整渲染 CSS(顶部 import),这里只融入调色板。 */
+.md .katex { color: var(--color-black); font-size: 1.1em; }
+.md .katex-display { text-align: center; margin: var(--space-3) 0; overflow-x: auto; }
+/* 脚注(remark-footnotes):引用号蓝色 + 脚注区低调分隔。 */
+.md sup > a[href^="#"] { color: var(--color-blue); text-decoration: none; font-size: 0.8em; }
+.md .footnotes {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray);
+  border-top: var(--border-hairline);
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+}
 `

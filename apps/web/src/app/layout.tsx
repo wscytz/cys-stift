@@ -1,6 +1,10 @@
 import type { Metadata, Viewport } from 'next'
 import { Space_Grotesk, Inter, JetBrains_Mono } from 'next/font/google'
 import '../styles/globals.css'
+// katex CSS(数学公式):走 bundle 进静态产物(本地优先,不走 CDN)。放根布局全局
+// 生效 —— MarkdownBody 渲染数学时依赖它(放 markdown.tsx 会进单测 import 图,
+// vite 在 test 环境解析 CSS 里的字体 url 会失败)。
+import 'katex/dist/katex.min.css'
 import { CaptureHost } from '@/features/capture/capture-host'
 import { FileDropHandler } from '@/features/capture/file-drop-handler'
 import { AppMenu } from '@/components/app-menu'

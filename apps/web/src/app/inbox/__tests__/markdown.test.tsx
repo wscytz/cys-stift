@@ -93,3 +93,34 @@ describe('MarkdownBody — 富 Markdown (remark-gfm)', () => {
     expect(html).toContain('((包豪斯背景))')
   })
 })
+
+describe('MarkdownBody — katex + 脚注', () => {
+  // ── katex 数学公式(remark-math + rehype-katex)──
+  it('渲染 inline 数学 $...$', () => {
+    const html = renderHtml('勾股 $a^2+b^2=c^2$ 定理')
+    // rehype-katex 注入 .katex 容器(class 含 katex)
+    expect(html).toContain('katex')
+  })
+
+  it('渲染 display 数学 $$...$$', () => {
+    const html = renderHtml('$$\\sum_{i=1}^n i$$')
+    // display 块带 katex-display class
+    expect(html).toMatch(/katex-display/)
+  })
+
+  // ── 脚注(remark-footnotes)──
+  it('渲染脚注 [^1] + 定义', () => {
+    const md = '参见[^1]。\n\n[^1]: 这是脚注内容'
+    const html = renderHtml(md)
+    expect(html).toContain('<sup') // 脚注引用号 sup
+    expect(html).toMatch(/footnote/i) // footnotes 区(class/id 含 footnote)
+  })
+
+  // ── sanitize 安全门:加 math/footnote 后仍剥 script(关键回归)──
+  it('sanitize 在 katex/脚注启用后仍剥 script', () => {
+    const html = renderHtml('<script>alert(1)</script>$x^2$')
+    expect(html).not.toContain('<script>')
+    expect(html).not.toContain('alert(1)')
+    expect(html).toContain('katex') // math 仍渲染(确认没因安全收缩误伤 math)
+  })
+})

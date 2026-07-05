@@ -18,6 +18,7 @@
     "d3-force": "^3.0.0",
     "dagre": "^0.8.5",
     "eventsource-parser": "1.1.2",
+    "katex": "^0.17.0",
     "lucide-react": "^1.22.0",
     "markitdownllm": "^0.1.5",
     "next": "15.0.3",
@@ -26,8 +27,10 @@
     "react-dom": "19.0.0",
     "react-markdown": "9",
     "rehype-highlight": "7",
+    "rehype-katex": "^7.0.1",
     "rehype-sanitize": "6",
     "remark-gfm": "^4.0.0",
+    "remark-math": "^6.0.0",
     "tailwindcss": "4.0.0-beta.3"
   },
   "devDependencies": {
