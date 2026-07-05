@@ -5,6 +5,25 @@
 
 ---
 
+## 2026-07-05 · v0.55.0 · markdown-katex-footnotes（数学公式 + 脚注）
+
+product-idea #4 Markdown 小尾。MarkdownBody 加数学公式 + 脚注;单一渲染器(工作台编辑器预览联动)。TOC 不做(卡片 YAGNI)。spec:`cys-stift-docs/docs/superpowers/specs/2026-07-05-markdown-katex-footnotes-design.md`;plan:`.../plans/2026-07-05-markdown-katex-footnotes.md`。
+
+- **katex 数学(remark-math 6 + rehype-katex 7 + katex 0.17)**:`$inline$` + `$$display$$`。katex CSS **本地 bundle**(`import 'katex/dist/katex.min.css'`,不走 CDN —— 本地优先 + 隐私)。import 放根布局 `layout.tsx`(放 markdown.tsx 会进单测 import 图,vite 在 test 环境解析 CSS 里字体 url 失败);production 全局生效,build 实测 **56 个 KaTeX_* woff2 字体**落 `out/_next/static/media/`。
+- **脚注走 remark-gfm 内置**:`remark-footnotes` v5 是**已废弃空 stub**(只 package.json + readme,无代码),readme 指示用 remark-gfm 代替 → 不引入废弃包,脚注 `[^1]` 直接由 remark-gfm 解析。
+- **sanitize**(`markdown.tsx:54-76`):放行 span/div 的 `math` class(remark-math 产出);rehype-katex 在 sanitize **之后**跑,其输出绕过 sanitize → **无需枚举 mathml 标签**(比 spec 描述简,同现有 highlight 模式)。`<script>`/`javascript:` 仍剥(反向测守)。
+- **plugin**:`remark=[remarkGfm, remarkMath]`;`rehype=[[rehypeSanitize, sanitizeSchema], rehypeHighlight, rehypeKatex]`。
+- **Bauhaus 微调**:`.katex` 颜色 `var(--color-black)` + display 居中;脚注 sup 蓝色 `var(--color-blue)` + footnotes 区低调分隔。无写死 hex。
+- **测试**:`markdown.test.tsx` +4(inline math / display math / 脚注 / sanitize 仍剥 script 反向断言)。
+
+### 顺带:workbench v0.54.0 fast-follow(`b89d1ca`)
+
+- 抽 focus-mode 互斥 `nextFocusStates(action, cur)` 纯函数(`features/canvas/focus-mode-transition.ts`)+ 6 单测;canvas page 的 `toggleFocusEdit` + ⌘. handler 改调它。闭合 v0.54.0 final opus review 的 1 Important defer(page 级互斥无专测)。
+
+web 1362 测试 / lint 0 / build exit 0。tag `v0.55.0`(local,未 push)。
+
+---
+
 ## 2026-07-04 · v0.54.0 · workbench-focus-edit（工作台专注编辑态）
 
 「展开工作台」后的深度编辑加**二档**:一键编辑器撑满,画布缩成可拖拽 / 可收起(剩角)的 minimap 预览。给长文 / 复杂修改一个沉浸式空间,画布仍作被动参考常驻一角。spec:`cys-stift-docs/docs/superpowers/specs/2026-07-04-workbench-focus-edit-design.md`;plan:`cys-stift-docs/docs/superpowers/plans/2026-07-04-workbench-focus-edit.md`。6 task subagent-driven(T1-T5 shipped `4527ac7..58ddaec`,T6 本轮 wrap-up)。

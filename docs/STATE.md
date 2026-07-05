@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.54.0。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.55.0。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 
@@ -46,6 +46,7 @@
 | **v0.53.0** | **wikilink 显式化 5 项:@wikilink DSL 标记(DSL_VERSION 1→2)+ 双链重命名追踪 + 跨画布双链(meta.crossCanvas + portal)+ 模糊匹配(Levenshtein≤2)+ load 批量同步;syncWikiLinkArrows dedup(T2 race 自愈)** | v0.53.0 |
 | **v0.53.1** | **安卓运行时验证修复(首次 emulator 跑暴露 v0.50.0 的运行时隐患):rustls ring provider 修 reqwest 启动 panic(致命闪退)+ 首页平台检测 hydration + 平台检测 SSR-safe hooks 全仓收口(useIsMac/useIsMobile/useIsDesktop,render 直读改 hook)+ CaptureHint/inbox 空状态 ⌘ 提示移动端隐藏;沉淀安卓开发工作流(Studio 仅 AVD/Logcat,构建走终端,阿里云镜像)。web 1330 测试** | v0.53.1 |
 | **v0.54.0** | **工作台专注编辑态:「展开工作台」后深度编辑加二档,dock 头部 ⤢ 触发,编辑器撑满 + 画布缩成可拖拽 / 可收起(剩角)的浮 `MinimapPreview`(独立组件,复用 minimap 投影纯函数 + drawElementMark);`.cv-host` 隐不卸载保 view 态 + chrome(Toolbar/SideRail/Outline/Companion/原 Minimap)隐;workbench-store +focusEdit(会话态,不持久);与 ⌘. 画布焦点模式互斥(双向)。老 minimap 收起条状 spec §7 记不连带改。web 1352 测试。** | v0.54.0 |
+| **v0.55.0** | **Markdown 数学公式 + 脚注(katex):`$inline$` / `$$display$$` 经 remark-math + rehype-katex;katex CSS **本地 bundle**(不走 CDN,56 woff2 字体落 media);脚注走 **remark-gfm 内置**(`remark-footnotes` v5 已废弃空 stub);sanitize 放行 `math` class + katex 后跑绕过(无需 mathml 枚举),script 仍剥。单一渲染器 MarkdownBody,工作台编辑器预览联动。顺带:workbench focus-mode 互斥抽 `nextFocusStates` 纯函数 + 6 测(v0.54.0 final review 的 Important defer 闭合)。web 1362 测试** | v0.55.0 |
 
 > v0.18–v0.21 版本号在历史中跳过(从 v0.17.0 直接进 v0.22.0),非缺失。
 > **v0.27.1-review-hardening 无独立 tag** — 该轮 hardening(rehydrateCards / parseCardsRaw / geometry reconcile / M1 label)的工作被折进 v0.31.0 重构(refactor v0.31.0-p1.2/p1.3,见 `docs/decisions/2026-06-21-v0.27.1-review-hardening.md`)。
