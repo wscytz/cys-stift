@@ -98,6 +98,9 @@ export async function applyOpsAndPersist(
       })
       cardsCreated++
     } catch (err) {
+      // ⚠️ known swallow:createWithId 失败时用户无感(配额满 / ID 冲突)。
+      // 低概率(配额满会被 capture 主路径先 toast;AI uid 生成 cardId 不冲突)。
+      // 修法:PersistResult 加 cardsFailed 累加 → 调用方(agent-confirm-card)toast。
       console.error('[canvas-host-builder] createWithId failed', cardId, err)
     }
   })

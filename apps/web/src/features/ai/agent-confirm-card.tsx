@@ -66,6 +66,8 @@ export function makeOnCardCreate(canvasId: CanvasId, service: CardService) {
         source: { kind: 'manual', deviceId: 'companion-agent' },
       })
     } catch (err) {
+      // ⚠️ known swallow(同 canvas-host-builder 的 createWithId)。
+      // 修法:factory 加 onFail 回调或返回计数,liveHost 路径调用方累加 toast。
       console.error('[agent-confirm-card] createWithId failed', p.cardId, err)
     }
   }
