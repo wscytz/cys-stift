@@ -5,6 +5,36 @@
 
 ---
 
+## 2026-07-04 · v0.54.0 · workbench-focus-edit（工作台专注编辑态）
+
+「展开工作台」后的深度编辑加**二档**:一键编辑器撑满,画布缩成可拖拽 / 可收起(剩角)的 minimap 预览。给长文 / 复杂修改一个沉浸式空间,画布仍作被动参考常驻一角。spec:`cys-stift-docs/docs/superpowers/specs/2026-07-04-workbench-focus-edit-design.md`;plan:`cys-stift-docs/docs/superpowers/plans/2026-07-04-workbench-focus-edit.md`。6 task subagent-driven(T1-T5 shipped `4527ac7..58ddaec`,T6 本轮 wrap-up)。
+
+- **二档切换(T1 + T4 + T5)**:`workbench-store +focusEdit`(会话态,open/close 复位,不持久)+ dock 头部 ⤢ 按钮触发(`onToggleFocusEdit` props 链路,无快捷键,YAGNI)。**与 ⌘. 画布焦点模式互斥**(双向,handler-inline 无 loop)。
+- **专注档布局(T5,`58ddaec`)**:`.cv-host` `display:none` **不卸载**(host 活,保 view 态,退出即恢复)+ dock panel `flex:1` 撑满 + chrome(Toolbar / SideRail / Outline / Companion / 原 Minimap)隐 + 浮 `MinimapPreview`(新独立组件,不复用 Minimap)。
+- **`MinimapPreview`(T2 + T3)**:复用 `minimap.ts` 投影纯函数 + `drawElementMark`(单一源,不重写);组件壳 / 交互新建。**可拖拽 + 收起剩一个小角**(~32×32 chip,不条状碍事,与老 minimap 收起条状区分);被动参考不响应 click-to-exit(退出走 dock 头部按钮);位置 / 收起态独立 localStorage key(`cys-stift-workbench-preview-{pos,collapsed}.v1`)。拖拽守卫 `justDraggedRef` 防误折叠(`857a5c8`);展开后补一帧 draw(`a74eb98`)。
+- **T1 store(`4527ac7`)**:`workbench-store +focusEdit`(boolean)+ `setFocusEdit(value)`(open/close 复位,false 默认)。会话态,不持久(切卡 / 关 dock 自动回二档关)。
+- **T2 component(`84dafc5`)**:`MinimapPreview.tsx` 组件骨架 + 收起态渲染(剩角 chip,chip 点击展开)。
+- **T3 drag + persist(`01b2bd0`)**:拖拽位置 + 持久化 + `justDraggedRef`(`857a5c8` 修)。
+- **T4 toggle button(`6c275ad`)**:dock panel 头部 ⤢ 按钮(props 链路)。
+- **T5 page wiring(`58ddaec`)**:`app/canvas/page.tsx` 二档布局切换 + chrome 联动 + focusMode 互斥(handler-inline)。
+
+### YAGNI 边界(不做)
+
+- 连续拖拽比例(预览缩放跟随窗口大小)。
+- 预览 click-to-navigate(点击预览跳位置;被动参考,不做)。
+- 快捷键(切换走 dock 头部按钮)。
+- 新路由(无 `/focus`,只是 dock 状态)。
+- 改编辑器本体(编辑器仍是 v0.51.0 的富 Markdown 编辑器,只换容器布局)。
+- 老 minimap 收起条状(相邻问题,spec §7 记,不连带改)。
+
+### 关联
+
+product-idea #3 工作台(#1 大卡搁置 / #2 内容版本 not-done 另线 / #4 Markdown 小尾可并行)。
+
+web 1352 测试 / lint 0 / build exit 0。tag `v0.54.0`(local,未 push)。
+
+---
+
 ## 2026-07-04 · v0.53.1 · android-runtime-hardening（安卓运行时验证修复）
 
 v0.50.0 落了安卓适配代码(platform.ts isMobile/isDesktop + 移动端 UI 门控 + capture-host `__TAURI__` catch + apk 打包),但**没真机跑过**。本轮首次跑 Android Studio emulator(arm64-v8a Android 14)暴露 3 个运行时隐患,一次性修掉。无新功能,纯加固。
