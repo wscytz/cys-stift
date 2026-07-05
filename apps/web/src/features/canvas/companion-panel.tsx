@@ -431,7 +431,7 @@ const styles = `
   position: fixed;
   inset: 0;
   top: var(--app-menu-height, 69px);
-  background: rgba(10, 10, 10, 0.25);
+  background: var(--color-scrim);
   border: none;
   padding: 0;
   cursor: default;

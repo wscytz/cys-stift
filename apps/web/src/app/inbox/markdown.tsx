@@ -241,8 +241,8 @@ const styles = `
 .md pre {
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
-  background: var(--color-black);
-  color: var(--color-white);
+  background: var(--color-code-bg);
+  color: var(--color-code-fg);
   padding: var(--space-2);
   overflow-x: auto;
   border-radius: var(--radius-sm);

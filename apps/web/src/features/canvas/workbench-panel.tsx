@@ -167,6 +167,7 @@ const styles = `
   padding: var(--space-quarter) 0;
 }
 .wb-panel__title:focus { border-bottom-color: var(--color-red); }
+.wb-panel__title:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .wb-panel__close {
   width: 28px;
   height: 28px;
@@ -198,6 +199,10 @@ const styles = `
 .wb-panel__focus[aria-pressed="true"] {
   background: var(--color-black);
   color: var(--color-white);
+}
+/* 触摸目标放大:画板/窄屏(<1024)按钮 28→40,与 canvas rail 事实标准对齐。 */
+@media (max-width: 1023px) {
+  .wb-panel__close, .wb-panel__focus { width: 40px; height: 40px; }
 }
 .wb-panel__body {
   flex: 1;

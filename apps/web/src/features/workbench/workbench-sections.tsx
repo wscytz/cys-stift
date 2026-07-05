@@ -242,6 +242,8 @@ const styles = `
 .wb__deck .wb__minicard:nth-child(1) { top: 16px; left: 10px; z-index: 1; }
 .wb__deck .wb__minicard:nth-child(2) { top: 8px; left: 5px; z-index: 2; }
 .wb__deck .wb__minicard:nth-child(3) { top: 0; left: 0; z-index: 3; }
+/* 单卡折叠态:只有一张卡时不应用堆叠偏移,居正。 */
+.wb__deck > .wb__minicard:only-child { top: 0; left: 0; }
 .wb__mcbar { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
 .wb__mctitle {
   font-family: var(--font-display); font-weight: 600; font-size: var(--font-size-xs);
@@ -249,7 +251,7 @@ const styles = `
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .wb__mcpreview {
-  font-size: 10px; color: var(--color-gray); padding: 1px 8px 0 12px;
+  font-size: var(--font-size-xs); color: var(--color-gray); padding: 1px 8px 0 12px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 `

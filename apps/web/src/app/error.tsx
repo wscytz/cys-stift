@@ -37,7 +37,7 @@ export default function GlobalError({
       {/* 调试:显示真实错误信息 + stack(生产也留,便于用户反馈定位) */}
       <details className="err-boundary__details">
         <summary className="err-boundary__digest">{t('error.boundary.tech')}</summary>
-        <pre className="err-boundary__stack">{error.message}\n{error.stack ?? ''}</pre>
+        <pre className="err-boundary__stack">{error.message + '\n' + (error.stack ?? '')}</pre>
       </details>
       <div className="err-boundary__actions">
         <button type="button" className="err-boundary__btn" onClick={reset}>

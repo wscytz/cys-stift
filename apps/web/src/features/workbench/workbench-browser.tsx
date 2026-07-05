@@ -165,6 +165,7 @@ const styles = `
   font-family: var(--font-content); font-size: var(--font-size-sm);
   color: var(--color-black); flex: 1; min-width: 0;
 }
+.wb__search-input:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .wb__modes { display: flex; gap: var(--space-1); flex-wrap: wrap; }
 .wb__mode {
   font-family: var(--font-display); font-weight: 600;
@@ -196,7 +197,7 @@ const styles = `
 .wb__tagchip:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .wb__tagchip--on { color: var(--color-white); }
 .wb__tagcnt {
-  font-family: var(--font-mono); font-size: 10px; opacity: 0.8;
+  font-family: var(--font-mono); font-size: var(--font-size-xs); opacity: 0.8;
   margin-left: var(--space-1);
 }
 .wb__hint, .wb__no-match {

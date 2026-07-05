@@ -109,6 +109,12 @@
   --color-gray-soft: #d9d9d9;
   --color-canvas: var(--color-white-soft);
 
+  /* Code block surface — 代码块语义=始终暗底,不跟主题翻转(dark mode 也不反相)。
+     light/dark 同值,派生自固定 hex(非 --color-black/white,避免翻转)。
+     hljs 语法高亮为暗底调的亮色变体,代码块始终暗底即正确,无需 dark 覆盖。 */
+  --color-code-bg: #0a0a0a;
+  --color-code-fg: #fafafa;
+
   /* Typography */
   --font-display: 'Space Grotesk', system-ui, sans-serif;
   --font-body: Inter, system-ui, -apple-system, sans-serif;

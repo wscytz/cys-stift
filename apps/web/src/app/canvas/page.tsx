@@ -1984,6 +1984,7 @@ const styles = `
 .cselect-edit:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .crename { height: 32px; padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-sm); border: var(--border-hairline); border-radius: var(--radius-sm); outline: none; min-width: 200px; }
 .cinput { display: block; width: 100%; height: 32px; margin-top: var(--space-2); padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-base); border: var(--border-hairline); border-radius: var(--radius-sm); outline: none; }
+.crename:focus-visible, .cinput:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .confirm__type {
   display: block; width: 100%; margin-top: var(--space-2);
   padding: var(--space-1) var(--space-2);

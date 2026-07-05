@@ -836,6 +836,29 @@ export const messages = {
   'freedraw.toCurveArrow': { zh: '转为曲线箭头', en: 'Convert to curved arrow' },
   'freedraw.toElbowArrow': { zh: '转为折线箭头', en: 'Convert to elbow arrow' },
   'freedraw.toRect': { zh: '转为矩形', en: 'Convert to rectangle' },
+
+  /* ── MarkdownEditor 工具栏 + 视图(D3) ── */
+  'editor.toolbar': { zh: 'markdown 格式', en: 'Markdown formatting' },
+  'editor.h2': { zh: '标题', en: 'Heading' },
+  'editor.bold': { zh: '粗体', en: 'Bold' },
+  'editor.italic': { zh: '斜体', en: 'Italic' },
+  'editor.strike': { zh: '删除线', en: 'Strikethrough' },
+  'editor.code': { zh: '行内代码', en: 'Inline code' },
+  'editor.codeblock': { zh: '代码块', en: 'Code block' },
+  'editor.quote': { zh: '引用', en: 'Quote' },
+  'editor.ul': { zh: '无序列表', en: 'Bullet list' },
+  'editor.task': { zh: '任务列表', en: 'Task list' },
+  'editor.table': { zh: '表格', en: 'Table' },
+  'editor.link': { zh: '链接', en: 'Link' },
+  'editor.view.split': { zh: '分屏', en: 'Split' },
+  'editor.view.source': { zh: '源码', en: 'Source' },
+  'editor.view.preview': { zh: '预览', en: 'Preview' },
+  'editor.placeholder': { zh: '写点什么… 支持表格 / 任务列表 / 代码(富 Markdown)', en: 'Write something… supports tables / task lists / code (rich Markdown)' },
+  'editor.previewEmpty': { zh: '预览为空', en: 'Preview is empty' },
+
+  /* ── 工作台画布预览(MinimapPreview) ── */
+  'canvas.preview.expand': { zh: '展开画布预览', en: 'Expand canvas preview' },
+  'canvas.preview.collapse': { zh: '收起画布预览', en: 'Collapse canvas preview' },
 } as const
 
 export type MessageKey = keyof typeof messages

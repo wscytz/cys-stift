@@ -15,28 +15,44 @@ import React, { useRef, useState, useEffect } from 'react'
 import { WorkbenchIcon, type WorkbenchIconName } from '@/features/canvas/workbench-icons'
 import { insertMarkdown, type MdAction } from './markdown-editor-helpers'
 import { MarkdownBody } from '@/app/inbox/markdown'
+import { useI18n } from '@/lib/i18n'
 
 type View = 'split' | 'source' | 'preview'
 
-const TOOLBAR: { name: WorkbenchIconName; action: MdAction; label: string }[] = [
-  { name: 'h2', action: 'h2', label: '标题' },
-  { name: 'bold', action: 'bold', label: '粗体' },
-  { name: 'italic', action: 'italic', label: '斜体' },
-  { name: 'strike', action: 'strike', label: '删除线' },
-  { name: 'code', action: 'code', label: '行内代码' },
-  { name: 'codeblock', action: 'codeblock', label: '代码块' },
-  { name: 'quote', action: 'quote', label: '引用' },
-  { name: 'ul', action: 'ul', label: '无序列表' },
-  { name: 'task', action: 'task', label: '任务列表' },
-  { name: 'table', action: 'table', label: '表格' },
-  { name: 'link', action: 'link', label: '链接' },
+const TOOLBAR: { name: WorkbenchIconName; action: MdAction }[] = [
+  { name: 'h2', action: 'h2' },
+  { name: 'bold', action: 'bold' },
+  { name: 'italic', action: 'italic' },
+  { name: 'strike', action: 'strike' },
+  { name: 'code', action: 'code' },
+  { name: 'codeblock', action: 'codeblock' },
+  { name: 'quote', action: 'quote' },
+  { name: 'ul', action: 'ul' },
+  { name: 'task', action: 'task' },
+  { name: 'table', action: 'table' },
+  { name: 'link', action: 'link' },
 ]
 
-const VIEWS: { v: View; label: string }[] = [
-  { v: 'split', label: '分屏' },
-  { v: 'source', label: '源码' },
-  { v: 'preview', label: '预览' },
+const VIEWS: { v: View; key: 'editor.view.split' | 'editor.view.source' | 'editor.view.preview' }[] = [
+  { v: 'split', key: 'editor.view.split' },
+  { v: 'source', key: 'editor.view.source' },
+  { v: 'preview', key: 'editor.view.preview' },
 ]
+
+/** 工具栏 action → i18n key(标题/粗体/…)。顺序与 TOOLBAR 一致。 */
+const TOOLBAR_KEYS = {
+  h2: 'editor.h2',
+  bold: 'editor.bold',
+  italic: 'editor.italic',
+  strike: 'editor.strike',
+  code: 'editor.code',
+  codeblock: 'editor.codeblock',
+  quote: 'editor.quote',
+  ul: 'editor.ul',
+  task: 'editor.task',
+  table: 'editor.table',
+  link: 'editor.link',
+} as const
 
 export interface MarkdownEditorProps {
   value: string
@@ -45,6 +61,7 @@ export interface MarkdownEditorProps {
 }
 
 export function MarkdownEditor({ value, onChange, className }: MarkdownEditorProps) {
+  const { t } = useI18n()
   const taRef = useRef<HTMLTextAreaElement>(null)
   const pendingSel = useRef<{ s: number; e: number } | null>(null)
   const [view, setView] = useState<View>('split')
@@ -72,33 +89,39 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
   return (
     <div className={`md-editor${className ? ' ' + className : ''}`}>
       <style>{styles}</style>
-      <div className="md-editor__toolbar" role="toolbar" aria-label="markdown 格式">
-        {TOOLBAR.map((t) => (
-          <button
-            key={t.action}
-            type="button"
-            className="md-editor__btn"
-            title={t.label}
-            aria-label={t.label}
-            onClick={() => apply(t.action)}
-          >
-            <WorkbenchIcon name={t.name} size={16} />
-          </button>
-        ))}
+      <div className="md-editor__toolbar" role="toolbar" aria-label={t('editor.toolbar')}>
+        {TOOLBAR.map((tb) => {
+          const label = t(TOOLBAR_KEYS[tb.action])
+          return (
+            <button
+              key={tb.action}
+              type="button"
+              className="md-editor__btn"
+              title={label}
+              aria-label={label}
+              onClick={() => apply(tb.action)}
+            >
+              <WorkbenchIcon name={tb.name} size={16} />
+            </button>
+          )
+        })}
         <span className="md-editor__spacer" />
-        {VIEWS.map((v) => (
-          <button
-            key={v.v}
-            type="button"
-            className={`md-editor__btn md-editor__btn--text${view === v.v ? ' is-active' : ''}`}
-            title={v.label}
-            aria-label={v.label}
-            aria-pressed={view === v.v}
-            onClick={() => setView(v.v)}
-          >
-            {v.label}
-          </button>
-        ))}
+        {VIEWS.map((v) => {
+          const label = t(v.key)
+          return (
+            <button
+              key={v.v}
+              type="button"
+              className={`md-editor__btn md-editor__btn--text${view === v.v ? ' is-active' : ''}`}
+              title={label}
+              aria-label={label}
+              aria-pressed={view === v.v}
+              onClick={() => setView(v.v)}
+            >
+              {label}
+            </button>
+          )
+        })}
       </div>
       <div className={`md-editor__body md-editor__body--${view}`}>
         {(view === 'split' || view === 'source') && (
@@ -107,7 +130,7 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
             className="md-editor__textarea"
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="写点什么… 支持表格 / 任务列表 / 代码（富 Markdown）"
+            placeholder={t('editor.placeholder')}
             spellCheck={false}
           />
         )}
@@ -116,7 +139,7 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
             {value.trim() ? (
               <MarkdownBody source={value} />
             ) : (
-              <p className="md-editor__empty">预览为空</p>
+              <p className="md-editor__empty">{t('editor.previewEmpty')}</p>
             )}
           </div>
         )}
@@ -180,6 +203,7 @@ const styles = `
   color: var(--color-black);
   background: var(--color-white);
 }
+.md-editor__textarea:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .md-editor__preview {
   overflow: auto;
   padding: var(--space-2);

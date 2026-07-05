@@ -19,6 +19,7 @@ import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
 import { readToken } from '@cys-stift/canvas-engine'
 import { computeMinimapProjection } from './minimap'
 import { drawElementMark } from './minimap-component'
+import { useI18n } from '@/lib/i18n'
 
 const PREVIEW_W = 240
 const PREVIEW_H = 180
@@ -62,6 +63,7 @@ function savePos(p: PreviewPos): void {
 }
 
 export function MinimapPreview({ host }: { host: CanvasHost | null }) {
+  const { t } = useI18n()
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const rafRef = useRef<number | null>(null)
   const [collapsed, setCollapsed] = useState<boolean>(loadCollapsed)
@@ -213,7 +215,7 @@ export function MinimapPreview({ host }: { host: CanvasHost | null }) {
           boxShadow: '4px 4px 0 0 var(--color-black)', borderRadius: 'var(--radius-sm)',
           display: 'grid', placeItems: 'center', cursor: 'pointer',
         }}
-        role="button" tabIndex={0} aria-label="展开画布预览"
+        role="button" tabIndex={0} aria-label={t('canvas.preview.expand')}
         onClick={toggleCollapse}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCollapse() } }}
       >▸</div>
@@ -246,7 +248,7 @@ export function MinimapPreview({ host }: { host: CanvasHost | null }) {
           type="button" data-testid="mp-collapse"
           className="cv-chrome-toggle"
           onClick={toggleCollapse}
-          aria-label="收起画布预览" aria-expanded={!collapsed} title="收起"
+          aria-label={t('canvas.preview.collapse')} aria-expanded={!collapsed} title={t('canvas.preview.collapse')}
         >▾</button>
       </div>
       <canvas

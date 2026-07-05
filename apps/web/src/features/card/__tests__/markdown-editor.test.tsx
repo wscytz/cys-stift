@@ -35,7 +35,7 @@ describe('MarkdownEditor — 工具栏', () => {
   it('点 bold → onChange 收到 **占位符**', () => {
     const onChange = vi.fn()
     const { host } = render(<MarkdownEditor value="x" onChange={onChange} />)
-    const btn = host.querySelector('button[aria-label="粗体"]') as HTMLButtonElement
+    const btn = host.querySelector('button[aria-label="editor.bold"]') as HTMLButtonElement
     expect(btn).toBeTruthy()
     act(() => {
       btn.click()
@@ -47,7 +47,7 @@ describe('MarkdownEditor — 工具栏', () => {
   it('点 table → onChange 含表格模板', () => {
     const onChange = vi.fn()
     const { host } = render(<MarkdownEditor value="" onChange={onChange} />)
-    const btn = host.querySelector('button[aria-label="表格"]') as HTMLButtonElement
+    const btn = host.querySelector('button[aria-label="editor.table"]') as HTMLButtonElement
     act(() => {
       btn.click()
     })
@@ -57,7 +57,7 @@ describe('MarkdownEditor — 工具栏', () => {
   it('点 task → onChange 含 - [ ] ', () => {
     const onChange = vi.fn()
     const { host } = render(<MarkdownEditor value="todo" onChange={onChange} />)
-    const btn = host.querySelector('button[aria-label="任务列表"]') as HTMLButtonElement
+    const btn = host.querySelector('button[aria-label="editor.task"]') as HTMLButtonElement
     act(() => {
       btn.click()
     })
@@ -86,7 +86,7 @@ describe('MarkdownEditor — 输入与视图', () => {
     expect(host.querySelector('textarea')).toBeTruthy()
     expect(host.querySelector('.md-editor__preview')).toBeTruthy()
 
-    const pvBtn = host.querySelector('button[aria-label="预览"]') as HTMLButtonElement
+    const pvBtn = host.querySelector('button[aria-label="editor.view.preview"]') as HTMLButtonElement
     act(() => {
       pvBtn.click()
     })
@@ -96,7 +96,7 @@ describe('MarkdownEditor — 输入与视图', () => {
 
   it('切源码后无预览区', () => {
     const { host } = render(<MarkdownEditor value="# 标题" onChange={() => {}} />)
-    const srcBtn = host.querySelector('button[aria-label="源码"]') as HTMLButtonElement
+    const srcBtn = host.querySelector('button[aria-label="editor.view.source"]') as HTMLButtonElement
     act(() => {
       srcBtn.click()
     })

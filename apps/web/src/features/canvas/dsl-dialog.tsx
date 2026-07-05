@@ -257,7 +257,7 @@ const styles = `
 .dsl-syntax__body { margin: 0 var(--space-2) var(--space-2); font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black-soft); line-height: 1.5; }
 .dsl-syntax__code {
   margin: 0 var(--space-2) var(--space-2); padding: var(--space-2);
-  background: var(--color-black); color: var(--color-white);
+  background: var(--color-code-bg); color: var(--color-code-fg);
   font-family: var(--font-mono); font-size: var(--font-size-xs);
   border-radius: var(--radius-sm); line-height: 1.6; overflow-x: auto;
 }
