@@ -13,7 +13,7 @@
 | blue | `#003f7f` | `#e0ebf5` | archive（已沉淀） |
 | black | `#0a0a0a` | `#2b2b2b` | canvas（工作区） |
 | white | `#fafafa` | `#ffffff` | 背景 |
-| gray | `#8c8c8c` | `#d9d9d9` | system UI（不抢戏） |
+| gray | `#666666` | `#d9d9d9` | system UI（不抢戏） |
 
 **硬约束**：
 
