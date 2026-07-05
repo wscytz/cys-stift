@@ -14,7 +14,7 @@ import { DSL_GRAMMAR_REFERENCE as GRAMMAR } from './dsl-grammar'
 export function buildCanvasPrompt(
   host: CanvasHost,
   service: CardService,
-  canvasId: CanvasId,
+  canvasId?: CanvasId,
 ): string {
   const snapshot = snapshotCanvas(host, service, canvasId)
   const canvasText = formatCanvasSnapshot(snapshot)

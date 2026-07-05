@@ -14,7 +14,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { Modal, Button } from '@cys-stift/ui'
-import type { CardId, CanvasId, CardService } from '@cys-stift/domain'
+import type { CardId, CardService } from '@cys-stift/domain'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
 import { pushToast } from '@/lib/toast-store'
@@ -161,8 +161,7 @@ export function DslDialog({
   const copyAsPrompt = async () => {
     if (!host) return
     try {
-      // canvasId 不进 snapshotCanvas(host 自带元素),传占位即可。
-      const prompt = buildCanvasPrompt(host, service, '' as unknown as CanvasId)
+      const prompt = buildCanvasPrompt(host, service)
       await navigator.clipboard.writeText(prompt)
       pushToast({ kind: 'success', message: t('canvas.dslPromptCopied') })
     } catch {

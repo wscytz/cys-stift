@@ -15,7 +15,7 @@ import { useEffect } from 'react'
 import { captureSinkRegistry } from './capture-sink'
 import { fileCaptureSource } from './file-capture-sink'
 import { restoreFromFile } from '@/features/canvas/cystift-payload'
-import type { CardService } from '@cys-stift/domain'
+import type { CardService, CaptureInput, CaptureSource } from '@cys-stift/domain'
 import { pushToast } from '@/lib/toast-store'
 import { useI18n } from '@/lib/i18n'
 import { useDb } from '@/lib/db-client'
@@ -52,8 +52,7 @@ function dispatchFiles(
 ): void {
   if (files.length === 0) return
   const source = fileCaptureSource(kind, getDeviceId())
-  files.forEach((file, i) => {
-    const singleSource = i === 0 ? source : { ...source, fileCount: 1 }
+  files.forEach((file) => {
     // P5.4 — a dropped `.cystift` PNG/SVG restores the canvas instead of
     // becoming a card. Probe png/svg files first; only fall through to the
     // normal capture path if it isn't a cystift export.
@@ -70,25 +69,25 @@ function dispatchFiles(
             })
           } else {
             // Not a cystift file — create a card from it as usual.
-            captureAndToast(file, singleSource, t)
+            captureAndToast(file, source, t)
           }
         })
-        .catch(() => captureAndToast(file, singleSource, t))
+        .catch(() => captureAndToast(file, source, t))
       return
     }
-    captureAndToast(file, singleSource, t)
+    captureAndToast(file, source, t)
   })
 }
 
 function captureAndToast(
   file: File,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  singleSource: any,
+  source: CaptureSource,
   t: (key: MessageKey, params?: Record<string, string | number>) => string,
 ): void {
-  void captureSinkRegistry
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .submit({ source: singleSource as any, file } as any)
+  // file 作 CaptureInput 的额外属性,经结构子类型传到 FileCaptureSink(它从 input.file 取)。
+  // registry.submit 签名是 CaptureInput;构造带类型的 input 变量,不再用 as any。
+  const input: CaptureInput & { file: File } = { source, file }
+  void captureSinkRegistry.submit(input)
     .then(() => {
       pushToast({
         kind: 'success',

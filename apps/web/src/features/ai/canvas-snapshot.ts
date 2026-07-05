@@ -86,7 +86,10 @@ export interface CanvasSnapshotOutput {
 export function snapshotCanvas(
   host: CanvasHost,
   service: CardService,
-  _canvasId: CanvasId,
+  /** canvasId 当前未使用(实现读 host 全量元素,不按 canvasId 过滤)。保留为可选:
+   *  ① 现有 22 调用点传 CanvasId 仍兼容;② 调用方无需构造占位 id(如 buildCanvasPrompt
+   *  的「复制为提示词」路径);③ 供未来 per-canvas scope 过滤用。删参数要改 22 处,YAGNI。 */
+  _canvasId?: CanvasId,
 ): CanvasSnapshotOutput {
   const cards: SnapshotCard[] = []
   const arrows: SnapshotArrow[] = []
