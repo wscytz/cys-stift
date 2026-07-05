@@ -27,6 +27,7 @@ import { canvasToMarkdown, markdownFileName } from '@/features/canvas/canvas-to-
 import { RelationPanel } from '@/features/canvas/relation-panel'
 import { FreedrawPanel } from '@/features/canvas/freedraw-panel'
 import { Minimap } from '@/features/canvas/minimap-component'
+import { MinimapPreview } from '@/features/canvas/minimap-preview'
 import { OutlinePanel } from '@/features/canvas/outline-panel'
 import { CanvasCompanionPanel } from '@/features/canvas/companion-panel'
 import { autoRelate } from '@/features/canvas/auto-relate'
@@ -77,8 +78,8 @@ import { canvasViewStore } from '@/lib/canvas-view-store'
 export default function CanvasPage() {
   const { t } = useI18n()
   const { snap, service, ready } = useDb()
-  // T5:工作台 dock 状态(开/关 + 当前 cardId)。非持久(关画布/刷新即重置)。
-  const { cardId: wbCardId } = useWorkbench()
+  // T5:工作台 dock 状态(开/关 + 当前 cardId + 专注编辑)。非持久(关画布/刷新即重置)。
+  const { cardId: wbCardId, focusEdit } = useWorkbench()
   const pathname = usePathname()
   const handle = useRef<SelfCanvasHandle>({ adapter: null })
   // adapter 就绪态抬进 state(ref 赋值不触发 re-render,否则冷启动/切画布后
@@ -588,7 +589,12 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         const tgt = e.target as HTMLElement | null
         if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return
         e.preventDefault()
-        setFocusMode((m) => !m)
+        setFocusMode((m) => {
+          const next = !m
+          // 进画布焦点 → 退出专注编辑(互斥)
+          if (next) workbenchStore.setFocusEdit(false)
+          return next
+        })
         return
       }
       const tgt = e.target as HTMLElement | null
@@ -1079,10 +1085,21 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     [wbCardId, service, t, allWikiCandidates, activeCanvasId],
   )
 
+  // T5:专注编辑切换 —— 翻 focusEdit + 进专注时退出画布焦点(互斥)。
+  // focusMode 在 deps 里:否则关闭焦点后立即点开专注会用到 stale 的 focusMode=true。
+  const toggleFocusEdit = useCallback(() => {
+    const next = !focusEdit
+    workbenchStore.setFocusEdit(next)
+    if (next && focusMode) setFocusMode(false)
+  }, [focusEdit, focusMode])
+
+  // T5:chrome(Toolbar/SideRail/Minimap 等)在 focusMode 或 focusEdit 时都隐。
+  const chromeHidden = focusMode || focusEdit
+
   return (
     <main id="main" tabIndex={-1} className={`page${focusMode ? ' page--focus' : ''}`}>
       <h1 className="sr-only">{t('canvas.crumb')}</h1>
-      {!focusMode && (
+      {!chromeHidden && (
       <Toolbar region="canvas">
         <CanvasSwitcher
           canvases={canvases}
@@ -1181,7 +1198,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       )}
 
       <div className="cv-dock">
-      <div className={`cv-host cv-host--${tool}`} onContextMenu={(e) => {
+      <div className={`cv-host cv-host--${tool}${focusEdit ? ' cv-host--hidden' : ''}`} onContextMenu={(e) => {
         e.preventDefault()
         const adapter = handle.current.adapter
         if (!adapter) return
@@ -1216,7 +1233,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         )}
         <RelationPanel host={adapter} canvasEl={canvasElRef.current} />
         <FreedrawPanel host={adapter} canvasEl={canvasElRef.current} />
-        {!focusMode && (
+        {!chromeHidden && (
         <>
         <CanvasSideRail
           aiEnabled={aiEnabled}
@@ -1288,12 +1305,15 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       {/* T5:工作台 dock 右栏 —— 卡片详情弹窗「展开工作台」打开;收起 → workbenchStore.close。
           flex dock:cv-host(flex:1) + 本栏(clamp 宽)。卡找不到/已删 → 不渲染。 */}
       {wbCardId && wbCard && !wbCard.deletedAt && (
-        <aside className="cv-dock__panel" aria-label={t('canvas.workbench.expand')}>
+        <aside className={`cv-dock__panel${focusEdit ? ' cv-dock__panel--focus' : ''}`} aria-label={t('canvas.workbench.expand')}>
           <WorkbenchPanel
             card={wbCard}
             onSave={wbSave}
             onClose={() => workbenchStore.close()}
+            focusEdit={focusEdit}
+            onToggleFocusEdit={toggleFocusEdit}
           />
+          {focusEdit && <MinimapPreview host={adapter} />}
         </aside>
       )}
       </div>
@@ -1860,6 +1880,9 @@ const styles = `
   background: var(--color-white);
   overflow: hidden;
 }
+/* T5:专注编辑态 —— 隐 cv-host(不卸载,host 存活供 MinimapPreview 订阅)+ dock panel 撑满。 */
+.cv-host--hidden { display: none; }
+.cv-dock__panel--focus { flex: 1; width: auto; border-left: none; }
 /* 橡皮光标:SVG 圆圈(28px),让用户看清擦除范围。其他工具保持 crosshair/text/cell。 */
 .cv-host--eraser canvas {
   cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'><circle cx='14' cy='14' r='11' fill='none' stroke='black' stroke-width='2'/><circle cx='14' cy='14' r='11' fill='none' stroke='white' stroke-width='1' stroke-dasharray='2,2'/></svg>") 14 14, crosshair;
