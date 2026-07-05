@@ -110,3 +110,68 @@ describe('WorkbenchPanel', () => {
     void rerender
   })
 })
+
+describe('WorkbenchPanel focus toggle', () => {
+  it('渲染专注切换按钮（focusEdit=false → aria-pressed=false）', () => {
+    const { host } = render(
+      <WorkbenchPanel
+        card={card}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+        focusEdit={false}
+        onToggleFocusEdit={vi.fn()}
+      />,
+    )
+    const btn = host.querySelector('[data-testid="wb-focus-toggle"]') as HTMLButtonElement | null
+    expect(btn).not.toBeNull()
+    expect(btn!.getAttribute('aria-pressed')).toBe('false')
+    host.remove()
+  })
+
+  it('click → onToggleFocusEdit 调一次', () => {
+    const onToggle = vi.fn()
+    const { host } = render(
+      <WorkbenchPanel
+        card={card}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+        focusEdit={false}
+        onToggleFocusEdit={onToggle}
+      />,
+    )
+    const btn = host.querySelector('[data-testid="wb-focus-toggle"]') as HTMLButtonElement
+    act(() => {
+      btn.click()
+    })
+    expect(onToggle).toHaveBeenCalledTimes(1)
+    host.remove()
+  })
+
+  it('focusEdit=true → aria-pressed=true（图标切到 collapse）', () => {
+    const { host } = render(
+      <WorkbenchPanel
+        card={card}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+        focusEdit
+        onToggleFocusEdit={vi.fn()}
+      />,
+    )
+    const btn = host.querySelector('[data-testid="wb-focus-toggle"]') as HTMLButtonElement
+    expect(btn.getAttribute('aria-pressed')).toBe('true')
+    // 头部应只有 1 个 focus toggle（不重复）
+    expect(host.querySelectorAll('[data-testid="wb-focus-toggle"]').length).toBe(1)
+    host.remove()
+  })
+
+  it('未传 focusEdit/onToggleFocusEdit → 不崩（可选默认；T5 未接线时）', () => {
+    const { host } = render(
+      <WorkbenchPanel card={card} onSave={vi.fn()} onClose={vi.fn()} />,
+    )
+    // 默认态下也渲染按钮（focusEdit=false），click 不抛
+    const btn = host.querySelector('[data-testid="wb-focus-toggle"]') as HTMLButtonElement | null
+    expect(btn).not.toBeNull()
+    expect(() => act(() => { btn!.click() })).not.toThrow()
+    host.remove()
+  })
+})

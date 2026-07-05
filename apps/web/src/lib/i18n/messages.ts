@@ -458,6 +458,7 @@ export const messages = {
   'canvas.organize.apply': { zh: '应用', en: 'Apply' },
   'canvas.focusMode': { zh: '焦点模式', en: 'Focus mode' },
   'canvas.exitFocus': { zh: '退出焦点', en: 'Exit focus' },
+  'canvas.focusEdit': { zh: '专注编辑', en: 'Focus edit' },
   'canvas.overviewLede': { zh: '整画布鸟瞰——点击任意位置居中视口', en: 'Whole-canvas bird eye view — click anywhere to center' },
   'canvas.overviewEmpty': { zh: '画布上还没有元素', en: 'No elements on the canvas yet' },
   'canvas.outline.empty': { zh: '画布上还没有元素', en: 'No elements on the canvas yet' },

@@ -23,9 +23,26 @@ export interface WorkbenchPanelProps {
   card: Card
   onSave: (patch: { title: string; body: string; tags: TagRef[] }) => void
   onClose: () => void
+  /**
+   * 专注编辑态（工作台撑满 + 画布缩预览）。
+   * 头部按钮读它显示图标（true=collapse / false=expand）。
+   * 可选：默认 false。T5 在 page 接线 store.setFocusEdit。
+   */
+  focusEdit?: boolean
+  /**
+   * 切换专注态（由 page 实现：store.setFocusEdit + 与 focusMode 互斥）。
+   * 可选：默认 no-op。Toggle 是 VIEW 切换；脏草稿由既有防抖 autosave 持久化，无需 flush。
+   */
+  onToggleFocusEdit?: () => void
 }
 
-export function WorkbenchPanel({ card, onSave, onClose }: WorkbenchPanelProps) {
+export function WorkbenchPanel({
+  card,
+  onSave,
+  onClose,
+  focusEdit = false,
+  onToggleFocusEdit,
+}: WorkbenchPanelProps) {
   const { t } = useI18n()
   const [title, setTitle] = useState(card.title)
   const [body, setBody] = useState(card.body)
@@ -78,6 +95,17 @@ export function WorkbenchPanel({ card, onSave, onClose }: WorkbenchPanelProps) {
           aria-label={t('card.detail.fieldTitle')}
         />
         <Tag color="black">{t(typeKeyOf(card.type))}</Tag>
+        <button
+          type="button"
+          data-testid="wb-focus-toggle"
+          className="wb-panel__focus"
+          onClick={onToggleFocusEdit}
+          aria-label={focusEdit ? t('canvas.exitFocus') : t('canvas.focusEdit')}
+          aria-pressed={focusEdit}
+          title={focusEdit ? t('canvas.exitFocus') : t('canvas.focusEdit')}
+        >
+          <WorkbenchIcon name={focusEdit ? 'collapse' : 'expand'} size={16} />
+        </button>
         <button
           type="button"
           className="wb-panel__close"
@@ -153,6 +181,24 @@ const styles = `
 }
 .wb-panel__close:hover { background: var(--color-yellow-soft); }
 .wb-panel__close:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.wb-panel__focus {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: var(--border-hairline);
+  background: var(--color-white);
+  color: var(--color-black);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+.wb-panel__focus:hover { background: var(--color-yellow-soft); }
+.wb-panel__focus:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.wb-panel__focus[aria-pressed="true"] {
+  background: var(--color-black);
+  color: var(--color-white);
+}
 .wb-panel__body {
   flex: 1;
   min-height: 0;
