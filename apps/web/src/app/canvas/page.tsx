@@ -21,6 +21,7 @@ import { CanvasOverviewModal } from '@/features/canvas/canvas-overview-modal'
 import { ShortcutHelpDialog } from '@/features/canvas/shortcut-help-dialog'
 import { DiffDialog } from '@/features/canvas/diff-dialog'
 import { applyLayout } from '@/features/canvas/apply-layout'
+import { nextFocusStates } from '@/features/canvas/focus-mode-transition'
 import { summarizeMovement } from '@/features/canvas/layout-movement'
 import { OrganizePopover } from '@/features/canvas/organize-popover'
 import { canvasToMarkdown, markdownFileName } from '@/features/canvas/canvas-to-markdown'
@@ -589,12 +590,10 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         const tgt = e.target as HTMLElement | null
         if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return
         e.preventDefault()
-        setFocusMode((m) => {
-          const next = !m
-          // 进画布焦点 → 退出专注编辑(互斥)
-          if (next) workbenchStore.setFocusEdit(false)
-          return next
-        })
+        // 互斥决策走纯函数 nextFocusStates(与 toggleFocusEdit 共用,可单测)。
+        const n = nextFocusStates('toggle-canvas-focus', { focusEdit, focusMode })
+        workbenchStore.setFocusEdit(n.focusEdit)
+        setFocusMode(n.focusMode)
         return
       }
       const tgt = e.target as HTMLElement | null
@@ -619,7 +618,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [zoomBy, toggleSnap, t, focusMode])
+  }, [zoomBy, toggleSnap, t, focusMode, focusEdit])
 
   // BUG-A:applyLayout 的 onCardCreate 回调——create 类 op 落库为真实 Card。
   // 走 createCardOnCanvas(service, adapter, activeCanvasId, ...),复用 createWithId,
@@ -1087,10 +1086,11 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
 
   // T5:专注编辑切换 —— 翻 focusEdit + 进专注时退出画布焦点(互斥)。
   // focusMode 在 deps 里:否则关闭焦点后立即点开专注会用到 stale 的 focusMode=true。
+  // 互斥决策走纯函数 nextFocusStates(与 ⌘. handler 共用,可单测)。
   const toggleFocusEdit = useCallback(() => {
-    const next = !focusEdit
-    workbenchStore.setFocusEdit(next)
-    if (next && focusMode) setFocusMode(false)
+    const n = nextFocusStates('toggle-edit', { focusEdit, focusMode })
+    workbenchStore.setFocusEdit(n.focusEdit)
+    if (n.focusMode !== focusMode) setFocusMode(n.focusMode)
   }, [focusEdit, focusMode])
 
   // T5:chrome(Toolbar/SideRail/Minimap 等)在 focusMode 或 focusEdit 时都隐。
