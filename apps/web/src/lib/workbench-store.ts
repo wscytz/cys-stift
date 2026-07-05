@@ -14,9 +14,11 @@ import { useSyncExternalStore } from 'react'
 
 interface WorkbenchState {
   cardId: string | null
+  /** 专注编辑态(工作台撑满 + 画布缩预览)。会话态不持久;切卡/关 dock 复位。 */
+  focusEdit: boolean
 }
 
-let _state: WorkbenchState = { cardId: null }
+let _state: WorkbenchState = { cardId: null, focusEdit: false }
 let _cachedSnapshot: WorkbenchState = _state
 const _subscribers = new Set<() => void>()
 
@@ -33,6 +35,11 @@ function getServerSnapshot(): WorkbenchState {
   return _cachedSnapshot
 }
 
+/** 测试桥:读当前快照(供 workbench-store.test.ts 用,同 db-client 范式)。 */
+export function getSnapshotWorkbench(): WorkbenchState {
+  return getSnapshot()
+}
+
 export function subscribe(cb: () => void): () => void {
   _subscribers.add(cb)
   return () => {
@@ -41,16 +48,25 @@ export function subscribe(cb: () => void): () => void {
 }
 
 export const workbenchStore = {
-  /** 展开工作台到指定卡。 */
+  /** 展开工作台到指定卡。切卡时 focusEdit 复位(spec:专注不跨卡继承)。 */
   open(cardId: string): void {
     if (_state.cardId === cardId) return
-    _state = { cardId }
+    // 切卡 → focusEdit 复位 false
+    _state = { cardId, focusEdit: false }
     notify()
   },
   /** 收起工作台。 */
   close(): void {
     if (_state.cardId === null) return
-    _state = { cardId: null }
+    _state = { cardId: null, focusEdit: false }
+    notify()
+  },
+  /** 进入/退出专注编辑态。没开 dock 时是 no-op(无处编辑)。 */
+  setFocusEdit(value: boolean): void {
+    // 没开 dock 不能进专注(无处编辑)
+    if (_state.cardId === null) return
+    if (_state.focusEdit === value) return
+    _state = { ..._state, focusEdit: value }
     notify()
   },
   /** 当前展开的卡 id（null = 未展开）。 */
@@ -59,7 +75,7 @@ export const workbenchStore = {
   },
 }
 
-/** 订阅工作台状态（cardId）。SSR 安全（server 快照 = 初始 null）。 */
-export function useWorkbench(): { cardId: string | null } {
+/** 订阅工作台状态（cardId + focusEdit）。SSR 安全（server 快照 = 初始 null/false）。 */
+export function useWorkbench(): { cardId: string | null; focusEdit: boolean } {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 }
