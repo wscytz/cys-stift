@@ -1,34 +1,69 @@
 # cy's Stift
 
 > 本地优先的灵感画布。
-> 你的灵感，在画布上生长。
+> 你的灵感,在画布上生长。
 
 ---
 
 ## 这是什么
 
-**cy's Stift** 是一个本地优先的灵感工具。用包豪斯式的克制与几何，帮你把一闪而过的想法接住、把散落的念头连成线、把反复出现的洞察沉淀为作品。
+**cy's Stift** 是一个本地优先的灵感工具。用包豪斯式的克制与几何,帮你把一闪而过的想法接住、把散落的念头连成线、把反复出现的洞察沉淀为作品。
 
 **核心信念**
 
-1. **本地优先** —— 数据是用户的，不是云端的。
-2. **形随功能** —— 包豪斯是约束，不是滤镜。
+1. **本地优先** —— 数据是用户的,不是云端的(本地 localStorage + OPFS,无 server,离线可用)。
+2. **形随功能** —— 包豪斯是约束,不是滤镜(6 原色 + 8px 网格,不写死 hex/px)。
 3. **特性即接口** —— 每个 feature 是可独立替换的"切片"。
-4. **数据可迁移** —— 本地数据随时可导出为开放格式，不做锁定。
+4. **数据可迁移** —— 本地数据随时可导出为开放格式(JSON + Markdown + DSL),不做锁定。
+5. **转义(画布 ↔ 文字 DSL 双向)** —— 整张画布能压成一段文字,文字也能反向改画布;任何 AI(或任何人)读写一段文字就能驱动画布编辑。这是核心卖点。
+
+---
+
+## 下载
+
+最新版 [**v0.56.0**](https://github.com/wscytz/cys-stift/releases/tag/v0.56.0):
+
+| 平台 | 文件 | 说明 |
+|---|---|---|
+| **macOS**(Apple Silicon) | `cys-stift_0.56.0_aarch64.dmg`(6.8M) | 拖到 Applications |
+| **Windows** | `cys-stift_0.56.0_windows.zip`(5.3M) | 解压运行 .exe(需 WebView2,Win11 自带;Win10 手动装) |
+| **Android**(arm64) | `app-universal-debug.apk`(241M) | debug 版(含符号,体积大);arm64 设备可装;安装时允许"未知来源" |
+
+> iPad/iOS 不做。Windows 版走 CI(本地 macOS 不能 cross-compile)。Android release 签名版待 keystore 配置(debug 版功能完整,仅缺签名 + 体积大)。
+
+---
+
+## 特性
+
+**捕获** —— 全局快捷键 + Mini Input + 文件拖拽,3 秒落库。
+
+**inbox** —— 多媒介编辑(链接/代码/引用/媒体)+ 草稿自动保存 + 发送到画布。
+
+**canvas(自研 Canvas 2D)** —— 6 种元素(card/arrow/freedraw/text/rect/frame)+ 多画布 + 视图持久化 + 关系箭头(straight/curve/elbow + 手绘识别)+ 工具栏(选择/手绘/文本/连接/橡皮)+ AI 排版 + 导出(图片 SVG/PNG + Markdown + DSL)+ Outline / Minimap / 全局缩略图 + 双链 `[[]]` 自动建箭头 + **DSL 模态编辑器(转义)** + 对齐分布 9 操作 + 画布模板 + 整理范式(思维导图/流程图/网格/紧凑 × 四方向)+ 焦点模式 + frame + 手绘规范化(保角 RDP + 贝塞尔平滑 + $1 形状识别)。
+
+**工作台** —— per-card 深度编辑(`/workbench` 库页 + canvas dock 编辑器 + **专注编辑态** ⤢ 二档:编辑器撑满 + 画布缩成可拖拽/收起的浮 minimap 预览)。
+
+**Markdown 渲染** —— GFM(表格/任务列表/删除线)+ 代码高亮(Bauhaus 主题)+ **数学公式**(katex `$inline$`/`$$display$$`)+ 脚注 + 块引用 `((标题))` 嵌入(环检测)。
+
+**全局图谱** —— `/graph` 跨画布语义三维签名力导向图(d3-force)+ 缩放条 + 触摸板手势(pinch 缩放/双指平移)。
+
+**关系网络** —— 块引用 + 详情建/删关系 + 跨画布 backlinks + 智能关系推荐(本地四信号 + 可选 AI 语义)+ **wikilink `[[标题]]` 自动建 references 箭头**(跨画布 + 模糊匹配 Levenshtein≤2 + 重命名追踪)+ **AI 对话 agent** `/ask`(对话 → cys-dsl 块 → 确认门 before/after 缩略图)。
+
+**AI** —— 多 provider(OpenAI / Anthropic / DeepSeek / Ollama 本地,零成本)+ AI 排版(诚实位移反馈:重排 N 张 / AI 认为已合理 / 未改动)+ AI 伴侣面板(发现 tab 本地预筛 + 对话 tab)+ **DSL 重试闭环**(AI 出坏 DSL 自动重试喂回错误,maxAttempts=3)+ 失败样本采集(可导出调优)。
+
+**画板适配** —— 响应式(<1024 汉堡抽屉 + companion 覆盖 + canvas 断点归一)+ 触摸手势(双指 pinch zoom + 双指平移 + 触摸目标 44px)+ Android 运行时(rustls ring provider + 平台检测 SSR-safe hooks)。
+
+**其他** —— 命令面板(⌘K)+ 标签墙 `/tags`(10 色)+ 时间线 `/timeline`(全局)+ 全文搜索(title 加权 + 摘要)+ 软删恢复 + JSON 导出/导入(含画布几何 + freeform)+ 暗色模式 + 中英双语。
+
+完整能力见 [`docs/STATE.md`](docs/STATE.md)「当前能力」段。
 
 ---
 
 ## 状态
 
-**完整可用的本地优先灵感画布**(v0.43.0)。
+**v0.56.0** — 完整可用的本地优先灵感画布。lint 0 / test 1362 全绿 / build exit 0。
 
-捕获 / inbox(多媒介编辑)/ canvas(自研 Canvas 2D 画布 + 多画布 + 语义关系箭头 + 双链 + frame + 模板 + **整理范式(思维导图/流程图/网格/紧凑 × 四方向)** + 导出)/ 全局图谱(力导向 + 缩放条 + 触摸板手势)/ 块引用 / 标签 / 命令面板 / 时间线 / **画布 AI 伴侣面板(发现 + 对话,历史持久化)** / **AI 排版(诚实反馈 + 主动重排)** / AI(3 provider,DeepSeek/OpenAI/Ollama) 全部交付。桌面端可本地构建未签名 DMG。
-
-**v0.43 打磨轮**(手测反馈六批 + 内测三修):关系箭头高倍放大不再消失(端点解析脱离视锥剔除)/ 图谱删卡不灰屏 + 触摸板 pinch 缩放双指平移 + 缩放条 + 卡详情 action 行常驻 + **加关系实时刷新**(freeform store 订阅通道)/ 伴侣对话历史持久化 + 缩略图不溢出 + 折叠非破坏性 / AI 排版"从来没改过布局"根因三合一(拓宽思考抑制 + 主动重排 prompt + 诚实位移反馈)/ 版本号单一可信源 + 主菜单实时显示 / 整理范式(策略 × 方向 × 间距)/ **鸟瞰图视口方框符号修**(委托引擎单一正解)/ **对比度**(二级文字 gray→black-soft + 图谱硬编码 hex→token)。
-
-**画布 AI 伴侣面板**(v0.42):画布常驻 AI 浮面板。**发现** tab 本地预筛零成本常驻(重复 / 可关联 / 孤立卡)+ 选中定位 / 建立关联 / AI 深挖;**对话** tab = /ask agent 上画布,操作 live host + DSL 提议确认门。非破坏性,默认开。
-
-**当前状态、版本里程碑、下一步、已知 debt 全见 [`docs/STATE.md`](docs/STATE.md)** — 单一可信源。历史见 [`docs/changelog.md`](docs/changelog.md)。
+当前状态、版本里程碑、下一步、已知 debt 全见 [`docs/STATE.md`](docs/STATE.md) — 单一可信源。历史见 [`docs/changelog.md`](docs/changelog.md)。
 
 ---
 
@@ -37,30 +72,18 @@
 ```
 cys-stift/
 ├── apps/
-│   ├── web/             Next.js (App Router) 应用壳，静态导出
-│   └── desktop/         Tauri v2 桌面壳
+│   ├── web/             Next.js 15 (App Router) 应用壳,静态导出(无 server)
+│   └── desktop/         Tauri v2 桌面壳(macOS / Windows / Android)
 ├── packages/
-│   ├── ui/              包豪斯设计系统
+│   ├── canvas-engine/   自研 Canvas 2D 引擎(零业务依赖,框架无关 — 北极星:可剥离成独立包)
+│   ├── ui/              包豪斯设计系统(6 原色 + 8px 网格 + token)
 │   ├── db/              Drizzle ORM + SQLite schema
-│   ├── domain/          核心领域模型（Phase 2+）
-│   └── config/          共享配置
-├── docs/
-│   ├── specs/   设计文档（定稿）
-│   ├── plans/  阶段实现计划
-│   ├── architecture/       架构总览
-│   ├── adr/                架构决策记录
-│   ├── design/             设计 token 文档
-│   ├── development/        开发指南 / 变更日志
-│   └── memory/             跨模型 / 跨会话记忆
-├── .nvmrc               Node 22
-├── .gitattributes       LF 强制
-├── .editorconfig
-├── .gitignore
-├── .prettierrc
-├── tsconfig.base.json
-├── pnpm-workspace.yaml
+│   └── domain/          纯 TS 核心领域模型(零依赖)
+├── docs/                用户向文档(STATE / changelog / user / setup / tokens / architecture)
 └── package.json
 ```
+
+> 过程文档(设计思考 / 实现计划 / 决策 / 审计 / spec / plan)在私有仓库 `cys-stift-docs`,本地并排 clone 对照,见 [`docs/INTERNAL-DOCS.md`](docs/INTERNAL-DOCS.md)。
 
 ---
 
@@ -71,10 +94,13 @@ cys-stift/
 | 架构总览 | [`docs/architecture/overview.md`](./docs/architecture/overview.md) |
 | 设计 token / 包豪斯规则 | [`docs/design/tokens.md`](./docs/design/tokens.md) |
 | 如何搭建开发环境 | [`docs/development/setup.md`](./docs/development/setup.md) |
-| 用户指南 / 隐私说明 | [`docs/user/`](./docs/user/) |
+| 用户指南 | [`docs/user/README.md`](./docs/user/README.md) |
+| 隐私说明(AI 隐私必读) | [`docs/user/privacy.md`](./docs/user/privacy.md) |
+| 转义手册(画布 ↔ DSL) | [`docs/user/transliteration.md`](./docs/user/transliteration.md) |
 | 当前状态 / 版本里程碑 | [`docs/STATE.md`](./docs/STATE.md) |
 | 阶段变更历史 | [`docs/changelog.md`](./docs/changelog.md) |
-| 内部过程文档(设计思考/计划/决策) | 已迁移至私有仓库,见 [`docs/INTERNAL-DOCS.md`](./docs/INTERNAL-DOCS.md) |
+| AI 方向文档 | [`docs/ai-direction.md`](./docs/ai-direction.md) |
+| 内部过程文档(已迁私有仓) | [`docs/INTERNAL-DOCS.md`](./docs/INTERNAL-DOCS.md) |
 
 ---
 
@@ -84,18 +110,18 @@ cys-stift/
 # 安装依赖
 pnpm install
 
-# 起 Next.js 开发服务器（mac/win 都一样）
+# 起 Next.js 开发服务器
 pnpm dev
 # → http://localhost:3000
 
-# 构建静态产物（mac/win 都一样）
+# 构建静态产物
 pnpm build
 
-# 启动 Tauri 桌面壳（需要 Rust 工具链）
+# 启动 Tauri 桌面壳(需要 Rust 工具链)
 pnpm tauri dev
 ```
 
-详见 [`docs/development/setup.md`](./docs/development/setup.md)。
+详见 [`docs/development/setup.md`](./docs/development/setup.md)。验证门:`pnpm -r lint && pnpm -r test && pnpm --filter web build`(三者 exit 0)。
 
 ---
 
