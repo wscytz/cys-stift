@@ -13,7 +13,7 @@
 - **c1 DSL 重试闭环(已 ship 核对闭合)**:retryUntilValid 共享助手 + canvas/ask/companion 三路径自动重试(错误喂回模型,maxAttempts=3)+ c2 失败样本采集。澄清 user+messages 同传非 bug(provider either/or,user 是 required 兜底)。fast-follow:AIRequest 改 discriminated union(低优)。
 - **类型逃逸修复**:file-drop-handler 删无意义 singleSource 三元(paste kind spread fileCount 产无效 CaptureSource,原 any 掩盖的 latent bug)+ 去 as any;snapshotCanvas/buildCanvasPrompt canvasId 改可选,dsl-dialog 不再构造 `'' as CanvasId` 占位。
 - **文档对齐一轮**:STATE 298→227(砍历史回溯,changelog 有对等);当前能力补工作台+Markdown;user/README 工具栏 8→5 工具(椭圆/rect/arrow 实际走手绘识别)+ 补工作台/Markdown/Timeline/Android;architecture:tldraw→自研、packages/config(不存在)→canvas-engine;tokens gray `#8c8c8c`→`#666666`;changelog 清 11 处过期「未 push」。
-- **deepresearch 赛道缺口报告(private repo docs/research/)**:Heptabase 最重合;**推翻 AI-native 无竞品**(Heptabase 2026.3-6 ship AI Tutor/Agent+CLI);真实空白=转义DSL+完整开源本地优先AI-native Android 组合+移动可编辑;可防守定位="开源+本地优先+画布全状态双向文字+Android 可编辑"组合。
+- **deepresearch 竞品对标报告(private repo docs/research/)**:Notion + Heptabase 8 维度对标 + cy's Stift 特性验证(内部决策用,结论存私有仓)。
 
 lint 0 / test 1362 / build exit 0。tag `v0.56.0`。
 
