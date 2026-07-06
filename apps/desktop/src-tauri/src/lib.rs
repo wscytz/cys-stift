@@ -80,6 +80,11 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             #[cfg(desktop)] update_shortcut,
         ])
+        // dialog + fs:导出 helper(Android)用 dialog save(SAF picker)+ fs
+        // writeFile 绕过 WebView 不处理 Blob download 的限制。桌面也注册(统一),
+        // 但桌面导出路径走 Blob + a.click,不实际调用这两个插件。
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .setup(|app| {
             #[cfg(desktop)]
             {

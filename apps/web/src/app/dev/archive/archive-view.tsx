@@ -19,6 +19,7 @@ import {
   type ArchiveTrigger,
 } from '@/lib/archive-store'
 import { buildArchivePayload } from '@/lib/build-archive-payload'
+import { downloadFile } from '@/lib/download'
 import { VERSION } from '@/lib/version'
 
 // trigger → Bauhaus token 色(spec D7;release 黄 / 风险 op 蓝 / 手动 灰)。NO hex。
@@ -88,21 +89,15 @@ export function Page(): React.ReactElement {
     setSelPayload(p)
   }
 
-  function exportOne(m: ArchiveEntryMeta): void {
-    void archiveStore.loadPayload(m.archiveVersion).then((p) => {
-      if (!p) return
-      const blob = new Blob([JSON.stringify(p, null, 2)], {
-        type: 'application/json',
-      })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = exportFileName(m)
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      setTimeout(() => URL.revokeObjectURL(url), 1000)
+  async function exportOne(m: ArchiveEntryMeta): Promise<void> {
+    const p = await archiveStore.loadPayload(m.archiveVersion)
+    if (!p) return
+    const blob = new Blob([JSON.stringify(p, null, 2)], {
+      type: 'application/json',
     })
+    // 走 downloadFile(分平台:桌面 Blob+a.click / Android Tauri SAF save),
+    // 解决 Android WebView 不处理 Blob download 的静默失败。
+    await downloadFile(exportFileName(m), blob)
   }
 
   return (

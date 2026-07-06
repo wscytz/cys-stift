@@ -25,6 +25,7 @@ import { getSafeFileName } from './export-bounds'
 import type { ExportScope } from './export-bounds'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import { readToken } from '@cys-stift/canvas-engine'
+import { downloadFile } from '@/lib/download'
 
 export type RasterFormat = 'png' | 'jpeg'
 
@@ -142,17 +143,16 @@ async function rasterizeSvg(
   }
 }
 
-export function downloadImage(blob: Blob, canvasName: string, format: RasterFormat): void {
+export async function downloadImage(
+  blob: Blob,
+  canvasName: string,
+  format: RasterFormat,
+): Promise<void> {
   if (typeof window === 'undefined') return
   const ext = format === 'png' ? 'cystift.png' : 'jpg'
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${getSafeFileName(canvasName)}.${ext}`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  // 走 downloadFile(分平台:桌面 Blob+a.click / Android Tauri SAF save),
+  // 解决 Android WebView 不处理 Blob download 的静默失败。
+  await downloadFile(`${getSafeFileName(canvasName)}.${ext}`, blob)
 }
 
 export { buildCystiftPayload }

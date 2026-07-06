@@ -33,6 +33,7 @@ import {
 import { elementsToSvg } from '@cys-stift/canvas-engine'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import type { CardService, CanvasId } from '@cys-stift/domain'
+import { downloadFile } from '@/lib/download'
 
 export interface CanvasSvgExportOptions {
   scope?: ExportScope
@@ -108,22 +109,13 @@ export async function exportCanvasSvg(
   return { svg, width: result.width, height: result.height }
 }
 
-/** Trigger a browser download for an SVG string. */
-export function downloadSvg(svg: string, canvasName: string): void {
+/** Trigger a download for an SVG string (delegates to the cross-platform helper). */
+export async function downloadSvg(svg: string, canvasName: string): Promise<void> {
   if (typeof window === 'undefined') return
   const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' })
-  triggerDownload(blob, getSafeFileName(canvasName), 'svg')
-}
-
-function triggerDownload(blob: Blob, name: string, ext: string): void {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${name}.${ext}`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  // 走 downloadFile(分平台:桌面 Blob+a.click / Android Tauri SAF save),
+  // 解决 Android WebView 不处理 Blob download 的静默失败。
+  await downloadFile(`${getSafeFileName(canvasName)}.svg`, blob)
 }
 
 // ── Font embedding (best-effort, offline-safe) ─────────────────────────────

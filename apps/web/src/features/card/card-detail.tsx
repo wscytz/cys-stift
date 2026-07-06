@@ -868,20 +868,23 @@ export function CardDetailModal({
                   <Button
                     variant="secondary"
                     onClick={() => {
-                      try {
-                        const size = downloadCardMarkdown(card)
-                        pushToast({
-                          kind: 'success',
-                          message: t('card.exportSuccess', { n: size }),
-                        })
-                      } catch (e) {
-                        pushToast({
-                          kind: 'error',
-                          message: t('card.exportFailed', {
-                            error: (e as Error).message,
+                      // downloadCardMarkdown 现在异步(分平台下载);toast 在 .then 里推,
+                      // 失败走 .catch(对齐原 try/catch 的成功/失败反馈)。
+                      downloadCardMarkdown(card)
+                        .then((size) =>
+                          pushToast({
+                            kind: 'success',
+                            message: t('card.exportSuccess', { n: size }),
                           }),
-                        })
-                      }
+                        )
+                        .catch((e: unknown) =>
+                          pushToast({
+                            kind: 'error',
+                            message: t('card.exportFailed', {
+                              error: (e as Error).message,
+                            }),
+                          }),
+                        )
                     }}
                   >
                     {t('card.export')}

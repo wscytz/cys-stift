@@ -10,6 +10,7 @@ import type { AlignOp, CanvasElement } from '@cys-stift/canvas-engine'
 import { Button, Modal, Toolbar } from '@cys-stift/ui'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
+import { downloadFile } from '@/lib/download'
 import { SelfCanvas, type SelfCanvasHandle } from '@/features/canvas/self-canvas'
 import { CanvasIcon, CanvasBusyIcon, type CanvasIconName } from '@/features/canvas/canvas-icons'
 import { CardDetailModal } from '@/features/canvas/card-detail-modal'
@@ -799,9 +800,11 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
   }
 
   // 画布 → Markdown 导出(信念4「本地数据随时可导出开放格式」)。
-  // canvasToMarkdown 是纯函数;这里只做:取 elements + 映射 card 信息 + Blob 下载。
-  // try/catch:text 极大时 new Blob / createObjectURL 可抛(对齐 dsl-dialog download)。
-  const handleMarkdown = () => {
+  // canvasToMarkdown 是纯函数;这里只做:取 elements + 映射 card 信息 + 下载。
+  // 走 downloadFile(分平台:桌面 Blob+a.click / Android Tauri SAF save),
+  // 解决 Android WebView 不处理 Blob download 的静默失败。try/catch:text 极大
+  // 时 new Blob / createObjectURL 可抛(对齐 dsl-dialog download)。
+  const handleMarkdown = async () => {
     const adapter = handle.current.adapter
     if (!adapter) return
     try {
@@ -816,14 +819,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         canvasName: name,
       })
       const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = markdownFileName(name)
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      await downloadFile(markdownFileName(name), blob)
       pushToast({ kind: 'success', message: t('canvas.markdownDownloaded') })
     } catch {
       pushToast({ kind: 'error', message: t('canvas.markdownDownloadFail') })

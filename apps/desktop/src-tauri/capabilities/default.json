@@ -5,6 +5,9 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "global-shortcut:default"
+    "global-shortcut:default",
+    "dialog:default",
+    "fs:default",
+    "fs:allow-write-file"
   ]
 }

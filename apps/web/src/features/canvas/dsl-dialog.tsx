@@ -17,6 +17,7 @@ import { Modal, Button } from '@cys-stift/ui'
 import type { CardId, CardService } from '@cys-stift/domain'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
+import { downloadFile } from '@/lib/download'
 import { pushToast } from '@/lib/toast-store'
 import { serializeCanvasReadable, serializeCanvas } from '../ai/canvas-dsl'
 import { parseDslWithDiagnostics, type DslDiagnostic } from '../ai/dsl-parser'
@@ -169,21 +170,15 @@ export function DslDialog({
     }
   }
 
-  const download = () => {
-    // try/catch:text 极大时 new Blob / createObjectURL 可抛(配额/内存),冒泡到
-    // 错误边界不如 toast 友好(对齐 export-dialog doExport 的 try/catch 模式)。
-    // a.click() 本身 fire-and-forget 浏览器不让确认,那是浏览器限制,不算 bug。
+  const download = async () => {
+    // try/catch:text 极大时 new Blob / Tauri writeFile 可抛(配额/内存/SAF 拒绝),
+    // 冒泡到错误边界不如 toast 友好(对齐 export-dialog doExport 的 try/catch 模式)。
+    // 走 downloadFile(分平台:桌面 Blob+a.click / Android Tauri SAF save),
+    // 解决 Android WebView 不处理 Blob download 的静默失败。
     try {
       const baseName = canvasName || 'canvas'
       const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${baseName}.txt`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      await downloadFile(`${baseName}.txt`, blob)
       pushToast({ kind: 'success', message: t('canvas.dslDownloaded') })
     } catch {
       pushToast({ kind: 'error', message: t('canvas.dslDownloadFail') })

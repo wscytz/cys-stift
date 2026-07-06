@@ -6,6 +6,7 @@
  */
 import { useState } from 'react'
 import { settingsStore, useSettings } from '@/lib/settings-store'
+import { downloadFile } from '@/lib/download'
 import { loadSamples, clearSamples, getSampleCount } from '@/features/ai/sample-store'
 import { useI18n } from '@/lib/i18n'
 import { pushToast } from '@/lib/toast-store'
@@ -17,20 +18,15 @@ export function SampleExportPanel() {
   const count = ready ? getSampleCount() : 0
   const enabled = settings.aiSampleCapture !== false // undefined/true = 开
 
-  const onExport = () => {
+  const onExport = async () => {
     const samples = loadSamples()
     const payload = { exportedAt: new Date().toISOString(), version: 1, count: samples.length, samples }
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
     const d = new Date()
     const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
-    a.href = url
-    a.download = `cys-stift-samples-${stamp}.json`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    // 走 downloadFile(分平台:桌面 Blob+a.click / Android Tauri SAF save),
+    // 解决 Android WebView 不处理 Blob download 的静默失败。
+    await downloadFile(`cys-stift-samples-${stamp}.json`, blob)
     pushToast({ kind: 'success', message: t('samples.exported', { n: String(samples.length) }) })
   }
 

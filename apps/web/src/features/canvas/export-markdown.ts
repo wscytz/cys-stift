@@ -8,6 +8,7 @@ import type { CanvasHost } from '@cys-stift/canvas-engine'
 import type { CardId, CardService } from '@cys-stift/domain'
 import { resolveExportElements, getSafeFileName, type ExportScope } from './export-bounds'
 import { inferRelationType } from './relation-types'
+import { downloadFile } from '@/lib/download'
 
 export interface MarkdownExportOptions {
   scope?: ExportScope
@@ -90,15 +91,10 @@ function relationLabel(id: string): string {
   }
 }
 
-export function downloadMarkdown(md: string, canvasName: string): void {
+export async function downloadMarkdown(md: string, canvasName: string): Promise<void> {
   if (typeof window === 'undefined') return
   const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${getSafeFileName(canvasName)}.md`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  // 走 downloadFile(分平台:桌面 Blob+a.click / Android Tauri SAF save),
+  // 解决 Android WebView 不处理 Blob download 的静默失败。
+  await downloadFile(`${getSafeFileName(canvasName)}.md`, blob)
 }

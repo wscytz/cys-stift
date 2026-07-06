@@ -2,6 +2,7 @@
 
 import type { Card, Canvas, CanvasId } from '@cys-stift/domain'
 import { canvasFreeformStore, type CanvasFreeformSnapshot } from './canvas-freeform-store'
+import { downloadFile } from './download'
 
 // ── Export (spec §1.2 信念4 "数据可迁移") ──────────────────────────────────
 // Serialise the user's local data to an open JSON format. The browser
@@ -140,8 +141,9 @@ export async function buildExportPayload(
 }
 
 /**
- * Serialise the payload and trigger a browser download. Returns the
- * approximate byte size so the caller can show a hint.
+ * Serialise the payload and trigger a download (cross-platform: Blob+a.click
+ * on desktop, Tauri SAF save on Android). Returns the approximate byte size
+ * so the caller can show a hint.
  */
 export async function downloadExport(
   opts?: { includeDeleted?: boolean },
@@ -150,16 +152,10 @@ export async function downloadExport(
   const payload = await buildExportPayload(opts)
   const json = JSON.stringify(payload, null, 2)
   const blob = new Blob([json], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
   const stamp = payload.exportedAt.slice(0, 19).replace(/[:T]/g, '-')
-  a.download = `cys-stift-export-${stamp}.json`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  // Give the browser a tick to start the download before revoking.
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  // 走 downloadFile(分平台:桌面 Blob+a.click / Android Tauri SAF save),
+  // 解决 Android WebView 不处理 Blob download 的静默失败。
+  await downloadFile(`cys-stift-export-${stamp}.json`, blob)
   return blob.size
 }
 

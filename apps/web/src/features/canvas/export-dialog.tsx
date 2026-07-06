@@ -97,7 +97,7 @@ export function ExportDialog({
           pushToast({ kind: 'error', message: t('canvas.exportEmpty') })
           return
         }
-        downloadMarkdown(md, baseName)
+        await downloadMarkdown(md, baseName)
         pushToast({ kind: 'success', message: t('canvas.exportDone', { name: baseName }) })
         onClose()
         return
@@ -113,7 +113,7 @@ export function ExportDialog({
           pushToast({ kind: 'error', message: t('canvas.exportEmpty') })
           return
         }
-        downloadSvg(result.svg, baseName)
+        await downloadSvg(result.svg, baseName)
       } else {
         const blob = await exportCanvasImage(host, service, canvasId, canvasName, {
           scope: effectiveScope,
@@ -126,7 +126,7 @@ export function ExportDialog({
           pushToast({ kind: 'error', message: t('canvas.exportEmpty') })
           return
         }
-        downloadImage(blob, baseName, format)
+        await downloadImage(blob, baseName, format)
       }
       pushToast({ kind: 'success', message: t('canvas.exportDone', { name: baseName }) })
       onClose()
