@@ -15,7 +15,8 @@
  *
  * 接入:apply-layout.ts 的 applyLayout 入口(所有 5+ 调用点必经,零调用方改)。
  * case 清单见 cys-stift-docs/docs/specs/2026-07-07-dsl-sanitize-layer-draft.md。
- * 当前实现:case 6(非法 size)+ case 1/11(card 不存在 diagnostic)+ case 7(arrow 端点 diagnostic)。
+ * 当前实现:case 6(非法 size)+ case 1/11(card 不存在 diagnostic)+ case 7(arrow 端点 diagnostic)
+ *              + case 3(free op 跨 kind 告警)。
  */
 import type { DslOp, DslCardOp, DslFreeOp, DslArrowOp } from './dsl-parser'
 
@@ -30,10 +31,13 @@ export interface SanitizeResult {
   diagnostics: SanitizeDiagnostic[]
 }
 
-/** 上下文:画布上已有的 card/free id(case 1/11/7 判断 id 是否存在用)。可选 —— 无 ctx 时不产 diagnostic。 */
+/** 上下文:画布上已有的 card/free id(case 1/11/7 判断 id 是否存在用)。可选 —— 无 ctx 时不产 diagnostic。
+ *  existingFreeKinds(case 3 跨 kind 告警):host 的 free 元素 id → kind(rect/text/frame),
+ *  用来检测 free op 带了 host 已有但 kind 不同的 id(apply 会 mint 新 id 而非更新)。 */
 export interface SanitizeCtx {
   existingCardIds?: Set<string>
   existingFreeIds?: Set<string>
+  existingFreeKinds?: Map<string, 'rect' | 'text' | 'frame'>
 }
 
 /** card/rect/frame 的 w/h MAX 上限(防 LLM 生成超大跑出可视区)。
@@ -82,8 +86,27 @@ function sanitizeCard(
   return { ...op, w, h, x, y }
 }
 
-/** free shape(rect/text/frame)op:case 6(size)。case 3(跨 kind 告警)待后续。 */
-function sanitizeFree(op: DslFreeOp): DslFreeOp {
+/** free shape(rect/text/frame)op:case 6(size)+ case 3(跨 kind 告警)。
+ *  case 3:op.id 命中 host 已有但 kind 不同的元素 → diagnostic(apply 会 mint 新 id,提示用户/AI)。 */
+function sanitizeFree(
+  op: DslFreeOp,
+  idx: number,
+  ctx: SanitizeCtx | undefined,
+  diagnostics: SanitizeDiagnostic[],
+): DslFreeOp {
+  // case 3:跨 kind 告警(op shape ≠ host 已有同 id 元素的 kind)
+  // applyFreeOp update 路径有 kind 守卫 → 不命中 → create 路径 mint uid(不覆盖,安全);
+  // sanitize 额外产 diagnostic 让用户/AI 知道 id 被复用了。
+  if (op.id && ctx?.existingFreeKinds !== undefined) {
+    const hostKind = ctx.existingFreeKinds.get(op.id)
+    if (hostKind !== undefined && hostKind !== op.shape) {
+      diagnostics.push({
+        opIndex: idx,
+        message: `${op.shape} #${op.id} 与已有 ${hostKind} 跨 kind,将新建而非更新`,
+      })
+    }
+  }
+  // case 6:size 修正 + case 5:坐标钳位
   const w = sanitizeSize(op.w)
   const h = sanitizeSize(op.h)
   const x = clampCoord(op.x)
@@ -147,7 +170,7 @@ export function sanitizeDslOps(ops: DslOp[], ctx?: SanitizeCtx): SanitizeResult 
           out.push(sanitizeCard(op, idx, ctx, diagnostics))
           break
         case 'free':
-          out.push(sanitizeFree(op))
+          out.push(sanitizeFree(op, idx, ctx, diagnostics))
           break
         case 'arrow':
           out.push(sanitizeArrow(op, idx, existingIds, diagnostics))

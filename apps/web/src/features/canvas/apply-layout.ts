@@ -136,15 +136,24 @@ function finiteRound(n: unknown, fallback: number): number {
   return typeof n === 'number' && Number.isFinite(n) ? Math.round(n) : fallback
 }
 
-/** 从 host 提取现有 card/free id(case 1/11/7 sanitize diagnostic 用)。arrow 不算端点候选。 */
+/** 从 host 提取现有 card/free id(case 1/11/7 sanitize diagnostic 用)+ free 元素 id→kind(case 3 跨 kind 告警用)。
+ *  existingFreeIds 覆盖所有非 card 非 arrow 元素(含 freedraw,作 arrow 端点候选);
+ *  existingFreeKinds 只记 rect/text/frame(DslFreeOp 能产出的 kind,freedraw 不参与跨 kind 检测)。 */
 function buildSanitizeCtx(host: CanvasHost): SanitizeCtx {
   const existingCardIds = new Set<string>()
   const existingFreeIds = new Set<string>()
+  const existingFreeKinds = new Map<string, 'rect' | 'text' | 'frame'>()
   for (const el of host.getElements()) {
-    if (el.kind === 'card') existingCardIds.add(el.id)
-    else if (el.kind !== 'arrow') existingFreeIds.add(el.id)
+    if (el.kind === 'card') {
+      existingCardIds.add(el.id)
+    } else if (el.kind !== 'arrow') {
+      existingFreeIds.add(el.id)
+      if (el.kind === 'rect' || el.kind === 'text' || el.kind === 'frame') {
+        existingFreeKinds.set(el.id, el.kind)
+      }
+    }
   }
-  return { existingCardIds, existingFreeIds }
+  return { existingCardIds, existingFreeIds, existingFreeKinds }
 }
 
 function applyCardOp(

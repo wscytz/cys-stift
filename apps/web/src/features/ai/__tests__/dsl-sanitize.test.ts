@@ -192,6 +192,46 @@ describe('sanitizeDslOps — case 7: arrow 端点不存在 → diagnostic', () =
   })
 })
 
+describe('sanitizeDslOps — case 3: 跨 kind 告警(free op id 命中 host 已有不同 kind → diagnostic)', () => {
+  it('rect op id 在 existingFreeKinds 但是 text → diagnostic(将新建而非更新)', () => {
+    const op: DslOp = { type: 'free', shape: 'rect', id: 'r1', x: 0, y: 0, w: 100, h: 100 }
+    const ctx = { existingFreeKinds: new Map([['r1', 'text' as const]]) }
+    const { ops, diagnostics } = sanitizeDslOps([op], ctx)
+    expect(diagnostics).toHaveLength(1)
+    expect(diagnostics[0]!.opIndex).toBe(0)
+    expect(diagnostics[0]!.message).toMatch(/r1/)
+    // op 原样保留(sanitize 不改,apply create 路径自己 mint uid 避免覆盖)
+    expect(ops[0]).toBe(op)
+  })
+
+  it('rect op id 在 existingFreeKinds 同 kind(rect) → 无 diagnostic(正常 update)', () => {
+    const op: DslOp = { type: 'free', shape: 'rect', id: 'r1', x: 0, y: 0, w: 100, h: 100 }
+    const ctx = { existingFreeKinds: new Map([['r1', 'rect' as const]]) }
+    const { diagnostics } = sanitizeDslOps([op], ctx)
+    expect(diagnostics).toHaveLength(0)
+  })
+
+  it('无 ctx → 无 diagnostic(case 6 等不依赖 ctx 的路径仍可用)', () => {
+    const op: DslOp = { type: 'free', shape: 'rect', id: 'r1', x: 0, y: 0, w: 100, h: 100 }
+    const { diagnostics } = sanitizeDslOps([op])
+    expect(diagnostics).toHaveLength(0)
+  })
+
+  it('free op 无 id → 无 diagnostic(无 id 可查)', () => {
+    const op: DslOp = { type: 'free', shape: 'rect', x: 0, y: 0, w: 100, h: 100 }
+    const ctx = { existingFreeKinds: new Map([['r1', 'text' as const]]) }
+    const { diagnostics } = sanitizeDslOps([op], ctx)
+    expect(diagnostics).toHaveLength(0)
+  })
+
+  it('op.id 不在 existingFreeKinds → 无 diagnostic(新 id,apply 用 op.id)', () => {
+    const op: DslOp = { type: 'free', shape: 'rect', id: 'fresh', x: 0, y: 0, w: 100, h: 100 }
+    const ctx = { existingFreeKinds: new Map([['r1', 'text' as const]]) }
+    const { diagnostics } = sanitizeDslOps([op], ctx)
+    expect(diagnostics).toHaveLength(0)
+  })
+})
+
 describe('sanitizeDslOps — case 5: 越界坐标钳位 [-10000, 10000](保负向)', () => {
   it('card x/y 超大(1e6) → 钳到 10000', () => {
     const op: DslOp = { type: 'card', cardId: 'c1' as CardId, x: 999999, y: 888888, create: true }
