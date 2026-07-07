@@ -217,7 +217,9 @@ function applyFreeOp(host: CanvasHost, op: DslFreeOp): boolean {
   }
 
   // ── Create path ──
-  const base = { id: uid('free'), x, y, rotation: 0 } as const
+  // case 4:用 op.id(若提供 + host 无此 id)作 id,让 round-trip 一致 + arrow 能连本 batch 新建 free;
+  // host 已有此 id(跨 kind,update 没命中)→ mint 避免覆盖
+  const base = { id: op.id && !host.getElement(op.id) ? op.id : uid('free'), x, y, rotation: 0 } as const
   switch (op.shape) {
     case 'rect':
       host.upsert({ ...base, kind: 'rect', w: op.w ?? 200, h: op.h ?? 150, color: op.color ?? 'black' })

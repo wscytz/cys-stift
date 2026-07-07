@@ -398,15 +398,15 @@ describe('applyLayout', () => {
     expect(host.getElement('t1')).toMatchObject({ x: 50, text: 'updated' })
   })
 
-  it('creates a new rect when id not found', () => {
+  it('creates a new rect when id not found (case 4: 用 op.id 作 id)', () => {
     const host = new InMemoryCanvasHost()
 
     applyLayout(host, [{ type: 'free', shape: 'rect', id: 'ghost', x: 0, y: 0 }])
 
     const rects = host.getElements().filter((e) => e.kind === 'rect')
     expect(rects).toHaveLength(1)
-    // id is minted by uid('free'), not the op's unmatched 'ghost'.
-    expect(rects[0]!.id).not.toBe('ghost')
+    // case 4:id not found → create,用 op.id 作 id(round-trip 一致 + arrow 能连本 batch 新建)
+    expect(rects[0]!.id).toBe('ghost')
   })
 
   it('rect update preserves existing w/h when op omits them', () => {
@@ -726,5 +726,41 @@ describe('applyLayout — card create + onCardCreate', () => {
     applyLayout(host, [{ type: 'card', cardId: 'c1' as CardId, x: 5, y: 6, create: true }], undefined, () => calls++)
     expect(calls).toBe(0)
     expect(host.getElement('c1')).toMatchObject({ x: 5, y: 6 })
+  })
+})
+
+describe('applyLayout — case 4: free id round-trip + arrow 连新建', () => {
+  it('free create 用 op.id(若提供 + host 无此 id)作 id(round-trip 一致)', () => {
+    const host = new InMemoryCanvasHost()
+    applyLayout(host, [{ type: 'free', shape: 'rect', id: 'r1', x: 0, y: 0, w: 100, h: 100 }])
+    expect(host.getElement('r1')).toMatchObject({ kind: 'rect' })
+  })
+
+  it('free create 无 op.id → mint uid(向后兼容)', () => {
+    const host = new InMemoryCanvasHost()
+    applyLayout(host, [{ type: 'free', shape: 'rect', x: 0, y: 0, w: 100, h: 100 }])
+    const rect = host.getElements().find((e) => e.kind === 'rect')!
+    expect(rect.id).toMatch(/^free-/)
+  })
+
+  it('relation arrow 连本 batch 新建 free(op.id 端点,case 4 核心)', () => {
+    const host = new InMemoryCanvasHost()
+    applyLayout(host, [
+      { type: 'free', shape: 'rect', id: 'r1', x: 0, y: 0, w: 100, h: 100 },
+      { type: 'free', shape: 'rect', id: 'r2', x: 200, y: 0, w: 100, h: 100 },
+      { type: 'arrow', from: 'r1', to: 'r2', label: 'ref' },
+    ])
+    const arrow = host.getElements().find((e) => e.kind === 'arrow')
+    expect(arrow).toMatchObject({ from: 'r1', to: 'r2' })
+  })
+
+  it('free create op.id 撞 host 已有(跨 kind)→ mint 避免覆盖', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'r1', kind: 'text', x: 0, y: 0, w: 100, h: 40, rotation: 0, text: 'old' })
+    applyLayout(host, [{ type: 'free', shape: 'rect', id: 'r1', x: 100, y: 100, w: 50, h: 50 }])
+    expect(host.getElement('r1')).toMatchObject({ kind: 'text' })
+    const rect = host.getElements().find((e) => e.kind === 'rect')
+    expect(rect).toBeDefined()
+    expect(rect!.id).not.toBe('r1')
   })
 })
