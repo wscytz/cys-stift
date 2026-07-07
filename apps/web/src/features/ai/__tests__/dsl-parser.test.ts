@@ -588,4 +588,13 @@ describe('parseDsl — relational card (right-of / below + @gap)', () => {
     expect((op as { rel?: unknown }).rel).toBeUndefined()
     expect((op as { x: number }).x).toBe(0)
   })
+
+  it('arrow 无 #id(仅 from/to)→ 不报错,id undefined(LLM 常省略 arrow id)', () => {
+    const { ops, errors } = parseDslWithDiagnostics('[arrow] from #c0 to #c1 @label("next")')
+    expect(errors).toEqual([])
+    expect(ops).toHaveLength(1)
+    expect((ops[0] as { id?: string }).id).toBeUndefined()
+    expect((ops[0] as { from: string }).from).toBe('c0')
+    expect((ops[0] as { to: string }).to).toBe('c1')
+  })
 })

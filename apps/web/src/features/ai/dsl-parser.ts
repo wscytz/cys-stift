@@ -172,6 +172,15 @@ function extractId(text: string): string | null {
   return m ? m[1]! : null
 }
 
+/** 只在行首 `[kind …]` 头部里找 #id(arrow body 的 from #x/to #y 不是 header id)。
+ *  arrow 无 #id 时返回 null(不再误抓 from/to 端点当 id)。 */
+function extractHeaderId(line: string): string | null {
+  const bracketEnd = line.indexOf(']')
+  if (bracketEnd < 0) return null
+  const m = line.slice(0, bracketEnd).match(ID_RE)
+  return m ? m[1]! : null
+}
+
 function extractPos(text: string): { x: number; y: number } | null {
   let m = text.match(POS_RE)
   if (m) return { x: Number(m[1]), y: Number(m[2]) }
@@ -333,12 +342,10 @@ export function parseDslWithDiagnostics(dslText: string): {
 
     // ── Arrow line: `[arrow #arr1] from #a to #b @label("ref")`
     //    Free arrow (no from/to): `[arrow #id] @pos(x,y) @size(w,h) + sig`
-    if (line.startsWith('[arrow ')) {
-      const id = extractId(line)
-      if (!id) {
-        errors.push({ line: lineNo, text: line, message: 'missing #id' })
-        continue
-      }
+    //    #id 可选(arrows 从端点派生,id 只用于 round-trip update;LLM 常省略 → 不再报错,
+    //    降 LLM 认知负担,aligns「constrain generation entropy」。apply create 路径自己 mint uid)
+    if (line.startsWith('[arrow ') || line.startsWith('[arrow]')) {
+      const id = extractHeaderId(line)
       const fromMatch = line.match(/from\s+(#[a-zA-Z0-9_-]+)/)
       const toMatch = line.match(/to\s+(#[a-zA-Z0-9_-]+)/)
 
@@ -346,7 +353,7 @@ export function parseDslWithDiagnostics(dslText: string): {
         // 关系箭头
         ops.push({
           type: 'arrow',
-          id,
+          id: id ?? undefined,
           from: fromMatch[1]!.replace('#', ''),
           to: toMatch[1]!.replace('#', ''),
           label: extractLabel(line),
@@ -372,7 +379,7 @@ export function parseDslWithDiagnostics(dslText: string): {
         }
         ops.push({
           type: 'arrow',
-          id,
+          id: id ?? undefined,
           from: '',
           to: '',
           freeArrow: true,
