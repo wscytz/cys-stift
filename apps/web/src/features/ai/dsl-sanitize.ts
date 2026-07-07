@@ -62,7 +62,7 @@ function clampCoord(n: number): number {
   return Math.min(MAX_COORD, Math.max(-MAX_COORD, n))
 }
 
-/** card op:case 6(size)+ case 1/11(id 不存在 diagnostic)。 */
+/** card op:case 6(size)+ case 1/11(id 不存在)+ case 2b(create id 冲突预检)diagnostic。 */
 function sanitizeCard(
   op: DslCardOp,
   idx: number,
@@ -75,6 +75,13 @@ function sanitizeCard(
     diagnostics.push({
       opIndex: idx,
       message: `card #${op.cardId} 不存在于画布(若想新建需加 create 标记)`,
+    })
+  }
+  // case 2b:create flag + id 已在 existingCardIds → diagnostic(预检 id 冲突,apply 时 createWithId 会失败;case 2a 计数 cardsFailed 兜底)
+  if (op.create && ctx?.existingCardIds !== undefined && ctx.existingCardIds.has(String(op.cardId))) {
+    diagnostics.push({
+      opIndex: idx,
+      message: `create card #${op.cardId} id 已存在(冲突,建卡将失败)`,
     })
   }
   // case 6:size 修正 + case 5:坐标钳位

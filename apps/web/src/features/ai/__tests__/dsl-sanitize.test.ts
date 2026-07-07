@@ -232,6 +232,28 @@ describe('sanitizeDslOps — case 3: 跨 kind 告警(free op id 命中 host 已�
   })
 })
 
+describe('sanitizeDslOps — case 2b: create id 冲突预检 diagnostic', () => {
+  it('card create + cardId 已在 existingCardIds → diagnostic(id 冲突预检,apply 前提示)', () => {
+    const op: DslOp = { type: 'card', cardId: 'c1' as CardId, x: 0, y: 0, create: true }
+    const { ops, diagnostics } = sanitizeDslOps([op], { existingCardIds: new Set(['c1']), existingFreeIds: new Set() })
+    expect(diagnostics).toHaveLength(1)
+    expect(diagnostics[0]!.message).toMatch(/c1/)
+    expect(ops[0]).toBe(op) // op 保留(apply 自己处理,case 2a 计数兜底)
+  })
+
+  it('card create + cardId 不在 existingCardIds → 无 diagnostic(正常 create)', () => {
+    const op: DslOp = { type: 'card', cardId: 'new1' as CardId, x: 0, y: 0, create: true }
+    const { diagnostics } = sanitizeDslOps([op], { existingCardIds: new Set(), existingFreeIds: new Set() })
+    expect(diagnostics).toHaveLength(0)
+  })
+
+  it('card 无 create + id 已存在 → 无 diagnostic(正常 update,不是冲突)', () => {
+    const op: DslOp = { type: 'card', cardId: 'c1' as CardId, x: 100, y: 200 }
+    const { diagnostics } = sanitizeDslOps([op], { existingCardIds: new Set(['c1']), existingFreeIds: new Set() })
+    expect(diagnostics).toHaveLength(0)
+  })
+})
+
 describe('sanitizeDslOps — case 5: 越界坐标钳位 [-10000, 10000](保负向)', () => {
   it('card x/y 超大(1e6) → 钳到 10000', () => {
     const op: DslOp = { type: 'card', cardId: 'c1' as CardId, x: 999999, y: 888888, create: true }
