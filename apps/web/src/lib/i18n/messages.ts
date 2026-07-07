@@ -412,6 +412,7 @@ export const messages = {
   'agent.applying': { zh: '应用中…', en: 'Applying…' },
   'agent.applied': { zh: '已应用 {n} 条变更(卡 {cards})', en: 'Applied {n} changes ({cards} cards)' },
   'agent.applyFailed': { zh: '应用失败', en: 'Apply failed' },
+  'agent.cardsFailed': { zh: '{n} 张卡未创建(配额满/ID 冲突)', en: '{n} card(s) not created (quota/id conflict)' },
   'agent.reject': { zh: '拒绝', en: 'Reject' },
   'agent.retry': { zh: '让 AI 重试', en: 'Ask AI to retry' },
   'agent.edit': { zh: '编辑 DSL', en: 'Edit DSL' },

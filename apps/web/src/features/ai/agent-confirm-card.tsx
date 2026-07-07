@@ -197,6 +197,10 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
           cards: String(res.cardsUpdated + res.cardsCreated),
         }),
       })
+      // case 2a:createWithId 失败的卡(cardsFailed>0)单独 info toast,让用户知道有卡没建成
+      if (res.cardsFailed > 0) {
+        pushToast({ kind: 'info', message: t('agent.cardsFailed', { n: String(res.cardsFailed) }) })
+      }
       onApplied({ applied: res.applied, cardsUpdated: res.cardsUpdated, cardsCreated: res.cardsCreated })
     } catch (err) {
       console.error('[AgentConfirmCard] apply failed', err)
