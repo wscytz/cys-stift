@@ -191,6 +191,17 @@ describe('applyOpsAndPersist', () => {
     expect(res.cardsCreated).toBe(0)
   })
 
+  it('透出 sanitizeDiagnostics(ops 引用不存在的 card → diagnostic 挂 PersistResult)', async () => {
+    const svc = makeService([])
+    const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
+    const ops: DslOp[] = [
+      { type: 'card', cardId: 'ghost' as never, x: 0, y: 0 }, // 无 create + 不存在 → case 1 diagnostic
+    ]
+    const res = await applyOpsAndPersist(host, before, ops, CANVAS, svc)
+    expect(res.sanitizeDiagnostics).toBeDefined()
+    expect(res.sanitizeDiagnostics!.length).toBeGreaterThanOrEqual(1)
+  })
+
   it('无变更的 card 不回写(避免无谓 update)', async () => {
     const svc = makeService([cardOnCanvas('c1', String(CANVAS), 100, 100)])
     const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)

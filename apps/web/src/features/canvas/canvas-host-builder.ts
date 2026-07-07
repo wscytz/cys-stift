@@ -25,6 +25,7 @@ import type { CanvasId, CardId, CardService, Card, ColorToken } from '@cys-stift
 import { canvasFreeformStore } from '@/lib/canvas-freeform-store'
 import { loadCardsIntoEditor, cardToElement, elementToCardPosition } from './canvas-binding'
 import { applyLayout } from './apply-layout'
+import type { SanitizeDiagnostic } from '@/features/ai/dsl-sanitize'
 import type { DslOp } from '@/features/ai/dsl-parser'
 import { freeformElementsOf } from './canvas-freeform-binding'
 
@@ -61,6 +62,8 @@ export interface PersistResult {
   cardsCreated: number
   /** create 指令落库失败数(配额满/ID 冲突;case 2a 不再静默吞,调用方可 toast)。 */
   cardsFailed: number
+  /** Sanitize 诊断(引用不存在的卡/端点等,case 1/11/7);有则挂,无则 undefined。 */
+  sanitizeDiagnostics?: SanitizeDiagnostic[]
   /** freeform 元素变更数(added + updated + removed)。 */
   freeformChanged: number
 }
@@ -145,7 +148,7 @@ export async function applyOpsAndPersist(
     }
   }
 
-  return {
+  const persistResult: PersistResult = {
     applied: result.applied,
     skipped: result.skipped,
     cardsUpdated,
@@ -153,6 +156,11 @@ export async function applyOpsAndPersist(
     cardsFailed,
     freeformChanged,
   }
+  // 透出 sanitizeDiagnostics(让 /ask temp 路径也能 toast 引用不存在的卡/端点)
+  if (result.sanitizeDiagnostics && result.sanitizeDiagnostics.length > 0) {
+    persistResult.sanitizeDiagnostics = result.sanitizeDiagnostics
+  }
+  return persistResult
 }
 
 /** 从 host element id 还原 CardId(card 元素 id 就是 String(card.id))。 */

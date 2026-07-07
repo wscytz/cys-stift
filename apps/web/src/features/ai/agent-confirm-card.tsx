@@ -23,6 +23,7 @@ import { Button } from '@cys-stift/ui'
 import type { CanvasId, CardId, CardService, ColorToken } from '@cys-stift/domain'
 import { InMemoryCanvasHost, readToken, type CanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
 import { parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
+import type { SanitizeDiagnostic } from './dsl-sanitize'
 import { applyLayout } from '@/features/canvas/apply-layout'
 import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
 import { buildCanvasHostForCanvas, applyOpsAndPersist } from '@/features/canvas/canvas-host-builder'
@@ -150,18 +151,18 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
     if (preview.kind !== 'ok' || !afterState) return
     setPhase('applying')
     try {
-      let res: { applied: number; cardsUpdated: number; cardsCreated: number; cardsFailed: number }
+      let res: { applied: number; cardsUpdated: number; cardsCreated: number; cardsFailed: number; sanitizeDiagnostics?: SanitizeDiagnostic[] }
       if (liveHost) {
         // live:host.batch 单 undo;onCardCreate 建卡;画布页 bindCardWriteback + freeform
         // binding 持久化。不调 applyOpsAndPersist(会双写)。
         const creator = makeOnCardCreate(targetCanvasId, service)
         const r = applyLayout(liveHost, preview.ops, undefined, creator.onCardCreate)
-        res = { applied: r.applied, cardsUpdated: 0, cardsCreated: r.newlyApplied.length, cardsFailed: creator.getFailed() }
+        res = { applied: r.applied, cardsUpdated: 0, cardsCreated: r.newlyApplied.length, cardsFailed: creator.getFailed(), ...(r.sanitizeDiagnostics ? { sanitizeDiagnostics: r.sanitizeDiagnostics } : {}) }
       } else {
         // /ask 原 temp 路径(不变):重建 host(before)再 applyOpsAndPersist(内部再 applyLayout 一次落库)。
         const { host, before } = await buildCanvasHostForCanvas(targetCanvasId, service)
         const p = await applyOpsAndPersist(host, before, preview.ops, targetCanvasId, service)
-        res = { applied: p.applied, cardsUpdated: p.cardsUpdated, cardsCreated: p.cardsCreated, cardsFailed: p.cardsFailed }
+        res = { applied: p.applied, cardsUpdated: p.cardsUpdated, cardsCreated: p.cardsCreated, cardsFailed: p.cardsFailed, ...(p.sanitizeDiagnostics ? { sanitizeDiagnostics: p.sanitizeDiagnostics } : {}) }
       }
       setPhase('applied')
       // T5:风险 op 存档 —— agent apply 成功(res.applied > 0)后落档(b 类,
@@ -200,6 +201,10 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
       // case 2a:createWithId 失败的卡(cardsFailed>0)单独 info toast,让用户知道有卡没建成
       if (res.cardsFailed > 0) {
         pushToast({ kind: 'info', message: t('agent.cardsFailed', { n: String(res.cardsFailed) }) })
+      }
+      // case 1/11/7:sanitize diagnostic(引用不存在的卡/端点)透出 UI,让用户知道 AI 提议有悬空引用
+      if (res.sanitizeDiagnostics && res.sanitizeDiagnostics.length > 0) {
+        pushToast({ kind: 'info', message: t('agent.sanitizeDiagnostics', { n: String(res.sanitizeDiagnostics.length) }) })
       }
       onApplied({ applied: res.applied, cardsUpdated: res.cardsUpdated, cardsCreated: res.cardsCreated })
     } catch (err) {
