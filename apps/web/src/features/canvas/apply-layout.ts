@@ -12,12 +12,13 @@
  * Design decisions (unchanged from pre-refactor):
  * - Layout runs inside host.batch() for a single undo step
  * - Missing cards are skipped (no-op); arrows missing an endpoint are skipped
- * - Card positions are clamped to positive coordinates
+ * - Card positions preserve negative coords (canvas pan allows negative); sanitize clamps size only
  * - Errors on individual ops are swallowed; the rest of the layout applies
  */
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import type { CardId } from '@cys-stift/domain'
 import type { DslOp, DslCardOp, DslFreeOp, DslArrowOp } from '../ai/dsl-parser'
+import { sanitizeDslOps } from '../ai/dsl-sanitize'
 
 /** AI-created free shapes / arrows need a unique id (tldraw used to auto-mint). */
 function uid(prefix: string): string {
@@ -69,14 +70,18 @@ export function applyLayout(
   appliedHashes?: Set<string>,
   onCardCreate?: (params: { cardId: string; x: number; y: number; w: number; h: number; color?: string }) => void,
 ): ApplyResult {
-  if (ops.length === 0) return { applied: 0, skipped: 0, newlyApplied: [] }
+  // Sanitize:修正 LLM 常见错误(非法 size 等)。纯函数,永不抛错。放 hash 前,
+  // 让 appliedHashes 基于 sanitized op(一致)。diagnostics 暂不透出 UI(后续 case 1/11)。
+  const cleanOps = sanitizeDslOps(ops).ops
+
+  if (cleanOps.length === 0) return { applied: 0, skipped: 0, newlyApplied: [] }
 
   let applied = 0
   let skipped = 0
   const newlyApplied: string[] = []
 
   host.batch(() => {
-    for (const op of ops) {
+    for (const op of cleanOps) {
       const hash = JSON.stringify(op)
       if (appliedHashes?.has(hash)) {
         skipped++
