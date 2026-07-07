@@ -11,7 +11,7 @@
  * bump 规则:增删指令种类 / 增删属性 / 改颜色枚举 → bump DSL_VERSION。
  * 纯改 prompt 措辞、改 parser 正则细节(不动语法)→ 不 bump。
  */
-export const DSL_VERSION = 2
+export const DSL_VERSION = 3
 
 /**
  * `@text("...")` / `@label("...")` 值的最大字符数。
@@ -44,6 +44,10 @@ export const DSL_COLOR_ALIASES: Record<string, DslColor> = { grey: 'gray' }
  */
 export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one element per line):
   [card #id] @pos(x, y) @size(w, h) @color(red|yellow|blue|black|white|gray|grey)
+  # relational placement (optional alternative to @pos — let the engine compute coords):
+  #   [card #id] right-of #anchor @gap(20)   # x = anchor.x + anchor.w + gap; y = anchor.y
+  #   [card #id] below #anchor @gap(20)      # y = anchor.y + anchor.h + gap; x = anchor.x
+  #   (@gap defaults to 20; anchor must be a card placed earlier in this block or already on canvas)
   [rect #id] @pos(x, y) @size(w, h) @color(c)
   [text #id] @pos(x, y) @text("...") @color(c)
   [frame #id] @pos(x, y) @size(w, h) @text("title") @color(c)   # themed group/section container

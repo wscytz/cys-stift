@@ -20,6 +20,8 @@ import type { CardId } from '@cys-stift/domain'
 import type { DslOp, DslCardOp, DslFreeOp, DslArrowOp } from '../ai/dsl-parser'
 import { sanitizeDslOps } from '../ai/dsl-sanitize'
 import type { SanitizeCtx, SanitizeDiagnostic } from '../ai/dsl-sanitize'
+import { solveRelational } from '../ai/relational-solver'
+import type { ExistingGeom } from '../ai/relational-solver'
 
 /** AI-created free shapes / arrows need a unique id (tldraw used to auto-mint). */
 function uid(prefix: string): string {
@@ -75,10 +77,20 @@ export function applyLayout(
 ): ApplyResult {
   // Sanitize:修正 LLM 常见错误(非法 size 等)+ 产 diagnostic(引用不存在的卡/端点)。
   // 纯函数,永不抛错。放 hash 前,让 appliedHashes 基于 sanitized op(一致)。
-  const { ops: cleanOps, diagnostics: sanitizeDiagnostics } = sanitizeDslOps(ops, buildSanitizeCtx(host))
-  if (sanitizeDiagnostics.length > 0) {
+  const { ops: sanitized, diagnostics: sanitizeDiagnostics } = sanitizeDslOps(ops, buildSanitizeCtx(host))
+
+  // Solve relational(B工程):rel card(right-of/below #anchor)→ 绝对坐标。sanitize 后、apply 前。
+  // anchor 到画布已有 card 或同批更早 op。anchor 缺失 → diagnostic(合并透出)。
+  const { ops: cleanOps, diagnostics: relDiagnostics } = solveRelational(
+    sanitized,
+    buildExistingGeometry(host),
+  )
+  const allDiagnostics =
+    relDiagnostics.length > 0 ? [...sanitizeDiagnostics, ...relDiagnostics] : sanitizeDiagnostics
+
+  if (allDiagnostics.length > 0) {
     // dev 可见;UI 透出(AgentConfirmCard/dsl-dialog toast)留后续。
-    console.warn('[applyLayout] sanitize diagnostics', sanitizeDiagnostics)
+    console.warn('[applyLayout] diagnostics', allDiagnostics)
   }
 
   if (cleanOps.length === 0) return { applied: 0, skipped: 0, newlyApplied: [] }
@@ -125,7 +137,7 @@ export function applyLayout(
 
   // sanitizeDiagnostics 只在有诊断时挂上(无诊断时 ApplyResult 不带该字段,保 toEqual 契约)
   const result: ApplyResult = { applied, skipped, newlyApplied }
-  if (sanitizeDiagnostics.length > 0) result.sanitizeDiagnostics = sanitizeDiagnostics
+  if (allDiagnostics.length > 0) result.sanitizeDiagnostics = allDiagnostics
   return result
 }
 
@@ -154,6 +166,18 @@ function buildSanitizeCtx(host: CanvasHost): SanitizeCtx {
     }
   }
   return { existingCardIds, existingFreeIds, existingFreeKinds }
+}
+
+/** 从 host 提取现有 card 的几何(id → {x,y,w,h}),供 relational solver 查 anchor。
+ *  只记 card(关系式只 anchor 到 card);free/arrow 不参与(B工程 pilot 范围)。 */
+function buildExistingGeometry(host: CanvasHost): Map<string, ExistingGeom> {
+  const geom = new Map<string, ExistingGeom>()
+  for (const el of host.getElements()) {
+    if (el.kind === 'card') {
+      geom.set(el.id, { x: el.x, y: el.y, w: el.w, h: el.h })
+    }
+  }
+  return geom
 }
 
 function applyCardOp(

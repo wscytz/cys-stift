@@ -526,3 +526,66 @@ describe('@text/@label 长度上限 (DSL_MAX_TEXT_LEN)', () => {
     expect(op.text).toBe('hello')
   })
 })
+
+// ── B工程:relational 坐标(right-of / below + @gap)─────────────────────────────
+// 关系式 card:不要求 @pos(占位 x/y=0),rel 描述对 anchor 的相对关系,求解器填真值。
+// 绝对 card(@pos)路径行为不变(回归,保 e2e round-trip byte-equal);无 @pos 且无 rel 仍报错。
+describe('parseDsl — relational card (right-of / below + @gap)', () => {
+  it('right-of #anchor @gap(20) → rel 带 dir/anchor/gap,x/y 占位 0', () => {
+    const ops = parseDsl('[card #a] right-of #c0 @gap(20)')
+    expect(ops).toHaveLength(1)
+    const op = ops[0]!
+    expect(op.type).toBe('card')
+    expect((op as { rel?: unknown }).rel).toEqual({ dir: 'right-of', anchor: 'c0', gap: 20 })
+    expect((op as { x: number }).x).toBe(0)
+    expect((op as { y: number }).y).toBe(0)
+  })
+
+  it('below #anchor 无 @gap → gap 默认 20', () => {
+    const ops = parseDsl('[card #a] below #c0')
+    const op = ops[0]!
+    expect((op as { rel?: { gap: number } }).rel?.gap).toBe(20)
+    expect((op as { rel?: { dir: string } }).rel?.dir).toBe('below')
+  })
+
+  it('relational card 保留 @size / @color', () => {
+    const ops = parseDsl('[card #a] right-of #c0 @gap(40) @size(200,100) @color(blue)')
+    const op = ops[0]!
+    expect((op as { w?: number }).w).toBe(200)
+    expect((op as { h?: number }).h).toBe(100)
+    expect((op as { color?: string }).color).toBe('blue')
+  })
+
+  it('relational card 可带 create flag', () => {
+    const ops = parseDsl('[card #a create] right-of #c0 @gap(20)')
+    const op = ops[0]!
+    expect((op as { create?: boolean }).create).toBe(true)
+  })
+
+  it('anchor id 支持下划线/短横线', () => {
+    const ops = parseDsl('[card #a] right-of #card_1-2 @gap(10)')
+    const op = ops[0]!
+    expect((op as { rel?: { anchor: string } }).rel?.anchor).toBe('card_1-2')
+  })
+
+  it('绝对 card(@pos)路径不变 —— 无 rel(回归,保 e2e round-trip byte-equal)', () => {
+    const ops = parseDsl('[card #c1] @pos(100,200) @size(240,120) @color(blue)')
+    const op = ops[0]!
+    expect((op as { rel?: unknown }).rel).toBeUndefined()
+    expect((op as { x: number }).x).toBe(100)
+    expect((op as { y: number }).y).toBe(200)
+  })
+
+  it('无 @pos 且无 rel → 仍报 missing @pos(既有契约不破)', () => {
+    const { ops, errors } = parseDslWithDiagnostics('[card #a] @color(blue)')
+    expect(ops).toHaveLength(0)
+    expect(errors[0]?.message).toBe('missing @pos')
+  })
+
+  it('@gap 出现在绝对 card 上(无 rel)→ gap 忽略,正常绝对 op', () => {
+    const ops = parseDsl('[card #a] @pos(0,0) @gap(20)')
+    const op = ops[0]!
+    expect((op as { rel?: unknown }).rel).toBeUndefined()
+    expect((op as { x: number }).x).toBe(0)
+  })
+})

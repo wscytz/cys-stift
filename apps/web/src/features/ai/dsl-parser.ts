@@ -27,6 +27,11 @@ export type DslCardOp = {
   h?: number
   color?: string
   create?: boolean
+  /** B工程 pilot:关系式坐标。有 rel 时 x/y 是占位(0,0),求解器 solveRelational 填真值。
+   *  right-of #anchor:x = anchor.x + anchor.w + gap;y = anchor.y
+   *  below    #anchor:y = anchor.y + anchor.h + gap;x = anchor.x
+   *  仅 AI 输入路径;serializeCanvas 永不 emit rel(rel 解决后画布存绝对坐标)。 */
+  rel?: { dir: 'right-of' | 'below'; anchor: string; gap: number }
 }
 
 export type DslFreeOp =
@@ -141,6 +146,12 @@ const TEXT_RE = /@text\("((?:[^"\\]|\\.)*)"\)/
 
 /** Size directive: `@size(w,h)` — supports negative values (free arrow direction encoding). */
 const SIZE_RE = /@size\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)/
+
+/** B工程:关系式放置指令。`right-of #anchor` / `below #anchor` —— anchor 须为同批更早出现或画布已有的 card。
+ *  关键字后必接 #id(防散文里的 "below" 误命中)。求解器(solveRelational)据此算绝对坐标。 */
+const RELATION_RE = /(right-of|below)\s+#([a-zA-Z0-9_-]+)/
+/** B工程:gap 指令 `@gap(n)`,关系式放置的间距(默认 20)。 */
+const GAP_RE = /@gap\((-?\d+(?:\.\d+)?)\)/
 
 /** Arrow relation signature — line style + terminal (semantics). */
 const DASH_RE = /@dash\((solid|dashed|dotted)\)/
@@ -268,19 +279,44 @@ export function parseDslWithDiagnostics(dslText: string): {
 
     // 识别的种类前缀须与 ./dsl-grammar.ts 的 DSL_KINDS 一致;dsl-sync.test.ts 锁漂移。
     // ── Card line: `[card #abc123] @pos(300, 400)` or `[card #abc123 create] @pos(300, 400)`
+    //    B工程 relational 变体:`[card #a] right-of #c0 @gap(20)` —— 不要求 @pos,rel 算坐标。
     if (line.startsWith('[card ')) {
       const id = extractId(line)
       if (!id) {
         errors.push({ line: lineNo, text: line, message: 'missing #id' })
         continue
       }
+      const size = extractSize(line)
+      const hasCreate = /\bcreate\b/.test(line)
+      const relMatch = line.match(RELATION_RE)
+      if (relMatch) {
+        // relational 变体:@pos 可选(占位,求解器覆盖);rel 描述对 anchor 的相对关系。
+        const pos = extractPos(line)
+        const gapMatch = line.match(GAP_RE)
+        const op: any = {
+          type: 'card',
+          cardId: id as CardId,
+          x: pos?.x ?? 0,
+          y: pos?.y ?? 0,
+          w: size?.w,
+          h: size?.h,
+          color: extractColor(line),
+          rel: {
+            dir: relMatch[1] as 'right-of' | 'below',
+            anchor: relMatch[2] as string,
+            gap: gapMatch ? Number(gapMatch[1]) : 20,
+          },
+        }
+        if (hasCreate) op.create = true
+        ops.push(op)
+        continue
+      }
+      // 绝对变体(既有):要求 @pos
       const pos = extractPos(line)
       if (!pos) {
         errors.push({ line: lineNo, text: line, message: 'missing @pos' })
         continue
       }
-      const size = extractSize(line)
-      const hasCreate = /\bcreate\b/.test(line)
       const op: any = {
         type: 'card',
         cardId: id as CardId,
@@ -290,9 +326,7 @@ export function parseDslWithDiagnostics(dslText: string): {
         h: size?.h,
         color: extractColor(line),
       }
-      if (hasCreate) {
-        op.create = true
-      }
+      if (hasCreate) op.create = true
       ops.push(op)
       continue
     }

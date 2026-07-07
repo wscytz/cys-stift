@@ -3,6 +3,7 @@ import { applyLayout } from '../apply-layout'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import type { DslOp } from '../../ai/dsl-parser'
+import { parseDsl } from '../../ai/dsl-parser'
 import type { CardId } from '@cys-stift/domain'
 
 /** Pre-seed a card element so a `card` op has something to reposition. */
@@ -762,5 +763,80 @@ describe('applyLayout — case 4: free id round-trip + arrow 连新建', () => {
     const rect = host.getElements().find((e) => e.kind === 'rect')
     expect(rect).toBeDefined()
     expect(rect!.id).not.toBe('r1')
+  })
+})
+
+// ── B工程:relational card 经 applyLayout 全链路(sanitize → solve → apply)─────────
+describe('applyLayout — relational card (right-of / below)', () => {
+  it('right-of 链:c0 绝对 create,c1 right-of c0 → c1 落在求解坐标', () => {
+    const host = new InMemoryCanvasHost()
+    const created: string[] = []
+    applyLayout(
+      host,
+      [
+        { type: 'card', cardId: 'c0' as CardId, x: 100, y: 100, w: 240, h: 120, create: true },
+        {
+          type: 'card',
+          cardId: 'c1' as CardId,
+          x: 0,
+          y: 0,
+          w: 240,
+          h: 120,
+          create: true,
+          rel: { dir: 'right-of', anchor: 'c0', gap: 20 },
+        },
+      ],
+      undefined,
+      (p) => created.push(p.cardId),
+    )
+    expect(host.getElement('c1')).toMatchObject({ x: 360, y: 100, w: 240, h: 120 })
+    expect(created).toEqual(['c0', 'c1'])
+  })
+
+  it('relational anchor 到画布已有 card(seed c0)→ c1 用 c0 真实几何算偏移', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'c0', 100, 100) // 240×120
+    applyLayout(host, [
+      {
+        type: 'card',
+        cardId: 'c1' as CardId,
+        x: 0,
+        y: 0,
+        create: true,
+        rel: { dir: 'below', anchor: 'c0', gap: 20 },
+      },
+    ])
+    // c1.y = 100 + 120 + 20 = 240;c1.x = 100
+    expect(host.getElement('c1')).toMatchObject({ x: 100, y: 240 })
+  })
+
+  it('relational anchor 缺失 → result.sanitizeDiagnostics 透出', () => {
+    const host = new InMemoryCanvasHost()
+    const res = applyLayout(host, [
+      {
+        type: 'card',
+        cardId: 'c1' as CardId,
+        x: 0,
+        y: 0,
+        create: true,
+        rel: { dir: 'right-of', anchor: 'ghost', gap: 20 },
+      },
+    ])
+    expect(res.sanitizeDiagnostics).toBeDefined()
+    expect(res.sanitizeDiagnostics!.some((d) => /ghost/.test(d.message))).toBe(true)
+  })
+
+  it('relational DSL 文本端到端:parse → applyLayout → 落点正确', () => {
+    const host = new InMemoryCanvasHost()
+    const ops = parseDsl(
+      '[card #c0 create] @pos(100,100) @size(240,120)\n' +
+        '[card #c1 create] right-of #c0 @gap(20) @size(240,120)\n' +
+        '[card #c2 create] below #c1 @gap(20) @size(240,120)',
+    )
+    applyLayout(host, ops)
+    expect(host.getElement('c0')).toMatchObject({ x: 100, y: 100 })
+    expect(host.getElement('c1')).toMatchObject({ x: 360, y: 100 }) // right-of c0
+    // c2 below c1:c1.x=360, c1.y=100, c1.h=120 → c2.x=360, c2.y=100+120+20=240
+    expect(host.getElement('c2')).toMatchObject({ x: 360, y: 240 })
   })
 })
