@@ -239,7 +239,10 @@ describe('applyLayout', () => {
     const result = applyLayout(host, [{ type: 'card', cardId: 'ghost' as CardId, x: 100, y: 200 }])
 
     expect(host.getElements()).toHaveLength(0)
-    expect(result).toEqual({ applied: 0, skipped: 1, newlyApplied: [] })
+    // counts 验字段(sanitize 对不存在的 card 挂 sanitizeDiagnostics,不验全对象)
+    expect(result.applied).toBe(0)
+    expect(result.skipped).toBe(1)
+    expect(result.newlyApplied).toEqual([])
   })
 
   // ── text color — DSL symmetry fix 3 ──
@@ -451,7 +454,10 @@ describe('applyLayout', () => {
       { type: 'arrow', from: 'c1', to: 'ghost', label: 'ref' }, // 跳过:to 端点不存在
     ])
 
-    expect(res).toEqual({ applied: 2, skipped: 2, newlyApplied: [] })
+    // counts 验字段(ops 含 ghost card + arrow→ghost → sanitize 挂 sanitizeDiagnostics,不验全对象)
+    expect(res.applied).toBe(2)
+    expect(res.skipped).toBe(2)
+    expect(res.newlyApplied).toEqual([])
   })
 
   it('empty ops returns zeros', () => {

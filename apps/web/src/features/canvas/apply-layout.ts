@@ -19,6 +19,7 @@ import type { CanvasHost } from '@cys-stift/canvas-engine'
 import type { CardId } from '@cys-stift/domain'
 import type { DslOp, DslCardOp, DslFreeOp, DslArrowOp } from '../ai/dsl-parser'
 import { sanitizeDslOps } from '../ai/dsl-sanitize'
+import type { SanitizeCtx, SanitizeDiagnostic } from '../ai/dsl-sanitize'
 
 /** AI-created free shapes / arrows need a unique id (tldraw used to auto-mint). */
 function uid(prefix: string): string {
@@ -45,6 +46,8 @@ export interface ApplyResult {
   applied: number
   skipped: number
   newlyApplied: string[]
+  /** Sanitize 诊断(引用不存在的卡/端点等,case 1/11/7)。调用方可选透出 UI;空表示无诊断。 */
+  sanitizeDiagnostics?: SanitizeDiagnostic[]
 }
 
 /**
@@ -70,9 +73,13 @@ export function applyLayout(
   appliedHashes?: Set<string>,
   onCardCreate?: (params: { cardId: string; x: number; y: number; w: number; h: number; color?: string }) => void,
 ): ApplyResult {
-  // Sanitize:修正 LLM 常见错误(非法 size 等)。纯函数,永不抛错。放 hash 前,
-  // 让 appliedHashes 基于 sanitized op(一致)。diagnostics 暂不透出 UI(后续 case 1/11)。
-  const cleanOps = sanitizeDslOps(ops).ops
+  // Sanitize:修正 LLM 常见错误(非法 size 等)+ 产 diagnostic(引用不存在的卡/端点)。
+  // 纯函数,永不抛错。放 hash 前,让 appliedHashes 基于 sanitized op(一致)。
+  const { ops: cleanOps, diagnostics: sanitizeDiagnostics } = sanitizeDslOps(ops, buildSanitizeCtx(host))
+  if (sanitizeDiagnostics.length > 0) {
+    // dev 可见;UI 透出(AgentConfirmCard/dsl-dialog toast)留后续。
+    console.warn('[applyLayout] sanitize diagnostics', sanitizeDiagnostics)
+  }
 
   if (cleanOps.length === 0) return { applied: 0, skipped: 0, newlyApplied: [] }
 
@@ -116,7 +123,10 @@ export function applyLayout(
     }
   })
 
-  return { applied, skipped, newlyApplied }
+  // sanitizeDiagnostics 只在有诊断时挂上(无诊断时 ApplyResult 不带该字段,保 toEqual 契约)
+  const result: ApplyResult = { applied, skipped, newlyApplied }
+  if (sanitizeDiagnostics.length > 0) result.sanitizeDiagnostics = sanitizeDiagnostics
+  return result
 }
 
 /** Math.round + 有限性守卫:AI/用户输入 @pos(1e309) → Number 得 Infinity,
@@ -124,6 +134,17 @@ export function applyLayout(
  *  非有限值回落 fallback(已有元素保留原坐标,新建元素用 0)。 */
 function finiteRound(n: unknown, fallback: number): number {
   return typeof n === 'number' && Number.isFinite(n) ? Math.round(n) : fallback
+}
+
+/** 从 host 提取现有 card/free id(case 1/11/7 sanitize diagnostic 用)。arrow 不算端点候选。 */
+function buildSanitizeCtx(host: CanvasHost): SanitizeCtx {
+  const existingCardIds = new Set<string>()
+  const existingFreeIds = new Set<string>()
+  for (const el of host.getElements()) {
+    if (el.kind === 'card') existingCardIds.add(el.id)
+    else if (el.kind !== 'arrow') existingFreeIds.add(el.id)
+  }
+  return { existingCardIds, existingFreeIds }
 }
 
 function applyCardOp(

@@ -132,3 +132,62 @@ describe('sanitizeDslOps — case 6: 非法 size 修正', () => {
     expect(ops[0]).toBe(garbage)
   })
 })
+
+describe('sanitizeDslOps — case 1+11: card 引用不存在 id → diagnostic', () => {
+  it('card 无 create flag + id 不在 existingCardIds → diagnostic(提示加 create)', () => {
+    const op: DslOp = { type: 'card', cardId: 'ghost' as CardId, x: 0, y: 0 }
+    const { ops, diagnostics } = sanitizeDslOps([op], { existingCardIds: new Set(), existingFreeIds: new Set() })
+    expect(diagnostics).toHaveLength(1)
+    expect(diagnostics[0]!.opIndex).toBe(0)
+    expect(diagnostics[0]!.message).toMatch(/ghost/)
+    // op 原样保留(sanitize 不删,apply 自己 skip)
+    expect(ops[0]).toBe(op)
+  })
+
+  it('card id 在 existingCardIds → 无 diagnostic(正常 update)', () => {
+    const op: DslOp = { type: 'card', cardId: 'c1' as CardId, x: 100, y: 200 }
+    const { diagnostics } = sanitizeDslOps([op], { existingCardIds: new Set(['c1']), existingFreeIds: new Set() })
+    expect(diagnostics).toHaveLength(0)
+  })
+
+  it('card 有 create flag + id 不存在 → 无 diagnostic(正常 create)', () => {
+    const op: DslOp = { type: 'card', cardId: 'new1' as CardId, x: 0, y: 0, create: true }
+    const { diagnostics } = sanitizeDslOps([op], { existingCardIds: new Set(), existingFreeIds: new Set() })
+    expect(diagnostics).toHaveLength(0)
+  })
+
+  it('无 ctx 时不 diagnostic(case 6 等不依赖 ctx 的路径)', () => {
+    const op: DslOp = { type: 'card', cardId: 'ghost' as CardId, x: 0, y: 0 }
+    const { diagnostics } = sanitizeDslOps([op])
+    expect(diagnostics).toHaveLength(0)
+  })
+})
+
+describe('sanitizeDslOps — case 7: arrow 端点不存在 → diagnostic', () => {
+  it('relation arrow from 不在 existingCardIds → diagnostic', () => {
+    const op: DslOp = { type: 'arrow', from: 'ghost', to: 'c2' }
+    const { ops, diagnostics } = sanitizeDslOps([op], { existingCardIds: new Set(['c2']), existingFreeIds: new Set() })
+    expect(diagnostics).toHaveLength(1)
+    expect(diagnostics[0]!.opIndex).toBe(0)
+    expect(diagnostics[0]!.message).toMatch(/ghost/)
+    expect(ops[0]).toBe(op) // op 保留(apply 自己 skip)
+  })
+
+  it('relation arrow to 不存在 → diagnostic', () => {
+    const op: DslOp = { type: 'arrow', from: 'c1', to: 'ghost' }
+    const { diagnostics } = sanitizeDslOps([op], { existingCardIds: new Set(['c1']), existingFreeIds: new Set() })
+    expect(diagnostics).toHaveLength(1)
+  })
+
+  it('relation arrow 两端都在 → 无 diagnostic', () => {
+    const op: DslOp = { type: 'arrow', from: 'c1', to: 'c2' }
+    const { diagnostics } = sanitizeDslOps([op], { existingCardIds: new Set(['c1', 'c2']), existingFreeIds: new Set() })
+    expect(diagnostics).toHaveLength(0)
+  })
+
+  it('free arrow(无 from/to) → 无 diagnostic(无需端点)', () => {
+    const op: DslOp = { type: 'arrow', from: '', to: '', freeArrow: true, x: 0, y: 0, w: 10, h: 10 }
+    const { diagnostics } = sanitizeDslOps([op], { existingCardIds: new Set(), existingFreeIds: new Set() })
+    expect(diagnostics).toHaveLength(0)
+  })
+})
