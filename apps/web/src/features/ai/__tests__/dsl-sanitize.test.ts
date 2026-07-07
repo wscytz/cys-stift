@@ -191,3 +191,47 @@ describe('sanitizeDslOps — case 7: arrow 端点不存在 → diagnostic', () =
     expect(diagnostics).toHaveLength(0)
   })
 })
+
+describe('sanitizeDslOps — case 5: 越界坐标钳位 [-10000, 10000](保负向)', () => {
+  it('card x/y 超大(1e6) → 钳到 10000', () => {
+    const op: DslOp = { type: 'card', cardId: 'c1' as CardId, x: 999999, y: 888888, create: true }
+    const { ops } = sanitizeDslOps([op])
+    expect(ops[0]).toMatchObject({ x: 10000, y: 10000 })
+  })
+
+  it('card x/y 超大负值(-1e6) → 钳到 -10000(保负向,不破负坐标契约)', () => {
+    const op: DslOp = { type: 'card', cardId: 'c1' as CardId, x: -999999, y: -888888, create: true }
+    const { ops } = sanitizeDslOps([op])
+    expect(ops[0]).toMatchObject({ x: -10000, y: -10000 })
+  })
+
+  it('card 合理负坐标(-100) → 保留(不钳)', () => {
+    const op: DslOp = { type: 'card', cardId: 'c1' as CardId, x: -100, y: -50, create: true }
+    const { ops } = sanitizeDslOps([op])
+    expect(ops[0]).toMatchObject({ x: -100, y: -50 })
+  })
+
+  it('card 合法坐标(500) → 不动', () => {
+    const op: DslOp = { type: 'card', cardId: 'c1' as CardId, x: 500, y: 300, create: true }
+    const { ops } = sanitizeDslOps([op])
+    expect(ops[0]).toMatchObject({ x: 500, y: 300 })
+  })
+
+  it('free shape x/y 超大 → 钳', () => {
+    const op: DslOp = { type: 'free', shape: 'rect', x: 99999, y: 99999, w: 100, h: 100 }
+    const { ops } = sanitizeDslOps([op])
+    expect(ops[0]).toMatchObject({ x: 10000, y: 10000 })
+  })
+
+  it('free arrow x/y 超大 → 钳位置(但 w/h 不动)', () => {
+    const op: DslOp = { type: 'arrow', from: '', to: '', freeArrow: true, x: 99999, y: 99999, w: -50, h: 30 }
+    const { ops } = sanitizeDslOps([op])
+    expect(ops[0]).toMatchObject({ x: 10000, y: 10000, w: -50, h: 30 })
+  })
+
+  it('关系箭头(无 x/y) → 不动', () => {
+    const op: DslOp = { type: 'arrow', from: 'a', to: 'b' }
+    const { ops } = sanitizeDslOps([op])
+    expect((ops[0] as { x?: number }).x).toBeUndefined()
+  })
+})

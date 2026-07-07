@@ -48,6 +48,16 @@ function sanitizeSize(n: number | undefined): number | undefined {
   return Math.min(MAX_SIZE, n)
 }
 
+/** x/y 坐标 MAX 绝对值(防 LLM 生成 1e6 跑出可视区)。保负向 —— 负坐标合法(画布 pan 允许,
+ *  commit fac88bb 契约),只钳极端有限值,不钳合理负值(如 -100)。 */
+const MAX_COORD = 10000
+
+/** 坐标钳位:n 已是有限数(parse POS_RE 保证) → 钳 [-MAX_COORD, MAX_COORD];防御性防非有限(→0)。 */
+function clampCoord(n: number): number {
+  if (!Number.isFinite(n)) return 0
+  return Math.min(MAX_COORD, Math.max(-MAX_COORD, n))
+}
+
 /** card op:case 6(size)+ case 1/11(id 不存在 diagnostic)。 */
 function sanitizeCard(
   op: DslCardOp,
@@ -63,19 +73,23 @@ function sanitizeCard(
       message: `card #${op.cardId} 不存在于画布(若想新建需加 create 标记)`,
     })
   }
-  // case 6:size 修正
+  // case 6:size 修正 + case 5:坐标钳位
   const w = sanitizeSize(op.w)
   const h = sanitizeSize(op.h)
-  if (w === op.w && h === op.h) return op
-  return { ...op, w, h }
+  const x = clampCoord(op.x)
+  const y = clampCoord(op.y)
+  if (w === op.w && h === op.h && x === op.x && y === op.y) return op
+  return { ...op, w, h, x, y }
 }
 
 /** free shape(rect/text/frame)op:case 6(size)。case 3(跨 kind 告警)待后续。 */
 function sanitizeFree(op: DslFreeOp): DslFreeOp {
   const w = sanitizeSize(op.w)
   const h = sanitizeSize(op.h)
-  if (w === op.w && h === op.h) return op
-  return { ...op, w, h }
+  const x = clampCoord(op.x)
+  const y = clampCoord(op.y)
+  if (w === op.w && h === op.h && x === op.x && y === op.y) return op
+  return { ...op, w, h, x, y }
 }
 
 /** arrow op:case 7(端点不存在 diagnostic)。free arrow 不检查(无端点)。
@@ -95,7 +109,11 @@ function sanitizeArrow(
       diagnostics.push({ opIndex: idx, message: `arrow to #${op.to} 不存在于画布` })
     }
   }
-  return op
+  // case 5:free arrow x/y 钳位(位置);w/h 不动(负值编码方向)。关系箭头无 x/y(undefined 透传)
+  const x = op.x !== undefined ? clampCoord(op.x) : undefined
+  const y = op.y !== undefined ? clampCoord(op.y) : undefined
+  if (x === op.x && y === op.y) return op
+  return { ...op, x, y }
 }
 
 /**
