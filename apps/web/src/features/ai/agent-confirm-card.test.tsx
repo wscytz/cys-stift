@@ -171,7 +171,7 @@ function flushMicro() {
 describe('makeOnCardCreate', () => {
   it('调 service.createWithId,mirror canvas-host-builder 模板', () => {
     const { service, created } = makeMockService()
-    const fn = makeOnCardCreate('canvas-1' as never, service)
+    const { onCardCreate: fn } = makeOnCardCreate('canvas-1' as never, service)
     fn({ cardId: 'c1', x: 10, y: 20, w: 240, h: 120 })
     expect(created).toHaveLength(1)
     const call = created[0]!
@@ -198,7 +198,7 @@ describe('makeOnCardCreate', () => {
 
   it('color 参数透传成 ColorToken(条件 spread,与模板一致)', () => {
     const { service, created } = makeMockService()
-    makeOnCardCreate('c' as never, service)({
+    makeOnCardCreate('c' as never, service).onCardCreate({
       cardId: 'c2', x: 0, y: 0, w: 1, h: 1, color: 'red',
     })
     expect(created[0]!.input).toMatchObject({ color: 'red' })
@@ -206,18 +206,19 @@ describe('makeOnCardCreate', () => {
 
   it('无 color 时不带 color 字段(模板:条件 spread)', () => {
     const { service, created } = makeMockService()
-    makeOnCardCreate('c' as never, service)({ cardId: 'c3', x: 0, y: 0, w: 1, h: 1 })
+    makeOnCardCreate('c' as never, service).onCardCreate({ cardId: 'c3', x: 0, y: 0, w: 1, h: 1 })
     expect((created[0]!.input as { color?: string }).color).toBeUndefined()
   })
 
-  it('createWithId 抛错时静默吞(不向上传播)', () => {
+  it('createWithId 抛错时计入 failed(不向上传播,case 2a 不再静默)', () => {
     const boom = {
       createWithId: () => {
         throw new Error('dup id')
       },
     } as unknown as Parameters<typeof makeOnCardCreate>[1]
-    const fn = makeOnCardCreate('c' as never, boom)
+    const { onCardCreate: fn, getFailed } = makeOnCardCreate('c' as never, boom)
     expect(() => fn({ cardId: 'x', x: 0, y: 0, w: 1, h: 1 })).not.toThrow()
+    expect(getFailed()).toBe(1)
   })
 })
 

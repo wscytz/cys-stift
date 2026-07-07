@@ -54,8 +54,12 @@ type Phase = 'confirming' | 'applying' | 'applied' | 'error'
  * mirror canvas-host-builder.ts:88-99 的 onCardCreate(ask-agent 建卡模板):
  * 同样的 createWithId 字段(title/body/type/canvasPosition{z,rotation}/color?/source)。
  */
-export function makeOnCardCreate(canvasId: CanvasId, service: CardService) {
-  return (p: { cardId: string; x: number; y: number; w: number; h: number; color?: string }) => {
+export function makeOnCardCreate(canvasId: CanvasId, service: CardService): {
+  onCardCreate: (p: { cardId: string; x: number; y: number; w: number; h: number; color?: string }) => void
+  getFailed: () => number
+} {
+  let failed = 0
+  const onCardCreate = (p: { cardId: string; x: number; y: number; w: number; h: number; color?: string }) => {
     try {
       service.createWithId(p.cardId as CardId, {
         title: '',
@@ -66,11 +70,12 @@ export function makeOnCardCreate(canvasId: CanvasId, service: CardService) {
         source: { kind: 'manual', deviceId: 'companion-agent' },
       })
     } catch (err) {
-      // ⚠️ known swallow(同 canvas-host-builder 的 createWithId)。
-      // 修法:factory 加 onFail 回调或返回计数,liveHost 路径调用方累加 toast。
+      // case 2a(修 createWithId swallow):不再静默,累加 failed → live 路径调用方读 getFailed() toast。
+      failed++
       console.error('[agent-confirm-card] createWithId failed', p.cardId, err)
     }
   }
+  return { onCardCreate, getFailed: () => failed }
 }
 
 export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApplied, onRejected, sampleContext }: Props) {
@@ -145,17 +150,18 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
     if (preview.kind !== 'ok' || !afterState) return
     setPhase('applying')
     try {
-      let res: { applied: number; cardsUpdated: number; cardsCreated: number }
+      let res: { applied: number; cardsUpdated: number; cardsCreated: number; cardsFailed: number }
       if (liveHost) {
         // live:host.batch 单 undo;onCardCreate 建卡;画布页 bindCardWriteback + freeform
         // binding 持久化。不调 applyOpsAndPersist(会双写)。
-        const r = applyLayout(liveHost, preview.ops, undefined, makeOnCardCreate(targetCanvasId, service))
-        res = { applied: r.applied, cardsUpdated: 0, cardsCreated: r.newlyApplied.length }
+        const creator = makeOnCardCreate(targetCanvasId, service)
+        const r = applyLayout(liveHost, preview.ops, undefined, creator.onCardCreate)
+        res = { applied: r.applied, cardsUpdated: 0, cardsCreated: r.newlyApplied.length, cardsFailed: creator.getFailed() }
       } else {
         // /ask 原 temp 路径(不变):重建 host(before)再 applyOpsAndPersist(内部再 applyLayout 一次落库)。
         const { host, before } = await buildCanvasHostForCanvas(targetCanvasId, service)
         const p = await applyOpsAndPersist(host, before, preview.ops, targetCanvasId, service)
-        res = { applied: p.applied, cardsUpdated: p.cardsUpdated, cardsCreated: p.cardsCreated }
+        res = { applied: p.applied, cardsUpdated: p.cardsUpdated, cardsCreated: p.cardsCreated, cardsFailed: p.cardsFailed }
       }
       setPhase('applied')
       // T5:风险 op 存档 —— agent apply 成功(res.applied > 0)后落档(b 类,

@@ -59,6 +59,8 @@ export interface PersistResult {
   cardsUpdated: number
   /** 新建 card 数(create 指令)。 */
   cardsCreated: number
+  /** create 指令落库失败数(配额满/ID 冲突;case 2a 不再静默吞,调用方可 toast)。 */
+  cardsFailed: number
   /** freeform 元素变更数(added + updated + removed)。 */
   freeformChanged: number
 }
@@ -85,6 +87,7 @@ export async function applyOpsAndPersist(
   // onCardCreate:create 指令落 service.createWithId(空标题卡,几何 + 颜色来自 DSL)。
   // 后续 applyLayout 会在 host 里 upsert 该 card 元素,统一进 after 回写。
   let cardsCreated = 0
+  let cardsFailed = 0
   const result = applyLayout(host, ops, undefined, ({ cardId, x, y, w, h, color }) => {
     // createWithId:DSL 指定 id 建卡。空标题 + 空 body,用户后续编辑。
     try {
@@ -98,9 +101,8 @@ export async function applyOpsAndPersist(
       })
       cardsCreated++
     } catch (err) {
-      // ⚠️ known swallow:createWithId 失败时用户无感(配额满 / ID 冲突)。
-      // 低概率(配额满会被 capture 主路径先 toast;AI uid 生成 cardId 不冲突)。
-      // 修法:PersistResult 加 cardsFailed 累加 → 调用方(agent-confirm-card)toast。
+      // case 2a(修 createWithId swallow):不再静默,累加 cardsFailed → 调用方 toast。
+      cardsFailed++
       console.error('[canvas-host-builder] createWithId failed', cardId, err)
     }
   })
@@ -148,6 +150,7 @@ export async function applyOpsAndPersist(
     skipped: result.skipped,
     cardsUpdated,
     cardsCreated,
+    cardsFailed,
     freeformChanged,
   }
 }

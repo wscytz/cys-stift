@@ -178,6 +178,19 @@ describe('applyOpsAndPersist', () => {
     expect(svc.createWithId).toHaveBeenCalledWith('new1', expect.objectContaining({ canvasPosition: expect.objectContaining({ x: 50, y: 50 }) }))
   })
 
+  it('createWithId 抛错 → cardsFailed 计数(cardsCreated 不增,不再静默吞)', async () => {
+    const svc = makeService([])
+    vi.spyOn(svc, 'createWithId').mockImplementation(() => { throw new Error('quota exceeded') })
+    const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
+    const ops: DslOp[] = [
+      { type: 'card', cardId: 'new1' as never, x: 0, y: 0, create: true },
+      { type: 'card', cardId: 'new2' as never, x: 100, y: 0, create: true },
+    ]
+    const res = await applyOpsAndPersist(host, before, ops, CANVAS, svc)
+    expect(res.cardsFailed).toBe(2)
+    expect(res.cardsCreated).toBe(0)
+  })
+
   it('无变更的 card 不回写(避免无谓 update)', async () => {
     const svc = makeService([cardOnCanvas('c1', String(CANVAS), 100, 100)])
     const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
