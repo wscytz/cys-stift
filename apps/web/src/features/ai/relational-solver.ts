@@ -82,8 +82,19 @@ export function solveRelational(
         continue
       }
       const gap = op.rel.gap
-      const x = op.rel.dir === 'right-of' ? anchor.x + anchor.w + gap : anchor.x
-      const y = op.rel.dir === 'below' ? anchor.y + anchor.h + gap : anchor.y
+      const ax = op.rel.dir === 'right-of' ? anchor.x + anchor.w + gap : anchor.x
+      const ay = op.rel.dir === 'below' ? anchor.y + anchor.h + gap : anchor.y
+      // 碰撞避让:沿关系轴(below→y / right-of→x)推开已置 card,消除参照系碰撞
+      const { x, y } = resolveCollision(
+        ax,
+        ay,
+        w,
+        h,
+        op.rel.dir === 'below' ? 'y' : 'x',
+        geom,
+        gap,
+        cardId,
+      )
       const { rel: _rel, ...rest } = op
       out.push({ ...rest, x, y, w, h })
       geom.set(cardId, { x, y, w, h })
@@ -101,4 +112,48 @@ export function solveRelational(
 /** 仅供测试/类型导出:从 DslCardOp 判定是否 relational(apply 层不直接用)。 */
 export function isRelationalCard(op: DslCardOp): boolean {
   return op.rel !== undefined
+}
+
+/** AABB 相交(严格 >0 重叠面积)。纯函数,永不抛错。 */
+function rectsOverlap(a: ExistingGeom, b: ExistingGeom): boolean {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
+}
+
+/**
+ * 碰撞避让:card (ax,ay,w,h) 若与 geom 里任何已置 card 相交,沿 axis 单向推进越过障碍,
+ * 直到无相交(单调有界,每轮至少越过一张,≤ geom.size 轮收敛)。
+ *
+ * 为什么沿「关系自己的轴」:below 的 x 由 anchor 固定(列归属)→ 推 y 守列;
+ * right-of 的 y 由 anchor 固定(行归属)→ 推 x 守行。语义最保真。
+ * clearance = 该 card 的 @gap(与 anchor 间距一致,避让后视觉间距均匀)。
+ *
+ * 单遍不破依赖:anchor 在 op 序更早 → 避让时所有相关 card 已最终落位;后续 right-of/below
+ * 本 card 的 op 用本 card 避让后的最终 geom 派生,自动跟随,无需级联。
+ */
+function resolveCollision(
+  ax: number,
+  ay: number,
+  w: number,
+  h: number,
+  axis: 'x' | 'y',
+  geom: Map<string, ExistingGeom>,
+  clearance: number,
+  selfId: string,
+): { x: number; y: number } {
+  let x = ax
+  let y = ay
+  // 每轮扫所有已置 card,越过最深相交障碍;无相交则停。坐标只增 → 必收敛。
+  for (let iter = 0, max = geom.size + 1; iter < max; iter++) {
+    let bumped = false
+    for (const [id, g] of geom) {
+      if (id === selfId) continue
+      if (rectsOverlap({ x, y, w, h }, g)) {
+        if (axis === 'y') y = Math.max(y, g.y + g.h + clearance)
+        else x = Math.max(x, g.x + g.w + clearance)
+        bumped = true
+      }
+    }
+    if (!bumped) break
+  }
+  return { x, y }
 }

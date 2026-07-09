@@ -121,4 +121,70 @@ describe('solveRelational — relational → 绝对坐标', () => {
     expect(out[2]).toMatchObject({ cardId: 'c1', x: 100, y: 240 }) // below c0
     expect(out[3]).toMatchObject({ cardId: 'c2', x: 360, y: 240 }) // right-of c1 (c1.x=100+240? no: c1.x=100, c1.w=240 → 100+240+20=360)
   })
+
+  // ── 碰撞避让(axis-aligned flow avoidance)───────────────────────────────────
+  // 真实实验发现:competent 模型 tree-org B 臂 ~0.13 overlap 全来自参照系碰撞 ——
+  // c4[right-of c3] 与 c5[below c2] 两条 1D 链算到同坐标 (720,410)。solver 应沿关系轴避让。
+  it('tree-org 参照系碰撞:c4(right-of c3)与 c5(below c2)同位 → 避让后无任何两卡相交', () => {
+    const ops = parseDsl(
+      '[card #c0 create] @pos(400,50) @size(240,120)\n' +
+        '[card #c1 create] below #c0 @gap(60)\n' +
+        '[card #c2 create] right-of #c1 @gap(80)\n' +
+        '[card #c3 create] below #c1 @gap(60)\n' +
+        '[card #c4 create] right-of #c3 @gap(80)\n' +
+        '[card #c5 create] below #c2 @gap(60)\n' +
+        '[card #c6 create] right-of #c5 @gap(80)',
+    )
+    const { ops: out, diagnostics } = solveRelational(ops)
+    expect(diagnostics).toEqual([])
+    const cards = out
+      .filter((o): o is Extract<DslOp, { type: 'card' }> => o.type === 'card')
+      .map((o) => ({ id: String(o.cardId), x: o.x, y: o.y, w: o.w ?? 240, h: o.h ?? 120 }))
+    const overlap = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) =>
+      a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
+    // 主验收:解算后无任何两卡 bbox 相交
+    for (let i = 0; i < cards.length; i++) {
+      for (let j = i + 1; j < cards.length; j++) {
+        expect(overlap(cards[i]!, cards[j]!)).toBe(false)
+      }
+    }
+    // c6 跟随 c5(right-of 语义:同 y、x 更大)c5 被避让后 c6 用其最终几何派生
+    const c5 = cards.find((c) => c.id === 'c5')!
+    const c6 = cards.find((c) => c.id === 'c6')!
+    expect(c6.y).toBe(c5.y)
+    expect(c6.x).toBeGreaterThan(c5.x)
+  })
+
+  it('right-of 参照系碰撞:c4(right-of c2)与 c3(below c1)同位 → 沿 x 向右推、y 不变', () => {
+    // 水平镜像版:两个 100×100 + gap20;c3[below c1] 与 c4[right-of c2] 算到同 (120,120)
+    const ops = parseDsl(
+      '[card #c0 create] @pos(0,0) @size(100,100)\n' +
+        '[card #c1 create] right-of #c0 @gap(20) @size(100,100)\n' +
+        '[card #c2 create] below #c0 @gap(20) @size(100,100)\n' +
+        '[card #c3 create] below #c1 @gap(20) @size(100,100)\n' +
+        '[card #c4 create] right-of #c2 @gap(20) @size(100,100)\n' +
+        '[card #c5 create] below #c4 @gap(20) @size(100,100)',
+    )
+    const { ops: out, diagnostics } = solveRelational(ops)
+    expect(diagnostics).toEqual([])
+    const byId = (id: string) => {
+      const o = out.find((o): o is Extract<DslOp, { type: 'card' }> => o.type === 'card' && String(o.cardId) === id)!
+      return { x: o.x, y: o.y, w: o.w ?? 240, h: o.h ?? 120 }
+    }
+    const c4 = byId('c4')
+    // c4 原 (120,120) 撞 c3 → 沿 x 推过 c3(c3.x+w+gap=120+100+20=240),y 守行不变(=c2.y=120)
+    expect(c4.x).toBe(240)
+    expect(c4.y).toBe(120)
+    // c5 below c4 → 用 c4 最终几何,c5.y = c4.y+c4.h+gap
+    expect(byId('c5').y).toBe(c4.y + c4.h + 20)
+  })
+
+  it('与 existingGeometry 绝对障碍避让:rel card 被推过画布已有 card', () => {
+    // c0 @ (0,0);c1 right-of c0 算得 (120,0),但画布已有障碍 obs 在 (120,0) 100×100 → 推到 (240,0)
+    const ops = parseDsl('[card #c0 create] @pos(0,0) @size(100,100)\n[card #c1 create] right-of #c0 @gap(20) @size(100,100)')
+    const existing = new Map([['obs', { x: 120, y: 0, w: 100, h: 100 }]])
+    const { ops: out, diagnostics } = solveRelational(ops, existing)
+    expect(diagnostics).toEqual([])
+    expect(out[1]).toMatchObject({ cardId: 'c1', x: 240, y: 0 }) // 推过障碍(obs.x+w+gap=120+100+20)
+  })
 })
