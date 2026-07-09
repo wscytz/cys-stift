@@ -5,16 +5,33 @@
 
 ---
 
-## 2026-07-09 · unreleased · relational-dsl-solver（关系式坐标 + 碰撞避让 solver）
+## 2026-07-09 · unreleased · dsl-sanitize + relational-coordinates（AI 输出兜底层 + 关系式坐标）
 
-论文 #3 B工程产品化。DSL 加**关系式坐标表示**(parser 认 `right-of`/`below #anchor @gap`,DSL_VERSION 2→3)+ 单遍求解器(rel→绝对)+ **碰撞避让**。AI prompt 已教(`agent-prompt.ts` + `canvas-prompt.ts` 都 import `DSL_GRAMMAR_REFERENCE`,含 relational 块)→ 模型可选用。`serialize` 永不发 rel(向后兼容,老画布 round-trip 不变)。
+两条线一起攒着(sanitize 07-07 / relational 07-09),待 release 合并 v0.57.0。**未 tag**(待手测 + release 决策)。
+
+### DSL sanitize 兜底层（`dsl-sanitize.ts`,新）— 学 tldraw sanitization,纯函数永不抛错
+
+AI/用户输入的 DSL op 进 apply 前**先过 sanitize**:修非法值 + 产 diagnostic(引用不存在的卡/端点),让"非法也不崩 + 丢卡可见"。关键设计:**不设 MIN 下界**(合法小卡保 round-trip)+ **保负向**(画布 pan 允许负坐标,只钳 size 不改坐标符号)。
+
+- **case 6 非法 size**:非正 → undef(走默认)/ 超大 → MAX / 合法小卡保留。
+- **case 5 越界坐标钳位** `[-10000,10000]`:保负向(`a799d02`)。
+- **case 1/11/7 diagnostic 基础设施**:引用不存在的卡/端点 → `SanitizeDiagnostic`(opIndex + message)+ ctx(`existingCardIds`/`existingFreeIds`/`existingFreeKinds`)。
+- **case 2a 修 createWithId 静默吞**:原 create id 冲突被 swallow → 计数 `cardsFailed` + info toast(让丢卡可见,不再静默;`cce4fca` + UI `11783d2`)。
+- **case 2b create id 冲突预检** diagnostic(sanitize 全闭合;`d8553a6`)。
+- **case 3 跨 kind 告警**:rect op 命中 text id 等 → diagnostic(`62061f0`)。
+- **case 4 free create 用 op.id**:round-trip 一致 + arrow 能连本 batch 新建 free(`857af74`)。
+- **diagnostic toast UI(闭环)**:case 1/11/7 + cardsFailed 透出 UI(AgentConfirmCard / dsl-dialog toast;`ef57cbf`)。
+
+### 关系式坐标 + 碰撞避让 solver（论文 #3 B工程产品化）
+
+DSL 加**关系式坐标表示**(parser 认 `right-of`/`below #anchor @gap`,DSL_VERSION 2→3)+ 单遍求解器(rel→绝对)+ **碰撞避让**。AI prompt 已教(`agent-prompt.ts` + `canvas-prompt.ts` 都 import `DSL_GRAMMAR_REFERENCE`,含 relational 块)→ 模型可选用。`serialize` 永不发 rel(向后兼容,老画布 round-trip 不变)。
 
 - **parser**(`dsl-parser.ts`):`DslCardOp.rel`(dir/anchor/gap);`RELATION_RE`/`GAP_RE`;arrow `#id` 改可选(LLM 常省略 `[arrow] from #a to #b`)+ header-scoped id 提取(防误抓 from/to)。
 - **solver**(`relational-solver.ts`,新):`solveRelational` 单遍顺序求解;**轴向碰撞避让**(rel card 与已置 card bbox 相交 → `below` 推 y 守列 / `right-of` 推 x 守行,clearance=该卡 `@gap`;纯函数永不抛错;单遍不破依赖,后续 op 用避让后最终 geom 派生)。
 - **apply**(`apply-layout.ts`):sanitize → solveRelational → apply;diagnostic 合并透出(复用 SanitizeDiagnostic)。
 - **背景/验证**:论文实验发现 competent 模型 B 臂 overlap 100% 来自 tree-org 参照系碰撞(`c4[right-of c3]` 与 `c5[below c2]` 算同坐标);加碰撞避让后 5 模型 overlap .02-.05 → 0(代价 compactness −2~5%,alignment 零损失)。详见 cys-derivative 论文仓 `findings-solver-v2-2026-07-09.md`。
 
-web 1437 tests + lint 0 + build 0。FF merge `feat/relational-dsl` → main @ `ebcab46`(61ede35 relational + 220b7e7 arrow id + ebcab46 碰撞避让)。**未 tag**(待 release 决策)。
+web 1439 tests + lint 0(6 包)+ build exit 0(2026-07-09 全门复验)。relational FF merge `feat/relational-dsl` → main @ `ebcab46`(61ede35 relational + 220b7e7 arrow id + ebcab46 碰撞避让);后续 `b794ae0` apply-layout 端到端集成测试 + `18ee9b4` solver clearance 钳 ≥0(负 `@gap` 不残留重叠硬化)。
 
 ---
 
