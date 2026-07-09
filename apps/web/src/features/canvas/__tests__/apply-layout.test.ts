@@ -839,4 +839,30 @@ describe('applyLayout — relational card (right-of / below)', () => {
     // c2 below c1:c1.x=360, c1.y=100, c1.h=120 → c2.x=360, c2.y=100+120+20=240
     expect(host.getElement('c2')).toMatchObject({ x: 360, y: 240 })
   })
+
+  it('relational 碰撞避让端到端:tree-org 参照系碰撞 → applyLayout 后无两卡重叠', () => {
+    // c4[right-of c3] 与 c5[below c2] 单遍算到同坐标 → solver 轴向避让后应全解;经全链路(sanitize→solve→apply)验
+    const host = new InMemoryCanvasHost()
+    const ops = parseDsl(
+      '[card #c0 create] @pos(400,50) @size(240,120)\n' +
+        '[card #c1 create] below #c0 @gap(60)\n' +
+        '[card #c2 create] right-of #c1 @gap(80)\n' +
+        '[card #c3 create] below #c1 @gap(60)\n' +
+        '[card #c4 create] right-of #c3 @gap(80)\n' +
+        '[card #c5 create] below #c2 @gap(60)\n' +
+        '[card #c6 create] right-of #c5 @gap(80)',
+    )
+    applyLayout(host, ops)
+    const cards = host.getElements().filter((e) => e.kind === 'card')
+    expect(cards).toHaveLength(7)
+    const overlap = (
+      a: { x: number; y: number; w: number; h: number },
+      b: { x: number; y: number; w: number; h: number },
+    ) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
+    for (let i = 0; i < cards.length; i++) {
+      for (let j = i + 1; j < cards.length; j++) {
+        expect(overlap(cards[i]!, cards[j]!)).toBe(false)
+      }
+    }
+  })
 })
