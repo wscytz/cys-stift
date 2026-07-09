@@ -140,6 +140,9 @@ function resolveCollision(
   clearance: number,
   selfId: string,
 ): { x: number; y: number } {
+  // clearance 钳 ≥0:负 @gap(parser 接受负数)会让推进推不过障碍(新坐标仍相交)→ 跑满 max 轮残留重叠。
+  // 钳 0 后负 gap 退化为"卡片贴合"(clearance=0,严格 >0 不算重叠),避让仍保证清空、且必收敛。
+  const clr = Math.max(0, clearance)
   let x = ax
   let y = ay
   // 每轮扫所有已置 card,越过最深相交障碍;无相交则停。坐标只增 → 必收敛。
@@ -148,8 +151,8 @@ function resolveCollision(
     for (const [id, g] of geom) {
       if (id === selfId) continue
       if (rectsOverlap({ x, y, w, h }, g)) {
-        if (axis === 'y') y = Math.max(y, g.y + g.h + clearance)
-        else x = Math.max(x, g.x + g.w + clearance)
+        if (axis === 'y') y = Math.max(y, g.y + g.h + clr)
+        else x = Math.max(x, g.x + g.w + clr)
         bumped = true
       }
     }

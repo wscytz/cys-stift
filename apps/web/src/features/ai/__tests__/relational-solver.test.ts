@@ -187,4 +187,23 @@ describe('solveRelational — relational → 绝对坐标', () => {
     expect(diagnostics).toEqual([])
     expect(out[1]).toMatchObject({ cardId: 'c1', x: 240, y: 0 }) // 推过障碍(obs.x+w+gap=120+100+20)
   })
+
+  it('负 @gap 不破坏避让:clearance 钳 0,贴合不重叠、不残留', () => {
+    // c0 @ (0,0) 240×120;c1 right-of c0 @gap(-100) → 原算 ax = 0+240-100 = 140(撞 c0 自身)。
+    // 负 gap 让推进推不过障碍;钳 0 后 c1 被推到 c0 右沿 240(贴合,严格 >0 不算重叠)。
+    const ops = parseDsl(
+      '[card #c0 create] @pos(0,0) @size(240,120)\n[card #c1 create] right-of #c0 @gap(-100) @size(240,120)',
+    )
+    const { ops: out, diagnostics } = solveRelational(ops)
+    expect(diagnostics).toEqual([])
+    const cards = out
+      .filter((o): o is Extract<DslOp, { type: 'card' }> => o.type === 'card')
+      .map((o) => ({ id: String(o.cardId), x: o.x, y: o.y, w: o.w ?? 240, h: o.h ?? 120 }))
+    const c0 = cards.find((c) => c.id === 'c0')!
+    const c1 = cards.find((c) => c.id === 'c1')!
+    const overlap =
+      c0.x < c1.x + c1.w && c0.x + c0.w > c1.x && c0.y < c1.y + c1.h && c0.y + c0.h > c1.y
+    expect(overlap).toBe(false)
+    expect(c1.x).toBeGreaterThanOrEqual(c0.x + c0.w) // 清空(c0 右沿及之后)
+  })
 })
