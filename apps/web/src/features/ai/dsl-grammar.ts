@@ -44,9 +44,11 @@ export const DSL_COLOR_ALIASES: Record<string, DslColor> = { grey: 'gray' }
  */
 export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one element per line):
   [card #id] @pos(x, y) @size(w, h) @color(red|yellow|blue|black|white|gray|grey)
-  # relational placement (optional alternative to @pos — let the engine compute coords):
-  #   [card #id] right-of #anchor @gap(20)   # x = anchor.x + anchor.w + gap; y = anchor.y
-  #   [card #id] below #anchor @gap(20)      # y = anchor.y + anchor.h + gap; x = anchor.x
+  # relational placement — PREFER for structured layouts (trees, lists, grids, hierarchies;
+  #   anything row/column-shaped). The engine computes coords AND avoids overlaps, so you skip
+  #   error-prone coordinate math. Reserve @pos for free/scattered positioning only:
+  #   [card #id] right-of #anchor @gap(20)   # right of anchor, same row (x=anchor.x+w+gap; y=anchor.y)
+  #   [card #id] below #anchor @gap(20)      # below anchor, same column (y=anchor.y+h+gap; x=anchor.x)
   #   (@gap defaults to 20; anchor must be a card placed earlier in this block or already on canvas)
   [rect #id] @pos(x, y) @size(w, h) @color(c)
   [text #id] @pos(x, y) @text("...") @color(c)
