@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-07-09 · unreleased · relational-dsl-solver（关系式坐标 + 碰撞避让 solver）
+
+论文 #3 B工程产品化。DSL 加**关系式坐标表示**(parser 认 `right-of`/`below #anchor @gap`,DSL_VERSION 2→3)+ 单遍求解器(rel→绝对)+ **碰撞避让**。AI prompt 已教(`agent-prompt.ts` + `canvas-prompt.ts` 都 import `DSL_GRAMMAR_REFERENCE`,含 relational 块)→ 模型可选用。`serialize` 永不发 rel(向后兼容,老画布 round-trip 不变)。
+
+- **parser**(`dsl-parser.ts`):`DslCardOp.rel`(dir/anchor/gap);`RELATION_RE`/`GAP_RE`;arrow `#id` 改可选(LLM 常省略 `[arrow] from #a to #b`)+ header-scoped id 提取(防误抓 from/to)。
+- **solver**(`relational-solver.ts`,新):`solveRelational` 单遍顺序求解;**轴向碰撞避让**(rel card 与已置 card bbox 相交 → `below` 推 y 守列 / `right-of` 推 x 守行,clearance=该卡 `@gap`;纯函数永不抛错;单遍不破依赖,后续 op 用避让后最终 geom 派生)。
+- **apply**(`apply-layout.ts`):sanitize → solveRelational → apply;diagnostic 合并透出(复用 SanitizeDiagnostic)。
+- **背景/验证**:论文实验发现 competent 模型 B 臂 overlap 100% 来自 tree-org 参照系碰撞(`c4[right-of c3]` 与 `c5[below c2]` 算同坐标);加碰撞避让后 5 模型 overlap .02-.05 → 0(代价 compactness −2~5%,alignment 零损失)。详见 cys-derivative 论文仓 `findings-solver-v2-2026-07-09.md`。
+
+web 1437 tests + lint 0 + build 0。FF merge `feat/relational-dsl` → main @ `ebcab46`(61ede35 relational + 220b7e7 arrow id + ebcab46 碰撞避让)。**未 tag**(待 release 决策)。
+
+---
+
 ## 2026-07-05 · v0.56.0 · polish-batch（UI 打磨 + c1 闭合 + 类型逃逸 + 文档对齐）
 
 打包分发版。围绕 deepresearch 赛道缺口结论(转义 DSL = 最窄幸存差异化,AI-native 已被 Heptabase 占)推进 + 健壮性 + 文档对齐。
