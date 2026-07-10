@@ -51,6 +51,9 @@ export function solveRelational(
 
   // seed:画布现有 card 几何(复制,不污染入参)
   const geom = new Map<string, ExistingGeom>(existingGeometry)
+  // anchor 缺失的 card(占位 geom)→ 依赖它的下游 rel 也判 broken,产链式 diagnostic
+  // (否则下游会静默解析到占位坐标,用户看到卡在怪位置无信号)
+  const brokenAnchors = new Set<string>()
 
   let i = 0
   for (const op of ops) {
@@ -75,11 +78,21 @@ export function solveRelational(
           opIndex: idx,
           message: `relational card #${cardId} 的 anchor #${op.rel.anchor} 不存在(画布/同批更早均无)`,
         })
+        // 标 broken:下游 anchor 到本卡的 rel 也会得链式 diagnostic(否则静默解析到占位)
+        brokenAnchors.add(cardId)
         // 剥离 rel,保留占位 x/y(apply 自己 create/skip)
         const { rel: _rel, ...rest } = op
         out.push({ ...rest, w, h })
         geom.set(cardId, { x: op.x, y: op.y, w, h })
         continue
+      }
+      // 传递性断链:anchor 存在但本身是 broken 占位 → 本卡也判 broken + diagnostic(链式传播)
+      if (brokenAnchors.has(op.rel.anchor)) {
+        diagnostics.push({
+          opIndex: idx,
+          message: `relational card #${cardId} 的 anchor #${op.rel.anchor} 上游 anchor 缺失(链式占位,坐标可能不符预期)`,
+        })
+        brokenAnchors.add(cardId)
       }
       const gap = op.rel.gap
       const ax = op.rel.dir === 'right-of' ? anchor.x + anchor.w + gap : anchor.x
@@ -146,6 +159,7 @@ function resolveCollision(
   let x = ax
   let y = ay
   // 每轮扫所有已置 card,越过最深相交障碍;无相交则停。坐标只增 → 必收敛。
+  // 上界 geom.size+1:最坏每轮新揭一张障碍(N 张需 N 轮越过 + 1 轮确认无相交),故 max=geom.size+1。
   for (let iter = 0, max = geom.size + 1; iter < max; iter++) {
     let bumped = false
     for (const [id, g] of geom) {

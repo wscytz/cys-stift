@@ -206,4 +206,56 @@ describe('solveRelational — relational → 绝对坐标', () => {
     expect(overlap).toBe(false)
     expect(c1.x).toBeGreaterThanOrEqual(c0.x + c0.w) // 清空(c0 右沿及之后)
   })
+
+  it('传递性断 anchor:c1 anchor 缺失 → c2(→c1)也得 diagnostic(链式,不静默解析到占位)', () => {
+    const ops = parseDsl(
+      '[card #c1 create] right-of #ghost @gap(20) @size(100,100)\n' +
+        '[card #c2 create] right-of #c1 @gap(20) @size(100,100)',
+    )
+    const { diagnostics } = solveRelational(ops)
+    // c1 直接断 + c2 链式断:两条 diagnostic(否则 c2 静默解析到占位坐标,用户无信号)
+    expect(diagnostics).toHaveLength(2)
+    expect(diagnostics[0]!.message).toContain('#c1')
+    expect(diagnostics[1]!.message).toContain('#c2')
+    expect(diagnostics[1]!.message).toContain('链式')
+  })
+
+  it('环(c1→c2→c1):单遍天然防环,不进死循环;两员均判 broken(直接 + 链式)', () => {
+    const ops = parseDsl(
+      '[card #c1 create] right-of #c2 @gap(20) @size(100,100)\n' +
+        '[card #c2 create] right-of #c1 @gap(20) @size(100,100)',
+    )
+    // c1 前向引用 c2(尚未置)→ 直接 diagnostic + broken;c2 → c1(broken)→ 链式 diagnostic。
+    // 单遍 anchor 必更早 → 环天然断,无死循环(测试能返回即证终止)。
+    const { diagnostics } = solveRelational(ops)
+    expect(diagnostics).toHaveLength(2)
+    expect(diagnostics.some((d) => d.message.includes('#c1'))).toBe(true)
+    expect(diagnostics.some((d) => d.message.includes('#c2'))).toBe(true)
+  })
+
+  it('紧密堆叠障碍压力:N 张(furthest-first 插入)→ 必收敛、零残留重叠', () => {
+    // c0 @ (0,0);N 张 100×100 障碍紧密列(20 间隙),furthest-first 入 existingGeometry。
+    // c1 right-of c0 @gap(20) 算得 (120,0) 撞首张 → 须一路推过全部 N 张(每轮新揭一张,最坏序)。
+    const N = 8
+    const existing = new Map<string, { x: number; y: number; w: number; h: number }>([
+      ['c0', { x: 0, y: 0, w: 100, h: 100 }],
+    ])
+    for (let k = N; k >= 1; k--) {
+      existing.set(`obs${k}`, { x: 120 * k, y: 0, w: 100, h: 100 })
+    }
+    const ops = parseDsl('[card #c1 create] right-of #c0 @gap(20) @size(100,100)')
+    const { ops: out, diagnostics } = solveRelational(ops, existing)
+    expect(diagnostics).toEqual([])
+    const c1 = out.find((o): o is Extract<DslOp, { type: 'card' }> => o.type === 'card')!
+    const box = { x: c1.x!, y: c1.y!, w: 100, h: 100 }
+    const overlap = (b: { x: number; y: number; w: number; h: number }) =>
+      box.x < b.x + b.w && box.x + box.w > b.x && box.y < b.y + b.h && box.y + box.h > b.y
+    // 零残留:c1 与 c0 + 全部 N 张障碍都不相交(终止上界 max=geom.size+1 保证推完)
+    expect(overlap(existing.get('c0')!)).toBe(false)
+    for (let k = 1; k <= N; k++) {
+      expect(overlap(existing.get(`obs${k}`)!)).toBe(false)
+    }
+    // 推过最远障碍 obsN 右沿(c1.x ≥ obsN.x + w − clr)
+    expect(c1.x).toBeGreaterThanOrEqual(120 * N + 100 - 20)
+  })
 })
