@@ -139,11 +139,24 @@ function sanitizeArrow(
       diagnostics.push({ opIndex: idx, message: `arrow to #${op.to} 不存在于画布` })
     }
   }
-  // case 5:free arrow x/y 钳位(位置);w/h 不动(负值编码方向)。关系箭头无 x/y(undefined 透传)
+  // case 5:free arrow x/y 钳位(位置);curve 控制点 / elbow 折点 同为页坐标,一并钳
+  //  (同 case-5 防 LLM 生成超大跑出可视区;applyArrowOp 原样写 host 无二次钳)。
+  //  w/h 不动(负值编码方向)。关系箭头无 x/y/curve/elbow(undefined 透传)。
   const x = op.x !== undefined ? clampCoord(op.x) : undefined
   const y = op.y !== undefined ? clampCoord(op.y) : undefined
-  if (x === op.x && y === op.y) return op
-  return { ...op, x, y }
+  const curve =
+    op.curve !== undefined ? { cx: clampCoord(op.curve.cx), cy: clampCoord(op.curve.cy) } : undefined
+  const elbow =
+    op.elbow !== undefined ? op.elbow.map((p) => ({ x: clampCoord(p.x), y: clampCoord(p.y) })) : undefined
+  // 引用稳定:仅在某值实际被钳时才算改(合法 curve/elbow 原样往返 byte-equal)。
+  // NaN 经 clampCoord→0,0!==NaN 为 true → 必判为改(顺带修非有限 curve/elbow)。
+  const curveChanged =
+    op.curve !== undefined && (curve!.cx !== op.curve.cx || curve!.cy !== op.curve.cy)
+  const elbowChanged =
+    op.elbow !== undefined &&
+    op.elbow.some((p, i) => elbow![i]!.x !== p.x || elbow![i]!.y !== p.y)
+  if (x === op.x && y === op.y && !curveChanged && !elbowChanged) return op
+  return { ...op, x, y, curve, elbow }
 }
 
 /**
@@ -160,6 +173,9 @@ export function sanitizeDslOps(ops: DslOp[], ctx?: SanitizeCtx): SanitizeResult 
   const diagnostics: SanitizeDiagnostic[] = []
   const out: DslOp[] = []
 
+  // 永不抛错契约:非数组入参(null/undefined/非数组,仅可能由 as any 误传)→ 当空,不抛。
+  const src = Array.isArray(ops) ? ops : []
+
   // 预合并 existingIds(arrow 端点检查用 —— 端点可能是 card 或 free 元素)
   let existingIds: Set<string> | undefined
   if (ctx?.existingCardIds || ctx?.existingFreeIds) {
@@ -169,7 +185,7 @@ export function sanitizeDslOps(ops: DslOp[], ctx?: SanitizeCtx): SanitizeResult 
   }
 
   let i = 0
-  for (const op of ops) {
+  for (const op of src) {
     const idx = i++
     try {
       switch (op.type) {

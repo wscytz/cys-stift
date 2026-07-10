@@ -296,4 +296,58 @@ describe('sanitizeDslOps — case 5: 越界坐标钳位 [-10000, 10000](保负�
     const { ops } = sanitizeDslOps([op])
     expect((ops[0] as { x?: number }).x).toBeUndefined()
   })
+
+  it('free arrow curve 控制点超大(9.9e6) → 钳到 10000(与 x/y 同 case-5,防跑出可视区)', () => {
+    const op: DslOp = {
+      type: 'arrow', from: '', to: '', freeArrow: true,
+      curve: { cx: 9999999, cy: -9999999 },
+    } as DslOp
+    const { ops } = sanitizeDslOps([op])
+    expect((ops[0] as { curve?: { cx: number; cy: number } }).curve).toEqual({ cx: 10000, cy: -10000 })
+  })
+
+  it('free arrow curve 合理(500,-100) → 原样保留(引用稳定,保 roundtrip)', () => {
+    const op: DslOp = {
+      type: 'arrow', from: '', to: '', freeArrow: true,
+      curve: { cx: 500, cy: -100 },
+    } as DslOp
+    const { ops } = sanitizeDslOps([op])
+    // 合法值未变 → 返回原对象引用(byte-equal roundtrip)
+    expect(ops[0]).toBe(op)
+    expect((ops[0] as { curve?: { cx: number; cy: number } }).curve).toEqual({ cx: 500, cy: -100 })
+  })
+
+  it('free arrow elbow 折点超大 → 逐点钳(页坐标同 case-5)', () => {
+    const op: DslOp = {
+      type: 'arrow', from: '', to: '', freeArrow: true,
+      elbow: [{ x: 9999999, y: 100 }, { x: -50, y: 9999999 }],
+    } as DslOp
+    const { ops } = sanitizeDslOps([op])
+    expect((ops[0] as { elbow?: { x: number; y: number }[] }).elbow).toEqual([
+      { x: 10000, y: 100 },
+      { x: -50, y: 10000 },
+    ])
+  })
+
+  it('free arrow curve 非有限(NaN) → 钳到 0(永不抛错 + 不残留 NaN 进 host)', () => {
+    const op: DslOp = {
+      type: 'arrow', from: '', to: '', freeArrow: true,
+      curve: { cx: NaN, cy: 500 },
+    } as DslOp
+    const { ops } = sanitizeDslOps([op])
+    expect((ops[0] as { curve?: { cx: number; cy: number } }).curve).toEqual({ cx: 0, cy: 500 })
+  })
+})
+
+describe('sanitizeDslOps — 永不抛错契约(非数组入参)', () => {
+  it('null ops → 返回空 ops(不抛 TypeError,契约要求纯函数永不抛)', () => {
+    const result = sanitizeDslOps(null as unknown as DslOp[])
+    expect(result.ops).toEqual([])
+    expect(result.diagnostics).toEqual([])
+  })
+
+  it('undefined ops → 返回空 ops(不抛)', () => {
+    const result = sanitizeDslOps(undefined as unknown as DslOp[])
+    expect(result.ops).toEqual([])
+  })
 })
