@@ -116,11 +116,19 @@ export async function applyOpsAndPersist(
   const freeformAfter = freeformElementsOf(after)
   const freeformBefore = freeformElementsOf(before)
   await canvasFreeformStore.save(canvasId, freeformAfter)
-  const freeformChanged = Math.abs(freeformAfter.length - freeformBefore.length) +
-    freeformAfter.filter((a) => {
-      const b = freeformBefore.find((el) => el.id === a.id)
-      return !b || JSON.stringify(b) !== JSON.stringify(a)
-    }).length
+  // 变更数 = added + updated + removed(原公式 |Δlen| + (added+updated) 漏算 removed、
+  // 重复算 added,加+删混合时错;改正确三和)。beforeById 降查找 O(n²)→O(n)。
+  const beforeById = new Map(freeformBefore.map((el) => [el.id, el]))
+  const afterIds = new Set(freeformAfter.map((el) => el.id))
+  let freeformAdded = 0
+  let freeformUpdated = 0
+  for (const a of freeformAfter) {
+    const b = beforeById.get(a.id)
+    if (!b) freeformAdded++
+    else if (JSON.stringify(b) !== JSON.stringify(a)) freeformUpdated++
+  }
+  const freeformRemoved = freeformBefore.filter((b) => !afterIds.has(b.id)).length
+  const freeformChanged = freeformAdded + freeformUpdated + freeformRemoved
 
   // ── card 回写:after 的 card 元素,位置/颜色变了就 service.update。
   let cardsUpdated = 0

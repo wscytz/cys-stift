@@ -159,12 +159,35 @@ describe('applyOpsAndPersist', () => {
     ]
     const res = await applyOpsAndPersist(host, before, ops, CANVAS, svc)
     expect(res.applied).toBeGreaterThanOrEqual(1)
+    // freeformChanged:新增 1 arrow → added=1(updated/removed=0)= 1
+    // (旧公式此处算成 2:|Δlen|=1 + added=1 双算)
+    expect(res.freeformChanged).toBe(1)
     // freeform store 应含新建的 arrow(applyArrowOp create 路径 mint 新 id,
     // 不保留 op.id,故按 kind 断言而非 id)
     const saved = freeformStore.get(String(CANVAS))!
     expect(saved.some((e) => e.kind === 'arrow' && e.from === 'c1' && e.to === 'c2')).toBe(true)
     // store 不含 card(freeformOnly 过滤)
     expect(saved.some((e) => e.kind === 'card')).toBe(false)
+  })
+
+  it('freeform 变更数 = added + updated(更新已有 rect + 新增 arrow = 2;钉三和公式)', async () => {
+    // seed r1 在 store;DSL 移动 r1(updated)+ 新建 arrow(added)→ freeformChanged 应 = 2
+    // (旧公式 |Δlen|+(added+updated) = 1+2 = 3,加+更新混合错)
+    freeformStore.set(String(CANVAS), [
+      { id: 'r1', kind: 'rect', x: 0, y: 0, w: 10, h: 10, rotation: 0 },
+    ])
+    const svc = makeService([cardOnCanvas('c1', String(CANVAS), 0, 0), cardOnCanvas('c2', String(CANVAS), 100, 0)])
+    const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
+    const ops: DslOp[] = [
+      { type: 'free', shape: 'rect', id: 'r1', x: 500, y: 500, w: 10, h: 10 } as DslOp,
+      { type: 'arrow', from: 'c1', to: 'c2' } as DslOp,
+    ]
+    const res = await applyOpsAndPersist(host, before, ops, CANVAS, svc)
+    expect(res.freeformChanged).toBe(2)
+    // r1 被更新(位置变),arrow 新建
+    const saved = freeformStore.get(String(CANVAS))!
+    expect(saved.find((e) => e.id === 'r1')).toMatchObject({ x: 500, y: 500 })
+    expect(saved.some((e) => e.kind === 'arrow')).toBe(true)
   })
 
   it('create card 指令落 service.createWithId', async () => {
