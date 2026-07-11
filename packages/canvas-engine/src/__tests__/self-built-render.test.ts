@@ -360,6 +360,29 @@ describe('drawSelectionOutlines', () => {
     // elbow 不画中点圆点(走折点手柄分支)
     expect(ctx._calls.some((c) => c.startsWith('arc'))).toBe(false)
   })
+
+  it('arrow + text 同选 → text 选中框仍虚线(箭头分支不复位 dash 的 bug 修)', () => {
+    // text 在 arrow 之上层(KIND_LAYER 4>3),drawSelectionOutlines 按 z 序迭代:
+    // arrow 先画手柄(setLineDash([]) 实线),text 后画选中框(应虚线)。
+    // 旧实现 arrow 分支不复位 dash → text 选中框画成实线。
+    const ctx = mockCtx()
+    const els = [
+      { id: 'ca', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'cb', kind: 'card', x: 200, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'cb' },
+      { id: 't1', kind: 'text', x: 500, y: 500, w: 80, h: 20, rotation: 0, text: 'note' },
+    ] as unknown as CanvasElement[]
+    drawSelectionOutlines(ctx, ['ar', 't1'], els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' })
+    // text 选中框 strokeRect(498,498,84,24)(外扩 2px)
+    const textBoxIdx = ctx._calls.findIndex((c) => c === 'strokeRect(498,498,84,24)')
+    expect(textBoxIdx).toBeGreaterThanOrEqual(0)
+    // 该框之前最后一个 setLineDash 应是虚线(6,4),不是箭头手柄留下的实线()
+    let lastDash = ''
+    for (let i = textBoxIdx - 1; i >= 0; i--) {
+      if (ctx._calls[i]!.startsWith('setLineDash')) { lastDash = ctx._calls[i]!; break }
+    }
+    expect(lastDash).toBe('setLineDash(6,4)')
+  })
 })
 
 describe('drawMarquee', () => {

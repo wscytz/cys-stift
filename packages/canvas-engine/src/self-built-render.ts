@@ -376,6 +376,9 @@ export function drawSelectionOutlines(
           ctx.stroke()
         }
       }
+      // 复位虚线选中框:箭头手柄用实线([]),text 在 arrow 之上层(KIND_LAYER 4>3),
+      // 不复位会让后续 text 的选中框画成实线。与非箭头分支末尾的复位同构。
+      ctx.setLineDash([6 / view.zoom, 4 / view.zoom])
       continue
     }
     const b = normalizeBox(el) // 负 bbox(自由箭头)归一化,选中框/handle 才画对
