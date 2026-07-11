@@ -123,6 +123,31 @@ describe('[症状1] 弯曲箭头 — curve 手柄拖动', () => {
     expect(el.curve!.cy).toBe(-50)
   })
 
+  // ── 闹鬼 bug(2026-07-11 修):curve/elbow 手柄松手后必须清拖拽态。
+  // 旧实现 onUp 不清 curveDragging/elbowDragging → 松手后任何无按键 hover 都让箭头跟
+  // 光标弯/折 + 每次进 undo 栈(闹鬼 + 污染)。onCancel 对这俩走 onUp,一并覆盖。
+  it('curve 手柄松手后 hover(无按键)不再 mutate arrow', () => {
+    const { host, canvas } = makeHost({ arrow: { route: 'curve', curve: { cx: 200, cy: 50 } }, selectArrow: true })
+    dispatch(canvas, 'pointerdown', 200, 50)
+    dispatch(canvas, 'pointermove', 200, 90) // 拖 → 反算 cy=130
+    dispatch(canvas, 'pointerup', 200, 90)
+    expect(host.getElement('ar')!.curve).toEqual({ cx: 200, cy: 130 })
+    // 松手后 hover 到 (200,40):旧实现 curve 跟到 cy=30(闹鬼);修后应纹丝不动。
+    dispatch(canvas, 'pointermove', 200, 40, { buttons: 0 })
+    expect(host.getElement('ar')!.curve).toEqual({ cx: 200, cy: 130 })
+  })
+
+  it('elbow 手柄松手后 hover(无按键)不再 mutate arrow', () => {
+    const { host, canvas } = makeHost({ arrow: { route: 'elbow', elbow: [{ x: 200, y: 50 }] }, selectArrow: true })
+    dispatch(canvas, 'pointerdown', 200, 50) // 命中折点手柄
+    dispatch(canvas, 'pointermove', 220, 70) // 拖折点
+    dispatch(canvas, 'pointerup', 220, 70)
+    expect(host.getElement('ar')!.elbow!).toEqual([{ x: 220, y: 70 }])
+    // 松手后 hover 到 (999,999):旧实现折点跟过去(闹鬼);修后应不动。
+    dispatch(canvas, 'pointermove', 999, 999, { buttons: 0 })
+    expect(host.getElement('ar')!.elbow!).toEqual([{ x: 220, y: 70 }])
+  })
+
   it('从 straight arrow 拖中点手柄 → 自动转 curve(straight→curve 转换)', () => {
     // connect 创建的 arrow 无 route/curve → arrowRoute='straight'。拖中点应转 curve。
     const { host, canvas } = makeHost({ selectArrow: true })

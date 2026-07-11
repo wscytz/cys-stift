@@ -1058,6 +1058,11 @@ export class SelfBuiltAdapter implements CanvasHost {
       }
       this.dragGroup = null
       this.panning = null
+      // curve/elbow 手柄拖拽:松手必须清,否则后续无按键 hover 会让箭头跟光标"闹鬼"
+      // + 每次 hover 进 undo 栈(clearInteractionState 只在 setTool/restore/visibility 调,
+      // onUp 路径不会经过)。onCancel 对这俩走 onUp,一并覆盖。
+      this.curveDragging = null
+      this.elbowDragging = null
     }
     // pointercancel:系统中断 pointer(浏览器手势/通知/触屏多点/OS 中断)时触发而非 up。
     // 对 drag/resize/erase/pan 等"清理型"态复用 onUp(只清状态,无副作用)。
@@ -1108,6 +1113,11 @@ export class SelfBuiltAdapter implements CanvasHost {
     this.visibilityHandler = () => {
       if (document.visibilityState === 'hidden') {
         this.clearInteractionState()
+        // activePointers / pinch 不在 clearInteractionState 里清(startPinch 先填再用,
+        // 全局清会坏 pinch);但 tab 隐藏时浏览器不发 up/cancel,丢失的指会在 activePointers
+        // 留幽灵 → 回来后单指配对幽灵触发假 pinch 乱缩放。隐藏即视指针全失效,这里清。
+        this.activePointers.clear()
+        this.pinch = null
         this.scheduleRender()
       }
     }
