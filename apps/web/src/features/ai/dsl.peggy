@@ -1,0 +1,142 @@
+// cys-dsl grammar — Peggy 声明式语法(正则 → PEG 升级)。
+//
+// 角色:**结构 tokenizer** —— 把单行 token 化成 {kind, ds} 结构;语义 coercion
+// (Number / finite 守卫 / escape unescape / 颜色枚举校验 / elbow 拆分 / DSL_MAX_TEXT_LEN 截断)
+// 在 dsl-parser.ts 包装层做(复用旧 extract 算法,不重写)。
+//
+// 行模型:`[kind ` 前缀提交种类 + directive*(无序重复)+ 尾部 .*(容忍残余散文)。
+// `#id` 也作为 directive(idDir)进循环 —— 等价旧正则"整行任意位置提取 #id";缺失则 TS 报
+// 'missing #id'(契约:[card @pos(1,2) → missing #id,而非 unrecognized)。
+// directive* 末尾的 skipChunk 消费"未知非空白串",让后续已知 directive 仍能被找到 ——
+// 等价旧正则的整行任意位置提取(如 from #card:1 中 from 截到 #card 后,skipChunk 吃 :1,to 仍命中)。
+//
+// 改本文件后跑:`pnpm --filter web gen:dsl` 重生 dsl-parser.gen.js。
+// 可接受语言与旧正则 parser 等价(契约见 dsl-parser/robustness/e2e-roundtrip/sync 测试)。
+
+Line
+  = cardLine / arrowLine / rectLine / textLine / frameLine / freedrawLine / bracketUnknown / prose
+
+// ── card:`[card ` 提交;#id / right-of|below #anchor / create 都是 directive ──
+cardLine
+  = '[' 'card' sp ds:cardDir* .* { return { kind: 'card', ds: ds } }
+
+cardDir
+  = ws d:(idDir / posDir / sizeDir / colorDir / relationDir / gapDir / createDir / skipChunk) { return d }
+
+// ── arrow:`[arrow ` 或 `[arrow]` 提交;#id 可省([arrow]);relation(from/to) vs free(pos/size) ──
+arrowLine
+  = '[' 'arrow' (sp / ']') ds:arrowDir* .* { return { kind: 'arrow', ds: ds } }
+
+arrowDir
+  = ws d:(idDir / fromDir / toDir / posDir / sizeDir / colorDir / labelDir / dashDir / arrowheadDir / curveDir / routeDir / elbowDir / wikilinkDir / skipChunk) { return d }
+
+// ── rect / text / frame:共享 freeDir(id/pos/size/color/text)──
+rectLine
+  = '[' 'rect' sp ds:freeDir* .* { return { kind: 'rect', ds: ds } }
+
+textLine
+  = '[' 'text' sp ds:freeDir* .* { return { kind: 'text', ds: ds } }
+
+frameLine
+  = '[' 'frame' sp ds:freeDir* .* { return { kind: 'frame', ds: ds } }
+
+freeDir
+  = ws d:(idDir / posDir / sizeDir / colorDir / textDir / skipChunk) { return d }
+
+// ── freedraw:透传 no-op(不产 op 不报错)──
+freedrawLine
+  = '[' 'freedraw' sp .* { return { kind: 'freedraw' } }
+
+// ── [ 开头但非已知 kind(或已知 kind 缺空格如 [card])→ unrecognized diagnostic ──
+bracketUnknown
+  = '[' .* { return { kind: 'unknown' } }
+
+// ── 非 [ 开头(注释/散文/围栏/空)→ 静默 skip ──
+prose
+  = .* { return null }
+
+// ─── directives(返回 [tag, ...rawArgs] 元组;TS 层 coerce)───
+// #id(header id,允许冒号 card:1)—— 作为 directive 进循环,等价旧行政 parser 整行任意位置提取
+idDir
+  = '#' id:$idChars tail:$(':' idChars)? { return ['id', tail ? id + tail : id] }
+
+posDir
+  = '@pos(' x:$num ',' ws y:$num ')' { return ['pos', x, y] }
+  / 'at' sp '(' x:$num ',' ws y:$num ')' { return ['pos', x, y] }
+
+sizeDir
+  = '@size(' w:$num ',' ws h:$num ')' { return ['size', w, h] }
+
+colorDir
+  = '@color(' c:$([^)]+) ')' { return ['color', c] }
+
+// relation 关键字后必接 #id(防散文里的 below 误命中)
+relationDir
+  = dir:$('right-of' / 'below') sp '#' anchor:$idChars { return ['rel', dir, anchor] }
+
+gapDir
+  = '@gap(' g:$num ')' { return ['gap', g] }
+
+// create 词边界(防 created/createFoo 误命中)
+createDir
+  = 'create' !idChar { return ['create', true] }
+
+// from/to 的 id 字符集**不含冒号**(复刻旧 regex #[a-zA-Z0-9_-]+;遇冒号截断,
+// 残余 :1 由 skipChunk 吃掉,让后续 to 仍命中 —— 见 from #card:1 to #nope)
+fromDir
+  = 'from' sp '#' id:$idChars { return ['from', id] }
+
+toDir
+  = 'to' sp '#' id:$idChars { return ['to', id] }
+
+labelDir
+  // 不处理转义(复刻旧 LABEL_RE [^"]*);TS 层也不 unescape,只截断
+  = '@label("' v:$([^"]*) '"' { return ['label', v] }
+
+textDir
+  // 处理转义(复刻旧 TEXT_RE (?:[^"\\]|\\.)*);TS 层双步 unescape
+  = '@text("' v:$(escChar*) '"' { return ['text', v] }
+
+dashDir
+  = '@dash(' c:$([^)]+) ')' { return ['dash', c] }
+
+arrowheadDir
+  = '@arrowhead(' c:$([^)]+) ')' { return ['arrowhead', c] }
+
+routeDir
+  = '@route(' c:$([^)]+) ')' { return ['route', c] }
+
+curveDir
+  = '@curve(' x:$num ',' ws y:$num ')' { return ['curve', x, y] }
+
+elbowDir
+  // 捕获原始串,TS 层分号拆分 + 过滤好坏点(复刻旧 extractElbow)
+  = '@elbow(' v:$([^)]+) ')' { return ['elbow', v] }
+
+wikilinkDir
+  // 词边界(复刻旧 @wikilink\b):@wikilinkXYZ 不命中
+  = '@wikilink' !idChar { return ['wikilink', true] }
+
+// ─── lexemes ───
+num
+  = '-'? [0-9]+ ('.' [0-9]+)?
+
+escChar
+  = '\\' . / [^"\\]
+
+idChars
+  = [a-zA-Z0-9_-]+
+
+idChar
+  = [a-zA-Z0-9_-]
+
+// skipChunk:消费一个非空白串(未知指令残余 / ] 等),返回 null(被 directive* 收集后 TS 过滤)。
+// 用 [^ \t] 而非 [^\s]:行已按 \n 切(Peggy 行级解析),内部只剩空格/制表符作分隔。
+skipChunk
+  = [^ \t]+ { return null }
+
+ws
+  = [ \t]*
+
+sp
+  = [ \t]+

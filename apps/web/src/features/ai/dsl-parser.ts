@@ -1,22 +1,29 @@
 'use client'
 
 /**
- * DSL Parser — parses AI output for canvas layout (P6 v0.33.1).
+ * DSL Parser — parses AI output (or pasted/edited DSL) for canvas layout.
  *
- * The AI outputs a DSL block like:
+ * 架构(正则 → PEG 升级,2026-07):
+ *   dsl.peggy(Peggy 语法,结构 tokenizer)—— pnpm gen:dsl → dsl-parser.gen.js
+ *   本文件(TS 包装层)—— 按行调用生成 parser,做语义 coercion:
+ *     Number / finite 守卫 / escape unescape / 颜色枚举校验 / elbow 拆分 / DSL_MAX_TEXT_LEN 截断
+ *   永不抛错 + 坐标恒有限 + byte-equal round-trip 契约不变(见 dsl-* 测试)。
  *
- *   [card #abc123] @pos(300, 400) @color(blue)
- *   [rect #r1] @pos(100, 200) @size(300, 400) @color(red)
- *   [arrow #arr1] @label("references")
- *
- * The parser extracts these directives into typed operations that
- * `applyLayout(editor, ops)` can execute.
+ * 行级解析:按 \n 切行,逐行 parse Line 规则 → {kind, ds} 结构 → build{Card,Arrow,Free}
+ * 组装 DslOp / 记 diagnostic。`#id` 也是 directive(等价旧"整行任意位置提取");directive*
+ * 内的 skipChunk 吃未知残余 → 复刻旧正则的任意位置/任意顺序容错。
  */
 
 import type { CardId } from '@cys-stift/domain'
-import { DSL_MAX_TEXT_LEN } from './dsl-grammar'
+import {
+  DSL_COLORS,
+  DSL_COLOR_ALIASES,
+  DSL_MAX_TEXT_LEN,
+} from './dsl-grammar'
+// Peggy 生成;类型垫片见 dsl-parser.gen.d.ts
+import { parse as parseLine } from './dsl-parser.gen.js'
 
-// ── Operation types ──────────────────────────────────────────────────────────
+// ── Operation types(导出签名零变更,下游 apply-layout/solver/sanitize/6 引用点依赖)────
 
 export type DslCardOp = {
   type: 'card'
@@ -118,136 +125,75 @@ export type DslDiagnostic = {
   message: string
 }
 
-// ── Parser ───────────────────────────────────────────────────────────────────
+// ── Grammar 产出结构(Peggy Line 规则返回值;unknown 经 LineResult 解释)─────────────
 
-/** Card reference: `#id` or `shape:cardId` */
-const ID_RE = /#([a-zA-Z0-9_-]+:[a-zA-Z0-9_-]+|[a-zA-Z0-9_-]+)/
+type DirectiveTuple =
+  | ['id', string]
+  | ['pos', string, string]
+  | ['size', string, string]
+  | ['color', string]
+  | ['label', string]
+  | ['text', string]
+  | ['dash', string]
+  | ['arrowhead', string]
+  | ['route', string]
+  | ['curve', string, string]
+  | ['elbow', string]
+  | ['rel', string, string]
+  | ['gap', string]
+  | ['create', true]
+  | ['from', string]
+  | ['to', string]
+  | ['wikilink', true]
 
-/** Position directive: `@pos(300, 400)` or inline `at (300, 400)`. Supports
- *  negatives — elements dragged above/left of origin serialize as @pos(-x,-y)
- *  (canvas pan lets coords go negative), so the regex must round-trip them
- *  (else negative-coord cards fail to reparse → "missing @pos"). */
-const POS_RE = /@pos\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)/
-const AT_RE = /at\s+\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)/
+/** directive* 收集的元组列表(null = skipChunk 消费的未知残余,过滤掉)。 */
+type LineResult =
+  | null // prose / 注释 / 围栏 / 空(静默 skip)
+  | { kind: 'freedraw' } // 透传 no-op(skip,不报错)
+  | { kind: 'unknown' } // [ 开头但非已知 kind → unrecognized
+  | { kind: 'card'; ds: unknown[] }
+  | { kind: 'arrow'; ds: unknown[] }
+  | { kind: 'rect'; ds: unknown[] }
+  | { kind: 'text'; ds: unknown[] }
+  | { kind: 'frame'; ds: unknown[] }
 
-/** Color directive: Bauhaus 6 原色 + grey 别名。引擎 colorOf 只认这 7 个
- *  名字(red/yellow/blue/black/white/gray/grey)。其他写法(green/teal/pink/
- *  orange/purple)不匹配 → color 字段 undefined → 渲染回退默认色(而非
- *  静默变黑)。审计 H3:此前正则 `[a-z]+` 接受任意小写色名,越界色被引擎
- *  colorOf 回退成黑色,造成转义契约的静默违反。
- *  单一源:./dsl-grammar.ts 的 DSL_COLORS + DSL_COLOR_ALIASES;dsl-sync.test.ts 锁漂移。 */
-const COLOR_RE = /@color\((red|yellow|blue|black|white|gray|grey)\)/
+// ── 语义 coercion(算法搬迁自旧 extract*,行为等价)──────────────────────────────
 
-/** Label directive: `@label\("([^"]*)"\)` */
-const LABEL_RE = /@label\("([^"]*)"\)/
+/** parser 接受的颜色集合 = DSL_COLORS ∪ aliases 键(dsl-sync 锁)。grey 存原样不归一。 */
+const ACCEPTED_COLORS: ReadonlySet<string> = new Set([
+  ...DSL_COLORS,
+  ...Object.keys(DSL_COLOR_ALIASES),
+])
 
-/** Text directive: `@text("...")` — escape-aware (serializeCanvas escapes quotes/backslashes). */
-const TEXT_RE = /@text\("((?:[^"\\]|\\.)*)"\)/
-
-/** Size directive: `@size(w,h)` — supports negative values (free arrow direction encoding). */
-const SIZE_RE = /@size\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)/
-
-/** B工程:关系式放置指令。`right-of #anchor` / `below #anchor` —— anchor 须为同批更早出现或画布已有的 card。
- *  关键字后必接 #id(防散文里的 "below" 误命中)。求解器(solveRelational)据此算绝对坐标。 */
-const RELATION_RE = /(right-of|below)\s+#([a-zA-Z0-9_-]+)/
-/** B工程:gap 指令 `@gap(n)`,关系式放置的间距(默认 20)。 */
-const GAP_RE = /@gap\((-?\d+(?:\.\d+)?)\)/
-
-/** Arrow relation signature — line style + terminal (semantics). */
-const DASH_RE = /@dash\((solid|dashed|dotted)\)/
-const ARROWHEAD_RE = /@arrowhead\((arrow|triangle|none)\)/
-/** 弯曲控制点:@curve(cx, cy)(支持负坐标)。 */
-const CURVE_RE = /@curve\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)/
-/** 路由形态:@route(straight|curve|elbow)。 */
-const ROUTE_RE = /@route\((straight|curve|elbow)\)/
-/** 折点:@elbow(x,y;x,y) — 分号分隔 1-2 个折点(均支持负坐标)。 */
-const ELBOW_RE = /@elbow\(([^)]+)\)/
-
-/** @wikilink 显式标记:仅 meta.wikilink===true 的箭头 emit。`@wikilinkXYZ` 不匹配
- *  (单词边界 \b 防前缀误命中)。parser 在 arrow 分支(关系 + 自由)统一填 wikilink。 */
-const WIKILINK_RE = /@wikilink\b/
-
-function extractId(text: string): string | null {
-  const m = text.match(ID_RE)
-  return m ? m[1]! : null
+/** 字符串 → 有限数;非有限(NaN/Infinity)归 0 —— 守 robustness 契约"坐标恒有限"。 */
+function finiteNum(raw: string): number {
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : 0
 }
 
-/** 只在行首 `[kind …]` 头部里找 #id(arrow body 的 from #x/to #y 不是 header id)。
- *  arrow 无 #id 时返回 null(不再误抓 from/to 端点当 id)。 */
-function extractHeaderId(line: string): string | null {
-  const bracketEnd = line.indexOf(']')
-  if (bracketEnd < 0) return null
-  const m = line.slice(0, bracketEnd).match(ID_RE)
-  return m ? m[1]! : null
+/** 颜色校验:接受 canonical ∪ 别名键;越界(green 等)→ undefined(不静默变黑)。 */
+function validColor(raw: string): string | undefined {
+  return ACCEPTED_COLORS.has(raw) ? raw : undefined
 }
 
-function extractPos(text: string): { x: number; y: number } | null {
-  let m = text.match(POS_RE)
-  if (m) return { x: Number(m[1]), y: Number(m[2]) }
-  m = text.match(AT_RE)
-  if (m) return { x: Number(m[1]), y: Number(m[2]) }
-  return null
+/** 枚举校验:grammar 捕获原始串(`[^)]+`),这里收窄到合法值;越界 → undefined。 */
+function validEnum<T extends string>(raw: string, list: readonly T[]): T | undefined {
+  return (list as readonly string[]).includes(raw) ? (raw as T) : undefined
 }
 
-function extractColor(text: string): string | undefined {
-  const m = text.match(COLOR_RE)
-  return m?.[1]
-}
-
-function extractLabel(text: string): string | undefined {
-  const m = text.match(LABEL_RE)
-  const v = m?.[1] || undefined
-  // 防超长 DoS(AI 输出不可信):静默截断,不报错(parser robust)。DSL_MAX_TEXT_LEN 来自 dsl-grammar。
-  return v && v.length > DSL_MAX_TEXT_LEN ? v.slice(0, DSL_MAX_TEXT_LEN) : v
-}
-
-/** Extract + unescape an `@text("...")` value (inverse of serializeCanvas's escapeQuoted). */
-function extractText(text: string): string | undefined {
-  const m = text.match(TEXT_RE)
-  if (!m) return undefined
-  const v = m[1]!.replace(/\\"/g, '"').replace(/\\\\/g, '\\')
-  // 防超长 DoS(AI 输出不可信):静默截断,不报错(parser robust)。DSL_MAX_TEXT_LEN 来自 dsl-grammar。
+/** 防超长 DoS(AI 输出不可信):静默截断到 DSL_MAX_TEXT_LEN,不报错(parser robust)。 */
+function truncate(v: string): string {
   return v.length > DSL_MAX_TEXT_LEN ? v.slice(0, DSL_MAX_TEXT_LEN) : v
 }
 
-function extractSize(text: string): { w: number; h: number } | null {
-  const m = text.match(SIZE_RE)
-  if (m) return { w: Number(m[1]), h: Number(m[2]) }
-  return null
+/** @text 双步 unescape(顺序锁定:\"→" 先,\\→\ 后)—— serializeCanvas escapeQuoted 的逆。 */
+function unescapeQuoted(v: string): string {
+  return v.replace(/\\"/g, '"').replace(/\\\\/g, '\\')
 }
 
-function extractDash(
-  text: string,
-): 'solid' | 'dashed' | 'dotted' | undefined {
-  return text.match(DASH_RE)?.[1] as 'solid' | 'dashed' | 'dotted' | undefined
-}
-
-function extractArrowhead(
-  text: string,
-): 'arrow' | 'triangle' | 'none' | undefined {
-  return text.match(ARROWHEAD_RE)?.[1] as
-    | 'arrow'
-    | 'triangle'
-    | 'none'
-    | undefined
-}
-
-function extractCurve(text: string): { cx: number; cy: number } | undefined {
-  const m = text.match(CURVE_RE)
-  if (!m) return undefined
-  return { cx: Number(m[1]), cy: Number(m[2]) }
-}
-
-function extractRoute(text: string): 'straight' | 'curve' | 'elbow' | undefined {
-  const m = text.match(ROUTE_RE)
-  return m?.[1] as 'straight' | 'curve' | 'elbow' | undefined
-}
-
-/** 解析 @elbow(x,y;x,y):分号分隔,每个折点 x,y(支持负)。返回 1-2 个折点;解析失败 → undefined。 */
-function extractElbow(text: string): { x: number; y: number }[] | undefined {
-  const m = text.match(ELBOW_RE)
-  if (!m) return undefined
-  const pts = m[1]!
+/** @elbow(x,y;x,y) 拆分:分号分隔,每个折点 x,y(支持负);过滤坏点,保好点(复刻 extractElbow)。 */
+function parseElbow(raw: string): { x: number; y: number }[] | undefined {
+  const pts = raw
     .split(';')
     .map((pair) => pair.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/))
     .filter(Boolean)
@@ -255,18 +201,181 @@ function extractElbow(text: string): { x: number; y: number }[] | undefined {
   return pts.length >= 1 ? pts.slice(0, 2) : undefined
 }
 
+// ── fold:directive 元组列表 → 结构化字段(首遇优先,复刻旧正则"首个 match"语义)────────
+
+interface Folded {
+  id?: string
+  pos?: [number, number]
+  size?: { w: number; h: number }
+  color?: string
+  label?: string
+  text?: string
+  dash?: string
+  arrowhead?: string
+  route?: string
+  curve?: { cx: number; cy: number }
+  elbow?: { x: number; y: number }[]
+  rel?: { dir: string; anchor: string }
+  gap?: number
+  create?: boolean
+  from?: string
+  to?: string
+  wikilink?: boolean
+}
+
+function fold(ds: unknown[]): Folded {
+  const a: Folded = {}
+  for (const d of ds) {
+    if (!Array.isArray(d)) continue // null(skipChunk)/非元组 → 跳过
+    const [tag, v1, v2] = d as [string, unknown, unknown]
+    switch (tag) {
+      case 'id': if (a.id === undefined) a.id = String(v1); break
+      case 'pos': if (!a.pos) a.pos = [finiteNum(String(v1)), finiteNum(String(v2))]; break
+      case 'size': if (!a.size) a.size = { w: finiteNum(String(v1)), h: finiteNum(String(v2)) }; break
+      case 'color': if (a.color === undefined) a.color = validColor(String(v1)); break
+      case 'label': if (a.label === undefined) a.label = truncate(String(v1)); break // 不 unescape(复刻 LABEL_RE)
+      case 'text': if (a.text === undefined) a.text = truncate(unescapeQuoted(String(v1))); break
+      case 'dash': if (!a.dash) a.dash = validEnum(String(v1), ['solid', 'dashed', 'dotted']); break
+      case 'arrowhead': if (!a.arrowhead) a.arrowhead = validEnum(String(v1), ['arrow', 'triangle', 'none']); break
+      case 'route': if (!a.route) a.route = validEnum(String(v1), ['straight', 'curve', 'elbow']); break
+      case 'curve': if (!a.curve) a.curve = { cx: finiteNum(String(v1)), cy: finiteNum(String(v2)) }; break
+      case 'elbow': if (!a.elbow) a.elbow = parseElbow(String(v1)); break
+      case 'rel': if (!a.rel) a.rel = { dir: String(v1), anchor: String(v2) }; break
+      case 'gap': if (a.gap === undefined) a.gap = finiteNum(String(v1)); break
+      case 'create': if (!a.create) a.create = true; break
+      case 'from': if (!a.from) a.from = String(v1); break
+      case 'to': if (!a.to) a.to = String(v1); break
+      case 'wikilink': if (!a.wikilink) a.wikilink = true; break
+    }
+  }
+  return a
+}
+
+// ── build:结构 → DslOp 或 diagnostic ──────────────────────────────────────────
+
+type BuildResult = { op: DslOp } | { diag: string } | null
+
+function buildCard(ds: unknown[]): BuildResult {
+  const d = fold(ds)
+  if (d.id === undefined) return { diag: 'missing #id' }
+  if (d.rel) {
+    const op: DslCardOp = {
+      type: 'card',
+      cardId: d.id as CardId,
+      x: d.pos ? d.pos[0] : 0,
+      y: d.pos ? d.pos[1] : 0,
+      w: d.size?.w,
+      h: d.size?.h,
+      color: d.color,
+      rel: {
+        dir: d.rel.dir as 'right-of' | 'below',
+        anchor: d.rel.anchor,
+        gap: d.gap ?? 20,
+      },
+    }
+    if (d.create) op.create = true
+    return { op }
+  }
+  if (d.pos) {
+    const op: DslCardOp = {
+      type: 'card',
+      cardId: d.id as CardId,
+      x: d.pos[0],
+      y: d.pos[1],
+      w: d.size?.w,
+      h: d.size?.h,
+      color: d.color,
+    }
+    if (d.create) op.create = true
+    return { op }
+  }
+  return { diag: 'missing @pos' }
+}
+
+function buildArrow(ds: unknown[]): BuildResult {
+  const d = fold(ds)
+  const common = {
+    id: d.id,
+    label: d.label,
+    color: d.color,
+    dash: d.dash as 'solid' | 'dashed' | 'dotted' | undefined,
+    arrowhead: d.arrowhead as 'arrow' | 'triangle' | 'none' | undefined,
+    curve: d.curve,
+    route: d.route as 'straight' | 'curve' | 'elbow' | undefined,
+    elbow: d.elbow,
+    wikilink: d.wikilink || undefined,
+  }
+  if (d.from && d.to) {
+    const op: DslArrowOp = {
+      type: 'arrow',
+      from: d.from,
+      to: d.to,
+      ...common,
+    }
+    return { op }
+  }
+  if (d.pos && d.size) {
+    const op: DslArrowOp = {
+      type: 'arrow',
+      from: '',
+      to: '',
+      freeArrow: true,
+      x: d.pos[0],
+      y: d.pos[1],
+      w: d.size.w,
+      h: d.size.h,
+      ...common,
+    }
+    return { op }
+  }
+  return { diag: 'free arrow missing @pos/@size' }
+}
+
+function buildFree(kind: 'rect' | 'text' | 'frame', ds: unknown[]): BuildResult {
+  const d = fold(ds)
+  if (d.id === undefined) return { diag: 'missing #id' }
+  if (!d.pos) return { diag: 'missing @pos' }
+  if (kind === 'rect') {
+    const op: DslFreeOp = {
+      type: 'free', shape: 'rect', id: d.id,
+      x: d.pos[0], y: d.pos[1], w: d.size?.w, h: d.size?.h, color: d.color,
+    }
+    return { op }
+  }
+  if (kind === 'text') {
+    const op: DslFreeOp = {
+      type: 'free', shape: 'text', id: d.id,
+      x: d.pos[0], y: d.pos[1], text: d.text, color: d.color,
+    }
+    return { op }
+  }
+  const op: DslFreeOp = {
+    type: 'free', shape: 'frame', id: d.id,
+    x: d.pos[0], y: d.pos[1], w: d.size?.w, h: d.size?.h, text: d.text, color: d.color,
+  }
+  return { op }
+}
+
+function buildOp(r: LineResult): BuildResult {
+  if (r === null || r.kind === 'freedraw') return null // 静默 skip
+  if (r.kind === 'unknown') return { diag: 'unrecognized element kind' }
+  if (r.kind === 'card') return buildCard(r.ds)
+  if (r.kind === 'arrow') return buildArrow(r.ds)
+  return buildFree(r.kind, r.ds) // rect / text / frame
+}
+
+// ── Parser ───────────────────────────────────────────────────────────────────
+
 /**
  * Parse a DSL block into ops AND per-line diagnostics for dropped lines.
  *
- * Unlike {@link parseDsl}, this preserves 1-based original line numbers so
- * the editor can tell the user WHICH lines were dropped and why (the
- * "transliteration core selling point" — silent data loss is a trust
- * problem). Lines are classified:
+ * 行分类(保留 1-based 原始行号,编辑器告诉用户哪行被丢、为什么 —— 转义核心卖点的反信任问题):
  *
- * - empty / `# comment` / non-`[`-prefixed prose → skipped silently (no error)
- * - a `[`-prefixed line that fails to parse → records a {@link DslDiagnostic}
+ * - empty / `# comment` / 非 `[` 散文 / 围栏 → 静默 skip(无 error)
+ * - `[` 行解析后缺关键字段 → 记 {@link DslDiagnostic}
  *
- * `ops` from this function are identical to what {@link parseDsl} returns.
+ * 永不抛错:grammar 本身因尾部 `.*` 对任何 `[` 行都 succeed;极端输入(控制字符等)若仍
+ * 抛 → 该行静默跳过(不崩整块)。坐标恒 finite(finiteNum 守卫)。
  */
 export function parseDslWithDiagnostics(dslText: string): {
   ops: DslOp[]
@@ -280,219 +389,22 @@ export function parseDslWithDiagnostics(dslText: string): {
     const lineNo = i + 1
     const line = rawLines[i]!.trim()
     if (!line) continue
-    // `#` comment lines (serializeCanvasReadable title etc.) → skip silently.
-    if (line.startsWith('#')) continue
-    // Non-`[`-prefixed lines are free-form prose the user/AI may include.
-    // Only `[`-prefixed lines that fail to parse are errors.
-    if (!line.startsWith('[')) continue
 
-    // 识别的种类前缀须与 ./dsl-grammar.ts 的 DSL_KINDS 一致;dsl-sync.test.ts 锁漂移。
-    // ── Card line: `[card #abc123] @pos(300, 400)` or `[card #abc123 create] @pos(300, 400)`
-    //    B工程 relational 变体:`[card #a] right-of #c0 @gap(20)` —— 不要求 @pos,rel 算坐标。
-    if (line.startsWith('[card ')) {
-      const id = extractId(line)
-      if (!id) {
-        errors.push({ line: lineNo, text: line, message: 'missing #id' })
-        continue
-      }
-      const size = extractSize(line)
-      const hasCreate = /\bcreate\b/.test(line)
-      const relMatch = line.match(RELATION_RE)
-      if (relMatch) {
-        // relational 变体:@pos 可选(占位,求解器覆盖);rel 描述对 anchor 的相对关系。
-        const pos = extractPos(line)
-        const gapMatch = line.match(GAP_RE)
-        const op: any = {
-          type: 'card',
-          cardId: id as CardId,
-          x: pos?.x ?? 0,
-          y: pos?.y ?? 0,
-          w: size?.w,
-          h: size?.h,
-          color: extractColor(line),
-          rel: {
-            dir: relMatch[1] as 'right-of' | 'below',
-            anchor: relMatch[2] as string,
-            gap: gapMatch ? Number(gapMatch[1]) : 20,
-          },
-        }
-        if (hasCreate) op.create = true
-        ops.push(op)
-        continue
-      }
-      // 绝对变体(既有):要求 @pos
-      const pos = extractPos(line)
-      if (!pos) {
-        errors.push({ line: lineNo, text: line, message: 'missing @pos' })
-        continue
-      }
-      const op: any = {
-        type: 'card',
-        cardId: id as CardId,
-        x: pos.x,
-        y: pos.y,
-        w: size?.w,
-        h: size?.h,
-        color: extractColor(line),
-      }
-      if (hasCreate) op.create = true
-      ops.push(op)
+    let result: LineResult
+    try {
+      result = parseLine(line, { startRule: 'Line' }) as LineResult
+    } catch {
+      // grammar 理论上不抛(尾部 .* 兜底);真抛了 → 静默跳过该行(永不抛错契约)
       continue
     }
 
-    // ── Arrow line: `[arrow #arr1] from #a to #b @label("ref")`
-    //    Free arrow (no from/to): `[arrow #id] @pos(x,y) @size(w,h) + sig`
-    //    #id 可选(arrows 从端点派生,id 只用于 round-trip update;LLM 常省略 → 不再报错,
-    //    降 LLM 认知负担,aligns「constrain generation entropy」。apply create 路径自己 mint uid)
-    if (line.startsWith('[arrow ') || line.startsWith('[arrow]')) {
-      const id = extractHeaderId(line)
-      const fromMatch = line.match(/from\s+(#[a-zA-Z0-9_-]+)/)
-      const toMatch = line.match(/to\s+(#[a-zA-Z0-9_-]+)/)
-
-      if (fromMatch && toMatch) {
-        // 关系箭头
-        ops.push({
-          type: 'arrow',
-          id: id ?? undefined,
-          from: fromMatch[1]!.replace('#', ''),
-          to: toMatch[1]!.replace('#', ''),
-          label: extractLabel(line),
-          color: extractColor(line),
-          dash: extractDash(line),
-          arrowhead: extractArrowhead(line),
-          curve: extractCurve(line),
-          route: extractRoute(line),
-          elbow: extractElbow(line),
-          wikilink: WIKILINK_RE.test(line) || undefined,
-        })
-      } else {
-        // 自由箭头:无 from/to,需 pos + size(w/h 可负,编码线段方向)
-        const pos = extractPos(line)
-        const size = extractSize(line)
-        if (!pos || !size) {
-          errors.push({
-            line: lineNo,
-            text: line,
-            message: 'free arrow missing @pos/@size',
-          })
-          continue
-        }
-        ops.push({
-          type: 'arrow',
-          id: id ?? undefined,
-          from: '',
-          to: '',
-          freeArrow: true,
-          x: pos.x,
-          y: pos.y,
-          w: size.w,
-          h: size.h,
-          label: extractLabel(line),
-          color: extractColor(line),
-          dash: extractDash(line),
-          arrowhead: extractArrowhead(line),
-          curve: extractCurve(line),
-          route: extractRoute(line),
-          elbow: extractElbow(line),
-          wikilink: WIKILINK_RE.test(line) || undefined,
-        })
-      }
-      continue
+    const built = buildOp(result)
+    if (built === null) continue // prose / freedraw skip
+    if ('op' in built) {
+      ops.push(built.op)
+    } else {
+      errors.push({ line: lineNo, text: line, message: built.diag })
     }
-
-    // ── Rect line (Phase 0 / T3 unified grammar): `[rect #id] @pos(x,y) @size(w,h) @color(c)`
-    if (line.startsWith('[rect ')) {
-      const id = extractId(line)
-      if (!id) {
-        errors.push({ line: lineNo, text: line, message: 'missing #id' })
-        continue
-      }
-      const pos = extractPos(line)
-      if (!pos) {
-        errors.push({ line: lineNo, text: line, message: 'missing @pos' })
-        continue
-      }
-      const size = extractSize(line)
-      ops.push({
-        type: 'free',
-        id,
-        shape: 'rect',
-        x: pos.x,
-        y: pos.y,
-        w: size?.w,
-        h: size?.h,
-        color: extractColor(line),
-      })
-      continue
-    }
-
-    // ── Text line (Phase 0 / T3): `[text #id] @pos(x,y) @text("...") @color(c)`
-    if (line.startsWith('[text ')) {
-      const id = extractId(line)
-      if (!id) {
-        errors.push({ line: lineNo, text: line, message: 'missing #id' })
-        continue
-      }
-      const pos = extractPos(line)
-      if (!pos) {
-        errors.push({ line: lineNo, text: line, message: 'missing @pos' })
-        continue
-      }
-      ops.push({
-        type: 'free',
-        id,
-        shape: 'text',
-        x: pos.x,
-        y: pos.y,
-        text: extractText(line),
-        color: extractColor(line),
-      })
-      continue
-    }
-
-    // ── Frame line (主题分区): `[frame #id] @pos(x,y) @size(w,h) @text("title") @color(c)`
-    if (line.startsWith('[frame ')) {
-      const id = extractId(line)
-      if (!id) {
-        errors.push({ line: lineNo, text: line, message: 'missing #id' })
-        continue
-      }
-      const pos = extractPos(line)
-      if (!pos) {
-        errors.push({ line: lineNo, text: line, message: 'missing @pos' })
-        continue
-      }
-      const size = extractSize(line)
-      ops.push({
-        type: 'free',
-        id,
-        shape: 'frame',
-        x: pos.x,
-        y: pos.y,
-        w: size?.w,
-        h: size?.h,
-        text: extractText(line),
-        color: extractColor(line),
-      })
-      continue
-    }
-
-    // ── Freedraw line: `[freedraw #id] @pos(x,y)` — recognized but a
-    //    deliberate NO-OP. freedraw point sequences never enter the DSL
-    //    (privacy R2), so serializeCanvasReadable emits position-only metadata
-    //    for human readability; the parser acknowledges the line (so a canvas
-    //    doesn't flag its OWN exported freedraw as "invalid") but produces no
-    //    apply op — the host's freedraw element is left untouched on apply.
-    if (line.startsWith('[freedraw ')) {
-      continue
-    }
-
-    // ── `[`-prefixed but no recognized kind prefix (e.g. `[foo #x] ...`)
-    errors.push({
-      line: lineNo,
-      text: line,
-      message: 'unrecognized element kind',
-    })
   }
 
   return { ops, errors }
