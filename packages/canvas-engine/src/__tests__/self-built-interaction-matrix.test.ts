@@ -81,9 +81,11 @@ describe('交互矩阵 — 每种 kind × resize(SE 角)', () => {
       dispatch(canvas, 'pointermove', 300, 300)
       dispatch(canvas, 'pointerup', 300, 300)
       const el = host.getElement('e1')!
-      // bbox 放大
+      // bbox 放大(card 例外:mode A 卡高由 cardDisplayMode 派生,resize 只改宽,h 不由 resize 控制)
       expect(el.w).toBeGreaterThan(100)
-      expect(el.h).toBeGreaterThan(100)
+      if (kind !== 'card') {
+        expect(el.h).toBeGreaterThan(100)
+      }
       if (kind === 'freedraw') {
         // 真身=点序列:末点(原在 bbox SE 角 200,200)必须随 resize 外扩
         const pts = el.meta?.points as [number, number][]

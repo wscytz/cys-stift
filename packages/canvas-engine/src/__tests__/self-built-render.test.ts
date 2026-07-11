@@ -78,6 +78,40 @@ describe('renderElements', () => {
     expect(() => renderElements(ctx, els, view, 800, 600, () => null, '#0f172a')).not.toThrow()
   })
 
+  // ── cardDisplayMode(密度切换):title/subtitle/compact/auto 的 body 行数 ──
+  // width=240 -> wrap 宽 220 -> 31 字/行(mock ctx 每字 7px);"a"×100 = 4 wrapped 行。
+  function cardCalls(mode: 'compact' | 'auto' | 'title' | 'subtitle'): string[] {
+    const ctx = mockCtx()
+    const els: CanvasElement[] = [{ id: 'c1', kind: 'card', x: 0, y: 0, w: 240, h: 200, rotation: 0 }]
+    renderElements(
+      ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600,
+      () => ({ title: 'T', body: 'a'.repeat(100), type: 'note', pinned: false, subtitle: 'sub' }),
+      '#0f172a', domTokenResolver, els, mode,
+    )
+    return ctx._calls.filter((c) => c.startsWith('fillText'))
+  }
+
+  it('cardMode=title:0 body 行(只 type + title = 2 fillText)', () => {
+    const ft = cardCalls('title')
+    expect(ft.length).toBe(2)
+  })
+
+  it('cardMode=subtitle:1 副标题行(type + title + subtitle = 3 fillText)', () => {
+    const ft = cardCalls('subtitle')
+    expect(ft.length).toBe(3)
+    expect(ft.some((c) => c.startsWith('fillText(sub@'))).toBe(true)
+  })
+
+  it('cardMode=compact:3 body 行截断(4 wrapped -> 3;总 5 fillText)', () => {
+    const ft = cardCalls('compact')
+    expect(ft.length).toBe(5) // type + title + 3 body
+  })
+
+  it('cardMode=auto:全部 wrapped 行(4 行;总 6 fillText)', () => {
+    const ft = cardCalls('auto')
+    expect(ft.length).toBe(6) // type + title + 4 body
+  })
+
   it('draws a freedraw stroke as a smoothed bézier (not a bare polyline)', () => {
     const ctx = mockCtx()
     const els = [

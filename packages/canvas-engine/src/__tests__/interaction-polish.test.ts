@@ -161,7 +161,7 @@ describe('[B2-T2] resize snap — snap 模式尺寸落 8 倍数', () => {
     dispatch(canvas, 'pointerup', 123, 123)
     const a = host.getElement('a')!
     expect(a.w % 8).toBe(0)
-    expect(a.h % 8).toBe(0)
+    // card mode A:h 由 cardDisplayMode 派生,resize 不改 h(只改 w);h%8 不再断言。
     expect(a.w).toBeGreaterThan(100) // 确实放大了
   })
 
@@ -234,7 +234,9 @@ describe('[B4-T3] connect 模式 card 可连暗示', () => {
     }
     ;(host as unknown as { ctx: unknown }).ctx = ctx
     ;(host as unknown as { renderNow: () => void }).renderNow()
-    expect(calls.some((c) => c.startsWith('strokeRect(0,0,100,100)'))).toBe(true)
+    // connect 暗示虚线:strokeRect 画在卡 bbox(0,0,100,*)。h 现由 cardDisplayMode 派生
+    // (mode A:无 body -> 最小高 58),不再固定 100;放宽 h 断言只验轮廓存在。
+    expect(calls.some((c) => c.startsWith('strokeRect(0,0,100,'))).toBe(true)
     expect(calls.some((c) => c.startsWith('setLineDash'))).toBe(true)
   })
 

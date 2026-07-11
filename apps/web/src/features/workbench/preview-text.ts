@@ -42,3 +42,14 @@ export function plainPreview(md: string, maxLen: number): string {
   if (t.length > maxLen) return t.slice(0, maxLen) + '…'
   return t
 }
+
+/**
+ * 副标题(卡 subtitle 模式用):body 首个 `##` 副标题文本;无则首行(走 plainPreview 剥 markdown)。
+ * 不匹配 `#`(H1,常是卡标题重复)或 `###`(更深层);只取 H2 作副标题。
+ */
+export function subtitleOf(body: string): string {
+  if (!body) return ''
+  const m = body.match(/^##\s+(.+?)\s*$/m)
+  if (m && m[1]) return m[1].replace(/[*`~_]/g, '').trim().slice(0, 60)
+  return plainPreview(body, 60)
+}

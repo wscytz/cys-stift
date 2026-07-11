@@ -78,6 +78,10 @@ export interface Settings {
   /** AI 交互样本累积开关。undefined=默认开(首提判定用);false=显式关(addSample 不写)。
    *  独立字段(非 labs):工具性本地累积,非"附加能力风险"。不出本机(R2 兼容)。 */
   aiSampleCapture?: boolean
+  /** 卡片显示模式(密度切换,2026-07):compact(默认,3 行截断)/ auto(全文,卡高随内容)/
+   *  title(仅标题)/ subtitle(标题+副标题)。模式管卡高(mode A);视图设置,不进 DSL。
+   *  向后兼容:旧 settings 无此字段 -> 默认 compact(旧行为)。 */
+  cardDisplayMode?: 'compact' | 'auto' | 'title' | 'subtitle'
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -150,6 +154,7 @@ function isValid(v: unknown): v is Settings {
     }
   }
   if ('aiSampleCapture' in o && o.aiSampleCapture !== undefined && typeof o.aiSampleCapture !== 'boolean') return false
+  if ('cardDisplayMode' in o && o.cardDisplayMode !== undefined && !['compact', 'auto', 'title', 'subtitle'].includes(o.cardDisplayMode as string)) return false
   return true
 }
 
@@ -420,6 +425,21 @@ export const settingsStore = {
     if (id !== null && !_settings.profiles.some((x) => x.id === id)) return false
     const prev = _settings
     _settings = { ..._settings, activeProfileId: id }
+    if (!saveSettings(_settings)) {
+      _settings = prev
+      notifyQuota()
+      notify()
+      return false
+    }
+    notify()
+    return true
+  },
+  /** 卡片显示模式(密度切换)。返回 true=持久化成功。 */
+  updateCardDisplayMode(m: 'compact' | 'auto' | 'title' | 'subtitle'): boolean {
+    hydrateOnce()
+    if (_settings.cardDisplayMode === m) return true
+    const prev = _settings
+    _settings = { ..._settings, cardDisplayMode: m }
     if (!saveSettings(_settings)) {
       _settings = prev
       notifyQuota()

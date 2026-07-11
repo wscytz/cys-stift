@@ -22,6 +22,8 @@ import {
 import { attachCanvasFreeformPersistence } from './canvas-freeform-binding'
 import { SelfBuiltAdapter } from '@cys-stift/canvas-engine'
 import { canvasViewStore } from '@/lib/canvas-view-store'
+import { settingsStore } from '@/lib/settings-store'
+import { subtitleOf } from '@/features/workbench/preview-text'
 import { screenToPage } from '@cys-stift/canvas-engine'
 import { measureText, textEditKeyAction } from '@cys-stift/canvas-engine'
 import { readToken } from '@cys-stift/canvas-engine'
@@ -110,10 +112,20 @@ export function SelfCanvas({
     const adapter = new SelfBuiltAdapter(canvas, {
       getCardInfo: (id) => {
         const c = service.get(id as never)
-        return c ? { title: c.title, body: c.body ?? '', type: c.type, pinned: c.pinned } : null
+        if (!c) return null
+        const body = c.body ?? ''
+        return {
+          title: c.title,
+          body,
+          type: c.type,
+          pinned: c.pinned,
+          // subtitle 模式用:body 首个 ## 副标题,无则首行(plainPreview 剥 markdown)。
+          subtitle: body ? subtitleOf(body) : undefined,
+        }
       },
       // card 橡皮模式命中卡片 → 通知 page softDelete(进回收桶)。adapter 随后自己 remove 几何。
       onEraseCard: (id) => onEraseCard(id),
+      cardMode: settingsStore.get().cardDisplayMode ?? 'compact',
     })
     adapter.setEraserMode(eraserMode)
     adapterInner.current = adapter
@@ -229,6 +241,16 @@ export function SelfCanvas({
 
   // 橡皮模式变化 → 同步到 adapter(text/card/all 命中过滤)。
   // adapter 重建(切画布)时构造里已 setEraserMode 初值;这里处理运行时切换。
+  // 卡片显示模式(密度切换)变化 -> 同步 adapter(构造时已传初值;这里处理运行时切换)。
+  useEffect(() => {
+    const apply = () => {
+      const m = settingsStore.get().cardDisplayMode ?? 'compact'
+      adapterInner.current?.setCardMode(m)
+    }
+    apply()
+    return settingsStore.subscribe(apply)
+  }, [])
+
   useEffect(() => {
     adapterInner.current?.setEraserMode(eraserMode)
   }, [eraserMode])

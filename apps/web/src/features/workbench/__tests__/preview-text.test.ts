@@ -2,7 +2,7 @@
  * plainPreview - markdown body 剥成单行纯文本预览(库页堆叠卡/行预览)。
  */
 import { describe, it, expect } from 'vitest'
-import { plainPreview } from '../preview-text'
+import { plainPreview, subtitleOf } from '../preview-text'
 
 describe('plainPreview', () => {
   it('剥标题 #', () => {
@@ -52,5 +52,20 @@ describe('plainPreview', () => {
 
   it('混合:标题+粗体+双链(典型卡片首行)', () => {
     expect(plainPreview('# **重点** 见 [[概念A]]', 60)).toBe('重点 见 概念A')
+  })
+})
+
+describe('subtitleOf', () => {
+  it('取首个 ## 副标题(不取 H1 / H3)', () => {
+    expect(subtitleOf('# H1\n## 副标题\n正文')).toBe('副标题')
+    expect(subtitleOf('## 直接副标题')).toBe('直接副标题')
+    expect(subtitleOf('### H3\n## H2')).toBe('H2') // 跳过 H3,取首个 H2
+  })
+  it('无 ## -> 首行 plainPreview(剥 markdown)', () => {
+    expect(subtitleOf('**粗** 首行')).toBe('粗 首行')
+    expect(subtitleOf('- 列表首行')).toBe('列表首行')
+  })
+  it('空 body -> 空串', () => {
+    expect(subtitleOf('')).toBe('')
   })
 })

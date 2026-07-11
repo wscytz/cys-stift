@@ -15,7 +15,26 @@ import { smoothBezierSegments } from './smooth-path'
  * 颜色/字体走设计 token(readToken 读 CSS 变量),不在绘制路径写裸 hex;
  * 仅 readToken 的 fallback 形参里保留 hex 兜底。
  */
-export type CardInfo = { title: string; body: string; type: string; pinned: boolean }
+export type CardInfo = { title: string; body: string; type: string; pinned: boolean; subtitle?: string }
+
+/**
+ * 卡片显示模式(密度切换,用户设置驱动,2026-07):
+ * - `compact`(默认,现状):title + body 3 行截断。
+ * - `auto`:title + body 全文 wrap 行(上限 CARD_AUTO_MAX_LINES),卡高随内容。
+ * - `title`:仅 title + 类型标,不画 body(最大密度)。
+ * - `subtitle`:title + 副标题(body 首个 `##` 或首行,web 层 getCardInfo 算好塞 CardInfo.subtitle)。
+ * 模式决定卡高 + 行数(模式管高度,用户不拖卡高;宽度仍可拖)。视图设置,不进 DSL。
+ */
+export type CardDisplayMode = 'compact' | 'auto' | 'title' | 'subtitle'
+
+// ── 卡片度量常量(与 drawElement 卡分支一致:pad=10 / 类型标 pad / title pad+16 / body pad+38 / 行高 16)──
+export const CARD_PAD = 10
+/** body 首行的 y 偏移(= pad + 38:类型标 + title 区)。 */
+export const CARD_TITLE_AREA = 48
+export const CARD_LINE_H = 16
+export const CARD_BOTTOM_PAD = 10
+/** auto 模式最大行数(超长文档不占满屏,截断)。 */
+export const CARD_AUTO_MAX_LINES = 30
 
 /**
  * 可注入的 token 解析器:把设计 token 名解析成具体值。
@@ -71,6 +90,8 @@ export function renderElements(
   // (如视锥剔除后的可见列表),端点 card 被剔除→ find 不到→ from/to=null→ 箭头不画。
   // 故实时渲染时这里传 getSortedElements()(全集),SVG 导出等不剔除场景传同一全集两次。
   allForResolution: CanvasElement[] = toDraw,
+  // 卡片显示模式(密度切换,web 层 settings 传入;默认 compact = 旧行为)。
+  cardMode: CardDisplayMode = 'compact',
 ): void {
   ctx.clearRect(0, 0, cssWidth, cssHeight)
   ctx.fillStyle = background
@@ -82,7 +103,7 @@ export function renderElements(
   for (const el of toDraw) {
     // drawElement 接收的 allElements 是端点解析全集(非 toDraw),保证箭头即便其
     // 端点 card 被视锥剔除也能 resolve 端点画出来(高倍放大消失 bug 的根因)。
-    drawElement(ctx, el, allForResolution, getCardInfo, tokenResolver)
+    drawElement(ctx, el, allForResolution, getCardInfo, tokenResolver, cardMode)
   }
   ctx.restore()
 }
@@ -93,6 +114,7 @@ function drawElement(
   allElements: CanvasElement[],
   getCardInfo: (id: string) => CardInfo | null,
   tokenResolver: TokenResolver,
+  cardMode: CardDisplayMode,
 ): void {
   switch (el.kind) {
     case 'card': {
@@ -128,13 +150,23 @@ function drawElement(
       ctx.fillStyle = tokenResolver('--color-black', '#0a0a0a')
       ctx.font = `500 15px ${tokenResolver('--font-content', 'Inter, "PingFang SC", "Microsoft YaHei UI", sans-serif')}`
       ctx.fillText(info.title || '(untitled)', el.x + pad, el.y + pad + 16)
-      // body(3 行截断,content 字体:用户输入正文,中文回退同 title)
-      if (info.body) {
+      // body(content 字体,按 cardMode 渲染:title=0 行 / subtitle=1 行副标题 / compact=3 / auto=全行截断)
+      if (info.body && cardMode !== 'title') {
         ctx.fillStyle = tokenResolver('--color-black-soft', '#475569')
         ctx.font = `12px ${tokenResolver('--font-content', 'Inter, "PingFang SC", "Microsoft YaHei UI", sans-serif')}`
-        const lines = wrapLines(info.body, el.w - pad * 2, ctx)
-        for (let i = 0; i < Math.min(3, lines.length); i++) {
-          ctx.fillText(lines[i]!, el.x + pad, el.y + pad + 38 + i * 16)
+        if (cardMode === 'subtitle') {
+          // 副标题:web 层 getCardInfo 算好的首 ## / 首行(plainPreview 剥 markdown)。
+          if (info.subtitle) {
+            ctx.fillText(info.subtitle, el.x + pad, el.y + pad + 38)
+          }
+        } else {
+          // compact / auto:wrap 行,cap 截断(compact=3,auto=CARD_AUTO_MAX_LINES)。
+          const lines = wrapLines(info.body, el.w - pad * 2, ctx)
+          const cap = cardMode === 'compact' ? 3 : CARD_AUTO_MAX_LINES
+          const lineCount = Math.min(cap, lines.length)
+          for (let i = 0; i < lineCount; i++) {
+            ctx.fillText(lines[i]!, el.x + pad, el.y + pad + 38 + i * 16)
+          }
         }
       }
       break
@@ -445,4 +477,29 @@ export function wrapLines(text: string, maxWidth: number, ctx: CanvasRenderingCo
     if (line) out.push(line)
   }
   return out
+}
+
+/**
+ * mode + body + width -> {lineCount, height}(纯函数,卡高派生核心)。
+ *
+ * - title:0 行,最小高。
+ * - subtitle:body 非空 -> 1 行(副标题文本由 web 层 getCardInfo 算,这里只定几何)。
+ * - compact:min(3, wrapped) 行。
+ * - auto:min(CARD_AUTO_MAX_LINES, wrapped) 行(超长截断)。
+ * height = CARD_TITLE_AREA + lineCount·CARD_LINE_H + CARD_BOTTOM_PAD。
+ * 需 ctx 做 wrap 测量(compact/auto);title/subtitle 不依赖 ctx(但签名统一传)。
+ */
+export function resolveCardLayout(
+  mode: CardDisplayMode,
+  body: string,
+  width: number,
+  ctx: CanvasRenderingContext2D,
+): { lineCount: number; height: number } {
+  const baseH = CARD_TITLE_AREA + CARD_BOTTOM_PAD
+  if (mode === 'title' || !body) return { lineCount: 0, height: baseH }
+  if (mode === 'subtitle') return { lineCount: 1, height: baseH + CARD_LINE_H }
+  const cap = mode === 'compact' ? 3 : CARD_AUTO_MAX_LINES
+  const wrapped = wrapLines(body, width - CARD_PAD * 2, ctx)
+  const lineCount = Math.min(cap, wrapped.length)
+  return { lineCount, height: baseH + lineCount * CARD_LINE_H }
 }

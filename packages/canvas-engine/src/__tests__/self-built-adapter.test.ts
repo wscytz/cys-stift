@@ -264,7 +264,7 @@ describe('SelfBuiltAdapter resize', () => {
   it('select 模式拖 SE handle → 缩放元素(fixed=nw)', () => {
     const host = new SelfBuiltAdapter(document.createElement('canvas'))
     const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
-    host.upsert({ id: 'c1', kind: 'card', x: 100, y: 100, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'c1', kind: 'rect', x: 100, y: 100, w: 100, h: 100, rotation: 0 })
     ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['c1'])
     // SE 角在 (200,200);down 在 SE → 进 resize;move 到 (150,150) → se 缩到 {100,100,50,50}
     dispatch(canvas, 'pointerdown', 200, 200)
@@ -450,7 +450,7 @@ describe('SelfBuiltAdapter undo coalescing (drag/resize/batch → 1 step)', () =
   it('resize:down(handle)→move×2→up 合并为 1 undo 步', () => {
     const host = new SelfBuiltAdapter(document.createElement('canvas'))
     const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
-    host.upsert({ id: 'c1', kind: 'card', x: 100, y: 100, w: 100, h: 100, rotation: 0 }) // +1 步
+    host.upsert({ id: 'c1', kind: 'rect', x: 100, y: 100, w: 100, h: 100, rotation: 0 }) // +1 步
     ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['c1'])
     dispatch(canvas, 'pointerdown', 200, 200) // SE 角 → resize 开始(+1 步 + coalescing)
     dispatch(canvas, 'pointermove', 180, 180) // 缩放(coalesced)

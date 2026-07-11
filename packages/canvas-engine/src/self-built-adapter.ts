@@ -15,7 +15,7 @@ import type {
   UserChange,
 } from './canvas-host'
 import { sortByLayer, sanitizeView, ZOOM_MIN, ZOOM_MAX } from './canvas-host'
-import { renderElements, drawSelectionOutlines, drawMarquee, domTokenResolver, type CardInfo, type TokenResolver } from './self-built-render'
+import { renderElements, drawSelectionOutlines, drawMarquee, domTokenResolver, resolveCardLayout, type CardInfo, type TokenResolver, type CardDisplayMode } from './self-built-render'
 import { hitTest, screenToPage, eraserHitTest, hitTestCardWithTolerance } from './self-built-hittest'
 import { commitFreedraw, translateFreedraw, scaleFreedrawToBox } from './self-built-freedraw'
 import { handleAtPoint, resizeGeometry, type Handle } from './self-built-resize'
@@ -38,6 +38,8 @@ export class SelfBuiltAdapter implements CanvasHost {
   protected ctx: CanvasRenderingContext2D | null
   private getCardInfo: (id: string) => CardInfo | null
   private tokenResolver: TokenResolver
+  /** 卡片显示模式(密度切换,web 层 settings 传入;默认 compact = 旧行为)。 */
+  private cardMode: CardDisplayMode = 'compact'
   private rafId: number | null = null
   private panning: {
     startSx: number
@@ -103,14 +105,44 @@ export class SelfBuiltAdapter implements CanvasHost {
 
   constructor(
     private canvas: HTMLCanvasElement,
-    opts?: { getCardInfo?: (id: string) => CardInfo | null; tokenResolver?: TokenResolver; onEraseCard?: (cardId: string) => void },
+    opts?: { getCardInfo?: (id: string) => CardInfo | null; tokenResolver?: TokenResolver; onEraseCard?: (cardId: string) => void; cardMode?: CardDisplayMode },
   ) {
     this.ctx = canvas.getContext('2d')
     this.getCardInfo = opts?.getCardInfo ?? (() => null)
     this.tokenResolver = opts?.tokenResolver ?? domTokenResolver
     this.onEraseCard = opts?.onEraseCard ?? null
+    this.cardMode = opts?.cardMode ?? 'compact'
     this.attachPointer()
     this.attachKeyboard()
+  }
+
+  /** 设置卡片显示模式(web 层 settings 变更时调,触发重渲)。 */
+  setCardMode(m: CardDisplayMode): void {
+    if (this.cardMode === m) return
+    this.cardMode = m
+    // 模式变 -> 所有卡高度都要重算(一次全量同步,不推 undo)。
+    this.syncCardHeights(this.getSortedElements())
+    this.scheduleRender()
+  }
+
+  /**
+   * 同步卡高到模式派生值(静默:不推 undo、不 emit 持久化--派生值每次 render 重算,self-heal)。
+   * @param targets 要同步的卡集合(renderNow 传 visible 省全量 wrap;setCardMode 传全集)。
+   */
+  protected syncCardHeights(targets: CanvasElement[]): void {
+    if (!this.ctx) return
+    let changed = false
+    for (const el of targets) {
+      if (el.kind !== 'card') continue
+      const info = this.getCardInfo(el.id)
+      const body = info?.body ?? ''
+      const { height } = resolveCardLayout(this.cardMode, body, el.w, this.ctx)
+      if (el.h !== height) {
+        this.elements.set(el.id, { ...el, h: height })
+        changed = true
+      }
+    }
+    if (changed) this._elementsVersion++
   }
 
   protected scheduleRender(): void {
@@ -146,6 +178,9 @@ export class SelfBuiltAdapter implements CanvasHost {
     // freedraw 预览(__preview,用户正画的)也无条件保留。
     const vp = viewportBounds(this.view, w, h)
     const visible = this.getVisibleElements(vp, w, h)
+    // 卡高同步(模式派生):每帧只同步 visible 卡(省全量 wrap);body/width 改走 upsert->
+    // scheduleRender->此行,选中卡(可见)高度跟随。模式变由 setCardMode 全量同步。
+    this.syncCardHeights(visible)
     // allForResolution = 全集(getSortedElements 缓存):关系箭头端点靠 from/to id
     // 在元素集里 find 出来。视锥剔除会丢掉屏外端点 card → 若箭头从「被剔除后的
     // 列表」里 resolve 端点会 find 不到 → 不画 → 高倍放大时长箭头凭空消失。
@@ -160,6 +195,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       this.tokenResolver('--color-canvas', '#ffffff'),
       this.tokenResolver,
       this.getSortedElements(),
+      this.cardMode,
     )
     // selection outline 需要全部元素(找 selected id),用层排序缓存(不另调 getElements)。
     drawSelectionOutlines(ctx, this.getSelectedIds(), this.getSortedElements(), this.view, this.tokenResolver)
@@ -873,6 +909,10 @@ export class SelfBuiltAdapter implements CanvasHost {
             // freedraw 真身=点序列:把点序列从旧 bbox 线性映射到新 box(不只改 bbox)。
             const scaled = scaleFreedrawToBox(el, g)
             if (scaled) this.upsert(scaled)
+          } else if (el.kind === 'card') {
+            // card 高度由 cardDisplayMode 派生(mode A):resize 只改 x/y/w,h 留给
+            // syncCardHeights 下个 render 帧按新 w 重算(拖角 -> 宽变 -> 高跟随内容)。
+            this.upsert({ ...el, x: g.x, y: g.y, w: g.w })
           } else {
             this.upsert({ ...el, x: g.x, y: g.y, w: g.w, h: g.h })
           }

@@ -135,6 +135,29 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        <section className="section">
+          <h2 className="section__h">{t('settings.cardDisplay')}</h2>
+          <p className="section__lede">{t('settings.cardDisplayLede')}</p>
+          <div className="field-row">
+            <label className="mono-label" htmlFor="set-card-display">{t('settings.cardDisplay')}</label>
+            <select
+              id="set-card-display"
+              className="set__select"
+              value={settings.cardDisplayMode ?? 'compact'}
+              onChange={(e) =>
+                settingsStore.updateCardDisplayMode(
+                  e.target.value as 'compact' | 'auto' | 'title' | 'subtitle',
+                )
+              }
+            >
+              <option value="compact">{t('settings.cardDisplayCompact')}</option>
+              <option value="auto">{t('settings.cardDisplayAuto')}</option>
+              <option value="title">{t('settings.cardDisplayTitle')}</option>
+              <option value="subtitle">{t('settings.cardDisplaySubtitle')}</option>
+            </select>
+          </div>
+        </section>
+
         {isDesktopVal && (
         <section className="section">
           <h2 className="section__h">{t('settings.captureShortcut')}</h2>
