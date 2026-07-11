@@ -408,6 +408,7 @@ export const messages = {
   'ask.newCanvasName': { zh: '画布 {n}', en: 'Canvas {n}' },
   'agent.proposeTitle': { zh: 'AI 提议改动画布「{canvas}」', en: 'AI proposes canvas edits: {canvas}' },
   'agent.appliedTitle': { zh: '已应用 ✓', en: 'Applied ✓' },
+  'ai.confirm.layoutTitle': { zh: 'AI 排版提议', en: 'AI layout proposal' },
   'agent.apply': { zh: '应用', en: 'Apply' },
   'agent.applying': { zh: '应用中…', en: 'Applying…' },
   'agent.applied': { zh: '已应用 {n} 条变更(卡 {cards})', en: 'Applied {n} changes ({cards} cards)' },
