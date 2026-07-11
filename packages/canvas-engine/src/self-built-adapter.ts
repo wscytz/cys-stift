@@ -910,9 +910,11 @@ export class SelfBuiltAdapter implements CanvasHost {
             const scaled = scaleFreedrawToBox(el, g)
             if (scaled) this.upsert(scaled)
           } else if (el.kind === 'card') {
-            // card 高度由 cardDisplayMode 派生(mode A):resize 只改 x/y/w,h 留给
-            // syncCardHeights 下个 render 帧按新 w 重算(拖角 -> 宽变 -> 高跟随内容)。
-            this.upsert({ ...el, x: g.x, y: g.y, w: g.w })
+            // card 高度由 cardDisplayMode 派生(mode A):resize 只改 x/w,**y 锚定 el.y 不动**。
+            // h 留给 syncCardHeights 下个 render 帧按新 w 重算(拖角 -> 宽变 -> 高跟随内容)。
+            // 不取 g.y:ne/nw 上角的 g.y=point.y(指针),取了卡会垂直跳到指针;mode A 高度
+            // 派生,顶应固定,只让 handle 的水平分量(x/w)生效。
+            this.upsert({ ...el, x: g.x, y: el.y, w: g.w })
           } else {
             this.upsert({ ...el, x: g.x, y: g.y, w: g.w, h: g.h })
           }

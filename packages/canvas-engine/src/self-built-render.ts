@@ -156,8 +156,11 @@ function drawElement(
         ctx.font = `12px ${tokenResolver('--font-content', 'Inter, "PingFang SC", "Microsoft YaHei UI", sans-serif')}`
         if (cardMode === 'subtitle') {
           // 副标题:web 层 getCardInfo 算好的首 ## / 首行(plainPreview 剥 markdown)。
+          // wrap 取首行(副标题语义=1 行):subtitleOf 截 60 字,窄卡(默认 240px)放不下
+          // 会横溢出边界,走 wrapLines 与 compact/auto 同口径自然截宽。
           if (info.subtitle) {
-            ctx.fillText(info.subtitle, el.x + pad, el.y + pad + 38)
+            const subLines = wrapLines(info.subtitle, el.w - pad * 2, ctx)
+            if (subLines[0]) ctx.fillText(subLines[0], el.x + pad, el.y + pad + 38)
           }
         } else {
           // compact / auto:wrap 行,cap 截断(compact=3,auto=CARD_AUTO_MAX_LINES)。

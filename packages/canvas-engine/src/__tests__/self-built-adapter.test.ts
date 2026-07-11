@@ -273,6 +273,21 @@ describe('SelfBuiltAdapter resize', () => {
     expect(host.getElement('c1')).toMatchObject({ x: 100, y: 100, w: 50, h: 50 })
   })
 
+  it('card 拖 NE handle:mode A 只改宽,y 锚定不跳(BUG-1 回归)', () => {
+    // 回归:card resize 曾取 g.y(= NE handle 的指针 y)→ 拖上角 card 垂直跳到指针。
+    // mode A 高度派生,顶应固定(y=el.y),只让 handle 水平分量(x/w)生效。
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'c1', kind: 'card', x: 100, y: 100, w: 100, h: 100, rotation: 0 })
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['c1'])
+    // NE 角 = (x+w, y) = (200,100);down 命中 NE;move 到 (150,50) 向左上拖
+    dispatch(canvas, 'pointerdown', 200, 100)
+    dispatch(canvas, 'pointermove', 150, 50)
+    dispatch(canvas, 'pointerup', 150, 50)
+    // y 锚定 100(不跳);ne: w=point.x-x=150-100=50;x 保持 100(右角不挪左)
+    expect(host.getElement('c1')).toMatchObject({ x: 100, y: 100, w: 50 })
+  })
+
   it('freedraw 模式不 resize(工具不是 select)', () => {
     const host = new SelfBuiltAdapter(document.createElement('canvas'))
     const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas

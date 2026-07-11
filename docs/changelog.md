@@ -14,8 +14,9 @@
 - **引擎**:`resolveCardLayout` 纯函数(mode+body+width -> 行数+高度);`drawElement` 卡分支按 mode 渲染;`adapter.syncCardHeights`(renderNow 同步 visible,setCardMode 全量)+ card resize 改宽不高;`CardInfo.subtitle` 由 web 层 `subtitleOf`(复用 `plainPreview`)算。
 - **设置**:`settings-store` 加 `cardDisplayMode` 字段 + `updateCardDisplayMode`;`self-canvas` 订阅 settings -> `adapter.setCardMode`。
 - **契约**:dsl round-trip/robustness 零改全绿(模式是视图设置不进 DSL;el.h 派生但 serialize 照常 emit,同 mode+body 同 h -> byte-equal)。
+- **发版前 review fix** ① card resize 拖 ne/nw 上角曾取 `g.y`(=指针 y)→ 卡垂直跳;改 `y: el.y` 锚定,mode A 高度派生只让 x/w 随 handle(顶固定)。② subtitle 渲染曾走单行 `fillText` 不 wrap,长副标题(≤60 字)溢出窄卡(默认 240px);改走 `wrapLines` 取首行(与 compact/auto 同口径)。③ `getCardInfo.subtitle` 改 lazy(仅 subtitle 模式才算,省每帧每 visible 卡一次 subtitleOf)。各配回归测。
 
-canvas-engine 537 + web 1462 tests + lint 0 + build 0。`226a90d`。
+canvas-engine 539 + web 1462 tests + lint 0 + build 0。
 
 ---
 

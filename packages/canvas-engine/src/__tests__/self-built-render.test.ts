@@ -102,6 +102,21 @@ describe('renderElements', () => {
     expect(ft.some((c) => c.startsWith('fillText(sub@'))).toBe(true)
   })
 
+  it('cardMode=subtitle:长副标题 wrap 截到首行(不溢出卡宽)', () => {
+    // 回归:subtitle 渲染曾走单行 fillText 不 wrap,subtitleOf 截 60 字 → 窄卡横溢出。
+    // mock ctx 每字 7px,卡宽 240 -> wrap 宽 220 -> 31 字/行。50 字副标题应截到 31 字。
+    const ctx = mockCtx()
+    const els: CanvasElement[] = [{ id: 'c1', kind: 'card', x: 0, y: 0, w: 240, h: 200, rotation: 0 }]
+    renderElements(
+      ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600,
+      () => ({ title: 'T', body: 'body', type: 'note', pinned: false, subtitle: 's'.repeat(50) }),
+      '#0f172a', domTokenResolver, els, 'subtitle',
+    )
+    // 首行 = 31 字(wrap 截断),不是全长 50 字(溢出)
+    expect(ctx._calls.some((c) => c.startsWith(`fillText(${'s'.repeat(31)}@`))).toBe(true)
+    expect(ctx._calls.some((c) => c.startsWith(`fillText(${'s'.repeat(50)}@`))).toBe(false)
+  })
+
   it('cardMode=compact:3 body 行截断(4 wrapped -> 3;总 5 fillText)', () => {
     const ft = cardCalls('compact')
     expect(ft.length).toBe(5) // type + title + 3 body

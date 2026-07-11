@@ -114,13 +114,17 @@ export function SelfCanvas({
         const c = service.get(id as never)
         if (!c) return null
         const body = c.body ?? ''
+        // subtitle 仅 subtitle 模式需要(render 走 wrap 取首行);其它模式不算,省每帧每
+        // visible 卡一次 subtitleOf(regex + 可能 plainPreview)。settingsStore.cardDisplayMode
+        // 与 adapter.cardMode 由下方 setCardMode useEffect 同步,此处读与 render 用的一致。
+        const needSub = (settingsStore.get().cardDisplayMode ?? 'compact') === 'subtitle'
         return {
           title: c.title,
           body,
           type: c.type,
           pinned: c.pinned,
           // subtitle 模式用:body 首个 ## 副标题,无则首行(plainPreview 剥 markdown)。
-          subtitle: body ? subtitleOf(body) : undefined,
+          subtitle: needSub && body ? subtitleOf(body) : undefined,
         }
       },
       // card 橡皮模式命中卡片 → 通知 page softDelete(进回收桶)。adapter 随后自己 remove 几何。
