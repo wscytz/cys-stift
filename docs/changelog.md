@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-07-11 · v0.57.3 · 删 dark 模式(聚焦 Bauhaus light-only)+ README 更新
+
+演示网站暗色模式箭头不可见(自研 canvas 引擎不响应主题切换重渲染:token 缓存清空靠 MutationObserver,与 adapter RAF 重渲时序竞态)+「有时候切不过去」。cy's Stift 是 Bauhaus 白底黑字经典,light 是主设计;删 dark 聚焦 + 彻底消除渲染 bug。
+
+- **删 dark**:`tokens.css` dark 块 + `globals.css` 4 组 dark 控件规则(scrollbar/checkbox/select/number 反相)+ settings 主题选择器 + i18n theme 键。
+- **theme.ts resolveTheme 恒 light**:向后兼容旧 `settings.theme='dark'`(legacy 字段保留,loadSettings/isValid 不破,但 resolveTheme 无视 → data-theme 恒 light)+ layout inline script 恒设 light + theme.test 重写。
+- **README**:v0.56.0 → v0.57.3 + 补 v0.57.x 特性(关系式坐标 DSL/卡片密度模式/双击建卡/sanitize 兜底)+ 删暗色提及 + 测数刷新。
+
+web 1456 tests + lint 0 + build 0。
+
+---
+
 ## 2026-07-11 · v0.57.2 · 卡片显示模式(密度切换:仅标题/副标题/紧凑/自适应)
 
 用户反馈画布卡片对长文处理太薄(只显 3 行截断)。加**用户可设置的卡片显示模式**:

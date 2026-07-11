@@ -61,20 +61,14 @@ export default function RootLayout({
     <html lang="zh-CN" suppressHydrationWarning className={`${display.variable} ${body.variable} ${mono.variable}`}>
       <head>
         {/*
-         * Early-apply theme (spec §5.6, 2026-06-20). The inline script
-         * runs synchronously before any page paints, so users with
-         * dark-mode preference don't see a light-mode flash. Reads the
-         * stored preference and resolves 'system' against the OS
-         * media query, then writes data-theme on <html>.
-         *
-         * After hydration the <ThemeBoot> component takes over for
-         * live OS-theme-change tracking (this script only runs once).
+         * Light-only(Bauhaus,2026-07-11 删 dark):恒 data-theme="light"。历史曾按
+         * settings/OS 切 dark(spec §5.6),但自研 canvas 引擎不响应主题重渲染致暗色
+         * 箭头不可见 + 切换时序竞态;cy's Stift 白底黑字经典,聚焦 light。inline script
+         * 首帧即设 light(防任何 flash),ThemeBoot 恒 light(见 theme.ts)。
          */}
         <script
           // eslint-disable-next-line react/no-danger
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var raw=localStorage.getItem('cys-stift.settings.v1');var pref='system';if(raw){var p=JSON.parse(raw);if(p&&p.settings&&(p.settings.theme==='light'||p.settings.theme==='dark'||p.settings.theme==='system'))pref=p.settings.theme;}var resolved=pref==='dark'?'dark':pref==='light'?'light':(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',resolved);}catch(e){document.documentElement.setAttribute('data-theme','light');}})();`,
-          }}
+          dangerouslySetInnerHTML={{ __html: `document.documentElement.setAttribute('data-theme','light');` }}
         />
       </head>
       <body>

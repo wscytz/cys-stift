@@ -21,12 +21,12 @@
 
 ## 下载
 
-最新版 [**v0.56.0**](https://github.com/wscytz/cys-stift/releases/tag/v0.56.0):
+最新版 [**v0.57.2**](https://github.com/wscytz/cys-stift/releases/tag/v0.57.2):
 
 | 平台 | 文件 | 说明 |
 |---|---|---|
-| **macOS**(Apple Silicon) | `cys-stift_0.56.0_aarch64.dmg`(6.8M) | 拖到 Applications |
-| **Windows** | `cys-stift_0.56.0_windows.zip`(5.3M) | 解压运行 .exe(需 WebView2,Win11 自带;Win10 手动装) |
+| **macOS**(Apple Silicon) | `cys-stift_0.57.2_aarch64.dmg`(7.4M) | 拖到 Applications |
+| **Windows** | `cys-stift_0.57.2_windows.zip` | 解压运行 .exe(需 WebView2,Win11 自带;Win10 手动装;CI 产出) |
 | **Android**(arm64) | `app-universal-debug.apk`(241M) | debug 版(含符号,体积大);arm64 设备可装;安装时允许"未知来源" |
 
 > iPad/iOS 不做。Windows 版走 CI(本地 macOS 不能 cross-compile)。Android release 签名版待 keystore 配置(debug 版功能完整,仅缺签名 + 体积大)。
@@ -39,7 +39,7 @@
 
 **inbox** —— 多媒介编辑(链接/代码/引用/媒体)+ 草稿自动保存 + 发送到画布。
 
-**canvas(自研 Canvas 2D)** —— 6 种元素(card/arrow/freedraw/text/rect/frame)+ 多画布 + 视图持久化 + 关系箭头(straight/curve/elbow + 手绘识别)+ 工具栏(选择/手绘/文本/连接/橡皮)+ AI 排版 + 导出(图片 SVG/PNG + Markdown + DSL)+ Outline / Minimap / 全局缩略图 + 双链 `[[]]` 自动建箭头 + **DSL 模态编辑器(转义)** + 对齐分布 9 操作 + 画布模板 + 整理范式(思维导图/流程图/网格/紧凑 × 四方向)+ 焦点模式 + frame + 手绘规范化(保角 RDP + 贝塞尔平滑 + $1 形状识别)。
+**canvas(自研 Canvas 2D)** —— 6 种元素(card/arrow/freedraw/text/rect/frame)+ 多画布 + 视图持久化 + 关系箭头(straight/curve/elbow + 手绘识别)+ 工具栏(选择/手绘/文本/连接/橡皮)+ AI 排版 + 导出(图片 SVG/PNG + Markdown + DSL)+ Outline / Minimap / 全局缩略图 + 双链 `[[]]` 自动建箭头 + **DSL 模态编辑器(转义)** + 对齐分布 9 操作 + 画布模板 + 整理范式(思维导图/流程图/网格/紧凑 × 四方向)+ 焦点模式 + frame + 手绘规范化(保角 RDP + 贝塞尔平滑 + $1 形状识别)+ **关系式坐标 DSL**(right-of/below + 碰撞避让)+ **卡片密度模式**(紧凑/自适应/仅标题/副标题)+ 双击空白建卡 + **DSL sanitize 兜底**(AI 非法值不崩)。
 
 **工作台** —— per-card 深度编辑(`/workbench` 库页 + canvas dock 编辑器 + **专注编辑态** ⤢ 二档:编辑器撑满 + 画布缩成可拖拽/收起的浮 minimap 预览)。
 
@@ -53,7 +53,7 @@
 
 **画板适配** —— 响应式(<1024 汉堡抽屉 + companion 覆盖 + canvas 断点归一)+ 触摸手势(双指 pinch zoom + 双指平移 + 触摸目标 44px)+ Android 运行时(rustls ring provider + 平台检测 SSR-safe hooks)。
 
-**其他** —— 命令面板(⌘K)+ 标签墙 `/tags`(10 色)+ 时间线 `/timeline`(全局)+ 全文搜索(title 加权 + 摘要)+ 软删恢复 + JSON 导出/导入(含画布几何 + freeform)+ 暗色模式 + 中英双语。
+**其他** —— 命令面板(⌘K)+ 标签墙 `/tags`(10 色)+ 时间线 `/timeline`(全局)+ 全文搜索(title 加权 + 摘要)+ 软删恢复 + JSON 导出/导入(含画布几何 + freeform)+ 中英双语。
 
 完整能力见 [`docs/STATE.md`](docs/STATE.md)「当前能力」段。
 
@@ -61,7 +61,7 @@
 
 ## 状态
 
-**v0.56.0** — 完整可用的本地优先灵感画布。lint 0 / test 1362 全绿 / build exit 0。
+**v0.57.2** — 完整可用的本地优先灵感画布。lint 0 / test 1995 全绿(canvas-engine 539 + web 1456)/ build exit 0。
 
 当前状态、版本里程碑、下一步、已知 debt 全见 [`docs/STATE.md`](docs/STATE.md) — 单一可信源。历史见 [`docs/changelog.md`](docs/changelog.md)。
 

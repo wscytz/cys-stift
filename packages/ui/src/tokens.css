@@ -2,12 +2,10 @@
  * Bauhaus tokens — runtime CSS variables (spec §5.1).
  * Kept in sync with tokens.ts.
  *
- * Dark variant (spec §5.6, 2026-06-20): `--color-white` and
- * `--color-black` swap so backgrounds turn dark and text stays
- * legible. The 6 chromatic Bauhaus primaries (red/yellow/blue/gray)
- * keep their hue but get brighter values for AA contrast on dark.
- * Activated by setting `data-theme="dark"` on any ancestor (root
- * `<html>` in our root layout, see apps/web layout.tsx).
+ * Light-only(2026-07-11 删 dark,原 spec §5.6):Bauhaus 白底黑字经典。历史曾支持
+ * dark,但自研 canvas 引擎不响应主题切换重渲染(暗色下箭头不可见 + 切换竞态),已移除
+ * 聚焦 light。旧 settingsStore.theme 仍接受 legacy 值,但 theme.ts resolveTheme 恒
+ * light + 此处无 dark 变体(data-theme 恒 "light")。
  */
 
 /* ── Responsive breakpoints(约定值;@media 不能用 var(),全仓 @media 统一这两个数字)──
@@ -49,46 +47,7 @@
   --color-scrim: rgba(10, 10, 10, 0.25);
 }
 
-/*
- * Dark theme: backgrounds invert (white → near-black), text inverts
- * (black → near-white). Hue tokens (red/yellow/blue/gray) brighten to
- * keep AA contrast on the dark page. Soft variants go to deep
- * coloured washes (instead of pastels) so the muted-soft usage in
- * confirm modals stays readable.
- *
- * Specificity: `:root[data-theme='dark']` is 0,1,1 (one type, one
- * class+attr), beating `:root` (0,0,1) and the plain
- * `[data-theme='light']` (0,1,0) so it wins over the light default
- * and any Tailwind preset reset of the same vars.
- */
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --color-red: #ff4d4d;
-  --color-red-soft: #3a0e0e;
-  --color-yellow: #ffd633;
-  --color-yellow-soft: #3a3308;
-  --color-blue: #66a3ff;
-  --color-blue-soft: #0e1f3a;
-  --color-black: #fafafa;
-  --color-black-soft: #d9d9d9;
-  --color-white: #0a0a0a;
-  --color-white-soft: #161616;
-  --color-gray: #808080;
-  --color-gray-soft: #2b2b2b;
-
-  /* Borders — in dark we want a thin gray hairline instead of black
-     on black. */
-  --border-hairline: 1px solid var(--color-gray);
-  --border-thick: 2px solid var(--color-gray);
-
-  --shadow-sm: 0 1px 0 0 currentColor;
-  --shadow-md: 2px 2px 0 0 currentColor;
-  --shadow-lg: 4px 4px 0 0 currentColor;
-
-  --color-canvas: var(--color-white-soft);
-  --color-page-bg: var(--color-white);
-  --color-page-fg: var(--color-black);
-}
+/* Dark variant removed (2026-07-11): light-only,见文件顶部说明。 */
 
 :root {
   /* color-scheme: 让 WebView 的 native 控件(select/checkbox/滚动条/number spinner)

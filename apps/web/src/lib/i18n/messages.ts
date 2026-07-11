@@ -555,12 +555,6 @@ export const messages = {
 
   /* ── Settings ── */
   'settings.crumb': { zh: '设置', en: 'settings' },
-  'settings.appearance': { zh: '外观', en: 'Appearance' },
-  'settings.appearanceLede': { zh: '在亮色与暗色模式之间切换。「跟随系统」实时追踪 OS 设置。（Bauhaus 六原色保留）', en: 'Switch between light and dark. "Follow system" tracks your OS setting live. (Six Bauhaus colours preserved.)' },
-  'settings.theme': { zh: '主题', en: 'Theme' },
-  'settings.themeSystem': { zh: '跟随系统', en: 'Follow system' },
-  'settings.themeLight': { zh: '亮色', en: 'Light' },
-  'settings.themeDark': { zh: '暗色', en: 'Dark' },
   'settings.cardDisplay': { zh: '卡片显示', en: 'Card display' },
   'settings.cardDisplayLede': { zh: '画布卡片的密度(模式决定卡高;宽度仍可拖)。', en: 'Density of canvas cards (mode sets card height; width still draggable).' },
   'settings.cardDisplayCompact': { zh: '紧凑(3 行截断)', en: 'Compact (3 lines)' },

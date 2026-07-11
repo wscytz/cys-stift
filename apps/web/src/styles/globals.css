@@ -45,15 +45,6 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-gray); }
 ::-webkit-scrollbar-corner { background: transparent; }
-/* 暗色反相:thumb 白,边暗色。 */
-:root[data-theme='dark'] * {
-  scrollbar-color: var(--color-white) transparent;
-}
-:root[data-theme='dark'] ::-webkit-scrollbar-thumb {
-  background: var(--color-white);
-  border-color: var(--color-black);
-}
-:root[data-theme='dark'] ::-webkit-scrollbar-thumb:hover { background: var(--color-gray); }
 
 /* ── Bauhaus native 控件自绘(v0.39.1 跨平台适配)──────────────────────────
    Mac/Win 都不复用系统控件 —— 统一一套硬边框、无圆角、token 配色的 Bauhaus 控件。
@@ -90,13 +81,6 @@ input[type='checkbox']:checked::after {
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
-:root[data-theme='dark'] input[type='checkbox'] {
-  border-color: var(--color-white);
-  background: transparent;
-}
-:root[data-theme='dark'] input[type='checkbox']:hover { border-color: var(--color-gray); }
-:root[data-theme='dark'] input[type='checkbox']:checked { background: var(--color-white); }
-:root[data-theme='dark'] input[type='checkbox']:checked::after { border-color: var(--color-black); }
 
 /* select:自绘触发器(token 边框 + 自定义 ▾ 箭头),下拉面板本体仍 native。
    保留原生焦点环供可访问性。 */
@@ -120,12 +104,6 @@ select {
 }
 select:hover { border-color: var(--color-black); }
 select:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-:root[data-theme='dark'] select {
-  background-color: var(--color-black);
-  color: var(--color-white);
-  border-color: var(--color-white);
-}
-:root[data-theme='dark'] select option { background: var(--color-black); color: var(--color-white); }
 
 /* number:隐藏 spinner(Tauri WebView2 下暗色出戏),保留可输入。
    体积/数量输入用步进,但靠键盘;spinner 隐藏统一外观。 */
@@ -145,11 +123,6 @@ input[type='number']::-webkit-outer-spin-button {
   margin: 0;
 }
 input[type='number'] { -moz-appearance: textfield; }
-:root[data-theme='dark'] input[type='number'] {
-  background-color: var(--color-black);
-  color: var(--color-white);
-  border-color: var(--color-white);
-}
 
 a {
   color: var(--color-blue);

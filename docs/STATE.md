@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.57.2(2026-07-11 tag 发版;卡片显示模式)。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.57.3(2026-07-11 tag 发版;删 dark 聚焦 light。v0.57.2 卡片显示模式 + 发版前 review fix)。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 
@@ -48,6 +48,9 @@
 | **v0.54.0** | **工作台专注编辑态:「展开工作台」后深度编辑加二档,dock 头部 ⤢ 触发,编辑器撑满 + 画布缩成可拖拽 / 可收起(剩角)的浮 `MinimapPreview`(独立组件,复用 minimap 投影纯函数 + drawElementMark);`.cv-host` 隐不卸载保 view 态 + chrome(Toolbar/SideRail/Outline/Companion/原 Minimap)隐;workbench-store +focusEdit(会话态,不持久);与 ⌘. 画布焦点模式互斥(双向)。老 minimap 收起条状 spec §7 记不连带改。web 1352 测试。** | v0.54.0 |
 | **v0.55.0** | **Markdown 数学公式 + 脚注(katex):`$inline$` / `$$display$$` 经 remark-math + rehype-katex;katex CSS **本地 bundle**(不走 CDN,56 woff2 字体落 media);脚注走 **remark-gfm 内置**(`remark-footnotes` v5 已废弃空 stub);sanitize 放行 `math` class + katex 后跑绕过(无需 mathml 枚举),script 仍剥。单一渲染器 MarkdownBody,工作台编辑器预览联动。顺带:workbench focus-mode 互斥抽 `nextFocusStates` 纯函数 + 6 测(v0.54.0 final review 的 Important defer 闭合)。web 1362 测试** | v0.55.0 |
 | **v0.56.0** | **打包分发版:UI 打磨批(暗色代码块反相 HIGH 修复 + i18n 漏键 + focus-visible 一致性 + 触摸目标 + token 漂移,Explore 审计 10 瑕疵)+ c1 DSL 重试闭环核对闭合(三路径自动重试 + c2 失败采集,user+messages 同传澄清非 bug)+ 类型逃逸修复(file-drop-handler latent bug + canvasId 占位)+ 文档对齐一轮(STATE 瘦身/user-README 工具栏修正/architecture tldraw→自研)+ deepresearch 竞品对标报告(内部决策用,私有仓)。lint 0/test 1362/build 0** | v0.56.0 |
+| **v0.57.1** | **DSL 兜底 + 关系式 + PEG + 双击建卡 + 工作台打磨:sanitize 层(tldraw 风纯函数永不抛错,case 1-11)+ 关系式坐标 DSL(right-of/below + 碰撞避让 solver,论文 #3 产品化)+ parser 正则→Peggy 语法驱动(6 套 191 测 byte-equal)+ arrow #id 可选 + 双击空白建卡 + 工作台 dock 完成按钮/保存状态/术语统一/库页剥 markdown 预览** | v0.57.1 |
+| **v0.57.2** | **卡片显示模式(密度切换):4 档(紧凑/自适应/仅标题/副标题)+ 模式管高度(mode A,用户不拖高)+ settings 单选 + 发版前 review fix(card resize 拖 ne/nw 上角锚定 y 不跳 + subtitle wrap 取首行不溢出 + getCardInfo subtitle lazy)** | v0.57.2 |
+| **v0.57.3** | **删 dark 模式(聚焦 Bauhaus light-only):演示网站暗色箭头不可见(canvas 引擎不响应主题切换重渲染:token 缓存 MutationObserver 与 RAF 时序竞态)+「切不过去」→ 删 tokens/globals dark 规则 + settings 主题选择器 + theme.ts resolveTheme 恒 light(legacy settings.theme 兼容)+ README 更新 v0.57.x** | v0.57.3 |
 
 > v0.18–v0.21 版本号在历史中跳过(从 v0.17.0 直接进 v0.22.0),非缺失。
 > **v0.27.1-review-hardening 无独立 tag** — 该轮 hardening(rehydrateCards / parseCardsRaw / geometry reconcile / M1 label)的工作被折进 v0.31.0 重构(refactor v0.31.0-p1.2/p1.3,见 `docs/decisions/2026-06-21-v0.27.1-review-hardening.md`)。

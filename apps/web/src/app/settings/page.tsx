@@ -114,28 +114,6 @@ export default function SettingsPage() {
         </section>
 
         <section className="section">
-          <h2 className="section__h">{t('settings.appearance')}</h2>
-          <p className="section__lede">{t('settings.appearanceLede')}</p>
-          <div className="field-row">
-            <label className="mono-label" htmlFor="set-theme">{t('settings.theme')}</label>
-            <select
-              id="set-theme"
-              className="set__select"
-              value={settings.theme}
-              onChange={(e) =>
-                settingsStore.updateTheme(
-                  e.target.value as 'light' | 'dark' | 'system',
-                )
-              }
-            >
-              <option value="system">{t('settings.themeSystem')}</option>
-              <option value="light">{t('settings.themeLight')}</option>
-              <option value="dark">{t('settings.themeDark')}</option>
-            </select>
-          </div>
-        </section>
-
-        <section className="section">
           <h2 className="section__h">{t('settings.cardDisplay')}</h2>
           <p className="section__lede">{t('settings.cardDisplayLede')}</p>
           <div className="field-row">
