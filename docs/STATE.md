@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.57.0(未 tag,代码测全绿,待手测发版)。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.57.1(2026-07-11 tag 发版;v0.57.0 未单独 tag,并入本版)。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 
@@ -165,17 +165,13 @@
 > 判断"这一步该不该做"先读 **[`docs/development/polish-phase.md`](development/polish-phase.md)**(打磨 vs 修缝判据 + 反馈驱动流程 + 退出标准)。
 > 燃料 = 你手测的真实反馈。每轮主线开工走 brainstorming,严守「一次一问 + 逐段确认」(skill-checklist-discipline 记忆)。
 
-### 当前焦点(2026-07-11,v0.57.0 发版准备)
+### 当前焦点(2026-07-11,v0.57.1 已发)
 
-**v0.56.0 已发**(打包分发版:UI 打磨批 + c1 闭合 + 类型逃逸修复 + 文档对齐)。主线进 **v0.57.0 发版准备**:
+**v0.57.1 已 tag 发版**(DSL sanitize 兜底层 + 关系式坐标+碰撞避让 + arrow#id 可选 + parser 正则->Peggy + 双击建卡入口 + 工作台编辑打磨:完成按钮/保存状态/专注术语/库页预览剥 markdown)。v0.57.0 未单独 tag,并入 v0.57.1。
 
-- **未发布堆(全在 main、代码测全绿、未 tag)** —— 一条 DSL/排版纵深线 + parser/UX:
-  - **sanitize 兜底层全闭合**(`dsl-sanitize.ts`,学 tldraw sanitization,纯函数永不抛错):case 6 非法 size 修正 / case 1·11·7 diagnostic + ctx 基础设施 / case 5 越界坐标钳位(保负向)/ case 2a 修 createWithId 静默吞(计数 cardsFailed)/ case 2b create id 冲突预检 / case 3 跨 kind 告警 / case 4 free create 用 op.id;diagnostic toast 透出 UI(丢卡/幽灵端点不再静默)。
-  - **关系式坐标**(`right-of`/`below #anchor @gap`)+ **碰撞避让 solver**(单遍解算 + axis-aligned flow avoidance,消除参照系碰撞)+ **arrow #id 可选**(LLM 常省略)。
-  - **relational 进 AI prompt**(结构化布局优先用关系式,论文 H2a 产品化)。
-  - **DSL parser 正则 → Peggy 语法驱动**(07-11):`dsl.peggy` + 生成 `dsl-parser.gen.js` + TS 包装层;行为守恒(6 套 191 测零改全绿),不 bump DSL_VERSION;加指令从 4–6 处降到 3 处。
-  - **双击空白建卡入口**(07-11):Figma/tldraw 惯例,新用户可发现;与右键菜单建卡并存。
-- **发版门 = 手测**(代码测不能验真 AI + 真 app):清单见 `cys-stift-docs/docs/handoff/2026-07-09-handtest-checklist-v057.md`(A 关系式+避让 / B sanitize+toast / C arrow#id = 发布阻塞;D v0.54/v0.55 旧债)+ **07-11 新增:E 双击建卡手感 / F PEG 往返(AI 排版 + DSL 对话框粘贴往返)**。**全绿 → 切 v0.57.0 tag**。
+- **手测仍需真机验**(代码测全绿,但真 AI + 真 app 只能手测):清单见 `cys-stift-docs/docs/handoff/2026-07-09-handtest-checklist-v057.md`(A 关系式+避让 / B sanitize+toast / C arrow#id / D v0.54/v0.55 旧债 / E 双击建卡 / F PEG 往返 / G 工作台完成按钮+保存状态+预览剥 markdown)。发现问题 -> 补 v0.57.2。
+- **下一步候选**:卡片长文处理(缩略太薄,用户反馈)+ 专注态可发现(⤢ 加标签/长文自动进,第二批)+ 堆叠卡交互(可点/溢出计数)。
+
 
 product-idea 大方向四块**全闭合**:#1 大卡搁置 / #2 DSL 版本号 v0.45 / #3 工作台 v0.51+v0.54 / #4 Markdown v0.38+v0.55。
 

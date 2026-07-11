@@ -6,6 +6,7 @@ import { useI18n } from '@/lib/i18n'
 import { useCanvases } from '@/lib/canvas-store'
 import type { WorkbenchModeId } from './workbench-modes'
 import { groupForMode, extractPinned, type WorkbenchSection } from './workbench-grouping'
+import { plainPreview } from './preview-text'
 
 /**
  * WorkbenchSections — 分区列表(手风琴:同时只一区展开)。
@@ -87,8 +88,8 @@ export function WorkbenchSections({
               >
                 <span className="wb__rb" style={{ background: 'var(--color-yellow)' }} aria-hidden="true" />
                 <div className="wb__rowtext">
-                  <div className="wb__rowtitle">{c.title || c.body.slice(0, 40) || c.id}</div>
-                  <div className="wb__rowpreview">{c.body.slice(0, 60)}</div>
+                  <div className="wb__rowtitle">{c.title || plainPreview(c.body, 40) || c.id}</div>
+                  <div className="wb__rowpreview">{plainPreview(c.body, 60)}</div>
                 </div>
               </li>
             ))}
@@ -155,8 +156,8 @@ function WorkbenchSectionRow({
             >
               <span className="wb__rb" style={{ background: section.colorBar }} aria-hidden="true" />
               <div className="wb__rowtext">
-                <div className="wb__rowtitle">{c.title || c.body.slice(0, 40) || c.id}</div>
-                <div className="wb__rowpreview">{c.body.slice(0, 60)}</div>
+                <div className="wb__rowtitle">{c.title || plainPreview(c.body, 40) || c.id}</div>
+                <div className="wb__rowpreview">{plainPreview(c.body, 60)}</div>
               </div>
             </li>
           ))}
@@ -171,8 +172,8 @@ function WorkbenchSectionRow({
               .map((c, i) => (
                 <div key={c.id} className="wb__minicard" style={{ opacity: i === 0 ? 1 : 0.9 }}>
                   <span className="wb__mcbar" style={{ background: section.colorBar }} />
-                  <div className="wb__mctitle">{c.title || c.body.slice(0, 24) || c.id}</div>
-                  <div className="wb__mcpreview">{c.body.slice(0, 30)}</div>
+                  <div className="wb__mctitle">{c.title || plainPreview(c.body, 24) || c.id}</div>
+                  <div className="wb__mcpreview">{plainPreview(c.body, 30)}</div>
                 </div>
               ))}
           </div>

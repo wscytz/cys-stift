@@ -5,9 +5,9 @@
 
 ---
 
-## 2026-07-11 · v0.57.0（未 tag,待手测）· DSL 兜底层 + 关系式坐标 + parser PEG 化 + 双击建卡入口
+## 2026-07-11 · v0.57.1 · DSL 兜底层 + 关系式坐标 + parser PEG 化 + 双击建卡 + 工作台编辑打磨
 
-四条线攒在 main 上,代码测全绿,**未 tag**(发版门 = 手测绿 → 切 v0.57.0 tag)。sanitize 07-07 / relational 07-09 / PEG + UX 07-11。
+五条线攒在 main 上,代码测全绿,tag v0.57.1 发版(v0.57.0 未单独 tag,并入本版)。sanitize 07-07 / relational 07-09 / PEG + UX 07-11 / 工作台打磨 07-11。
 
 ### DSL sanitize 兜底层（`dsl-sanitize.ts`,新）— 学 tldraw sanitization,纯函数永不抛错
 
@@ -42,7 +42,15 @@ web 1439 tests + lint 0(6 包)+ build exit 0(2026-07-09 全门复验)。relation
 
 新用户找不到建卡入口(右键菜单不可发现)。加 **双击空白处直建卡**(self-canvas `onDoubleClick` 未命中卡/frame/选中箭头 → 复用 CanvasContextMenu 的 `creating` 模式,跳过三选项菜单直入标题输入;选中箭头时仍走加折点),与既有右键菜单建卡并存;顺带修空状态/首页假文案(原"双击创建"此前是错的——双击空白并不建卡,现在真建了)。`2b873b2`。
 
-web 1449 tests + lint 0 + build exit 0(2026-07-11 全门复验;PEG 差分门 6 套 191 测零改全绿 = 行为守恒证明)。
+### 工作台编辑打磨（2026-07-11）
+
+用户反馈"工作台编辑不够清晰 + 找不到退出按钮",三处改:
+
+- **dock 显式「完成 ✓」按钮 + 保存状态指示**(`workbench-panel.tsx`):原 X 关闭键(纯图标"关闭",其实 flush+close)重做为实心黑底「完成」按钮(显式 commit);头部加 autosave 状态(`保存中…`->`✓ 已保存`,派生 dirty + flush 后 1.5s savedFlash)让 autosave 不再隐身。i18n 加 `workbench.done/saving/saved` + `common.done`。
+- **术语统一**:`canvas.exitFocus`("退出焦点")原被 ⌘. 焦点模式与 ⤢ 专注编辑**共用**导致混淆;新增 `canvas.exitFocusEdit`="退出专注"专给工作台 ⤢ 退出,`canvas.exitFocus` 留给 ⌘. 焦点模式。
+- **库页预览剥 markdown**(`workbench-sections.tsx` + 新 `preview-text.ts` 纯函数):堆叠卡/行预览原 `body.slice(0,N)` 裸露 `#`/`**`/`[[]`/代码符;改用 `plainPreview(md,N)` 轻量剥标记取首段纯文本(9 测覆盖)。markdown 卡预览可读。
+
+web 1459 tests + lint 0 + build exit 0(2026-07-11 全门复验;PEG 差分门 6 套 191 测零改全绿 = 行为守恒证明)。
 
 ---
 

@@ -46,6 +46,9 @@ export function WorkbenchPanel({
   const { t } = useI18n()
   const [title, setTitle] = useState(card.title)
   const [body, setBody] = useState(card.body)
+  // savedFlash:flush 后短暂亮「已保存」1.5s,让 autosave 可见(用户知道编辑落了)。
+  const [savedFlash, setSavedFlash] = useState(false)
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // 最新草稿 + 最新 onSave 放 ref，避免防抖 effect 依赖函数身份。
   const draftRef = useRef({ title, body })
@@ -53,29 +56,43 @@ export function WorkbenchPanel({
   const onSaveRef = useRef(onSave)
   onSaveRef.current = onSave
 
+  // flush:脏才存 + 亮「已保存」。放 ref 让防抖 effect / close 共用,不进 effect deps。
+  const flushRef = useRef<() => void>(() => {})
+  flushRef.current = () => {
+    const d = draftRef.current
+    if (d.title !== card.title || d.body !== card.body) {
+      onSaveRef.current({ title: d.title, body: d.body, tags: card.tags ?? [] })
+      setSavedFlash(true)
+      if (flashTimer.current) clearTimeout(flashTimer.current)
+      flashTimer.current = setTimeout(() => setSavedFlash(false), 1500)
+    }
+  }
+
   // 切卡时重置草稿（card.id 变或 card 内容变）
   useEffect(() => {
     setTitle(card.title)
     setBody(card.body)
   }, [card.id, card.title, card.body])
 
+  // dirty = 有未 flush 的编辑(派生:草稿 vs card 当前值)。
+  const dirty = title !== card.title || body !== card.body
+
   // 防抖自动存（500ms）。脏才存。
   useEffect(() => {
-    const id = setTimeout(() => {
-      const d = draftRef.current
-      if (d.title !== card.title || d.body !== card.body) {
-        onSaveRef.current({ title: d.title, body: d.body, tags: card.tags ?? [] })
-      }
-    }, 500)
+    const id = setTimeout(() => flushRef.current(), 500)
     return () => clearTimeout(id)
   }, [title, body, card.title, card.body, card.tags])
 
+  // 卸载清 flash 定时器。
+  useEffect(
+    () => () => {
+      if (flashTimer.current) clearTimeout(flashTimer.current)
+    },
+    [],
+  )
+
   const handleClose = () => {
-    // 收起前 flush 脏编辑，防丢。
-    const d = draftRef.current
-    if (d.title !== card.title || d.body !== card.body) {
-      onSaveRef.current({ title: d.title, body: d.body, tags: card.tags ?? [] })
-    }
+    flushRef.current() // 收起前 flush 脏编辑，防丢。
     onClose()
   }
 
@@ -95,25 +112,29 @@ export function WorkbenchPanel({
           aria-label={t('card.detail.fieldTitle')}
         />
         <Tag color="black">{t(typeKeyOf(card.type))}</Tag>
+        <span className="wb-panel__status" aria-live="polite" data-testid="wb-status">
+          {dirty ? t('workbench.saving') : savedFlash ? t('workbench.saved') : ''}
+        </span>
         <button
           type="button"
           data-testid="wb-focus-toggle"
           className="wb-panel__focus"
           onClick={onToggleFocusEdit}
-          aria-label={focusEdit ? t('canvas.exitFocus') : t('canvas.focusEdit')}
+          aria-label={focusEdit ? t('canvas.exitFocusEdit') : t('canvas.focusEdit')}
           aria-pressed={focusEdit}
-          title={focusEdit ? t('canvas.exitFocus') : t('canvas.focusEdit')}
+          title={focusEdit ? t('canvas.exitFocusEdit') : t('canvas.focusEdit')}
         >
           <WorkbenchIcon name={focusEdit ? 'collapse' : 'expand'} size={16} />
         </button>
         <button
           type="button"
-          className="wb-panel__close"
+          data-testid="wb-done"
+          className="wb-panel__done"
           onClick={handleClose}
-          aria-label={t('common.close')}
-          title={t('common.close')}
+          aria-label={t('workbench.done')}
+          title={t('workbench.done')}
         >
-          <WorkbenchIcon name="collapse" size={16} />
+          {t('workbench.done')}
         </button>
       </header>
       <div className="wb-panel__body">
@@ -168,20 +189,33 @@ const styles = `
 }
 .wb-panel__title:focus { border-bottom-color: var(--color-red); }
 .wb-panel__title:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-.wb-panel__close {
-  width: 28px;
+/* autosave 状态:保存中… / ✓ 已保存。aria-live 让屏幕阅读器播报。min-width 防切换抖动。 */
+.wb-panel__status {
+  font-size: var(--font-size-xs);
+  color: var(--color-gray);
+  white-space: nowrap;
+  min-width: 52px;
+  text-align: right;
+  flex-shrink: 0;
+}
+/* 完成按钮:实心黑底白字(主动作,显式 commit+close),区别于专注切换的描边按钮。 */
+.wb-panel__done {
+  padding: 0 var(--space-2);
   height: 28px;
   display: grid;
   place-items: center;
-  border: var(--border-hairline);
-  background: var(--color-white);
-  color: var(--color-black);
+  border: 1.5px solid var(--color-black);
+  background: var(--color-black);
+  color: var(--color-white);
   cursor: pointer;
-  border-radius: var(--radius-sm);
+  border-radius: 1px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--font-size-xs);
   flex-shrink: 0;
 }
-.wb-panel__close:hover { background: var(--color-yellow-soft); }
-.wb-panel__close:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.wb-panel__done:hover { background: var(--color-red); border-color: var(--color-red); }
+.wb-panel__done:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .wb-panel__focus {
   width: 28px;
   height: 28px;
@@ -202,7 +236,7 @@ const styles = `
 }
 /* 触摸目标放大:画板/窄屏(<1024)按钮 28→40,与 canvas rail 事实标准对齐。 */
 @media (max-width: 1023px) {
-  .wb-panel__close, .wb-panel__focus { width: 40px; height: 40px; }
+  .wb-panel__done, .wb-panel__focus { height: 40px; }
 }
 .wb-panel__body {
   flex: 1;

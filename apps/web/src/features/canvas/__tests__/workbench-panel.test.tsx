@@ -58,7 +58,7 @@ describe('WorkbenchPanel', () => {
     const onSave = vi.fn()
     const onClose = vi.fn()
     const { host } = render(<WorkbenchPanel card={card} onSave={onSave} onClose={onClose} />)
-    const btn = host.querySelector('button[aria-label="common.close"]') as HTMLButtonElement
+    const btn = host.querySelector('button[aria-label="workbench.done"]') as HTMLButtonElement
     act(() => {
       btn.click()
     })
@@ -80,12 +80,29 @@ describe('WorkbenchPanel', () => {
       setter.call(ta, '改过的正文')
       ta.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    const btn = host.querySelector('button[aria-label="common.close"]') as HTMLButtonElement
+    const btn = host.querySelector('button[aria-label="workbench.done"]') as HTMLButtonElement
     act(() => {
       btn.click()
     })
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ body: '改过的正文' }))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('保存状态:初始空;编辑后显「保存中…」(autosave 可见化)', () => {
+    const { host } = render(<WorkbenchPanel card={card} onSave={vi.fn()} onClose={vi.fn()} />)
+    const status = host.querySelector('[data-testid="wb-status"]') as HTMLElement
+    expect(status.textContent).toBe('') // 初始无编辑 -> 空
+    const ta = host.querySelector('textarea') as HTMLTextAreaElement
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      'value',
+    )!.set!
+    act(() => {
+      setter.call(ta, '新内容')
+      ta.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    expect(status.textContent).toBe('workbench.saving') // dirty -> 保存中
+    host.remove()
   })
 
   it('切卡（card.id 变）重置草稿标题', () => {
