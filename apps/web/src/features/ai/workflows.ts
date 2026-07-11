@@ -26,6 +26,52 @@ import { serializeCardsForAI } from './ai-context'
 import { getCurrentAI, isAIReady } from './ai-settings-provider'
 import { streamText } from './stream-text'
 
+export interface GenerateOutlineResult {
+  /** false = AI 未就绪或卡片太少(调用方提示 outlineTooFew)。 */
+  ok: boolean
+  /** ok=true 但 AI 返回空(调用方提示 outlineEmpty)。 */
+  empty?: boolean
+  /** ok=true 且非空:大纲 markdown(调用方开确认门;确认后才建卡)。 */
+  markdown?: string
+}
+
+/**
+ * 生成大纲 markdown(只 AI,不建卡)—— 给画布确认门用。
+ *
+ * summarizeOutline 的拆分:本函数只负责"读卡 → AI → 返回 markdown",
+ * 建卡时机上移到调用方(确认门 apply 时)。隐私同 summarizeOutline
+ * (serializeCardsForAI allowlist + 软删过滤,无 deviceId/media.dataUrl,无 vision)。
+ */
+export async function generateOutline(
+  opts: { service: CardService; canvasId: CanvasId; signal?: AbortSignal },
+): Promise<GenerateOutlineResult> {
+  const cfg = getCurrentAI()
+  if (!cfg || !isAIReady(cfg)) return { ok: false }
+
+  const cards = opts.service
+    .listOnCanvas(opts.canvasId)
+    .filter((c) => !c.archived && !c.deletedAt)
+  if (cards.length < 2) return { ok: false }
+
+  const serialized = serializeCardsForAI(cards)
+
+  const systemPrompt =
+    'You are a summarization assistant. Given canvas cards, output a concise Markdown outline grouping them by theme. Group related cards under ## headings; list card titles as bullets. Output Markdown only — no preamble, no code fences.'
+
+  const userPrompt = `Summarize these cards into a Markdown outline grouped by theme:\n\n${serialized}`
+
+  const result = await streamText(
+    cfg,
+    { system: systemPrompt, user: userPrompt, temperature: 0.3 },
+    () => {},
+    opts.signal,
+  )
+
+  const content = result?.content?.trim()
+  if (!content) return { ok: true, empty: true }
+  return { ok: true, markdown: content }
+}
+
 export interface SummarizeOutlineResult {
   /** false = AI 未就绪或卡片太少(已静默 no-op,调用方决定是否提示)。 */
   ok: boolean
