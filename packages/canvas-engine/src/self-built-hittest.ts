@@ -2,6 +2,7 @@
 import type { CanvasElement, CanvasView } from './canvas-host'
 import { normalizeBox } from './bounds'
 import { arrowEndpoints, arrowRoute, elbowSegments, autoElbowPath, cardObstacles } from './self-built-arrow'
+import { freedrawPointsOf } from './self-built-freedraw'
 
 /** 命中容差:屏幕 6px,页坐标里 /zoom(由调用方传入)。 */
 const HIT_TOLERANCE_PX = 6
@@ -203,9 +204,13 @@ export function eraserHitTest(
       continue
     }
     if (el.kind === 'freedraw') {
-      const pts = (el.meta?.points as [number, number][] | undefined) ?? []
-      for (let j = 1; j < pts.length; j++) {
-        if (pointToSegmentDistance(pageX, pageY, pts[j-1]![0], pts[j-1]![1], pts[j]![0], pts[j]![1]) <= lineTol) return el.id
+      // freedrawPointsOf 唯一 sanctioned reader(R2 收敛):免得未来它加校验(过滤 NaN / 改存储)
+      // 时,擦除几何和渲染读法发散。空/缺 → null → 跳过(等价旧 ?? [] 的"不命中")。
+      const pts = freedrawPointsOf(el)
+      if (pts) {
+        for (let j = 1; j < pts.length; j++) {
+          if (pointToSegmentDistance(pageX, pageY, pts[j-1]![0], pts[j-1]![1], pts[j]![0], pts[j]![1]) <= lineTol) return el.id
+        }
       }
       continue
     }
