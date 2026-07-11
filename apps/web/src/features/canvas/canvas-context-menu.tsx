@@ -10,11 +10,13 @@ import { useI18n } from '@/lib/i18n'
  * portal 到 body,复用 cv-rail__menu 视觉。
  */
 export function CanvasContextMenu({
-  open, x, y, onClose, onCreateHere, onPasteDsl, onFitView,
+  open, x, y, initialCreating, onClose, onCreateHere, onPasteDsl, onFitView,
 }: {
   open: boolean
   x: number
   y: number
+  /** 打开即直入「建卡」输入模式(双击空白建卡复用此组件,跳过三选项菜单)。 */
+  initialCreating?: boolean
   onClose: () => void
   onCreateHere: (title: string) => void
   onPasteDsl: () => void
@@ -35,7 +37,8 @@ export function CanvasContextMenu({
 
   useEffect(() => {
     if (!open) { setCreating(false); setTitle(''); committedRef.current = false }
-  }, [open])
+    else if (initialCreating) setCreating(true) // 双击空白建卡:打开即直入输入模式
+  }, [open, initialCreating])
 
   if (!open || typeof document === 'undefined') return null
 

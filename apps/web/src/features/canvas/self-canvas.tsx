@@ -50,6 +50,7 @@ export function SelfCanvas({
   eraserMode,
   onEraseCard,
   onOpenCard,
+  onDoubleClickEmpty,
   adapterRef,
   canvasElRef,
   onAdapterReady,
@@ -63,6 +64,9 @@ export function SelfCanvas({
   /** card 模式命中卡片时触发(page 层 service.softDelete 进回收桶)。 */
   onEraseCard: (cardId: string) => void
   onOpenCard: (card: Card) => void
+  /** 双击空白画布(未命中卡片/frame、且无选中箭头)→ 建卡。page 层打开「在此处建卡」内联输入。
+   *  Figma/tldraw 惯例:双击空白直建卡(比右键菜单易发现);与右键菜单建卡并存。 */
+  onDoubleClickEmpty?: (pageX: number, pageY: number, clientX: number, clientY: number) => void
   adapterRef: React.MutableRefObject<SelfCanvasHandle>
   /** Page-supplied ref so the RelationPanel can read the canvas rect for
    *  positioning (子4: panel floats above selected arrow, needs screen coords). */
@@ -208,8 +212,14 @@ export function SelfCanvas({
         return
       }
     }
-    // 未命中卡片/frame:选中箭头时双击 → 加折点(elbow 未满)/ 重置直线(否则)。
-    adapter.doubleClickArrowAt(p)
+    // 未命中卡片/frame:选中箭头 → 加折点(elbow 未满)/ 重置直线(existing);
+    // 否则空白处双击 → 建卡(Figma/tldraw 惯例,比右键菜单易发现)。
+    const selArrow = adapter.getSelectedIds().some((id) => adapter.getElement(id)?.kind === 'arrow')
+    if (selArrow) {
+      adapter.doubleClickArrowAt(p)
+    } else if (onDoubleClickEmpty) {
+      onDoubleClickEmpty(p.x, p.y, e.clientX, e.clientY)
+    }
   }
 
   // edit 会话出现时 focus textarea。

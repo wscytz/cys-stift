@@ -149,7 +149,7 @@ export default function CanvasPage() {
   const [shortcutOpen, setShortcutOpen] = useState(false)
   const [diffOpen, setDiffOpen] = useState(false)
   const [overviewOpen, setOverviewOpen] = useState(false)
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; px: number; py: number } | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; px: number; py: number; creating?: boolean } | null>(null)
 
   // useMemo:snap/画布变化才重算(listOnCanvas + filter 是 2 次 O(n),无 memo 每 render 重算)。
   const onCanvas = useMemo(
@@ -1216,6 +1216,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           eraserMode={eraserMode}
           onEraseCard={onEraseCard}
           onOpenCard={(card) => setDetail({ card })}
+          onDoubleClickEmpty={(px, py, cx, cy) => setCtxMenu({ x: cx, y: cy, px, py, creating: true })}
           adapterRef={handle}
           canvasElRef={canvasElRef}
           onAdapterReady={setAdapter}
@@ -1517,6 +1518,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         open={ctxMenu !== null}
         x={ctxMenu?.x ?? 0}
         y={ctxMenu?.y ?? 0}
+        initialCreating={ctxMenu?.creating}
         onClose={() => setCtxMenu(null)}
         onCreateHere={(title) => {
           const adapter = handle.current.adapter
