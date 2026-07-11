@@ -5,9 +5,9 @@
 
 ---
 
-## 2026-07-09 · unreleased · dsl-sanitize + relational-coordinates（AI 输出兜底层 + 关系式坐标）
+## 2026-07-11 · v0.57.0（未 tag,待手测）· DSL 兜底层 + 关系式坐标 + parser PEG 化 + 双击建卡入口
 
-两条线一起攒着(sanitize 07-07 / relational 07-09),待 release 合并 v0.57.0。**未 tag**(待手测 + release 决策)。
+四条线攒在 main 上,代码测全绿,**未 tag**(发版门 = 手测绿 → 切 v0.57.0 tag)。sanitize 07-07 / relational 07-09 / PEG + UX 07-11。
 
 ### DSL sanitize 兜底层（`dsl-sanitize.ts`,新）— 学 tldraw sanitization,纯函数永不抛错
 
@@ -33,6 +33,16 @@ DSL 加**关系式坐标表示**(parser 认 `right-of`/`below #anchor @gap`,DSL_
 - **背景/验证**:论文实验发现 competent 模型 B 臂 overlap 100% 来自 tree-org 参照系碰撞(`c4[right-of c3]` 与 `c5[below c2]` 算同坐标);加碰撞避让后 5 模型 overlap .02-.05 → 0(代价 compactness −2~5%,alignment 零损失)。详见 cys-derivative 论文仓 `findings-solver-v2-2026-07-09.md`。
 
 web 1439 tests + lint 0(6 包)+ build exit 0(2026-07-09 全门复验)。relational FF merge `feat/relational-dsl` → main @ `ebcab46`(61ede35 relational + 220b7e7 arrow id + ebcab46 碰撞避让);后续 `b794ae0` apply-layout 端到端集成测试 + `18ee9b4` solver clearance 钳 ≥0(负 `@gap` 不残留重叠硬化)+ **prompt 策略升级(relational 从"可选"提为结构化布局优先,本轮)**。
+
+### DSL parser 正则 → Peggy 语法驱动（2026-07-11）
+
+`dsl-parser.ts` 从"15+ 正则整行任意位置提取"换为 **Peggy 声明式语法**(`dsl.peggy` → `pnpm --filter web gen:dsl` 产 `dsl-parser.gen.js` 进仓 + `.d.ts` 垫片;TS 包装层做语义 coercion:Number/finite/unescape/枚举校验/elbow 拆分/截断,算法搬迁自旧 extract\*)。行模型 = `[kind ` 前缀提交 + `directive*`(无序重复)+ 尾部 `.*` 容忍;`#id` 作 directive、`skipChunk`(`[^ \t]+`)吃未知残余 → 复刻旧"整行任意位置提取"容错。**收益**:加一条指令从 4–6 处正则改降到 3 处(grammar + fold + build);消除"extract anywhere"潜在歧义(label 值含 `@pos(1,2)` 文本不再被引号外误提);为更精确诊断(带失败指令/位置)铺路。**契约守恒**:导出签名 + DslOp 类型零变更,serializer 未动,**不 bump DSL_VERSION**(可接受语言不变);dsl-parser/robustness/e2e-roundtrip/sync/roundtrip/sanitize 6 套 191 测**零改全绿** + 富样本全 kind(负坐标/转义/unicode/wikilink/elbow/curve)往返 byte-equal。peggy(^5.1.0)加为 web devDep。`52c5522`。
+
+### 画布建卡入口:双击空白建卡（2026-07-11）
+
+新用户找不到建卡入口(右键菜单不可发现)。加 **双击空白处直建卡**(self-canvas `onDoubleClick` 未命中卡/frame/选中箭头 → 复用 CanvasContextMenu 的 `creating` 模式,跳过三选项菜单直入标题输入;选中箭头时仍走加折点),与既有右键菜单建卡并存;顺带修空状态/首页假文案(原"双击创建"此前是错的——双击空白并不建卡,现在真建了)。`2b873b2`。
+
+web 1449 tests + lint 0 + build exit 0(2026-07-11 全门复验;PEG 差分门 6 套 191 测零改全绿 = 行为守恒证明)。
 
 ---
 
