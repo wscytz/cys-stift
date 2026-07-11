@@ -179,6 +179,10 @@ function elementToSvg(
       const dashAttr = dashArr.length ? ` stroke-dasharray="${dashArr.join(' ')}"` : ''
       const route = arrowRoute(el)
       const ctrl = route === 'curve' && el.curve ? { x: el.curve.cx + dx, y: el.curve.cy + dy } : null
+      const ctrlPage = route === 'curve' && el.curve ? { x: el.curve.cx, y: el.curve.cy } : null
+      // 实际 elbow 渲染路径(页坐标):手设 → elbowSegments;空 → autoElbowPath 自动绕障。
+      // polyline 渲染 + 箭头头角度共用 —— 自动绕障也走这份,免得头朝向和折线不一致。
+      let elbowPts: { x: number; y: number }[] | null = null
       const segs: string[] = []
       if (ctrl) {
         segs.push(`<path d="M ${fx} ${fy} Q ${ctrl.x} ${ctrl.y} ${tx} ${ty}" fill="none" stroke="${stroke}" stroke-width="2"${dashAttr}/>`)
@@ -187,7 +191,7 @@ function elementToSvg(
         // 手设 elbow → elbowSegments;空 → autoElbowPath 自动绕障(obstacles 排除 from/to 卡),
         // 与实时渲染 / hitTest 同源(三视图视觉一致)。
         const hasManual = !!(el.elbow && el.elbow.length > 0)
-        const pts = hasManual
+        elbowPts = hasManual
           ? elbowSegments(el, from, to)
           : autoElbowPath(
               el,
@@ -195,15 +199,15 @@ function elementToSvg(
               to,
               cardObstacles(allElements, new Set([el.from, el.to].filter((v): v is string => !!v))),
             )
-        if (pts && pts.length >= 2) {
-          const coords = pts.map((p) => `${p.x + dx},${p.y + dy}`).join(' ')
+        if (elbowPts && elbowPts.length >= 2) {
+          const coords = elbowPts.map((p) => `${p.x + dx},${p.y + dy}`).join(' ')
           segs.push(`<polyline points="${coords}" fill="none" stroke="${stroke}" stroke-width="2"${dashAttr}/>`)
         }
       } else {
         segs.push(`<line x1="${fx}" y1="${fy}" x2="${tx}" y2="${ty}" stroke="${stroke}" stroke-width="2"${dashAttr}/>`)
       }
-      // 箭头头(与实时渲染同源几何;dash 不应用到箭头头;角度按 route = 终点切线)。
-      const angle = arrowHeadAngle(el, from, to)
+      // 箭头头(与实时渲染同源几何;dash 不应用到箭头头;角度 = 终点切线,按实际路径 segs/ctrl)。
+      const angle = arrowHeadAngle(route, from, to, { ctrl: ctrlPage, segs: elbowPts })
       const headKind = el.arrowhead ?? 'arrow'
       const pts = arrowheadPoints(headKind, { x: tx, y: ty }, angle)
       if (pts.length === 3) {

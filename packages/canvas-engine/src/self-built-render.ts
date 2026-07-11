@@ -228,8 +228,9 @@ function drawElement(
       ctx.setLineDash(dashPattern(el.dash))
       ctx.stroke()
       ctx.setLineDash([]) // 复位,免污染后续绘制
-      // 箭头头:角度取终点切线(按 route,见 arrowHeadAngle)。
-      const angle = arrowHeadAngle(el, from, to)
+      // 箭头头:角度取终点切线(按 route + 实际渲染路径 segs/ctrl,见 arrowHeadAngle)。
+      // 自动绕障 elbow 也走 segs(含折点),免得头朝向和折线不一致。
+      const angle = arrowHeadAngle(route, from, to, { ctrl, segs })
       const headKind = el.arrowhead ?? 'arrow'
       const pts = arrowheadPoints(headKind, to, angle)
       if (pts.length === 3) {

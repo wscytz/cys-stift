@@ -231,30 +231,31 @@ describe('elbowSegments — 折线路径折点', () => {
   })
 })
 
-describe('arrowHeadAngle — 终点切线角(按 route)', () => {
+describe('arrowHeadAngle — 终点切线角(按实际渲染路径)', () => {
   const from = { x: 0, y: 0 }
   const to = { x: 100, y: 0 }
   it('straight → atan2(to - from):水平向右 = 0', () => {
-    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0 } as CanvasElement
-    expect(arrowHeadAngle(a, from, to)).toBeCloseTo(0)
+    expect(arrowHeadAngle('straight', from, to, {})).toBeCloseTo(0)
   })
   it('curve → atan2(to - ctrl):ctrl 在 to 上方 → 角朝下(正)', () => {
-    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, route: 'curve', curve: { cx: 50, cy: -50 } } as CanvasElement
-    // to=(100,0), ctrl=(50,-50):atan2(0-(-50), 100-50) = atan2(50,50) = π/4
-    expect(arrowHeadAngle(a, from, to)).toBeCloseTo(Math.PI / 4)
+    // to=(100,0), ctrl=(50,-50):atan2(0-(-50),100-50) = atan2(50,50) = π/4
+    expect(arrowHeadAngle('curve', from, to, { ctrl: { x: 50, y: -50 } })).toBeCloseTo(Math.PI / 4)
   })
-  it('elbow 1 折点 → 最后一段 = to - lastElbow', () => {
-    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, route: 'elbow', elbow: [{ x: 100, y: 0 }] } as CanvasElement
-    // elbow=(100,0), to=(100,0) → 同点退化 → atan2(0,0)=0
-    expect(arrowHeadAngle(a, from, to)).toBeCloseTo(0)
+  it('elbow 手设路径 → 最后一段 = to - 倒数第二点', () => {
+    // segs=[from(0,0), elbow(100,0), to(100,0)];prev=(100,0);atan2(0,0)=0
+    expect(arrowHeadAngle('elbow', from, to, { segs: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 0 }] })).toBeCloseTo(0)
   })
-  it('elbow 折点在 to 正左方 → 最后一段水平向右', () => {
-    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, route: 'elbow', elbow: [{ x: 0, y: 0 }] } as CanvasElement
-    // lastElbow=(0,0), to=(100,0) → atan2(0,100)=0
-    expect(arrowHeadAngle(a, from, to)).toBeCloseTo(0)
+  it('elbow 最后一段水平向右 → 角 0', () => {
+    // segs=[(0,0),(0,100),(100,100)];prev=(0,100);atan2(100-100,100-0)=0
+    expect(arrowHeadAngle('elbow', { x: 0, y: 0 }, { x: 100, y: 100 }, { segs: [{ x: 0, y: 0 }, { x: 0, y: 100 }, { x: 100, y: 100 }] })).toBeCloseTo(0)
   })
-  it('elbow 无折点(退化)→ atan2(to - from)', () => {
-    const a = { id: 'a', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, route: 'elbow' } as CanvasElement
-    expect(arrowHeadAngle(a, from, to)).toBeCloseTo(0)
+  it('elbow segs 缺失(退化)→ atan2(to - from)', () => {
+    expect(arrowHeadAngle('elbow', from, to, { segs: null })).toBeCloseTo(0)
+  })
+  it('auto-elbow(空 elbow)折线路径 → 角度取最后一段,不当直线(bug 修)', () => {
+    // from=(0,0) to=(100,100);auto hFirst 折点 (100,0) → 最后一段 (100,0)→(100,100) 垂直向下 = π/2。
+    // 旧实现只看 arrow.elbow(空)→ 当直线 atan2(100,100)=π/4(错,头朝向和折线不一致)。
+    const segs = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }]
+    expect(arrowHeadAngle('elbow', { x: 0, y: 0 }, { x: 100, y: 100 }, { segs })).toBeCloseTo(Math.PI / 2)
   })
 })

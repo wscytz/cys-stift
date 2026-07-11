@@ -378,25 +378,26 @@ export function autoElbowPath(
 
 /**
  * 箭头头角度:终点处的切线方向(to 的来向角)。route 决定取哪段方向。
- * - straight: to - from
- * - curve: to - ctrl(贝塞尔终点切线)
- * - elbow: 最后一段方向 = to - lastElbow(无折点则 to - from)
+ * 取**实际渲染路径**(调用方传入 segs/ctrl):
+ * - straight / 退化 → to − from
+ * - curve → to − ctrl(贝塞尔终点切线)
+ * - elbow → to − 最后一段的起点(segs 倒数第二个点)
+ *
+ * 关键:elbow 必须传实际渲染 segs(含自动绕障算出的折点),不能只看 arrow.elbow —— 否则
+ * 自动绕障(arrow.elbow 空)的箭头会按直线算,头朝向和实际折线路径不一致(2026-07-11 修)。
  */
 export function arrowHeadAngle(
-  arrow: CanvasElement,
+  route: 'straight' | 'curve' | 'elbow',
   from: Point,
   to: Point,
+  path: { ctrl?: Point | null; segs?: Point[] | null },
 ): number {
-  const route = arrowRoute(arrow)
-  if (route === 'curve' && arrow.curve) {
-    return Math.atan2(to.y - arrow.curve.cy, to.x - arrow.curve.cx)
+  if (route === 'curve' && path.ctrl) {
+    return Math.atan2(to.y - path.ctrl.y, to.x - path.ctrl.x)
   }
-  if (route === 'elbow') {
-    const segs = elbowSegments(arrow, from, to)
-    if (segs && segs.length >= 2) {
-      const prev = segs[segs.length - 2]!
-      return Math.atan2(to.y - prev.y, to.x - prev.x)
-    }
+  if (route === 'elbow' && path.segs && path.segs.length >= 2) {
+    const prev = path.segs[path.segs.length - 2]!
+    return Math.atan2(to.y - prev.y, to.x - prev.x)
   }
   return Math.atan2(to.y - from.y, to.x - from.x)
 }
