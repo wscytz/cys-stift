@@ -140,6 +140,9 @@
 | v0.54.0 | release: v0.54.0 工作台专注编辑态(二档切换+MinimapPreview 独立组件+chrome 联动+… | v0.54.0 |
 | v0.55.0 | release: v0.55.0 Markdown 数学公式 + 脚注(katex) | v0.55.0 |
 | v0.56.0 | release: v0.56.0 polish-batch（UI 打磨 + c1 闭合 + 类型逃逸 + 文档对齐） | v0.56.0 |
+| v0.57.1 | feat(workbench): 编辑打磨 + bump 0.57.1 | v0.57.1 |
+| v0.57.2 | chore(desktop): sync Cargo.lock | v0.57.2 |
+| v0.57.3 | feat(theme): 删 dark 模式,聚焦 Bauhaus light-only + bump 0.57.3 | v0.57.3 |
 <!-- gen-state:end -->
 
 ## 当前能力(用户视角)
