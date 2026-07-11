@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-07-11 · v0.57.2 · 卡片显示模式(密度切换:仅标题/副标题/紧凑/自适应)
+
+用户反馈画布卡片对长文处理太薄(只显 3 行截断)。加**用户可设置的卡片显示模式**:
+
+- **4 模式(密度递减)**:`compact`(默认,3 行截断,现状)/ `auto`(全文 wrap,卡高随内容,上限 30 行)/ `title`(仅标题)/ `subtitle`(标题+副标题:body 首个 `##` 或首行,剥 markdown)。
+- **模式管高度(mode A)**:模式决定卡高 + 行数;用户不拖卡高(宽度仍可拖,拖角 -> 宽变 -> 高跟随内容)。`/settings` 加「卡片显示」单选,全局作用,默认 compact(老用户无感)。
+- **引擎**:`resolveCardLayout` 纯函数(mode+body+width -> 行数+高度);`drawElement` 卡分支按 mode 渲染;`adapter.syncCardHeights`(renderNow 同步 visible,setCardMode 全量)+ card resize 改宽不高;`CardInfo.subtitle` 由 web 层 `subtitleOf`(复用 `plainPreview`)算。
+- **设置**:`settings-store` 加 `cardDisplayMode` 字段 + `updateCardDisplayMode`;`self-canvas` 订阅 settings -> `adapter.setCardMode`。
+- **契约**:dsl round-trip/robustness 零改全绿(模式是视图设置不进 DSL;el.h 派生但 serialize 照常 emit,同 mode+body 同 h -> byte-equal)。
+
+canvas-engine 537 + web 1462 tests + lint 0 + build 0。`226a90d`。
+
+---
+
 ## 2026-07-11 · v0.57.1 · DSL 兜底层 + 关系式坐标 + parser PEG 化 + 双击建卡 + 工作台编辑打磨
 
 五条线攒在 main 上,代码测全绿,tag v0.57.1 发版(v0.57.0 未单独 tag,并入本版)。sanitize 07-07 / relational 07-09 / PEG + UX 07-11 / 工作台打磨 07-11。

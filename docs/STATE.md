@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.57.1(2026-07-11 tag 发版;v0.57.0 未单独 tag,并入本版)。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.57.2(2026-07-11 tag 发版;卡片显示模式)。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 
@@ -165,12 +165,12 @@
 > 判断"这一步该不该做"先读 **[`docs/development/polish-phase.md`](development/polish-phase.md)**(打磨 vs 修缝判据 + 反馈驱动流程 + 退出标准)。
 > 燃料 = 你手测的真实反馈。每轮主线开工走 brainstorming,严守「一次一问 + 逐段确认」(skill-checklist-discipline 记忆)。
 
-### 当前焦点(2026-07-11,v0.57.1 已发)
+### 当前焦点(2026-07-11,v0.57.2 已发)
 
-**v0.57.1 已 tag 发版**(DSL sanitize 兜底层 + 关系式坐标+碰撞避让 + arrow#id 可选 + parser 正则->Peggy + 双击建卡入口 + 工作台编辑打磨:完成按钮/保存状态/专注术语/库页预览剥 markdown)。v0.57.0 未单独 tag,并入 v0.57.1。
+**v0.57.2 已 tag 发版**(DSL sanitize 兜底层 + 关系式坐标+碰撞避让 + arrow#id 可选 + parser 正则->Peggy + 双击建卡入口 + 工作台编辑打磨 + 卡片显示模式:4 密度切换/卡高模式派生/subtitle 副标题)。v0.57.0 未单独 tag,并入 v0.57.1。
 
-- **手测仍需真机验**(代码测全绿,但真 AI + 真 app 只能手测):清单见 `cys-stift-docs/docs/handoff/2026-07-09-handtest-checklist-v057.md`(A 关系式+避让 / B sanitize+toast / C arrow#id / D v0.54/v0.55 旧债 / E 双击建卡 / F PEG 往返 / G 工作台完成按钮+保存状态+预览剥 markdown)。发现问题 -> 补 v0.57.2。
-- **下一步候选**:卡片长文处理(缩略太薄,用户反馈)+ 专注态可发现(⤢ 加标签/长文自动进,第二批)+ 堆叠卡交互(可点/溢出计数)。
+- **手测仍需真机验**(代码测全绿,但真 AI + 真 app 只能手测):清单见 `cys-stift-docs/docs/handoff/2026-07-09-handtest-checklist-v057.md`(A 关系式+避让 / B sanitize+toast / C arrow#id / D v0.54/v0.55 旧债 / E 双击建卡 / F PEG 往返 / G 工作台完成按钮+保存状态+预览剥 markdown / H 卡片显示模式 4 档切换)。发现问题 -> 补 v0.57.3。
+- **下一步候选**:专注态可发现(⤢ 加标签/长文自动进)+ 堆叠卡交互(可点/溢出计数)+ 卡片显示模式手测反馈迭代。
 
 
 product-idea 大方向四块**全闭合**:#1 大卡搁置 / #2 DSL 版本号 v0.45 / #3 工作台 v0.51+v0.54 / #4 Markdown v0.38+v0.55。
