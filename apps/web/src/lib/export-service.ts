@@ -422,19 +422,19 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
       key: 'cys-stift.cards.v1',
       value: JSON.stringify({ cards: payload.cards }),
     })
-    if (payload.mediaAssets && typeof payload.mediaAssets === 'object') {
+    if (payload.mediaAssets && typeof payload.mediaAssets === 'object' && !Array.isArray(payload.mediaAssets)) {
       writes.push({
         key: 'cys-stift.media.v1',
         value: JSON.stringify({ assets: payload.mediaAssets }),
       })
     }
-    if (payload.drafts) {
+    if (payload.drafts && typeof payload.drafts === 'object' && !Array.isArray(payload.drafts)) {
       writes.push({
         key: 'cys-stift.drafts.v1',
         value: JSON.stringify({ drafts: payload.drafts }),
       })
     }
-    if (payload.settings) {
+    if (payload.settings && typeof payload.settings === 'object' && !Array.isArray(payload.settings)) {
       writes.push({
         key: 'cys-stift.settings.v2',
         value: JSON.stringify({ settings: payload.settings }),
@@ -443,7 +443,7 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
     // canvas 列表:与 cards/media 同走同步 localStorage 写,纳入现有 snapshot
     // rollback 机制(snapshot 数组遍历 writes,自动包含此 key)。旧 JSON 无
     // canvases 字段 → 跳过(向后兼容)。
-    if (payload.canvases) {
+    if (payload.canvases && typeof payload.canvases === 'object' && !Array.isArray(payload.canvases)) {
       writes.push({
         key: 'cys-stift.canvases.v1',
         value: JSON.stringify({ snapshot: payload.canvases }),
@@ -452,7 +452,7 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
     // canvas-view(zoom/pan/gridMode/gridSize per canvas):与 canvases 同走同步
     // localStorage 写 + rollback。payload 存扁平 views map,写回时还原为
     // canvas-view-store 的 `{ views }` envelope。旧 JSON 无 canvasView 字段 → 跳过。
-    if (payload.canvasView && typeof payload.canvasView === 'object') {
+    if (payload.canvasView && typeof payload.canvasView === 'object' && !Array.isArray(payload.canvasView)) {
       writes.push({
         key: 'cys-stift.canvas-view.v1',
         value: JSON.stringify({ views: payload.canvasView }),
