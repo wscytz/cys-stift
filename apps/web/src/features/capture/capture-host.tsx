@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * CaptureHost — Phase 6 + 6.5g. Mounts the global Cmd/Ctrl+Shift+Space
+ * CaptureHost — Phase 6 + 6.5g. Mounts the global Cmd/Ctrl+Shift+E
  * shortcut listener, the menu "open capture" CustomEvent, and renders
  * a single MiniInput instance. One host per app; no event bus, no
  * multi-instance.
@@ -9,13 +9,12 @@
  * Shortcut matching rules (plan §3 T3):
  * - metaKey OR ctrlKey must be true (cross-platform)
  * - shiftKey must be true
- * - code === 'Space' (more reliable than key which can be a CJK char)
+ * - code === 'KeyE' (default; user-configurable — more reliable than key
+ *   which can be a CJK char)
  * - active element must NOT be INPUT / TEXTAREA / contenteditable
  * - MiniInput must NOT already be open (avoids repeat-fires)
  *
- * On match: event.preventDefault() (blocks browser default, e.g. macOS
- * Spotlight is OS-level so it can't be blocked here — that's fine, the
- * shortcut works inside the browser context which is where MiniInput lives).
+ * On match: event.preventDefault() (blocks browser default).
  *
  * Menu entry: AppMenu dispatches `cys-stift:open-capture` to ask the
  * CaptureHost to open the Mini Input. Same instance, same onSubmit.
@@ -35,7 +34,7 @@ export const CAPTURE_OPEN_EVENT = 'cys-stift:open-capture'
 
 /**
  * 把 web 端 CaptureShortcut(modKey + shift + KeyboardEvent.code)转成 Tauri
- * accelerator 字符串(如 "CmdOrCtrl+Shift+Space")。modKey meta→CmdOrCtrl 跨平台
+ * accelerator 字符串(如 "CmdOrCtrl+Shift+E")。modKey meta→CmdOrCtrl 跨平台
  * (Tauri 自动 Cmd on macOS / Ctrl on Win+Linux);code 归一化(KeyC→C、Digit1→1)。
  * 用于桌面壳跟随用户改的快捷键(修补轮:此前 Rust 写死,web 可改但不联动)。
  */
@@ -89,7 +88,7 @@ export function CaptureHost() {
           ? { kind: 'menubar' as const, deviceId: did }
           : {
               kind: 'shortcut' as const,
-              shortcutId: 'cmd-shift-space',
+              shortcutId: 'capture-shortcut',
               deviceId: did,
             }
       return captureSinkRegistry

@@ -75,7 +75,7 @@ export function ShortcutHelpDialog({
     },
     {
       title: t('canvas.shortcutsGlobal'),
-      rows: [[isMacVal ? '⌘⇧Space' : 'Ctrl+Shift+Space', t('capture.shortcutHelp')]],
+      rows: [[isMacVal ? '⌘⇧E' : 'Ctrl+Shift+E', t('capture.shortcutHelp')]],
     },
   ]
 

@@ -2,7 +2,7 @@
 
 /**
  * CaptureHint (spec §4.1 / plan Task 9) — a one-time, dismissible banner
- * surfacing the global ⌘⇧Space shortcut to first-time users. Hidden once
+ * surfacing the global ⌘⇧E shortcut to first-time users. Hidden once
  * settings.seenCaptureHint is true. Mounted on the home page.
  */
 import { useSettings, settingsStore } from '@/lib/settings-store'
@@ -14,8 +14,8 @@ export function CaptureHint() {
   const { t } = useI18n()
   const isMobile = useIsMobile()
   if (!ready || settings.seenCaptureHint) return null
-  // 移动端无系统全局热键(安卓/iOS 无 Cmd+Shift+Space 概念;桌面壳的 global-shortcut
-  // 仅 cfg(desktop) 注册)。文案 capture.hint 写死 ⌘⇧Space,在触屏设备上误导 → 移动端整条隐藏。
+  // 移动端无系统全局热键(安卓/iOS 无 Cmd+Shift+E 概念;桌面壳的 global-shortcut
+  // 仅 cfg(desktop) 注册)。文案 capture.hint 写死 ⌘⇧E,在触屏设备上误导 → 移动端整条隐藏。
   if (isMobile) return null
   return (
     <div className="capture-hint" data-testid="capture-hint" role="status">

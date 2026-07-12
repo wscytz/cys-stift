@@ -3,7 +3,7 @@
 /**
  * cy's Stift — Phase 0 + Phase 4 + Phase 6 + Phase 7. A Bauhaus-styled
  * home page so we can verify tokens, fonts and the 8px grid are wired.
- * Phase 6 adds the capture entry hint (Cmd/Ctrl+Shift+Space) — the
+ * Phase 6 adds the capture entry hint (Cmd/Ctrl+Shift+E) — the
  * button itself is decorative; the actual Mini Input is global and
  * launched from anywhere.
  * Phase 7 adds the Archive entry (blue region stripe).
@@ -196,7 +196,7 @@ export default function HomePage() {
         .home__nav-link--archive .home__nav-arrow { background: var(--color-blue); }
         .home__nav-link--archive:hover { box-shadow: 4px 4px 0 0 var(--color-blue); }
         /* Capture hint card — decorative. The actual Mini Input is global
-           and launches from anywhere via Cmd/Ctrl+Shift+Space. We don't
+           and launches from anywhere via Cmd/Ctrl+Shift+E. We don't
            wire a click handler to this card to keep the capture flow
            single-source (the keyboard shortcut). */
         .home__capture {

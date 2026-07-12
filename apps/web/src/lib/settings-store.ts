@@ -85,7 +85,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  captureShortcut: { modKey: 'meta', shift: true, code: 'Space' },
+  captureShortcut: { modKey: 'meta', shift: true, code: 'KeyE' },
   theme: 'system',
   locale: 'zh',
   profiles: [],
@@ -200,6 +200,11 @@ function loadSettings(): Settings {
     const parsed = JSON.parse(raw) as { settings?: unknown }
     if (!isValid(parsed.settings)) return DEFAULT_SETTINGS
     const loaded = parsed.settings as Settings
+    // B1 迁移:Space 注册必败(Carbon 限制 + 输入法冲突)→ 一次性迁移 KeyE。
+    if (loaded.captureShortcut?.code === 'Space') {
+      loaded.captureShortcut = { ...loaded.captureShortcut, code: 'KeyE' }
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings: loaded }))
+    }
     if (typeof loaded.seenCaptureHint !== 'boolean') loaded.seenCaptureHint = false
     if (!loaded.profiles) loaded.profiles = []
     if (!loaded.labs || typeof loaded.labs !== 'object') loaded.labs = {}

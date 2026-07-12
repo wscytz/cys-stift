@@ -21,7 +21,7 @@ beforeEach(async () => {
 describe('settingsStore.get — defaults', () => {
   it('returns DEFAULT_SETTINGS on a clean profile', () => {
     const s = store.get()
-    expect(s.captureShortcut).toEqual({ modKey: 'meta', shift: true, code: 'Space' })
+    expect(s.captureShortcut).toEqual({ modKey: 'meta', shift: true, code: 'KeyE' })
     expect(s.theme).toBe('system')
     expect(s.locale).toBe('zh')
     expect(s.profiles).toEqual([])
@@ -36,7 +36,7 @@ describe('settingsStore.update — merge + persist', () => {
     expect(s.theme).toBe('dark')
     // Untouched fields preserved.
     expect(s.locale).toBe('zh')
-    expect(s.captureShortcut.code).toBe('Space')
+    expect(s.captureShortcut.code).toBe('KeyE')
   })
 
   it('persists to localStorage in a { settings } envelope', () => {
@@ -296,7 +296,7 @@ describe('settingsStore — quota exceeded (rollback + notify)', () => {
       })
       store.updateCaptureShortcut({ code: 'KeyC' })
       unsub()
-      expect(store.get().captureShortcut.code).toBe('Space')
+      expect(store.get().captureShortcut.code).toBe('KeyE')
       expect(quotaFired).toBe(true)
     } finally {
       restore()
@@ -452,5 +452,64 @@ describe('settingsStore — v1→v2 migration', () => {
     const s = store2.get()
     expect(s.profiles).toEqual([])
     expect(s.activeProfileId).toBeNull()
+  })
+})
+
+// B1 迁移:Space 在 macOS Carbon RegisterEventHotKey 注册必败(输入法/Spotlight
+// 冲突)→ 默认换 KeyE,老用户 code=Space 一次性迁移为 KeyE(存回 localStorage)。
+describe('captureShortcut Space→KeyE 迁移', () => {
+  it('老用户 code=Space 迁移为 KeyE(一次性,存回)', async () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        settings: {
+          captureShortcut: { modKey: 'meta', shift: true, code: 'Space' },
+          theme: 'light',
+          locale: 'zh',
+          profiles: [],
+          activeProfileId: null,
+          seenCaptureHint: false,
+          export: { includeDeleted: true },
+          labs: {},
+        },
+      }),
+    )
+    vi.resetModules()
+    const fresh = (await import('../settings-store')).settingsStore
+    const s = fresh.get()
+    expect(s.captureShortcut.code).toBe('KeyE')
+    // 存回(localStorage 已是 KeyE,下次 load 不再迁移)
+    const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY)!) as {
+      settings: { captureShortcut: { code: string } }
+    }
+    expect(stored.settings.captureShortcut.code).toBe('KeyE')
+  })
+
+  it('新用户默认 KeyE', () => {
+    // localStorage already cleared in beforeEach; store is a fresh import.
+    const s = store.get()
+    expect(s.captureShortcut.code).toBe('KeyE')
+  })
+
+  it('用户自定义 code(非 Space)不被迁移', async () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        settings: {
+          captureShortcut: { modKey: 'ctrl', shift: true, code: 'KeyJ' },
+          theme: 'light',
+          locale: 'zh',
+          profiles: [],
+          activeProfileId: null,
+          seenCaptureHint: false,
+          export: { includeDeleted: true },
+          labs: {},
+        },
+      }),
+    )
+    vi.resetModules()
+    const fresh = (await import('../settings-store')).settingsStore
+    const s = fresh.get()
+    expect(s.captureShortcut.code).toBe('KeyJ')
   })
 })

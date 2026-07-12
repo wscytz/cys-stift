@@ -652,7 +652,7 @@ function CardTile({
 
 function EmptyState({ view }: { view: View }) {
   const { t } = useI18n()
-  // 移动端无系统全局热键;inbox.empty.hint 文案写死 ⌘⇧Space,触屏设备上误导 → 隐藏。
+  // 移动端无系统全局热键;inbox.empty.hint 文案写死 ⌘⇧E,触屏设备上误导 → 隐藏。
   const isMobile = useIsMobile()
   return (
     <UICard>
