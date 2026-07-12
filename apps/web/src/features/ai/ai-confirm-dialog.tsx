@@ -232,7 +232,7 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
   return (
     <Modal open onClose={props.onRejected} title={title} closeLabel={t('common.close')}>
       <div className="ac">
-        <p className="ac__title">{phase === 'applied' ? t('agent.appliedTitle') : title}</p>
+        <p className="ac__title">{title}</p>
 
         {props.mode === 'outline' && (
           editing ? (
@@ -276,17 +276,15 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
           <textarea className="ac__edit" value={editedDsl} onChange={(e) => setEditedDsl(e.target.value)} rows={Math.min(8, editedDsl.split('\n').length)} />
         )}
 
-        {phase !== 'applied' && (
-          <div className="ac__actions">
-            <Button variant="primary" onClick={() => void handleApply()} disabled={phase === 'applying' || (props.mode !== 'outline' && (!afterState || (props.mode === 'dsl' && totalChanges === 0)))}>
-              {phase === 'applying' ? t('agent.applying') : t('agent.apply')}
-            </Button>
-            {props.mode !== 'cluster' && (
-              <Button variant="ghost" onClick={() => setEditing((v) => !v)}>{t('agent.edit')}</Button>
-            )}
-            <Button variant="ghost" onClick={() => { recordReject(); props.onRejected() }}>{t('agent.reject')}</Button>
-          </div>
-        )}
+        <div className="ac__actions">
+          <Button variant="primary" onClick={() => void handleApply()} disabled={phase === 'applying' || phase === 'applied' || (props.mode !== 'outline' && (!afterState || ((props.mode === 'dsl' || props.mode === 'cluster') && totalChanges === 0)))}>
+            {phase === 'applying' ? t('agent.applying') : t('agent.apply')}
+          </Button>
+          {props.mode !== 'cluster' && (
+            <Button variant="ghost" onClick={() => setEditing((v) => !v)}>{t('agent.edit')}</Button>
+          )}
+          <Button variant="ghost" onClick={() => { recordReject(); props.onRejected() }}>{t('agent.reject')}</Button>
+        </div>
       </div>
       <style>{confirmStyles}</style>
     </Modal>

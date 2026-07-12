@@ -249,3 +249,58 @@ describe('AiConfirmDialog edge — dsl 无变更 → 应用 disabled', () => {
     unmount()
   })
 })
+
+// ── Fix 3:cluster 0 变更(applyClusters 无 arrow)→ Apply disabled ──
+
+describe('AiConfirmDialog edge — Fix 3 cluster 0 变更 → Apply disabled', () => {
+  it('cluster applyClusters 返回 arrowsCreated=0(无 diff)→ 应用按钮 disabled', async () => {
+    // 把 mocked applyClusters 换成 no-op(不 upsert arrow,arrowsCreated=0)
+    const { applyClusters } = await import('@/features/ai/cluster')
+    const mocked = applyClusters as unknown as { mockImplementationOnce: (fn: (...args: never[]) => unknown) => void }
+    mocked.mockImplementationOnce((_host: never, _clusters: never) => ({ arrowsCreated: 0, clustersApplied: 0 }))
+
+    const initial: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 50, rotation: 0, color: 'white' } as CanvasElement,
+      { id: 'c2', kind: 'card', x: 200, y: 0, w: 100, h: 50, rotation: 0, color: 'white' } as CanvasElement,
+    ]
+    const { host: mockHost } = makeMockHost(initial)
+    const service = { get: () => ({ id: 'c1' }) } as never
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog mode="cluster" clusters={[{ ids: ['c1', 'c2'], kind: 'related', reason: 'x' }]} targetCanvasId={'cv' as never} service={service} liveHost={mockHost} onApplied={() => {}} onRejected={() => {}} />,
+    )
+    await act(async () => { await flushMicro() })
+    const applyBtn = byText(dom, /^应用$|^Apply$/)!
+    // cluster mode + totalChanges===0(applyClusters 无 arrow)→ disabled
+    expect(applyBtn.disabled).toBe(true)
+    unmount()
+  })
+})
+
+// ── Fix 4:'applied' 相位死代码删(appliedTitle 不出现在 AiConfirmDialog) ──
+
+describe('AiConfirmDialog edge — Fix 4 applied 相位死代码已删', () => {
+  it('apply 成功后 标题不切换到 appliedTitle(保持原 mode 标题)', async () => {
+    const { host: mockHost } = makeMockHost([])
+    const service = { createWithId: vi.fn() } as never
+    const onApplied = vi.fn()
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog mode="dsl" dsl="[rect #r1] @pos(100,200) @size(300,400)" targetCanvasId={'cv' as never} service={service} liveHost={mockHost} onApplied={onApplied} onRejected={() => {}} />,
+    )
+    await act(async () => { await flushMicro() })
+    const applyBtn = byText(dom, /^应用$|^Apply$/)!
+    await act(async () => { applyBtn.click() })
+    await act(async () => { await flushMicro() })
+
+    // onApplied 触发(生产立即 unmount;test 里不 unmount → 标题应保持原 mode 标题)
+    expect(onApplied).toHaveBeenCalledTimes(1)
+    // appliedTitle('已应用 ✓')不应出现 —— phase='applied' 分支已删
+    const titleEl = dom.querySelector('.ac__title')
+    expect(titleEl?.textContent).not.toMatch(/已应用/)
+    // 按钮区仍渲染(无 phase !== 'applied' 守卫)
+    expect(byText(dom, /^应用$|^Apply$/)).not.toBeNull()
+    // apply 完后 phase=applied → 二次点应被 disabled 守卫拦
+    const applyBtnAfter = byText(dom, /^应用$|^Apply$/)!
+    expect(applyBtnAfter.disabled).toBe(true)
+    unmount()
+  })
+})
