@@ -177,7 +177,7 @@ export default function SettingsPage() {
                 settingsStore.updateCaptureShortcut({ code: e.target.value })
               }
             >
-              {['Space', 'KeyC', 'KeyN', 'KeyI', 'Comma', 'Period'].map((c) => (
+              {['KeyE', 'KeyC', 'KeyN', 'KeyI', 'Comma', 'Period'].map((c) => (
                 <option key={c} value={c}>
                   {labelFor(c)}
                 </option>

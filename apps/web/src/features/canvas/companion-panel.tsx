@@ -221,6 +221,8 @@ export function CanvasCompanionPanel({
               role="tab"
               aria-selected={tab === tb}
               onClick={() => {
+                // 拖拽刚结束(pointerup 后浏览器仍 fire click)→ 吞掉,不切 tab(同折叠按钮范式)
+                if (justDraggedRef.current) { justDraggedRef.current = false; return }
                 setTab(tb)
                 try { window.localStorage.setItem(TAB_KEY, tb) } catch { /* quota */ }
               }}
