@@ -284,6 +284,21 @@ function hydrateOnce() {
   notify()
 }
 
+// ── Cross-tab sync (P1, 2026-07-12) ──────────────────────────────────────────
+// 镜像 db-client.ts / canvas-store.ts 的 storage 监听:其它 tab 写 settings.v2
+// 时本 tab 收到 storage 事件 → 重新 loadSettings + notify,否则本 tab 内存缓存
+// _settings 不刷新,用户在 Tab A 改 AI profile / 主题 / 语言后 Tab B 仍显示旧值,
+// 且 Tab B 的任何操作会用旧缓存覆盖刚写入的设置(静默丢失)。storage 事件只在
+// 「其它 tab 写」时触发(本 tab 自己写不触发),不与 saveSettings 循环。
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key !== STORAGE_KEY) return
+    if (!_hydrated) return // fresh tab relies on its own first-mount hydrate
+    _settings = loadSettings()
+    notify()
+  })
+}
+
 let _cached: Settings = _settings
 function getSnapshot(): Settings {
   if (_cached !== _settings) _cached = _settings

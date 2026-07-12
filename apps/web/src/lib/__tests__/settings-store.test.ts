@@ -621,3 +621,53 @@ describe('v1→v2 迁移 edge', () => {
     expect(window.localStorage.getItem('cys-stift.settings.v1')).toBeNull()
   })
 })
+
+// ── Cross-tab storage sync (P1, 2026-07-12) ──────────────────────────────────
+// 镜像 db-client / canvas-store 的 cross-tab storage 测试。其它 tab 写 settings.v2
+// 时本 tab 收到 storage 事件 → 重新 loadSettings + notify,否则本 tab 内存缓存
+// _settings 不刷新,跨 tab 设置不同步。
+describe('settingsStore — cross-tab storage sync', () => {
+  it('reloads settings + notifies when settings.v2 changes in another tab', async () => {
+    vi.resetModules()
+    window.localStorage.clear()
+    const mod = await import('../settings-store')
+    const store = mod.settingsStore
+    // hydrate so _hydrated=true (listener only acts after first hydrate).
+    store.get()
+    const cb = vi.fn()
+    const unsub = store.subscribe(cb)
+    // Simulate another tab writing settings.v2 with theme=dark.
+    const otherTab = JSON.stringify({
+      settings: {
+        captureShortcut: { modKey: 'meta', shift: true, code: 'KeyE' },
+        theme: 'dark',
+        locale: 'en',
+        profiles: [],
+        activeProfileId: null,
+      },
+    })
+    window.localStorage.setItem(STORAGE_KEY, otherTab)
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: STORAGE_KEY, newValue: otherTab }),
+    )
+    expect(store.get().theme).toBe('dark')
+    expect(store.get().locale).toBe('en')
+    expect(cb).toHaveBeenCalled()
+    unsub()
+  })
+
+  it('ignores storage events for other keys', async () => {
+    vi.resetModules()
+    window.localStorage.clear()
+    const mod = await import('../settings-store')
+    const store = mod.settingsStore
+    store.get()
+    const cb = vi.fn()
+    const unsub = store.subscribe(cb)
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: 'cys-stift.other.v1', newValue: '{}' }),
+    )
+    expect(cb).not.toHaveBeenCalled()
+    unsub()
+  })
+})

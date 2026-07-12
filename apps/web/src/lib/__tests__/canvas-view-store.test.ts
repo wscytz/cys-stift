@@ -424,3 +424,51 @@ describe('canvasViewStore — quota rollback is subscriber-visible (Bug 1)', () 
     expect(seen[0]![CANVAS_A as unknown as string]?.zoom).toBe(2)
   })
 })
+
+// ── Cross-tab storage sync (P1, 2026-07-12) ──────────────────────────────────
+// 镜像 db-client / canvas-store 的 cross-tab storage 测试。其它 tab 写
+// canvas-view.v1 时本 tab 收到 storage 事件 → 重新 loadViewMap + notify。
+describe('canvasViewStore — cross-tab storage sync', () => {
+  it('reloads views + notifies when canvas-view.v1 changes in another tab', async () => {
+    vi.resetModules()
+    window.localStorage.clear()
+    const mod = await import('../canvas-view-store')
+    const store = mod.canvasViewStore
+    const subscribe = mod.subscribe
+    // hydrate so _hydrated=true (listener only acts after first hydrate).
+    store.get(CANVAS_A)
+    const calls: number[] = []
+    const unsub = subscribe(() => calls.push(1))
+    // Simulate another tab writing canvas-view.v1 with zoom=5 for canvas-a.
+    const otherTab = JSON.stringify({
+      views: {
+        'canvas-a': { zoom: 5, panX: 10, panY: 20, gridMode: 'free', gridSize: 16 },
+      },
+    })
+    window.localStorage.setItem(STORAGE_KEY, otherTab)
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: STORAGE_KEY, newValue: otherTab }),
+    )
+    expect(store.get(CANVAS_A).zoom).toBe(5)
+    expect(store.get(CANVAS_A).gridMode).toBe('free')
+    expect(calls.length).toBeGreaterThan(0)
+    unsub()
+  })
+
+  it('ignores storage events for other keys', async () => {
+    vi.resetModules()
+    window.localStorage.clear()
+    const mod = await import('../canvas-view-store')
+    const store = mod.canvasViewStore
+    const subscribe = mod.subscribe
+    store.get(CANVAS_A)
+    const calls: number[] = []
+    const unsub = subscribe(() => calls.push(1))
+    const before = calls.length
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: 'cys-stift.other.v1', newValue: '{}' }),
+    )
+    expect(calls.length).toBe(before)
+    unsub()
+  })
+})

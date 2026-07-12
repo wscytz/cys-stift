@@ -128,6 +128,20 @@ function hydrateOnce() {
   notify()
 }
 
+// ── Cross-tab sync (P1, 2026-07-12) ──────────────────────────────────────────
+// 镜像 db-client.ts / canvas-store.ts 的 storage 监听:其它 tab 写 canvas-view.v1
+// 时本 tab 收到 storage 事件 → 重新 loadViewMap + notify,否则本 tab 内存缓存
+// _views 不刷新,跨 tab 画布缩放/平移/网格不同步。storage 事件只在「其它 tab 写」
+// 时触发(本 tab 自己写不触发),不与 persist 循环。
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key !== STORAGE_KEY) return
+    if (!_hydrated) return // fresh tab relies on its own first-mount hydrate
+    _views = loadViewMap()
+    notify()
+  })
+}
+
 /**
  * 持久化当前 _views 到 localStorage。返回 true=写入成功,false=配额满。
  * 调用方负责在失败时回滚 _views 到写入前的值(否则内存与 localStorage

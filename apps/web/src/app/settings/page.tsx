@@ -60,9 +60,15 @@ export default function SettingsPage() {
         // imported cards with the stale pre-import list (silent data loss —
         // the cross-tab 'storage' event doesn't fire in the same tab).
         rehydrateCards()
-        // Reload so media/draft/settings stores (which keep their own
-        // in-memory cache) also re-hydrate from disk.
-        setTimeout(() => window.location.reload(), 400)
+        // Reload immediately — no setTimeout delay. importFromJson completes
+        // all synchronous localStorage writes (writes[] loop) before resolving,
+        // so localStorage is fully consistent at this point. A delayed reload
+        // would leave a window where other in-memory stores (settings /
+        // canvas-view / drafts) still hold stale caches; any user action in
+        // that window would persist() the stale cache and overwrite the just-
+        // imported data. Immediate reload forces every store to re-hydrate
+        // from the authoritative localStorage with zero window.
+        window.location.reload()
       }
     }
     reader.onerror = () =>

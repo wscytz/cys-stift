@@ -6,10 +6,7 @@
  * exported app away), routes each file through the capture registry as
  * its own submit() call (FileCaptureSink creates one card per file).
  *
- * Skips text inputs so users can still paste into form fields. Drops
- * onto the tldraw canvas area fall through to tldraw's own default
- * external-content handlers (which create image/video shapes) — we
- * only act when the drop target is OUTSIDE tldraw's container.
+ * Skips text inputs so users can still paste into form fields.
  */
 import { useEffect } from 'react'
 import { captureSinkRegistry } from './capture-sink'
@@ -22,18 +19,13 @@ import { useDb } from '@/lib/db-client'
 import { getDeviceId } from '@/lib/device-id'
 import type { MessageKey } from '@/lib/i18n/messages'
 
+/** True when the drop target is an editable element (input/textarea/select/
+ *  contenteditable) — we let the browser handle paste natively there. */
 function isEditableTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false
   if (el.isContentEditable) return true
   const tag = el.tagName
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
-}
-
-/** True when the drop target is inside a tldraw canvas container — we
- *  let tldraw's own external-content handler pick that up. */
-function isInsideTldraw(el: EventTarget | null): boolean {
-  if (!(el instanceof HTMLElement)) return false
-  return Boolean(el.closest('.tl-container'))
 }
 
 interface DropOrPastePayload {
@@ -152,7 +144,6 @@ export function FileDropHandler() {
       }
     }
     const onDrop = (e: DragEvent) => {
-      if (isInsideTldraw(e.target)) return // let tldraw handle
       const files = e.dataTransfer?.files
       if (!files || files.length === 0) return
       e.preventDefault()
@@ -160,7 +151,6 @@ export function FileDropHandler() {
     }
     const onPaste = (e: ClipboardEvent) => {
       if (isEditableTarget(e.target)) return
-      if (isInsideTldraw(e.target)) return
       const items = e.clipboardData?.items
       if (!items) return
       const files: File[] = []

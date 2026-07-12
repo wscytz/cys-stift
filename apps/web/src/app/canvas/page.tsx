@@ -605,6 +605,10 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     }
     const onPaste = (e: ClipboardEvent) => {
       if (isEditable(e.target)) return
+      // FileDropHandler (layout-level, registered first) may have already
+      // handled this paste (e.g. pasted a file) and called preventDefault.
+      // Skip to avoid redundant processing — explicit priority guard.
+      if (e.defaultPrevented) return
       const items = e.clipboardData?.items
       if (!items) return
       let textItem: DataTransferItem | null = null
