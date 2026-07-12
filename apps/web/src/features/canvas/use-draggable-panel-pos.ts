@@ -1,5 +1,5 @@
 'use client'
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 export interface PanelPos {
   left: number
@@ -43,6 +43,16 @@ export function useDraggablePanelPos(
   })
   const justDraggedRef = useRef(false)
 
+  /**
+   * 持当前拖拽的 window 监听器(onMove/onUp),供 unmount cleanup 使用。
+   * 拖中组件卸载(路由切走 / 父组件条件渲染)时,onUp 不会 fire → 监听泄漏。
+   * cleanup effect(下方 [])读此 ref 移除残留监听。null = 未在拖中。
+   */
+  const dragHandlersRef = useRef<{
+    onMove: (ev: PointerEvent) => void
+    onUp: () => void
+  } | null>(null)
+
   /** 持久化 pos 到 localStorage(try/catch:配额满 / 隐私模式 → warn 不抛)。 */
   const persistPos = (p: PanelPos) => {
     try {
@@ -79,6 +89,24 @@ export function useDraggablePanelPos(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /**
+   * unmount cleanup:拖中组件卸载时移除残留 window 监听(防泄漏)。
+   * 拖中 onUp 未 fire(pointerup/cancel 都不会在卸载后自然触发)→ 监听挂在
+   * window 上泄漏。此处读 dragHandlersRef,若有残留则移除。正常拖完 onUp
+   * 已清 + ref 已置 null → 此处 no-op。
+   */
+  useEffect(() => {
+    return () => {
+      const h = dragHandlersRef.current
+      if (h) {
+        window.removeEventListener('pointermove', h.onMove)
+        window.removeEventListener('pointerup', h.onUp)
+        window.removeEventListener('pointercancel', h.onUp)
+        dragHandlersRef.current = null
+      }
+    }
+  }, [])
+
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return
     const el = containerRef.current
@@ -112,9 +140,11 @@ export function useDraggablePanelPos(
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onUp)
+      dragHandlersRef.current = null // 已清,unmount cleanup 不再重复移除
       // Fix 1:拖完 pointerup 时存一次(不在每次 pointermove 写,避免 60Hz IO)。
       if (moved && lastPos) persistPos(lastPos)
     }
+    dragHandlersRef.current = { onMove, onUp } // 供 unmount cleanup 移除
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)

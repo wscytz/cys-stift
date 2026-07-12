@@ -6,6 +6,7 @@ import {
   saveConversation,
   clearConversation,
   conversationKey,
+  migrateAllLegacyConversations,
   type PersistedConversationMessage,
 } from '../conversation-store'
 
@@ -299,5 +300,112 @@ describe('clearConversation', () => {
 
   it('does not throw when key absent', () => {
     expect(() => clearConversation('absent' as CanvasId)).not.toThrow()
+  })
+})
+
+// ── migrateAllLegacyConversations — 全量迁移(修备份漏 v1) ──────────────────
+//
+// 问题:loadConversation 的 lazy migrate 只在「打开画布」时迁该画布。未打开过的
+// 画布的 v1 conversation 永远不迁 → export-service 只枚举 v2 → 备份漏。
+// migrateAllLegacyConversations 枚举所有 v1 key,一次性迁完 + 删旧 key。
+
+describe('migrateAllLegacyConversations — 全量迁移 v1 → v2 + 删旧 key', () => {
+  it('migrates companion v1 keys for canvases that were never opened', () => {
+    // 两画布都有 v1 companion 数据,但从未 loadConversation(未被 lazy migrate)
+    window.localStorage.setItem(
+      'cys-stift.companion-chat.never-opened-1.v1',
+      JSON.stringify([{ role: 'user', content: 'legacy-1' }]),
+    )
+    window.localStorage.setItem(
+      'cys-stift.companion-chat.never-opened-2.v1',
+      JSON.stringify([{ role: 'user', content: 'legacy-2' }]),
+    )
+
+    const count = migrateAllLegacyConversations()
+
+    expect(count).toBe(2)
+    // v2 写入
+    expect(loadConversation('never-opened-1' as CanvasId).map((m) => m.content)).toEqual(['legacy-1'])
+    expect(loadConversation('never-opened-2' as CanvasId).map((m) => m.content)).toEqual(['legacy-2'])
+    // v1 旧 key 已删
+    expect(window.localStorage.getItem('cys-stift.companion-chat.never-opened-1.v1')).toBeNull()
+    expect(window.localStorage.getItem('cys-stift.companion-chat.never-opened-2.v1')).toBeNull()
+  })
+
+  it('migrates ask-global messages by targetCanvasId (including no-target → default)', () => {
+    window.localStorage.setItem(
+      'cys-stift.ask-chat.v1',
+      JSON.stringify([
+        { role: 'user', content: 'for-x', targetCanvasId: 'ask-cv-x' },
+        { role: 'user', content: 'for-y', targetCanvasId: 'ask-cv-y' },
+        { role: 'user', content: 'no-target' }, // → DEFAULT_CANVAS_ID
+      ]),
+    )
+
+    migrateAllLegacyConversations()
+
+    expect(loadConversation('ask-cv-x' as CanvasId).map((m) => m.content)).toEqual(['for-x'])
+    expect(loadConversation('ask-cv-y' as CanvasId).map((m) => m.content)).toEqual(['for-y'])
+    expect(loadConversation(DEFAULT_CANVAS_ID).map((m) => m.content)).toContain('no-target')
+    // ask 全局 key 已删
+    expect(window.localStorage.getItem('cys-stift.ask-chat.v1')).toBeNull()
+  })
+
+  it('deletes v1 keys even when v2 already has data (lazy already migrated — v1 stale)', () => {
+    const CID = 'already-lazy' as CanvasId
+    // lazy migrate 已跑过(loadConversation 写了 v2),但 v1 未删
+    saveConversation(CID, [{ role: 'user', content: 'new-v2-data' }])
+    window.localStorage.setItem(
+      `cys-stift.companion-chat.${CID}.v1`,
+      JSON.stringify([{ role: 'user', content: 'stale-v1' }]),
+    )
+
+    migrateAllLegacyConversations()
+
+    // v2 保留(不重写 —— 幂等)
+    expect(loadConversation(CID).map((m) => m.content)).toEqual(['new-v2-data'])
+    // v1 已删(stale 子集,不再需要)
+    expect(window.localStorage.getItem(`cys-stift.companion-chat.${CID}.v1`)).toBeNull()
+  })
+
+  it('is idempotent — running twice does not duplicate or lose data', () => {
+    window.localStorage.setItem(
+      'cys-stift.companion-chat.idem-all.v1',
+      JSON.stringify([{ role: 'user', content: 'once' }]),
+    )
+    const first = migrateAllLegacyConversations()
+    const second = migrateAllLegacyConversations()
+
+    expect(first).toBe(1)
+    expect(second).toBe(0) // 第二次无 v1 key 可迁
+    // v2 数据不重复
+    expect(loadConversation('idem-all' as CanvasId)).toHaveLength(1)
+  })
+
+  it('returns 0 and is a no-op when no v1 keys exist (pure v2 state)', () => {
+    saveConversation('pure-v2' as CanvasId, [{ role: 'user', content: 'x' }])
+    const count = migrateAllLegacyConversations()
+    expect(count).toBe(0)
+    expect(loadConversation('pure-v2' as CanvasId).map((m) => m.content)).toEqual(['x'])
+  })
+
+  it('SSR early-return: returns 0 when window is undefined', () => {
+    const originalWindow = globalThis.window
+    // @ts-expect-error — simulate SSR
+    delete globalThis.window
+    try {
+      expect(migrateAllLegacyConversations()).toBe(0)
+    } finally {
+      globalThis.window = originalWindow
+    }
+  })
+
+  it('skips corrupt v1 JSON without crashing (companion + ask)', () => {
+    window.localStorage.setItem('cys-stift.companion-chat.corrupt.v1', '{broken')
+    window.localStorage.setItem('cys-stift.ask-chat.v1', '{also broken')
+    expect(() => migrateAllLegacyConversations()).not.toThrow()
+    // 坏 key 仍被删(无法解析 = 无数据,删除安全)
+    expect(window.localStorage.getItem('cys-stift.companion-chat.corrupt.v1')).toBeNull()
+    expect(window.localStorage.getItem('cys-stift.ask-chat.v1')).toBeNull()
   })
 })

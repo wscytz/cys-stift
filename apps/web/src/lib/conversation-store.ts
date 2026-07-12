@@ -138,6 +138,95 @@ function migrateLegacy(canvasId: CanvasId): PersistedConversationMessage[] {
 }
 
 /**
+ * 全量迁移所有遗留 v1 conversation key → v2,并删除 v1 key。
+ *
+ * 为什么需要:loadConversation 的 lazy migrate 只在「打开某画布」时迁该画布。
+ * 未打开过的画布的 v1 conversation 永远不迁 → export-service 只枚举 v2 key
+ * → 备份漏掉未打开画布的对话。本函数枚举 localStorage 所有 v1 key,一次性
+ * 迁完 + 删旧 key,使全应用进入纯 v2 状态(所有读路径只看 v2 即可)。
+ *
+ * 幂等:已迁(或 v2 已有数据)的画布不重写 v2;所有 v1 key 无论是否已迁都
+ * 删除(v1 是 v2 的子集/等价 —— lazy migrate 写 v2 不删 v1,残留 v1 是 stale)。
+ *
+ * SSR / 异常静默。返回成功迁移(首次写新 v2 key)的画布数。
+ */
+export function migrateAllLegacyConversations(): number {
+  if (typeof window === 'undefined') return 0
+
+  // 1. 收集所有需要处理的 canvasId + 记下所有 companion v1 key(后面删)
+  const canvasIds = new Set<string>()
+  const companionOldKeys: string[] = []
+  for (let i = 0; i < window.localStorage.length; i++) {
+    const key = window.localStorage.key(i)
+    if (!key) continue
+    if (key.startsWith(COMPANION_OLD_PREFIX) && key.endsWith(COMPANION_OLD_SUFFIX)) {
+      const cid = key.slice(
+        COMPANION_OLD_PREFIX.length,
+        key.length - COMPANION_OLD_SUFFIX.length,
+      )
+      if (cid) {
+        canvasIds.add(cid)
+        companionOldKeys.push(key)
+      }
+    }
+  }
+
+  // 2. ask 全局:key 存在 → 无 target 的消息归 DEFAULT_CANVAS_ID;扫显式 target
+  let hasAskGlobal = false
+  try {
+    const a = window.localStorage.getItem(ASK_OLD_KEY)
+    if (a) {
+      hasAskGlobal = true
+      const p = JSON.parse(a)
+      if (Array.isArray(p)) {
+        // 无 target 的消息只归 DEFAULT_CANVAS_ID(migrateLegacy 的路由规则)
+        canvasIds.add(String(DEFAULT_CANVAS_ID))
+        for (const item of p) {
+          if (item == null || typeof item !== 'object') continue
+          const obj = item as Record<string, unknown>
+          if (typeof obj.targetCanvasId === 'string') {
+            canvasIds.add(obj.targetCanvasId)
+          }
+        }
+      }
+    }
+  } catch {
+    /* 坏 JSON 跳过 */
+  }
+
+  // 3. 对每个 canvasId:若 v2 空 → migrateLegacy + save;若 v2 已有 → 跳过(幂等)
+  let migratedCount = 0
+  for (const cid of canvasIds) {
+    const v2Key = conversationKey(cid as CanvasId)
+    if (window.localStorage.getItem(v2Key)) continue // v2 已有(lazy 已迁 / 用户新对话)
+    const msgs = migrateLegacy(cid as CanvasId)
+    if (msgs.length > 0) {
+      saveConversation(cid as CanvasId, msgs)
+      migratedCount++
+    }
+  }
+
+  // 4. 删除所有 v1 key(companion per-canvas + ask global)。v1 已全量迁入 v2
+  //    (或 v2 已有更新数据),v1 是 stale 子集,删除安全。
+  for (const key of companionOldKeys) {
+    try {
+      window.localStorage.removeItem(key)
+    } catch {
+      /* 隐私模式等 —— 跳过 */
+    }
+  }
+  if (hasAskGlobal) {
+    try {
+      window.localStorage.removeItem(ASK_OLD_KEY)
+    } catch {
+      /* 同上 */
+    }
+  }
+
+  return migratedCount
+}
+
+/**
  * 写入某画布的对话历史(封顶最近 100 条,对齐旧 ask-history)。
  * quota 超 / 任何存储异常 → 静默跳过(不崩聊天)。返回 true=写入成功,false=跳过。
  */

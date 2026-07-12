@@ -1227,3 +1227,88 @@ describe('full round-trip — settings + templates + samples + conversations', (
     expect(window.localStorage.getItem(SAMPLES_KEY)).toBeNull()
   })
 })
+
+// ── Important: v1 conversation 备份不漏(migrate-all 后全量进 v2) ──────────
+//
+// 问题:conversation-store 的 lazy migrate 只在 loadConversation(canvasId)
+// 时迁该画布。未打开画布的 v1 conversation 永远不迁 → export 只枚举 v2 key
+// → 备份漏。修法:app 启动跑 migrateAllLegacyConversations(全量迁 + 删 v1)。
+// 此测模拟 app 启动(手动调 migrate),验证之后 export 覆盖未打开画布。
+
+describe('Important — v1 conversation 备份不漏(migrate-all 后 export 覆盖)', () => {
+  it('未打开画布的 v1 companion 对话:migrate 后进 export payload', async () => {
+    const { migrateAllLegacyConversations } = await import('../conversation-store')
+    // 画布 A 有 v1 companion 数据,但从未 loadConversation(未被 lazy migrate)
+    window.localStorage.setItem(
+      'cys-stift.companion-chat.unopened-backup.v1',
+      JSON.stringify([{ role: 'user', content: 'never-opened-but-backed-up' }]),
+    )
+
+    // 模拟 app 启动(layout 的 LegacyConversationMigrator mount 时跑)
+    migrateAllLegacyConversations()
+
+    const payload = await mod.buildExportPayload()
+    expect(payload.conversations).toBeDefined()
+    expect(payload.conversations!['unopened-backup']).toBeDefined()
+    expect(payload.conversations!['unopened-backup']![0]!.content).toBe('never-opened-but-backed-up')
+    // v1 key 已删(migrate 全量迁完 + 删旧)
+    expect(window.localStorage.getItem('cys-stift.companion-chat.unopened-backup.v1')).toBeNull()
+  })
+
+  it('未打开画布的 ask-global 对话:migrate 后按 targetCanvasId 进 export', async () => {
+    const { migrateAllLegacyConversations } = await import('../conversation-store')
+    window.localStorage.setItem(
+      'cys-stift.ask-chat.v1',
+      JSON.stringify([
+        { role: 'user', content: 'routed', targetCanvasId: 'ask-target-cv' },
+      ]),
+    )
+
+    migrateAllLegacyConversations()
+
+    const payload = await mod.buildExportPayload()
+    expect(payload.conversations).toBeDefined()
+    expect(payload.conversations!['ask-target-cv']).toBeDefined()
+    expect(payload.conversations!['ask-target-cv']![0]!.content).toBe('routed')
+    expect(window.localStorage.getItem('cys-stift.ask-chat.v1')).toBeNull()
+  })
+})
+
+// ── Minor: payload.conversations 数组守卫(防坏 key) ─────────────────────
+//
+// payload.conversations 应为 Record<canvasId, msgs>,但 [] 也通过
+// typeof === 'object' → Object.entries([{...}]) 产 ['0', item] → 写坏 key
+// cys-stift.conversation.0.v2。guard 加 !Array.isArray 与 canvasView 守卫一致。
+
+describe('Minor — payload.conversations 数组守卫(防坏 key)', () => {
+  it('conversations as array → 不写坏 key cys-stift.conversation.<index>.v2', async () => {
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      cards: [{ id: 'c1', title: 't', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
+      // 恶意 / 损坏:conversations 是数组而非 Record
+      conversations: [{ role: 'user', content: 'bad' }] as unknown as Record<string, unknown[]>,
+    })
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(true)
+    // 不应写坏 key(index 作为 canvasId)
+    expect(window.localStorage.getItem('cys-stift.conversation.0.v2')).toBeNull()
+    expect(window.localStorage.getItem('cys-stift.conversation.1.v2')).toBeNull()
+    // conversations 计数也不报告(未实际写任何 key)
+    expect(result.conversations).toBeUndefined()
+  })
+
+  it('conversations as empty array [] → 安全跳过(不写任何 key)', async () => {
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      cards: [{ id: 'c1', title: 't', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
+      conversations: [] as unknown as Record<string, unknown[]>,
+    })
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(true)
+    expect(result.conversations).toBeUndefined()
+  })
+})

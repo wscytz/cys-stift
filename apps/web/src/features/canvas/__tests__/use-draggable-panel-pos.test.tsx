@@ -577,10 +577,7 @@ describe('useDraggablePanelPos — 拖中卸载(读写竞态不崩)', () => {
    * 风险场景:pointerdown + pointermove 已触发(挂了 window 监听),此时组件
    * 卸载(路由切走 / 父组件条件渲染)→ window 监听仍在,后续 pointermove 调
    * setPos 作用于已卸载组件。React 19 静默吞(18+ 已删 warning),不崩。
-   * 此测验证:卸载不抛,且卸载后 window 上不再有残留 pointermove 监听
-   * (onUp 未触发 → 监听未清;但 setPos no-op)。注:真正的监听清理靠 pointerup
-   * / pointercancel fire。若用户卸载后无 pointer event,监听会泄漏 —— 此为已知
-   * 低概率风险(卸载通常伴随 pointer 离屏 → fire up),此处只测"不崩"。
+   * 此测验证:卸载不抛(setPos no-op)。监听清的验证见下方的 cleanup 测。
    */
   it('pointerdown + move 后立即 unmount → 不抛(React 19 setPos no-op)', () => {
     const r = renderWithRef()
@@ -596,11 +593,44 @@ describe('useDraggablePanelPos — 拖中卸载(读写竞态不崩)', () => {
         window.dispatchEvent(new PointerEvent('pointermove', { clientX: 150, clientY: 150, pointerId: 1 }))
       })
       r.unmount() // 卸载(setPos 后)
-      // 卸载后再 fire pointermove(监听仍在 window 上)→ setPos no-op,不崩
-      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 200, clientY: 200, pointerId: 1 }))
-      // fire pointerup 清监听(测后干净)
-      window.dispatchEvent(new PointerEvent('pointerup', { clientX: 200, clientY: 200, pointerId: 1 }))
     }).not.toThrow()
+  })
+
+  /**
+   * 监听泄漏修复:拖中(pointerdown+move,onUp 未 fire)卸载 → dragHandlersRef
+   * 仍持 onMove/onUp → useEffect cleanup 移除 3 个 window 监听。
+   * 验证:unmount 时 removeEventListener 被调,类型含 pointermove/pointerup/pointercancel。
+   * 修前:cleanup 不存在 → 监听泄漏(已知 bug,罕见但真泄漏)。
+   */
+  it('拖中 unmount → cleanup 移除 window pointer 监听(不泄漏)', () => {
+    const removeSpy = vi.spyOn(window, 'removeEventListener')
+    const r = renderWithRef()
+    const handle = r.handle()
+    const outer = handle.parentElement as HTMLElement
+    const container = outer.parentElement as HTMLElement
+    mockRect(outer, { left: 100, top: 100, width: 100, height: 100 })
+    mockRect(container, { left: 0, top: 0, width: 800, height: 600 })
+
+    removeSpy.mockClear() // 跳过 mount 阶段噪音
+    act(() => {
+      handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 110, clientY: 110, pointerId: 1, button: 0 }))
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 150, clientY: 150, pointerId: 1 }))
+    })
+    // 拖中(onUp 未 fire):removeEventListener 不应被调
+    const duringDragRemoves = removeSpy.mock.calls
+      .map((c) => c[0] as string)
+      .filter((t) => t === 'pointermove' || t === 'pointerup' || t === 'pointercancel')
+    expect(duringDragRemoves).toHaveLength(0)
+
+    act(() => { r.unmount() })
+    // unmount cleanup 应移除 pointermove + pointerup + pointercancel(各 1 次)
+    const cleanupRemoves = removeSpy.mock.calls
+      .map((c) => c[0] as string)
+      .filter((t) => t === 'pointermove' || t === 'pointerup' || t === 'pointercancel')
+      .sort()
+    expect(cleanupRemoves).toEqual(['pointercancel', 'pointermove', 'pointerup'])
+
+    removeSpy.mockRestore()
   })
 })
 

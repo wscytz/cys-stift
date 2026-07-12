@@ -17,6 +17,7 @@ import { AIProviderSync } from '@/features/ai/ai-settings-provider'
 import { ArchiveReleaseGate } from '@/features/archive/archive-release-gate'
 import { SkipLink } from '@/components/skip-link'
 import { RouteFocus } from '@/components/route-focus'
+import { LegacyConversationMigrator } from '@/components/legacy-conversation-migrator'
 
 // 字体自托管(2026-07-06):next/font/google 在 build 时拉 fonts.googleapis.com,
 // 网络不稳(梯子/CDN)即 build 失败。cy's Stift 本地优先,不该 build 时依赖 CDN。
@@ -81,6 +82,7 @@ export default function RootLayout({
           <AIProviderSync />
           <ArchiveReleaseGate />
           <ThemeBoot />
+          <LegacyConversationMigrator />
           <CaptureHost />
           <FileDropHandler />
           <ToastHost />

@@ -476,7 +476,10 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
     // 与 canvases/templates 同走同步 localStorage 写 + rollback —— 每个 key 独立
     // 纳入 snapshot/writes 数组,原子性由现有 rollback 机制覆盖。
     // 旧 JSON 无此字段 → 跳过(向后兼容)。
-    if (payload.conversations && typeof payload.conversations === 'object') {
+    // guard 加 !Array.isArray:conversations 应为 Record<canvasId, msgs>,但 []
+    // 也通过 typeof === 'object' → Object.entries([]) 产 ['0', item] → 坏 key
+    // cys-stift.conversation.0.v2。与 canvasView 守卫风格一致(只接 Record)。
+    if (payload.conversations && typeof payload.conversations === 'object' && !Array.isArray(payload.conversations)) {
       for (const [canvasId, msgs] of Object.entries(payload.conversations)) {
         if (!Array.isArray(msgs)) continue
         writes.push({
@@ -552,7 +555,7 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
     ...(payload.canvases ? { canvases: payload.canvases.canvases.length } : {}),
     ...(freeformCanvases > 0 ? { freeformCanvases } : {}),
     ...(freeformSkipped > 0 ? { freeformSkipped } : {}),
-    ...(payload.conversations
+    ...(payload.conversations && !Array.isArray(payload.conversations)
       ? { conversations: Object.keys(payload.conversations).length }
       : {}),
     ...(payload.canvasTemplates ? { canvasTemplates: payload.canvasTemplates.length } : {}),
