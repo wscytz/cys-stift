@@ -42,6 +42,10 @@ vi.mock('@/features/ai/cluster', () => ({
   parseClusters: () => [],
 }))
 
+vi.mock('@/app/inbox/markdown', () => ({
+  MarkdownBody: ({ source }: { source: string }) => <div data-testid="md">{source}</div>,
+}))
+
 import { AiConfirmDialog } from '../ai-confirm-dialog'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -131,6 +135,25 @@ describe('AiConfirmDialog — cluster mode', () => {
     await act(async () => { applyBtn.click() })
     // cluster apply 走 liveHost.batch(外部包,单 undo)
     expect(calls.batch).toBeGreaterThanOrEqual(1)
+    expect(onApplied).toHaveBeenCalledTimes(1)
+    unmount()
+  })
+})
+
+describe('AiConfirmDialog — outline mode', () => {
+  it('渲染 markdown 预览;点应用 → service.create 建卡;onApplied 触发', async () => {
+    const created: unknown[] = []
+    const service = { create: (input: unknown) => { created.push(input) } } as never
+    const onApplied = vi.fn()
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog mode="outline" outlineMarkdown={'## T\n- a'} canvasId={'cv' as never} service={service} onApplied={onApplied} onRejected={() => {}} />,
+    )
+    await act(async () => { await flushMicro() })
+    expect(dom.querySelector('[data-testid="md"]')?.textContent).toBe('## T\n- a')
+    const applyBtn = byText(dom, /^应用$|^Apply$/)!
+    await act(async () => { applyBtn.click() })
+    expect(created).toHaveLength(1)
+    expect((created[0] as { body: string }).body).toBe('## T\n- a')
     expect(onApplied).toHaveBeenCalledTimes(1)
     unmount()
   })

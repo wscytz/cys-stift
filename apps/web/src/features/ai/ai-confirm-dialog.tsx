@@ -25,6 +25,7 @@ import { applyClusters, type CardCluster } from './cluster'
 import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
 import { summarizeMovement } from '@/features/canvas/layout-movement'
 import { Thumb, DiffGroup, summarizeEl, confirmStyles } from './canvas-thumb'
+import { MarkdownBody } from '@/app/inbox/markdown'
 import { useI18n } from '@/lib/i18n'
 import { pushToast } from '@/lib/toast-store'
 import { addSample, genSampleId } from './sample-store'
@@ -62,8 +63,14 @@ interface ClusterProps extends BaseProps {
   liveHost: CanvasHost
 }
 
+interface OutlineProps extends BaseProps {
+  mode: 'outline'
+  outlineMarkdown: string
+  canvasId: CanvasId
+}
+
 // Task 4 加 ClusterProps;Task 5 加 OutlineProps。
-export type AiConfirmDialogProps = DslProps | ClusterProps
+export type AiConfirmDialogProps = DslProps | ClusterProps | OutlineProps
 
 export function AiConfirmDialog(props: AiConfirmDialogProps) {
   const { t } = useI18n()
@@ -71,6 +78,8 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
   const [editing, setEditing] = useState(false)
   const dslInitial = props.mode === 'dsl' ? props.dsl : ''
   const [editedDsl, setEditedDsl] = useState(dslInitial)
+  const mdInitial = props.mode === 'outline' ? props.outlineMarkdown : ''
+  const [editedMarkdown, setEditedMarkdown] = useState(mdInitial)
 
   // ── dsl mode: parse + 预演 diff ──
   const preview = useMemo(() => {
@@ -181,6 +190,14 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
           kind: res.arrowsCreated > 0 ? 'success' : 'info',
           message: res.arrowsCreated > 0 ? t('canvas.aiClusterDone', { n: String(res.arrowsCreated) }) : t('canvas.aiClusterNone'),
         })
+      } else { // outline
+        const body = editing ? editedMarkdown : props.outlineMarkdown
+        props.service.create({
+          title: t('ai.confirm.outlineCardTitle'),
+          body,
+          source: { kind: 'manual', deviceId: 'web' },
+        })
+        pushToast({ kind: 'success', message: t('ai.confirm.outlineCreated') })
       }
       setPhase('applied')
       props.onApplied()
@@ -191,7 +208,7 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
     }
   }
 
-  const title = props.mode === 'dsl' ? t('ai.confirm.layoutTitle') : props.mode === 'cluster' ? t('ai.confirm.clusterTitle') : ''
+  const title = props.mode === 'dsl' ? t('ai.confirm.layoutTitle') : props.mode === 'cluster' ? t('ai.confirm.clusterTitle') : t('ai.confirm.outlineTitle')
 
   // parseError 态:显示错误 + 编辑/重试(retry = onRejected,用户手动重跑 AI)。
   if (props.mode === 'dsl' && preview?.kind === 'parseError') {
@@ -216,6 +233,21 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
     <Modal open onClose={props.onRejected} title={title} closeLabel={t('common.close')}>
       <div className="ac">
         <p className="ac__title">{phase === 'applied' ? t('agent.appliedTitle') : title}</p>
+
+        {props.mode === 'outline' && (
+          editing ? (
+            <textarea
+              className="ac__edit"
+              value={editedMarkdown}
+              onChange={(e) => setEditedMarkdown(e.target.value)}
+              rows={Math.min(12, editedMarkdown.split('\n').length)}
+            />
+          ) : (
+            <div className="ac__md-preview">
+              <MarkdownBody source={editedMarkdown || props.outlineMarkdown} />
+            </div>
+          )
+        )}
 
         {diff && (
           <div className="ac__diff">
@@ -246,10 +278,10 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
 
         {phase !== 'applied' && (
           <div className="ac__actions">
-            <Button variant="primary" onClick={() => void handleApply()} disabled={phase === 'applying' || !afterState || (props.mode === 'dsl' && totalChanges === 0)}>
+            <Button variant="primary" onClick={() => void handleApply()} disabled={phase === 'applying' || (props.mode !== 'outline' && (!afterState || (props.mode === 'dsl' && totalChanges === 0)))}>
               {phase === 'applying' ? t('agent.applying') : t('agent.apply')}
             </Button>
-            {props.mode === 'dsl' && (
+            {props.mode !== 'cluster' && (
               <Button variant="ghost" onClick={() => setEditing((v) => !v)}>{t('agent.edit')}</Button>
             )}
             <Button variant="ghost" onClick={() => { recordReject(); props.onRejected() }}>{t('agent.reject')}</Button>
