@@ -23,7 +23,6 @@ import { ShortcutHelpDialog } from '@/features/canvas/shortcut-help-dialog'
 import { DiffDialog } from '@/features/canvas/diff-dialog'
 import { applyLayout } from '@/features/canvas/apply-layout'
 import { nextFocusStates } from '@/features/canvas/focus-mode-transition'
-import { summarizeMovement } from '@/features/canvas/layout-movement'
 import { OrganizePopover } from '@/features/canvas/organize-popover'
 import { canvasToMarkdown, markdownFileName } from '@/features/canvas/canvas-to-markdown'
 import { RelationPanel } from '@/features/canvas/relation-panel'
@@ -45,22 +44,19 @@ import { retryUntilValid, buildDslCorrection } from '@/features/ai/retry-until-v
 import { TemplatePicker, type TemplateChoice } from '@/features/canvas/template-picker'
 import { allTemplates, saveCustomTemplate, addCustomTemplate } from '@/lib/canvas-templates'
 import { streamText } from '@/features/ai/stream-text'
-import { summarizeOutline } from '@/features/ai/workflows'
+import { generateOutline } from '@/features/ai/workflows'
 import {
   buildClusterUserPrompt,
   parseClusters,
-  applyClusters,
   CLUSTER_SYSTEM_PROMPT,
 } from '@/features/ai/cluster'
+import { AiConfirmDialog, type AiConfirmDialogProps } from '@/features/ai/ai-confirm-dialog'
 import { useAIEnabled } from '@/features/ai/ai-settings-provider'
 import { AiSetupCard } from '@/features/ai/ai-setup-card'
 import { useAIAction } from '@/features/ai/use-ai-action'
 import { addSample, genSampleId } from '@/features/ai/sample-store'
 import { settingsStore } from '@/lib/settings-store'
 import { pushToast } from '@/lib/toast-store'
-import { archiveStore } from '@/lib/archive-store'
-import { buildArchivePayload } from '@/lib/build-archive-payload'
-import { VERSION } from '@/lib/version'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import {
   addCardShape,
@@ -101,6 +97,8 @@ export default function CanvasPage() {
   // Task 6: when AI isn't ready, the AI-layout entry shows the AiSetupCard
   // guide overlay instead of silently no-oping. Toggled by runAI(经 onNotReady)。
   const [showAiSetup, setShowAiSetup] = useState(false)
+  /** 画布 AI 确认门(layout/cluster/outline 三 action 共用)。null = 关闭。 */
+  const [aiConfirm, setAiConfirm] = useState<AiConfirmDialogProps | null>(null)
   // 稳定引用(setShowAiSetup 本就稳定):避免内联箭头每渲染新引用 → useAIAction 的
   // runAI 因 onNotReady dep 每渲染变 → 三 handler 每渲染重建(失稳定性)。包 useCallback
   // 后 runAI 只在 aiBusy/t 变时变,handler 稳定性回到原 aiBusy-dep 语义。
@@ -355,6 +353,7 @@ export default function CanvasPage() {
   }, [])
 
   const handleAILayout = useCallback(async () => {
+    if (aiConfirm) return
     await runAI('layout', async (ready, signal) => {
       const adapter = handle.current.adapter
       if (!adapter) return
@@ -401,83 +400,30 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         pushToast({ kind: 'info', message: t('canvas.aiLayoutEmpty') })
         return
       }
-      // 重试闭环后重 parse:r.accepted=true → ops>0 走 apply;accepted=false(重试预算尽)
-      // → 诚实告知已重试 N 次仍失败(新文案,区别于单次 parseFail)。
+      // 重试闭环后重 parse:r.accepted=true → ops>0 开确认门;accepted=false → 也开
+      // 确认门(parseError 态,让用户看错误 + 编辑/重试,而非直接 toast 失败)。
       const { ops } = parseDslWithDiagnostics(r.text)
       if (ops.length === 0) {
-        // 失败样本采集(c2):retry 耗尽仍 parse 失败 → 记 parse_failed。最值钱的调优数据。开关关时 no-op。
         addSample(
           { id: genSampleId(), ts: Date.now(), kind: 'dsl', source: 'canvasLayout', context: formatted, aiOutput: r.text, outcome: 'parse_failed', attempts: r.attempts, parseErrors: r.lastErrors, targetCanvasId: activeCanvasId },
           settingsStore.get().aiSampleCapture,
         )
-        pushToast({
-          kind: 'info',
-          message: t('canvas.aiLayoutRetryFailed', { n: String(r.attempts) }),
-        })
+        // 仍开确认门(parseError 态):用户可看错误 + 手改 DSL + 应用,或重试。
+        setAiConfirm({ mode: 'dsl', dsl: r.text, targetCanvasId: activeCanvasId, service, liveHost: adapter, sampleContext: { source: 'layout', context: formatted, targetCanvasId: activeCanvasId }, onApplied: () => setAiConfirm(null), onRejected: () => setAiConfirm(null) })
         return
       }
-      // 诚实位移反馈(Fix 4c):applyLayout 的 applied/skipped 无法区分「AI 真重排」
-      // vs「AI 把坐标原样吐回」(两者 applied 都 >0)。在 apply 前后快照卡的 x/y,
-      // 用纯函数 summarizeMovement 算实际位移 → 三分支反馈。这是「排版从来没有改变
-      // 过我的布局」投诉的根因诊断:坐标原样返回时给「AI 认为当前布局已合理」而非
-      // 假成功。只对比将被 apply 的卡 id(交集),省去无关元素。
-      const cardIdsInOps = new Set(
-        ops
-          .filter((op): op is typeof op & { type: 'card' } => op.type === 'card')
-          .map((op) => String(op.cardId)),
-      )
-      const snapshotPositions = (): Record<string, { x: number; y: number }> => {
-        const map: Record<string, { x: number; y: number }> = {}
-        for (const el of adapter.getElements()) {
-          if (el.kind !== 'card') continue
-          if (!cardIdsInOps.has(el.id)) continue
-          map[el.id] = { x: el.x, y: el.y }
-        }
-        return map
-      }
-      const before = snapshotPositions()
-      const { applied } = applyLayout(adapter, ops)
-      // T5:风险 op 存档 —— apply 成功(applied > 0)后落档(b 类,fire-and-forget,
-      // 不阻塞 UI;append 失败 console.warn 不影响用户流程)。
-      if (applied > 0) {
-        void buildArchivePayload()
-          .then((p) => archiveStore.append('ai-layout', `AI 重排 ${applied} 张`, p, VERSION))
-          .catch((err) => console.warn('[archive] ai-layout append failed', err))
-      }
-      // 捕获样本:canvas 排版 apply(无 confirm card,独立记)。开关关时 addSample 内部 no-op。
-      addSample(
-        { id: genSampleId(), ts: Date.now(), kind: 'dsl', source: 'canvasLayout', context: formatted, aiOutput: r.text, outcome: 'applied', targetCanvasId: activeCanvasId },
-        settingsStore.get().aiSampleCapture,
-      )
-      const after = snapshotPositions()
-      const summary = summarizeMovement(before, after)
-      // 三分支(替换旧 applied/skipped 双分支):
-      //  - applied=0:卡/端点缺失(原逻辑保留)
-      //  - moved>0:真重排 → success「重排了 N 张(平均 Xpx)」
-      //  - moved=0 但 applied>0:AI 把坐标原样吐回 → info「认为当前布局已合理,未改动」
-      //    (这才是用户感知「没变」的诚实解释;skipped 作为次要信息并入此分支)
-      if (applied === 0) {
-        pushToast({ kind: 'info', message: t('canvas.aiLayoutNoneApplied') })
-      } else if (summary.moved > 0) {
-        pushToast({
-          kind: 'success',
-          message: t('canvas.aiLayoutMoved', {
-            moved: String(summary.moved),
-            avgPx: String(summary.avgPx),
-          }),
-        })
-      } else {
-        // AI 返回了 DSL 但坐标没变 → 诚实告知未改动(而非假成功)。
-        pushToast({ kind: 'info', message: t('canvas.aiLayoutUnchanged') })
-      }
+      // ops>0:开确认门(before/after 缩略图 + 摘要 + 应用/编辑/拒绝)。
+      // 不直接 applyLayout —— 位移反馈/archive/sample 全在确认门 apply 内。
+      setAiConfirm({ mode: 'dsl', dsl: r.text, targetCanvasId: activeCanvasId, service, liveHost: adapter, sampleContext: { source: 'layout', context: formatted, targetCanvasId: activeCanvasId }, onApplied: () => setAiConfirm(null), onRejected: () => setAiConfirm(null) })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCanvasId, service, t, runAI])
+  }, [activeCanvasId, service, t, runAI, aiConfirm])
 
   // AI cluster(找重复 / 找相似):读画布上的卡 → AI 分组 → 落 related-to 关系箭头
   // 连组内成员(非破坏性:只加关系,不合并不删卡)。走 serializeCardsForAI(allowlist
   // + 软删除过滤,无 deviceId / 无 media.dataUrl),遵守 AI 隐私铁律(无 vision)。
   const handleAICluster = useCallback(async () => {
+    if (aiConfirm) return
     await runAI('cluster', async (ready, signal) => {
       const adapter = handle.current.adapter
       if (!adapter) return
@@ -514,49 +460,36 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         pushToast({ kind: 'info', message: t('canvas.aiClusterNone') })
         return
       }
-      const res = applyClusters(adapter, clusters, service, activeCanvasId)
-      // T5:风险 op 存档 —— cluster apply 成功(新建至少一条关系箭头)后落档。
-      // fire-and-forget;失败 console.warn 不影响用户流程。
-      if (res.arrowsCreated > 0) {
-        void buildArchivePayload()
-          .then((p) => archiveStore.append('cluster', `cluster: ${clusters.length} 组`, p, VERSION))
-          .catch((err) => console.warn('[archive] cluster append failed', err))
-      }
-      pushToast({
-        kind: res.arrowsCreated > 0 ? 'success' : 'info',
-        message:
-          res.arrowsCreated > 0
-            ? t('canvas.aiClusterDone', { n: String(res.arrowsCreated) })
-            : t('canvas.aiClusterNone'),
-      })
+      // 不直接 applyClusters —— 开确认门(before/after 箭头 + 摘要 + 应用/拒绝)。
+      setAiConfirm({ mode: 'cluster', clusters, targetCanvasId: activeCanvasId, service, liveHost: adapter, onApplied: () => setAiConfirm(null), onRejected: () => setAiConfirm(null) })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCanvasId, service, t, runAI])
+  }, [activeCanvasId, service, t, runAI, aiConfirm])
 
-  // 总结大纲工作流(W-T4):读当前画布卡片 → AI 生成 Markdown 大纲 → 写入 inbox
-  // 新卡。走 summarizeOutline(内部 serializeCardsForAI allowlist + 软删过滤,
-  // 无 deviceId / 无 media.dataUrl,遵守 AI 隐私铁律,无 vision)。
+  // 总结大纲工作流(W-T4):读当前画布卡片 → AI 生成 Markdown 大纲 → 确认门
+  // 预览 → 用户确认后建 inbox 新卡。走 generateOutline(只 AI 不建卡,建卡在
+  // 确认门 apply 内)。serializeCardsForAI allowlist + 软删过滤,无 deviceId /
+  // 无 media.dataUrl,遵守 AI 隐私铁律,无 vision。
   // AI 未就绪 → AiSetupCard 引导(与 handleAILayout 同门,不静默 no-op)。
   const handleAIOutline = useCallback(async () => {
+    if (aiConfirm) return
     await runAI('outline', async (_ready, signal) => {
-      const res = await summarizeOutline({
-        service,
-        canvasId: activeCanvasId,
-        signal,
-      })
+      const adapter = handle.current.adapter
+      if (!adapter) return
+      const res = await generateOutline({ service, canvasId: activeCanvasId, signal })
       if (!res.ok) {
-        // 卡片太少(<2):AI 已在函数内门控返回;此处给明确提示而非静默。
         pushToast({ kind: 'info', message: t('ai.workflow.outlineTooFew') })
         return
       }
-      if (res.empty) {
+      if (res.empty || !res.markdown) {
         pushToast({ kind: 'info', message: t('ai.workflow.outlineEmpty') })
         return
       }
-      pushToast({ kind: 'success', message: t('ai.workflow.outlineDone') })
+      // 不立即建卡 —— 开确认门(markdown 预览 + 应用=建卡 / 编辑 / 拒绝)。
+      setAiConfirm({ mode: 'outline', outlineMarkdown: res.markdown, canvasId: activeCanvasId, service, onApplied: () => setAiConfirm(null), onRejected: () => setAiConfirm(null) })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCanvasId, service, t, runAI])
+  }, [activeCanvasId, service, t, runAI, aiConfirm])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // ⌘C / Ctrl+C 复制选中元素为 DSL(剪贴板交换格式)。必须在下面
@@ -1514,6 +1447,8 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         </div>
       </Modal>
 
+      {aiConfirm && <AiConfirmDialog {...aiConfirm} />}
+
       <CanvasContextMenu
         open={ctxMenu !== null}
         x={ctxMenu?.x ?? 0}
@@ -1771,7 +1706,7 @@ function CanvasSideRail({
           <RailButton label={t('canvas.aiLayout')} short={t('canvas.rail.aiLayout')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'layout'} ariaBusy={aiBusy === 'layout'} busyTitle={t('canvas.aiRunning')} onClick={onAILayout} icon="ai" />
           {/* AI 工作流 popover:聚类重排 / 生成关系 / 总结大纲。3 项分别是现有
               handler 的分组入口。菜单项 disabled 同各自前置(cluster/relate 走
-              现有 handler,内含选中/卡片数门控;outline 走 summarizeOutline)。 */}
+              现有 handler,内含选中/卡片数门控;outline 走 generateOutline + 确认门)。 */}
           <div className="cv-rail__group">
             <RailButton label={t('ai.workflow.title')} short={t('canvas.rail.aiWorkflow')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'outline'} ariaBusy={aiBusy === 'outline'} busyTitle={t('canvas.aiRunning')} onClick={() => setWfMenuOpen((o) => !o)} pressed={wfMenuOpen} icon="workflow" buttonRef={wfTriggerRef} />
           </div>
@@ -1821,7 +1756,7 @@ function CanvasSideRail({
             style={wfMenuPos ? { left: `${wfMenuPos.left}px`, top: `${wfMenuPos.top}px` } : { visibility: 'hidden' }}
           >
             {/* 聚类重排 / 生成关系 复用现有 handler(内含选中/卡片数门控);
-                总结大纲走 summarizeOutline(AI 未就绪时 handler 弹 AiSetupCard)。 */}
+                总结大纲走 generateOutline + 确认门(AI 未就绪时 handler 弹 AiSetupCard)。 */}
             <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={aiBusy !== null} onClick={() => { setWfMenuOpen(false); onAICluster() }}>{t('ai.workflow.cluster')}</button>
             <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={aiBusy !== null} onClick={() => { setWfMenuOpen(false); onAutoRelate() }}>{t('ai.workflow.relate')}</button>
             <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={aiBusy !== null} onClick={() => { setWfMenuOpen(false); onAIOutline() }}>{t('ai.workflow.outline')}</button>
