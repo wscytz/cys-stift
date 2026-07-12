@@ -18,11 +18,12 @@
  * to avoid colliding with the right-side rail + bottom-right minimap. z-index 30
  * sits with the other floating panels, below modals (100).
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import { elementCenter } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
 import { buildOutline, type OutlineItem } from './outline'
+import { useDraggablePanelPos } from './use-draggable-panel-pos'
 
 const PANEL_WIDTH = 220
 /** Cap the list height so a huge canvas doesn't push the panel off-screen;
@@ -50,6 +51,9 @@ export function OutlinePanel({
 }) {
   const { t } = useI18n()
   const [collapsed, setCollapsed] = useState(loadCollapsed)
+  // 可拖浮面板位置(null = 默认 left/top,持久 'cys-stift.outline-pos.v1')。
+  const panelRef = useRef<HTMLDivElement>(null)
+  const { pos, onPointerDown, positioned, justDraggedRef } = useDraggablePanelPos(panelRef, 'cys-stift.outline-pos.v1')
   // Re-render on host changes — mirrors RelationPanel's subscription pattern
   // (debt 收口 2026-06-23, replaces polling). user change covers add/remove/edit
   // of elements; selection change keeps the highlighted row in sync; view change
@@ -104,13 +108,15 @@ export function OutlinePanel({
 
   return (
     <div
+      ref={panelRef}
       className="cv-outline"
       role="group"
       aria-label={title}
       style={{
         position: 'absolute',
-        left: 'var(--space-1)',
-        top: 'calc(var(--app-menu-height) + 3px)',
+        ...(positioned && pos
+          ? { left: pos.left, top: pos.top, right: 'auto', bottom: 'auto' }
+          : { left: 'var(--space-1)', top: 'calc(var(--app-menu-height) + 3px)', right: 'auto', bottom: 'auto' }),
         width: PANEL_WIDTH,
         zIndex: 30,
         background: 'var(--color-white)',
@@ -119,14 +125,18 @@ export function OutlinePanel({
         borderRadius: 'var(--radius-sm)',
       }}
     >
-      {/* Title bar: mono small-caps title + collapse toggle (mirrors minimap). */}
+      {/* Title bar: mono small-caps title + collapse toggle (mirrors minimap).
+          标题栏可拖(cursor: move + onPointerDown)。 */}
       <div
+        onPointerDown={onPointerDown}
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: 'var(--space-1)',
           borderBottom: collapsed ? 'none' : 'var(--border-hairline)',
+          cursor: 'move',
+          touchAction: 'none',
         }}
       >
         <span
@@ -144,6 +154,8 @@ export function OutlinePanel({
           type="button"
           className="cv-chrome-toggle"
           onClick={() => {
+            // 拖拽刚结束(pointerup 后浏览器仍 fire click)→ 吞掉,不折叠
+            if (justDraggedRef.current) { justDraggedRef.current = false; return }
             const next = !collapsed
             setCollapsed(next)
             try { window.localStorage.setItem(COLLAPSED_KEY, next ? '1' : '0') } catch { /* quota */ }

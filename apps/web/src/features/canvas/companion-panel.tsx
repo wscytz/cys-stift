@@ -28,6 +28,7 @@ import {
   DEEPEN_SYSTEM_PROMPT,
   type DeepenResult,
 } from './companion-discovery-ai'
+import { useDraggablePanelPos } from './use-draggable-panel-pos'
 
 const PANEL_WIDTH = 360
 /** 限制列表高度,避免大画布把面板顶出屏;内部滚动。 */
@@ -70,6 +71,9 @@ export function CanvasCompanionPanel({
   const [collapsed, setCollapsed] = useState(loadCollapsed)
   const isNarrow = useMatchMedia('(max-width: 1023px)')
   const [tab, setTab] = useState<Tab>(loadTab)
+  // 可拖浮面板位置(null = 默认 right/top,持久 'cys-stift.companion-pos.v1')。
+  const panelRef = useRef<HTMLDivElement>(null)
+  const { pos, onPointerDown, positioned, justDraggedRef } = useDraggablePanelPos(panelRef, 'cys-stift.companion-pos.v1')
   // host 变更触发重算 + 重渲染 —— 镜像 OutlinePanel 的 force 范式(它也没把 force 进 deps)。
   const [, force] = useState(0)
   // AI 深挖 note 按 insight.id 索引(稳定 id = kind + 排序后 cardIds),重算后 note 仍在。
@@ -178,13 +182,15 @@ export function CanvasCompanionPanel({
         />
       )}
     <div
+      ref={panelRef}
       className="cv-companion"
       role="group"
       aria-label={title}
       style={{
         position: 'absolute',
-        right: 'var(--space-1)',
-        top: 'calc(var(--app-menu-height) + 3px)',
+        ...(positioned && pos
+          ? { left: pos.left, top: pos.top, right: 'auto', bottom: 'auto' }
+          : { right: 'var(--space-1)', top: 'calc(var(--app-menu-height) + 3px)', left: 'auto', bottom: 'auto' }),
         width: isNarrow ? 'min(360px, calc(100vw - 60px))' : PANEL_WIDTH,
         zIndex: 30,
         background: 'var(--color-white)',
@@ -193,14 +199,17 @@ export function CanvasCompanionPanel({
         borderRadius: 'var(--radius-sm)',
       }}
     >
-      {/* 标题栏:tab 切换 + 折叠 */}
+      {/* 标题栏:tab 切换 + 折叠。标题栏可拖(cursor: move + onPointerDown)。 */}
       <div
+        onPointerDown={onPointerDown}
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: 'var(--space-1)',
           borderBottom: collapsed ? 'none' : 'var(--border-hairline)',
+          cursor: 'move',
+          touchAction: 'none',
         }}
       >
         <div role="tablist" aria-label={title} style={{ display: 'flex', gap: 'var(--space-1)' }}>
@@ -236,6 +245,8 @@ export function CanvasCompanionPanel({
           type="button"
           className="cv-chrome-toggle"
           onClick={() => {
+            // 拖拽刚结束(pointerup 后浏览器仍 fire click)→ 吞掉,不折叠
+            if (justDraggedRef.current) { justDraggedRef.current = false; return }
             const next = !collapsed
             setCollapsed(next)
             try { window.localStorage.setItem(COLLAPSED_KEY, next ? '1' : '0') } catch { /* quota */ }
