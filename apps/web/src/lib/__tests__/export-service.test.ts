@@ -25,9 +25,17 @@ beforeEach(async () => {
 const CARDS_KEY = 'cys-stift.cards.v1'
 const MEDIA_KEY = 'cys-stift.media.v1'
 const DRAFTS_KEY = 'cys-stift.drafts.v1'
-const SETTINGS_KEY = 'cys-stift.settings.v1'
+// P0 fix: settings-store 读写的是 v2 key(见 settings-store.ts STORAGE_KEY)。
+// 旧测试用 v1 镜像了 production bug —— 测试绿但 production 丢全部设置。
+// 对齐权威源(v2)后,旧 production 代码(读 v1)会让这些断言 RED —— 证明 bug 存在。
+const SETTINGS_KEY = 'cys-stift.settings.v2'
+const SETTINGS_KEY_LEGACY_V1 = 'cys-stift.settings.v1'
 const CANVASES_KEY = 'cys-stift.canvases.v1'
 const CANVAS_VIEW_KEY = 'cys-stift.canvas-view.v1'
+const TEMPLATES_KEY = 'cys-stift.canvas-templates.v1'
+const SAMPLES_KEY = 'cys-stift.ai-samples.v1'
+const CONVERSATION_PREFIX = 'cys-stift.conversation.'
+const CONVERSATION_SUFFIX = '.v2'
 
 function makeCard(overrides: Partial<Card> = {}): Card {
   return {
@@ -98,6 +106,29 @@ function seedCanvases(canvases: Canvas[], activeCanvasId: string) {
  */
 function seedCanvasView(views: Record<string, unknown>) {
   window.localStorage.setItem(CANVAS_VIEW_KEY, JSON.stringify({ views }))
+}
+
+/** Seed 自建画布模板(canvas-templates store,裸数组)。 */
+function seedTemplates(templates: Array<{ name: string; dsl: string; preset?: boolean }>) {
+  window.localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates))
+}
+
+/** Seed AI 交互样本(sample-store,裸数组)。 */
+function seedSamples(samples: Array<Record<string, unknown>>) {
+  window.localStorage.setItem(SAMPLES_KEY, JSON.stringify(samples))
+}
+
+/** Seed per-canvas 对话历史(conversation-store,per-canvas key,裸数组)。 */
+function seedConversation(canvasId: string, messages: Array<Record<string, unknown>>) {
+  window.localStorage.setItem(
+    CONVERSATION_PREFIX + canvasId + CONVERSATION_SUFFIX,
+    JSON.stringify(messages),
+  )
+}
+
+/** 读取 per-canvas 对话历史的 localStorage key(与 conversation-store conversationKey 同算法)。 */
+function conversationStorageKey(canvasId: string): string {
+  return CONVERSATION_PREFIX + canvasId + CONVERSATION_SUFFIX
 }
 
 // ── buildExportPayload ────────────────────────────────────────────────────
@@ -914,5 +945,285 @@ describe('importFromJson — freeform save 失败诚实回报', () => {
     // 全成功 → freeformSkipped 不出现(向后兼容:全成功不报 skipped)
     expect(result.freeformSkipped).toBeUndefined()
     spy.mockRestore()
+  })
+})
+
+// ── P0 regression: settings key v1→v2 drift fix ───────────────────────────
+//
+// The bug: export-service read/wrote `cys-stift.settings.v1`, but
+// settings-store uses `cys-stift.settings.v2` (multi-profile migration
+// deleted the v1 key on first load). Backups silently dropped ALL settings
+// (AI profiles / theme / locale / labs / shortcuts). The test mirrored the
+// bug (seeded v1 → test green), so it went undetected. These tests prove:
+//   (a) seeding v2 (the authoritative key) → payload.settings is present;
+//   (b) seeding v1 (the stale key) → payload.settings is absent (regression
+//       guard: if someone reverts export-service to read v1, this fails).
+
+describe('P0 regression — settings key v1→v2', () => {
+  it('reads settings from v2 (authoritative key) — not v1', async () => {
+    const settings = { theme: 'dark', locale: 'en', profiles: [] }
+    // Seed the authoritative v2 key (what settings-store actually reads).
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ settings }))
+
+    const payload = await mod.buildExportPayload()
+
+    expect(payload.settings).toEqual(settings)
+  })
+
+  it('seeding v1 (stale key) → payload.settings is undefined (regression guard)', async () => {
+    // If someone reverts export-service to read v1, this test breaks —
+    // proving the v1 key is wrong. settings-store deletes v1 on migration,
+    // so v1 is empty in production.
+    window.localStorage.setItem(SETTINGS_KEY_LEGACY_V1, JSON.stringify({
+      settings: { theme: 'dark' },
+    }))
+
+    const payload = await mod.buildExportPayload()
+
+    // v1 is NOT read → settings absent. This is the correct behaviour.
+    expect(payload.settings).toBeUndefined()
+  })
+
+  it('import writes settings to v2 key (not v1)', async () => {
+    const settings = { theme: 'dark', locale: 'en' }
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      cards: [{ id: 'c1', title: 't', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
+      settings,
+    })
+
+    const result = await mod.importFromJson(json)
+
+    expect(result.ok).toBe(true)
+    // Written to v2 (authoritative) ...
+    expect(JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!)).toEqual({ settings })
+    // ... NOT to v1.
+    expect(window.localStorage.getItem(SETTINGS_KEY_LEGACY_V1)).toBeNull()
+  })
+
+  it('round-trips settings through export → wipe → import (v2 key, no loss)', async () => {
+    const settings = {
+      theme: 'dark',
+      locale: 'en',
+      profiles: [{ id: 'p1', name: 'Ollama', provider: 'ollama', apiKey: '', baseUrl: 'http://localhost:11434', model: 'llama3', enabled: true }],
+      activeProfileId: 'p1',
+      captureShortcut: { modKey: 'meta', shift: true, code: 'KeyE' },
+      seenCaptureHint: true,
+    }
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ settings }))
+
+    const json = JSON.stringify(await mod.buildExportPayload())
+    window.localStorage.clear()
+
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(true)
+
+    // settings round-tripped through the v2 key.
+    const restored = JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!) as { settings: typeof settings }
+    expect(restored.settings).toEqual(settings)
+  })
+})
+
+// ── P1: canvasTemplates / aiSamples / conversations in backup ─────────────
+//
+// Three user-data stores were absent from export/import, silently losing data
+// on device migration. These tests cover: export reads them, import writes
+// them, full round-trip preserves them, and legacy JSON without them imports
+// cleanly (backward compat).
+
+describe('P1 — canvasTemplates in backup', () => {
+  const knownTemplates = [
+    { name: 'my-mindmap', dsl: '[frame #f1] @pos(0,0) @size(100,100)' },
+    { name: 'retro-board', dsl: '[card #c1 create] @pos(0,0)' },
+  ]
+
+  it('buildExportPayload includes canvasTemplates when seeded', async () => {
+    seedTemplates(knownTemplates)
+    const payload = await mod.buildExportPayload()
+    expect(payload.canvasTemplates).toEqual(knownTemplates)
+  })
+
+  it('omits canvasTemplates when store is absent', async () => {
+    seedStores({ cards: [makeCard()] })
+    const payload = await mod.buildExportPayload()
+    expect(payload.canvasTemplates).toBeUndefined()
+  })
+
+  it('import writes canvasTemplates to localStorage', async () => {
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      cards: [{ id: 'c1', title: 't', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
+      canvasTemplates: knownTemplates,
+    })
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(true)
+    expect(result.canvasTemplates).toBe(knownTemplates.length)
+    expect(JSON.parse(window.localStorage.getItem(TEMPLATES_KEY)!)).toEqual(knownTemplates)
+  })
+
+  it('round-trips canvasTemplates through export → wipe → import', async () => {
+    seedTemplates(knownTemplates)
+    const json = JSON.stringify(await mod.buildExportPayload())
+    window.localStorage.clear()
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(true)
+    expect(JSON.parse(window.localStorage.getItem(TEMPLATES_KEY)!)).toEqual(knownTemplates)
+  })
+})
+
+describe('P1 — aiSamples in backup', () => {
+  const knownSamples = [
+    { id: 's1', ts: 1000, source: 'ask', kind: 'dsl', outcome: 'applied', context: 'ctx', aiOutput: 'out' },
+    { id: 's2', ts: 2000, source: 'companion', kind: 'qa', outcome: 'answered', context: 'ctx2', aiOutput: 'out2' },
+  ]
+
+  it('buildExportPayload includes aiSamples when seeded', async () => {
+    seedSamples(knownSamples)
+    const payload = await mod.buildExportPayload()
+    expect(payload.aiSamples).toEqual(knownSamples)
+  })
+
+  it('omits aiSamples when store is absent', async () => {
+    seedStores({ cards: [makeCard()] })
+    const payload = await mod.buildExportPayload()
+    expect(payload.aiSamples).toBeUndefined()
+  })
+
+  it('import writes aiSamples to localStorage', async () => {
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      cards: [{ id: 'c1', title: 't', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
+      aiSamples: knownSamples,
+    })
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(true)
+    expect(result.aiSamples).toBe(knownSamples.length)
+    expect(JSON.parse(window.localStorage.getItem(SAMPLES_KEY)!)).toEqual(knownSamples)
+  })
+
+  it('round-trips aiSamples through export → wipe → import', async () => {
+    seedSamples(knownSamples)
+    const json = JSON.stringify(await mod.buildExportPayload())
+    window.localStorage.clear()
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(true)
+    expect(JSON.parse(window.localStorage.getItem(SAMPLES_KEY)!)).toEqual(knownSamples)
+  })
+})
+
+describe('P1 — conversations (per-canvas) in backup', () => {
+  const canvasA = 'canvas-conv-a'
+  const canvasB = 'canvas-conv-b'
+  const msgsA = [
+    { role: 'user', content: 'hello A' },
+    { role: 'assistant', content: 'hi A', dslBlocks: ['[card #c1]'] },
+  ]
+  const msgsB = [{ role: 'user', content: 'hello B' }]
+
+  it('buildExportPayload includes conversations (per-canvas enumeration) when seeded', async () => {
+    seedConversation(canvasA, msgsA)
+    seedConversation(canvasB, msgsB)
+    const payload = await mod.buildExportPayload()
+    expect(payload.conversations).toBeDefined()
+    expect(payload.conversations![canvasA]).toEqual(msgsA)
+    expect(payload.conversations![canvasB]).toEqual(msgsB)
+    expect(Object.keys(payload.conversations!)).toHaveLength(2)
+  })
+
+  it('omits conversations when no conversation keys exist', async () => {
+    seedStores({ cards: [makeCard()] })
+    const payload = await mod.buildExportPayload()
+    expect(payload.conversations).toBeUndefined()
+  })
+
+  it('import writes each conversation key back to localStorage', async () => {
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      cards: [{ id: 'c1', title: 't', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
+      conversations: { [canvasA]: msgsA, [canvasB]: msgsB },
+    })
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(true)
+    expect(result.conversations).toBe(2)
+    expect(JSON.parse(window.localStorage.getItem(conversationStorageKey(canvasA))!)).toEqual(msgsA)
+    expect(JSON.parse(window.localStorage.getItem(conversationStorageKey(canvasB))!)).toEqual(msgsB)
+  })
+
+  it('round-trips conversations through export → wipe → import', async () => {
+    seedConversation(canvasA, msgsA)
+    seedConversation(canvasB, msgsB)
+    const json = JSON.stringify(await mod.buildExportPayload())
+    window.localStorage.clear()
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(true)
+    expect(JSON.parse(window.localStorage.getItem(conversationStorageKey(canvasA))!)).toEqual(msgsA)
+    expect(JSON.parse(window.localStorage.getItem(conversationStorageKey(canvasB))!)).toEqual(msgsB)
+  })
+})
+
+// ── Full round-trip: all stores including new keys ────────────────────────
+
+describe('full round-trip — settings + templates + samples + conversations', () => {
+  it('export → wipe → import preserves all user data (no silent loss)', async () => {
+    const settings = {
+      theme: 'dark',
+      locale: 'en',
+      profiles: [{ id: 'p1', name: 'Local', provider: 'ollama', apiKey: '', baseUrl: 'http://x', model: 'llama3', enabled: true }],
+      activeProfileId: 'p1',
+    }
+    const templates = [{ name: 'tmpl', dsl: '[frame #f1] @pos(0,0)' }]
+    const samples = [{ id: 's1', ts: 1, source: 'ask', kind: 'qa', outcome: 'answered', context: 'c', aiOutput: 'o' }]
+    const convMsgs = [{ role: 'user', content: 'q' }]
+
+    seedStores({ cards: [makeCard()], settings })
+    seedTemplates(templates)
+    seedSamples(samples)
+    seedConversation('canvas-x', convMsgs)
+
+    const json = JSON.stringify(await mod.buildExportPayload())
+    window.localStorage.clear()
+
+    // After wipe, none of the keys exist.
+    expect(window.localStorage.getItem(SETTINGS_KEY)).toBeNull()
+    expect(window.localStorage.getItem(TEMPLATES_KEY)).toBeNull()
+    expect(window.localStorage.getItem(SAMPLES_KEY)).toBeNull()
+    expect(window.localStorage.getItem(conversationStorageKey('canvas-x'))).toBeNull()
+
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(true)
+
+    // All user data restored.
+    expect(JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!)).toEqual({ settings })
+    expect(JSON.parse(window.localStorage.getItem(TEMPLATES_KEY)!)).toEqual(templates)
+    expect(JSON.parse(window.localStorage.getItem(SAMPLES_KEY)!)).toEqual(samples)
+    expect(JSON.parse(window.localStorage.getItem(conversationStorageKey('canvas-x'))!)).toEqual(convMsgs)
+  })
+
+  it('backward compat: legacy JSON without new fields imports without error', async () => {
+    // A pre-P1 backup (no canvasTemplates/aiSamples/conversations) must import
+    // cleanly — missing optional fields are skipped, no crash, no spurious writes.
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      app: "cy's Stift",
+      cards: [{ id: 'legacy', title: 'old', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
+      mediaAssets: {},
+    })
+
+    const result = await mod.importFromJson(json)
+    expect(result.ok).toBe(true)
+    expect(result.canvasTemplates).toBeUndefined()
+    expect(result.aiSamples).toBeUndefined()
+    expect(result.conversations).toBeUndefined()
+    expect(window.localStorage.getItem(TEMPLATES_KEY)).toBeNull()
+    expect(window.localStorage.getItem(SAMPLES_KEY)).toBeNull()
   })
 })

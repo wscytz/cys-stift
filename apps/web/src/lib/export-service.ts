@@ -3,14 +3,20 @@
 import type { Card, Canvas, CanvasId } from '@cys-stift/domain'
 import { canvasFreeformStore, type CanvasFreeformSnapshot } from './canvas-freeform-store'
 import { downloadFile } from './download'
+import type { CanvasTemplate } from './canvas-templates'
+import type { PersistedConversationMessage } from './conversation-store'
+import type { Sample } from '@/features/ai/sample-store'
 
 // ── Export (spec §1.2 信念4 "数据可迁移") ──────────────────────────────────
 // Serialise the user's local data to an open JSON format. The browser
 // stores we read from:
-//   - cys-stift.cards.v1     (db-client, Phase 2)
-//   - cys-stift.media.v1     (media-store, Phase 6.5f)
-//   - cys-stift.drafts.v1    (draft-store, Phase 6.5a) — optional
-//   - cys-stift.settings.v1  (settings-store, Phase 6.5h) — optional
+//   - cys-stift.cards.v1                       (db-client, Phase 2)
+//   - cys-stift.media.v1                       (media-store, Phase 6.5f)
+//   - cys-stift.drafts.v1                      (draft-store, Phase 6.5a) — optional
+//   - cys-stift.settings.v2                    (settings-store, multi-profile) — optional
+//   - cys-stift.canvas-templates.v1            (canvas-templates, 自建模板) — optional
+//   - cys-stift.ai-samples.v1                  (sample-store, AI 样本) — optional
+//   - cys-stift.conversation.<canvasId>.v2     (conversation-store, per-canvas) — optional
 //
 // Format is versioned (`version: 1`). A future import path or schema
 // migration bumps the version. We deliberately keep this plain JSON so
@@ -45,6 +51,12 @@ export interface ExportPayload {
    * 这里只存 `.views` 部分以保持 payload 扁平。旧版 JSON 无此字段(向后兼容)。
    */
   canvasView?: Record<string, unknown>
+  /** 用户自建画布模板(裸数组,与 canvas-templates store 的 localStorage 同形)。旧版 JSON 无此字段。 */
+  canvasTemplates?: CanvasTemplate[]
+  /** AI 交互样本(裸数组,与 sample-store 的 localStorage 同形)。旧版 JSON 无此字段。 */
+  aiSamples?: Sample[]
+  /** per-canvas AI 对话历史,key=canvasId。枚举 localStorage 的 cys-stift.conversation.<id>.v2。旧版 JSON 无此字段。 */
+  conversations?: Record<string, PersistedConversationMessage[]>
 }
 
 function readJson(key: string): unknown {
@@ -55,6 +67,37 @@ function readJson(key: string): unknown {
   } catch {
     return null
   }
+}
+
+/**
+ * 枚举 localStorage 中所有 per-canvas 对话历史 key(cys-stift.conversation.<canvasId>.v2),
+ * 返回 `{ canvasId: messages[] }` map。无匹配 / 全空 / SSR → undefined(omit field)。
+ *
+ * conversation-store 的 key 是 per-canvas 的(每个画布独立对话上下文),无法用单 key
+ * 读取,必须枚举 localStorage。坏 JSON 静默跳过(不抛,不纳入 payload)。
+ */
+function readAllConversations(): Record<string, PersistedConversationMessage[]> | undefined {
+  if (typeof window === 'undefined') return undefined
+  const prefix = 'cys-stift.conversation.'
+  const suffix = '.v2'
+  const out: Record<string, PersistedConversationMessage[]> = {}
+  for (let i = 0; i < window.localStorage.length; i++) {
+    const key = window.localStorage.key(i)
+    if (!key || !key.startsWith(prefix) || !key.endsWith(suffix)) continue
+    const canvasId = key.slice(prefix.length, key.length - suffix.length)
+    if (!canvasId) continue
+    try {
+      const raw = window.localStorage.getItem(key)
+      if (!raw) continue
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        out[canvasId] = parsed as PersistedConversationMessage[]
+      }
+    } catch {
+      // 坏 JSON 跳过(不纳入 payload,不抛)
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined
 }
 
 /**
@@ -89,7 +132,7 @@ export async function buildExportPayload(
   const draftsPayload = readJson('cys-stift.drafts.v1') as {
     drafts?: Record<string, unknown>
   } | null
-  const settingsPayload = readJson('cys-stift.settings.v1') as {
+  const settingsPayload = readJson('cys-stift.settings.v2') as {
     settings?: Record<string, unknown>
   } | null
 
@@ -126,6 +169,20 @@ export async function buildExportPayload(
   } | null
   const canvasView = canvasViewPayload?.views
 
+  // 用户自建画布模板(canvas-templates store,裸数组)。直接读原始 key。
+  // 预设模板硬编码在代码里(PRESET_TEMPLATES),不进 payload(导入时自然合并)。
+  const templatesRaw = readJson('cys-stift.canvas-templates.v1')
+  const canvasTemplates = Array.isArray(templatesRaw)
+    ? (templatesRaw as CanvasTemplate[])
+    : undefined
+
+  // AI 交互样本(sample-store,裸数组)。直接读原始 key。
+  const samplesRaw = readJson('cys-stift.ai-samples.v1')
+  const aiSamples = Array.isArray(samplesRaw) ? (samplesRaw as Sample[]) : undefined
+
+  // per-canvas AI 对话历史(conversation-store,多 key 枚举)。
+  const conversations = readAllConversations()
+
   return {
     version: EXPORT_FORMAT_VERSION,
     exportedAt: new Date().toISOString(),
@@ -137,6 +194,9 @@ export async function buildExportPayload(
     ...(canvasesEnvelope ? { canvases: canvasesEnvelope } : {}),
     ...(freeform ? { freeform } : {}),
     ...(canvasView ? { canvasView } : {}),
+    ...(canvasTemplates ? { canvasTemplates } : {}),
+    ...(aiSamples ? { aiSamples } : {}),
+    ...(conversations ? { conversations } : {}),
   }
 }
 
@@ -177,6 +237,12 @@ export interface ImportResult {
    *  不整体失败(卡片/canvas 列表已成功落地且有 rollback),但诚实回报供 UI 提示。
    *  全成功时为 undefined(向后兼容)。 */
   freeformSkipped?: number
+  /** 导入的 per-canvas 对话历史 key 数。 */
+  conversations?: number
+  /** 导入的自建画布模板数。 */
+  canvasTemplates?: number
+  /** 导入的 AI 交互样本数。 */
+  aiSamples?: number
   error?: string
 }
 
@@ -370,7 +436,7 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
     }
     if (payload.settings) {
       writes.push({
-        key: 'cys-stift.settings.v1',
+        key: 'cys-stift.settings.v2',
         value: JSON.stringify({ settings: payload.settings }),
       })
     }
@@ -391,6 +457,33 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
         key: 'cys-stift.canvas-view.v1',
         value: JSON.stringify({ views: payload.canvasView }),
       })
+    }
+    // 用户自建画布模板(裸数组,与 canvas-templates store 同形)。旧 JSON 无此字段 → 跳过。
+    if (payload.canvasTemplates && Array.isArray(payload.canvasTemplates)) {
+      writes.push({
+        key: 'cys-stift.canvas-templates.v1',
+        value: JSON.stringify(payload.canvasTemplates),
+      })
+    }
+    // AI 交互样本(裸数组,与 sample-store 同形)。旧 JSON 无此字段 → 跳过。
+    if (payload.aiSamples && Array.isArray(payload.aiSamples)) {
+      writes.push({
+        key: 'cys-stift.ai-samples.v1',
+        value: JSON.stringify(payload.aiSamples),
+      })
+    }
+    // per-canvas AI 对话历史(多 key,每个 canvasId 一个 localStorage key)。
+    // 与 canvases/templates 同走同步 localStorage 写 + rollback —— 每个 key 独立
+    // 纳入 snapshot/writes 数组,原子性由现有 rollback 机制覆盖。
+    // 旧 JSON 无此字段 → 跳过(向后兼容)。
+    if (payload.conversations && typeof payload.conversations === 'object') {
+      for (const [canvasId, msgs] of Object.entries(payload.conversations)) {
+        if (!Array.isArray(msgs)) continue
+        writes.push({
+          key: `cys-stift.conversation.${canvasId}.v2`,
+          value: JSON.stringify(msgs),
+        })
+      }
     }
   } catch (e) {
     return {
@@ -459,5 +552,10 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
     ...(payload.canvases ? { canvases: payload.canvases.canvases.length } : {}),
     ...(freeformCanvases > 0 ? { freeformCanvases } : {}),
     ...(freeformSkipped > 0 ? { freeformSkipped } : {}),
+    ...(payload.conversations
+      ? { conversations: Object.keys(payload.conversations).length }
+      : {}),
+    ...(payload.canvasTemplates ? { canvasTemplates: payload.canvasTemplates.length } : {}),
+    ...(payload.aiSamples ? { aiSamples: payload.aiSamples.length } : {}),
   }
 }
