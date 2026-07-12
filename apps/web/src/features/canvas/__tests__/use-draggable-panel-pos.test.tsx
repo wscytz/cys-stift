@@ -434,3 +434,289 @@ describe('useDraggablePanelPos — Fix 2 mount clamp(小视口防陷阱)', () =>
     host.remove()
   })
 })
+
+// ── Fix 1 batch-2:pointercancel 路径 / 多次快速拖 / 拖中卸载(读写竞态) ────────
+
+describe('useDraggablePanelPos — pointercancel 触发存(同 pointerup 路径)', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    hookBag = null
+  })
+
+  /**
+   * onUp 同时挂 pointerup + pointercancel。OS 中断触屏(系统通知 / 来电 /
+   * 浏览器手势抢占)→ pointercancel fire。验证:cancel 路径同样 persistPos,
+   * 用户拖到的位置不丢。
+   */
+  it('pointerdown + move + pointercancel → localStorage 写入(同 pointerup)', () => {
+    const r = renderWithRef()
+    const handle = r.handle()
+    const outer = handle.parentElement as HTMLElement
+    const container = outer.parentElement as HTMLElement
+    mockRect(outer, { left: 100, top: 100, width: 100, height: 100 })
+    mockRect(container, { left: 0, top: 0, width: 800, height: 600 })
+
+    act(() => {
+      handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 110, clientY: 110, pointerId: 1, button: 0 }))
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 150, clientY: 150, pointerId: 1 }))
+      // pointercancel 替代 pointerup(系统中断)
+      window.dispatchEvent(new PointerEvent('pointercancel', { clientX: 150, clientY: 150, pointerId: 1 }))
+    })
+
+    const raw = window.localStorage.getItem('test-pos')
+    expect(raw).not.toBeNull()
+    const p = JSON.parse(raw!) as { left: number; top: number }
+    // 数学同 "drag 写 localStorage" 测:newLeft = 100 + 40 = 140
+    expect(p.left).toBe(140)
+    expect(p.top).toBe(140)
+    r.unmount()
+  })
+
+  it('pointerdown + pointercancel(未 move)→ localStorage 不写(moved=false)', () => {
+    const r = renderWithRef()
+    const handle = r.handle()
+    const outer = handle.parentElement as HTMLElement
+    const container = outer.parentElement as HTMLElement
+    mockRect(outer, { left: 100, top: 100, width: 100, height: 100 })
+    mockRect(container, { left: 0, top: 0, width: 800, height: 600 })
+
+    act(() => {
+      handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 110, clientY: 110, pointerId: 1, button: 0 }))
+      // 无 move 直接 cancel(瞬间中断)
+      window.dispatchEvent(new PointerEvent('pointercancel', { clientX: 110, clientY: 110, pointerId: 1 }))
+    })
+
+    expect(window.localStorage.getItem('test-pos')).toBeNull()
+    r.unmount()
+  })
+
+  /**
+   * pointercancel 后再发 pointerup:onUp 已 removeEventListener,cancel 后的 up
+   * 不应触发二次 persist(否则重复写)。验证 spy 只被调一次。
+   */
+  it('pointercancel 后再 pointerup → onUp 不重复触发(setItem 只 1 次)', () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
+    const r = renderWithRef()
+    const handle = r.handle()
+    const outer = handle.parentElement as HTMLElement
+    const container = outer.parentElement as HTMLElement
+    mockRect(outer, { left: 100, top: 100, width: 100, height: 100 })
+    mockRect(container, { left: 0, top: 0, width: 800, height: 600 })
+
+    setItemSpy.mockClear()
+    act(() => {
+      handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 110, clientY: 110, pointerId: 1, button: 0 }))
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 150, clientY: 150, pointerId: 1 }))
+      window.dispatchEvent(new PointerEvent('pointercancel', { clientX: 150, clientY: 150, pointerId: 1 }))
+    })
+    const writesAfterCancel = setItemSpy.mock.calls.filter((c) => c[0] === 'test-pos').length
+    expect(writesAfterCancel).toBe(1)
+
+    // 再发 pointerup(浏览器可能同时 fire cancel + up)→ onUp 已移除,不再写
+    act(() => {
+      window.dispatchEvent(new PointerEvent('pointerup', { clientX: 150, clientY: 150, pointerId: 1 }))
+    })
+    const writesAfterUp = setItemSpy.mock.calls.filter((c) => c[0] === 'test-pos').length
+    expect(writesAfterUp).toBe(1) // 仍只 1 次
+
+    setItemSpy.mockRestore()
+    r.unmount()
+  })
+})
+
+describe('useDraggablePanelPos — 多次快速拖(连续 down/up 不泄漏)', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    hookBag = null
+  })
+
+  /**
+   * 模拟连续两次拖动(down→move→up→down→move→up)。
+   * 风险:第一次 onUp 若没 removeEventListener → 第二次 move 触发两个 onMove
+   * → pos 抖动 / 监听泄漏。验证:第二次拖后 pos 准确,localStorage 写最终值。
+   */
+  it('两次连续拖:第二次 pos 覆盖第一次,localStorage 为最终值', () => {
+    const r = renderWithRef()
+    const handle = r.handle()
+    const outer = handle.parentElement as HTMLElement
+    const container = outer.parentElement as HTMLElement
+    mockRect(outer, { left: 100, top: 100, width: 100, height: 100 })
+    mockRect(container, { left: 0, top: 0, width: 800, height: 600 })
+
+    // 第一次拖:dx=dy=20 → newLeft = 100 + 20 = 120
+    act(() => {
+      handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 110, clientY: 110, pointerId: 1, button: 0 }))
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 130, clientY: 130, pointerId: 1 }))
+      window.dispatchEvent(new PointerEvent('pointerup', { clientX: 130, clientY: 130, pointerId: 1 }))
+    })
+    let raw = window.localStorage.getItem('test-pos')
+    expect(JSON.parse(raw!)).toEqual({ left: 120, top: 120 })
+
+    // 第二次拖:从新位置(120,120)起,再 dx=dy=30 → newLeft = 120 + 30 = 150
+    // 注意:onMove 用 pos?.left(pos 是 state,第一次拖后已更新)或 startLeft-contRect.left
+    // 这里 pos 已非空(120),curLeft = 120,dx = 160 - 130 = 30 → 150
+    act(() => {
+      handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 130, clientY: 130, pointerId: 1, button: 0 }))
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 160, clientY: 160, pointerId: 1 }))
+      window.dispatchEvent(new PointerEvent('pointerup', { clientX: 160, clientY: 160, pointerId: 1 }))
+    })
+    raw = window.localStorage.getItem('test-pos')
+    expect(JSON.parse(raw!)).toEqual({ left: 150, top: 150 })
+
+    r.unmount()
+  })
+})
+
+describe('useDraggablePanelPos — 拖中卸载(读写竞态不崩)', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    hookBag = null
+  })
+
+  /**
+   * 风险场景:pointerdown + pointermove 已触发(挂了 window 监听),此时组件
+   * 卸载(路由切走 / 父组件条件渲染)→ window 监听仍在,后续 pointermove 调
+   * setPos 作用于已卸载组件。React 19 静默吞(18+ 已删 warning),不崩。
+   * 此测验证:卸载不抛,且卸载后 window 上不再有残留 pointermove 监听
+   * (onUp 未触发 → 监听未清;但 setPos no-op)。注:真正的监听清理靠 pointerup
+   * / pointercancel fire。若用户卸载后无 pointer event,监听会泄漏 —— 此为已知
+   * 低概率风险(卸载通常伴随 pointer 离屏 → fire up),此处只测"不崩"。
+   */
+  it('pointerdown + move 后立即 unmount → 不抛(React 19 setPos no-op)', () => {
+    const r = renderWithRef()
+    const handle = r.handle()
+    const outer = handle.parentElement as HTMLElement
+    const container = outer.parentElement as HTMLElement
+    mockRect(outer, { left: 100, top: 100, width: 100, height: 100 })
+    mockRect(container, { left: 0, top: 0, width: 800, height: 600 })
+
+    expect(() => {
+      act(() => {
+        handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 110, clientY: 110, pointerId: 1, button: 0 }))
+        window.dispatchEvent(new PointerEvent('pointermove', { clientX: 150, clientY: 150, pointerId: 1 }))
+      })
+      r.unmount() // 卸载(setPos 后)
+      // 卸载后再 fire pointermove(监听仍在 window 上)→ setPos no-op,不崩
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 200, clientY: 200, pointerId: 1 }))
+      // fire pointerup 清监听(测后干净)
+      window.dispatchEvent(new PointerEvent('pointerup', { clientX: 200, clientY: 200, pointerId: 1 }))
+    }).not.toThrow()
+  })
+})
+
+// ── Fix 2 batch-2:container 极小 / 负 pos / 0×0 显式 / 共享 container ──────
+
+describe('useDraggablePanelPos — Fix 2 mount clamp 边界', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    hookBag = null
+  })
+
+  /**
+   * container 极小(比持久 pos 小)→ mount clamp 把超界 pos 拉回 container 边界。
+   * 注:jsdom 下 box(el)rect 默认 0×0 → maxLeft = contWidth - 0 - 4, maxTop = contHeight。
+   * 真实浏览器 box 有尺寸 → maxLeft 更小(可 0)。这里验证"超界 pos 被拉回"的 clamp
+   * 行为本身(pos 200 超 maxLeft 46 → clamp 到 46,不残留 200)。
+   */
+  it('container 极小(50×50)→ 超界 pos clamp 到 container 边界(不残留 200)', () => {
+    window.localStorage.setItem('test-pos', JSON.stringify({ left: 200, top: 200 }))
+    const host = document.createElement('div')
+    mockRect(host, { left: 0, top: 0, right: 50, bottom: 50, width: 50, height: 50, x: 0, y: 0 })
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    act(() => { root.render(<HarnessWithRef storageKey="test-pos" />) })
+
+    // box=0×0(jsdom)→ maxLeft = 50 - 0 - 4 = 46, maxTop = 50 - 0 = 50
+    // pos (200,200) 超 → clamp 到 (46, 50)
+    expect(hookBag!.pos).toEqual({ left: 46, top: 50 })
+    const raw = window.localStorage.getItem('test-pos')
+    expect(JSON.parse(raw!)).toEqual({ left: 46, top: 50 })
+
+    act(() => { root.unmount() })
+    host.remove()
+  })
+
+  /**
+   * 负 pos(localStorage 手改 / 损坏但通过 number 校验)→ mount clamp 用
+   * Math.max(0, pos.left) 钳到 0。
+   */
+  it('localStorage 负 pos → clamp 到 (0,0)(Math.max(0, ...))', () => {
+    window.localStorage.setItem('test-pos', JSON.stringify({ left: -50, top: -100 }))
+    const host = document.createElement('div')
+    mockRect(host, { left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600, x: 0, y: 0 })
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    act(() => { root.render(<HarnessWithRef storageKey="test-pos" />) })
+
+    expect(hookBag!.pos).toEqual({ left: 0, top: 0 })
+    const raw = window.localStorage.getItem('test-pos')
+    expect(JSON.parse(raw!)).toEqual({ left: 0, top: 0 })
+
+    act(() => { root.unmount() })
+    host.remove()
+  })
+
+  /**
+   * container 0×0(jsdom 默认 / 元素隐藏)→ mount clamp 早退跳过。
+   * pos 保持 localStorage 原值(不 clamp 也不重写)。这是守卫:防 getBoundingClientRect
+   * 全 0 时 maxLeft/maxTop 全 0 → 误 clamp 到 (0,0)。
+   */
+  it('container 0×0 → mount clamp 跳过(pos 保持 localStorage 原值)', () => {
+    window.localStorage.setItem('test-pos', JSON.stringify({ left: 500, top: 300 }))
+    const host = document.createElement('div')
+    // 不 mock rect → jsdom 默认全 0(0×0)
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    act(() => { root.render(<HarnessWithRef storageKey="test-pos" />) })
+
+    // 0×0 早退 → pos 不变
+    expect(hookBag!.pos).toEqual({ left: 500, top: 300 })
+    // localStorage 也不重写(未触发 clamp)
+    expect(window.localStorage.getItem('test-pos')).toBe(JSON.stringify({ left: 500, top: 300 }))
+
+    act(() => { root.unmount() })
+    host.remove()
+  })
+})
+
+describe('useDraggablePanelPos — 多 panel 共享同一 parent container', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    hookBag = null
+  })
+
+  /**
+   * 场景:同一画布页 companion + outline 两个面板,它们的 parentElement 都是
+   * 画布容器(共享 container)。验证:共享 container 不互相干扰 —— 各自 storageKey
+   * 独立持久,各自 mount clamp 只读自己的 pos。
+   * 注:现有 "多 panel 不串" 测用的是独立 host,这里用共享 parent。
+   */
+  it('两 panel 共享 parent container → 各自 pos 独立(不串)', () => {
+    // 模拟:companion 持久 (10,20);outline 无持久
+    window.localStorage.setItem('pos-companion', JSON.stringify({ left: 10, top: 20 }))
+    // 共享 parent(画布容器)
+    const sharedParent = document.createElement('div')
+    mockRect(sharedParent, { left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600, x: 0, y: 0 })
+    document.body.appendChild(sharedParent)
+
+    const hostA = document.createElement('div')
+    const hostB = document.createElement('div')
+    sharedParent.appendChild(hostA)
+    sharedParent.appendChild(hostB)
+
+    const rootA = createRoot(hostA)
+    const rootB = createRoot(hostB)
+    act(() => { rootA.render(<HarnessWithRef storageKey="pos-companion" />) })
+    const bagA = hookBag
+    act(() => { rootB.render(<HarnessWithRef storageKey="pos-outline" />) })
+    const bagB = hookBag
+
+    expect(bagA!.pos).toEqual({ left: 10, top: 20 })
+    expect(bagB!.pos).toBeNull()
+
+    act(() => { rootA.unmount(); rootB.unmount() })
+    hostA.remove()
+    hostB.remove()
+    sharedParent.remove()
+  })
+})

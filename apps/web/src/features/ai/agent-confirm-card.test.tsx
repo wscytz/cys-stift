@@ -432,3 +432,64 @@ describe('AgentConfirmCard — T5 archive trigger (ai-agent)', () => {
     unmount()
   })
 })
+
+// ── Fix 4 batch-2:AgentConfirmCard 仍用 appliedTitle(Fix 4 只删 AiConfirmDialog 死相位) ──
+
+describe('AgentConfirmCard — Fix 4 appliedTitle 仍用(不破 /ask + companion)', () => {
+  /**
+   * Fix 4 删了 AiConfirmDialog 的 appliedTitle 三元(死相位:onApplied 立即 unmount)。
+   * 但 AgentConfirmCard 内联在 /ask + companion 对话流里,apply 后不 unmount →
+   * phase='applied' 标题切换到 appliedTitle(「已应用 ✓」)是活的、用户可见的。
+   * 此测验证:AgentConfirmCard apply 成功后,标题切换到 appliedTitle(不回归)。
+   * 这是 appliedTitle i18n key 保留的理由 —— 删了会破 AgentConfirmCard。
+   */
+  it('live 模式 apply 成功 → phase=applied → 标题显示 appliedTitle(已应用 ✓)', async () => {
+    const { host: mockHost } = makeMockHost({ elements: emptyEls() })
+    const { service } = makeMockService()
+    const onApplied = vi.fn()
+    const dsl = '[rect #r1] @pos(10,20) @size(100,50)'
+    const { host: dom, unmount } = mount(
+      <AgentConfirmCard
+        dsl={dsl}
+        targetCanvasId={'cv' as never}
+        service={service}
+        liveHost={mockHost}
+        onApplied={onApplied}
+        onRejected={() => {}}
+      />,
+    )
+    await act(async () => { await flushMicro() })
+
+    // apply 前:标题是 proposeTitle(含 canvas 名)
+    const titleBefore = dom.querySelector('.ac__title')
+    expect(titleBefore?.textContent).toMatch(/cv/) // proposeTitle {canvas: 'cv'}
+
+    const applyBtn = byText(dom, /^应用$|^Apply$/)!
+    expect(applyBtn.disabled).toBe(false)
+    await act(async () => { applyBtn.click() })
+    await act(async () => { await flushMicro() })
+
+    // apply 后:phase='applied' → 标题切换到 appliedTitle(「已应用 ✓」)
+    expect(onApplied).toHaveBeenCalledTimes(1)
+    const titleAfter = dom.querySelector('.ac__title')
+    expect(titleAfter?.textContent).toMatch(/已应用/)
+
+    // actions 区在 applied 相位隐藏(phase !== 'applied' 守卫)
+    expect(byText(dom, /^应用$|^Apply$/)).toBeNull()
+
+    unmount()
+  })
+
+  /**
+   * 源码审计:AgentConfirmCard 仍引用 appliedTitle(与 AiConfirmDialog 对比)。
+   * 防有人误删 appliedTitle i18n key(以为 AiConfirmDialog 不用 = 没人用)。
+   */
+  it('AgentConfirmCard 源码仍引用 appliedTitle(活的,非死代码)', async () => {
+    const fs = await vi.importActual<typeof import('node:fs')>('node:fs')
+    const path = await vi.importActual<typeof import('node:path')>('node:path')
+    // 测试与源码同目录(src/features/ai/),无 __tests/ 子目录
+    const file = path.resolve(__dirname, 'agent-confirm-card.tsx')
+    const content = fs.readFileSync(file, 'utf8')
+    expect(content).toMatch(/appliedTitle/)
+  })
+})

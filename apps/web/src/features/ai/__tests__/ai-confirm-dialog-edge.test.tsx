@@ -304,3 +304,78 @@ describe('AiConfirmDialog edge — Fix 4 applied 相位死代码已删', () => {
     unmount()
   })
 })
+
+// ── Fix 3 batch-2:outline 仍可点(无 totalChanges 守卫)/ cluster >0 可点 ──
+
+describe('AiConfirmDialog edge — Fix 3 outline 无 totalChanges 守卫(仍可点)', () => {
+  /**
+   * disabled 条件:phase==='applying'/'applied' || (mode !== 'outline' && (...))
+   * → outline mode 跳过 totalChanges===0 守卫,永远可点(只要非 applying/applied)。
+   * 这是设计意图:outline 建 inbox 卡,不依赖画布 diff(totalChanges 对 outline 无意义)。
+   */
+  it('outline mode 空 markdown → 应用按钮 NOT disabled(无 totalChanges 守卫)', async () => {
+    const service = { create: vi.fn() } as never
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog mode="outline" outlineMarkdown={''} canvasId={'cv' as never} service={service} onApplied={() => {}} onRejected={() => {}} />,
+    )
+    await act(async () => { await flushMicro() })
+    const applyBtn = byText(dom, /^应用$|^Apply$/)!
+    expect(applyBtn).not.toBeNull()
+    expect(applyBtn.disabled).toBe(false) // outline 不受 totalChanges 守卫
+    unmount()
+  })
+
+  it('outline mode 有 markdown → 应用按钮 NOT disabled', async () => {
+    const service = { create: vi.fn() } as never
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog mode="outline" outlineMarkdown={'## 标题\n- a\n- b'} canvasId={'cv' as never} service={service} onApplied={() => {}} onRejected={() => {}} />,
+    )
+    await act(async () => { await flushMicro() })
+    const applyBtn = byText(dom, /^应用$|^Apply$/)!
+    expect(applyBtn.disabled).toBe(false)
+    unmount()
+  })
+})
+
+describe('AiConfirmDialog edge — Fix 3 cluster >0 变更 → 应用可点(不回归)', () => {
+  /**
+   * Fix 3 只对 cluster totalChanges===0 加 disabled。totalChanges>0(有 arrow)
+   * 仍可点 —— 此测验证守卫不误伤正常 cluster。
+   * 注:mocked applyClusters 默认 upsert 一条 arrow → diff added=1 → totalChanges=1。
+   */
+  it('cluster 有 arrow(totalChanges=1)→ 应用按钮 NOT disabled', async () => {
+    const initial: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 50, rotation: 0, color: 'white' } as CanvasElement,
+      { id: 'c2', kind: 'card', x: 200, y: 0, w: 100, h: 50, rotation: 0, color: 'white' } as CanvasElement,
+    ]
+    const { host: mockHost } = makeMockHost(initial)
+    const service = { get: () => ({ id: 'c1' }) } as never
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog mode="cluster" clusters={[{ ids: ['c1', 'c2'], kind: 'related', reason: 'x' }]} targetCanvasId={'cv' as never} service={service} liveHost={mockHost} onApplied={() => {}} onRejected={() => {}} />,
+    )
+    await act(async () => { await flushMicro() })
+    const applyBtn = byText(dom, /^应用$|^Apply$/)!
+    expect(applyBtn.disabled).toBe(false) // 有变更 → 可点
+    unmount()
+  })
+})
+
+// ── Fix 4 batch-2:AiConfirmDialog 无 appliedTitle 残留 / AgentConfirmCard 仍用 ──
+
+describe('AiConfirmDialog edge — Fix 4 appliedTitle 残留审计', () => {
+  /**
+   * Fix 4 删了 AiConfirmDialog 的 phase==='applied' 标题三元(appliedTitle 死相位)。
+   * agent.appliedTitle i18n key 保留(AgentConfirmCard 共享)。
+   * 此测 grep 源码确认 AiConfirmDialog 不再引用 appliedTitle(防回归)。
+   */
+  it('AiConfirmDialog 源码无 appliedTitle 引用(死代码已删)', async () => {
+    const src = await vi.importActual<typeof import('node:fs')>('node:fs')
+    const path = await vi.importActual<typeof import('node:path')>('node:path')
+    const file = path.resolve(__dirname, '..', 'ai-confirm-dialog.tsx')
+    const content = src.readFileSync(file, 'utf8')
+    // appliedTitle 不应出现在 AiConfirmDialog 源码(已删)
+    expect(content).not.toMatch(/appliedTitle/)
+    // 但 phase='applied' 仍保留(disabled 防双击 + setPhase)
+    expect(content).toMatch(/'applied'/)
+  })
+})
