@@ -15,7 +15,7 @@
  *
  * 不改 AgentConfirmCard —— /ask + companion 继续用它(它内联在对话流里,非 Modal)。
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { Button, Modal } from '@cys-stift/ui'
 import type { CanvasId, CardService } from '@cys-stift/domain'
 import { InMemoryCanvasHost, type CanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
@@ -82,12 +82,21 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
   const [editedMarkdown, setEditedMarkdown] = useState(mdInitial)
 
   // ── dsl mode: parse + 预演 diff ──
+  // useDeferredValue: 用户逐键编辑 textarea 时,editedDsl 每键变化;若 preview
+  // useMemo 直接绑 editedDsl,每键都重算 parseDslWithDiagnostics + 克隆 liveHost
+  // → applyLayout 预演 → diffCanvasSnapshots,大画布(多卡)明显卡。deferredDsl
+  // 让 React 在空闲时才把新值 commit 给 preview(类似 300ms debounce 但无 timer,
+  // React 调度原生,不引入新依赖且更 idiomatic)。textarea 仍绑 editedDsl(即时
+  // 显示用户输入),apply 用 preview.ops(deferred 态,停顿后才更新)。
+  const deferredDsl = useDeferredValue(editedDsl)
   const preview = useMemo(() => {
     if (props.mode !== 'dsl') return null
-    const { ops, errors } = parseDslWithDiagnostics(editing ? editedDsl : props.dsl)
+    const { ops, errors } = parseDslWithDiagnostics(editing ? deferredDsl : props.dsl)
     if (errors.length > 0 && ops.length === 0) return { kind: 'parseError' as const, errors }
     return { kind: 'ok' as const, ops, errors }
-  }, [props, editing, editedDsl])
+    // editing 仍非 deferred(切换编辑态应立即重算);deferredDsl 是 debounced 值。
+    // props 在依赖里保持原有行为(父组件换 DSL 立即重算)。
+  }, [props, editing, deferredDsl])
 
   const [beforeState, setBeforeState] = useState<CanvasElement[] | null>(null)
   const [afterState, setAfterState] = useState<CanvasElement[] | null>(null)
