@@ -157,4 +157,29 @@ describe('AiConfirmDialog — outline mode', () => {
     expect(onApplied).toHaveBeenCalledTimes(1)
     unmount()
   })
+
+  it('编辑 markdown(不退出编辑)点应用 → service.create body 用编辑后值', async () => {
+    const created: unknown[] = []
+    const service = { create: (input: unknown) => { created.push(input) } } as never
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog mode="outline" outlineMarkdown={'## original'} canvasId={'cv' as never} service={service} onApplied={() => {}} onRejected={() => {}} />,
+    )
+    await act(async () => { await flushMicro() })
+    // 点 edit → textarea 出现
+    const editBtn = byText(dom, /^编辑 DSL$|^Edit DSL$/)!
+    await act(async () => { editBtn.click() })
+    const ta = dom.querySelector('textarea') as HTMLTextAreaElement
+    expect(ta).toBeTruthy()
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+      setter.call(ta, '## edited')
+      ta.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    // 不退出编辑,点 apply → body 应为编辑后值(editing 态用 editedMarkdown)
+    const applyBtn = byText(dom, /^应用$|^Apply$/)!
+    await act(async () => { applyBtn.click() })
+    expect(created).toHaveLength(1)
+    expect((created[0] as { body: string }).body).toBe('## edited')
+    unmount()
+  })
 })

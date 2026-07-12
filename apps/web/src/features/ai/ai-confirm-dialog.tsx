@@ -244,7 +244,7 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
             />
           ) : (
             <div className="ac__md-preview">
-              <MarkdownBody source={editedMarkdown || props.outlineMarkdown} />
+              <MarkdownBody source={editing ? editedMarkdown : props.outlineMarkdown} />
             </div>
           )
         )}
