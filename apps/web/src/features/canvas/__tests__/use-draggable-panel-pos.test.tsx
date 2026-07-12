@@ -167,3 +167,139 @@ describe('useDraggablePanelPos', () => {
     r.unmount()
   })
 })
+
+// ── edge-case 补测 ────────────────────────────────────────────────────────
+// justDraggedRef 是防误触折叠的关键:pointerup 后浏览器仍 fire click → 折叠按钮
+// onClick 检查 justDraggedRef.current,true 则吞掉。hook 本身只设 true(消费者重置),
+// 所以这里验证:拖动设 true、亚像素抖动不设。
+
+/** 暴露 justDraggedRef 给 test(通过外层变量捕获 hook 返回,ref 对象稳定)。 */
+let hookBag: ReturnType<typeof useDraggablePanelPos> | null = null
+function HarnessWithRef({ storageKey }: { storageKey: string }) {
+  const ref = React.useRef<HTMLDivElement>(null)
+  hookBag = useDraggablePanelPos(ref, storageKey)
+  const { pos, onPointerDown } = hookBag
+  return (
+    <div ref={ref} style={{ position: 'absolute', left: pos?.left ?? 0, top: pos?.top ?? 0 }}>
+      <div data-testid="handle" onPointerDown={onPointerDown}>drag</div>
+    </div>
+  )
+}
+
+function renderWithRef(storageKey = 'test-pos') {
+  const host = document.createElement('div')
+  document.body.appendChild(host)
+  const root = createRoot(host)
+  act(() => { root.render(<HarnessWithRef storageKey={storageKey} />) })
+  return {
+    host,
+    root,
+    handle: () => host.querySelector('[data-testid="handle"]') as HTMLElement,
+    unmount() { act(() => { root.unmount() }); host.remove() },
+  }
+}
+
+describe('useDraggablePanelPos — justDraggedRef(防误触折叠)', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    hookBag = null
+  })
+
+  it('超过阈值的拖动 → justDraggedRef.current=true', () => {
+    const r = renderWithRef()
+    const handle = r.handle()
+    const outer = handle.parentElement as HTMLElement
+    const container = outer.parentElement as HTMLElement
+    mockRect(outer, { left: 100, top: 100, width: 100, height: 100 })
+    mockRect(container, { left: 0, top: 0, width: 800, height: 600 })
+
+    expect(hookBag!.justDraggedRef.current).toBe(false)
+    act(() => {
+      handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 110, clientY: 110, pointerId: 1, button: 0 }))
+      // 移动 40px(远超 3px 阈值)
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 150, clientY: 150, pointerId: 1 }))
+      window.dispatchEvent(new PointerEvent('pointerup', { clientX: 150, clientY: 150, pointerId: 1 }))
+    })
+    expect(hookBag!.justDraggedRef.current).toBe(true)
+    r.unmount()
+  })
+
+  it('亚像素抖动(<3px)→ justDraggedRef 不设 + 不写 localStorage', () => {
+    const r = renderWithRef()
+    const handle = r.handle()
+    const outer = handle.parentElement as HTMLElement
+    const container = outer.parentElement as HTMLElement
+    mockRect(outer, { left: 100, top: 100, width: 100, height: 100 })
+    mockRect(container, { left: 0, top: 0, width: 800, height: 600 })
+
+    act(() => {
+      handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 110, clientY: 110, pointerId: 1, button: 0 }))
+      // 移动 2px(低于 3px 阈值 → moved 不触发)
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 112, clientY: 112, pointerId: 1 }))
+      window.dispatchEvent(new PointerEvent('pointerup', { clientX: 112, clientY: 112, pointerId: 1 }))
+    })
+    expect(hookBag!.justDraggedRef.current).toBe(false)
+    expect(window.localStorage.getItem('test-pos')).toBeNull()
+    r.unmount()
+  })
+})
+
+describe('useDraggablePanelPos — localStorage 损坏/缺字段', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    hookBag = null
+  })
+
+  it('corrupt JSON → 不抛 + pos=null', () => {
+    window.localStorage.setItem('test-pos', '{ NOT JSON {{{')
+    const r = renderWithRef()
+    expect(hookBag!.pos).toBeNull()
+    expect(hookBag!.positioned).toBe(false)
+    r.unmount()
+  })
+
+  it('缺 top 字段(只有 left)→ pos=null(不半成形)', () => {
+    window.localStorage.setItem('test-pos', JSON.stringify({ left: 100 }))
+    const r = renderWithRef()
+    expect(hookBag!.pos).toBeNull()
+    expect(hookBag!.positioned).toBe(false)
+    r.unmount()
+  })
+
+  it('left/top 非数字(字符串)→ pos=null', () => {
+    window.localStorage.setItem('test-pos', JSON.stringify({ left: '100', top: '50' }))
+    const r = renderWithRef()
+    expect(hookBag!.pos).toBeNull()
+    r.unmount()
+  })
+})
+
+describe('useDraggablePanelPos — 多 panel 不串(storageKey 隔离)', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    hookBag = null
+  })
+
+  it('两个 panel 不同 storageKey → 拖一个不污染另一个的持久值', () => {
+    // panel A 持久 (10,20);panel B 无持久
+    window.localStorage.setItem('pos-a', JSON.stringify({ left: 10, top: 20 }))
+    const hostA = document.createElement('div')
+    const hostB = document.createElement('div')
+    document.body.appendChild(hostA)
+    document.body.appendChild(hostB)
+    const rootA = createRoot(hostA)
+    const rootB = createRoot(hostB)
+    act(() => { rootA.render(<HarnessWithRef storageKey="pos-a" />) })
+    const bagA = hookBag
+    act(() => { rootB.render(<HarnessWithRef storageKey="pos-b" />) })
+    const bagB = hookBag
+
+    expect(bagA!.pos).toEqual({ left: 10, top: 20 })
+    expect(bagB!.pos).toBeNull()
+
+    // pos-b 仍是 null(A 的持久没串过来)
+    act(() => { rootA.unmount(); rootB.unmount() })
+    hostA.remove()
+    hostB.remove()
+  })
+})

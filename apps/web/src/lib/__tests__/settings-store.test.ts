@@ -512,4 +512,112 @@ describe('captureShortcut Space→KeyE 迁移', () => {
     const s = fresh.get()
     expect(s.captureShortcut.code).toBe('KeyJ')
   })
+
+  // ── B1 迁移 edge-case 补测 ──────────────────────────────────────────────
+  it('Space 迁移保留兄弟字段(theme/locale/profiles 不丢)', async () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        settings: {
+          captureShortcut: { modKey: 'meta', shift: true, code: 'Space' },
+          theme: 'dark',
+          locale: 'en',
+          profiles: [{ id: 'p1', name: 'OpenAI', provider: 'openai', apiKey: 'sk-x', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', enabled: true }],
+          activeProfileId: 'p1',
+          seenCaptureHint: true,
+          export: { includeDeleted: false },
+          labs: { visionLab: true },
+        },
+      }),
+    )
+    vi.resetModules()
+    const fresh = (await import('../settings-store')).settingsStore
+    const s = fresh.get()
+    // code 迁移
+    expect(s.captureShortcut.code).toBe('KeyE')
+    // 兄弟字段全保(theme/locale/profiles/active/seen/export/labs)
+    expect(s.theme).toBe('dark')
+    expect(s.locale).toBe('en')
+    expect(s.profiles).toHaveLength(1)
+    expect(s.profiles[0]!.id).toBe('p1')
+    expect(s.activeProfileId).toBe('p1')
+    expect(s.seenCaptureHint).toBe(true)
+    expect(s.export?.includeDeleted).toBe(false)
+    expect(s.labs?.visionLab).toBe(true)
+    // modKey/shift 不变(只改 code)
+    expect(s.captureShortcut.modKey).toBe('meta')
+    expect(s.captureShortcut.shift).toBe(true)
+  })
+
+  it('Space 迁移幂等(第二次 load 不再迁移,KeyE 稳定)', async () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        settings: {
+          captureShortcut: { modKey: 'meta', shift: true, code: 'Space' },
+          theme: 'light',
+          locale: 'zh',
+          profiles: [],
+          activeProfileId: null,
+        },
+      }),
+    )
+    // 第一次 load → 迁移 Space→KeyE + 存回
+    vi.resetModules()
+    const s1 = (await import('../settings-store')).settingsStore.get()
+    expect(s1.captureShortcut.code).toBe('KeyE')
+    // 第二次 load(新模块实例,模拟 reload)→ 读到的已是 KeyE,不触发迁移分支
+    vi.resetModules()
+    const s2 = (await import('../settings-store')).settingsStore.get()
+    expect(s2.captureShortcut.code).toBe('KeyE')
+    // localStorage 仍是 KeyE(没被改)
+    const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY)!) as { settings: { captureShortcut: { code: string } } }
+    expect(stored.settings.captureShortcut.code).toBe('KeyE')
+  })
+})
+
+// v1→v2 迁移 edge-case 补测(删 v1 key + 幂等)
+describe('v1→v2 迁移 edge', () => {
+  it('迁移后 v1 key 被删除(不再读 v1)', async () => {
+    window.localStorage.setItem(
+      'cys-stift.settings.v1',
+      JSON.stringify({
+        settings: {
+          captureShortcut: { modKey: 'meta', shift: true, code: 'Space' },
+          theme: 'system',
+          locale: 'zh',
+          ai: { provider: 'openai', apiKey: 'sk-x', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', enabled: true },
+          seenCaptureHint: false,
+        },
+      }),
+    )
+    vi.resetModules()
+    const store2 = (await import('../settings-store')).settingsStore
+    store2.get() // 触发迁移
+    expect(window.localStorage.getItem('cys-stift.settings.v1')).toBeNull()
+    expect(window.localStorage.getItem('cys-stift.settings.v2')).not.toBeNull()
+  })
+
+  it('迁移幂等(第二次 load 读 v2,不重复迁移)', async () => {
+    window.localStorage.setItem(
+      'cys-stift.settings.v1',
+      JSON.stringify({
+        settings: {
+          captureShortcut: { modKey: 'meta', shift: true, code: 'Space' },
+          theme: 'system',
+          locale: 'zh',
+          ai: { provider: 'openai', apiKey: 'sk-x', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', enabled: true },
+          seenCaptureHint: false,
+        },
+      }),
+    )
+    vi.resetModules()
+    const s1 = (await import('../settings-store')).settingsStore.get()
+    const profilesCount1 = s1.profiles.length
+    // 第二次 load:v1 已删,读 v2 → profiles 数不变(不重复迁移)
+    vi.resetModules()
+    const s2 = (await import('../settings-store')).settingsStore.get()
+    expect(s2.profiles).toHaveLength(profilesCount1)
+    expect(window.localStorage.getItem('cys-stift.settings.v1')).toBeNull()
+  })
 })
