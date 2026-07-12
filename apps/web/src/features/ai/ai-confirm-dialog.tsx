@@ -21,6 +21,7 @@ import type { CanvasId, CardService } from '@cys-stift/domain'
 import { InMemoryCanvasHost, type CanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
 import { parseDslWithDiagnostics } from './dsl-parser'
 import { applyLayout } from '@/features/canvas/apply-layout'
+import { applyClusters, type CardCluster } from './cluster'
 import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
 import { summarizeMovement } from '@/features/canvas/layout-movement'
 import { Thumb, DiffGroup, summarizeEl, confirmStyles } from './canvas-thumb'
@@ -54,8 +55,15 @@ interface DslProps extends BaseProps {
   liveHost: CanvasHost
 }
 
+interface ClusterProps extends BaseProps {
+  mode: 'cluster'
+  clusters: CardCluster[]
+  targetCanvasId: CanvasId
+  liveHost: CanvasHost
+}
+
 // Task 4 加 ClusterProps;Task 5 加 OutlineProps。
-export type AiConfirmDialogProps = DslProps
+export type AiConfirmDialogProps = DslProps | ClusterProps
 
 export function AiConfirmDialog(props: AiConfirmDialogProps) {
   const { t } = useI18n()
@@ -76,17 +84,29 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
   const [afterState, setAfterState] = useState<CanvasElement[] | null>(null)
 
   useEffect(() => {
-    if (props.mode !== 'dsl') return
-    if (preview?.kind !== 'ok') { setBeforeState(null); setAfterState(null); return }
-    let cancelled = false
-    const before = props.liveHost.getElements()
-    const afterHost = new InMemoryCanvasHost()
-    afterHost.applyWithoutEcho(() => { for (const el of before) afterHost.upsert(el) })
-    applyLayout(afterHost, preview.ops)
-    if (cancelled) return
-    setBeforeState(before)
-    setAfterState(afterHost.getElements())
-    return () => { cancelled = true }
+    if (props.mode === 'dsl') {
+      if (preview?.kind !== 'ok') { setBeforeState(null); setAfterState(null); return }
+      let cancelled = false
+      const before = props.liveHost.getElements()
+      const afterHost = new InMemoryCanvasHost()
+      afterHost.applyWithoutEcho(() => { for (const el of before) afterHost.upsert(el) })
+      applyLayout(afterHost, preview.ops)
+      if (cancelled) return
+      setBeforeState(before)
+      setAfterState(afterHost.getElements())
+      return () => { cancelled = true }
+    }
+    if (props.mode === 'cluster') {
+      let cancelled = false
+      const before = props.liveHost.getElements()
+      const afterHost = new InMemoryCanvasHost()
+      afterHost.applyWithoutEcho(() => { for (const el of before) afterHost.upsert(el) })
+      applyClusters(afterHost, props.clusters, props.service, String(props.targetCanvasId))
+      if (cancelled) return
+      setBeforeState(before)
+      setAfterState(afterHost.getElements())
+      return () => { cancelled = true }
+    }
   }, [props, preview])
 
   const diff = useMemo(() => {
@@ -107,54 +127,71 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
   }
 
   const handleApply = async () => {
-    if (props.mode !== 'dsl') return
-    if (preview?.kind !== 'ok' || !afterState) return
+    if (phase === 'applying') return
     setPhase('applying')
     try {
-      // 诚实位移反馈(迁自 page handleAILayout):apply 前后快照卡位置 → summarizeMovement。
-      const cardIdsInOps = new Set(
-        preview.ops
-          .filter((op): op is typeof op & { type: 'card' } => op.type === 'card')
-          .map((op) => String(op.cardId)),
-      )
-      const snapPositions = (): Record<string, { x: number; y: number }> => {
-        const m: Record<string, { x: number; y: number }> = {}
-        for (const el of props.liveHost.getElements()) {
-          if (el.kind !== 'card') continue
-          if (!cardIdsInOps.has(el.id)) continue
-          m[el.id] = { x: el.x, y: el.y }
-        }
-        return m
-      }
-      const before = snapPositions()
-      const { applied } = applyLayout(props.liveHost, preview.ops)
-      if (applied > 0) {
-        void buildArchivePayload()
-          .then((p) => archiveStore.append('ai-layout', `AI 重排 ${applied} 张`, p, VERSION))
-          .catch((err) => console.warn('[archive] ai-layout append failed', err))
-      }
-      if (props.sampleContext) {
-        const edited = editing && editedDsl && editedDsl !== props.dsl
-        addSample(
-          { id: genSampleId(), ts: Date.now(), kind: 'dsl', source: 'canvasLayout', context: props.sampleContext.context, aiOutput: props.dsl, editedOutput: edited ? editedDsl : undefined, outcome: edited ? 'applied_edited' : 'applied', targetCanvasId: props.sampleContext.targetCanvasId },
-          settingsStore.get().aiSampleCapture,
+      if (props.mode === 'dsl') {
+        if (preview?.kind !== 'ok' || !afterState) { setPhase('confirming'); return }
+        // 诚实位移反馈(迁自 page handleAILayout):apply 前后快照卡位置 → summarizeMovement。
+        const cardIdsInOps = new Set(
+          preview.ops
+            .filter((op): op is typeof op & { type: 'card' } => op.type === 'card')
+            .map((op) => String(op.cardId)),
         )
+        const snapPositions = (): Record<string, { x: number; y: number }> => {
+          const m: Record<string, { x: number; y: number }> = {}
+          for (const el of props.liveHost.getElements()) {
+            if (el.kind !== 'card') continue
+            if (!cardIdsInOps.has(el.id)) continue
+            m[el.id] = { x: el.x, y: el.y }
+          }
+          return m
+        }
+        const before = snapPositions()
+        const { applied } = applyLayout(props.liveHost, preview.ops)
+        if (applied > 0) {
+          void buildArchivePayload()
+            .then((p) => archiveStore.append('ai-layout', `AI 重排 ${applied} 张`, p, VERSION))
+            .catch((err) => console.warn('[archive] ai-layout append failed', err))
+        }
+        if (props.sampleContext) {
+          const edited = editing && editedDsl && editedDsl !== props.dsl
+          addSample(
+            { id: genSampleId(), ts: Date.now(), kind: 'dsl', source: 'canvasLayout', context: props.sampleContext.context, aiOutput: props.dsl, editedOutput: edited ? editedDsl : undefined, outcome: edited ? 'applied_edited' : 'applied', targetCanvasId: props.sampleContext.targetCanvasId },
+            settingsStore.get().aiSampleCapture,
+          )
+        }
+        const after = snapPositions()
+        const summary = summarizeMovement(before, after)
+        if (applied === 0) pushToast({ kind: 'info', message: t('canvas.aiLayoutNoneApplied') })
+        else if (summary.moved > 0) pushToast({ kind: 'success', message: t('canvas.aiLayoutMoved', { moved: String(summary.moved), avgPx: String(summary.avgPx) }) })
+        else pushToast({ kind: 'info', message: t('canvas.aiLayoutUnchanged') })
+      } else if (props.mode === 'cluster') {
+        // cluster apply:applyClusters 内部无 batch → 外部包 batch 保单 undo。
+        let res = { arrowsCreated: 0, clustersApplied: 0 }
+        props.liveHost.batch(() => {
+          res = applyClusters(props.liveHost, props.clusters, props.service, String(props.targetCanvasId))
+        })
+        if (res.arrowsCreated > 0) {
+          void buildArchivePayload()
+            .then((p) => archiveStore.append('cluster', `cluster: ${props.clusters.length} 组`, p, VERSION))
+            .catch((err) => console.warn('[archive] cluster append failed', err))
+        }
+        pushToast({
+          kind: res.arrowsCreated > 0 ? 'success' : 'info',
+          message: res.arrowsCreated > 0 ? t('canvas.aiClusterDone', { n: String(res.arrowsCreated) }) : t('canvas.aiClusterNone'),
+        })
       }
-      const after = snapPositions()
-      const summary = summarizeMovement(before, after)
-      if (applied === 0) pushToast({ kind: 'info', message: t('canvas.aiLayoutNoneApplied') })
-      else if (summary.moved > 0) pushToast({ kind: 'success', message: t('canvas.aiLayoutMoved', { moved: String(summary.moved), avgPx: String(summary.avgPx) }) })
-      else pushToast({ kind: 'info', message: t('canvas.aiLayoutUnchanged') })
       setPhase('applied')
       props.onApplied()
     } catch (err) {
-      console.error('[AiConfirmDialog] dsl apply failed', err)
+      console.error('[AiConfirmDialog] apply failed', err)
       setPhase('error')
       pushToast({ kind: 'error', message: t('agent.applyFailed') })
     }
   }
 
-  const title = props.mode === 'dsl' ? t('ai.confirm.layoutTitle') : ''
+  const title = props.mode === 'dsl' ? t('ai.confirm.layoutTitle') : props.mode === 'cluster' ? t('ai.confirm.clusterTitle') : ''
 
   // parseError 态:显示错误 + 编辑/重试(retry = onRejected,用户手动重跑 AI)。
   if (props.mode === 'dsl' && preview?.kind === 'parseError') {
@@ -203,16 +240,18 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
           </div>
         )}
 
-        {editing && (
+        {props.mode === 'dsl' && editing && (
           <textarea className="ac__edit" value={editedDsl} onChange={(e) => setEditedDsl(e.target.value)} rows={Math.min(8, editedDsl.split('\n').length)} />
         )}
 
         {phase !== 'applied' && (
           <div className="ac__actions">
-            <Button variant="primary" onClick={() => void handleApply()} disabled={phase === 'applying' || !afterState || totalChanges === 0}>
+            <Button variant="primary" onClick={() => void handleApply()} disabled={phase === 'applying' || !afterState || (props.mode === 'dsl' && totalChanges === 0)}>
               {phase === 'applying' ? t('agent.applying') : t('agent.apply')}
             </Button>
-            <Button variant="ghost" onClick={() => setEditing((v) => !v)}>{t('agent.edit')}</Button>
+            {props.mode === 'dsl' && (
+              <Button variant="ghost" onClick={() => setEditing((v) => !v)}>{t('agent.edit')}</Button>
+            )}
             <Button variant="ghost" onClick={() => { recordReject(); props.onRejected() }}>{t('agent.reject')}</Button>
           </div>
         )}

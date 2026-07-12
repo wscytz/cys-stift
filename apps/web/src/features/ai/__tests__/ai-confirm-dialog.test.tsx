@@ -31,6 +31,17 @@ vi.mock('@/lib/archive-store', () => ({
 }))
 vi.mock('@/lib/build-archive-payload', () => ({ buildArchivePayload: vi.fn().mockResolvedValue({ cards: [], mediaAssets: {} }) }))
 
+vi.mock('@/features/ai/cluster', () => ({
+  applyClusters: vi.fn((host: { upsert: (el: unknown) => void }, _clusters: unknown[]) => {
+    // 模拟 cluster apply:往 host upsert 一条 arrow(让预演 after 含箭头 → diff 可见 + apply 可观测)
+    host.upsert({ id: 'arr-test', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2', color: 'gray', dash: 'dotted', arrowhead: 'arrow', text: 'related-to' })
+    return { arrowsCreated: 1, clustersApplied: 1 }
+  }),
+  CLUSTER_SYSTEM_PROMPT: '',
+  buildClusterUserPrompt: () => '',
+  parseClusters: () => [],
+}))
+
 import { AiConfirmDialog } from '../ai-confirm-dialog'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -96,6 +107,31 @@ describe('AiConfirmDialog — dsl mode(layout)', () => {
     )
     await act(async () => { await flushMicro() })
     expect(byText(dom, /^应用$|^Apply$/)).toBeNull() // 应用按钮不出现(parseError)
+    unmount()
+  })
+})
+
+describe('AiConfirmDialog — cluster mode', () => {
+  it('点应用 → liveHost.batch 被调(单 undo);摘要显示将新增箭头', async () => {
+    // 初始 2 张卡(供 cluster 连)
+    const initial: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 50, rotation: 0, color: 'white' } as CanvasElement,
+      { id: 'c2', kind: 'card', x: 200, y: 0, w: 100, h: 50, rotation: 0, color: 'white' } as CanvasElement,
+    ]
+    const { host: mockHost, calls } = makeMockHost(initial)
+    const service = { get: () => ({ id: 'c1' }) } as never
+    const onApplied = vi.fn()
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog mode="cluster" clusters={[{ ids: ['c1', 'c2'], kind: 'related', reason: 'x' }]} targetCanvasId={'cv' as never} service={service} liveHost={mockHost} onApplied={onApplied} onRejected={() => {}} />,
+    )
+    await act(async () => { await flushMicro() })
+    // 摘要:diff added arrow 可见("新增"/"关系" 文案)。mocked applyClusters 往预演 host upsert 了 arrow。
+    expect(dom.textContent).toMatch(/新增|关系|relation|arrow/i)
+    const applyBtn = byText(dom, /^应用$|^Apply$/)!
+    await act(async () => { applyBtn.click() })
+    // cluster apply 走 liveHost.batch(外部包,单 undo)
+    expect(calls.batch).toBeGreaterThanOrEqual(1)
+    expect(onApplied).toHaveBeenCalledTimes(1)
     unmount()
   })
 })

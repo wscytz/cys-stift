@@ -409,6 +409,8 @@ export const messages = {
   'agent.proposeTitle': { zh: 'AI 提议改动画布「{canvas}」', en: 'AI proposes canvas edits: {canvas}' },
   'agent.appliedTitle': { zh: '已应用 ✓', en: 'Applied ✓' },
   'ai.confirm.layoutTitle': { zh: 'AI 排版提议', en: 'AI layout proposal' },
+  'ai.confirm.clusterTitle': { zh: 'AI 分组提议', en: 'AI cluster proposal' },
+  'ai.confirm.arrowsToAdd': { zh: '将新增 {n} 条关系', en: 'Will add {n} relations' },
   'agent.apply': { zh: '应用', en: 'Apply' },
   'agent.applying': { zh: '应用中…', en: 'Applying…' },
   'agent.applied': { zh: '已应用 {n} 条变更(卡 {cards})', en: 'Applied {n} changes ({cards} cards)' },
