@@ -32,6 +32,10 @@ export function RouteFocus() {
     const main = document.getElementById('main')
     if (main) {
       main.focus()
+      // Reset scroll on route change: Next.js static export preserves scrollY
+      // across navigations, which can leave the sticky AppMenu scrolled out of
+      // view. Force top so the menu is visible after every navigation.
+      window.scrollTo(0, 0)
     }
   }, [pathname])
 
