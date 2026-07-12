@@ -9,7 +9,7 @@
  *
  * codebase policy:react-dom/client + act(非 @testing-library/react)。
  */
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { useDraggablePanelPos } from '../use-draggable-panel-pos'
@@ -301,5 +301,136 @@ describe('useDraggablePanelPos — 多 panel 不串(storageKey 隔离)', () => {
     act(() => { rootA.unmount(); rootB.unmount() })
     hostA.remove()
     hostB.remove()
+  })
+})
+
+// ── Fix 1:onUp 时存一次(非每次 move) + setItem try/catch ───────────────────
+
+describe('useDraggablePanelPos — Fix 1 持久化时机(pointerup 一次) + quota try/catch', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    hookBag = null
+  })
+
+  /**
+   * 拖动期间发多次 pointermove,但 localStorage 只在 pointerup 时写一次。
+   * 用 setItem spy 计调用次数:多次 move + 1 up → setItem 调用 ≤ 1 次。
+   */
+  it('多次 pointermove 不反复写 localStorage,仅 pointerup 后写一次', () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
+    const r = renderWithRef()
+    const handle = r.handle()
+    const outer = handle.parentElement as HTMLElement
+    const container = outer.parentElement as HTMLElement
+    mockRect(outer, { left: 100, top: 100, width: 100, height: 100 })
+    mockRect(container, { left: 0, top: 0, width: 800, height: 600 })
+
+    setItemSpy.mockClear() // 跳过 mount 阶段(此处无 clamp 写)
+    act(() => {
+      handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 110, clientY: 110, pointerId: 1, button: 0 }))
+      // 5 次 pointermove(模拟 60Hz 拖动)
+      for (let i = 1; i <= 5; i++) {
+        window.dispatchEvent(new PointerEvent('pointermove', { clientX: 110 + i * 10, clientY: 110 + i * 10, pointerId: 1 }))
+      }
+    })
+    // 拖动期间应未写(只 pointerup 时写)
+    const writesDuringDrag = setItemSpy.mock.calls.filter((c) => c[0] === 'test-pos').length
+    expect(writesDuringDrag).toBe(0)
+
+    act(() => {
+      window.dispatchEvent(new PointerEvent('pointerup', { clientX: 160, clientY: 160, pointerId: 1 }))
+    })
+    // pointerup 后写一次
+    const writesAfterUp = setItemSpy.mock.calls.filter((c) => c[0] === 'test-pos').length
+    expect(writesAfterUp).toBe(1)
+
+    setItemSpy.mockRestore()
+    r.unmount()
+  })
+
+  /**
+   * setItem 抛 QuotaExceededError → 不向上抛,console.warn 记录。
+   * 验读写不对称已修(写也有 try/catch,同 settings-store saveSettings 范式)。
+   */
+  it('setItem 抛 QuotaExceededError → 不抛 + console.warn', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const quota = new DOMException('quota exceeded', 'QuotaExceededError')
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw quota })
+    const r = renderWithRef()
+    const handle = r.handle()
+    const outer = handle.parentElement as HTMLElement
+    const container = outer.parentElement as HTMLElement
+    mockRect(outer, { left: 100, top: 100, width: 100, height: 100 })
+    mockRect(container, { left: 0, top: 0, width: 800, height: 600 })
+
+    expect(() => {
+      act(() => {
+        handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 110, clientY: 110, pointerId: 1, button: 0 }))
+        window.dispatchEvent(new PointerEvent('pointermove', { clientX: 150, clientY: 150, pointerId: 1 }))
+        window.dispatchEvent(new PointerEvent('pointerup', { clientX: 150, clientY: 150, pointerId: 1 }))
+      })
+    }).not.toThrow()
+
+    // console.warn 被调(配额失败信号)
+    expect(warnSpy).toHaveBeenCalled()
+    const warnArgs = warnSpy.mock.calls.find((c) => /useDraggablePanelPos/.test(String(c[0])))
+    expect(warnArgs).toBeTruthy()
+
+    setItemSpy.mockRestore()
+    warnSpy.mockRestore()
+    r.unmount()
+  })
+})
+
+// ── Fix 2:mount 时 clamp localStorage 持久 pos 到 container(防小视口陷阱) ──
+
+describe('useDraggablePanelPos — Fix 2 mount clamp(小视口防陷阱)', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    hookBag = null
+  })
+
+  /**
+   * 模拟:用户拖过(localStorage 持久 pos),后窗口缩小 / 换小屏 → 旧 pos 超新 container。
+   * mount 时 useLayoutEffect 把超界 pos 拉回 container 边界,并更新 localStorage。
+   */
+  it('localStorage pos 超新 container → mount 后 clamp 入 + 更新 localStorage', () => {
+    // 旧视口存了 (1500, 700);新 container 只 800×600(面板 100×100 默认 0→maxLeft=796, maxTop=600)
+    window.localStorage.setItem('test-pos', JSON.stringify({ left: 1500, top: 700 }))
+    const host = document.createElement('div')
+    // 关键:mount 前预 mock host(containerRef.current.parentElement)的 rect
+    mockRect(host, { left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600, x: 0, y: 0 })
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    act(() => { root.render(<HarnessWithRef storageKey="test-pos" />) })
+
+    // pos 被 clamp 入(1500 → 796,700 → 600)
+    expect(hookBag!.pos).toEqual({ left: 796, top: 600 })
+    // localStorage 也被更新为合法值(下次 mount 不需再 clamp)
+    const raw = window.localStorage.getItem('test-pos')
+    expect(raw).not.toBeNull()
+    expect(JSON.parse(raw!)).toEqual({ left: 796, top: 600 })
+
+    act(() => { root.unmount() })
+    host.remove()
+  })
+
+  /**
+   * pos 在 container 内 → mount clamp 不触发(pos 不变,localStorage 不重写)。
+   */
+  it('localStorage pos 在 container 内 → mount 不改 pos / 不重写 localStorage', () => {
+    window.localStorage.setItem('test-pos', JSON.stringify({ left: 100, top: 50 }))
+    const originalRaw = window.localStorage.getItem('test-pos')
+    const host = document.createElement('div')
+    mockRect(host, { left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600, x: 0, y: 0 })
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    act(() => { root.render(<HarnessWithRef storageKey="test-pos" />) })
+
+    expect(hookBag!.pos).toEqual({ left: 100, top: 50 }) // 不变
+    expect(window.localStorage.getItem('test-pos')).toBe(originalRaw) // 不重写
+
+    act(() => { root.unmount() })
+    host.remove()
   })
 })
