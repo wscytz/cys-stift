@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.57.3(2026-07-11 tag 发版;删 dark 聚焦 light。v0.57.2 卡片显示模式 + 发版前 review fix)。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.58.0(2026-07-12 打包手测中;#1 AI 确认门 + B1/B3/B4 打磨批 + fix batch。v0.57.3 删 dark 聚焦 light)。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 
@@ -171,12 +171,12 @@
 > 判断"这一步该不该做"先读 **[`docs/development/polish-phase.md`](development/polish-phase.md)**(打磨 vs 修缝判据 + 反馈驱动流程 + 退出标准)。
 > 燃料 = 你手测的真实反馈。每轮主线开工走 brainstorming,严守「一次一问 + 逐段确认」(skill-checklist-discipline 记忆)。
 
-### 当前焦点(2026-07-11,v0.57.2 已发)
+### 当前焦点(2026-07-12,v0.58.0 打包手测中)
 
-**v0.57.2 已 tag 发版**(DSL sanitize 兜底层 + 关系式坐标+碰撞避让 + arrow#id 可选 + parser 正则->Peggy + 双击建卡入口 + 工作台编辑打磨 + 卡片显示模式:4 密度切换/卡高模式派生/subtitle 副标题)。v0.57.0 未单独 tag,并入 v0.57.1。
+**v0.58.0 打包手测中**(大版本):#1 AI 排版/cluster/outline 确认门 + B1 全局热键 Space→E + B3 悬浮窗(companion/outline)可拖 + B4 菜单条 sticky 切界面修 + fix batch(dropdown KeyE / tab guard / cluster 0 disable / applied 死相位删 / 拖窗 localStorage try/catch+节流+mount clamp)。审核 #1「AI 过程不可见」+ v0.57.3 手测反馈 4 个严重度 3 问题。
 
-- **手测仍需真机验**(代码测全绿,但真 AI + 真 app 只能手测):清单见 `cys-stift-docs/docs/handoff/2026-07-09-handtest-checklist-v057.md`(A 关系式+避让 / B sanitize+toast / C arrow#id / D v0.54/v0.55 旧债 / E 双击建卡 / F PEG 往返 / G 工作台完成按钮+保存状态+预览剥 markdown / H 卡片显示模式 4 档切换)。发现问题 -> 补 v0.57.3。
-- **下一步候选**:专注态可发现(⤢ 加标签/长文自动进)+ 堆叠卡交互(可点/溢出计数)+ 卡片显示模式手测反馈迭代。
+- **手测清单**:#1 三 mode 确认门(dsl before/after 缩略图 + cluster 箭头 + outline markdown 预览 + 编辑 + parseError)/ B1 ⌘⇧E 全局热键(老用户 Space 自动迁移,Windows Ctrl⇧E)/ B3 拖 companion+outline(minimap 不变,位置持久)/ B4 切路由菜单钉顶 + 长页滚动 + 横向不溢出 / 拖窗配额不崩 / cluster 0 变更 Apply disabled。
+- **下一步候选**:B2 对话滚动 + Medium 三项(DSL 入口可发现性/保存反馈/数据安心)+ 优化 backlog 23 点(DSL 编辑 debounce / AI 重试不对称 / capture-host 测 / page.tsx 拆 hook 等,见 `.superpowers/sdd/optimization-report.md`)。
 
 
 product-idea 大方向四块**全闭合**:#1 大卡搁置 / #2 DSL 版本号 v0.45 / #3 工作台 v0.51+v0.54 / #4 Markdown v0.38+v0.55。

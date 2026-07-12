@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-07-12 · v0.58.0 · AI 确认门 + UX 打磨批(B1/B3/B4)
+
+审核 #1「画布 AI 过程不可见 = 用户不知 AI 有没有用」+ v0.57.3 手测反馈 3 个严重度 3 问题。画布 AI 从"直接副作用"改为"开 Modal 确认门";悬浮窗可拖;热键换 E;菜单条 sticky 修。
+
+- **#1 AI 排版/cluster/outline 确认门**:画布三 AI action 不再直接 applyLayout/applyClusters/建卡,改开 Modal(before/after 缩略图 + 变更摘要 + 应用/编辑/拒绝)。新建 `AiConfirmDialog`(discriminated union dsl/cluster/outline 三 mode),复用 /ask `AgentConfirmCard` 缩略图范式(抽 `canvas-thumb.tsx` 共享 DRY)。`generateOutline` 拆出(只 AI 不建卡,确认门 apply 才建)。parseFailed 开 parseError 态(看错误 + 手改 DSL,非孤立 toast)。`AgentConfirmCard` 零回归(/ask + companion 不动)。
+- **B1 全局热键 Space→E**:macOS Carbon 对 Space 限制 + 输入法冲突致注册失败。默认 `Cmd+Shift+Space` → `Cmd+Shift+E`(macOS)/ `Ctrl+Shift+E`(Windows,Tauri `CmdOrCtrl` 自适应,跨平台已就绪)。老用户 Space 自动迁移 KeyE(loadSettings)。i18n 多处 `⌘⇧Space`→`⌘⇧E`。shortcutId 通用化。
+- **B3 悬浮窗可拖**:companion/outline 标题栏可拖(挡画布核心,迫切)。抽 `useDraggablePanelPos` hook(从 minimap 现成逻辑;minimap refactor 用共享 hook 零回归)。position localStorage 持久化 + clamp + justDraggedRef 防误触折叠。
+- **B4 菜单条 sticky**:`AppMenu position:sticky` 切路由失效(根因 `overflow-x:hidden` 破坏 sticky,CSS 规范)。改 `overflow-x:clip`(不触发对侧 axis,sticky 恢复相对视口)+ route-focus `scrollTo(0,0)`(路由切换重置滚动)。
+- **fix batch**:拖窗 localStorage setItem try/catch(配额不崩)+ onUp 节流(非 60Hz move)+ mount clamp(小视口不跑屏)/ settings dropdown `Space`→`KeyE` / companion tab 拖拽 guard / cluster 0 变更 disable Apply / 删 `applied` 死相位。
+- 测试:22 edge 测补(#1 确认门 + B1 迁移 + B3 拖 + fix 边界)+ 1497 全绿 + e2e render-sweep 12 路由绿。
+
+---
+
 ## 2026-07-11 · v0.57.3 · 删 dark 模式(聚焦 Bauhaus light-only)+ README 更新
 
 演示网站暗色模式箭头不可见(自研 canvas 引擎不响应主题切换重渲染:token 缓存清空靠 MutationObserver,与 adapter RAF 重渲时序竞态)+「有时候切不过去」。cy's Stift 是 Bauhaus 白底黑字经典,light 是主设计;删 dark 聚焦 + 彻底消除渲染 bug。
