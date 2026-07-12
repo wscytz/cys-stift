@@ -98,7 +98,7 @@ export default function TrashPage() {
               className="confirm__type"
               type="text"
               autoFocus
-              placeholder={t('trash.deleteForeverTypePlaceholder')}
+              placeholder={t('common.deleteConfirmWord')}
               value={deleteConfirmText}
               onChange={(e) => setDeleteConfirmText(e.target.value)}
             />
@@ -114,7 +114,7 @@ export default function TrashPage() {
               </Button>
               <Button
                 variant="danger"
-                disabled={deleteConfirmText !== 'delete'}
+                disabled={deleteConfirmText !== t('common.deleteConfirmWord')}
                 onClick={() => {
                   service.hardDelete(confirmingCard.id)
                   setConfirmHardDelete(null)

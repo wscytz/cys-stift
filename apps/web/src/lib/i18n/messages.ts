@@ -167,7 +167,7 @@ export const messages = {
   'canvas.deleteModalTitle': { zh: '删除画布', en: 'Delete canvas' },
   'canvas.deleteModalBodyCards': { zh: '画布「{name}」上有 {n} 张卡片。删除后它们将被退回收件箱。', en: 'Canvas "{name}" has {n} cards. They will be sent back to the inbox.' },
   'canvas.deleteModalBodyNoCards': { zh: '确定删除画布「{name}」吗？此操作不可撤销。', en: 'Delete canvas "{name}"? This cannot be undone.' },
-  'canvas.deleteConfirmType': { zh: '输入 delete 确认删除（画布上的卡片会退回收件箱）', en: 'Type "delete" to confirm (cards on this canvas return to the inbox)' },
+  'canvas.deleteConfirmType': { zh: '输入"删除"确认删除（画布上的卡片会退回收件箱）', en: 'Type "delete" to confirm (cards on this canvas return to the inbox)' },
   'canvas.deleteDefaultHint': { zh: '默认画布不能删除,请新建一张画布再删这张', en: "Can't delete the default canvas — create a new canvas first, then delete this one" },
   'canvas.deleteCanvas': { zh: '删除画布', en: 'Delete canvas' },
   'canvas.namePlaceholder': { zh: '画布名称…', en: 'Canvas name…' },
@@ -555,8 +555,8 @@ export const messages = {
   'trash.deleteForeverTitle': { zh: '永久删除？', en: 'Delete forever?' },
   'trash.deleteForeverBody': { zh: '卡片「{title}」将从存储中永久删除，此操作不可撤销。', en: 'Card "{title}" will be permanently removed from storage. This cannot be undone.' },
   'trash.deleteForeverBtn': { zh: '永久删除', en: 'Delete forever' },
-  'trash.deleteForeverConfirm': { zh: '请输入 “delete” 以确认永久删除（不可撤销）。', en: 'Type "delete" to confirm permanent deletion (cannot be undone).' },
-  'trash.deleteForeverTypePlaceholder': { zh: 'delete', en: 'delete' },
+  'trash.deleteForeverConfirm': { zh: '请输入"删除"以确认永久删除（不可撤销）。', en: 'Type "delete" to confirm permanent deletion (cannot be undone).' },
+  'trash.deleteForeverTypePlaceholder': { zh: '删除', en: 'delete' },
 
   /* ── Settings ── */
   'settings.crumb': { zh: '设置', en: 'settings' },
@@ -705,6 +705,9 @@ export const messages = {
   'common.loading': { zh: '读取中…', en: 'Loading…' },
   'common.dismiss': { zh: '关闭', en: 'Dismiss' },
   'common.skipToContent': { zh: '跳到主内容', en: 'Skip to content' },
+  /* 删除确认输入词 — locale-aware(zh='删除' / en='delete'),trash + canvas 共用。
+     不降门槛(仍需输入匹配词),只是把拼写测试改成本地语言。 */
+  'common.deleteConfirmWord': { zh: '删除', en: 'delete' },
 
   /* ── tldraw ── */
   'tldraw.loading': { zh: '画布加载中…', en: 'Loading canvas…' },

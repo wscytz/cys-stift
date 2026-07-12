@@ -1281,13 +1281,13 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           type="text"
           autoFocus
           autoComplete="off"
-          placeholder="delete"
+          placeholder={t('common.deleteConfirmWord')}
           value={deleteConfirmText}
           onChange={(e) => setDeleteConfirmText(e.target.value)}
         />
         <div className="confirm__actions">
           <Button variant="ghost" onClick={() => { setConfirmDeleteId(null); setDeleteConfirmText('') }}>{t('common.cancel')}</Button>
-          <Button variant="danger" disabled={deleteConfirmText !== 'delete'} onClick={confirmDelete}>{t('canvas.deleteCanvas')}</Button>
+          <Button variant="danger" disabled={deleteConfirmText !== t('common.deleteConfirmWord')} onClick={confirmDelete}>{t('canvas.deleteCanvas')}</Button>
         </div>
       </Modal>
 
