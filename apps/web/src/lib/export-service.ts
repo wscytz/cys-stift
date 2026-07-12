@@ -478,7 +478,7 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
     // 旧 JSON 无此字段 → 跳过(向后兼容)。
     // guard 加 !Array.isArray:conversations 应为 Record<canvasId, msgs>,但 []
     // 也通过 typeof === 'object' → Object.entries([]) 产 ['0', item] → 坏 key
-    // cys-stift.conversation.0.v2。与 canvasView 守卫风格一致(只接 Record)。
+    // cys-stift.conversation.0.v2。
     if (payload.conversations && typeof payload.conversations === 'object' && !Array.isArray(payload.conversations)) {
       for (const [canvasId, msgs] of Object.entries(payload.conversations)) {
         if (!Array.isArray(msgs)) continue

@@ -408,4 +408,84 @@ describe('migrateAllLegacyConversations — 全量迁移 v1 → v2 + 删旧 key'
     expect(window.localStorage.getItem('cys-stift.companion-chat.corrupt.v1')).toBeNull()
     expect(window.localStorage.getItem('cys-stift.ask-chat.v1')).toBeNull()
   })
+
+  // 性能:多 canvas 时 ASK_OLD_KEY 应只 parse 一次(预 parse 复用),不应 N canvas = N 次
+  // parse 同一份 JSON。boot 一次性 + μs 级,但工程上避免重复读。
+  it('reads ASK_OLD_KEY minimally across N canvases (parse once, not per-canvas)', () => {
+    // 3 画布各有 companion v1 数据(进 canvasIds 集合)+ ask-global 含 3 个 target
+    window.localStorage.setItem(
+      'cys-stift.companion-chat.perf-1.v1',
+      JSON.stringify([{ role: 'user', content: 'c1' }]),
+    )
+    window.localStorage.setItem(
+      'cys-stift.companion-chat.perf-2.v1',
+      JSON.stringify([{ role: 'user', content: 'c2' }]),
+    )
+    window.localStorage.setItem(
+      'cys-stift.companion-chat.perf-3.v1',
+      JSON.stringify([{ role: 'user', content: 'c3' }]),
+    )
+    window.localStorage.setItem(
+      'cys-stift.ask-chat.v1',
+      JSON.stringify([
+        { role: 'assistant', content: 'a1', targetCanvasId: 'perf-1' },
+        { role: 'assistant', content: 'a2', targetCanvasId: 'perf-2' },
+        { role: 'assistant', content: 'a3', targetCanvasId: 'perf-3' },
+      ]),
+    )
+
+    // 用计数 stub 包裹真实 localStorage(jsdom 的 Storage.prototype 上 spy 不可靠,
+    // 改用对象 stub —— 同 saveConversation 配额测试的既有范式)
+    const real = window.localStorage
+    let askKeyReads = 0
+    const stub = {
+      getItem: (key: string) => {
+        if (key === 'cys-stift.ask-chat.v1') askKeyReads++
+        return real.getItem(key)
+      },
+      setItem: real.setItem.bind(real),
+      removeItem: real.removeItem.bind(real),
+      clear: real.clear.bind(real),
+      key: real.key.bind(real),
+      get length() {
+        return real.length
+      },
+    }
+    Object.defineProperty(window, 'localStorage', { value: stub, configurable: true })
+
+    try {
+      const count = migrateAllLegacyConversations()
+      // 行为等价:3 个 companion v1 都迁(ask 部分被合并进同 v2 key,不额外计数)
+      expect(count).toBe(3)
+      // ASK_OLD_KEY 在 scan 阶段读 1 次;旧实现会额外读 N(=3)次 per-canvas。
+      // 断言「只读 1 次」锁定 parse-once 优化。
+      expect(askKeyReads).toBe(1)
+      // 3 canvas 都收到 companion + ask 合并(各 2 条) —— 行为等价于旧实现
+      expect(loadConversation('perf-1' as CanvasId)).toHaveLength(2)
+      expect(loadConversation('perf-2' as CanvasId)).toHaveLength(2)
+      expect(loadConversation('perf-3' as CanvasId)).toHaveLength(2)
+      // 迁完后 ASK_OLD_KEY 已删
+      expect(real.getItem('cys-stift.ask-chat.v1')).toBeNull()
+    } finally {
+      Object.defineProperty(window, 'localStorage', { value: real, configurable: true })
+    }
+  })
+
+  it('falls back to per-canvas read when ask JSON is corrupt (no regression)', () => {
+    // 2 画布 + ask-global 是坏 JSON:opts.askGlobal 不传(坏 JSON 无法 parse 成 array)
+    // → migrateLegacy 退化到内部自取路径(再读再坏,静默跳过) —— 行为等价于旧实现
+    window.localStorage.setItem(
+      'cys-stift.companion-chat.fallback.v1',
+      JSON.stringify([{ role: 'user', content: 'ok' }]),
+    )
+    window.localStorage.setItem('cys-stift.ask-chat.v1', '{broken')
+
+    const count = migrateAllLegacyConversations()
+
+    // companion v1 仍迁成功(ask 坏 → 不贡献,不炸)
+    expect(count).toBe(1)
+    expect(loadConversation('fallback' as CanvasId).map((m) => m.content)).toEqual(['ok'])
+    // ask 坏 key 已删
+    expect(window.localStorage.getItem('cys-stift.ask-chat.v1')).toBeNull()
+  })
 })

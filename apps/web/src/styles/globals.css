@@ -48,6 +48,21 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: var(--color-gray); }
 ::-webkit-scrollbar-corner { background: transparent; }
 
+/* ── 窄容器滚动条(ask / companion 对话 thread)──────────────────────────
+   全局 10px 滚动条在窄侧栏(60vh ask thread / 50vh companion thread)里偏重,
+   局部收窄到 6px + 去掉 2px inset 边框(slim 下 inset 会吃掉可见 thumb),
+   保持 Bauhaus 硬色块 + token 配色(黑 thumb / 灰 hover / 透明 track)。
+   Firefox 的 scrollbar-width: thin + scrollbar-color 已由上方 `*` 全局应用。 */
+.ask__thread::-webkit-scrollbar,
+.cc-chat__thread::-webkit-scrollbar { width: 6px; height: 6px; }
+.ask__thread::-webkit-scrollbar-thumb,
+.cc-chat__thread::-webkit-scrollbar-thumb {
+  background: var(--color-black);
+  border: 0;
+}
+.ask__thread::-webkit-scrollbar-thumb:hover,
+.cc-chat__thread::-webkit-scrollbar-thumb:hover { background: var(--color-gray); }
+
 /* ── Bauhaus native 控件自绘(v0.39.1 跨平台适配)──────────────────────────
    Mac/Win 都不复用系统控件 —— 统一一套硬边框、无圆角、token 配色的 Bauhaus 控件。
    checkbox/select/number 的 native 部分仍由 WebView 处理(语义/可访问性),只覆盖

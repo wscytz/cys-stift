@@ -1278,7 +1278,7 @@ describe('Important — v1 conversation 备份不漏(migrate-all 后 export 覆�
 //
 // payload.conversations 应为 Record<canvasId, msgs>,但 [] 也通过
 // typeof === 'object' → Object.entries([{...}]) 产 ['0', item] → 写坏 key
-// cys-stift.conversation.0.v2。guard 加 !Array.isArray 与 canvasView 守卫一致。
+// cys-stift.conversation.0.v2。guard 加 !Array.isArray 防坏 key。
 
 describe('Minor — payload.conversations 数组守卫(防坏 key)', () => {
   it('conversations as array → 不写坏 key cys-stift.conversation.<index>.v2', async () => {

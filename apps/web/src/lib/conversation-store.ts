@@ -81,12 +81,23 @@ export function loadConversation(canvasId: CanvasId): PersistedConversationMessa
  * 合并旧 companion v1 + 旧 ask 全局(过滤本画布)。
  * 合并顺序:companion-first,然后 ask-global-filtered-by-targetCanvasId。
  * 坏数据静默跳过(不抛)。
+ *
+ * 性能:migrateAllLegacyConversations 会对 N 个 canvasId 调本函数。若每次都
+ * 读 + parse 同一个 ASK_OLD_KEY → N 次重复 parse(同一份 JSON)。boot 一次性 +
+ * μs 级,但工程上可避免。opts.askGlobal 允许调用方预 parse 一次后传入;不传
+ * (lazy migrate 路径 / loadConversation)则内部自取,行为不变。
+ *
+ * @param opts.askGlobal 预 parsed 的 ASK_OLD_KEY 内容(已通过 Array.isArray 校验)。
+ *                       传入时直接用,不再读 localStorage;不传时内部读 + parse。
  */
-function migrateLegacy(canvasId: CanvasId): PersistedConversationMessage[] {
+function migrateLegacy(
+  canvasId: CanvasId,
+  opts?: { askGlobal?: unknown[] },
+): PersistedConversationMessage[] {
   const out: PersistedConversationMessage[] = []
   const cid = String(canvasId)
 
-  // 旧 companion per-canvas
+  // 旧 companion per-canvas(companion key 总是按 canvas 隔离,无法预 parse 共享)
   try {
     const c = window.localStorage.getItem(`${COMPANION_OLD_PREFIX}${cid}${COMPANION_OLD_SUFFIX}`)
     if (c) {
@@ -98,40 +109,45 @@ function migrateLegacy(canvasId: CanvasId): PersistedConversationMessage[] {
   }
 
   // 旧 ask 全局:按 targetCanvasId 过滤;无 targetCanvasId 的只归 DEFAULT_CANVAS_ID
-  try {
-    const a = window.localStorage.getItem(ASK_OLD_KEY)
-    if (a) {
-      const p = JSON.parse(a)
-      if (Array.isArray(p)) {
-        for (const item of p) {
-          if (
-            item == null ||
-            typeof item !== 'object' ||
-            ((item as Record<string, unknown>).role !== 'user' &&
-              (item as Record<string, unknown>).role !== 'assistant') ||
-            typeof (item as Record<string, unknown>).content !== 'string'
-          ) {
-            continue
-          }
-          const obj = item as Record<string, unknown>
-          const target = obj.targetCanvasId
-          const matches =
-            (typeof target === 'string' && target === cid) ||
-            (target == null && cid === String(DEFAULT_CANVAS_ID))
-          if (matches) {
-            // 去 targetCanvasId 字段(新 store 不需要)
-            out.push({
-              role: obj.role as 'user' | 'assistant',
-              content: obj.content as string,
-              ...(Array.isArray(obj.dslBlocks) ? { dslBlocks: obj.dslBlocks as string[] } : {}),
-              ...(typeof obj.streaming === 'boolean' ? { streaming: obj.streaming } : {}),
-            })
-          }
-        }
+  // opts.askGlobal 传入 → 直接用(避免 N canvas = N 次 parse 同一 key);否则自取(lazy)
+  let askItems: unknown[] | undefined = opts?.askGlobal
+  if (askItems === undefined) {
+    try {
+      const a = window.localStorage.getItem(ASK_OLD_KEY)
+      if (a) {
+        const p = JSON.parse(a)
+        if (Array.isArray(p)) askItems = p
+      }
+    } catch {
+      /* 坏数据跳过 */
+    }
+  }
+  if (askItems) {
+    for (const item of askItems) {
+      if (
+        item == null ||
+        typeof item !== 'object' ||
+        ((item as Record<string, unknown>).role !== 'user' &&
+          (item as Record<string, unknown>).role !== 'assistant') ||
+        typeof (item as Record<string, unknown>).content !== 'string'
+      ) {
+        continue
+      }
+      const obj = item as Record<string, unknown>
+      const target = obj.targetCanvasId
+      const matches =
+        (typeof target === 'string' && target === cid) ||
+        (target == null && cid === String(DEFAULT_CANVAS_ID))
+      if (matches) {
+        // 去 targetCanvasId 字段(新 store 不需要)
+        out.push({
+          role: obj.role as 'user' | 'assistant',
+          content: obj.content as string,
+          ...(Array.isArray(obj.dslBlocks) ? { dslBlocks: obj.dslBlocks as string[] } : {}),
+          ...(typeof obj.streaming === 'boolean' ? { streaming: obj.streaming } : {}),
+        })
       }
     }
-  } catch {
-    /* 坏数据跳过 */
   }
 
   return out
@@ -171,14 +187,18 @@ export function migrateAllLegacyConversations(): number {
     }
   }
 
-  // 2. ask 全局:key 存在 → 无 target 的消息归 DEFAULT_CANVAS_ID;扫显式 target
+  // 2. ask 全局:key 存在 → 无 target 的消息归 DEFAULT_CANVAS_ID;扫显式 target。
+  //    parse 一次:后续 migrateLegacy 直接复用 opts.askGlobal(避免 N canvas = N 次
+  //    parse 同一份 JSON —— boot 一次性 + μs 级,但工程上更干净)。
   let hasAskGlobal = false
+  let askGlobalItems: unknown[] | undefined
   try {
     const a = window.localStorage.getItem(ASK_OLD_KEY)
     if (a) {
       hasAskGlobal = true
       const p = JSON.parse(a)
       if (Array.isArray(p)) {
+        askGlobalItems = p
         // 无 target 的消息只归 DEFAULT_CANVAS_ID(migrateLegacy 的路由规则)
         canvasIds.add(String(DEFAULT_CANVAS_ID))
         for (const item of p) {
@@ -191,15 +211,19 @@ export function migrateAllLegacyConversations(): number {
       }
     }
   } catch {
-    /* 坏 JSON 跳过 */
+    /* 坏 JSON 跳过;opts.askGlobal 不传 → migrateLegacy 内部自取(再 parse 仍坏,静默) */
   }
 
-  // 3. 对每个 canvasId:若 v2 空 → migrateLegacy + save;若 v2 已有 → 跳过(幂等)
+  // 3. 对每个 canvasId:若 v2 空 → migrateLegacy + save;若 v2 已有 → 跳过(幂等)。
+  //    成功 parsed 时传 opts.askGlobal 复用(parse 一次);坏 JSON 时退化到自取路径。
   let migratedCount = 0
   for (const cid of canvasIds) {
     const v2Key = conversationKey(cid as CanvasId)
     if (window.localStorage.getItem(v2Key)) continue // v2 已有(lazy 已迁 / 用户新对话)
-    const msgs = migrateLegacy(cid as CanvasId)
+    const msgs = migrateLegacy(
+      cid as CanvasId,
+      askGlobalItems !== undefined ? { askGlobal: askGlobalItems } : undefined,
+    )
     if (msgs.length > 0) {
       saveConversation(cid as CanvasId, msgs)
       migratedCount++
