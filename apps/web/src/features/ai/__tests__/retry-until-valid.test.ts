@@ -101,3 +101,38 @@ describe('buildDslCorrection', () => {
     expect(out).not.toContain('Line 9:')
   })
 })
+
+describe('retryUntilValid — network errors', () => {
+  it('retries on non-AbortError and succeeds on retry', async () => {
+    let calls = 0
+    const result = await retryUntilValid({
+      initialMessages: [{ role: 'user', content: 'q' }],
+      produce: async () => { calls++; if (calls === 1) throw new Error('network'); return 'ok' },
+      parse: (t) => ({ ok: t === 'ok', errors: [] }),
+      buildCorrection: () => 'fix',
+    })
+    expect(result.accepted).toBe(true)
+    expect(result.attempts).toBe(2)
+  })
+
+  it('rethrows AbortError without retry', async () => {
+    const e = new Error('aborted'); e.name = 'AbortError'
+    await expect(retryUntilValid({
+      initialMessages: [{ role: 'user', content: 'q' }],
+      produce: async () => { throw e },
+      parse: () => ({ ok: true, errors: [] }),
+      buildCorrection: () => 'fix',
+    })).rejects.toThrow('aborted')
+  })
+
+  it('exhausts attempts on repeated network errors', async () => {
+    const result = await retryUntilValid({
+      initialMessages: [{ role: 'user', content: 'q' }],
+      produce: async () => { throw new Error('network') },
+      parse: () => ({ ok: true, errors: [] }),
+      buildCorrection: () => 'fix',
+    })
+    expect(result.accepted).toBe(false)
+    expect(result.attempts).toBe(3)
+  })
+})

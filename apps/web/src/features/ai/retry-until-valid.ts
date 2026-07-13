@@ -35,7 +35,15 @@ export async function retryUntilValid(opts: RetryOptions): Promise<RetryResult> 
   let lastText = ''
   let lastErrors: DslDiagnostic[] | undefined
   for (let attempt = 0; attempt < max; attempt++) {
-    const text = await opts.produce(messages, attempt)
+    let text: string
+    try {
+      text = await opts.produce(messages, attempt)
+    } catch (err) {
+      // 用户取消(AbortError)→ 立即冒出,不重试。
+      if (err instanceof Error && err.name === 'AbortError') throw err
+      // 网络错(非取消)→ 计入 attempt,重试同 messages(非 AI 输出错,不喂 correction)。
+      continue
+    }
     lastText = text
     const { ok, errors } = opts.parse(text)
     if (ok) return { text, attempts: attempt + 1, accepted: true }
