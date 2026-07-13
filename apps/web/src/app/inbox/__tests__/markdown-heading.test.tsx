@@ -2,7 +2,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { MarkdownBody } from '../markdown'
+import { MarkdownBody, sanitizeSchema } from '../markdown'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -45,5 +45,13 @@ describe('MarkdownBody 标题渲染', () => {
     const { host, unmount } = renderMd('# 一级')
     expect(host.querySelector('h1')?.textContent, host.innerHTML).toBe('一级')
     unmount()
+  })
+
+  it('sanitizeSchema 放行 h1-h6(防被删致标题不渲染 —— bug 1 守卫)', () => {
+    const tags = sanitizeSchema.tagNames as string[]
+    expect(tags, 'h1-h6 必须在 tagNames,否则 rehype-sanitize 剥标题').toContain('h1')
+    for (const h of ['h2', 'h3', 'h4', 'h5', 'h6']) {
+      expect(tags).toContain(h)
+    }
   })
 })

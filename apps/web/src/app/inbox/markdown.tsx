@@ -53,11 +53,11 @@ export interface EmbedSegment {
  *   hljs-keyword/hljs-string 等;defaultSchema 的 attributes.span=null 会把它们剥掉,
  *   显式放行(限 `hljs-` 前缀,不开放任意 class → 仍防注入)。
  */
-const sanitizeSchema = {
+export const sanitizeSchema = {
   ...defaultSchema,
   tagNames: [
     ...(defaultSchema.tagNames ?? []),
-    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',  // 显式放行:default schema 不含 h1-h6,会被剥 → 标题不渲染(bug 1)
     'del',
     'table',
     'thead',
