@@ -171,7 +171,11 @@
 > 判断"这一步该不该做"先读 **[`docs/development/polish-phase.md`](development/polish-phase.md)**(打磨 vs 修缝判据 + 反馈驱动流程 + 退出标准)。
 > 燃料 = 你手测的真实反馈。每轮主线开工走 brainstorming,严守「一次一问 + 逐段确认」(skill-checklist-discipline 记忆)。
 
-### 当前焦点(2026-07-13,工作台重设计 + 两 bug 修,待手测)
+### 当前焦点(2026-07-14,apps/web review 完 + bug 修)
+
+**apps/web review**(2026-07-14,用户选全量+4 维度):8 批 13 文件 + i18n。2 中 bug 修(workbench 切卡丢编辑 + bar 全透明,`fc913ee`)+ 5 stale 注释清(page/self-canvas/settings-store/card-detail/settings-page)+ **bug 2b open**(TAG_COLORS 5 色 teal/pink/orange/purple/green 无 token → 全局 tag 50% 透明;用户定收敛 6 原色,含迁移 + tag chip 文字色 a11y,留下次)。报告 `cys-stift-docs/docs/reviews/2026-07-14-apps-web-code-review.md`。
+
+### 历史焦点(2026-07-13,工作台重设计 + 两 bug 修,待手测)
 
 **工作台重设计**(v0.58.1 后):左库+右编辑器二合一 `/workbench`;画布双击进工作台 + hover 只读速览 popover;砍 focusEdit + 删 canvas 专用 card-detail-modal。打包后修两 bug:markdown 标题渲染 + Tag 黑底白字 a11y。全门绿(1588 测 + lint 0 + build 0),**v0.58.0/0.58.1/0.59.0 已 commit 未 tag 待手测**。清单 `cys-stift-docs/docs/handoff/2026-07-13-workbench-redesign-handtest.md`。
 
