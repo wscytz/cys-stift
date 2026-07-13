@@ -13,7 +13,6 @@ import { useI18n } from '@/lib/i18n'
 import { downloadFile } from '@/lib/download'
 import { SelfCanvas, type SelfCanvasHandle } from '@/features/canvas/self-canvas'
 import { CanvasIcon, CanvasBusyIcon, type CanvasIconName } from '@/features/canvas/canvas-icons'
-import { CardDetailModal } from '@/features/canvas/card-detail-modal'
 import { workbenchStore } from '@/lib/workbench-store'
 import { ExportDialog } from '@/features/canvas/export-dialog'
 import { DslDialog } from '@/features/canvas/dsl-dialog'
@@ -32,8 +31,7 @@ import { CanvasCompanionPanel } from '@/features/canvas/companion-panel'
 import { autoRelate } from '@/features/canvas/auto-relate'
 import { CanvasContextMenu } from '@/features/canvas/canvas-context-menu'
 import { CanvasEmptyMotif } from '@/features/canvas/canvas-empty-motif'
-import { syncWikiLinkArrows, syncAllWikiLinks, resyncWikiLinksForTitleChange } from '@/features/canvas/wiki-links'
-import { syncEmbedArrows, resolveCardByTitle } from '@/features/canvas/embed-links'
+import { syncAllWikiLinks } from '@/features/canvas/wiki-links'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { serializeCanvas } from '@/features/ai/canvas-dsl'
 import { parseDsl, parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
@@ -84,7 +82,6 @@ export default function CanvasPage() {
   const [adapter, setAdapter] = useState<SelfBuiltAdapter | null>(null)
   const adapterReady = !!adapter
   const canvasElRef = useRef<HTMLCanvasElement | null>(null)
-  const [detail, setDetail] = useState<{ card: Card } | null>(null)
   const [snapMode, setSnapMode] = useState<'snap' | 'free'>('snap')
   const [tool, setTool] = useState<'select' | 'freedraw' | 'eraser' | 'text' | 'connect'>('select')
   /** 橡皮模式:text 只擦文字 / card 只擦卡片(进回收桶)/ all 擦一切。选中 eraser 时顶栏出 3 子模式切换。 */
@@ -635,7 +632,6 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     if (id === activeCanvasId) return
     // 切画布显式清选择 — 不只靠 key={canvasId} 重建的隐式副作用(契约化,防 key 防线被改)。
     handle.current.adapter?.setSelectedIds([])
-    setDetail(null)
     canvasStore.setActive(id)
   }
 
@@ -868,7 +864,6 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       adapter.setView({ ...v, panX: cx - c.x * zoom, panY: cy - c.y * zoom })
       adapter.setSelectedIds([cardId])
     }
-    setDetail({ card })
     pendingJumpCardRef.current = null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adapter])
@@ -941,18 +936,6 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
 
   // Bug B fix: derive the LIVE card from the store by id during render.
   // The page re-renders on any store change (useDb subscription), but the
-  // modal used to keep showing the STALE `detail.card` captured at open
-  // time — including a ghost card since soft-deleted / archived-elsewhere
-  // (another tab, the side-rail delete, a batch action). service.get returns
-  // soft-deleted cards too, so we filter on !deletedAt: when the card is
-  // gone (or soft-deleted) effectiveDetail becomes null and the modal
-  // unmounts. Edited-elsewhere cards show fresh data. Action callbacks read
-  // effectiveDetail.card.id (guaranteed non-null while modal is open).
-  const liveDetailCard = detail ? (service.get(detail.card.id) ?? null) : null
-  const effectiveDetail =
-    liveDetailCard && !liveDetailCard.deletedAt
-      ? { card: liveDetailCard }
-      : null
 
 
   // chrome(Toolbar/SideRail/Minimap 等)在 focusMode 时隐。
@@ -1218,118 +1201,6 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         </div>
       </Modal>
 
-      {effectiveDetail && (
-        <CardDetailModal
-          card={effectiveDetail.card}
-          onClose={() => setDetail(null)}
-          onExpand={() => {
-            // T5:展开工作台 dock 编辑同一张卡 + 关掉 modal(dock 接管编辑)。
-            workbenchStore.open(effectiveDetail.card.id)
-            setDetail(null)
-          }}
-          onSave={(patch) => {
-            // Bug C fix: previously only title + body were persisted, which
-            // silently dropped tag edits (and would drop any other field the
-            // modal collects if it grows). Spread the full patch through so
-            // title/body/tags all reach service.update (mirrors inbox's onSave).
-            // D2 双链标题重命名追踪:捕获 oldTitle(update 前),title 真变时调
-            // resyncWikiLinksForTitleChange 让引用旧/新标题的卡 re-sync wikilink 箭头。
-            const oldTitle = service.get(effectiveDetail.card.id)?.title
-            const updated = service.update(effectiveDetail.card.id, patch)
-            if (updated && handle.current.adapter) updateCardShape(handle.current.adapter, updated)
-            if (updated) setDetail({ card: updated })
-            // F7 双链同步:画布上编辑卡 body 保存后,解析 [[标题]] 自动建/删 references
-            // wikilink 箭头。只在画布上触发(inbox 卡可能没上画布,arrow 无意义)。
-            if (updated && handle.current.adapter && patch.body !== undefined) {
-              const { created, removed } = syncWikiLinkArrows({
-                host: handle.current.adapter,
-                getCardTitle: (id) => service.get(id as CardId)?.title,
-                sourceCardId: effectiveDetail.card.id,
-                body: patch.body,
-                // T5 跨画布双链:候选池 + 当前画布 id,让 [[远画布卡标题]] 也能匹配。
-                allCards: allWikiCandidates,
-                currentCanvasId: activeCanvasId as string,
-              })
-              if (created > 0 || removed > 0) {
-                pushToast({ kind: 'info', message: t('canvas.wikiLinked', { created: String(created), removed: String(removed) }) })
-              }
-            }
-            // BR-T5 块引用同步:画布上编辑卡 body 保存后,解析 ((标题)) 自动建/删
-            // embeds 箭头。与 wikilink 同分支(wikiLinks 已 toast;embeds 仅在
-            // 有变更时单独 toast,口径一致)。
-            if (updated && handle.current.adapter && patch.body !== undefined) {
-              const emb = syncEmbedArrows({
-                host: handle.current.adapter,
-                getCardTitle: (id) => service.get(id as CardId)?.title,
-                sourceCardId: effectiveDetail.card.id,
-                body: patch.body,
-              })
-              if (emb.created > 0 || emb.removed > 0) {
-                pushToast({ kind: 'info', message: t('canvas.embedLinked', { created: String(emb.created), removed: String(emb.removed) }) })
-              }
-            }
-            // D2 标题重命名追踪:title 真变 → 画布上所有 body 含 [[oldTitle]]/[[newTitle]] 的卡 re-sync
-            if (updated && handle.current.adapter && oldTitle !== undefined && patch.title !== undefined && patch.title !== oldTitle) {
-              const canvasCardIds = handle.current.adapter
-                .getElements()
-                .filter((e) => e.kind === 'card')
-                .map((e) => e.id)
-              resyncWikiLinksForTitleChange({
-                host: handle.current.adapter!,
-                getCardTitle: (id) => service.get(id as CardId)?.title,
-                getCardBody: (id) => service.get(id as CardId)?.body,
-                canvasCardIds,
-                oldTitle,
-                newTitle: patch.title,
-                // T5 跨画布双链:候选池 + 当前画布 id,透传给底层 syncWikiLinkArrows。
-                allCards: allWikiCandidates,
-                currentCanvasId: activeCanvasId as string,
-              })
-            }
-            return updated != null
-          }}
-          onArchive={() => {
-            service.archive(effectiveDetail.card.id)
-            if (handle.current.adapter) removeCardShape(handle.current.adapter, effectiveDetail.card.id)
-            setDetail(null)
-          }}
-          onUnarchive={() => {
-            service.unarchive(effectiveDetail.card.id)
-            const c = service.get(effectiveDetail.card.id)
-            if (c && handle.current.adapter) addCardShape(handle.current.adapter, c)
-            setDetail(c ? { card: c } : null)
-          }}
-          onDelete={() => {
-            service.softDelete(effectiveDetail.card.id)
-            if (handle.current.adapter) removeCardShape(handle.current.adapter, effectiveDetail.card.id)
-            setDetail(null)
-          }}
-          onSendToInbox={() => {
-            service.removeFromCanvas(effectiveDetail.card.id)
-            if (handle.current.adapter) removeCardShape(handle.current.adapter, effectiveDetail.card.id)
-            setDetail(null)
-          }}
-          host={adapter}
-          getCardTitle={(id) => service.get(id as CardId)?.title}
-          onJumpToCard={(cardId) => {
-            // Backlink 跳转:选中对方卡元素 + 居中视口 + 关闭本 modal。
-            // 复用 OutlinePanel/Minimap 同款 centering(pan = screenCenter - pageCenter*zoom)。
-            const a = adapter
-            const el = a?.getElement(cardId)
-            if (a && el) {
-              const v = a.getView()
-              const hostEl = document.querySelector('.cv-host canvas') as HTMLCanvasElement | null
-              const cx = (hostEl?.clientWidth ?? 800) / 2
-              const cy = (hostEl?.clientHeight ?? 600) / 2
-              const c = elementCenter(el)
-              const zoom = v.zoom || 1
-              a.setView({ ...v, panX: cx - c.x * zoom, panY: cy - c.y * zoom })
-              a.setSelectedIds([cardId])
-            }
-            setDetail(null)
-          }}
-        />
-      )}
 
       <ExportDialog
         open={exportOpen}
