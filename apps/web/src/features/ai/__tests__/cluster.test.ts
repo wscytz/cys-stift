@@ -112,7 +112,7 @@ describe('parseClusters (defensive — never throws)', () => {
       { ids: ['1', '2'], kind: 'duplicate', reason: 'both about hooks' },
       { ids: ['7', '12', '3'], kind: 'related', reason: 'state mgmt' },
     ])
-    const out = parseClusters(raw, KNOWN)
+    const out = parseClusters(raw, KNOWN).clusters
     expect(out).toHaveLength(2)
     expect(out[0]?.ids).toEqual(['1', '2'])
     expect(out[0]?.kind).toBe('duplicate')
@@ -121,15 +121,15 @@ describe('parseClusters (defensive — never throws)', () => {
 
   it('strips a ```json fenced block', () => {
     const raw = '```json\n[{"ids":["1","2"],"kind":"related","reason":"x"}]\n```'
-    expect(parseClusters(raw, KNOWN)).toHaveLength(1)
+    expect(parseClusters(raw, KNOWN).clusters).toHaveLength(1)
   })
 
   it('returns [] on non-JSON garbage', () => {
-    expect(parseClusters('the cards are similar', KNOWN)).toEqual([])
+    expect(parseClusters('the cards are similar', KNOWN).clusters).toEqual([])
   })
 
   it('returns [] on non-array JSON', () => {
-    expect(parseClusters('{"ids":["1","2"]}', KNOWN)).toEqual([])
+    expect(parseClusters('{"ids":["1","2"]}', KNOWN).clusters).toEqual([])
   })
 
   it('drops clusters with ids NOT in the known set (model hallucinated ids)', () => {
@@ -137,30 +137,57 @@ describe('parseClusters (defensive — never throws)', () => {
       { ids: ['1', '2'], kind: 'related', reason: 'ok' },
       { ids: ['1', '999'], kind: 'related', reason: '999 is fake' },
     ])
-    const out = parseClusters(raw, KNOWN)
+    const out = parseClusters(raw, KNOWN).clusters
     expect(out).toHaveLength(1)
     expect(out[0]?.ids).toEqual(['1', '2'])
   })
 
   it('drops single-card clusters (< 2 valid ids)', () => {
     const raw = JSON.stringify([{ ids: ['1'], kind: 'related', reason: 'alone' }])
-    expect(parseClusters(raw, KNOWN)).toEqual([])
+    expect(parseClusters(raw, KNOWN).clusters).toEqual([])
   })
 
   it('coerces numeric ids to strings', () => {
     const raw = JSON.stringify([{ ids: [1, 2], kind: 'related', reason: 'n' }])
-    const out = parseClusters(raw, KNOWN)
+    const out = parseClusters(raw, KNOWN).clusters
     expect(out[0]?.ids).toEqual(['1', '2'])
   })
 
   it('defaults unknown kind to "related"', () => {
     const raw = JSON.stringify([{ ids: ['1', '2'], kind: 'whatever', reason: 'x' }])
-    expect(parseClusters(raw, KNOWN)[0]?.kind).toBe('related')
+    expect(parseClusters(raw, KNOWN).clusters[0]?.kind).toBe('related')
   })
 
   it('caps reason length (defensive against huge model output)', () => {
     const raw = JSON.stringify([{ ids: ['1', '2'], kind: 'related', reason: 'x'.repeat(2000) }])
-    expect(parseClusters(raw, KNOWN)[0]?.reason.length).toBeLessThanOrEqual(200)
+    expect(parseClusters(raw, KNOWN).clusters[0]?.reason.length).toBeLessThanOrEqual(200)
+  })
+})
+
+// ── parseClusters — errors (Task 2) ─────────────────────────────────────────
+
+describe('parseClusters — errors (Task 2)', () => {
+  const known = new Set(['1', '2', '3'])
+  it('returns invalid-JSON error', () => {
+    const r = parseClusters('not json', known)
+    expect(r.clusters).toEqual([])
+    expect(r.errors.length).toBeGreaterThan(0)
+    expect(r.errors[0]).toMatch(/JSON/i)
+  })
+  it('returns not-an-array error for JSON object', () => {
+    const r = parseClusters('{"a":1}', known)
+    expect(r.clusters).toEqual([])
+    expect(r.errors[0]).toMatch(/array/i)
+  })
+  it('returns no-valid-clusters error when all ids unknown', () => {
+    const r = parseClusters('[{"ids":["x","y"],"kind":"related"}]', known)
+    expect(r.clusters).toEqual([])
+    expect(r.errors.length).toBeGreaterThan(0)
+  })
+  it('returns empty errors on success', () => {
+    const r = parseClusters('[{"ids":["1","2"],"kind":"related"}]', known)
+    expect(r.clusters.length).toBe(1)
+    expect(r.errors).toEqual([])
   })
 })
 

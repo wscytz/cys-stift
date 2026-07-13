@@ -17,7 +17,8 @@
  * AI 返回 JSON 数组,每项:
  *   { "ids": ["3","7","12"], "kind": "duplicate" | "related", "reason": "都是 React hooks" }
  * ids 引用 prompt 里 [card #id] 的 id;kind 仅用于展示(reason 里说明);应用时一律
- * 落 related-to 关系。模型输出不规范时 parseClusters 返回 [](防御性,绝不抛)。
+ * 落 related-to 关系。模型输出不规范时 parseClusters 返回 { clusters: [], errors: [...] }
+ * (防御性,绝不抛)。
  */
 
 import type { Card, CardId, CardService } from '@cys-stift/domain'
@@ -74,18 +75,26 @@ Output JSON array only:`
 
 // ── 输出解析(纯函数,防御性,绝不抛) ──────────────────────────────────────────
 
+export interface ParseClustersResult {
+  clusters: CardCluster[]
+  errors: string[]
+}
+
 /**
  * 解析 AI 的 cluster 输出。坏 JSON / 非数组 / id 不在白名单 → 丢弃该项;全坏 → []。
  * `knownIds` = prompt 里实际出现过的 card id(只认这些,防模型编 id)。
+ * 返回 { clusters, errors }:clusters 绝不为 undefined(防御性);errors 在成功时为 []。
  */
-export function parseClusters(raw: string, knownIds: Set<string>): CardCluster[] {
+export function parseClusters(raw: string, knownIds: Set<string>): ParseClustersResult {
   let data: unknown
   try {
     data = JSON.parse(stripJsonFence(raw))
   } catch {
-    return []
+    return { clusters: [], errors: ['invalid JSON — output must be a JSON array'] }
   }
-  if (!Array.isArray(data)) return []
+  if (!Array.isArray(data)) {
+    return { clusters: [], errors: ['output is not a JSON array'] }
+  }
   const known = knownIds
   const out: CardCluster[] = []
   for (const item of data) {
@@ -98,7 +107,10 @@ export function parseClusters(raw: string, knownIds: Set<string>): CardCluster[]
     const reason = String((item as { reason?: unknown }).reason ?? '').slice(0, 200)
     out.push({ ids: validIds, kind, reason })
   }
-  return out
+  if (out.length === 0) {
+    return { clusters: [], errors: ['no valid clusters — ids must match the provided [card #id] list and each cluster needs 2+ valid ids'] }
+  }
+  return { clusters: out, errors: [] }
 }
 
 function stripJsonFence(raw: string): string {

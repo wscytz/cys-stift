@@ -445,17 +445,22 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         return
       }
 
-      const result = await streamText(
-        ready,
-        { system: CLUSTER_SYSTEM_PROMPT, user: userPrompt, maxTokens: 2048, temperature: 0.2, structuredOutput: true, timeoutMs: 60_000 },
-        () => {},
-        signal,
-      )
-      if (!result?.content) {
-        pushToast({ kind: 'info', message: t('canvas.aiClusterEmpty') })
-        return
-      }
-      const clusters = parseClusters(result.content, knownIds)
+      const r = await retryUntilValid({
+        initialMessages: [{ role: 'user', content: userPrompt }],
+        produce: (messages) =>
+          streamText(ready, { system: CLUSTER_SYSTEM_PROMPT, user: userPrompt, messages, maxTokens: 2048, temperature: 0.2, structuredOutput: true, timeoutMs: 60_000 }, () => {}, signal)
+            .then((x) => x?.content ?? ''),
+        parse: (text) => {
+          const { clusters, errors } = parseClusters(text, knownIds)
+          return {
+            ok: clusters.length > 0,
+            errors: errors.map((m) => ({ line: 0, text: '', message: m })),
+          }
+        },
+        buildCorrection: (errs) =>
+          `Your previous cluster output was invalid: ${errs.map((e) => e.message).join('; ')}. Regenerate the JSON array using ONLY these known card ids: ${[...knownIds].join(', ')}.`,
+      })
+      const { clusters } = parseClusters(r.text, knownIds)
       if (clusters.length === 0) {
         pushToast({ kind: 'info', message: t('canvas.aiClusterNone') })
         return
