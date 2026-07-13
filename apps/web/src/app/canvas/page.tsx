@@ -41,6 +41,7 @@ import { serializeCanvas } from '@/features/ai/canvas-dsl'
 import { parseDsl, parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
 import { DSL_GRAMMAR_REFERENCE } from '@/features/ai/dsl-grammar'
 import { retryUntilValid, buildDslCorrection } from '@/features/ai/retry-until-valid'
+import { SaveStatusBadge } from '@/features/canvas/save-status-badge'
 import { TemplatePicker, type TemplateChoice } from '@/features/canvas/template-picker'
 import { allTemplates, saveCustomTemplate, addCustomTemplate } from '@/lib/canvas-templates'
 import { streamText } from '@/features/ai/stream-text'
@@ -1163,6 +1164,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           canvasElRef={canvasElRef}
           onAdapterReady={setAdapter}
         />
+        <SaveStatusBadge />
         {!ready ? null : onCanvas === 0 && !hasFreeform && (adapter?.getElements().length ?? 0) === 0 && (
           <div className="cv-empty">
             <CanvasEmptyMotif />

@@ -822,6 +822,7 @@ export const messages = {
   'canvas.aiLayoutEmpty': { zh: 'AI 未返回有效排版', en: 'AI returned no valid layout' },
   'canvas.aiLayoutMoved': { zh: 'AI 重排了 {moved} 张卡(平均 {avgPx}px)', en: 'AI reorganized {moved} cards (avg {avgPx}px)' },
   'canvas.aiLayoutUnchanged': { zh: 'AI 认为当前布局已合理,未改动', en: 'AI considers the current layout reasonable — no change' },
+  'canvas.saved': { zh: '已保存', en: 'Saved' },
   'canvas.aiSetupTitle': { zh: '启用 AI 自动排版', en: 'Enable AI auto-layout' },
   'canvas.aiCluster': { zh: 'AI 找相似', en: 'AI cluster' },
   'canvas.aiClusterDone': { zh: '已连 {n} 条相似关系', en: 'Created {n} similarity links' },
