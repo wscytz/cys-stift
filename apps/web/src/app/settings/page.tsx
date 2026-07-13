@@ -21,10 +21,10 @@ import {
 } from '@/lib/export-service'
 
 /**
- * /settings — spec §5.5 "可在设置改". MVP exposes only the capture
- * shortcut (modifier + shift + key). Saved to web-local localStorage;
- * CaptureHost reads it live. Canvas shortcuts (+ - 0 1 g) and recording
- * UI are post-MVP.
+ * /settings — 用户设置页(spec §5.5)。语言 / 卡片显示模式(密度,v0.57.2)/ 捕获快捷键
+ * (仅桌面,移动端无系统全局热键)/ AI provider profile(AISettingsPanel)/ AI 样本导出
+ * (SampleExportPanel)/ 实验室区(LAB_REGISTRY,默认全关 + 确认门)/ 数据导出导入(JSON 全量备份)。
+ * useIsDesktop hook 守捕获快捷键段(防 SSG/安卓首帧 hydration mismatch)。
  */
 export default function SettingsPage() {
   const { t, locale, setLocale } = useI18n()
