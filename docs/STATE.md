@@ -173,7 +173,7 @@
 
 ### 当前焦点(2026-07-13,工作台重设计 + 两 bug 修,待手测)
 
-**工作台重设计**(v0.58.1 后):左库+右编辑器二合一 `/workbench`;画布双击进工作台 + hover 只读速览 popover;砍 focusEdit + 删 canvas 专用 card-detail-modal。打包后修两 bug:markdown 标题渲染 + Tag 黑底白字 a11y。全门绿(1583 测 + lint 0 + build 0),**v0.58.0/0.58.1/0.59.0 已 commit 未 tag 待手测**。清单 `cys-stift-docs/docs/handoff/2026-07-13-workbench-redesign-handtest.md`。
+**工作台重设计**(v0.58.1 后):左库+右编辑器二合一 `/workbench`;画布双击进工作台 + hover 只读速览 popover;砍 focusEdit + 删 canvas 专用 card-detail-modal。打包后修两 bug:markdown 标题渲染 + Tag 黑底白字 a11y。全门绿(1588 测 + lint 0 + build 0),**v0.58.0/0.58.1/0.59.0 已 commit 未 tag 待手测**。清单 `cys-stift-docs/docs/handoff/2026-07-13-workbench-redesign-handtest.md`。
 
 ### 历史焦点(2026-07-12,v0.58.0 确认门 + UX 打磨)
 
