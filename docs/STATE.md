@@ -171,7 +171,11 @@
 > 判断"这一步该不该做"先读 **[`docs/development/polish-phase.md`](development/polish-phase.md)**(打磨 vs 修缝判据 + 反馈驱动流程 + 退出标准)。
 > 燃料 = 你手测的真实反馈。每轮主线开工走 brainstorming,严守「一次一问 + 逐段确认」(skill-checklist-discipline 记忆)。
 
-### 当前焦点(2026-07-12,v0.58.0 打包手测中)
+### 当前焦点(2026-07-13,工作台重设计待手测)
+
+**工作台重设计**(v0.58.1 后):左库+右编辑器二合一 `/workbench`;画布双击进工作台 + hover 速览 popover;砍 focusEdit + 删 canvas 专用 card-detail-modal。全门绿(1580 测 + lint 0 + build 0),待手测。清单 `cys-stift-docs/docs/handoff/2026-07-13-workbench-redesign-handtest.md`。
+
+### 历史焦点(2026-07-12,v0.58.0 打包手测中)
 
 **v0.58.0 打包手测中**(大版本):#1 AI 排版/cluster/outline 确认门 + B1 全局热键 Space→E + B3 悬浮窗(companion/outline)可拖 + B4 菜单条 sticky 切界面修 + fix batch(dropdown KeyE / tab guard / cluster 0 disable / applied 死相位删 / 拖窗 localStorage try/catch+节流+mount clamp)。审核 #1「AI 过程不可见」+ v0.57.3 手测反馈 4 个严重度 3 问题。
 
