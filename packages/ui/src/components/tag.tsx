@@ -21,7 +21,9 @@ export function Tag({ color = 'gray', children, className, ...rest }: TagProps) 
       ? 'var(--color-black)'
       : color === 'gray'
         ? 'var(--color-black-soft)'
-        : `var(--color-${color})`
+        : color === 'black'
+          ? 'var(--color-white)'
+          : `var(--color-${color})`
   const style = {
     ['--tag-color' as never]: textColor,
     ['--tag-color-soft' as never]: `var(--color-${color}-soft)`,
