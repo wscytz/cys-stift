@@ -1,21 +1,19 @@
 'use client'
 
 /**
- * WorkbenchPanel — 工作台 dock 面板（D2）。附在选中卡外侧的复杂编辑区。
+ * WorkbenchPanel — 工作台右栏编辑器。标题 + tags + Markdown body(autosave)。
  *
- * 受控组件：page 传 card + onSave + onClose（与 CardDetailModal 同口径）。
- *   - card：当前要编辑的卡。
- *   - onSave({title, body, tags})：page 落 service.update + updateCardShape（同步画布）。
- *   - onClose：收起（page 调 workbenchStore.close）。
+ * 受控组件:page 传 card + onSave + onClose。
+ *   - onSave({title, body, tags}):page 落 service.update(+ wikilink 追踪)。
+ *   - onClose:收起(page 调 workbenchStore.close)。
  *
- * 编辑：标题 input + MarkdownEditor（富 markdown 源 + 工具栏 + 预览）。
- * 存：autosave 防抖 500ms；收起时若脏则 flush 再 close（防丢编辑）。
+ * 存:autosave 防抖 500ms;收起时若脏则 flush 再 close(防丢编辑)。
  */
 import { useEffect, useRef, useState } from 'react'
 import type { Card, TagRef } from '@cys-stift/domain'
+import { TAG_COLORS } from '@cys-stift/domain'
 import { Tag } from '@cys-stift/ui'
 import { MarkdownEditor } from '@/features/card/markdown-editor'
-import { WorkbenchIcon } from '@/features/canvas/workbench-icons'
 import { typeKeyOf } from '@/lib/type-label'
 import { useI18n } from '@/lib/i18n'
 
@@ -23,36 +21,21 @@ export interface WorkbenchPanelProps {
   card: Card
   onSave: (patch: { title: string; body: string; tags: TagRef[] }) => void
   onClose: () => void
-  /**
-   * 专注编辑态（工作台撑满 + 画布缩预览）。
-   * 头部按钮读它显示图标（true=collapse / false=expand）。
-   * 可选：默认 false。T5 在 page 接线 store.setFocusEdit。
-   */
-  focusEdit?: boolean
-  /**
-   * 切换专注态（由 page 实现：store.setFocusEdit + 与 focusMode 互斥）。
-   * 可选：默认 no-op。Toggle 是 VIEW 切换；脏草稿由既有防抖 autosave 持久化，无需 flush。
-   */
-  onToggleFocusEdit?: () => void
 }
 
-export function WorkbenchPanel({
-  card,
-  onSave,
-  onClose,
-  focusEdit = false,
-  onToggleFocusEdit,
-}: WorkbenchPanelProps) {
+export function WorkbenchPanel({ card, onSave, onClose }: WorkbenchPanelProps) {
   const { t } = useI18n()
   const [title, setTitle] = useState(card.title)
   const [body, setBody] = useState(card.body)
+  const [tags, setTags] = useState<TagRef[]>(card.tags ?? [])
+  const [tagInput, setTagInput] = useState('')
   // savedFlash:flush 后短暂亮「已保存」1.5s,让 autosave 可见(用户知道编辑落了)。
   const [savedFlash, setSavedFlash] = useState(false)
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // 最新草稿 + 最新 onSave 放 ref，避免防抖 effect 依赖函数身份。
-  const draftRef = useRef({ title, body })
-  draftRef.current = { title, body }
+  // 最新草稿 + 最新 onSave 放 ref,避免防抖 effect 依赖函数身份。
+  const draftRef = useRef({ title, body, tags })
+  draftRef.current = { title, body, tags }
   const onSaveRef = useRef(onSave)
   onSaveRef.current = onSave
 
@@ -60,28 +43,36 @@ export function WorkbenchPanel({
   const flushRef = useRef<() => void>(() => {})
   flushRef.current = () => {
     const d = draftRef.current
-    if (d.title !== card.title || d.body !== card.body) {
-      onSaveRef.current({ title: d.title, body: d.body, tags: card.tags ?? [] })
+    const curTags = card.tags ?? []
+    const tagsChanged = JSON.stringify(d.tags) !== JSON.stringify(curTags)
+    if (d.title !== card.title || d.body !== card.body || tagsChanged) {
+      onSaveRef.current({ title: d.title, body: d.body, tags: d.tags })
       setSavedFlash(true)
       if (flashTimer.current) clearTimeout(flashTimer.current)
       flashTimer.current = setTimeout(() => setSavedFlash(false), 1500)
     }
   }
 
-  // 切卡时重置草稿（card.id 变或 card 内容变）
+  // 切卡时重置草稿(card.id 变或 card 内容变)。
   useEffect(() => {
     setTitle(card.title)
     setBody(card.body)
-  }, [card.id, card.title, card.body])
+    setTags(card.tags ?? [])
+    setTagInput('')
+  }, [card.id, card.title, card.body, card.tags])
 
-  // dirty = 有未 flush 的编辑(派生:草稿 vs card 当前值)。
-  const dirty = title !== card.title || body !== card.body
+  // dirty = 有未 flush 的编辑(草稿 vs card 当前值)。tags 用 JSON 比(小数组)。
+  const curTags = card.tags ?? []
+  const dirty =
+    title !== card.title ||
+    body !== card.body ||
+    JSON.stringify(tags) !== JSON.stringify(curTags)
 
-  // 防抖自动存（500ms）。脏才存。
+  // 防抖自动存(500ms)。脏才存。
   useEffect(() => {
     const id = setTimeout(() => flushRef.current(), 500)
     return () => clearTimeout(id)
-  }, [title, body, card.title, card.body, card.tags])
+  }, [title, body, tags, card.title, card.body, card.tags])
 
   // 卸载清 flash 定时器。
   useEffect(
@@ -92,8 +83,19 @@ export function WorkbenchPanel({
   )
 
   const handleClose = () => {
-    flushRef.current() // 收起前 flush 脏编辑，防丢。
+    flushRef.current() // 收起前 flush 脏编辑,防丢。
     onClose()
+  }
+
+  const addTag = (raw: string) => {
+    const val = raw.trim()
+    if (!val || tags.some((tg) => tg.value === val)) {
+      setTagInput('')
+      return
+    }
+    const color = TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)]!
+    setTags((prev) => [...prev, { value: val, color }])
+    setTagInput('')
   }
 
   const barColor = card.color ?? 'gray'
@@ -117,17 +119,6 @@ export function WorkbenchPanel({
         </span>
         <button
           type="button"
-          data-testid="wb-focus-toggle"
-          className="wb-panel__focus"
-          onClick={onToggleFocusEdit}
-          aria-label={focusEdit ? t('canvas.exitFocusEdit') : t('canvas.focusEdit')}
-          aria-pressed={focusEdit}
-          title={focusEdit ? t('canvas.exitFocusEdit') : t('canvas.focusEdit')}
-        >
-          <WorkbenchIcon name={focusEdit ? 'collapse' : 'expand'} size={16} />
-        </button>
-        <button
-          type="button"
           data-testid="wb-done"
           className="wb-panel__done"
           onClick={handleClose}
@@ -137,6 +128,33 @@ export function WorkbenchPanel({
           {t('workbench.done')}
         </button>
       </header>
+      <div className="wb-panel__tags">
+        {tags.map((tag) => (
+          <button
+            key={tag.value}
+            type="button"
+            className="wb-panel__tag-chip"
+            style={{ background: tag.color }}
+            aria-label={t('tag.remove') + ': ' + tag.value}
+            onClick={() => setTags((prev) => prev.filter((x) => x.value !== tag.value))}
+          >
+            {tag.value} ×
+          </button>
+        ))}
+        <input
+          className="wb-panel__tag-input"
+          value={tagInput}
+          onChange={(e) => setTagInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              addTag(tagInput)
+            }
+          }}
+          placeholder={t('tag.placeholder')}
+          aria-label={t('tag.add')}
+        />
+      </div>
       <div className="wb-panel__body">
         <MarkdownEditor value={body} onChange={setBody} />
       </div>
@@ -189,7 +207,6 @@ const styles = `
 }
 .wb-panel__title:focus { border-bottom-color: var(--color-red); }
 .wb-panel__title:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-/* autosave 状态:保存中… / ✓ 已保存。aria-live 让屏幕阅读器播报。min-width 防切换抖动。 */
 .wb-panel__status {
   font-size: var(--font-size-xs);
   color: var(--color-gray);
@@ -198,7 +215,6 @@ const styles = `
   text-align: right;
   flex-shrink: 0;
 }
-/* 完成按钮:实心黑底白字(主动作,显式 commit+close),区别于专注切换的描边按钮。 */
 .wb-panel__done {
   padding: 0 var(--space-2);
   height: 28px;
@@ -216,27 +232,41 @@ const styles = `
 }
 .wb-panel__done:hover { background: var(--color-red); border-color: var(--color-red); }
 .wb-panel__done:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-.wb-panel__focus {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border: var(--border-hairline);
-  background: var(--color-white);
-  color: var(--color-black);
-  cursor: pointer;
-  border-radius: var(--radius-sm);
+/* tags 编辑行:chip(× 删)+ input 回车加。复用 card-detail 范式 + TAG_COLORS 随机色。 */
+.wb-panel__tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: var(--border-hairline);
   flex-shrink: 0;
 }
-.wb-panel__focus:hover { background: var(--color-yellow-soft); }
-.wb-panel__focus:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-.wb-panel__focus[aria-pressed="true"] {
-  background: var(--color-black);
-  color: var(--color-white);
+.wb-panel__tag-chip {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--font-size-xs);
+  border: 0;
+  padding: var(--space-quarter) var(--space-1);
+  color: var(--color-black);
+  cursor: pointer;
+  border-radius: 1px;
 }
-/* 触摸目标放大:画板/窄屏(<1024)按钮 28→40,与 canvas rail 事实标准对齐。 */
+.wb-panel__tag-chip:hover { opacity: 0.8; }
+.wb-panel__tag-input {
+  flex: 1;
+  min-width: 100px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  color: var(--color-black);
+  padding: var(--space-quarter) 0;
+}
+.wb-panel__tag-input:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 @media (max-width: 1023px) {
-  .wb-panel__done, .wb-panel__focus { height: 40px; }
+  .wb-panel__done { height: 40px; }
 }
 .wb-panel__body {
   flex: 1;

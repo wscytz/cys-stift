@@ -1,6 +1,7 @@
 /**
- * T4 WorkbenchPanel：渲染标题/类型；收起按钮 onClose；编辑后收起 flush onSave。
- * react-dom/client + act（policy）。i18n mock（useI18n）。
+ * WorkbenchPanel：渲染标题/类型;收起按钮 onClose;编辑后收起 flush onSave;
+ * 无专注按钮(已砍 focusEdit);tag 编辑落 onSave。
+ * react-dom/client + act(policy)。i18n mock(useI18n)。
  */
 import { describe, it, expect, vi } from 'vitest'
 import React, { act } from 'react'
@@ -46,7 +47,7 @@ function render(el: React.ReactElement) {
 }
 
 describe('WorkbenchPanel', () => {
-  it('渲染卡标题（input 值）', () => {
+  it('渲染卡标题(input 值)', () => {
     const { host } = render(
       <WorkbenchPanel card={card} onSave={vi.fn()} onClose={vi.fn()} />,
     )
@@ -54,7 +55,14 @@ describe('WorkbenchPanel', () => {
     expect(input.value).toBe('包豪斯')
   })
 
-  it('收起按钮 → onClose（无编辑不 onSave）', () => {
+  it('不渲染专注切换按钮(已砍 focusEdit)', () => {
+    const { host } = render(
+      <WorkbenchPanel card={card} onSave={vi.fn()} onClose={vi.fn()} />,
+    )
+    expect(host.querySelector('[data-testid="wb-focus-toggle"]')).toBeNull()
+  })
+
+  it('收起按钮 → onClose(无编辑不 onSave)', () => {
     const onSave = vi.fn()
     const onClose = vi.fn()
     const { host } = render(<WorkbenchPanel card={card} onSave={onSave} onClose={onClose} />)
@@ -66,7 +74,7 @@ describe('WorkbenchPanel', () => {
     expect(onSave).not.toHaveBeenCalled()
   })
 
-  it('编辑 body 后收起 → flush onSave（含新 body）+ onClose', () => {
+  it('编辑 body 后收起 → flush onSave(含新 body)+ onClose', () => {
     const onSave = vi.fn()
     const onClose = vi.fn()
     const { host } = render(<WorkbenchPanel card={card} onSave={onSave} onClose={onClose} />)
@@ -88,6 +96,32 @@ describe('WorkbenchPanel', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('加 tag 后收起 → flush onSave 含新 tag', () => {
+    const onSave = vi.fn()
+    const { host } = render(<WorkbenchPanel card={card} onSave={onSave} onClose={vi.fn()} />)
+    const tagInput = host.querySelector('.wb-panel__tag-input') as HTMLInputElement
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!
+    act(() => {
+      setter.call(tagInput, '新标签')
+      tagInput.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    act(() => {
+      tagInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+    const btn = host.querySelector('button[aria-label="workbench.done"]') as HTMLButtonElement
+    act(() => {
+      btn.click()
+    })
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tags: expect.arrayContaining([expect.objectContaining({ value: '新标签' })]),
+      }),
+    )
+  })
+
   it('保存状态:初始空;编辑后显「保存中…」(autosave 可见化)', () => {
     const { host } = render(<WorkbenchPanel card={card} onSave={vi.fn()} onClose={vi.fn()} />)
     const status = host.querySelector('[data-testid="wb-status"]') as HTMLElement
@@ -105,16 +139,14 @@ describe('WorkbenchPanel', () => {
     host.remove()
   })
 
-  it('切卡（card.id 变）重置草稿标题', () => {
+  it('切卡(card.id 变)重置草稿标题', () => {
     const other = { ...card, id: 'c2', title: '另一张' } as unknown as Card
-    const { host, rerender } = render(
-      <WorkbenchPanel card={card} onSave={vi.fn()} onClose={vi.fn()} />,
-    ) as ReturnType<typeof render> & { rerender?: (el: React.ReactElement) => void }
-    // createRoot 没有 rerender；改用 unmount + 再 render
-    host.remove()
     const host2 = document.createElement('div')
     document.body.appendChild(host2)
     const root2 = createRoot(host2)
+    act(() => {
+      root2.render(<WorkbenchPanel card={card} onSave={vi.fn()} onClose={vi.fn()} />)
+    })
     act(() => {
       root2.render(<WorkbenchPanel card={other} onSave={vi.fn()} onClose={vi.fn()} />)
     })
@@ -124,71 +156,5 @@ describe('WorkbenchPanel', () => {
       root2.unmount()
     })
     host2.remove()
-    void rerender
-  })
-})
-
-describe('WorkbenchPanel focus toggle', () => {
-  it('渲染专注切换按钮（focusEdit=false → aria-pressed=false）', () => {
-    const { host } = render(
-      <WorkbenchPanel
-        card={card}
-        onSave={vi.fn()}
-        onClose={vi.fn()}
-        focusEdit={false}
-        onToggleFocusEdit={vi.fn()}
-      />,
-    )
-    const btn = host.querySelector('[data-testid="wb-focus-toggle"]') as HTMLButtonElement | null
-    expect(btn).not.toBeNull()
-    expect(btn!.getAttribute('aria-pressed')).toBe('false')
-    host.remove()
-  })
-
-  it('click → onToggleFocusEdit 调一次', () => {
-    const onToggle = vi.fn()
-    const { host } = render(
-      <WorkbenchPanel
-        card={card}
-        onSave={vi.fn()}
-        onClose={vi.fn()}
-        focusEdit={false}
-        onToggleFocusEdit={onToggle}
-      />,
-    )
-    const btn = host.querySelector('[data-testid="wb-focus-toggle"]') as HTMLButtonElement
-    act(() => {
-      btn.click()
-    })
-    expect(onToggle).toHaveBeenCalledTimes(1)
-    host.remove()
-  })
-
-  it('focusEdit=true → aria-pressed=true（图标切到 collapse）', () => {
-    const { host } = render(
-      <WorkbenchPanel
-        card={card}
-        onSave={vi.fn()}
-        onClose={vi.fn()}
-        focusEdit
-        onToggleFocusEdit={vi.fn()}
-      />,
-    )
-    const btn = host.querySelector('[data-testid="wb-focus-toggle"]') as HTMLButtonElement
-    expect(btn.getAttribute('aria-pressed')).toBe('true')
-    // 头部应只有 1 个 focus toggle（不重复）
-    expect(host.querySelectorAll('[data-testid="wb-focus-toggle"]').length).toBe(1)
-    host.remove()
-  })
-
-  it('未传 focusEdit/onToggleFocusEdit → 不崩（可选默认；T5 未接线时）', () => {
-    const { host } = render(
-      <WorkbenchPanel card={card} onSave={vi.fn()} onClose={vi.fn()} />,
-    )
-    // 默认态下也渲染按钮（focusEdit=false），click 不抛
-    const btn = host.querySelector('[data-testid="wb-focus-toggle"]') as HTMLButtonElement | null
-    expect(btn).not.toBeNull()
-    expect(() => act(() => { btn!.click() })).not.toThrow()
-    host.remove()
   })
 })
