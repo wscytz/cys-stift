@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import type { CanvasId, Card, CardId, TagRef } from '@cys-stift/domain'
 import { SelfBuiltAdapter, applyAlign, elementCenter, unionBounds, normalizeBox, screenToPage } from '@cys-stift/canvas-engine'
 import type { AlignOp, CanvasElement } from '@cys-stift/canvas-engine'
@@ -14,8 +14,7 @@ import { downloadFile } from '@/lib/download'
 import { SelfCanvas, type SelfCanvasHandle } from '@/features/canvas/self-canvas'
 import { CanvasIcon, CanvasBusyIcon, type CanvasIconName } from '@/features/canvas/canvas-icons'
 import { CardDetailModal } from '@/features/canvas/card-detail-modal'
-import { WorkbenchPanel } from '@/features/canvas/workbench-panel'
-import { useWorkbench, workbenchStore } from '@/lib/workbench-store'
+import { workbenchStore } from '@/lib/workbench-store'
 import { ExportDialog } from '@/features/canvas/export-dialog'
 import { DslDialog } from '@/features/canvas/dsl-dialog'
 import { CanvasOverviewModal } from '@/features/canvas/canvas-overview-modal'
@@ -28,7 +27,6 @@ import { canvasToMarkdown, markdownFileName } from '@/features/canvas/canvas-to-
 import { RelationPanel } from '@/features/canvas/relation-panel'
 import { FreedrawPanel } from '@/features/canvas/freedraw-panel'
 import { Minimap } from '@/features/canvas/minimap-component'
-import { MinimapPreview } from '@/features/canvas/minimap-preview'
 import { OutlinePanel } from '@/features/canvas/outline-panel'
 import { CanvasCompanionPanel } from '@/features/canvas/companion-panel'
 import { autoRelate } from '@/features/canvas/auto-relate'
@@ -77,9 +75,8 @@ import { canvasViewStore } from '@/lib/canvas-view-store'
 export default function CanvasPage() {
   const { t } = useI18n()
   const { snap, service, ready } = useDb()
-  // T5:工作台 dock 状态(开/关 + 当前 cardId + 专注编辑)。非持久(关画布/刷新即重置)。
-  const { cardId: wbCardId, focusEdit } = useWorkbench()
   const pathname = usePathname()
+  const router = useRouter()
   const handle = useRef<SelfCanvasHandle>({ adapter: null })
   // adapter 就绪态抬进 state(ref 赋值不触发 re-render,否则冷启动/切画布后
   // toolbar disabled、RelationPanel/FreedrawPanel/Minimap host=null 不挂载,
@@ -533,9 +530,8 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         const tgt = e.target as HTMLElement | null
         if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return
         e.preventDefault()
-        // 互斥决策走纯函数 nextFocusStates(与 toggleFocusEdit 共用,可单测)。
-        const n = nextFocusStates('toggle-canvas-focus', { focusEdit, focusMode })
-        workbenchStore.setFocusEdit(n.focusEdit)
+        // ⌘. 切焦点模式(隐藏 chrome,只留画布)。focusEdit 砍后只切 focusMode。
+        const n = nextFocusStates('toggle-canvas-focus', { focusEdit: false, focusMode })
         setFocusMode(n.focusMode)
         return
       }
@@ -561,7 +557,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [zoomBy, toggleSnap, t, focusMode, focusEdit])
+  }, [zoomBy, toggleSnap, t, focusMode])
 
   // BUG-A:applyLayout 的 onCardCreate 回调——create 类 op 落库为真实 Card。
   // 走 createCardOnCanvas(service, adapter, activeCanvasId, ...),复用 createWithId,
@@ -958,85 +954,9 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       ? { card: liveDetailCard }
       : null
 
-  // T5:工作台 dock 的当前卡 —— 从 snap 反应式取(随编辑/别处改动更新),
-  // 找不到或已软删 → null(不渲染 panel)。与 effectiveDetail 同口径(过滤 deletedAt)。
-  const wbCard = wbCardId
-    ? snap.cards.find((c) => c.id === wbCardId) ?? null
-    : null
-  // 存卡 + 同步画布形状 + wikilink/embed 箭头(镜像 CardDetailModal onSave L1241-1275)。
-  // 工作台是富内容编辑器,modal 关着时 ((标题))/[[标题]] 的箭头同步必须在这里做,
-  // 否则 dock 里编辑 embed/wikilink 不出、不删箭头。
-  const wbSave = useCallback(
-    (patch: { title: string; body: string; tags: TagRef[] }) => {
-      if (!wbCardId) return
-      // D2 双链标题重命名追踪:捕获 oldTitle(update 前),title 真变时调
-      // resyncWikiLinksForTitleChange 让引用旧/新标题的卡 re-sync wikilink 箭头。
-      const oldTitle = service.get(wbCardId as CardId)?.title
-      const updated = service.update(wbCardId as CardId, patch)
-      if (updated && handle.current.adapter) updateCardShape(handle.current.adapter, updated)
-      // F7 wikilink + BR-T5 embed 同步(只在 body 变时;同 modal 口径)。
-      if (updated && handle.current.adapter && patch.body !== undefined) {
-        const wl = syncWikiLinkArrows({
-          host: handle.current.adapter,
-          getCardTitle: (id) => service.get(id as CardId)?.title,
-          sourceCardId: wbCardId as CardId,
-          body: patch.body,
-          // T5 跨画布双链:候选池 + 当前画布 id,让 [[远画布卡标题]] 也能匹配。
-          allCards: allWikiCandidates,
-          currentCanvasId: activeCanvasId as string,
-        })
-        if (wl.created > 0 || wl.removed > 0) {
-          pushToast({ kind: 'info', message: t('canvas.wikiLinked', { created: String(wl.created), removed: String(wl.removed) }) })
-        }
-        const emb = syncEmbedArrows({
-          host: handle.current.adapter,
-          getCardTitle: (id) => service.get(id as CardId)?.title,
-          sourceCardId: wbCardId as CardId,
-          body: patch.body,
-        })
-        if (emb.created > 0 || emb.removed > 0) {
-          pushToast({ kind: 'info', message: t('canvas.embedLinked', { created: String(emb.created), removed: String(emb.removed) }) })
-        }
-      }
-      // D2 标题重命名追踪:title 真变 → 画布上所有 body 含 [[oldTitle]]/[[newTitle]] 的卡 re-sync
-      if (updated && handle.current.adapter && oldTitle !== undefined && patch.title !== oldTitle) {
-        const canvasCardIds = handle.current.adapter
-          .getElements()
-          .filter((e) => e.kind === 'card')
-          .map((e) => e.id)
-        resyncWikiLinksForTitleChange({
-          host: handle.current.adapter!,
-          getCardTitle: (id) => service.get(id as CardId)?.title,
-          getCardBody: (id) => service.get(id as CardId)?.body,
-          canvasCardIds,
-          oldTitle,
-          newTitle: patch.title,
-          // T5 跨画布双链:候选池 + 当前画布 id,透传给底层 syncWikiLinkArrows。
-          allCards: allWikiCandidates,
-          currentCanvasId: activeCanvasId as string,
-        })
-      }
-    },
-    // allWikiCandidates(useMemo on snap.cards)+ activeCanvasId 必须入 deps:
-    // 否则 snap.cards / activeCanvasId 变化但 wbCardId/service/t 不变时,wbSave
-    // 保留 stale closure → 工作台保存路径漏掉对新建/改名卡的双链匹配(allCards
-    // 是旧的)。allWikiCandidates 已 memo 化(只在 snap.cards 变时重新分配),
-    // 所以这里不会引入额外重渲染。wbSave 仅作为 prop 传入 WorkbenchDock,
-    // 无 useEffect 消费,加 deps 不会触发渲染循环。
-    [wbCardId, service, t, allWikiCandidates, activeCanvasId],
-  )
 
-  // T5:专注编辑切换 —— 翻 focusEdit + 进专注时退出画布焦点(互斥)。
-  // focusMode 在 deps 里:否则关闭焦点后立即点开专注会用到 stale 的 focusMode=true。
-  // 互斥决策走纯函数 nextFocusStates(与 ⌘. handler 共用,可单测)。
-  const toggleFocusEdit = useCallback(() => {
-    const n = nextFocusStates('toggle-edit', { focusEdit, focusMode })
-    workbenchStore.setFocusEdit(n.focusEdit)
-    if (n.focusMode !== focusMode) setFocusMode(n.focusMode)
-  }, [focusEdit, focusMode])
-
-  // T5:chrome(Toolbar/SideRail/Minimap 等)在 focusMode 或 focusEdit 时都隐。
-  const chromeHidden = focusMode || focusEdit
+  // chrome(Toolbar/SideRail/Minimap 等)在 focusMode 时隐。
+  const chromeHidden = focusMode
 
   return (
     <main id="main" tabIndex={-1} className={`page${focusMode ? ' page--focus' : ''}`}>
@@ -1127,6 +1047,16 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
             <AlignGroup adapterReady={adapterReady} count={selectedCardCount} onAlign={onAlign} />
           </>
         )}
+        <span className="tb-divider" aria-hidden="true" />
+        <button
+          type="button"
+          className="tb-btn"
+          onClick={() => router.push('/workbench')}
+          aria-label={t('canvas.workbench.entry')}
+          title={t('canvas.workbench.entry')}
+        >
+          <span className="tb-btn__label">{t('canvas.workbench.entry')}</span>
+        </button>
       </Toolbar>
       )}
       {organizeOpen && (
@@ -1140,7 +1070,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       )}
 
       <div className="cv-dock">
-      <div className={`cv-host cv-host--${tool}${focusEdit ? ' cv-host--hidden' : ''}`} onContextMenu={(e) => {
+      <div className={`cv-host cv-host--${tool}`} onContextMenu={(e) => {
         e.preventDefault()
         const adapter = handle.current.adapter
         if (!adapter) return
@@ -1158,7 +1088,7 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           tool={tool}
           eraserMode={eraserMode}
           onEraseCard={onEraseCard}
-          onOpenCard={(card) => setDetail({ card })}
+          onOpenCard={(card) => { workbenchStore.open(card.id); router.push('/workbench') }}
           onDoubleClickEmpty={(px, py, cx, cy) => setCtxMenu({ x: cx, y: cy, px, py, creating: true })}
           adapterRef={handle}
           canvasElRef={canvasElRef}
@@ -1246,20 +1176,6 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           </button>
         )}
       </div>
-      {/* T5:工作台 dock 右栏 —— 卡片详情弹窗「展开工作台」打开;收起 → workbenchStore.close。
-          flex dock:cv-host(flex:1) + 本栏(clamp 宽)。卡找不到/已删 → 不渲染。 */}
-      {wbCardId && wbCard && !wbCard.deletedAt && (
-        <aside className={`cv-dock__panel${focusEdit ? ' cv-dock__panel--focus' : ''}`} aria-label={t('canvas.workbench.expand')}>
-          <WorkbenchPanel
-            card={wbCard}
-            onSave={wbSave}
-            onClose={() => workbenchStore.close()}
-            focusEdit={focusEdit}
-            onToggleFocusEdit={toggleFocusEdit}
-          />
-          {focusEdit && <MinimapPreview host={adapter} />}
-        </aside>
-      )}
       </div>
 
       <Modal open={creatingName !== null} onClose={() => setCreatingName(null)} title={t('canvas.newModalTitle')} closeLabel={t('common.close')}>
