@@ -24,6 +24,7 @@
 import type { CanvasId, CardService } from '@cys-stift/domain'
 import { serializeCardsForAI } from './ai-context'
 import { getCurrentAI, isAIReady } from './ai-settings-provider'
+import { retryUntilValid } from './retry-until-valid'
 import { streamText } from './stream-text'
 
 export interface GenerateOutlineResult {
@@ -59,14 +60,19 @@ export async function generateOutline(
 
   const userPrompt = `Summarize these cards into a Markdown outline grouped by theme:\n\n${serialized}`
 
-  const result = await streamText(
-    cfg,
-    { system: systemPrompt, user: userPrompt, temperature: 0.3 },
-    () => {},
-    opts.signal,
-  )
-
-  const content = result?.content?.trim()
+  const r = await retryUntilValid({
+    initialMessages: [{ role: 'user', content: userPrompt }],
+    produce: (messages) =>
+      streamText(cfg, { system: systemPrompt, user: userPrompt, messages, temperature: 0.3 }, () => {}, opts.signal)
+        .then((x) => x?.content ?? ''),
+    parse: (text) => ({
+      ok: text.trim().length > 0,
+      errors: text.trim() ? [] : [{ line: 0, text: '', message: 'empty output' }],
+    }),
+    buildCorrection: () =>
+      'Your previous output was empty. Regenerate the Markdown outline grouping the cards by theme.',
+  })
+  const content = r.text.trim()
   if (!content) return { ok: true, empty: true }
   return { ok: true, markdown: content }
 }
