@@ -116,7 +116,8 @@ describe('retryUntilValid — network errors', () => {
   })
 
   it('rethrows AbortError without retry', async () => {
-    const e = new Error('aborted'); e.name = 'AbortError'
+    // 真实 streamText abort 抛 DOMException(不继承 Error),用合成实例复现 bug。
+    const e = new DOMException('aborted', 'AbortError')
     await expect(retryUntilValid({
       initialMessages: [{ role: 'user', content: 'q' }],
       produce: async () => { throw e },

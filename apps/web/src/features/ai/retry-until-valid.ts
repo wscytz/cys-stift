@@ -40,8 +40,11 @@ export async function retryUntilValid(opts: RetryOptions): Promise<RetryResult> 
       text = await opts.produce(messages, attempt)
     } catch (err) {
       // 用户取消(AbortError)→ 立即冒出,不重试。
-      if (err instanceof Error && err.name === 'AbortError') throw err
+      // 注意:DOMException 不继承 Error,不能用 instanceof Error 守卫(真实 streamText
+      // abort 抛 DOMException)。按 name 判定,与 use-ai-action.ts 的范式一致。
+      if (err && typeof err === 'object' && (err as { name?: string }).name === 'AbortError') throw err
       // 网络错(非取消)→ 计入 attempt,重试同 messages(非 AI 输出错,不喂 correction)。
+      console.warn('[retry-until-valid] network error, retrying', err)
       continue
     }
     lastText = text
