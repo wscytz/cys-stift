@@ -13,7 +13,8 @@
 - **入口统一**:画布双击卡 / 画布顶栏「工作台」按钮 / 全局菜单 / 库点卡 -> 都进工作台编辑。工作台顶栏「›画布」回画布。
 - **画布退为空间组织**:hover 卡(桌面 300ms 防抖)-> 只读速览 popover(标题+正文+tags+「在工作台编辑」);双击卡进工作台编辑。
 - **砍 focusEdit**(专注态,独立页不需要):store/panel/canvas 全清;删 canvas 专用 card-detail-modal.tsx;shared card-detail.tsx 不动(9 调用方)。
-- **验证**:web 1580 测 + lint 0 + build exit 0。待手测。
+- **打包后两 bug 修**(手测报):① markdown 标题(### / ## / #)不渲染 —— 根因 rehype-sanitize 的 default schema **不含 h1-h6** 被剥(旧注释"default 含 h1-h6"是错的),`sanitizeSchema` 显式放行 h1-h6;② 工作台类型标「笔记」黑底黑字 —— Tag `color="black"` 文字 `#0a0a0a` 落在 black-soft `#2b2b2b` 上(对比 ~1.5:1 不可读;旧注释"black high contrast"是错的),改白字 a11y。
+- **验证**:web 1583 测(+ 标题渲染 3 测)+ lint 0 + build exit 0。待手测。
 
 ## 2026-07-13 · v0.58.1 · 保存反馈统一 + AI 重试对称化
 

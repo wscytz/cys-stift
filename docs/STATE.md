@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.58.1(2026-07-13;保存反馈统一 + AI 重试对称化。v0.58.0 = AI 确认门 + B1/B3/B4 打磨批)。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:v0.59.0(2026-07-13;工作台重设计:左库+右编辑器二合一 `/workbench` / 画布双击进工作台 + hover 只读速览 / 砍 focusEdit + 删 canvas 专用详情弹窗;打包后两 bug 修:markdown 标题渲染 + Tag 黑底白字 a11y)。**v0.58.0 / v0.58.1 / v0.59.0 已 commit 未 tag,待手测绿再切 tag**(版本表由 git tag 生成,tag 前不显行 —— 故下表断在 v0.57.3,非缺失)。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 
@@ -150,7 +150,7 @@
 - **捕获**:全局快捷键 + Mini Input + 文件拖拽 + `.cystift` 文件拖回恢复
 - **inbox**:多媒介编辑(链接/代码/引用/媒体)+ 草稿自动保存 + 发送到画布
 - **canvas**:自研 Canvas 2D 自由画布(6 active kind:card/arrow/freedraw/text/rect/frame)+ 多画布 CRUD + 视图持久化 + 关系箭头(straight/curve/elbow + 手绘识别)+ 工具栏(选择/笔/橡皮/文本/连接)+ AI 排版(配 AI 才显,未配走引导卡;**关系式坐标 `right-of`/`below`**(AI 结构化布局优先用,solver 单遍解算 + 碰撞避让))+ 导出(图片 SVG/PNG + Markdown + DSL 二级菜单)+ Outline/Minimap/全局缩略图三态 + 双链 [[]] 自动建箭头 + DSL 模态编辑器(转义)+ **对齐分布 9 操作**(选中 ≥2)+ **画布模板**(4 预设 + 自建/导入)+ **AI 工作流模板**(聚类/关系/大纲)+ **整理范式**(策略:思维导图/流程图/网格/紧凑 × 方向 TB/LR/RL/BT × 间距,默认 mindmap/TB)+ **焦点模式**(⌘. 隐 chrome)+ **frame 双击重命名** + minimap 可拖拽 + **关系箭头高倍放大不再消失**(端点解析脱离视锥剔除)+ **手绘规范化 v1**(store-time 保角 RDP 简化 + 贝塞尔平滑 render/SVG 同源 + 转 arrow/rect chooser)
-- **工作台**(per-card 深度编辑):`/workbench` 库页(标签管理 + 堆叠分区)+ canvas **D2 dock 编辑器**(富 Markdown 编辑 + 预览联动)+ **专注编辑态**(v0.54 ⤢ 二档:编辑器撑满 + 画布缩成可拖拽/可收起的浮 `MinimapPreview`,与 ⌘. 焦点模式互斥)
+- **工作台**(编辑的唯一家,v0.59 重设计):`/workbench` 左库(WorkbenchBrowser 搜索/分类/堆叠分区)+ 右编辑器(WorkbenchPanel 标题+富 Markdown+tags 就地编辑);画布双击卡 / 顶栏「工作台」/ 全局菜单 / 库点卡 → 都进工作台;画布退为空间组织(hover 只读速览 popover + 双击进工作台)。v0.59 砍 focusEdit(独立页不需要)+ 删 canvas 专用详情弹窗(shared `card-detail.tsx` 9 调用方不动)。
 - **Markdown 渲染**(卡片 body,跨 inbox/canvas/workbench):GFM(表格/任务列表/删除线/自动链接)+ 代码高亮(Bauhaus 主题)+ **数学公式**(v0.55 katex `$inline$`/`$$display$$`,CSS 本地 bundle 不走 CDN)+ **脚注**(`[^1]`,remark-gfm 内置,不引入废弃的 remark-footnotes)+ 块引用 `((标题))` 嵌入(环检测 + missing 标记)
 - **graph**:全局图谱 `/graph` —— 语义三维签名力导向图(d3-force),跨画布消费已物化的双链/关系 arrow + **缩放条**(−/slider/+/reset)+ 触摸板 pinch=缩放/双指=平移(不再误缩放)+ 删卡不灰屏 + 卡详情 action 行 sticky 常驻 + **加关系实时刷新**(freeform store 订阅通道)
 - **archive**:网格/时间轴 + 多选批量 + 详情 Modal
@@ -163,7 +163,7 @@
 - **AI 排版**:诚实反馈(apply 前后位移对比 → "重排 N 张平均 Xpx" / "AI 认为已合理未改动")+ 主动重排 prompt + 拓宽思考抑制(deepseek 镜像/model 名)+ 60s 超时 + **DSL sanitize 兜底**(apply 前修非法 size/越界坐标,纯函数永不抛错;丢卡/引用幽灵端点 → diagnostic toast 可见)
 - **版本号**:单一可信源(`scripts/gen-version.mjs` 读 root package.json → version.ts + 同步 tauri.conf),主菜单 + 首页实时显示
 - **开发存档**(dev 工具,非用户向):release/风险 op/手动 checkpoint 落 OPFS 全量快照(版号区分,mediaAssets 剥 dataUrl),`/dev/archive` 列表+浏览+导出 JSON 外部 diff(查错误)+ release 自修自查;分层 retention(风险 op cap 100 FIFO,release/手动永久)
-- **settings**:快捷键自定义 + 导入/导出 + 暗色主题 + AI provider 配置 + **实验室区**(vision/autoCurate/autoTag/autoCapture/agentToolCalling 五个实验室,默认关,LAB_REGISTRY 注册表 + useLabEnabled 守卫 + 确认门;分层判据见 ai-labs-strategy spec)
+- **settings**:快捷键自定义 + 导入/导出 + AI provider 配置 + **卡片显示模式**(v0.57.2,4 档密度:紧凑/自适应/仅标题/副标题)+ **实验室区**(vision/autoCurate/autoTag/autoCapture/agentToolCalling 五个实验室,默认关,LAB_REGISTRY 注册表 + useLabEnabled 守卫 + 确认门;分层判据见 ai-labs-strategy spec)
 
 ## 下一步
 
@@ -171,19 +171,15 @@
 > 判断"这一步该不该做"先读 **[`docs/development/polish-phase.md`](development/polish-phase.md)**(打磨 vs 修缝判据 + 反馈驱动流程 + 退出标准)。
 > 燃料 = 你手测的真实反馈。每轮主线开工走 brainstorming,严守「一次一问 + 逐段确认」(skill-checklist-discipline 记忆)。
 
-### 当前焦点(2026-07-13,工作台重设计待手测)
+### 当前焦点(2026-07-13,工作台重设计 + 两 bug 修,待手测)
 
-**工作台重设计**(v0.58.1 后):左库+右编辑器二合一 `/workbench`;画布双击进工作台 + hover 速览 popover;砍 focusEdit + 删 canvas 专用 card-detail-modal。全门绿(1580 测 + lint 0 + build 0),待手测。清单 `cys-stift-docs/docs/handoff/2026-07-13-workbench-redesign-handtest.md`。
+**工作台重设计**(v0.58.1 后):左库+右编辑器二合一 `/workbench`;画布双击进工作台 + hover 只读速览 popover;砍 focusEdit + 删 canvas 专用 card-detail-modal。打包后修两 bug:markdown 标题渲染 + Tag 黑底白字 a11y。全门绿(1583 测 + lint 0 + build 0),**v0.58.0/0.58.1/0.59.0 已 commit 未 tag 待手测**。清单 `cys-stift-docs/docs/handoff/2026-07-13-workbench-redesign-handtest.md`。
 
-### 历史焦点(2026-07-12,v0.58.0 打包手测中)
+### 历史焦点(2026-07-12,v0.58.0 确认门 + UX 打磨)
 
-**v0.58.0 打包手测中**(大版本):#1 AI 排版/cluster/outline 确认门 + B1 全局热键 Space→E + B3 悬浮窗(companion/outline)可拖 + B4 菜单条 sticky 切界面修 + fix batch(dropdown KeyE / tab guard / cluster 0 disable / applied 死相位删 / 拖窗 localStorage try/catch+节流+mount clamp)。审核 #1「AI 过程不可见」+ v0.57.3 手测反馈 4 个严重度 3 问题。
+**v0.58.0**:画布 AI 从"直接副作用"改"确认门 Modal"(#1,三 mode before/after 缩略图)+ B1 热键 Space→E + B3 悬浮窗可拖 + B4 菜单条 sticky(`overflow-x:clip` 修)。**v0.58.1**:保存反馈统一(画布「已保存」角标 + 3 store 写失败 toast)+ AI 重试对称化(cluster/outline 套 retryUntilValid)。均已并入 v0.59 一起待手测。剩余 Medium / 优化 backlog 见 `.superpowers/sdd/optimization-report.md`。
 
-- **手测清单**:#1 三 mode 确认门(dsl before/after 缩略图 + cluster 箭头 + outline markdown 预览 + 编辑 + parseError)/ B1 ⌘⇧E 全局热键(老用户 Space 自动迁移,Windows Ctrl⇧E)/ B3 拖 companion+outline(minimap 不变,位置持久)/ B4 切路由菜单钉顶 + 长页滚动 + 横向不溢出 / 拖窗配额不崩 / cluster 0 变更 Apply disabled。
-- **下一步候选**:B2 对话滚动 + Medium 三项(DSL 入口可发现性/保存反馈/数据安心)+ 优化 backlog 23 点(DSL 编辑 debounce / AI 重试不对称 / capture-host 测 / page.tsx 拆 hook 等,见 `.superpowers/sdd/optimization-report.md`)。
-
-
-product-idea 大方向四块**全闭合**:#1 大卡搁置 / #2 DSL 版本号 v0.45 / #3 工作台 v0.51+v0.54 / #4 Markdown v0.38+v0.55。
+product-idea 大方向四块**全闭合**:#1 大卡搁置 / #2 DSL 版本号 v0.45 / #3 工作台 v0.51+v0.59(v0.54 focusEdit 已砍)/ #4 Markdown v0.38+v0.55。
 
 ### 短期 backlog
 
