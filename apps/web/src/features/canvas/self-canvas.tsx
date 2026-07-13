@@ -1,17 +1,15 @@
 'use client'
 
 /**
- * SelfCanvas — SelfBuiltAdapter 主路由版(Phase 2 子项目 1)。
- * 接 CardService(经 Phase 0 host 无关的 canvas-binding)+ 多画布(key=canvasId 重建)
- * + 视图持久化(canvasViewStore,经 host.getView/setView)+ 双击开卡(select 模式命中)。
- * 零 tldraw。卡片用 SelfBuiltAdapter 现有简化渲染(只 title)——完整渲染留子项目 2。
+ * SelfCanvas — SelfBuiltAdapter 主路由画布组件(自研 Canvas 2D,tldraw 2026-06-23 已完全移除)。
+ * 接 CardService(经 canvas-binding host 无关层)+ 多画布(key=canvasId 重建)
+ * + 视图持久化(canvasViewStore)+ 双击开卡(select 命中)/ 双击空白建卡 / 双击 frame 重命名。
+ * 卡片完整渲染(cardMode 4 档:compact/auto/title/subtitle,经 settingsStore)。
+ * freeform 元素(text/freedraw/arrow/rect/frame)经 attachCanvasFreeformPersistence 持久化(OPFS/localStorage)。
+ * v0.59:select 模式 hover 卡 300ms → CardPreviewPopover 只读速览;双击卡进工作台。
  *
- * 文本编辑(debt 收口 2026-06-23):Text 工具下点击 canvas 放浮动 textarea,
- * 原生 IME(composition)+ textEditKeyAction 守卫,Ctrl/Enter 或 blur 提交、
- * Escape 取消。逻辑从 /dev/canvas-self 的验证版搬过来,适配主路由(adapter 在 ref)。
- * 注:text/freedraw 等非卡片元素当前不持久化(reload 丢)——自研快照层是下一个 debt。
- *
- * shape 增删(发回/归档/删除)由 page 经 adapterRef 调 canvas-binding。
+ * 文本编辑:Text 工具点 canvas 放浮动 textarea,原生 IME + textEditKeyAction 守卫,
+ * Ctrl/Enter 或 blur 提交、Escape 取消;切画布 unmount 时 commitEdit(true) 防丢(commitRef 防双提交)。
  */
 import { useEffect, useRef, useState } from 'react'
 import type { CanvasId, Card, CardService } from '@cys-stift/domain'

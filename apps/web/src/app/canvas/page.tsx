@@ -66,9 +66,10 @@ import { canvasStore, useCanvases, getSnapshot as getCanvasesSnapshot } from '@/
 import { canvasViewStore } from '@/lib/canvas-view-store'
 
 /**
- * /canvas — Phase 2 子项目 1:切 SelfBuiltAdapter(自研 Canvas 2D),移除 tldraw。
- * tldraw 代码文件暂留(子项目 5 删)。canvas 管理 UI(switcher/rename/delete)+ CardDetailModal 保留。
- * 暂无 toolbar/导出/关系(子项目 2/3/4 接回)。卡片简化渲染(只 title)——完整渲染留子项目 2。
+ * /canvas — 自研 Canvas 2D 主画布页(tldraw 2026-06-23 已完全移除,见 ADR `docs/adr/2026-06-23-remove-tldraw.md`)。
+ * 顶栏 toolbar(工具/吸附/缩放/整理/对齐/工作台入口)+ 右侧 SideRail(AI 排版/聚类/大纲 + 模板 + 导出 + DSL + Diff + 快捷键)
+ * + 浮动面板(Relation/Freedraw/Outline/Companion/Minimap)。卡片完整渲染。
+ * 画布是核心:捕获→养→沉淀的心脏;转义双向(DSL)是核心卖点。详见 STATE + product-and-engine.md。
  */
 export default function CanvasPage() {
   const { t } = useI18n()
