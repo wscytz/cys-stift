@@ -185,3 +185,37 @@ describe('draftStore — SSR safety', () => {
     }
   })
 })
+
+// Task 6 quota:upsert 配额失败 → 回滚 + notifyQuota(AppMenu toast 订阅源)
+describe('draftStore — quota (Task 6)', () => {
+  let draftStore: typeof import('../draft-store').draftStore
+  let onQuotaExceeded: typeof import('../draft-store').onQuotaExceeded
+  beforeEach(async () => {
+    vi.resetModules()
+    window.localStorage.clear()
+    draftStore = (await import('../draft-store')).draftStore
+    onQuotaExceeded = (await import('../draft-store')).onQuotaExceeded
+  })
+  function simulateQuota() {
+    const orig = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem')
+    Object.defineProperty(Storage.prototype, 'setItem', {
+      configurable: true,
+      value: () => { throw new DOMException('quota', 'QuotaExceededError') },
+    })
+    return () => { if (orig) Object.defineProperty(Storage.prototype, 'setItem', orig) }
+  }
+  it('upsert 配额失败 → 回滚到 prev + notifyQuota', () => {
+    draftStore.upsert('capture', 'hello')
+    const restore = simulateQuota()
+    try {
+      let fired = false
+      const unsub = onQuotaExceeded(() => { fired = true })
+      draftStore.upsert('capture', 'world')
+      unsub()
+      expect(fired).toBe(true)
+      expect(draftStore.get('capture')?.payload).toBe('hello')
+    } finally {
+      restore()
+    }
+  })
+})

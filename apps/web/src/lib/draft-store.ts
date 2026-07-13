@@ -63,6 +63,14 @@ const _subscribers = new Set<() => void>()
 // (no failure observed yet).
 let _lastSaveOk = true
 
+// 配额失败订阅(Task 6 镜像 db-client):saveDrafts 失败 → 回滚 + notifyQuota → AppMenu toast。
+const _quotaSubscribers = new Set<() => void>()
+function notifyQuota(): void { for (const cb of _quotaSubscribers) cb() }
+export function onQuotaExceeded(cb: () => void): () => void {
+  _quotaSubscribers.add(cb)
+  return () => { _quotaSubscribers.delete(cb) }
+}
+
 /**
  * Returns whether the most recent draft write persisted to localStorage.
  * false means the last upsert/clear hit QuotaExceededError (or similar) —
@@ -115,19 +123,25 @@ export const draftStore = {
   },
   upsert(kind: DraftKind, payload: unknown): void {
     hydrateOnce()
+    const prev = _drafts
     const next: DraftMap = { ..._drafts }
     next[kind] = { kind, payload, updatedAt: new Date().toISOString() }
     _drafts = next
-    _lastSaveOk = saveDrafts(_drafts)
+    const ok = saveDrafts(_drafts)
+    if (!ok) { _drafts = prev; notifyQuota() }
+    _lastSaveOk = ok
     notify()
   },
   clear(kind: DraftKind): void {
     hydrateOnce()
     if (!_drafts[kind]) return
+    const prev = _drafts
     const next: DraftMap = { ..._drafts }
     delete next[kind]
     _drafts = next
-    _lastSaveOk = saveDrafts(_drafts)
+    const ok = saveDrafts(_drafts)
+    if (!ok) { _drafts = prev; notifyQuota() }
+    _lastSaveOk = ok
     notify()
   },
 }

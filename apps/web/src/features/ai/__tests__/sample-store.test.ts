@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   SAMPLES_KEY,
   loadSamples,
@@ -162,5 +162,41 @@ describe('sample-store dslVersion', () => {
     window.localStorage.setItem(SAMPLES_KEY, JSON.stringify([oldQa]))
     const loaded = loadSamples()
     expect(loaded[0]?.dslVersion).toBeUndefined()
+  })
+})
+
+// Task 6 quota:addSample 配额失败 → notifyQuota(AppMenu toast 订阅源)
+describe('sampleStore — quota (Task 6)', () => {
+  let onQuotaExceeded: typeof import('../sample-store').onQuotaExceeded
+  let addSample: typeof import('../sample-store').addSample
+  beforeEach(async () => {
+    vi.resetModules()
+    window.localStorage.clear()
+    onQuotaExceeded = (await import('../sample-store')).onQuotaExceeded
+    addSample = (await import('../sample-store')).addSample
+  })
+  function simulateQuota() {
+    const orig = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem')
+    Object.defineProperty(Storage.prototype, 'setItem', {
+      configurable: true,
+      value: () => { throw new DOMException('quota', 'QuotaExceededError') },
+    })
+    return () => { if (orig) Object.defineProperty(Storage.prototype, 'setItem', orig) }
+  }
+  it('addSample 配额失败 → notifyQuota + 返 false', () => {
+    const restore = simulateQuota()
+    try {
+      let fired = false
+      const unsub = onQuotaExceeded(() => { fired = true })
+      const ok = addSample(
+        { id: 's1', ts: 1, kind: 'dsl', source: 'ask', context: 'c', aiOutput: 'o', outcome: 'applied' },
+        true,
+      )
+      unsub()
+      expect(ok).toBe(false)
+      expect(fired).toBe(true)
+    } finally {
+      restore()
+    }
   })
 })

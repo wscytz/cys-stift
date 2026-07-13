@@ -41,6 +41,14 @@ export type Sample = DslSample | QaSample
 export const SAMPLES_KEY = 'cys-stift.ai-samples.v1'
 const CAP = 500
 
+// 配额失败订阅(Task 6):addSample 写失败 → notifyQuota → AppMenu toast。
+const _quotaSubscribers = new Set<() => void>()
+function notifyQuota(): void { for (const cb of _quotaSubscribers) cb() }
+export function onQuotaExceeded(cb: () => void): () => void {
+  _quotaSubscribers.add(cb)
+  return () => { _quotaSubscribers.delete(cb) }
+}
+
 export function genSampleId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
@@ -80,6 +88,7 @@ export function addSample(s: Sample, enabled: boolean | undefined): boolean {
     window.localStorage.setItem(SAMPLES_KEY, JSON.stringify(next))
     return true
   } catch {
+    notifyQuota()
     return false
   }
 }

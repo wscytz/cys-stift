@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import type { CanvasId } from '@cys-stift/domain'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import {
@@ -487,5 +487,38 @@ describe('migrateAllLegacyConversations — 全量迁移 v1 → v2 + 删旧 key'
     expect(loadConversation('fallback' as CanvasId).map((m) => m.content)).toEqual(['ok'])
     // ask 坏 key 已删
     expect(window.localStorage.getItem('cys-stift.ask-chat.v1')).toBeNull()
+  })
+})
+
+// Task 6 quota:saveConversation 配额失败 → notifyQuota(AppMenu toast 订阅源)
+describe('conversationStore — quota (Task 6)', () => {
+  let onQuotaExceeded: typeof import('../conversation-store').onQuotaExceeded
+  let saveConversation: typeof import('../conversation-store').saveConversation
+  beforeEach(async () => {
+    vi.resetModules()
+    window.localStorage.clear()
+    onQuotaExceeded = (await import('../conversation-store')).onQuotaExceeded
+    saveConversation = (await import('../conversation-store')).saveConversation
+  })
+  function simulateQuota() {
+    const orig = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem')
+    Object.defineProperty(Storage.prototype, 'setItem', {
+      configurable: true,
+      value: () => { throw new DOMException('quota', 'QuotaExceededError') },
+    })
+    return () => { if (orig) Object.defineProperty(Storage.prototype, 'setItem', orig) }
+  }
+  it('saveConversation 配额失败 → notifyQuota + 返 false', () => {
+    const restore = simulateQuota()
+    try {
+      let fired = false
+      const unsub = onQuotaExceeded(() => { fired = true })
+      const ok = saveConversation('c' as CanvasId, [])
+      unsub()
+      expect(ok).toBe(false)
+      expect(fired).toBe(true)
+    } finally {
+      restore()
+    }
   })
 })

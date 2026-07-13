@@ -12,6 +12,10 @@ import { onQuotaExceeded as onFreeformQuota } from '@/lib/canvas-freeform-store'
 import { onQuotaExceeded as onCanvasListQuota } from '@/lib/canvas-store'
 import { onQuotaExceeded as onSettingsQuota } from '@/lib/settings-store'
 import { onQuotaExceeded as onCanvasViewQuota } from '@/lib/canvas-view-store'
+import { onQuotaExceeded as onSampleQuota } from '@/features/ai/sample-store'
+import { onQuotaExceeded as onConversationQuota } from '@/lib/conversation-store'
+import { onQuotaExceeded as onDraftQuota } from '@/lib/draft-store'
+import { onQuotaExceeded as onGraphViewQuota } from '@/lib/graph-view-store'
 import { pushToast } from '@/lib/toast-store'
 import { VERSION } from '@/lib/version'
 import { useMatchMedia } from '@/lib/use-match-media'
@@ -44,6 +48,10 @@ export function AppMenu() {
       onCanvasListQuota(toast),
       onSettingsQuota(toast),
       onCanvasViewQuota(toast),
+      onSampleQuota(toast),
+      onConversationQuota(toast),
+      onDraftQuota(toast),
+      onGraphViewQuota(toast),
     ]
     return () => {
       unsubs.forEach((u) => u())

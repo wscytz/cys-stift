@@ -250,6 +250,14 @@ export function migrateAllLegacyConversations(): number {
   return migratedCount
 }
 
+// 配额失败订阅(Task 6):saveConversation 写失败 → notifyQuota → AppMenu toast。
+const _quotaSubscribers = new Set<() => void>()
+function notifyQuota(): void { for (const cb of _quotaSubscribers) cb() }
+export function onQuotaExceeded(cb: () => void): () => void {
+  _quotaSubscribers.add(cb)
+  return () => { _quotaSubscribers.delete(cb) }
+}
+
 /**
  * 写入某画布的对话历史(封顶最近 100 条,对齐旧 ask-history)。
  * quota 超 / 任何存储异常 → 静默跳过(不崩聊天)。返回 true=写入成功,false=跳过。
@@ -266,7 +274,8 @@ export function saveConversation(
     )
     return true
   } catch {
-    // QuotaExceededError 或隐私模式禁用 storage —— 跳过,不阻塞对话。
+    // QuotaExceededError 或隐私模式禁用 storage —— 跳过,不阻塞对话 + 提示配额。
+    notifyQuota()
     return false
   }
 }
