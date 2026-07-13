@@ -1,6 +1,6 @@
 {
   "name": "cys-stift",
-  "version": "0.58.1",
+  "version": "0.59.0",
   "private": true,
   "description": "cy's Stift — 本地优先的灵感画布",
   "author": "cy",
