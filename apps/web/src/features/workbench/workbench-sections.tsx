@@ -12,22 +12,25 @@ import { plainPreview } from './preview-text'
  * WorkbenchSections — 分区列表(手风琴:同时只一区展开)。
  *
  * 折叠态 = 卡组堆叠(A:3 张卡硬阴影叠厚度);展开态 = 行列表(C:色条+标题+预览)。
- * 行点击链路在子任务 5 接入(workbenchStore.open + router.push);当前 row 只渲染无 onClick。
+ * 行点击 → onOpenCard(工作台右栏就地编辑,不跳画布)。当前编辑卡(activeCardId)高亮。
  *
- * 子任务 2:canvas 模式 + 收件箱 + 手风琴。type/tag 模式经 groupForMode 路由同构渲染。
+ * canvas 模式 + 收件箱 + 手风琴。type/tag 模式经 groupForMode 路由同构渲染。
  */
 export function WorkbenchSections({
   cards,
   mode,
   selectedTags = [],
   tagColors = new Map<string, string>(),
+  activeCardId = null,
   onOpenCard,
 }: {
   cards: Card[]
   mode: WorkbenchModeId
   selectedTags?: string[]
   tagColors?: Map<string, string>
-  /** 行点击:打开卡(库本身不编辑,跳画布 dock 接管)。子任务 5。 */
+  /** 当前编辑卡(高亮)。null = 无。 */
+  activeCardId?: string | null
+  /** 行点击:就地编辑(工作台右栏接管)。 */
   onOpenCard: (card: Card) => void
 }) {
   const { t } = useI18n()
@@ -75,7 +78,7 @@ export function WorkbenchSections({
             {pinned.map((c) => (
               <li
                 key={c.id}
-                className="wb__row"
+                className={`wb__row${c.id === activeCardId ? ' wb__row--active' : ''}`}
                 role="button"
                 tabIndex={0}
                 onClick={() => onOpenCard(c)}
@@ -101,6 +104,7 @@ export function WorkbenchSections({
           key={s.key}
           section={s}
           expanded={expanded === s.key}
+          activeCardId={activeCardId}
           onToggle={() => setExpanded(expanded === s.key ? null : s.key)}
           onOpenCard={onOpenCard}
         />
@@ -114,11 +118,13 @@ export function WorkbenchSections({
 function WorkbenchSectionRow({
   section,
   expanded,
+  activeCardId = null,
   onToggle,
   onOpenCard,
 }: {
   section: WorkbenchSection
   expanded: boolean
+  activeCardId?: string | null
   onToggle: () => void
   onOpenCard: (card: Card) => void
 }) {
@@ -143,7 +149,7 @@ function WorkbenchSectionRow({
           {section.cards.map((c) => (
             <li
               key={c.id}
-              className="wb__row"
+              className={`wb__row${c.id === activeCardId ? ' wb__row--active' : ''}`}
               role="button"
               tabIndex={0}
               onClick={() => onOpenCard(c)}
@@ -221,6 +227,7 @@ const styles = `
   cursor: pointer;
 }
 .wb__row:hover { background: var(--color-gray-soft); }
+.wb__row--active { background: var(--color-yellow-soft); box-shadow: inset 3px 0 0 var(--color-red); }
 .wb__row:focus-visible { outline: 2px solid var(--color-red); outline-offset: -2px; }
 .wb__rb { width: 4px; height: 26px; flex-shrink: 0; }
 .wb__rowtext { min-width: 0; }

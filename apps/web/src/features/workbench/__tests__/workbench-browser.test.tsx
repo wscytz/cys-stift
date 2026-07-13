@@ -1,6 +1,5 @@
 /**
- * D4 WorkbenchBrowser shell(子任务 1):搜索框 + 模式切换器 + placeholder 计数 + 搜索过滤。
- * 子任务 2-4 会替换 placeholder 为真实分组(这些测试届时调整)。
+ * WorkbenchBrowser:搜索框 + 模式切换器 + 分区 + 行点击就地编辑 + 当前卡高亮。
  * react-dom/client + act(policy)。i18n mock。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -20,7 +19,7 @@ vi.mock('@/lib/i18n', () => ({
   }),
 }))
 
-// WorkbenchSections 调 useCanvases();mock 成空画布列表(canvas 模式下卡全进收件箱)。
+// WorkbenchSections 调 useCanvases();mock 成空画布列表(canvas 模式下卡全进收件箱/未知画布)。
 vi.mock('@/lib/canvas-store', () => ({
   useCanvases: () => ({
     snapshot: { canvases: [], activeCanvasId: 'default' },
@@ -28,18 +27,20 @@ vi.mock('@/lib/canvas-store', () => ({
   }),
 }))
 
-// 子任务 5 行点击链路:mock router + workbenchStore + toast,断言调用参数。
-// vi.hoisted 让 mock 函数与 vi.mock 同步提升(factory 内能安全引用)。
-const { pushMock, openMock, toastMock } = vi.hoisted(() => ({
+// 行点击链路 + 当前卡高亮:mock router + workbenchStore/useWorkbench + toast。
+// cardIdMock.current 可变(高亮测动态设)。vi.hoisted 让 mock 函数与 vi.mock 同步提升。
+const { pushMock, openMock, toastMock, cardIdMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
   openMock: vi.fn(),
   toastMock: vi.fn(),
+  cardIdMock: { current: null as string | null },
 }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock }),
 }))
 vi.mock('@/lib/workbench-store', () => ({
   workbenchStore: { open: openMock },
+  useWorkbench: () => ({ cardId: cardIdMock.current }),
 }))
 vi.mock('@/lib/toast-store', () => ({
   pushToast: (t: { kind: string; message: string }) => toastMock(t),
@@ -98,11 +99,12 @@ function setInputValue(input: HTMLInputElement, text: string) {
   input.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
-describe('WorkbenchBrowser shell (子任务1)', () => {
+describe('WorkbenchBrowser', () => {
   beforeEach(() => {
     pushMock.mockClear()
     openMock.mockClear()
     toastMock.mockClear()
+    cardIdMock.current = null
   })
 
   it('渲染搜索框 + 3 个模式 tab', () => {
@@ -156,7 +158,6 @@ describe('WorkbenchBrowser shell (子任务1)', () => {
     expect(host.querySelector('.wb__sections')).toBeNull()
   })
 
-  // ── 子任务 4:类型模式 + 标签模式 ──
   it('类型模式:type 不同的卡进不同分区', () => {
     const cards = [
       mk('1', { type: 'code' }),
@@ -229,8 +230,8 @@ describe('WorkbenchBrowser shell (子任务1)', () => {
     expect(host.querySelector('.wb__tagempty')).toBeTruthy()
   })
 
-  // ── 子任务 5:行点击链路 ──
-  it('行点击(有 canvasPosition)→ workbenchStore.open + push /canvas', () => {
+  // ── 行点击:就地编辑(不跳画布)──
+  it('行点击(有 canvasPosition)→ workbenchStore.open,不 push 不 toast', () => {
     const cards = [mk('1', { canvasId: 'c1' })]
     const { host } = render(<WorkbenchBrowser cards={cards} />)
     // canvas 模式:有 canvasPosition 但画布列表空 → 未知画布分区(非收件箱),默认展开
@@ -238,19 +239,19 @@ describe('WorkbenchBrowser shell (子任务1)', () => {
     expect(row).toBeTruthy()
     act(() => row.click())
     expect(openMock).toHaveBeenCalledWith('1')
-    expect(pushMock).toHaveBeenCalledWith('/canvas')
+    expect(pushMock).not.toHaveBeenCalled()
     expect(toastMock).not.toHaveBeenCalled()
   })
 
-  it('行点击(无 canvasPosition,收件箱卡)→ toast 提示 + push /inbox,不 open', () => {
+  it('行点击(无 canvasPosition,收件箱卡)→ 也就地 open,不跳 inbox 不 toast', () => {
     const cards = [mk('1')] // 无 canvasId → 收件箱
     const { host } = render(<WorkbenchBrowser cards={cards} />)
     const row = host.querySelector('.wb__row') as HTMLLIElement
     expect(row).toBeTruthy()
     act(() => row.click())
-    expect(openMock).not.toHaveBeenCalled()
-    expect(pushMock).toHaveBeenCalledWith('/inbox')
-    expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ kind: 'info' }))
+    expect(openMock).toHaveBeenCalledWith('1')
+    expect(pushMock).not.toHaveBeenCalled()
+    expect(toastMock).not.toHaveBeenCalled()
   })
 
   it('行键盘 Enter 触发等同点击(无障碍)', () => {
@@ -261,6 +262,14 @@ describe('WorkbenchBrowser shell (子任务1)', () => {
       row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     })
     expect(openMock).toHaveBeenCalledWith('1')
-    expect(pushMock).toHaveBeenCalledWith('/canvas')
+    expect(pushMock).not.toHaveBeenCalled()
+  })
+
+  it('当前编辑卡行高亮(activeCardId 命中 → wb__row--active)', () => {
+    cardIdMock.current = '1'
+    const cards = [mk('1', { canvasId: 'c1' }), mk('2', { canvasId: 'c1' })]
+    const { host } = render(<WorkbenchBrowser cards={cards} />)
+    const activeRow = host.querySelector('.wb__row--active')
+    expect(activeRow).toBeTruthy()
   })
 })

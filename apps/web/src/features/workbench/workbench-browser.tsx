@@ -1,11 +1,9 @@
 'use client'
 
 import { useCallback, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import type { Card } from '@cys-stift/domain'
 import { useI18n } from '@/lib/i18n'
-import { workbenchStore } from '@/lib/workbench-store'
-import { pushToast } from '@/lib/toast-store'
+import { workbenchStore, useWorkbench } from '@/lib/workbench-store'
 import { aggregateTags } from '@/features/tags/tag-ops'
 import {
   DEFAULT_WORKBENCH_MODE,
@@ -28,24 +26,15 @@ import { WorkbenchSections } from './workbench-sections'
  */
 export function WorkbenchBrowser({ cards }: { cards: Card[] }) {
   const { t } = useI18n()
-  const router = useRouter()
+  const { cardId: activeCardId } = useWorkbench()
   const [mode, setMode] = useState<WorkbenchModeId>(DEFAULT_WORKBENCH_MODE)
   const [query, setQuery] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
 
-  const onOpenCard = useCallback(
-    (card: Card) => {
-      if (card.canvasPosition) {
-        workbenchStore.open(card.id)
-        router.push('/canvas')
-      } else {
-        // 收件箱区/未上画布的卡 → 提示 + 去 inbox(库本身不编辑)
-        pushToast({ kind: 'info', message: t('workbench.notOnCanvas') })
-        router.push('/inbox')
-      }
-    },
-    [router, t],
-  )
+  // 行点击:就地编辑(工作台右栏接管)。所有卡(含 inbox 未上画布)都就地编辑,不跳画布。
+  const onOpenCard = useCallback((card: Card) => {
+    workbenchStore.open(card.id)
+  }, [])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -135,6 +124,7 @@ export function WorkbenchBrowser({ cards }: { cards: Card[] }) {
           mode={mode}
           selectedTags={selectedTags}
           tagColors={tagColors}
+          activeCardId={activeCardId}
           onOpenCard={onOpenCard}
         />
       )}
