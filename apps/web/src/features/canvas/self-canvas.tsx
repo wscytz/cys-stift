@@ -28,6 +28,7 @@ import { screenToPage } from '@cys-stift/canvas-engine'
 import { measureText, textEditKeyAction } from '@cys-stift/canvas-engine'
 import { readToken } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
+import { CardPreviewPopover } from './card-preview-popover'
 import { pushToast } from '@/lib/toast-store'
 
 /** 浮动 textarea 编辑会话:屏幕锚点(textarea 定位)+ 页锚点(text 元素落点)。 */
@@ -88,6 +89,10 @@ export function SelfCanvas({
   const committedRef = useRef(false)
   const [edit, setEdit] = useState<EditSession | null>(null)
   const [textValue, setTextValue] = useState('')
+  // 画布 hover 只读速览:hoveredCardId(命中卡)+ popoverPos(屏幕坐标)+ 防抖 timer。
+  const [hoveredCardId, setHoveredCardId] = useState<string | null>(null)
+  const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(null)
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Bug 7: mirror the in-progress edit state into refs so an unmount cleanup
   // (canvas switch) can commit the latest typed text. `commitEdit` reads
   // component state, but on unmount React captures the last-render values —
@@ -185,6 +190,48 @@ export function SelfCanvas({
       if (canvasElRef) canvasElRef.current = null
     }
   }, [canvasId, service, adapterRef])
+
+  // hover 只读速览:pointermove 命中卡(select 模式)→ 300ms 防抖设 hoveredCardId → 渲染 popover。
+  // 移出/换卡 → 清旧 timer 重设。长按/触屏留 backlog(本期桌面 hover)。
+  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const adapter = adapterInner.current
+    const canvas = innerCanvasRef.current
+    if (!adapter || !canvas) return
+    if (adapter.getTool() !== 'select') return
+    const rect = canvas.getBoundingClientRect()
+    const p = screenToPage(adapter.getView(), e.clientX - rect.left, e.clientY - rect.top)
+    const els = adapter.getElements()
+    let hitId: string | null = null
+    for (let i = els.length - 1; i >= 0; i--) {
+      const el = els[i]!
+      if (el.kind === 'card' && p.x >= el.x && p.x <= el.x + el.w && p.y >= el.y && p.y <= el.y + el.h) {
+        hitId = el.id
+        break
+      }
+    }
+    if (hitId !== hoveredCardId) {
+      if (hoverTimer.current) clearTimeout(hoverTimer.current)
+      if (hitId) {
+        const el = adapter.getElement(hitId)
+        const view = adapter.getView()
+        if (el) {
+          const id = hitId
+          hoverTimer.current = setTimeout(() => {
+            setHoveredCardId(id)
+            setPopoverPos({ x: el.x * view.zoom + view.panX, y: el.y * view.zoom + view.panY })
+          }, 300)
+        }
+      } else {
+        setHoveredCardId(null)
+        setPopoverPos(null)
+      }
+    }
+  }
+  const onPointerLeave = () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current)
+    setHoveredCardId(null)
+    setPopoverPos(null)
+  }
 
   // 双击开卡:select 模式下 dblclick 命中卡元素 → onOpenCard。
   const onDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -352,10 +399,23 @@ export function SelfCanvas({
         ref={innerCanvasRef}
         onClick={onCanvasClick}
         onDoubleClick={onDoubleClick}
+        onPointerMove={onPointerMove}
+        onPointerLeave={onPointerLeave}
         role="img"
         aria-label={t('canvas.srLabel')}
         style={{ width: '100%', height: '100%', display: 'block', touchAction: 'none' }}
       />
+      {hoveredCardId && popoverPos && (() => {
+        const c = service.get(hoveredCardId as never)
+        if (!c || c.deletedAt) return null
+        return (
+          <CardPreviewPopover
+            card={c}
+            onEdit={() => onOpenCard(c)}
+            style={{ left: popoverPos.x, top: popoverPos.y }}
+          />
+        )
+      })()}
       {edit && (
         <textarea
           ref={textareaRef}
