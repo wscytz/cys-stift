@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-07-13 · v0.58.1 · 保存反馈统一 + AI 重试对称化
+
+v0.58.0 收敛后(探查 4 确认 0 P0/0 P1)的 UX 打磨批。用户拍板做 2(保存反馈)+ 4(AI 重试),其他 Medium/重构不做。
+
+- **2-A 画布静态「已保存」角标**:画布右下持续显示「已保存」,让用户安心数据在本地有归宿(非单次反馈,不随拖卡闪)。SSR 安全(useEffect 置 show)。
+- **2-B 显式操作反馈 audit**:audit 画布显式入口,结论覆盖充分(AutoRelate/Frame/AI/Template/Markdown 全 toast;Create/Rename 视觉 + 角标;undo-redo 免),无需补(避免 toast 泛滥)。
+- **2-C 写失败反馈补齐**:draft/sample/conversation 3 store 加 notifyQuota(配额满 → AppMenu toast)+ draft 回滚内存。graph-view 订阅补(已有 notifyQuota 缺 AppMenu 订阅)。archive(OPFS 优先双路径,配额双失败罕见)/ workbench(不持久化)排除。
+- **4 AI 重试对称化**:cluster/outline 套 retryUntilValid(原仅 layout 重试,网络抖动/坏 JSON 一次死)。parseClusters 扩返 errors。retryUntilValid 加网络抖动重试(produce 抛非 AbortError → 重试)+ fix AbortError 检测对 DOMException 生效(原 instanceof Error 盲点,用户取消被当网络错重试)。
+- 测试:16 新测(retry 9 + workflows 2 + 角标 2 + 3 store quota)+ 全 1574 绿 + lint 0 + build 0。
+
 ## 2026-07-12 · v0.58.0 · AI 确认门 + UX 打磨批(B1/B3/B4)
 
 审核 #1「画布 AI 过程不可见 = 用户不知 AI 有没有用」+ v0.57.3 手测反馈 3 个严重度 3 问题。画布 AI 从"直接副作用"改为"开 Modal 确认门";悬浮窗可拖;热键换 E;菜单条 sticky 修。
