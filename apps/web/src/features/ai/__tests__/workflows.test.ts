@@ -71,4 +71,15 @@ describe('generateOutline', () => {
     expect(res).toEqual({ ok: true, empty: true })
     expect(streamTextSpy).toHaveBeenCalledTimes(3)
   })
+
+  it('网络错重试成功(Task 3 + Task 1 网络 retry)', async () => {
+    streamTextSpy
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce({ content: '## Topic\n- a' })
+    const svc = makeService([{ id: '1' }, { id: '2' }], [])
+    const res = await generateOutline({ service: svc, canvasId: 'c' as never })
+    expect(res.ok).toBe(true)
+    expect(res.markdown).toBe('## Topic\n- a')
+    expect(streamTextSpy).toHaveBeenCalledTimes(2)
+  })
 })

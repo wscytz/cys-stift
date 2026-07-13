@@ -218,4 +218,37 @@ describe('draftStore — quota (Task 6)', () => {
       restore()
     }
   })
+
+  it('clear 配额失败 → 回滚(草稿仍在)+ notifyQuota', () => {
+    draftStore.upsert('capture', 'hello')
+    const restore = simulateQuota()
+    try {
+      let fired = false
+      const unsub = onQuotaExceeded(() => { fired = true })
+      draftStore.clear('capture')
+      unsub()
+      expect(fired).toBe(true)
+      expect(draftStore.get('capture')?.payload).toBe('hello') // clear 失败回滚:草稿仍在
+    } finally {
+      restore()
+    }
+  })
+
+  it('多订阅:2 cb 都 fire;unsub 后该 cb 不 fire', () => {
+    draftStore.upsert('capture', 'hello')
+    const restore = simulateQuota()
+    try {
+      let fired1 = false
+      let fired2 = false
+      const unsub1 = onQuotaExceeded(() => { fired1 = true })
+      const unsub2 = onQuotaExceeded(() => { fired2 = true })
+      unsub1()
+      draftStore.upsert('capture', 'world')
+      expect(fired1).toBe(false) // unsub1 已退
+      expect(fired2).toBe(true)
+      unsub2()
+    } finally {
+      restore()
+    }
+  })
 })

@@ -137,3 +137,66 @@ describe('retryUntilValid — network errors', () => {
     expect(result.attempts).toBe(3)
   })
 })
+
+describe('retryUntilValid — edge cases (逻辑测试批)', () => {
+  it('混合:网络错(0)→ parse 错(1,喂 correction)→ 成功(2)', async () => {
+    let calls = 0
+    const seen: string[][] = []
+    const result = await retryUntilValid({
+      initialMessages: [{ role: 'user', content: 'q' }],
+      produce: async (messages) => {
+        calls++
+        seen.push(messages.map((m) => m.content))
+        if (calls === 1) throw new Error('network')
+        if (calls === 2) return 'bad'
+        return 'ok'
+      },
+      parse: (t) => (t === 'ok' ? { ok: true, errors: [] } : { ok: false, errors: [ERR(1, 'bad', 'wrong')] }),
+      buildCorrection: (errs) => `fix:${errs[0]!.message}`,
+    })
+    expect(result.accepted).toBe(true)
+    expect(result.attempts).toBe(3)
+    // 网络错(attempt 1)重试同 messages(无 correction);parse 错(attempt 2)喂了 correction
+    expect(seen[1]).toEqual(['q'])
+    expect(seen[2]).toContain('fix:wrong')
+  })
+
+  it('produce 抛 string(非 Error 非 DOMException)→ 当网络错重试,非 AbortError', async () => {
+    let calls = 0
+    const result = await retryUntilValid({
+      initialMessages: [{ role: 'user', content: 'q' }],
+      produce: async () => { calls++; if (calls === 1) throw 'string error'; return 'ok' },
+      parse: (t) => ({ ok: t === 'ok', errors: [] }),
+      buildCorrection: () => 'fix',
+    })
+    expect(result.accepted).toBe(true)
+    expect(result.attempts).toBe(2)
+  })
+
+  it('produce 抛 null → 当网络错重试(不炸)', async () => {
+    let calls = 0
+    const result = await retryUntilValid({
+      initialMessages: [{ role: 'user', content: 'q' }],
+      produce: async () => { calls++; if (calls === 1) throw null; return 'ok' },
+      parse: (t) => ({ ok: t === 'ok', errors: [] }),
+      buildCorrection: () => 'fix',
+    })
+    expect(result.accepted).toBe(true)
+    expect(result.attempts).toBe(2)
+  })
+
+  it('AbortError 在重试中途(attempt 1)→ 立即冒出,不再重试', async () => {
+    let calls = 0
+    await expect(retryUntilValid({
+      initialMessages: [{ role: 'user', content: 'q' }],
+      produce: async () => {
+        calls++
+        if (calls === 1) throw new Error('network')
+        throw new DOMException('aborted', 'AbortError')
+      },
+      parse: () => ({ ok: true, errors: [] }),
+      buildCorrection: () => 'fix',
+    })).rejects.toThrow('aborted')
+    expect(calls).toBe(2)
+  })
+})
