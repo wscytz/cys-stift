@@ -3,11 +3,11 @@
 /**
  * CardDetailModal — shared card detail / edit surface.
  *
- * Phase archive-detail (2026-06-20): extracted from inbox/page.tsx (Phase
- * 6.5b's "full 5-field editor" version) so /archive can reuse it. The
- * canvas's `card-detail-modal.tsx` is a smaller Phase 4 MVP (title +
- * body only) — intentionally NOT replaced here, it works and swapping
- * it would risk regressing tagged Phase 4.
+ * 历史提取:Phase archive-detail (2026-06-20) 从 inbox/page.tsx 抽出(full 5-field
+ * editor)供 /archive 复用。canvas 曾有专用 card-detail-modal.tsx(Phase 4 MVP,title+
+ * body),v0.59 已删(砍 focusEdit + 画布双击改进工作台,见 decisions/2026-07-13);
+ * 现所有详情入口(inbox/archive/ask/graph/search/timeline/command-palette/companion)
+ * 走本 shared 版。
  *
  * Consumers pick which action buttons appear via the `actions` prop:
  *   - archive context: actions=['unarchive', 'softDelete']

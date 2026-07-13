@@ -27,10 +27,10 @@ export interface CaptureShortcut {
 }
 
 /**
- * Theme preference (spec §5.6, 2026-06-20). 'system' follows the OS
- * `prefers-color-scheme` media query; 'light' / 'dark' are explicit
- * user overrides. Root layout reads this and sets `data-theme` on
- * <html> so the CSS variable variant in tokens.css kicks in.
+ * Theme preference (spec §5.6, 2026-06-20 加;**2026-07-11 v0.57.3 删 dark 聚焦 light-only**)。
+ * 类型保留 'light'|'dark'|'system'(legacy 兼容:旧 settings.theme='dark' 不破 isValid),
+ * 但 theme.ts resolveTheme **恒返 light**(见 ADR `docs/adr/2026-07-11-remove-dark-mode.md`)。
+ * data-theme 恒 light;dark variant 已从 tokens.css 删除;settings 主题选择器 UI 已移除。
  */
 export type ThemePreference = 'light' | 'dark' | 'system'
 
