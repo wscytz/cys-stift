@@ -19,7 +19,7 @@ import { useI18n } from '@/lib/i18n'
 
 export interface WorkbenchPanelProps {
   card: Card
-  onSave: (patch: { title: string; body: string; tags: TagRef[] }) => void
+  onSave: (cardId: string, patch: { title: string; body: string; tags: TagRef[] }) => void
   onClose: () => void
 }
 
@@ -46,7 +46,7 @@ export function WorkbenchPanel({ card, onSave, onClose }: WorkbenchPanelProps) {
     const curTags = card.tags ?? []
     const tagsChanged = JSON.stringify(d.tags) !== JSON.stringify(curTags)
     if (d.title !== card.title || d.body !== card.body || tagsChanged) {
-      onSaveRef.current({ title: d.title, body: d.body, tags: d.tags })
+      onSaveRef.current(card.id, { title: d.title, body: d.body, tags: d.tags })
       setSavedFlash(true)
       if (flashTimer.current) clearTimeout(flashTimer.current)
       flashTimer.current = setTimeout(() => setSavedFlash(false), 1500)
@@ -60,6 +60,22 @@ export function WorkbenchPanel({ card, onSave, onClose }: WorkbenchPanelProps) {
     setTags(card.tags ?? [])
     setTagInput('')
   }, [card.id, card.title, card.body, card.tags])
+
+  // 切卡防丢编辑(bug 1 修):card.id 变时,上一张的脏 draft 在 cleanup flush。
+  // 否则 autosave effect 的 cleanup 清掉旧 timer(<500ms 未触发)+ state 重置 +
+  // draftRef 覆盖 → 旧卡编辑丢。onSave 带 cardId 落对卡。close 场景 handleClose
+  // 已 flush,这里幂等再 flush(service.update 同 patch 无副作用)。
+  useEffect(() => {
+    const prev = card
+    return () => {
+      const d = draftRef.current
+      const tagsChanged = JSON.stringify(d.tags) !== JSON.stringify(prev.tags ?? [])
+      if (d.title !== prev.title || d.body !== prev.body || tagsChanged) {
+        onSaveRef.current(prev.id, { title: d.title, body: d.body, tags: d.tags })
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card.id])
 
   // dirty = 有未 flush 的编辑(草稿 vs card 当前值)。tags 用 JSON 比(小数组)。
   const curTags = card.tags ?? []
@@ -98,13 +114,11 @@ export function WorkbenchPanel({ card, onSave, onClose }: WorkbenchPanelProps) {
     setTagInput('')
   }
 
-  const barColor = card.color ?? 'gray'
-
   return (
     <aside className="wb-panel" aria-label={t('card.detail.title')}>
       <style>{styles}</style>
       <header className="wb-panel__head">
-        <span className={`wb-panel__bar wb-panel__bar--${barColor}`} aria-hidden="true" />
+        <span className="wb-panel__bar" style={{ background: card.color ?? 'var(--color-gray)' }} aria-hidden="true" />
         <input
           className="wb-panel__title"
           value={title}

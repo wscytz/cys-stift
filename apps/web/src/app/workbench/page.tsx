@@ -33,9 +33,8 @@ export default function WorkbenchPage() {
   const card = cardId ? service.get(cardId as CardId) : undefined
   const active = card && !card.deletedAt ? card : undefined
 
-  const wbSave = (patch: { title: string; body: string; tags: TagRef[] }) => {
-    if (!cardId) return
-    service.update(cardId as CardId, patch)
+  const wbSave = (id: CardId | string, patch: { title: string; body: string; tags: TagRef[] }) => {
+    service.update(id as CardId, patch)
   }
 
   return (

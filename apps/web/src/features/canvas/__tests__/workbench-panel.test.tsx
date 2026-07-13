@@ -92,7 +92,7 @@ describe('WorkbenchPanel', () => {
     act(() => {
       btn.click()
     })
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ body: '改过的正文' }))
+    expect(onSave).toHaveBeenCalledWith(card.id, expect.objectContaining({ body: '改过的正文' }))
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -116,6 +116,7 @@ describe('WorkbenchPanel', () => {
       btn.click()
     })
     expect(onSave).toHaveBeenCalledWith(
+      card.id,
       expect.objectContaining({
         tags: expect.arrayContaining([expect.objectContaining({ value: '新标签' })]),
       }),
@@ -156,5 +157,33 @@ describe('WorkbenchPanel', () => {
       root2.unmount()
     })
     host2.remove()
+  })
+
+  it('切卡前若有脏编辑 → flush 上一张(bug 1 防丢:autosave 500ms 未到也保)', () => {
+    const onSave = vi.fn()
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    act(() => {
+      root.render(<WorkbenchPanel card={card} onSave={onSave} onClose={vi.fn()} />)
+    })
+    // 编辑 c1 body(不等 autosave 500ms)
+    const ta = host.querySelector('textarea') as HTMLTextAreaElement
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    act(() => {
+      setter.call(ta, 'c1 的编辑')
+      ta.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    // 直接切卡 c2(模拟用户编辑后 <500ms 点另一张)
+    const other = { ...card, id: 'c2', title: '另一张' } as unknown as Card
+    act(() => {
+      root.render(<WorkbenchPanel card={other} onSave={onSave} onClose={vi.fn()} />)
+    })
+    // bug 1 修:切卡 cleanup flush c1 的脏编辑,不丢
+    expect(onSave).toHaveBeenCalledWith('c1', expect.objectContaining({ body: 'c1 的编辑' }))
+    act(() => {
+      root.unmount()
+    })
+    host.remove()
   })
 })
