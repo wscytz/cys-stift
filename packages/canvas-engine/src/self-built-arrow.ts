@@ -377,6 +377,45 @@ export function autoElbowPath(
 }
 
 /**
+ * Arrow route as a page-coordinate polyline. Hit testing and marquee selection
+ * share this representation so neither falls back to the straight chord.
+ */
+export function arrowPathPoints(
+  arrow: CanvasElement,
+  elements: CanvasElement[],
+  curveSteps = 24,
+): Point[] {
+  const { from, to } = arrowEndpoints(arrow, elements)
+  if (!from || !to) return []
+  const route = arrowRoute(arrow)
+  if (route === 'elbow') {
+    return autoElbowPath(
+      arrow,
+      from,
+      to,
+      cardObstacles(
+        elements,
+        new Set([arrow.from, arrow.to].filter((id): id is string => !!id)),
+      ),
+    )
+  }
+  if (route === 'curve' && arrow.curve) {
+    const count = Math.max(1, Math.floor(curveSteps))
+    const points: Point[] = [from]
+    for (let step = 1; step <= count; step++) {
+      const t = step / count
+      const u = 1 - t
+      points.push({
+        x: u * u * from.x + 2 * u * t * arrow.curve.cx + t * t * to.x,
+        y: u * u * from.y + 2 * u * t * arrow.curve.cy + t * t * to.y,
+      })
+    }
+    return points
+  }
+  return [from, to]
+}
+
+/**
  * 箭头头角度:终点处的切线方向(to 的来向角)。route 决定取哪段方向。
  * 取**实际渲染路径**(调用方传入 segs/ctrl):
  * - straight / 退化 → to − from

@@ -50,6 +50,76 @@ describe('marqueeSelect', () => {
     expect(marqueeSelect({ x: 500, y: 500, w: 20, h: 20 }, arrowEls)).not.toContain('ar')
   })
 
+  it('curve:框住曲线鼓包而不碰直线弦 → 选中', () => {
+    const curve: CanvasElement = {
+      id: 'curve',
+      kind: 'arrow',
+      x: 0,
+      y: 0,
+      w: 100,
+      h: 0,
+      rotation: 0,
+      route: 'curve',
+      curve: { cx: 50, cy: 100 },
+    }
+    expect(marqueeSelect({ x: 45, y: 45, w: 10, h: 10 }, [curve])).toEqual(['curve'])
+  })
+
+  it('curve:框只穿直线弦但不碰真实曲线 → 不选中', () => {
+    const curve: CanvasElement = {
+      id: 'curve',
+      kind: 'arrow',
+      x: 0,
+      y: 0,
+      w: 100,
+      h: 0,
+      rotation: 0,
+      route: 'curve',
+      curve: { cx: 50, cy: 100 },
+    }
+    expect(marqueeSelect({ x: 45, y: -2, w: 10, h: 4 }, [curve])).toEqual([])
+  })
+
+  it('elbow:框住任一折线段或折点都选中', () => {
+    const elbow: CanvasElement = {
+      id: 'elbow',
+      kind: 'arrow',
+      x: 0,
+      y: 0,
+      w: 100,
+      h: 100,
+      rotation: 0,
+      route: 'elbow',
+      elbow: [{ x: 0, y: 100 }],
+    }
+    expect(marqueeSelect({ x: -2, y: 45, w: 4, h: 10 }, [elbow])).toEqual(['elbow'])
+    expect(marqueeSelect({ x: 45, y: 98, w: 10, h: 4 }, [elbow])).toEqual(['elbow'])
+    expect(marqueeSelect({ x: -2, y: 98, w: 4, h: 4 }, [elbow])).toEqual(['elbow'])
+  })
+
+  it('straight:线段与框边共线或只触角都算相交', () => {
+    const horizontal: CanvasElement = {
+      id: 'horizontal',
+      kind: 'arrow',
+      x: 0,
+      y: 0,
+      w: 100,
+      h: 0,
+      rotation: 0,
+    }
+    const diagonal: CanvasElement = {
+      id: 'diagonal',
+      kind: 'arrow',
+      x: 0,
+      y: 0,
+      w: 100,
+      h: 100,
+      rotation: 0,
+    }
+    expect(marqueeSelect({ x: 25, y: 0, w: 50, h: 10 }, [horizontal])).toEqual(['horizontal'])
+    expect(marqueeSelect({ x: 50, y: 40, w: 10, h: 10 }, [diagonal])).toEqual(['diagonal'])
+  })
+
   // R1.3:负 bbox(如 .cystift 导入用负 w/h 编码方向)必须先归一化再判相交,
   // 否则 rectsIntersect 把负 w/h 当空范围 → 漏选。hitTest/视锥剔除已 normalize,
   // marquee 应一致。

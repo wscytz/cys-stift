@@ -1,7 +1,7 @@
 
 import type { CanvasElement, CanvasView } from './canvas-host'
 import { normalizeBox } from './bounds'
-import { arrowEndpoints, arrowRoute, elbowSegments, autoElbowPath, cardObstacles } from './self-built-arrow'
+import { arrowEndpoints, arrowPathPoints } from './self-built-arrow'
 import { freedrawPointsOf } from './self-built-freedraw'
 
 /** 命中容差:屏幕 6px,页坐标里 /zoom(由调用方传入)。 */
@@ -34,54 +34,15 @@ function pointToArrowDistance(
   x: number,
   y: number,
 ): number {
-  const { from, to } = arrowEndpoints(el, elements)
-  if (!from || !to) return Infinity // 悬空:由调用方 bbox 兜底
-
-  const route = arrowRoute(el)
-
-  if (route === 'elbow') {
-    // 手设 elbow → elbowSegments;空 elbow → autoElbowPath 自动绕障(路径与渲染一致)。
-    const hasManual = !!(el.elbow && el.elbow.length > 0)
-    const segs = hasManual
-      ? elbowSegments(el, from, to)
-      : autoElbowPath(
-          el,
-          from,
-          to,
-          cardObstacles(elements, new Set([el.from, el.to].filter((v): v is string => !!v))),
-        )
-    if (!segs || segs.length < 2) return Infinity
-    let best = Infinity
-    for (let i = 1; i < segs.length; i++) {
-      const d = pointToSegmentDistance(x, y, segs[i - 1]!.x, segs[i - 1]!.y, segs[i]!.x, segs[i]!.y)
-      if (d < best) best = d
-    }
-    return best
+  const points = arrowPathPoints(el, elements)
+  if (points.length < 2) return Infinity
+  let best = Infinity
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1]!
+    const b = points[i]!
+    best = Math.min(best, pointToSegmentDistance(x, y, a.x, a.y, b.x, b.y))
   }
-
-  if (route === 'curve' && el.curve) {
-    // 沿二次贝塞尔(控制点 ctrl)采样 N 段,点到每段距离取 min。
-    const ctrl = { x: el.curve.cx, y: el.curve.cy }
-    const N = 16
-    let prev = from
-    let best = Infinity
-    for (let s = 1; s <= N; s++) {
-      const t = s / N
-      // 二次贝塞尔点:B(t) = (1-t)²P0 + 2(1-t)t·C + t²·P1
-      const u = 1 - t
-      const pt = {
-        x: u * u * from.x + 2 * u * t * ctrl.x + t * t * to.x,
-        y: u * u * from.y + 2 * u * t * ctrl.y + t * t * to.y,
-      }
-      const d = pointToSegmentDistance(x, y, prev.x, prev.y, pt.x, pt.y)
-      if (d < best) best = d
-      prev = pt
-    }
-    return best
-  }
-
-  // straight(含 curve 标了 route 但无 curve 数据的退化):直线距离
-  return pointToSegmentDistance(x, y, from.x, from.y, to.x, to.y)
+  return best
 }
 
 /**

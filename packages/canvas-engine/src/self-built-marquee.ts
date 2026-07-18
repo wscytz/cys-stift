@@ -2,7 +2,7 @@
 
 import type { CanvasElement } from './canvas-host'
 import { normalizeBox } from './bounds'
-import { arrowEndpoints } from './self-built-arrow'
+import { arrowPathPoints } from './self-built-arrow'
 
 interface Rect {
   x: number
@@ -29,9 +29,7 @@ function pointInRect(px: number, py: number, r: Rect): boolean {
 /**
  * 框选:返回与 rect 相交的元素 id。空框(0 尺寸)→ 空。
  *
- * - **arrow**:按**线段-框相交**判定(arrowEndpoints 的 from→to 线段穿过/落在框内即
- *   选中)。关系箭头 bbox w=h=0,rectsIntersect 框不中;框住线的一段也该选中(用户
- *   直觉),所以用线段相交而非仅端点。端点解析失败 → 跳过。
+ * - **arrow**:按真实 route 的折线近似与框相交判定。curve/elbow 不退化成直线弦。
  * - 其它 kind:bbox 相交。
  */
 export function marqueeSelect(rect: Rect, elements: CanvasElement[]): string[] {
@@ -39,9 +37,14 @@ export function marqueeSelect(rect: Rect, elements: CanvasElement[]): string[] {
   const out: string[] = []
   for (const el of elements) {
     if (el.kind === 'arrow') {
-      const { from, to } = arrowEndpoints(el, elements)
-      if (from && to && segmentIntersectsRect(from.x, from.y, to.x, to.y, rect)) {
-        out.push(el.id)
+      const points = arrowPathPoints(el, elements)
+      for (let i = 1; i < points.length; i++) {
+        const a = points[i - 1]!
+        const b = points[i]!
+        if (segmentIntersectsRect(a.x, a.y, b.x, b.y, rect)) {
+          out.push(el.id)
+          break
+        }
       }
       continue
     }
@@ -67,7 +70,7 @@ function segmentIntersectsRect(
   )
 }
 
-/** 两线段是否相交(标准跨立判定)。 */
+/** 两线段是否相交,含端点、共线重叠和数值误差内的边接触。 */
 function segSeg(
   ax: number, ay: number, bx: number, by: number,
   cx: number, cy: number, dx: number, dy: number,
@@ -76,8 +79,32 @@ function segSeg(
   const d2 = cross(ax, ay, bx, by, dx, dy)
   const d3 = cross(cx, cy, dx, dy, ax, ay)
   const d4 = cross(cx, cy, dx, dy, bx, by)
-  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true
+  const eps = 1e-9
+  const opposite = (a: number, b: number) =>
+    (a > eps && b < -eps) || (a < -eps && b > eps)
+  if (opposite(d1, d2) && opposite(d3, d4)) return true
+  if (Math.abs(d1) <= eps && onSegment(ax, ay, bx, by, cx, cy, eps)) return true
+  if (Math.abs(d2) <= eps && onSegment(ax, ay, bx, by, dx, dy, eps)) return true
+  if (Math.abs(d3) <= eps && onSegment(cx, cy, dx, dy, ax, ay, eps)) return true
+  if (Math.abs(d4) <= eps && onSegment(cx, cy, dx, dy, bx, by, eps)) return true
   return false
+}
+
+function onSegment(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  px: number,
+  py: number,
+  eps: number,
+): boolean {
+  return (
+    px >= Math.min(ax, bx) - eps &&
+    px <= Math.max(ax, bx) + eps &&
+    py >= Math.min(ay, by) - eps &&
+    py <= Math.max(ay, by) + eps
+  )
 }
 
 /** 叉积 (p1→p2) × (p1→p3) 的 z 分量。 */
