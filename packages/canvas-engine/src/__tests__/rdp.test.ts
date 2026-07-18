@@ -19,6 +19,23 @@ function lShape(): [number, number][] {
 // ── 简化正确性 ─────────────────────────────────────────────────────────────────
 
 describe('simplifyPoints', () => {
+  it('三点 L 即使高 epsilon 也精确保留共享顶点', () => {
+    const points: [number, number][] = [[0, 0], [50, 0], [50, 50]]
+    expect(simplifyPoints(points, 100)).toEqual(points)
+  })
+
+  it('短抖动 L 选择转向前有效段端点作为折角', () => {
+    const points: [number, number][] = [[0, 0], [50, 0], [51, 1], [51, 50]]
+    const out = simplifyPoints(points, 100)
+    expect(out).toContainEqual([50, 0])
+    expect(out).not.toContainEqual([51, 1])
+  })
+
+  it('Z 形精确保留两个共享顶点', () => {
+    const points: [number, number][] = [[0, 0], [50, 0], [50, 50], [100, 50]]
+    expect(simplifyPoints(points, 100)).toEqual(points)
+  })
+
   it('共线点简化到首尾', () => {
     const out = simplifyPoints(collinear(20), 0.5)
     expect(out).toEqual([[0, 0], [95, 0]])

@@ -56,7 +56,10 @@ export function simplifyPoints(
   for (let i = 1; i < dirs.length; i++) {
     let delta = Math.abs(dirs[i]!.angle - dirs[i - 1]!.angle)
     if (delta > Math.PI) delta = 2 * Math.PI - delta // 折到 [0, π]
-    if (delta > CORNER_ANGLE) corners.add(dirs[i]!.idx)
+    // dirs[k].idx is the endpoint of segment points[idx-1] -> points[idx].
+    // The turn belongs to the previous effective segment's endpoint. This is
+    // also the stable representative when short jitter segments were skipped.
+    if (delta > CORNER_ANGLE) corners.add(dirs[i - 1]!.idx)
   }
 
   // 2. 锚点 = 首尾 ∪ 折角,去重排序。

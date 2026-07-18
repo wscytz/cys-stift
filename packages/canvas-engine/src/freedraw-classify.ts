@@ -225,7 +225,10 @@ export function detectArrowRoute(
     let delta = Math.abs(dirs[i]!.angle - dirs[i - 1]!.angle)
     if (delta > Math.PI) delta = 2 * Math.PI - delta // 折到 [0,π]
     if (delta > CORNER_ANGLE) {
-      const cp = points[dirs[i]!.idx]!
+      // A turn is shared by the previous and current effective segments.
+      // When short jitter segments were skipped, prefer the previous segment's
+      // endpoint instead of the far endpoint after the turn.
+      const cp = points[dirs[i - 1]!.idx]!
       // 合并相邻折角(< 8px 视为同一个)
       if (corners.length === 0 || Math.hypot(corners[corners.length - 1]!.x - cp[0], corners[corners.length - 1]!.y - cp[1]) > 8) {
         corners.push({ x: cp[0], y: cp[1] })

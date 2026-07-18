@@ -96,6 +96,29 @@ describe('classifyFreedraw', () => {
   })
 })
 
+describe('detectArrowRoute — exact corner coordinates', () => {
+  it('三点 L 的 elbow 是转向前后段共享顶点', () => {
+    expect(detectArrowRoute([[0, 0], [50, 0], [50, 50]])).toEqual({
+      kind: 'elbow',
+      elbow: [{ x: 50, y: 0 }],
+    })
+  })
+
+  it('短抖动 L 使用前一有效段端点,不使用转向后端点', () => {
+    expect(detectArrowRoute([[0, 0], [50, 0], [51, 1], [51, 50]])).toEqual({
+      kind: 'elbow',
+      elbow: [{ x: 50, y: 0 }],
+    })
+  })
+
+  it('Z 形返回两个精确共享顶点', () => {
+    expect(detectArrowRoute([[0, 0], [50, 0], [50, 50], [100, 50]])).toEqual({
+      kind: 'elbow',
+      elbow: [{ x: 50, y: 0 }, { x: 50, y: 50 }],
+    })
+  })
+})
+
 // ── duplicateFreedraw ─────────────────────────────────────────────────────────
 
 describe('duplicateFreedraw', () => {
