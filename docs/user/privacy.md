@@ -11,6 +11,19 @@
 - **启用 AI** → 你选定的 provider 收到你**明确允许它看**的字段(见下表);其他东西(API key、未启用字段、媒体文件二进制)不会被发送
 - **完全关闭** → AI 按钮消失,应用照常工作
 
+## 四种数据边界
+
+这些边界容易混在一起,但它们是四条不同的路径:
+
+| 数据 | 默认位置 / 去向 | 什么时候会离开本机 |
+|---|---|---|
+| **prompt** | 只在启用 AI 的那次请求中,由客户端组装后发给你选的 provider | 发送请求时。包括当前问题、最近对话上下文(最多 20 条)、RAG 允许字段和目标画布几何快照;不是后台同步 |
+| **conversation** | `cys-stift.conversation.<canvasId>.v2` 的本地 localStorage; `/ask` 与 Canvas companion 共用,每画布隔离,最多保留 100 条 | 不会自动外发;只有后续 AI 请求会把最近上下文带给你选的 provider,或你主动导出 JSON |
+| **sample** | `cys-stift.ai-samples.v1` 的本地 localStorage;默认开启累积直到你在设置中关闭,最近 500 条 | 不会自动外发;你在设置中导出样本或把完整 JSON 备份交给第三方时才离开本机 |
+| **export / archive** | Export 是你主动下载的开放 JSON; archive 是本地 OPFS(不可用时 localStorage) 的开发存档 | Export 文件由你决定是否分享; archive 本身不发给 AI。两者在最终边界清空 `apiKey`; archive 还剥离媒体 `dataUrl`,只留媒体元数据 |
+
+样本只保存 `question/context/aiOutput`、结果和 DSL 版号等脱敏字段,不保存原始 `Card[]`、settings、`deviceId` 或 API key。完整 JSON 备份可以包含卡片、媒体、草稿、设置、画布几何、对话和样本,所以分享前请把它当作包含你内容的文件处理。
+
 ---
 
 ## AI 看到了什么(逐字段)
@@ -132,8 +145,9 @@ AI 看到的是**坐标 / 类型 / 标签**,不是像素。所以 AI 能做:
 | **Ollama** | `http://localhost:11434`(本地) | 完全本地,数据不出本机 |
 
 每次 AI 请求,客户端只发送:
-- 你当前正在操作的卡 / 卡列表 / 画布快照
-- **不**发送你的其他卡、设置、API key、media 二进制
+- 你的当前问题 + 最近对话上下文(最多 20 条)
+- RAG 选出的相关卡(允许字段) / 当前操作的卡 / 目标画布几何快照
+- **不**发送 settings、API key、`source.deviceId`、软删除卡或 `media.dataUrl` 二进制
 
 provider 的服务端会按它的[隐私政策](https://openai.com/policies/row-privacy-policy)处理你的请求(OpenAI / Anthropic 默认**不**用 API 请求训练模型,但请以官方文档为准)。
 
@@ -152,11 +166,12 @@ provider 的服务端会按它的[隐私政策](https://openai.com/policies/row-
 - 你已经在自己的设备上,设备本身的锁屏是第一道防线
 - M4 可能升级到 OS keychain(macOS Keychain / Windows Credential Manager)
 
-### 不存什么
+### 其它本地数据
 
-- **不**记录 AI 请求历史
-- **不**记录用户操作用于训练
-- **不**上传 localStorage 里的其他 key
+- 对话会按画布持久化,可在 `/ask` 的「清空」操作中清除当前画布对话。
+- 样本累积可在设置页关闭,也可以直接导出或清空;它不是自动上传的训练集。
+- Export/Import 是用户主动操作,不是后台同步;Import 会覆盖或合并本地数据,操作前应先导出备份。
+- 不上传 localStorage 里的其他 key,也不记录与 AI 无关的用户操作用于训练。
 
 ---
 

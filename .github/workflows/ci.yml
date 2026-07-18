@@ -22,6 +22,20 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: public docs links
+        run: pnpm docs:links
+
+      - name: generated version sync
+        run: |
+          node scripts/gen-version.mjs
+          git diff --exit-code -- \
+            apps/web/src/lib/version.ts \
+            apps/web/package.json \
+            apps/desktop/package.json \
+            apps/desktop/src-tauri/Cargo.toml \
+            apps/desktop/src-tauri/Cargo.lock \
+            apps/desktop/src-tauri/tauri.conf.json
+
       # v0.37.0: a real typecheck gate. The package `test` scripts are just
       # `vitest run` (no tsc), and vitest does not typecheck — so type errors
       # in packages/domain, db, ui were silently passing. This step runs the

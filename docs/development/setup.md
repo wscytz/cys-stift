@@ -1,7 +1,7 @@
 # 开发环境搭建
 
 > macOS 与 Windows 双平台。命令一致（pnpm），前置工具链略有不同。
-> **精确版本清单见 [`dependencies.md`](dependencies.md)** —— 本档讲「怎么装」,dependencies.md 讲「装了什么 + 精确版本」。
+> **精确版本以仓库 manifest 为准** —— 根 [`package.json`](../../package.json)、Web [`apps/web/package.json`](../../apps/web/package.json) 与 Desktop [`apps/desktop/package.json`](../../apps/desktop/package.json) 锁定脚本和依赖；`pnpm-lock.yaml` 锁定解析结果。
 
 ---
 
@@ -19,6 +19,18 @@
 - 换行符 `.gitattributes` 强制 LF（仓库已配）
 - 目录 / 文件全小写连字符
 - 数据目录用 OS 规范路径（mac: `~/Library/Application Support`；win: `%APPDATA%`），不写死 `~/`
+
+### 文档与版本门禁
+
+产品版本只改根 [`package.json`](../../package.json)；构建前的 `scripts/gen-version.mjs` 会同步 Web/Desktop manifest、Cargo metadata、Tauri 配置和 Web 的生成常量。提交前可运行：
+
+```bash
+pnpm docs:links
+node scripts/gen-version.mjs
+git diff --exit-code -- apps/web/src/lib/version.ts apps/web/package.json apps/desktop/package.json apps/desktop/src-tauri/Cargo.toml apps/desktop/src-tauri/Cargo.lock apps/desktop/src-tauri/tauri.conf.json
+```
+
+`docs:links` 只检查本仓库公开入口文档的相对链接；外部 provider/发行页链接不在离线检查范围内。
 
 ---
 

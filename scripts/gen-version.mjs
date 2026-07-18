@@ -2,10 +2,10 @@
 // scripts/gen-version.mjs
 // 单一可信源:root package.json "version"。
 // 生成 apps/web/src/lib/version.ts(build-time 写入静态常量,适配静态导出),
-// 并把 apps/desktop/src-tauri/tauri.conf.json 的 version 字段同步过来。
+// 并把应用 manifest、Cargo package/lock 与 tauri.conf.json 的 version 字段同步过来。
 //
-// Why:之前版本号散落在 4 处(package.json / tauri.conf.json / page.tsx 硬编码 /
-// app-menu 无),手动同步必然漂移。这里收敛到一个源头 —— root package.json。
+// Why:之前版本号散落在多个 manifest 与 native 配置,手动同步必然漂移。
+// 这里收敛到一个源头 —— root package.json。
 // prebuild / predev 钩子触发,所以每次 build / dev 都自动刷新,无需新增依赖。
 //
 // No file deps — only node:fs + node:path。Node 18+。
@@ -18,6 +18,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(__dirname, '..')
 const PKG = resolve(ROOT, 'package.json')
 const VERSION_TS = resolve(ROOT, 'apps/web/src/lib/version.ts')
+const WEB_PKG = resolve(ROOT, 'apps/web/package.json')
+const DESKTOP_PKG = resolve(ROOT, 'apps/desktop/package.json')
+const CARGO_TOML = resolve(ROOT, 'apps/desktop/src-tauri/Cargo.toml')
+const CARGO_LOCK = resolve(ROOT, 'apps/desktop/src-tauri/Cargo.lock')
 const TAURI_CONF = resolve(ROOT, 'apps/desktop/src-tauri/tauri.conf.json')
 
 // 1) 读取单一可信源。
@@ -36,7 +40,44 @@ if (!existsSync(VERSION_TS) || readFileSync(VERSION_TS, 'utf8') !== tsContent) {
   writeFileSync(VERSION_TS, tsContent)
 }
 
-// 3) 同步 tauri.conf.json 的 version(保留原 JSON 格式;仅改 version 字段)。
+function syncJsonVersion(path) {
+  const raw = readFileSync(path, 'utf8')
+  const trailingNewline = raw.endsWith('\n')
+  const target = JSON.parse(raw)
+  if (target.version === version) return
+  target.version = version
+  writeFileSync(path, JSON.stringify(target, null, 2) + (trailingNewline ? '\n' : ''))
+}
+
+// 3) 同步应用 package manifest(包版本不是依赖版本,仍跟产品源一致)。
+syncJsonVersion(WEB_PKG)
+syncJsonVersion(DESKTOP_PKG)
+
+function syncCargoPackageVersion(path) {
+  const raw = readFileSync(path, 'utf8')
+  const pattern = /(\[package\][\s\S]*?^version\s*=\s*)"[^"]+"/m
+  const match = raw.match(pattern)
+  if (!match) throw new Error(`gen-version: could not find [package] version in ${path}`)
+  if (match[0].endsWith(`"${version}"`)) return
+  const next = raw.replace(pattern, `$1"${version}"`)
+  if (next !== raw) writeFileSync(path, next)
+}
+
+function syncCargoLockPackageVersion(path) {
+  const raw = readFileSync(path, 'utf8')
+  const pattern = /(\[\[package\]\]\nname = "cys-stift"\nversion = )"[^"]+"/
+  const match = raw.match(pattern)
+  if (!match) throw new Error(`gen-version: could not find cys-stift package in ${path}`)
+  if (match[0].endsWith(`"${version}"`)) return
+  const next = raw.replace(pattern, `$1"${version}"`)
+  if (next !== raw) writeFileSync(path, next)
+}
+
+// 4) 同步 native package metadata。
+syncCargoPackageVersion(CARGO_TOML)
+syncCargoLockPackageVersion(CARGO_LOCK)
+
+// 5) 同步 tauri.conf.json 的 version(保留原 JSON 格式;仅改 version 字段)。
 const raw = readFileSync(TAURI_CONF, 'utf8')
 const trailingNewline = raw.endsWith('\n')
 const conf = JSON.parse(raw)
@@ -48,4 +89,4 @@ if (conf.version !== version) {
 }
 
 // 4) 日志。
-console.log(`gen-version: ${version} → apps/web/src/lib/version.ts, tauri.conf.json`)
+console.log(`gen-version: ${version} → web/desktop manifests, Cargo metadata, version.ts, tauri.conf.json`)

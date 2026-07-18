@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-07-18 · 1.0.0-preview.1 · 稳定性 Lane F（文档与版本真值）
+
+关闭 N09、N22-N23,把公开文档、版本元数据和自动检查对齐到当前源码事实。此版本是本地 preview,未 tag、未 push、未 release。
+
+- **DSL 真值**:用户转义手册更新为 cys-dsl v4,补充显式 `[card #id create]`、关系式坐标、ApplyReport 与 AI/Agent before-after 确认门；不再声称 update-only 或静默应用。
+- **隐私真值**:隐私说明区分 prompt、per-canvas conversation、AI sample、用户主动 export 和本地 archive。明确 settings v2、样本默认累积/可关闭、对话最多 100 条、样本最多 500 条、export/archive 的 API key redaction 与 archive 媒体元数据边界。
+- **公开文档断链**:新增 `pnpm docs:links`,检查 README、setup、用户指南、隐私和转义入口共 5 份 Markdown；CI 在 Linux verify job 中执行,外部 URL 不伪装成本地通过。
+- **版本单一来源**:根 `package.json` 的 `1.0.0-preview.1` 由 `scripts/gen-version.mjs` 同步 `apps/web`/`apps/desktop` manifest、`Cargo.toml`/`Cargo.lock`、Tauri config 与生成的 `version.ts`；最近公开 tag/release 单独记为 v0.57.3。
+- **验证**:公开 docs link checker PASS；生成器幂等并在 clean tree 上 `git diff --exit-code`；Lane F gate 与全量 lint/test/build、桌面构建和最终数据恢复/VoiceOver 验收记录在本轮后续证据中。
+
 ## 2026-07-18 · v0.59.0 · 稳定性 Lane E（可访问性 / 触屏 / 动态视口）
 
 关闭 N08、N19-N20、N24,把 Canvas 可访问性从单一标签收敛为与 renderer 共用状态和命令的可操作对象树，并修复菜单键盘模式、动态视口和核心触控命中区。

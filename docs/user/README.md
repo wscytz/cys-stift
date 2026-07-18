@@ -267,4 +267,4 @@
 
 ---
 
-详见 [开发文档](../changelog.md) + [设计 spec](../specs/2026-06-19-cys-stift-design.md)。
+详见 [当前状态](../STATE.md) 与 [架构总览](../architecture/overview.md)。

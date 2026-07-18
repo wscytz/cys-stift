@@ -1,6 +1,6 @@
 {
   "name": "cys-stift",
-  "version": "0.59.0",
+  "version": "1.0.0-preview.1",
   "private": true,
   "description": "cy's Stift — 本地优先的灵感画布",
   "author": "cy",
@@ -15,6 +15,7 @@
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
+    "docs:links": "node scripts/check-doc-links.mjs",
     "tauri": "pnpm --filter desktop tauri",
     "clean": "pnpm -r exec rm -rf .next out dist node_modules/.cache"
   },

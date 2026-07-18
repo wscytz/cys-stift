@@ -15,19 +15,19 @@
 2. **形随功能** —— 包豪斯是约束,不是滤镜(6 原色 + 8px 网格,不写死 hex/px)。
 3. **特性即接口** —— 每个 feature 是可独立替换的"切片"。
 4. **数据可迁移** —— 本地数据随时可导出为开放格式(JSON + Markdown + DSL),不做锁定。
-5. **转义(画布 ↔ 文字 DSL 双向)** —— 整张画布能压成一段文字,文字也能反向改画布;任何 AI(或任何人)读写一段文字就能驱动画布编辑。这是核心卖点。
+5. **转义(画布 ↔ 文字 DSL 双向)** —— 整张画布能压成一段文字,文字也能在确认门后改画布;任何 AI(或任何人)读写一段文字就能提出画布编辑。这是核心卖点。
 
 ---
 
 ## 下载
 
-最新版 [**v0.57.2**](https://github.com/wscytz/cys-stift/releases/tag/v0.57.2):
+版本状态：源码当前为 **1.0.0-preview.1**（本地预览，尚未 tag/release）；最近公开 release/tag 是 [**v0.57.3**](https://github.com/wscytz/cys-stift/releases/tag/v0.57.3)。预览版不提供发布下载，稳定版二进制请从该 release 页面获取：
 
 | 平台 | 文件 | 说明 |
 |---|---|---|
-| **macOS**(Apple Silicon) | `cys-stift_0.57.2_aarch64.dmg`(7.4M) | 拖到 Applications |
-| **Windows** | `cys-stift_0.57.2_windows.zip` | 解压运行 .exe(需 WebView2,Win11 自带;Win10 手动装;CI 产出) |
-| **Android**(arm64) | `app-universal-debug.apk`(241M) | debug 版(含符号,体积大);arm64 设备可装;安装时允许"未知来源" |
+| **macOS**(Apple Silicon) | release 页面中的 `.dmg` | 拖到 Applications |
+| **Windows** | release 页面中的 `.zip` / `.exe` | 需 WebView2(Win11 自带;Win10 手动装) |
+| **Android**(arm64) | release 页面中的 APK(若该 release 提供) | 安装时允许"未知来源" |
 
 > iPad/iOS 不做。Windows 版走 CI(本地 macOS 不能 cross-compile)。Android release 签名版待 keystore 配置(debug 版功能完整,仅缺签名 + 体积大)。
 
@@ -41,7 +41,7 @@
 
 **canvas(自研 Canvas 2D)** —— 6 种元素(card/arrow/freedraw/text/rect/frame)+ 多画布 + 视图持久化 + 关系箭头(straight/curve/elbow + 手绘识别)+ 工具栏(选择/手绘/文本/连接/橡皮)+ AI 排版 + 导出(图片 SVG/PNG + Markdown + DSL)+ Outline / Minimap / 全局缩略图 + 双链 `[[]]` 自动建箭头 + **DSL 模态编辑器(转义)** + 对齐分布 9 操作 + 画布模板 + 整理范式(思维导图/流程图/网格/紧凑 × 四方向)+ 焦点模式 + frame + 手绘规范化(保角 RDP + 贝塞尔平滑 + $1 形状识别)+ **关系式坐标 DSL**(right-of/below + 碰撞避让)+ **卡片密度模式**(紧凑/自适应/仅标题/副标题)+ 双击空白建卡 + **DSL sanitize 兜底**(AI 非法值不崩)。
 
-**工作台** —— per-card 深度编辑(`/workbench` 库页 + canvas dock 编辑器 + **专注编辑态** ⤢ 二档:编辑器撑满 + 画布缩成可拖拽/收起的浮 minimap 预览)。
+**工作台** —— per-card 深度编辑(`/workbench` 库页 + canvas 右栏编辑器);画布 hover 只读速览,双击或侧栏入口进入工作台。当前版本已移除旧的 focusEdit 专注编辑态,避免把独立工作台和画布焦点模式混为一谈。
 
 **Markdown 渲染** —— GFM(表格/任务列表/删除线)+ 代码高亮(Bauhaus 主题)+ **数学公式**(katex `$inline$`/`$$display$$`)+ 脚注 + 块引用 `((标题))` 嵌入(环检测)。
 
@@ -61,7 +61,7 @@
 
 ## 状态
 
-**v0.57.2** — 完整可用的本地优先灵感画布。lint 0 / test 1995 全绿(canvas-engine 539 + web 1456)/ build exit 0。
+**1.0.0-preview.1** — 本地稳定性预览版(版本源见根 `package.json`)。A–F 稳定性门禁完成后等待最终桌面 / VoiceOver / 数据恢复验收；不代表已发布。
 
 当前状态、版本里程碑、下一步、已知 debt 全见 [`docs/STATE.md`](docs/STATE.md) — 单一可信源。历史见 [`docs/changelog.md`](docs/changelog.md)。
 
