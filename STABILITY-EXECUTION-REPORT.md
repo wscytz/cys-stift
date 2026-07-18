@@ -5,14 +5,15 @@
 | 字段 | 结果 |
 |---|---|
 | 开始 commit | `482dfbe` |
-| 实现 commits | `bfbbdc0`（Lane 2–4 UX）与 `087b342`（Lane 5 DSL/Intent） |
-| 分支 | `main`，相对 `origin/main` ahead 9，未 push |
+| 实现 commits | `bfbbdc0`（Lane 2–4 UX）、`087b342`（Lane 5 DSL/Intent）、`b10122d`（证据）与 `3c83433`（最终 UI/AI/Markdown 收口） |
+| 当前代码 HEAD | `3c834337e1dd543450cb5c61aa7c9be394ac9cf1` |
+| 分支 | `main`，报告提交后相对 `origin/main` ahead 15，未 push |
 | safety ref | `safety/pre-stability-20260718T112213Z` |
 | pre-stability bundle | `/Users/jinxunuo/projects/cys-stift-pre-stability-20260718T112213Z.bundle`，`git bundle verify` PASS |
 | bundle SHA-256 | `8ee8959ba1a3d9acc16ade2b710ab2e9b8005493dffc6ff229058cd517abac35` |
 | 环境 | macOS 26.5; Node 24.16.0; pnpm 9.15.0; Rust/Cargo 1.96.0 |
 | 预览版本 | `1.0.0-preview.1` |
-| 执行日期 | 2026-07-18 |
+| 执行日期 | 2026-07-18 至 2026-07-19 |
 
 ## 2. 批次 commits
 
@@ -29,6 +30,7 @@
 | Lane 3 Workbench/Canvas | `bfbbdc0`, `087b342` | Unified plan Lane 3 | 移动端 list→editor、来源返回、脏切换门、稳定保存态、单 AI 菜单、对象大纲、Canvas/Text DSL 桥 | PASS |
 | Lane 4 Settings/Profiles | `bfbbdc0` | Unified plan Lane 4 | 六分区顺序、profile 状态机与确认门、删除无效 Labs toggle、样本显式 opt-in、导入预检/替换/合并 | PASS |
 | Lane 5 Intent IR | `087b342` | Unified plan Lane 5 | typed IR、schema/validation、resolver/solver/compiler、immutable plan/commit、补偿、版本化 benchmark | PASS |
+| 最终收口 | `3c83433` | 扩展 UI/AI 审计 | 全触控 44px、200% 重排、动态批处理、Ask 请求归属、Canvas Markdown 实时/SVG 清洗 | PASS |
 
 ## 3. N01-N24
 
@@ -52,7 +54,7 @@
 | N16 | PASS | `776b866` | post-solve validation and bounded relational coordinates |
 | N17 | PASS | `e56166d` | lazy history prevents no-op undo entries |
 | N18 | PASS | `b90e4bb` | Rust + web transactional shortcut tests |
-| N19 | PASS | `643b42f` | touch target gate and 16-case UI audit |
+| N19 | PASS | `643b42f`, `3c83433` | 44px contract; 72-case normal + 72-case 200%-equivalent UI audits; dynamic card/batch controls |
 | N20 | PASS | `643b42f` | menu arrows/Home/End/Escape/Tab/focus restore tests |
 | N21 | PASS | `e56166d` | continuous eraser sweep regression tests |
 | N22 | PASS | `096b082` | `pnpm docs:links`: 5 public Markdown entries PASS |
@@ -61,20 +63,21 @@
 
 ## 4. 自动门
 
-Final single-run evidence: `/Users/jinxunuo/projects/cys-stability-evidence/20260718T155210Z/gates-all`.
+Final single-run evidence: `/Users/jinxunuo/projects/cys-stability-evidence/20260718T202914Z/gates-all` (HEAD `3c83433`).
 
 | 命令 | Exit | 结果 |
 |---|---:|---|
 | `pnpm install --frozen-lockfile` | 0 | lockfile up to date |
 | `pnpm -r lint` | 0 | all workspace lint PASS |
-| `pnpm -r test` | 0 | web 128 files / 1629 tests; domain 82 tests; canvas-engine PASS |
+| `pnpm -r test` | 0 | web 131 files / 1657 tests; domain 83 tests; canvas-engine 34 files / 568 tests; db 7 tests |
 | `pnpm --filter web build` | 0 | 22 static routes generated |
 | `pnpm --filter desktop tauri build --debug` | 0 | debug `.app` and DMG generated |
 | `pnpm --filter desktop build` | 0 | release `.app` and `1.0.0-preview.1` DMG generated |
 | `pnpm docs:links` | 0 | 5 Markdown files PASS |
 | `git diff --check` | 0 | PASS |
 | 2026-07-19 `pnpm -r lint` | 0 | 6 workspace projects PASS |
-| 2026-07-19 `pnpm -r test` | 0 | web 131 files / 1653 tests; domain 83 tests; canvas-engine PASS |
+| Ask request ownership focused tests | 0 | Stop / canvas switch / profile switch / unmount late-response guards PASS |
+| Keyboard/a11y focused tests | 0 | 5 files / 40 tests; object select/open/move/delete/undo and menu focus contract PASS |
 | 2026-07-19 `pnpm benchmark:intent` | 0 | 2 files / 15 tests PASS |
 | 2026-07-19 `pnpm --filter web build` | 0 | 22 static routes; `/design` and `/dev/*` contain `NEXT_NOT_FOUND` |
 | version generator repeat check | 0 | idempotent |
@@ -85,18 +88,19 @@ Final single-run evidence: `/Users/jinxunuo/projects/cys-stability-evidence/2026
 
 ## 5. UI、桌面与键盘验收
 
-- Current UI audit: `/Users/jinxunuo/projects/cys-stability-evidence/20260718T154800Z/ui-audit-current`.
-- Chrome 149; `/`, `/canvas`, `/settings`, `/ask`; 390x844, 768x1024, 1024x768, 1440x900.
-- 16 cases, 0 failures, no horizontal overflow, no visible button below 44px, no console failure.
+- Current UI audits: `/Users/jinxunuo/projects/cys-stability-evidence/20260719T041500Z/ui-audit-current` and `/Users/jinxunuo/projects/cys-stability-evidence/20260719T041500Z/ui-audit-200pct`.
+- Chrome 149; all 12 production routes; 320x568, 390x844, 768x1024, 844x390, 1024x768, 1440x900 plus six half-CSS viewports that reproduce 200% page-zoom layout pressure.
+- 72 normal cases + 72 200%-equivalent cases, both 0 failures: no document horizontal overflow, no visible audited button below 44px, no console failure.
 - Browser journey verified Canvas single AI menu, `更多`, accessible object list, DSL Canvas/Text bridge and parse preview; Home quick capture/current/recent; Workbench mobile direct drill-in/source-preview/save; Settings profile create/save/delete confirmations.
-- 2026-07-19 focused audit used 390x844 and 1440x900. No horizontal overflow on Home, Settings, Inbox, Workbench or Canvas; narrow Workbench uses one-column Markdown source/preview and keeps the title visible.
+- Dynamic 390x844 audit created a long Chinese/English Markdown card, opened link controls, selected it, and exercised Inbox/Archive batch bars. Markdown preview kept three readable lines with `white-space: pre-line`; all controls were >=44px and all batch buttons stayed on-screen. Synthetic data was permanently deleted afterward.
+- 200% visual follow-up found internal Settings clipping missed by the first document-width gate; responsive field rows, AI provider cards and sample actions were fixed, then rechecked with zero off-screen interactive controls.
 - Keyboard Canvas object tree journey and menu focus contract passed in browser/tests. A human VoiceOver listening pass is still an owner acceptance item; the semantic object tree and live announcements are present.
-- Release bundle: `/Users/jinxunuo/projects/cys-stift/apps/desktop/src-tauri/target/release/bundle/dmg/cys-stift_1.0.0-preview.1_aarch64.dmg`.
-- Debug bundle: `/Users/jinxunuo/projects/cys-stift/apps/desktop/src-tauri/target/debug/bundle/dmg/cys-stift_1.0.0-preview.1_aarch64.dmg`.
+- Desktop smoke: rebuilt debug process opened a `cy's Stift` 1280x800 window and loaded WebKit content. The first app-only screenshot exposed raw Canvas Markdown and is archived at `/Users/jinxunuo/projects/cys-stability-evidence/20260719T041500Z/desktop-smoke`; `3c83433` then added shared live/SVG Markdown cleaning with renderer tests. macOS refused a second app-only screenshot, so no post-fix screenshot claim is made.
+- Debug bundle: `/Users/jinxunuo/projects/cys-stift/apps/desktop/src-tauri/target/debug/bundle/dmg/cys-stift_1.0.0-preview.1_aarch64.dmg`. Earlier release bundle remains available, but the final code HEAD was validated as debug only.
 
 ## 6. 跨 profile 恢复
 
-Evidence: `/Users/jinxunuo/projects/cys-stability-evidence/20260718T154000Z/recovery/recovery-report.json`.
+Evidence: `/Users/jinxunuo/projects/cys-stability-evidence/20260719T041500Z/recovery/recovery-report.json`.
 
 | 字段 | 结果 |
 |---|---|
@@ -114,12 +118,13 @@ Profile A and Profile B used distinct temporary Chrome user-data directories. Th
 
 - Canvas first viewport keeps high-frequency actions visible; canvas management/template/help moved to accessible `更多` menu.
 - DSL is still v4 engine-backed, now exposed as Canvas <-> Text with self-contained examples and parse preview before Apply.
-- Inbox/archive/search-family card previews strip Markdown markers and preserve readable line structure; full detail still uses sanitized rich Markdown.
+- Inbox/archive/search-family and live Canvas/SVG card previews strip heading/list/emphasis/link Markdown markers and preserve readable line structure; full detail still uses sanitized rich Markdown.
 - Home capture is an actual action and current/recent work is in the first viewport. Recent cards open the selected editor directly instead of returning users to the library.
 - `/ask` is in primary navigation; dead development links are absent in development and production menus; `/design` and `/dev/*` render production 404 output.
 - Inbox/archive compact previews strip heading/list/emphasis/link Markdown markers. Full card views render sanitized Markdown; narrow Workbench uses explicit Source/Preview modes instead of an unreadable split.
 - Settings DOM and visual order now matches Data/Trust → Capture → Appearance → AI → Research → Labs. Import parses and dry-runs before showing Replace/Merge.
 - AI still requires explicit proposal/apply confirmation; no direct destructive AI mutation was introduced.
+- Ask streams are now owned by request generation + canvas + profile signature. Stop, canvas/profile switch and unmount abort or discard late provider results even when the provider ignores its signal.
 
 ## 8. Unified plan Lane 2–5 exit audit
 
@@ -134,13 +139,14 @@ Profile A and Profile B used distinct temporary Chrome user-data directories. Th
 | Lane 5 compiler/plan/commit | IR/schema/validator/resolver/solver/compiler and immutable plan hash; stale revision/expected-value guards | PASS |
 | Lane 5 host persistence/compensation | Card/freeform persistence-first adapter and compensation tests | PASS |
 | Lane 5 benchmark separation | `benchmarks/intent-ir-v1/dataset` keeps seed and held-out separate; provider-neutral logs/evaluator; 15/15 benchmark tests | PASS |
-| Human VoiceOver listening and public PR CI | Owner/release-stage work; semantic object tree is present but no human listening claim made | OPEN |
+| Human VoiceOver listening | Semantic object tree/live announcements and keyboard journey pass; no human listening claim made | NOT RUN |
+| Public PR CI | Branch was not pushed because push/tag/release require owner authorization | NOT RUN |
 
 ## 9. 发布判断
 
 ```text
 Decision: LOCAL GO CANDIDATE for 1.0.0-preview.1 owner acceptance
-Reason: code, all automated gates, UI audit, desktop bundles, secret scan and cross-profile recovery pass on the current local commits.
+Reason: code, all locally executable automated gates, 144-case UI audit, dynamic UI states, debug desktop bundle, secret scan and cross-profile recovery pass on current local commits.
 Required before public release: owner visual/VoiceOver acceptance and real pushed PR CI.
 Push/tag/release performed: NO
 ```
