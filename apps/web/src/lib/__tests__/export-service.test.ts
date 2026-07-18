@@ -861,6 +861,16 @@ describe('importFromJson — replace / merge transaction', () => {
       ...extra,
     })
 
+  it('dryRun returns a validated summary without mutating any store', async () => {
+    seedStores({ cards: [makeCard({ id: 'existing' as unknown as CardId })] })
+    const before = window.localStorage.getItem(CARDS_KEY)
+    const result = await mod.importFromJson(minimalPayload({
+      canvases: { canvases: [makeCanvas()], activeCanvasId: 'canvas-1' },
+    }), { mode: 'replace', dryRun: true })
+    expect(result).toMatchObject({ ok: true, cards: 1, mediaAssets: 0, canvases: 1 })
+    expect(window.localStorage.getItem(CARDS_KEY)).toBe(before)
+  })
+
   it('replace removes every owned target entry missing from the snapshot', async () => {
     const staleCanvas = 'stale-canvas' as unknown as CanvasId
     seedStores({

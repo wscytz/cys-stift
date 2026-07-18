@@ -88,9 +88,9 @@ describe('addSample', () => {
     expect(addSample(dsl, true)).toBe(true)
     expect(getSampleCount()).toBe(1)
   })
-  it('writes when enabled=undefined (default on)', () => {
-    expect(addSample(dsl, undefined)).toBe(true)
-    expect(getSampleCount()).toBe(1)
+  it('does not write before explicit consent', () => {
+    expect(addSample(dsl, undefined)).toBe(false)
+    expect(getSampleCount()).toBe(0)
   })
   it('caps to most recent 500', () => {
     for (let i = 0; i < 520; i++) {

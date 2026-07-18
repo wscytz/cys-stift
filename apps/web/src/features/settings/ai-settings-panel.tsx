@@ -8,7 +8,8 @@
  * - 「设为当前」(= active)+「删除」+「测试」+「保存」。
  * active profile = getCurrentAI 返回的 = /ask 等实际用的。
  */
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Button, Modal } from '@cys-stift/ui'
 import { settingsStore, useSettings } from '@/lib/settings-store'
 import { testConnection } from '@/features/ai/test-connection'
 import {
@@ -21,6 +22,12 @@ import { pushToast } from '@/lib/toast-store'
 
 const PROVIDERS: ProviderId[] = ['openai', 'anthropic', 'ollama']
 
+type ConfirmAction =
+  | { kind: 'switch'; id: string }
+  | { kind: 'new'; provider: ProviderId }
+  | { kind: 'provider'; provider: ProviderId }
+  | { kind: 'delete' }
+
 export function AISettingsPanel() {
   const { t } = useI18n()
   const { settings, ready } = useSettings()
@@ -32,9 +39,12 @@ export function AISettingsPanel() {
   const [testing, setTesting] = useState(false)
   const [showKey, setShowKey] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [testedIds, setTestedIds] = useState<Set<string>>(() => new Set())
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
 
-  // 懒选:初次打开若没编辑,选 active 或第一个。
-  if (ready && draft === null && editingId === null) {
+  // 初次打开选 active 或第一个；放 effect，避免 render 中 setState。
+  useEffect(() => {
+    if (!ready || draft !== null || editingId !== null) return
     const initialId = activeProfileId ?? profiles[0]?.id ?? null
     if (initialId) {
       const p = profiles.find((x) => x.id === initialId) ?? null
@@ -43,11 +53,37 @@ export function AISettingsPanel() {
         setDraft(p)
       }
     }
+  }, [activeProfileId, draft, editingId, profiles, ready])
+
+  const persisted = useMemo(
+    () => (draft ? profiles.find((profile) => profile.id === draft.id) ?? null : null),
+    [draft, profiles],
+  )
+  const dirty = !!draft && JSON.stringify(draft) !== JSON.stringify(persisted)
+
+  const clearTested = (id: string) => {
+    setTestedIds((current) => {
+      if (!current.has(id)) return current
+      const next = new Set(current)
+      next.delete(id)
+      return next
+    })
   }
 
-  const update = (patch: Partial<AIProfile>) => setDraft((d) => (d ? { ...d, ...patch } : d))
+  const update = (patch: Partial<AIProfile>) => {
+    if (draft) clearTested(draft.id)
+    setDraft((current) => (current ? { ...current, ...patch } : current))
+  }
 
   const onNewProfile = (provider: ProviderId) => {
+    if (dirty) {
+      setConfirmAction({ kind: 'new', provider })
+      return
+    }
+    createProfile(provider)
+  }
+
+  const createProfile = (provider: ProviderId) => {
     const def = getDefaultProviderDefaults(provider)
     const np: AIProfile = {
       id: genProfileId(),
@@ -65,6 +101,15 @@ export function AISettingsPanel() {
   }
 
   const selectProfile = (id: string) => {
+    if (draft?.id === id) return
+    if (dirty) {
+      setConfirmAction({ kind: 'switch', id })
+      return
+    }
+    applyProfileSelection(id)
+  }
+
+  const applyProfileSelection = (id: string) => {
     const p = profiles.find((x) => x.id === id) ?? null
     if (p) {
       setEditingId(p.id)
@@ -90,15 +135,50 @@ export function AISettingsPanel() {
   }
 
   const onDelete = () => {
-    if (!draft) return
+    if (!draft || !editingId) return
+    setConfirmAction({ kind: 'delete' })
+  }
+
+  const deleteConfirmed = () => {
+    if (!draft || !editingId) return
     settingsStore.deleteProfile(draft.id)
+    clearTested(draft.id)
     setDraft(null)
     setEditingId(null)
   }
 
   const onProviderChange = (provider: ProviderId) => {
+    if (!draft || provider === draft.provider) return
+    if (editingId) {
+      setConfirmAction({ kind: 'provider', provider })
+      return
+    }
+    applyProviderChange(provider)
+  }
+
+  const applyProviderChange = (provider: ProviderId) => {
     const def = getDefaultProviderDefaults(provider)
-    setDraft((d) => (d ? { ...d, provider, baseUrl: def.baseUrl, model: def.model } : d))
+    if (draft) clearTested(draft.id)
+    setDraft((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        provider,
+        apiKey: '',
+        baseUrl: def.baseUrl,
+        model: def.model,
+      }
+    })
+  }
+
+  const runConfirmedAction = () => {
+    const action = confirmAction
+    setConfirmAction(null)
+    if (!action) return
+    if (action.kind === 'switch') applyProfileSelection(action.id)
+    if (action.kind === 'new') createProfile(action.provider)
+    if (action.kind === 'provider') applyProviderChange(action.provider)
+    if (action.kind === 'delete') deleteConfirmed()
   }
 
   const onTest = async () => {
@@ -108,6 +188,7 @@ export function AISettingsPanel() {
     try {
       const result = await testConnection(draft)
       if (result.ok) {
+        setTestedIds((current) => new Set(current).add(draft.id))
         pushToast({ kind: 'success', message: t('settings.aiTestOk', { ms: String(result.latencyMs ?? 0) }) })
       } else {
         pushToast({ kind: 'error', message: t('settings.aiTestFail', { error: result.error ?? 'unknown' }) })
@@ -120,6 +201,16 @@ export function AISettingsPanel() {
   const def = draft ? getDefaultProviderDefaults(draft.provider) : null
   const canTest = !!draft && draft.enabled && draft.baseUrl.length > 0 && (!def?.needsKey || draft.apiKey.length > 0)
   const isActive = !!(draft && editingId && draft.id === activeProfileId)
+  const tested = !!draft && testedIds.has(draft.id)
+  const profileState = !draft
+    ? t('settings.aiStateNone')
+    : isActive
+      ? t('settings.aiStateActive')
+      : dirty || !editingId
+        ? t('settings.aiStateDraft')
+        : tested
+          ? t('settings.aiStateTested')
+          : t('settings.aiStateSaved')
 
   return (
     <section className="aip" data-testid="ai-settings">
@@ -129,6 +220,9 @@ export function AISettingsPanel() {
       <div className="aip__warn" role="note">
         <span aria-hidden="true">⚠</span> {t('settings.aiPlaintextWarning')}
       </div>
+      <p className="aip__state" data-testid="ai-profile-state" aria-live="polite">
+        {profileState}
+      </p>
 
       {/* profile 列表 */}
       <div className="aip__profileRow" data-testid="ai-profile-list">
@@ -256,15 +350,41 @@ export function AISettingsPanel() {
           )}
 
           <div className="aip__actions">
-            <button type="button" className="aip__btn" onClick={onTest} disabled={!canTest || testing}>{testing ? t('settings.aiTesting') : t('settings.aiTest')}</button>
+            <button type="button" className="aip__btn" onClick={onTest} disabled={!canTest || testing || dirty || !editingId}>{testing ? t('settings.aiTesting') : t('settings.aiTest')}</button>
             <button type="button" className="aip__btn" onClick={onDelete} disabled={editingId === null}>{t('settings.aiDeleteProfile')}</button>
-            <button type="button" className="aip__btn" onClick={setActive} disabled={!editingId || isActive}>{t('settings.aiSetActive')}</button>
-            <button type="button" className="aip__btn aip__btn--primary" onClick={save} disabled={!draft.enabled}>{t('settings.aiSave')}</button>
+            <button type="button" className="aip__btn" onClick={setActive} disabled={!editingId || isActive || !tested || dirty}>{t('settings.aiSetActive')}</button>
+            <button type="button" className="aip__btn aip__btn--primary" onClick={save} disabled={!draft.enabled || !dirty}>{t('settings.aiSave')}</button>
           </div>
         </>
       ) : (
-        <p className="aip__empty">{t('settings.aiLede')}</p>
+        <p className="aip__empty">{t('settings.aiNoProfile')}</p>
       )}
+      <Modal
+        open={confirmAction !== null}
+        onClose={() => setConfirmAction(null)}
+        title={
+          confirmAction?.kind === 'delete'
+            ? t('settings.aiDeleteConfirmTitle')
+            : confirmAction?.kind === 'provider'
+              ? t('settings.aiProviderConfirmTitle')
+              : t('settings.aiDiscardConfirmTitle')
+        }
+        closeLabel={t('common.close')}
+      >
+        <p className="aip__confirmBody">
+          {confirmAction?.kind === 'delete'
+            ? t('settings.aiDeleteConfirmBody')
+            : confirmAction?.kind === 'provider'
+              ? t('settings.aiProviderConfirmBody')
+              : t('settings.aiDiscardConfirmBody')}
+        </p>
+        <div className="aip__confirmActions">
+          <Button variant="ghost" onClick={() => setConfirmAction(null)}>{t('common.cancel')}</Button>
+          <Button variant="primary" onClick={runConfirmedAction}>
+            {confirmAction?.kind === 'delete' ? t('settings.aiDeleteProfile') : t('common.ok')}
+          </Button>
+        </div>
+      </Modal>
       <style>{panelStyles}</style>
     </section>
   )
@@ -276,6 +396,7 @@ const panelStyles = `
 .aip__h { font-family: var(--font-display); margin-left: var(--space-3); }
 .aip__lede { font-family: var(--font-body); color: var(--color-gray); margin: var(--space-1) var(--space-3) var(--space-3); }
 .aip__warn { margin: 0 var(--space-3) var(--space-3); padding: var(--space-2) var(--space-3); border: var(--border-thick); border-color: var(--color-red); font-family: var(--font-mono); font-size: var(--font-size-xs); background: var(--color-white); color: var(--color-black); }
+.aip__state { margin: 0 var(--space-3) var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-xs); font-weight: 700; }
 .aip__row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin: 0 var(--space-3) var(--space-2); }
 .aip__label { flex: 0 0 140px; font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); }
 .aip__input { flex: 1 1 auto; padding: var(--space-1) var(--space-2); border: var(--border-hairline); font-family: var(--font-mono); font-size: var(--font-size-sm); background: var(--color-white); color: var(--color-black); }
@@ -308,4 +429,6 @@ const panelStyles = `
 .aip__btn--primary { background: var(--color-black); color: var(--color-white); }
 .aip__btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .aip__empty { margin: 0 var(--space-3) var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
+.aip__confirmBody { line-height: 1.5; }
+.aip__confirmActions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-3); }
 `

@@ -13,7 +13,7 @@ import { useSettings } from '@/lib/settings-store'
 import type { MessageKey } from '@/lib/i18n/messages'
 
 /** 合法实验室 id(与 Settings.labs 字段一一对应)。 */
-export type LabId = 'visionLab' | 'autoCurateLab' | 'autoCaptureLab' | 'autoTagLab' | 'agentToolCallingLab'
+export type LabId = 'visionLab'
 
 /** 实验室元数据(从注册表读,<LabToggle> 渲染用)。 */
 export interface LabMeta {
@@ -34,48 +34,7 @@ export interface LabMeta {
  * 实验室注册表。新加 lab:① Settings.labs 加字段;② 这里加 meta;③ i18n 加 keys。
  * 顺序 = /settings 实验室区显示顺序。
  */
-export const LAB_REGISTRY: LabMeta[] = [
-  {
-    id: 'visionLab',
-    labelKey: 'settings.labs.visionLabel',
-    warnKey: 'settings.labs.visionWarn',
-    confirmTitleKey: 'settings.labs.visionConfirmTitle',
-    confirmBodyKey: 'settings.labs.visionConfirmBody',
-    confirmActionKey: 'settings.labs.visionConfirmAction',
-  },
-  {
-    id: 'autoCurateLab',
-    labelKey: 'settings.labs.autoCurateLabel',
-    warnKey: 'settings.labs.autoCurateWarn',
-    confirmTitleKey: 'settings.labs.autoCurateConfirmTitle',
-    confirmBodyKey: 'settings.labs.autoCurateConfirmBody',
-    confirmActionKey: 'settings.labs.confirmAction',
-  },
-  {
-    id: 'autoTagLab',
-    labelKey: 'settings.labs.autoTagLabel',
-    warnKey: 'settings.labs.autoTagWarn',
-    confirmTitleKey: 'settings.labs.autoTagConfirmTitle',
-    confirmBodyKey: 'settings.labs.autoTagConfirmBody',
-    confirmActionKey: 'settings.labs.confirmAction',
-  },
-  {
-    id: 'autoCaptureLab',
-    labelKey: 'settings.labs.autoCaptureLabel',
-    warnKey: 'settings.labs.autoCaptureWarn',
-    confirmTitleKey: 'settings.labs.autoCaptureConfirmTitle',
-    confirmBodyKey: 'settings.labs.autoCaptureConfirmBody',
-    confirmActionKey: 'settings.labs.confirmAction',
-  },
-  {
-    id: 'agentToolCallingLab',
-    labelKey: 'settings.labs.agentToolCallingLabel',
-    warnKey: 'settings.labs.agentToolCallingWarn',
-    confirmTitleKey: 'settings.labs.agentToolCallingConfirmTitle',
-    confirmBodyKey: 'settings.labs.agentToolCallingConfirmBody',
-    confirmActionKey: 'settings.labs.confirmAction',
-  },
-]
+export const LAB_REGISTRY: LabMeta[] = []
 
 /**
  * 统一实验室守卫 hook。false 时该 lab 路径完全不可达(代码层守卫,非仅 UI 隐藏)。

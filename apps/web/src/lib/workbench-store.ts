@@ -14,9 +14,10 @@ import { useSyncExternalStore } from 'react'
 
 interface WorkbenchState {
   cardId: string | null
+  origin: string | null
 }
 
-let _state: WorkbenchState = { cardId: null }
+let _state: WorkbenchState = { cardId: null, origin: null }
 let _cachedSnapshot: WorkbenchState = _state
 const _subscribers = new Set<() => void>()
 
@@ -46,25 +47,35 @@ export function subscribe(cb: () => void): () => void {
 }
 
 export const workbenchStore = {
-  /** 设当前编辑卡。 */
-  open(cardId: string): void {
-    if (_state.cardId === cardId) return
-    _state = { cardId }
+  /** 设当前编辑卡，并记录来源路由，供返回动作恢复用户上下文。 */
+  open(cardId: string, origin?: string): void {
+    const nextOrigin = origin ?? _state.origin
+    if (_state.cardId === cardId && _state.origin === nextOrigin) return
+    _state = { cardId, origin: nextOrigin ?? null }
     notify()
   },
   /** 清当前编辑卡。 */
   close(): void {
     if (_state.cardId === null) return
-    _state = { cardId: null }
+    _state = { cardId: null, origin: _state.origin }
     notify()
   },
   /** 当前编辑的卡 id（null = 无）。 */
   getCardId(): string | null {
     return _state.cardId
   },
+  getOrigin(): string | null {
+    return _state.origin
+  },
+  /** 仅记录进入工作台的来源，不改变当前卡片。 */
+  setOrigin(origin: string): void {
+    if (_state.origin === origin) return
+    _state = { ..._state, origin }
+    notify()
+  },
 }
 
 /** 订阅工作台状态（cardId）。SSR 安全（server 快照 = 初始 null）。 */
-export function useWorkbench(): { cardId: string | null } {
+export function useWorkbench(): { cardId: string | null; origin: string | null } {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 }

@@ -19,18 +19,26 @@ import { useI18n } from '@/lib/i18n'
 
 export interface WorkbenchPanelProps {
   card: Card
-  onSave: (cardId: string, patch: { title: string; body: string; tags: TagRef[] }) => void
+  onSave: (cardId: string, patch: { title: string; body: string; tags: TagRef[] }) => boolean | void
   onClose: () => void
+  onBackToList?: () => void
+  onDirtyChange?: (dirty: boolean) => void
 }
 
-export function WorkbenchPanel({ card, onSave, onClose }: WorkbenchPanelProps) {
+export function WorkbenchPanel({
+  card,
+  onSave,
+  onClose,
+  onBackToList,
+  onDirtyChange,
+}: WorkbenchPanelProps) {
   const { t } = useI18n()
   const [title, setTitle] = useState(card.title)
   const [body, setBody] = useState(card.body)
   const [tags, setTags] = useState<TagRef[]>(card.tags ?? [])
   const [tagInput, setTagInput] = useState('')
   // savedFlash:flush 后短暂亮「已保存」1.5s,让 autosave 可见(用户知道编辑落了)。
-  const [savedFlash, setSavedFlash] = useState(false)
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle')
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // 最新草稿 + 最新 onSave 放 ref,避免防抖 effect 依赖函数身份。
@@ -46,10 +54,11 @@ export function WorkbenchPanel({ card, onSave, onClose }: WorkbenchPanelProps) {
     const curTags = card.tags ?? []
     const tagsChanged = JSON.stringify(d.tags) !== JSON.stringify(curTags)
     if (d.title !== card.title || d.body !== card.body || tagsChanged) {
-      onSaveRef.current(card.id, { title: d.title, body: d.body, tags: d.tags })
-      setSavedFlash(true)
+      setSaveState('saving')
+      const ok = onSaveRef.current(card.id, { title: d.title, body: d.body, tags: d.tags })
+      setSaveState(ok === false ? 'failed' : 'saved')
       if (flashTimer.current) clearTimeout(flashTimer.current)
-      flashTimer.current = setTimeout(() => setSavedFlash(false), 1500)
+      flashTimer.current = setTimeout(() => setSaveState('idle'), 3000)
     }
   }
 
@@ -84,6 +93,8 @@ export function WorkbenchPanel({ card, onSave, onClose }: WorkbenchPanelProps) {
     body !== card.body ||
     JSON.stringify(tags) !== JSON.stringify(curTags)
 
+  useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
+
   // 防抖自动存(500ms)。脏才存。
   useEffect(() => {
     const id = setTimeout(() => flushRef.current(), 500)
@@ -109,8 +120,7 @@ export function WorkbenchPanel({ card, onSave, onClose }: WorkbenchPanelProps) {
       setTagInput('')
       return
     }
-    const color = TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)]!
-    setTags((prev) => [...prev, { value: val, color }])
+    setTags((prev) => [...prev, { value: val, color: stableTagColor(val) }])
     setTagInput('')
   }
 
@@ -129,8 +139,30 @@ export function WorkbenchPanel({ card, onSave, onClose }: WorkbenchPanelProps) {
         />
         <Tag color="black">{t(typeKeyOf(card.type))}</Tag>
         <span className="wb-panel__status" aria-live="polite" data-testid="wb-status">
-          {dirty ? t('workbench.saving') : savedFlash ? t('workbench.saved') : ''}
+          {saveState === 'saving'
+            ? t('workbench.saving')
+            : saveState === 'failed'
+              ? t('workbench.saveFailed')
+              : saveState === 'saved'
+                ? t('workbench.savedAt', {
+                    time: new Date().toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    }),
+                  })
+                : dirty
+                  ? t('workbench.saving')
+                  : ''}
         </span>
+        {onBackToList && (
+          <button
+            type="button"
+            className="wb-panel__back"
+            onClick={onBackToList}
+          >
+            {t('workbench.backToList')}
+          </button>
+        )}
         <button
           type="button"
           data-testid="wb-done"
@@ -144,16 +176,19 @@ export function WorkbenchPanel({ card, onSave, onClose }: WorkbenchPanelProps) {
       </header>
       <div className="wb-panel__tags">
         {tags.map((tag) => (
-          <button
-            key={tag.value}
-            type="button"
-            className="wb-panel__tag-chip"
-            style={{ background: tag.color }}
-            aria-label={t('tag.remove') + ': ' + tag.value}
-            onClick={() => setTags((prev) => prev.filter((x) => x.value !== tag.value))}
-          >
-            {tag.value} ×
-          </button>
+          <span key={tag.value} className="wb-panel__tag-chip" style={{ background: tag.color }}>
+            {tag.value}
+            <button
+              type="button"
+              className="wb-panel__tag-remove"
+              aria-label={t('tag.remove') + ': ' + tag.value}
+              onClick={() =>
+                setTags((prev) => prev.filter((x) => x.value !== tag.value))
+              }
+            >
+              ×
+            </button>
+          </span>
         ))}
         <input
           className="wb-panel__tag-input"
@@ -174,6 +209,12 @@ export function WorkbenchPanel({ card, onSave, onClose }: WorkbenchPanelProps) {
       </div>
     </aside>
   )
+}
+
+function stableTagColor(value: string): TagRef['color'] {
+  let hash = 0
+  for (let i = 0; i < value.length; i += 1) hash = (hash * 31 + value.charCodeAt(i)) | 0
+  return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length] ?? TAG_COLORS[0]!
 }
 
 const styles = `
@@ -266,6 +307,8 @@ const styles = `
   cursor: pointer;
   border-radius: 1px;
 }
+.wb-panel__tag-remove { border: 0; background: transparent; cursor: pointer; font-size: inherit; padding: 0 0 0 var(--space-1); min-width: 24px; min-height: 24px; }
+.wb-panel__back { border: 1px solid var(--color-black); background: var(--color-white); min-height: 44px; padding: 0 var(--space-2); cursor: pointer; }
 .wb-panel__tag-chip:hover { opacity: 0.8; }
 .wb-panel__tag-input {
   flex: 1;
@@ -280,6 +323,8 @@ const styles = `
 }
 .wb-panel__tag-input:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 @media (max-width: 1023px) {
+  .wb-panel__head { flex-wrap: wrap; padding-top: var(--space-2); }
+  .wb-panel__title { flex: 1 0 100%; width: 100%; padding: var(--space-1) 0; }
   .wb-panel__done { height: 40px; }
 }
 .wb-panel__body {

@@ -30,6 +30,12 @@ describe('workbenchStore', () => {
     expect(workbenchStore.getCardId()).toBe('c2')
   })
 
+  it('记录来源路由且 close 后保留', () => {
+    workbenchStore.open('c1', '/canvas')
+    workbenchStore.close()
+    expect(workbenchStore.getOrigin()).toBe('/canvas')
+  })
+
   it('open 同一 cardId 不重复通知', () => {
     let calls = 0
     const unsub = subscribe(() => {

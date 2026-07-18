@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { notFound } from 'next/navigation'
 import { Button } from '@cys-stift/ui/button'
 import { Input } from '@cys-stift/ui/input'
 import { Card } from '@cys-stift/ui/card'
@@ -13,6 +14,7 @@ export const metadata: Metadata = {
 }
 
 export default function DesignPage() {
+  if (process.env.NODE_ENV === 'production') notFound()
   return (
     <main id="main" tabIndex={-1} className="design">
       <h1 className="sr-only">cy&rsquo;s stift / design</h1>

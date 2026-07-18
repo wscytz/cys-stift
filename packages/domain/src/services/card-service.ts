@@ -65,7 +65,8 @@ export interface UpdateCardPatch {
   title?: string
   body?: string
   type?: CardType
-  color?: Card['color']
+  /** null explicitly clears an existing color; undefined leaves it unchanged. */
+  color?: Card['color'] | null
   pinned?: boolean
   media?: MediaRef[]
   links?: LinkPreview[]
@@ -186,7 +187,7 @@ export class CardService {
       ...(patch.title !== undefined ? { title: patch.title } : {}),
       ...(patch.body !== undefined ? { body: patch.body } : {}),
       ...(patch.type !== undefined ? { type: patch.type } : {}),
-      ...(patch.color !== undefined ? { color: patch.color } : {}),
+      ...(patch.color !== undefined ? { color: patch.color ?? undefined } : {}),
       ...(patch.pinned !== undefined ? { pinned: patch.pinned } : {}),
       ...(patch.tags !== undefined ? { tags: patch.tags } : {}),
       ...(patch.media !== undefined ? { media: patch.media } : {}),

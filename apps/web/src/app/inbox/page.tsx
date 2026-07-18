@@ -642,7 +642,7 @@ function CardTile({
             <Tag color="red">{t(typeKeyOf(card.type))}</Tag>
             {totalMedia > 0 && <Tag color="blue">{t('card.mediaCount', { n: totalMedia })}</Tag>}
             <span className="tile__time">
-              {card.capturedAt.toISOString().slice(0, 10)}
+              {card.capturedAt.toLocaleDateString()}
             </span>
           </div>
         </div>

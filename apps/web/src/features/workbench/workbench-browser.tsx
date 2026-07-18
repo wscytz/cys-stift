@@ -24,7 +24,7 @@ import { WorkbenchSections } from './workbench-sections'
  * 行点击(子任务 5):有 canvasPosition → workbenchStore.open + push /canvas(dock 接管编辑);
  * 无 canvasPosition → toast「未上画布」+ push /inbox(收件箱区卡本就未上画布,去 inbox 更顺)。
  */
-export function WorkbenchBrowser({ cards }: { cards: Card[] }) {
+export function WorkbenchBrowser({ cards, onOpenCard: onOpenCardProp }: { cards: Card[]; onOpenCard?: (card: Card) => void }) {
   const { t } = useI18n()
   const { cardId: activeCardId } = useWorkbench()
   const [mode, setMode] = useState<WorkbenchModeId>(DEFAULT_WORKBENCH_MODE)
@@ -33,8 +33,9 @@ export function WorkbenchBrowser({ cards }: { cards: Card[] }) {
 
   // 行点击:就地编辑(工作台右栏接管)。所有卡(含 inbox 未上画布)都就地编辑,不跳画布。
   const onOpenCard = useCallback((card: Card) => {
-    workbenchStore.open(card.id)
-  }, [])
+    if (onOpenCardProp) onOpenCardProp(card)
+    else workbenchStore.open(card.id)
+  }, [onOpenCardProp])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()

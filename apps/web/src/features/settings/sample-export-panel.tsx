@@ -16,7 +16,7 @@ export function SampleExportPanel() {
   const { settings, ready } = useSettings()
   const [, force] = useState(0)
   const count = ready ? getSampleCount() : 0
-  const enabled = settings.aiSampleCapture !== false // undefined/true = 开
+  const enabled = settings.aiSampleCapture === true
 
   const onExport = async () => {
     const samples = loadSamples()
@@ -45,6 +45,7 @@ export function SampleExportPanel() {
       <div className="sep__region" aria-hidden="true" />
       <h2 className="sep__h">{t('samples.title')}</h2>
       <p className="sep__lede">{t('samples.lede')}</p>
+      <p className="sep__disclosure" role="note">{t('samples.disclosure')}</p>
       <div className="sep__row">
         <label className="sep__label" htmlFor="ai-sample-capture">{t('samples.enable')}</label>
         <input id="ai-sample-capture" type="checkbox" checked={enabled} onChange={onToggle} />
@@ -59,6 +60,7 @@ export function SampleExportPanel() {
         .sep__region { position: absolute; top: 0; left: 0; width: 8px; height: 100%; background: var(--color-black); }
         .sep__h { font-family: var(--font-display); margin-left: var(--space-3); }
         .sep__lede { font-family: var(--font-body); color: var(--color-gray); margin: var(--space-1) var(--space-3) var(--space-3); }
+        .sep__disclosure { font-family: var(--font-mono); font-size: var(--font-size-xs); line-height: 1.5; margin: 0 var(--space-3) var(--space-3); padding: var(--space-2); border: 1px solid var(--color-gray); }
         .sep__row { display: flex; align-items: center; gap: var(--space-2); margin: 0 var(--space-3) var(--space-2); }
         .sep__label { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); }
         .sep__count { margin: 0 var(--space-3) var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-sm); color: var(--color-black); }

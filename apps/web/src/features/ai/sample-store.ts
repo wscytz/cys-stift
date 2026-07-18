@@ -2,7 +2,7 @@
  * sample-store — AI 交互样本的本地累积(供导出/调优/未来训练语料)。
  *
  * 镜像 ask-history 范式(SSR-safe / quota-safe),单全局 key,封顶最近 500 条。
- * 默认开累积(Settings.aiSampleCapture undefined/true 都写;显式 false 不写)——
+ * 明确同意后才累积(Settings.aiSampleCapture === true 才写)——
  * 由 addSample 的 enabled 参数控制(调用方读 settingsStore.get().aiSampleCapture 传入)。
  *
  * R2:样本字段(question/context/aiOutput)源自 buildAgentUserPrompt(走 serializeCardsForAI
@@ -76,11 +76,11 @@ export function loadSamples(): Sample[] {
 }
 
 /**
- * 追加一条样本。enabled=false(累积开关显式关)→ 不写,返回 false。
+ * 追加一条样本。仅 enabled=true 才写；undefined/false 均视为未同意。
  * 封顶最近 CAP 条(slice(-CAP))。quota 静默返 false。纯函数不调 Date.now —— ts 由 s 带。
  */
 export function addSample(s: Sample, enabled: boolean | undefined): boolean {
-  if (enabled === false) return false
+  if (enabled !== true) return false
   if (typeof window === 'undefined') return false
   try {
     const stamped = { ...s, dslVersion: DSL_VERSION }

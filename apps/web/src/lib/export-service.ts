@@ -248,6 +248,8 @@ export type ImportMode = 'replace' | 'merge'
 
 export interface ImportOptions {
   mode?: ImportMode
+  /** Validate and build the complete write plan without mutating storage. */
+  dryRun?: boolean
 }
 
 type JsonObject = Record<string, unknown>
@@ -712,6 +714,21 @@ export async function importFromJson(
       cards: 0,
       mediaAssets: 0,
       error: `serialise failed: ${(error as Error).message}`,
+    }
+  }
+
+  if (options?.dryRun) {
+    return {
+      ok: true,
+      cards: payload.cards.length,
+      mediaAssets: Object.keys(payload.mediaAssets ?? {}).length,
+      ...(payload.canvases ? { canvases: payload.canvases.canvases.length } : {}),
+      ...(incomingFreeform.size > 0 ? { freeformCanvases: incomingFreeform.size } : {}),
+      ...(payload.conversations && !Array.isArray(payload.conversations)
+        ? { conversations: Object.keys(payload.conversations).length }
+        : {}),
+      ...(payload.canvasTemplates ? { canvasTemplates: payload.canvasTemplates.length } : {}),
+      ...(payload.aiSamples ? { aiSamples: payload.aiSamples.length } : {}),
     }
   }
 

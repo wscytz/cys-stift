@@ -75,8 +75,8 @@ export interface Settings {
      *  不可预测 + 多轮外发:token 不可控。 */
     agentToolCallingLab?: boolean
   }
-  /** AI 交互样本累积开关。undefined=默认开(首提判定用);false=显式关(addSample 不写)。
-   *  独立字段(非 labs):工具性本地累积,非"附加能力风险"。不出本机(R2 兼容)。 */
+  /** AI 交互样本累积开关。仅 true=用户明确同意；undefined/false 均不写。
+   *  独立字段(非 labs)，只在本机保留，最多 500 条。 */
   aiSampleCapture?: boolean
   /** 卡片显示模式(密度切换,2026-07):compact(默认,3 行截断)/ auto(全文,卡高随内容)/
    *  title(仅标题)/ subtitle(标题+副标题)。模式管卡高(mode A);视图设置,不进 DSL。

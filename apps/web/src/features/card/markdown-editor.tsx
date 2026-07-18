@@ -16,6 +16,7 @@ import { WorkbenchIcon, type WorkbenchIconName } from '@/features/canvas/workben
 import { insertMarkdown, type MdAction } from './markdown-editor-helpers'
 import { MarkdownBody } from '@/app/inbox/markdown'
 import { useI18n } from '@/lib/i18n'
+import { useMatchMedia } from '@/lib/use-match-media'
 
 type View = 'split' | 'source' | 'preview'
 
@@ -65,6 +66,13 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
   const taRef = useRef<HTMLTextAreaElement>(null)
   const pendingSel = useRef<{ s: number; e: number } | null>(null)
   const [view, setView] = useState<View>('split')
+  const isNarrow = useMatchMedia('(max-width: 640px)')
+
+  // A two-column editor is not usable on phone widths. Start narrow screens
+  // in source mode; Preview remains one tap away in the same toolbar.
+  useEffect(() => {
+    if (isNarrow) setView((current) => current === 'split' ? 'source' : current)
+  }, [isNarrow])
 
   const apply = (action: MdAction) => {
     const ta = taRef.current
@@ -112,7 +120,7 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
             <button
               key={v.v}
               type="button"
-              className={`md-editor__btn md-editor__btn--text${view === v.v ? ' is-active' : ''}`}
+              className={`md-editor__btn md-editor__btn--text md-editor__btn--view-${v.v}${view === v.v ? ' is-active' : ''}`}
               title={label}
               aria-label={label}
               aria-pressed={view === v.v}
@@ -211,4 +219,9 @@ const styles = `
 }
 .md-editor__preview .md { font-size: var(--font-size-sm); }
 .md-editor__empty { color: var(--color-gray); font-style: italic; margin: 0; }
+@media (max-width: 640px) {
+  .md-editor__btn--view-split { display: none; }
+  .md-editor__body--split .md-editor__preview { display: none; }
+  .md-editor__body--split .md-editor__textarea { border-right: 0; }
+}
 `

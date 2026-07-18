@@ -136,6 +136,16 @@ describe('CardService', () => {
     expect(fetched?.archived).toBe(false)
   })
 
+  it('clears color only when patch explicitly uses null', () => {
+    const c = service.create({
+      title: 'colored',
+      source: dummySource,
+      color: 'red',
+    })
+    expect(service.update(c.id, { title: 'kept' })?.color).toBe('red')
+    expect(service.update(c.id, { color: null })?.color).toBeUndefined()
+  })
+
   it('update can swap multi-media arrays', () => {
     const c = service.create({ title: 'media', source: dummySource })
     service.update(c.id, {

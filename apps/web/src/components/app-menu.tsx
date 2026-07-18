@@ -70,23 +70,31 @@ export function AppMenu() {
     window.dispatchEvent(new CustomEvent(CAPTURE_OPEN_EVENT))
   }
 
-  const entries: { href: string; key: MessageKey; dev?: boolean }[] = [
-    { href: '/inbox', key: 'nav.inbox' },
-    { href: '/canvas', key: 'nav.canvas' },
-    { href: '/workbench', key: 'nav.workbench' },
-    { href: '/ask', key: 'nav.ask' },
-    { href: '/graph', key: 'nav.graph' },
-    { href: '/archive', key: 'nav.archive' },
-    { href: '/tags', key: 'nav.tags' },
-    { href: '/timeline', key: 'nav.timeline' },
-    { href: '/search', key: 'nav.search' },
-    { href: '/trash', key: 'nav.trash' },
-    { href: '/settings', key: 'nav.settings' },
-    // dev 工具:低调放底部,--dev modifier 降对比度(spec D7 入口;dev-only)。
-    ...(process.env.NODE_ENV !== 'production'
-      ? [{ href: '/dev/archive', key: 'nav.devArchive' as MessageKey, dev: true }]
-      : []),
+  const groups: Array<{
+    label: MessageKey
+    entries: { href: string; key: MessageKey }[]
+  }> = [
+    { label: 'nav.group.capture', entries: [
+      { href: '/inbox', key: 'nav.inbox' },
+      { href: '/canvas', key: 'nav.canvas' },
+      { href: '/workbench', key: 'nav.workbench' },
+    ] },
+    { label: 'nav.group.think', entries: [
+      { href: '/ask', key: 'nav.ask' },
+      { href: '/graph', key: 'nav.graph' },
+    ] },
+    { label: 'nav.group.find', entries: [
+      { href: '/archive', key: 'nav.archive' },
+      { href: '/tags', key: 'nav.tags' },
+      { href: '/timeline', key: 'nav.timeline' },
+      { href: '/search', key: 'nav.search' },
+      { href: '/trash', key: 'nav.trash' },
+    ] },
+    { label: 'nav.group.system', entries: [
+      { href: '/settings', key: 'nav.settings' },
+    ] },
   ]
+  const entries = groups.flatMap((group) => group.entries)
 
   const activeKey = entries.find((e) => pathname.startsWith(e.href))?.key
 
@@ -105,15 +113,20 @@ export function AppMenu() {
       <div
         className={`app-menu__entries${isNarrow && open ? ' app-menu__entries--open' : ''}`}
       >
-        {entries.map((e) => (
-          <Link
-            key={e.key}
-            href={e.href}
-            className={`app-menu__link ${activeKey === e.key ? 'app-menu__link--active' : ''} ${e.dev ? 'app-menu__link--dev' : ''}`}
-            onClick={() => setOpen(false)}
-          >
-            {t(e.key)}
-          </Link>
+        {groups.map((group) => (
+          <div key={group.label} className="app-menu__group" role="group" aria-label={t(group.label)}>
+            <span className="app-menu__group-label">{t(group.label)}</span>
+            {group.entries.map((e) => (
+              <Link
+                key={e.key}
+                href={e.href}
+                className={`app-menu__link ${activeKey === e.key ? 'app-menu__link--active' : ''}`}
+                onClick={() => setOpen(false)}
+              >
+                {t(e.key)}
+              </Link>
+            ))}
+          </div>
         ))}
       </div>
       <span className="app-menu__spacer" />
@@ -184,6 +197,9 @@ const styles = `
   user-select: none;
 }
 .app-menu__entries { display: flex; gap: var(--space-1); }
+.app-menu__group { display: flex; align-items: center; gap: var(--space-1); border-left: 1px solid var(--color-gray-soft); padding-left: var(--space-1); }
+.app-menu__group:first-child { border-left: 0; padding-left: 0; }
+.app-menu__group-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .app-menu__link {
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -195,10 +211,6 @@ const styles = `
 .app-menu__link:hover { color: var(--color-black); background: var(--color-gray-soft); }
 .app-menu__link:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .app-menu__link--active { color: var(--color-black); border-bottom: 2px solid var(--color-black); }
-/* dev 工具入口(存档等):降对比度低调放,active/hover 恢复正常显眼 */
-.app-menu__link--dev { opacity: 0.55; font-size: var(--font-size-xs); }
-.app-menu__link--dev:hover,
-.app-menu__link--dev.app-menu__link--active { opacity: 1; }
 .app-menu__spacer { flex: 1; }
 .app-menu__capture {
   font-family: var(--font-mono);
@@ -271,6 +283,9 @@ const styles = `
     opacity: 1;
     pointer-events: auto;
   }
+  .app-menu__group { flex-direction: column; align-items: stretch; border-left: 0; border-top: 1px solid var(--color-gray-soft); padding: var(--space-1) 0 0; }
+  .app-menu__group:first-child { border-top: 0; }
+  .app-menu__group-label { position: static; width: auto; height: auto; overflow: visible; clip-path: none; padding: var(--space-1) var(--space-2) 0; color: var(--color-gray); font-size: 10px; text-transform: uppercase; }
   /* 竖向抽屉里 active 用左条而非下划线 */
   .app-menu__link--active {
     border-bottom: none;

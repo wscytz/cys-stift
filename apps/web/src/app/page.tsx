@@ -7,29 +7,41 @@
  * clickable so first-time users do not need to discover the shortcut.
  * Phase 7 adds the Archive entry (blue region stripe).
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useI18n } from '@/lib/i18n'
 import { VERSION } from '@/lib/version'
 import { isMac as detectIsMac, isDesktop } from '@/lib/platform'
 import { CaptureHint } from '@/features/capture/capture-hint'
-import { CaptureSampleHint } from '@/components/capture-sample-hint'
 import { CAPTURE_OPEN_EVENT } from '@/features/capture/capture-host'
+import { useDb } from '@/lib/db-client'
+import { useCanvases } from '@/lib/canvas-store'
+import { workbenchStore } from '@/lib/workbench-store'
 
 export default function HomePage() {
   const { t } = useI18n()
+  const { snap, service, ready } = useDb()
+  const { snapshot: canvasSnapshot } = useCanvases()
   // 平台检测放 useEffect(navigator/window 客户端才有)。pre-mount 默认 false,
   // 让 SSG 构建期 HTML 与客户端首帧一致 —— 否则 hydration mismatch,dev 弹错误遮罩。
   const [isMac, setIsMac] = useState(false)
-  const [showCapture, setShowCapture] = useState(false)
+  const [desktop, setDesktop] = useState(false)
   useEffect(() => {
     setIsMac(detectIsMac())
-    setShowCapture(isDesktop())
+    setDesktop(isDesktop())
   }, [])
+  const activeCanvas = canvasSnapshot.canvases.find((canvas) => canvas.id === canvasSnapshot.activeCanvasId)
+  const activeCount = ready ? service.listOnCanvas(canvasSnapshot.activeCanvasId).length : 0
+  const recentCards = useMemo(() => {
+    if (!ready) return []
+    return service.listAll()
+      .filter((card) => !card.deletedAt && !card.archived)
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+      .slice(0, 4)
+  }, [ready, service, snap])
   return (
     <main id="main" tabIndex={-1} className="home">
       <CaptureHint />
-      <CaptureSampleHint />
       <header className="home__bar" aria-hidden="true" />
       <section className="home__content">
         <p className="home__eyebrow">{t('home.eyebrow')}</p>
@@ -37,42 +49,54 @@ export default function HomePage() {
           cy&rsquo;s <span className="home__title-accent">Stift</span>
         </h1>
         <p className="home__lede">{t('home.tagline')}</p>
-        <dl className="home__meta">
-          <div>
-            <dt>{t('home.feature.capture.title')}</dt>
-            <dd>{t('home.feature.capture.desc')}</dd>
-          </div>
-          <div>
-            <dt>{t('home.feature.inbox.title')}</dt>
-            <dd>{t('home.feature.inbox.desc')}</dd>
-          </div>
-          <div>
-            <dt>{t('home.feature.canvas.title')}</dt>
-            <dd>{t('home.feature.canvas.desc')}</dd>
-          </div>
-          <div>
-            <dt>{t('home.feature.archive.title')}</dt>
-            <dd>{t('home.feature.archive.desc')}</dd>
-          </div>
-        </dl>
-        <nav className="home__nav" aria-label={t('nav.homeNav')}>
-          {showCapture && (
+        <div className="home__quick-actions">
           <button
             type="button"
             className="home__capture"
-            aria-label="Quick capture"
             onClick={() => window.dispatchEvent(new CustomEvent(CAPTURE_OPEN_EVENT))}
           >
-            <div className="home__capture-arrow" aria-hidden="true">{isMac ? '⌘' : '^'}</div>
-            <div className="home__capture-label">{t('home.feature.capture.title')}</div>
-            <div className="home__capture-note">{isMac ? t('home.hint.mac') : t('home.hint.win')}</div>
+            <span className="home__capture-arrow" aria-hidden="true">+</span>
+            <span className="home__capture-label">{t('home.feature.capture.title')}</span>
+            <span className="home__capture-note">
+              {desktop ? (isMac ? t('home.hint.mac') : t('home.hint.win')) : t('home.feature.capture.desc')}
+            </span>
           </button>
-          )}
-          <Link href="/inbox" className="home__nav-link">
-            <span className="home__nav-arrow" aria-hidden="true">→</span>
-            <span className="home__nav-label">{t('home.feature.inbox.title')}</span>
-            <span className="home__nav-note">{t('home.feature.inbox.desc')}</span>
+          <Link href="/inbox" className="home__inbox-action">
+            <span aria-hidden="true">→</span>
+            <span>{t('home.feature.inbox.title')}</span>
           </Link>
+        </div>
+        <section className="home__continue" aria-labelledby="home-continue-title">
+          <div className="home__section-head">
+            <h2 id="home-continue-title">{t('home.continue')}</h2>
+            <Link href="/workbench">{t('home.openWorkbench')}</Link>
+          </div>
+          <div className="home__current">
+            <span>{t('home.currentCanvas')}</span>
+            <Link href="/canvas">
+              <strong>{activeCanvas?.name ?? t('nav.canvas')}</strong>
+              <small>{t('home.canvasCardCount', { n: String(activeCount) })}</small>
+            </Link>
+          </div>
+          <div className="home__recent">
+            <span>{t('home.recent')}</span>
+            {recentCards.length === 0 ? (
+              <p>{t('home.noRecent')}</p>
+            ) : (
+              <ul>
+                {recentCards.map((card) => (
+                  <li key={card.id}>
+                    <Link href="/workbench" onClick={() => workbenchStore.open(card.id, '/')}>
+                      <strong>{card.title || t('card.untitled')}</strong>
+                      <small>{card.updatedAt.toLocaleDateString()}</small>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+        <nav className="home__nav" aria-label={t('nav.homeNav')}>
           <Link href="/canvas" className="home__nav-link home__nav-link--canvas">
             <span className="home__nav-arrow" aria-hidden="true">→</span>
             <span className="home__nav-label">{t('home.feature.canvas.title')}</span>
@@ -111,7 +135,7 @@ export default function HomePage() {
           background: var(--color-red);
         }
         .home__content {
-          padding: var(--space-12) var(--space-10);
+          padding: var(--space-8) var(--space-10);
           max-width: 960px;
           display: flex;
           flex-direction: column;
@@ -129,7 +153,7 @@ export default function HomePage() {
           margin: 0;
           font-family: var(--font-display);
           font-weight: 500;
-          font-size: var(--font-size-4xl);
+          font-size: var(--font-size-3xl);
           line-height: 1;
           letter-spacing: -0.02em;
         }
@@ -142,26 +166,21 @@ export default function HomePage() {
           font-size: var(--font-size-xl);
           color: var(--color-black-soft);
         }
-        .home__meta {
-          margin: var(--space-6) 0 0;
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: var(--space-4);
-        }
-        .home__meta dt {
-          font-family: var(--font-mono);
-          font-size: var(--font-size-xs);
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-          color: var(--color-gray);
-        }
-        .home__meta dd {
-          margin: var(--space-1) 0 0;
-          padding-top: var(--space-1);
-          border-top: var(--border-hairline);
-          font-family: var(--font-display);
-          font-size: var(--font-size-lg);
-        }
+        .home__quick-actions { display: grid; grid-template-columns: minmax(0, 2fr) minmax(140px, 1fr); gap: var(--space-2); }
+        .home__inbox-action { display: flex; min-height: 72px; align-items: center; justify-content: center; gap: var(--space-2); border: var(--border-thick); color: var(--color-black); text-decoration: none; font-family: var(--font-display); font-size: var(--font-size-lg); }
+        .home__inbox-action:hover { background: var(--color-yellow); }
+        .home__inbox-action:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+        .home__continue { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: var(--space-3); border-top: var(--border-thick); padding-top: var(--space-3); }
+        .home__section-head { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; }
+        .home__section-head h2 { margin: 0; font-family: var(--font-display); font-size: var(--font-size-xl); }
+        .home__section-head a { color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-xs); }
+        .home__current, .home__recent { min-width: 0; }
+        .home__current > span, .home__recent > span { display: block; margin-bottom: var(--space-1); font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); text-transform: uppercase; }
+        .home__current a, .home__recent a { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: var(--space-2); color: var(--color-black); text-decoration: none; border-bottom: var(--border-hairline); }
+        .home__current small, .home__recent small { color: var(--color-gray); font-family: var(--font-mono); font-size: var(--font-size-xs); }
+        .home__recent ul { margin: 0; padding: 0; list-style: none; }
+        .home__recent p { color: var(--color-gray); }
+        @media (max-width: 640px) { .home__continue { grid-template-columns: 1fr; } .home__section-head { grid-column: 1; } }
         .home__foot {
           margin-top: auto;
           padding-top: var(--space-8);
@@ -246,7 +265,9 @@ export default function HomePage() {
           text-align: right;
         }
         @media (max-width: 768px) {
-          .home__capture-note { display: none; }
+          .home__content { padding: var(--space-6) var(--space-3); gap: var(--space-4); }
+          .home__quick-actions { grid-template-columns: 1fr; }
+          .home__capture-note { display: block; text-align: left; grid-column: 2; }
           .home__capture { grid-template-columns: 48px 1fr; }
         }
         .home__nav-link {
