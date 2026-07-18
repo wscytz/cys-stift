@@ -1,0 +1,569 @@
+{
+  "generatedAt": "2026-07-18T15:55:09.803Z",
+  "summaries": [
+    "/Users/jinxunuo/projects/cys-stability-evidence/20260718T112226Z/gates-baseline/summary.tsv",
+    "/Users/jinxunuo/projects/cys-stability-evidence/20260718T114106Z/gates-A/summary.tsv",
+    "/Users/jinxunuo/projects/cys-stability-evidence/20260718T121502Z/gates-B/summary.tsv",
+    "/Users/jinxunuo/projects/cys-stability-evidence/20260718T122914Z/gates-C/summary.tsv",
+    "/Users/jinxunuo/projects/cys-stability-evidence/20260718T130722Z/gates-D/summary.tsv",
+    "/Users/jinxunuo/projects/cys-stability-evidence/20260718T130921Z/gates-D/summary.tsv",
+    "/Users/jinxunuo/projects/cys-stability-evidence/20260718T134534Z/gates-E/summary.tsv",
+    "/Users/jinxunuo/projects/cys-stability-evidence/20260718T140754Z/gates-E/summary.tsv",
+    "/Users/jinxunuo/projects/cys-stability-evidence/20260718T152424Z/gates-F/summary.tsv",
+    "/Users/jinxunuo/projects/cys-stability-evidence/20260718T152923Z/gates-E/summary.tsv",
+    "/Users/jinxunuo/projects/cys-stability-evidence/20260718T155210Z/gates-all/summary.tsv"
+  ],
+  "rows": [
+    {
+      "lane": "baseline",
+      "gate": "install",
+      "exit": "0",
+      "duration_seconds": "0",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T112226Z/gates-baseline/logs/install.log",
+      "command": "pnpm install --frozen-lockfile"
+    },
+    {
+      "lane": "baseline",
+      "gate": "lint-all",
+      "exit": "0",
+      "duration_seconds": "2",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T112226Z/gates-baseline/logs/lint-all.log",
+      "command": "pnpm -r lint"
+    },
+    {
+      "lane": "baseline",
+      "gate": "test-all",
+      "exit": "0",
+      "duration_seconds": "13",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T112226Z/gates-baseline/logs/test-all.log",
+      "command": "pnpm -r test"
+    },
+    {
+      "lane": "baseline",
+      "gate": "web-build",
+      "exit": "0",
+      "duration_seconds": "12",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T112226Z/gates-baseline/logs/web-build.log",
+      "command": "pnpm --filter web build"
+    },
+    {
+      "lane": "baseline",
+      "gate": "tauri-debug",
+      "exit": "1",
+      "duration_seconds": "31",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T112226Z/gates-baseline/logs/tauri-debug.log",
+      "command": "pnpm --filter desktop tauri build --debug"
+    },
+    {
+      "lane": "A",
+      "gate": "web-security-tests",
+      "exit": "0",
+      "duration_seconds": "1",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T114106Z/gates-A/logs/web-security-tests.log",
+      "command": "pnpm --filter web test -- export-service build-archive-payload safe-href card-detail"
+    },
+    {
+      "lane": "A",
+      "gate": "web-build",
+      "exit": "0",
+      "duration_seconds": "10",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T114106Z/gates-A/logs/web-build.log",
+      "command": "pnpm --filter web build"
+    },
+    {
+      "lane": "B",
+      "gate": "web-dsl-tests",
+      "exit": "0",
+      "duration_seconds": "1",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T121502Z/gates-B/logs/web-dsl-tests.log",
+      "command": "pnpm --filter web test -- dsl apply-layout canvas-host-builder agent-confirm-card"
+    },
+    {
+      "lane": "B",
+      "gate": "web-build",
+      "exit": "0",
+      "duration_seconds": "11",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T121502Z/gates-B/logs/web-build.log",
+      "command": "pnpm --filter web build"
+    },
+    {
+      "lane": "C",
+      "gate": "canvas-tests",
+      "exit": "0",
+      "duration_seconds": "3",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T122914Z/gates-C/logs/canvas-tests.log",
+      "command": "pnpm --filter @cys-stift/canvas-engine test"
+    },
+    {
+      "lane": "D",
+      "gate": "web-desktop-contract-tests",
+      "exit": "0",
+      "duration_seconds": "2",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T130722Z/gates-D/logs/web-desktop-contract-tests.log",
+      "command": "pnpm --filter web test -- settings capture"
+    },
+    {
+      "lane": "D",
+      "gate": "cargo-tests",
+      "exit": "0",
+      "duration_seconds": "0",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T130722Z/gates-D/logs/cargo-tests.log",
+      "command": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml"
+    },
+    {
+      "lane": "D",
+      "gate": "web-desktop-contract-tests",
+      "exit": "0",
+      "duration_seconds": "1",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T130921Z/gates-D/logs/web-desktop-contract-tests.log",
+      "command": "pnpm --filter web test -- settings capture"
+    },
+    {
+      "lane": "D",
+      "gate": "cargo-tests",
+      "exit": "0",
+      "duration_seconds": "1",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T130921Z/gates-D/logs/cargo-tests.log",
+      "command": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml"
+    },
+    {
+      "lane": "E",
+      "gate": "web-accessibility-tests",
+      "exit": "0",
+      "duration_seconds": "5",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T134534Z/gates-E/logs/web-accessibility-tests.log",
+      "command": "pnpm --filter web test -- self-canvas canvas"
+    },
+    {
+      "lane": "E",
+      "gate": "web-build",
+      "exit": "1",
+      "duration_seconds": "11",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T134534Z/gates-E/logs/web-build.log",
+      "command": "pnpm --filter web build"
+    },
+    {
+      "lane": "E",
+      "gate": "web-accessibility-tests",
+      "exit": "0",
+      "duration_seconds": "5",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T140754Z/gates-E/logs/web-accessibility-tests.log",
+      "command": "pnpm --filter web test -- self-canvas canvas"
+    },
+    {
+      "lane": "E",
+      "gate": "web-build",
+      "exit": "0",
+      "duration_seconds": "10",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T140754Z/gates-E/logs/web-build.log",
+      "command": "pnpm --filter web build"
+    },
+    {
+      "lane": "F",
+      "gate": "web-build",
+      "exit": "0",
+      "duration_seconds": "10",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T152424Z/gates-F/logs/web-build.log",
+      "command": "pnpm --filter web build"
+    },
+    {
+      "lane": "F",
+      "gate": "diff-check",
+      "exit": "0",
+      "duration_seconds": "0",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T152424Z/gates-F/logs/diff-check.log",
+      "command": "git diff --check"
+    },
+    {
+      "lane": "E",
+      "gate": "web-accessibility-tests",
+      "exit": "0",
+      "duration_seconds": "6",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T152923Z/gates-E/logs/web-accessibility-tests.log",
+      "command": "pnpm --filter web test -- self-canvas canvas"
+    },
+    {
+      "lane": "E",
+      "gate": "web-build",
+      "exit": "0",
+      "duration_seconds": "20",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T152923Z/gates-E/logs/web-build.log",
+      "command": "pnpm --filter web build"
+    },
+    {
+      "lane": "all",
+      "gate": "install",
+      "exit": "0",
+      "duration_seconds": "0",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T155210Z/gates-all/logs/install.log",
+      "command": "pnpm install --frozen-lockfile"
+    },
+    {
+      "lane": "all",
+      "gate": "lint-all",
+      "exit": "0",
+      "duration_seconds": "3",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T155210Z/gates-all/logs/lint-all.log",
+      "command": "pnpm -r lint"
+    },
+    {
+      "lane": "all",
+      "gate": "test-all",
+      "exit": "0",
+      "duration_seconds": "17",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T155210Z/gates-all/logs/test-all.log",
+      "command": "pnpm -r test"
+    },
+    {
+      "lane": "all",
+      "gate": "web-build",
+      "exit": "0",
+      "duration_seconds": "11",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T155210Z/gates-all/logs/web-build.log",
+      "command": "pnpm --filter web build"
+    },
+    {
+      "lane": "all",
+      "gate": "tauri-debug",
+      "exit": "0",
+      "duration_seconds": "37",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T155210Z/gates-all/logs/tauri-debug.log",
+      "command": "pnpm --filter desktop tauri build --debug"
+    },
+    {
+      "lane": "all",
+      "gate": "diff-check",
+      "exit": "0",
+      "duration_seconds": "0",
+      "log": "/Users/jinxunuo/projects/cys-stability-evidence/20260718T155210Z/gates-all/logs/diff-check.log",
+      "command": "git diff --check"
+    }
+  ],
+  "findings": [
+    {
+      "id": "N01",
+      "severity": "P1",
+      "lane": "A",
+      "title": "CI 跳过 web 与 canvas-engine 测试",
+      "owners": [
+        ".github/workflows/ci.yml"
+      ],
+      "evidence": [
+        "PR 中显式运行两个包测试",
+        "mutation check 能让 CI 变红"
+      ]
+    },
+    {
+      "id": "N02",
+      "severity": "P1",
+      "lane": "A",
+      "title": "Export/archive 携带 API key",
+      "owners": [
+        "apps/web/src/lib/export-service.ts",
+        "apps/web/src/lib/build-archive-payload.ts"
+      ],
+      "evidence": [
+        "最终 JSON secret scan 零命中",
+        "redacted profile 状态可见"
+      ]
+    },
+    {
+      "id": "N03",
+      "severity": "P1",
+      "lane": "A",
+      "title": "覆盖导入未删除缺失数据",
+      "owners": [
+        "apps/web/src/lib/export-service.ts"
+      ],
+      "evidence": [
+        "replace 删除 owned stale keys",
+        "merge 保留",
+        "失败恢复"
+      ]
+    },
+    {
+      "id": "N04",
+      "severity": "P1",
+      "lane": "A",
+      "title": "导入媒体链接未验证",
+      "owners": [
+        "apps/web/src/features/card/card-detail.tsx",
+        "apps/web/src/lib/safe-href.ts"
+      ],
+      "evidence": [
+        "恶意媒体不可点击",
+        "合法文件可打开"
+      ]
+    },
+    {
+      "id": "N05",
+      "severity": "P1",
+      "lane": "B",
+      "title": "Arrow label quote/backslash 往返损坏",
+      "owners": [
+        "apps/web/src/features/ai/dsl.peggy",
+        "apps/web/src/features/ai/dsl-parser.ts",
+        "apps/web/src/features/ai/canvas-dsl.ts"
+      ],
+      "evidence": [
+        "quote/slash/Unicode canonical round-trip"
+      ]
+    },
+    {
+      "id": "N06",
+      "severity": "P1",
+      "lane": "B",
+      "title": "冒号 ID 在端点中截断",
+      "owners": [
+        "apps/web/src/features/ai/dsl.peggy"
+      ],
+      "evidence": [
+        "header/from/to/anchor 共用 idRef"
+      ]
+    },
+    {
+      "id": "N07",
+      "severity": "P1",
+      "lane": "B",
+      "title": "持久化失败仍报告 applied",
+      "owners": [
+        "apps/web/src/features/canvas/canvas-host-builder.ts",
+        "apps/web/src/features/canvas/apply-layout.ts",
+        "apps/web/src/features/ai/agent-confirm-card.tsx"
+      ],
+      "evidence": [
+        "applied=0",
+        "host 无 ghost",
+        "依赖 op 不 commit",
+        "无成功副作用"
+      ]
+    },
+    {
+      "id": "N08",
+      "severity": "P1",
+      "lane": "E",
+      "title": "画布无对象级键盘/辅助技术路径",
+      "owners": [
+        "apps/web/src/features/canvas/self-canvas.tsx",
+        "apps/web/src/app/canvas/page.tsx"
+      ],
+      "evidence": [
+        "键盘核心旅程",
+        "VoiceOver 对象/位置/关系"
+      ]
+    },
+    {
+      "id": "N09",
+      "severity": "P1",
+      "lane": "F",
+      "title": "DSL/隐私文档事实错误",
+      "owners": [
+        "README.md",
+        "docs/user/transliteration.md",
+        "docs/user/privacy.md"
+      ],
+      "evidence": [
+        "文档与 v4/create/确认门/settings v2 一致"
+      ]
+    },
+    {
+      "id": "N10",
+      "severity": "P2",
+      "lane": "C",
+      "title": "折角检测 off-by-one",
+      "owners": [
+        "packages/canvas-engine/src/rdp.ts",
+        "packages/canvas-engine/src/freedraw-classify.ts"
+      ],
+      "evidence": [
+        "三点 L 精确共享顶点",
+        "抖动 L/Z 形"
+      ]
+    },
+    {
+      "id": "N11",
+      "severity": "P2",
+      "lane": "C",
+      "title": "Straight arrow 无法再次拖弯",
+      "owners": [
+        "packages/canvas-engine/src/self-built-adapter.ts"
+      ],
+      "evidence": [
+        "straight 拖动切 curve",
+        "单步 undo"
+      ]
+    },
+    {
+      "id": "N12",
+      "severity": "P2",
+      "lane": "C",
+      "title": "Hover pointer 污染 active pointers",
+      "owners": [
+        "packages/canvas-engine/src/self-built-adapter.ts"
+      ],
+      "evidence": [
+        "hover+touch 不误 pinch",
+        "cancel/lostcapture 清理"
+      ]
+    },
+    {
+      "id": "N13",
+      "severity": "P2",
+      "lane": "C",
+      "title": "Marquee 忽略真实 arrow route",
+      "owners": [
+        "packages/canvas-engine/src/self-built-marquee.ts"
+      ],
+      "evidence": [
+        "curve/elbow/collinear/endpoint cases"
+      ]
+    },
+    {
+      "id": "N14",
+      "severity": "P2",
+      "lane": "C",
+      "title": "卡高同步后当前帧仍渲染旧对象",
+      "owners": [
+        "packages/canvas-engine/src/self-built-adapter.ts"
+      ],
+      "evidence": [
+        "单 RAF 内背景与文本一致"
+      ]
+    },
+    {
+      "id": "N15",
+      "severity": "P2",
+      "lane": "B",
+      "title": "空 host 新建 arrow 丢失请求 ID",
+      "owners": [
+        "apps/web/src/features/canvas/apply-layout.ts"
+      ],
+      "evidence": [
+        "empty-host arrow ID 稳定",
+        "再次序列化一致"
+      ]
+    },
+    {
+      "id": "N16",
+      "severity": "P2",
+      "lane": "B",
+      "title": "关系求解绕过坐标上限",
+      "owners": [
+        "apps/web/src/features/ai/dsl-sanitize.ts",
+        "apps/web/src/features/ai/relational-solver.ts"
+      ],
+      "evidence": [
+        "gap 边界",
+        "post-solve validate",
+        "长链不越界"
+      ]
+    },
+    {
+      "id": "N17",
+      "severity": "P2",
+      "lane": "C",
+      "title": "No-op 产生空 undo",
+      "owners": [
+        "packages/canvas-engine/src/self-built-adapter.ts",
+        "packages/canvas-engine/src/in-memory-host.ts"
+      ],
+      "evidence": [
+        "hydrate/sync/skipped/handle no-op history 不变"
+      ]
+    },
+    {
+      "id": "N18",
+      "severity": "P2",
+      "lane": "D",
+      "title": "快捷键注册失败后三端分叉",
+      "owners": [
+        "apps/web/src/app/settings/page.tsx",
+        "apps/web/src/features/capture/capture-host.tsx",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "evidence": [
+        "冲突/成功/竞态下 UI/store/native 一致"
+      ]
+    },
+    {
+      "id": "N19",
+      "severity": "P2",
+      "lane": "E",
+      "title": "触屏高频工具小于 44px",
+      "owners": [
+        "apps/web/src/app/canvas/page.tsx"
+      ],
+      "evidence": [
+        "四 viewport 核心目标短边 >=44"
+      ]
+    },
+    {
+      "id": "N20",
+      "severity": "P2",
+      "lane": "E",
+      "title": "Menu 缺少键盘契约",
+      "owners": [
+        "apps/web/src/app/canvas/page.tsx"
+      ],
+      "evidence": [
+        "打开/方向/Home/End/Escape/回焦"
+      ]
+    },
+    {
+      "id": "N21",
+      "severity": "P2",
+      "lane": "C",
+      "title": "快速 eraser 固定采样上限漏对象",
+      "owners": [
+        "packages/canvas-engine/src/self-built-adapter.ts"
+      ],
+      "evidence": [
+        "不同 zoom 的 50/200/1000px sweep"
+      ]
+    },
+    {
+      "id": "N22",
+      "severity": "P3",
+      "lane": "F",
+      "title": "公开文档断链",
+      "owners": [
+        "docs/development/setup.md",
+        "docs/user/privacy.md",
+        "docs/user/transliteration.md"
+      ],
+      "evidence": [
+        "link checker 零错误并进入 CI"
+      ]
+    },
+    {
+      "id": "N23",
+      "severity": "P3",
+      "lane": "F",
+      "title": "Cargo/web package 版本漂移",
+      "owners": [
+        "package.json",
+        "apps/web/package.json",
+        "apps/desktop/src-tauri/Cargo.toml",
+        "apps/desktop/src-tauri/tauri.conf.json"
+      ],
+      "evidence": [
+        "单一版本源策略",
+        "生成后无 diff"
+      ]
+    },
+    {
+      "id": "N24",
+      "severity": "P3",
+      "lane": "E",
+      "title": "Canvas 高度依赖 69px 与 100vh",
+      "owners": [
+        "apps/web/src/styles/globals.css",
+        "apps/web/src/app/canvas/page.tsx"
+      ],
+      "evidence": [
+        "flex/grid 剩余高度",
+        "动态 viewport 无裁切"
+      ]
+    }
+  ]
+}
