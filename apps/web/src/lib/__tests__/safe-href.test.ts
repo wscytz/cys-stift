@@ -52,7 +52,7 @@ describe('isSafeImageDataUrl — 图片 data URL', () => {
   const png = 'data:image/png;base64,iVBORw0KGgo='
   it('放行 png/jpeg/jpg/gif/webp base64', () => {
     expect(isSafeImageDataUrl(png)).toBe(true)
-    expect(isSafeImageDataUrl('data:image/jpeg;base64,/9j/4AAQ=')).toBe(true)
+    expect(isSafeImageDataUrl('data:image/jpeg;base64,/9j/4AAQSkZJRg==')).toBe(true)
     expect(isSafeImageDataUrl('data:image/webp;base64,UklGRg==')).toBe(true)
   })
   it('拒绝 svg(XSS 向量)/text/html/非图片', () => {
@@ -69,7 +69,7 @@ describe('isSafeImageDataUrl — 图片 data URL', () => {
     const big = 'data:image/png;base64,' + 'A'.repeat(8_000_000)
     expect(isSafeImageDataUrl(big)).toBe(false)
     // 自定义较小上限
-    expect(isSafeImageDataUrl(png, 10)).toBe(false)
+    expect(isSafeImageDataUrl(png, 5)).toBe(false)
   })
 })
 

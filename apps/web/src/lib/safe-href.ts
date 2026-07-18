@@ -11,6 +11,7 @@
  * card.links[].url verbatim — an XSS hole for imported cards).
  */
 const SAFE_HREF_PREFIXES = ['http://', 'https://', 'mailto:', 'tel:', '/']
+export const MAX_SAFE_MEDIA_BYTES = 5_000_000
 
 export function safeHref(href: string | undefined | null): string {
   if (typeof href !== 'string') return '#'
@@ -28,15 +29,49 @@ export function safeHref(href: string | undefined | null): string {
  * text/html. Returns false for anything that isn't a base64 data: URL of an
  * allowed image type. Used to harden imported media assets.
  */
-const SAFE_DATA_IMAGE_RE =
-  /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$/
+const SAFE_IMAGE_MIMES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/gif',
+  'image/webp',
+])
 
-export function isSafeImageDataUrl(value: unknown, maxBytes = 5_000_000): boolean {
-  if (typeof value !== 'string') return false
-  if (!SAFE_DATA_IMAGE_RE.test(value)) return false
-  // base64 length ≈ 4/3 of raw bytes; cap the data URL to stay within the
-  // localStorage quota budget.
-  return value.length <= Math.ceil(maxBytes * 1.4)
+const SAFE_FILE_MIMES = new Set([
+  'text/plain',
+  'text/markdown',
+  'text/csv',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.ms-excel',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/epub+zip',
+])
+
+const BASE64_DATA_URL_RE = /^data:([^;,]+);base64,([A-Za-z0-9+/]*={0,2})$/
+
+function parseBase64DataUrl(
+  value: unknown,
+): { mimeType: string; byteSize: number } | null {
+  if (typeof value !== 'string') return null
+  const match = BASE64_DATA_URL_RE.exec(value)
+  if (!match) return null
+  const mimeType = match[1]?.toLowerCase()
+  const base64 = match[2]
+  if (!mimeType || base64 === undefined || base64.length % 4 !== 0) return null
+  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0
+  return { mimeType, byteSize: (base64.length * 3) / 4 - padding }
+}
+
+export function isSafeImageDataUrl(
+  value: unknown,
+  maxBytes = MAX_SAFE_MEDIA_BYTES,
+): boolean {
+  const parsed = parseBase64DataUrl(value)
+  return !!parsed && SAFE_IMAGE_MIMES.has(parsed.mimeType) && parsed.byteSize <= maxBytes
 }
 
 /**
@@ -46,16 +81,26 @@ export function isSafeImageDataUrl(value: unknown, maxBytes = 5_000_000): boolea
  * (XSS vector). 5MB hard cap (same as image — single attachment shouldn't
  * blow the localStorage budget on its own).
  */
-const SAFE_DATA_FILE_RE =
-  /^data:(?:text\/(?:plain|markdown|csv|html)|application\/(?:pdf|msword|vnd\.openxmlformats-officedocument\.(?:wordprocessingml|spreadsheetml|presentationml))|application\/epub\+zip|image\/(?:png|jpeg|jpg|gif|webp));base64,[A-Za-z0-9+/=]+$/
-
 export function isSafeFileDataUrl(
   value: unknown,
-  maxBytes = 5_000_000,
+  maxBytes = MAX_SAFE_MEDIA_BYTES,
 ): boolean {
-  if (typeof value !== 'string') return false
-  if (!SAFE_DATA_FILE_RE.test(value)) return false
-  return value.length <= Math.ceil(maxBytes * 1.4)
+  const parsed = parseBase64DataUrl(value)
+  return !!parsed && SAFE_FILE_MIMES.has(parsed.mimeType) && parsed.byteSize <= maxBytes
+}
+
+export function isSafeMediaDataUrl(
+  value: unknown,
+  kind: unknown,
+  declaredMimeType: unknown,
+  maxBytes = MAX_SAFE_MEDIA_BYTES,
+): boolean {
+  if (typeof declaredMimeType !== 'string') return false
+  const parsed = parseBase64DataUrl(value)
+  if (!parsed || parsed.mimeType !== declaredMimeType.toLowerCase()) return false
+  if (kind === 'image') return isSafeImageDataUrl(value, maxBytes)
+  if (kind === 'file') return isSafeFileDataUrl(value, maxBytes)
+  return false
 }
 
 /**

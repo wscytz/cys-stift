@@ -158,12 +158,13 @@ function lsSave(canvasId: CanvasId, snapshot: CanvasFreeformSnapshot): boolean {
   }
 }
 
-function lsRemove(canvasId: CanvasId): void {
+function lsRemove(canvasId: CanvasId): boolean {
   try {
     window.localStorage.removeItem(storageKey(canvasId))
     window.localStorage.removeItem(legacyStorageKey(canvasId)) // 清旧 tldraw snapshot
+    return true
   } catch {
-    // best-effort
+    return false
   }
 }
 
@@ -223,21 +224,27 @@ async function opfsLoad(canvasId: CanvasId): Promise<CanvasFreeformSnapshot | nu
   }
 }
 
-async function opfsRemove(canvasId: CanvasId): Promise<void> {
+function isMissingEntry(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'NotFoundError'
+}
+
+async function opfsRemove(canvasId: CanvasId): Promise<boolean> {
   const root = await opfsRoot()
-  if (!root) return
+  if (!root) return true
+  let ok = true
   try {
     const dir = await root.getDirectoryHandle(OPFS_DIR)
     await dir.removeEntry(opfsFileName(canvasId))
-  } catch {
-    // 不存在 —— 无所谓。
+  } catch (error) {
+    if (!isMissingEntry(error)) ok = false
   }
   try {
     const dir = await root.getDirectoryHandle(OPFS_DIR)
     await dir.removeEntry(legacyOpfsFileName(canvasId)) // 清旧 tldraw snapshot
-  } catch {
-    // 不存在 —— 无所谓。
+  } catch (error) {
+    if (!isMissingEntry(error)) ok = false
   }
+  return ok
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────
@@ -276,10 +283,12 @@ export const canvasFreeformStore = {
    * 删除一个画布的 freeform 快照(画布被删时调用)。
    * 同时清理旧 tldraw snapshot 遗留数据(OPFS + localStorage 两处)。
    */
-  async remove(canvasId: CanvasId): Promise<void> {
-    if (typeof window === 'undefined') return
-    await opfsRemove(canvasId)
-    lsRemove(canvasId)
-    notifyChange()
+  async remove(canvasId: CanvasId): Promise<boolean> {
+    if (typeof window === 'undefined') return true
+    const opfsOk = await opfsRemove(canvasId)
+    const localOk = lsRemove(canvasId)
+    const ok = opfsOk && localOk
+    if (ok) notifyChange()
+    return ok
   },
 }

@@ -43,4 +43,21 @@ describe('buildArchivePayload', () => {
     const p = await buildArchivePayload()
     expect(p.mediaAssets).toEqual({})
   })
+
+  it('defense in depth: final archive payload redacts API keys', async () => {
+    const secret = 'sk-archive-must-never-leak-unique'
+    ;(buildExportPayload as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      version: 1,
+      cards: [],
+      mediaAssets: {},
+      settings: {
+        profiles: [{ id: 'p1', apiKey: secret }],
+      },
+    })
+
+    const serialized = JSON.stringify(await buildArchivePayload())
+
+    expect(serialized).not.toContain(secret)
+    expect(JSON.parse(serialized).settings.profiles[0].apiKey).toBe('')
+  })
 })

@@ -58,6 +58,7 @@ export function serializeCard(card: Card, opts: SerializeOptions = {}): string {
         if (
           asset.kind === 'image' &&
           inlineImages &&
+          asset.byteSize <= maxInlineImageBytes &&
           isSafeImageDataUrl(asset.dataUrl, maxInlineImageBytes)
         ) {
           lines.push(`![${ref.caption ?? asset.mimeType}](${asset.dataUrl})`)

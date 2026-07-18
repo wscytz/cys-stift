@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-07-18 · v0.59.0 · 稳定性 Lane A（CI / 备份安全 / 导入恢复）
+
+按统一稳定性交接包复核并关闭 N01-N04 的当前实现缺口。
+
+- **CI 真覆盖**:GitHub Actions 显式运行 web 与 canvas-engine 测试,不再只跑 domain/db + web build。
+- **密钥边界**:JSON export 与开发存档在最终载荷边界共用递归 redactor,`apiKey` 默认清空;导入 redacted profile 时只保留目标设备同 ID profile 的本地密钥。
+- **导入事务**:`importFromJson` 明确支持 `replace | merge`;replace 删除快照缺失的 owned stores/conversation/freeform,merge 按 id/name 保留目标端额外条目;localStorage 与 freeform 任一写入失败均恢复导入前快照并报告 complete/partial rollback。
+- **媒体双层校验**:导入时校验 id/kind/MIME/base64/实际与声明大小/日期/checksum;HTML、SVG、`javascript:`、kind/MIME 不符和超 5 MB 数据拒绝。详情渲染再次校验,非法附件不生成可点击链接。
+- **验证**:`pnpm -r lint`、`pnpm -r test`、`pnpm --filter web build` 全绿;web 1603 测、canvas-engine 539 测。Lane A 独立 gate 全绿。
+
 ## 2026-07-13 · v0.59.0 · 工作台重设计(左库 + 右编辑器二合一)
 
 用户手测 v0.58.1 反馈工作台体验断裂(画布无入口 / dock 打开路径藏详情弹窗 / 库页不编辑)。根因:编辑没有明确的家,详情弹窗/dock/库页三处抢,库又不参与编辑。

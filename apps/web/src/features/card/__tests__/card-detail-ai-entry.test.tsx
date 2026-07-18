@@ -23,6 +23,7 @@ import type { Card } from '@cys-stift/domain'
 // per spec §3.2, regardless of the configured-but-disabled flag).
 const mockIsAIReady = vi.fn()
 const mockGetCurrentAI = vi.fn()
+const mockGetAsset = vi.fn()
 vi.mock('@/features/ai/ai-settings-provider', () => ({
   useAIEnabled: () => true,
   isAIReady: (cfg: unknown) => mockIsAIReady(cfg),
@@ -73,7 +74,7 @@ vi.mock('@/lib/i18n', () => ({
 // card has no media, but the module import still runs — stub it to be safe.
 vi.mock('@/lib/media-store', () => ({
   mediaStore: {
-    getAsset: () => null,
+    getAsset: (...args: unknown[]) => mockGetAsset(...args),
     attach: vi.fn(),
     remove: vi.fn(),
   },
@@ -151,6 +152,8 @@ const baseProps = (
 beforeEach(() => {
   mockIsAIReady.mockReset()
   mockGetCurrentAI.mockReset()
+  mockGetAsset.mockReset()
+  mockGetAsset.mockReturnValue(null)
 })
 afterEach(() => vi.clearAllMocks())
 
@@ -188,6 +191,55 @@ describe('card-detail ✨ AI entry', () => {
     click(host, 'card-ai-entry')
     click(host, 'ai-menu-summarize')
     expect(byTestId(host, 'ai-popover-stub')).toBeTruthy()
+    unmount()
+  })
+})
+
+describe('card-detail imported file safety', () => {
+  const cardWithFile = (): Card => ({
+    ...fakeCard(),
+    media: [{ assetId: 'm1' as never, order: 0 }],
+  })
+
+  it('does not render a clickable link for an unsafe imported file URL', () => {
+    mockGetCurrentAI.mockReturnValue(null)
+    mockIsAIReady.mockReturnValue(false)
+    mockGetAsset.mockReturnValue({
+      id: 'm1',
+      kind: 'file',
+      mimeType: 'text/html',
+      dataUrl: 'javascript:alert(1)',
+      byteSize: 10,
+      createdAt: '2026-07-18T00:00:00.000Z',
+      checksum: '',
+    })
+    const { host, unmount } = mount(
+      <CardDetailModal {...baseProps({ card: cardWithFile() })} />,
+    )
+
+    expect(host.querySelector('.cd__media-item a')).toBeNull()
+    expect(host.querySelector('.cd__media-item')?.textContent).toContain('text/html')
+    unmount()
+  })
+
+  it('keeps a legal PDF data URL clickable', () => {
+    mockGetCurrentAI.mockReturnValue(null)
+    mockIsAIReady.mockReturnValue(false)
+    const dataUrl = 'data:application/pdf;base64,JVBERiA='
+    mockGetAsset.mockReturnValue({
+      id: 'm1',
+      kind: 'file',
+      mimeType: 'application/pdf',
+      dataUrl,
+      byteSize: 5,
+      createdAt: '2026-07-18T00:00:00.000Z',
+      checksum: '',
+    })
+    const { host, unmount } = mount(
+      <CardDetailModal {...baseProps({ card: cardWithFile() })} />,
+    )
+
+    expect(host.querySelector('.cd__media-item a')?.getAttribute('href')).toBe(dataUrl)
     unmount()
   })
 })

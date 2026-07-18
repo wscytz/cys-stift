@@ -6,6 +6,8 @@ import { downloadFile } from './download'
 import type { CanvasTemplate } from './canvas-templates'
 import type { PersistedConversationMessage } from './conversation-store'
 import type { Sample } from '@/features/ai/sample-store'
+import { redactExportSecrets, restoreDeviceProfileSecrets } from './export-redaction'
+import { isSafeMediaDataUrl, MAX_SAFE_MEDIA_BYTES } from './safe-href'
 
 // ── Export (spec §1.2 信念4 "数据可迁移") ──────────────────────────────────
 // Serialise the user's local data to an open JSON format. The browser
@@ -183,7 +185,7 @@ export async function buildExportPayload(
   // per-canvas AI 对话历史(conversation-store,多 key 枚举)。
   const conversations = readAllConversations()
 
-  return {
+  return redactExportSecrets({
     version: EXPORT_FORMAT_VERSION,
     exportedAt: new Date().toISOString(),
     app: "cy's Stift",
@@ -197,7 +199,7 @@ export async function buildExportPayload(
     ...(canvasTemplates ? { canvasTemplates } : {}),
     ...(aiSamples ? { aiSamples } : {}),
     ...(conversations ? { conversations } : {}),
-  }
+  })
 }
 
 /**
@@ -233,10 +235,6 @@ export interface ImportResult {
   canvases?: number
   /** 导入成功 freeform 几何的 canvas 数(OPFS/localStorage)。 */
   freeformCanvases?: number
-  /** freeform 持久化失败的 canvas 数(OPFS+localStorage 双失败)。
-   *  不整体失败(卡片/canvas 列表已成功落地且有 rollback),但诚实回报供 UI 提示。
-   *  全成功时为 undefined(向后兼容)。 */
-  freeformSkipped?: number
   /** 导入的 per-canvas 对话历史 key 数。 */
   conversations?: number
   /** 导入的自建画布模板数。 */
@@ -246,10 +244,165 @@ export interface ImportResult {
   error?: string
 }
 
-export async function importFromJson(jsonText: string): Promise<ImportResult> {
+export type ImportMode = 'replace' | 'merge'
+
+export interface ImportOptions {
+  mode?: ImportMode
+}
+
+type JsonObject = Record<string, unknown>
+type StorageOperation = { key: string; value: string | null }
+
+const STORE_KEYS = {
+  cards: 'cys-stift.cards.v1',
+  media: 'cys-stift.media.v1',
+  drafts: 'cys-stift.drafts.v1',
+  settings: 'cys-stift.settings.v2',
+  canvases: 'cys-stift.canvases.v1',
+  canvasView: 'cys-stift.canvas-view.v1',
+  templates: 'cys-stift.canvas-templates.v1',
+  samples: 'cys-stift.ai-samples.v1',
+} as const
+
+const CONVERSATION_PREFIX = 'cys-stift.conversation.'
+const CONVERSATION_SUFFIX = '.v2'
+const FREEFORM_PREFIX = 'cys-stift.canvas-freeform.'
+const FREEFORM_SUFFIX = '.v1'
+
+function isObject(value: unknown): value is JsonObject {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function storedObject(key: string, property?: string): JsonObject | undefined {
+  const parsed = readJson(key)
+  if (!isObject(parsed)) return undefined
+  if (!property) return parsed
+  const nested = parsed[property]
+  return isObject(nested) ? nested : undefined
+}
+
+function storedArray(key: string, property?: string): unknown[] {
+  const parsed = readJson(key)
+  const value = property && isObject(parsed) ? parsed[property] : parsed
+  return Array.isArray(value) ? value : []
+}
+
+function mergeByStringKey(
+  current: unknown[],
+  incoming: unknown[],
+  key: string,
+): unknown[] {
+  const result = [...current]
+  const indices = new Map<string, number>()
+  result.forEach((item, index) => {
+    if (isObject(item) && typeof item[key] === 'string') indices.set(item[key], index)
+  })
+  for (const item of incoming) {
+    if (!isObject(item) || typeof item[key] !== 'string') {
+      result.push(item)
+      continue
+    }
+    const index = indices.get(item[key])
+    if (index === undefined) {
+      indices.set(item[key], result.length)
+      result.push(item)
+    } else {
+      result[index] = item
+    }
+  }
+  return result
+}
+
+function listStorageKeys(prefix: string, suffix: string): string[] {
+  const storage = window.localStorage
+  const length = typeof storage.length === 'number' ? storage.length : 0
+  const keys: string[] = []
+  for (let index = 0; index < length; index++) {
+    const key = storage.key(index)
+    if (key?.startsWith(prefix) && key.endsWith(suffix)) keys.push(key)
+  }
+  return keys
+}
+
+function validateMediaAssets(value: unknown): string | null {
+  if (value === undefined) return null
+  if (!isObject(value)) return 'mediaAssets must be an object'
+  for (const [id, candidate] of Object.entries(value)) {
+    if (!isObject(candidate)) return `mediaAssets.${id} must be an object`
+    if (candidate.id !== id) return `mediaAssets.${id}.id must match its map key`
+    if (candidate.kind !== 'image' && candidate.kind !== 'file') {
+      return `mediaAssets.${id}.kind is invalid`
+    }
+    if (
+      typeof candidate.byteSize !== 'number' ||
+      !Number.isFinite(candidate.byteSize) ||
+      candidate.byteSize < 0 ||
+      candidate.byteSize > MAX_SAFE_MEDIA_BYTES
+    ) {
+      return `mediaAssets.${id}.byteSize is invalid`
+    }
+    if (
+      !isSafeMediaDataUrl(
+        candidate.dataUrl,
+        candidate.kind,
+        candidate.mimeType,
+        MAX_SAFE_MEDIA_BYTES,
+      )
+    ) {
+      return `mediaAssets.${id}.dataUrl or mimeType is unsafe`
+    }
+    if (
+      typeof candidate.createdAt !== 'string' ||
+      Number.isNaN(new Date(candidate.createdAt).getTime())
+    ) {
+      return `mediaAssets.${id}.createdAt is invalid`
+    }
+    if (typeof candidate.checksum !== 'string') {
+      return `mediaAssets.${id}.checksum must be a string`
+    }
+  }
+  return null
+}
+
+function restoreStorageSnapshot(
+  snapshot: Array<{ key: string; previous: string | null }>,
+): boolean {
+  let ok = true
+  for (const entry of snapshot) {
+    try {
+      if (entry.previous === null) window.localStorage.removeItem(entry.key)
+      else window.localStorage.setItem(entry.key, entry.previous)
+    } catch {
+      ok = false
+    }
+  }
+  return ok
+}
+
+function currentCanvasIds(): Set<string> {
+  const ids = new Set<string>()
+  const envelope = readJson(STORE_KEYS.canvases)
+  const snapshot = isObject(envelope) ? envelope.snapshot : undefined
+  const canvases = isObject(snapshot) ? snapshot.canvases : undefined
+  if (Array.isArray(canvases)) {
+    for (const canvas of canvases) {
+      if (isObject(canvas) && typeof canvas.id === 'string') ids.add(canvas.id)
+    }
+  }
+  for (const key of listStorageKeys(FREEFORM_PREFIX, FREEFORM_SUFFIX)) {
+    ids.add(key.slice(FREEFORM_PREFIX.length, -FREEFORM_SUFFIX.length))
+  }
+  return ids
+}
+
+export async function importFromJson(
+  jsonText: string,
+  options?: ImportOptions,
+): Promise<ImportResult> {
   if (typeof window === 'undefined') {
     return { ok: false, cards: 0, mediaAssets: 0, error: 'not in browser' }
   }
+  const mode = options?.mode ?? 'replace'
   let payload: ExportPayload
   try {
     payload = JSON.parse(jsonText) as ExportPayload
@@ -276,6 +429,10 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
       mediaAssets: 0,
       error: 'payload.cards is not an array',
     }
+  }
+  const mediaError = validateMediaAssets(payload.mediaAssets)
+  if (mediaError) {
+    return { ok: false, cards: 0, mediaAssets: 0, error: mediaError }
   }
   // v0.23.2-hardening: per-card structural validation. A malformed card
   // (missing id, missing createdAt, non-string title) would corrupt the
@@ -410,141 +567,218 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
       }
     }
   }
-  // Overwrite the four stores atomically. Missing optional keys are
-  // skipped. We (1) serialise everything first — a serialise error must
-  // abort before any store is touched; (2) snapshot each key's old raw
-  // value; (3) write them; (4) on any write error (e.g. quota on a big
-  // base64 media blob), roll back every touched key to its pre-import
-  // value so the user never ends up in a half-overwritten state.
-  const writes: { key: string; value: string }[] = []
+  const currentFreeformIds = currentCanvasIds()
+  const incomingFreeform = new Map<string, CanvasFreeformSnapshot>()
+  if (payload.freeform !== undefined) {
+    if (!isObject(payload.freeform)) {
+      return { ok: false, cards: 0, mediaAssets: 0, error: 'freeform must be an object' }
+    }
+    for (const [canvasId, snapshot] of Object.entries(payload.freeform)) {
+      if (!isObject(snapshot) || !Array.isArray(snapshot.elements)) {
+        return {
+          ok: false,
+          cards: 0,
+          mediaAssets: 0,
+          error: `freeform.${canvasId} is invalid`,
+        }
+      }
+      const invalidElement = snapshot.elements.some(
+        (element) =>
+          !isObject(element) ||
+          typeof element.id !== 'string' ||
+          typeof element.kind !== 'string',
+      )
+      if (invalidElement) {
+        return {
+          ok: false,
+          cards: 0,
+          mediaAssets: 0,
+          error: `freeform.${canvasId}.elements contains an invalid element`,
+        }
+      }
+      incomingFreeform.set(canvasId, snapshot as unknown as CanvasFreeformSnapshot)
+    }
+  }
+
+  const operations: StorageOperation[] = []
+  const planOptional = (key: string, present: boolean, value: unknown) => {
+    if (present) operations.push({ key, value: JSON.stringify(value) })
+    else if (mode === 'replace') operations.push({ key, value: null })
+  }
+
   try {
-    writes.push({
-      key: 'cys-stift.cards.v1',
-      value: JSON.stringify({ cards: payload.cards }),
+    const cards =
+      mode === 'merge'
+        ? mergeByStringKey(storedArray(STORE_KEYS.cards, 'cards'), payload.cards, 'id')
+        : payload.cards
+    operations.push({
+      key: STORE_KEYS.cards,
+      value: JSON.stringify({ cards }),
     })
-    if (payload.mediaAssets && typeof payload.mediaAssets === 'object' && !Array.isArray(payload.mediaAssets)) {
-      writes.push({
-        key: 'cys-stift.media.v1',
-        value: JSON.stringify({ assets: payload.mediaAssets }),
-      })
+
+    const hasMedia = isObject(payload.mediaAssets)
+    const mediaAssets = hasMedia
+      ? mode === 'merge'
+        ? { ...storedObject(STORE_KEYS.media, 'assets'), ...payload.mediaAssets }
+        : payload.mediaAssets
+      : undefined
+    planOptional(STORE_KEYS.media, hasMedia, { assets: mediaAssets })
+
+    const hasDrafts = isObject(payload.drafts)
+    const drafts = hasDrafts
+      ? mode === 'merge'
+        ? { ...storedObject(STORE_KEYS.drafts, 'drafts'), ...payload.drafts }
+        : payload.drafts
+      : undefined
+    planOptional(STORE_KEYS.drafts, hasDrafts, { drafts })
+
+    if (isObject(payload.settings)) {
+      const currentSettings = storedObject(STORE_KEYS.settings, 'settings')
+      const restored = restoreDeviceProfileSecrets(payload.settings, currentSettings)
+      let settings = restored
+      if (mode === 'merge' && currentSettings) {
+        settings = { ...currentSettings, ...restored }
+        if (Array.isArray(currentSettings.profiles) && Array.isArray(restored.profiles)) {
+          settings.profiles = mergeByStringKey(
+            currentSettings.profiles,
+            restored.profiles,
+            'id',
+          )
+        }
+      }
+      planOptional(STORE_KEYS.settings, true, { settings })
+    } else {
+      planOptional(STORE_KEYS.settings, false, null)
     }
-    if (payload.drafts && typeof payload.drafts === 'object' && !Array.isArray(payload.drafts)) {
-      writes.push({
-        key: 'cys-stift.drafts.v1',
-        value: JSON.stringify({ drafts: payload.drafts }),
-      })
-    }
-    if (payload.settings && typeof payload.settings === 'object' && !Array.isArray(payload.settings)) {
-      writes.push({
-        key: 'cys-stift.settings.v2',
-        value: JSON.stringify({ settings: payload.settings }),
-      })
-    }
-    // canvas 列表:与 cards/media 同走同步 localStorage 写,纳入现有 snapshot
-    // rollback 机制(snapshot 数组遍历 writes,自动包含此 key)。旧 JSON 无
-    // canvases 字段 → 跳过(向后兼容)。
-    if (payload.canvases && typeof payload.canvases === 'object' && !Array.isArray(payload.canvases)) {
-      writes.push({
-        key: 'cys-stift.canvases.v1',
-        value: JSON.stringify({ snapshot: payload.canvases }),
-      })
-    }
-    // canvas-view(zoom/pan/gridMode/gridSize per canvas):与 canvases 同走同步
-    // localStorage 写 + rollback。payload 存扁平 views map,写回时还原为
-    // canvas-view-store 的 `{ views }` envelope。旧 JSON 无 canvasView 字段 → 跳过。
-    if (payload.canvasView && typeof payload.canvasView === 'object' && !Array.isArray(payload.canvasView)) {
-      writes.push({
-        key: 'cys-stift.canvas-view.v1',
-        value: JSON.stringify({ views: payload.canvasView }),
-      })
-    }
-    // 用户自建画布模板(裸数组,与 canvas-templates store 同形)。旧 JSON 无此字段 → 跳过。
-    if (payload.canvasTemplates && Array.isArray(payload.canvasTemplates)) {
-      writes.push({
-        key: 'cys-stift.canvas-templates.v1',
-        value: JSON.stringify(payload.canvasTemplates),
-      })
-    }
-    // AI 交互样本(裸数组,与 sample-store 同形)。旧 JSON 无此字段 → 跳过。
-    if (payload.aiSamples && Array.isArray(payload.aiSamples)) {
-      writes.push({
-        key: 'cys-stift.ai-samples.v1',
-        value: JSON.stringify(payload.aiSamples),
-      })
-    }
-    // per-canvas AI 对话历史(多 key,每个 canvasId 一个 localStorage key)。
-    // 与 canvases/templates 同走同步 localStorage 写 + rollback —— 每个 key 独立
-    // 纳入 snapshot/writes 数组,原子性由现有 rollback 机制覆盖。
-    // 旧 JSON 无此字段 → 跳过(向后兼容)。
-    // guard 加 !Array.isArray:conversations 应为 Record<canvasId, msgs>,但 []
-    // 也通过 typeof === 'object' → Object.entries([]) 产 ['0', item] → 坏 key
-    // cys-stift.conversation.0.v2。
-    if (payload.conversations && typeof payload.conversations === 'object' && !Array.isArray(payload.conversations)) {
-      for (const [canvasId, msgs] of Object.entries(payload.conversations)) {
-        if (!Array.isArray(msgs)) continue
-        writes.push({
-          key: `cys-stift.conversation.${canvasId}.v2`,
-          value: JSON.stringify(msgs),
-        })
+
+    const hasCanvases = isObject(payload.canvases) && Array.isArray(payload.canvases.canvases)
+    let canvases: unknown = payload.canvases
+    if (hasCanvases && mode === 'merge') {
+      const current = storedObject(STORE_KEYS.canvases, 'snapshot')
+      const currentList = Array.isArray(current?.canvases) ? current.canvases : []
+      canvases = {
+        ...current,
+        ...payload.canvases,
+        canvases: mergeByStringKey(currentList, payload.canvases!.canvases, 'id'),
       }
     }
-  } catch (e) {
+    planOptional(STORE_KEYS.canvases, hasCanvases, { snapshot: canvases })
+
+    const hasCanvasView = isObject(payload.canvasView)
+    const canvasView = hasCanvasView
+      ? mode === 'merge'
+        ? { ...storedObject(STORE_KEYS.canvasView, 'views'), ...payload.canvasView }
+        : payload.canvasView
+      : undefined
+    planOptional(STORE_KEYS.canvasView, hasCanvasView, { views: canvasView })
+
+    const hasTemplates = Array.isArray(payload.canvasTemplates)
+    const templates = hasTemplates
+      ? mode === 'merge'
+        ? mergeByStringKey(
+            storedArray(STORE_KEYS.templates),
+            payload.canvasTemplates!,
+            'name',
+          )
+        : payload.canvasTemplates
+      : undefined
+    planOptional(STORE_KEYS.templates, hasTemplates, templates)
+
+    const hasSamples = Array.isArray(payload.aiSamples)
+    const samples = hasSamples
+      ? mode === 'merge'
+        ? mergeByStringKey(storedArray(STORE_KEYS.samples), payload.aiSamples!, 'id')
+        : payload.aiSamples
+      : undefined
+    planOptional(STORE_KEYS.samples, hasSamples, samples)
+
+    const incomingConversationKeys = new Set<string>()
+    if (isObject(payload.conversations)) {
+      for (const [canvasId, messages] of Object.entries(payload.conversations)) {
+        if (!Array.isArray(messages)) continue
+        const key = `${CONVERSATION_PREFIX}${canvasId}${CONVERSATION_SUFFIX}`
+        incomingConversationKeys.add(key)
+        operations.push({ key, value: JSON.stringify(messages) })
+      }
+    }
+    if (mode === 'replace') {
+      for (const key of listStorageKeys(CONVERSATION_PREFIX, CONVERSATION_SUFFIX)) {
+        if (!incomingConversationKeys.has(key)) operations.push({ key, value: null })
+      }
+    }
+  } catch (error) {
     return {
       ok: false,
       cards: 0,
       mediaAssets: 0,
-      error: `serialise failed: ${(e as Error).message}`,
+      error: `serialise failed: ${(error as Error).message}`,
     }
   }
 
-  // Snapshot old values now, before any write mutates storage.
-  const snapshot = writes.map((w) => ({
-    key: w.key,
-    prev: window.localStorage.getItem(w.key),
-  }))
-
+  const freeformIds = new Set(incomingFreeform.keys())
+  if (mode === 'replace') {
+    for (const canvasId of currentFreeformIds) freeformIds.add(canvasId)
+  }
+  const freeformSnapshot = new Map<string, CanvasFreeformSnapshot | null>()
   try {
-    for (const w of writes) window.localStorage.setItem(w.key, w.value)
-  } catch (e) {
-    // Roll back every key we touched to its pre-import value. A null
-    // prev means the key didn't exist before — remove it.
-    for (const s of snapshot) {
-      try {
-        if (s.prev === null) window.localStorage.removeItem(s.key)
-        else window.localStorage.setItem(s.key, s.prev)
-      } catch {
-        // Best-effort rollback; the original write error is what we
-        // report. Restoring smaller previous values rarely throws.
-      }
+    for (const canvasId of freeformIds) {
+      freeformSnapshot.set(
+        canvasId,
+        await canvasFreeformStore.load(canvasId as CanvasId),
+      )
     }
+  } catch (error) {
     return {
       ok: false,
       cards: 0,
       mediaAssets: 0,
-      error: `write failed: ${(e as Error).message}`,
+      error: `freeform snapshot failed: ${(error as Error).message}`,
     }
   }
 
-  // freeform 几何走 OPFS(异步),在 localStorage 原子写成功之后才写。不纳入
-  // localStorage rollback——若上面写入失败已 early return rollback,根本到不了这里。
-  // 全量 import 覆盖语义;canvasFreeformStore.save 内部 best-effort(OPFS 失败回退
-  // localStorage)。card 元素会被 store 自动过滤(DB 是单一可信源,见 spec §6.11)。
-  // save 返回 false = OPFS+localStorage 双失败:不整体失败(卡片/canvas 列表已落地),
-  // 但累计 freeformSkipped 诚实回报供 UI 提示(此前忽略返回值 → 静默丢失)。
+  const storageSnapshot = operations.map((operation) => ({
+    key: operation.key,
+    previous: window.localStorage.getItem(operation.key),
+  }))
+  try {
+    for (const operation of operations) {
+      if (operation.value === null) window.localStorage.removeItem(operation.key)
+      else window.localStorage.setItem(operation.key, operation.value)
+    }
+  } catch (error) {
+    const restored = restoreStorageSnapshot(storageSnapshot)
+    return {
+      ok: false,
+      cards: 0,
+      mediaAssets: 0,
+      error: `write failed: ${(error as Error).message}; rollback ${restored ? 'complete' : 'partial'}`,
+    }
+  }
+
   let freeformCanvases = 0
-  let freeformSkipped = 0
-  if (payload.freeform && typeof payload.freeform === 'object') {
-    for (const [canvasId, snap] of Object.entries(payload.freeform)) {
-      // 坏值防御(恶意/损坏 JSON):snap 非对象或 elements 非数组 → 跳过,不抛
-      // (此前 snap=null 时 snap.elements 抛 TypeError → 异步 unhandled rejection,
-      // localStorage 已写但 freeform 静默全丢 = 半损坏状态)。
-      if (!snap || typeof snap !== 'object' || !Array.isArray(snap.elements)) {
-        freeformSkipped++
-        continue
-      }
-      const saved = await canvasFreeformStore.save(canvasId as CanvasId, snap.elements)
-      if (saved) freeformCanvases++
-      else freeformSkipped++
+  try {
+    for (const canvasId of freeformIds) {
+      const incoming = incomingFreeform.get(canvasId)
+      const ok = incoming
+        ? await canvasFreeformStore.save(canvasId as CanvasId, incoming.elements)
+        : await canvasFreeformStore.remove(canvasId as CanvasId)
+      if (!ok) throw new Error(`could not persist canvas ${canvasId}`)
+      if (incoming) freeformCanvases++
+    }
+  } catch (error) {
+    let freeformRestored = true
+    for (const [canvasId, previous] of freeformSnapshot) {
+      const ok = previous
+        ? await canvasFreeformStore.save(canvasId as CanvasId, previous.elements)
+        : await canvasFreeformStore.remove(canvasId as CanvasId)
+      if (!ok) freeformRestored = false
+    }
+    const storageRestored = restoreStorageSnapshot(storageSnapshot)
+    return {
+      ok: false,
+      cards: 0,
+      mediaAssets: 0,
+      error: `freeform write failed: ${(error as Error).message}; rollback ${storageRestored && freeformRestored ? 'complete' : 'partial'}`,
     }
   }
 
@@ -554,7 +788,6 @@ export async function importFromJson(jsonText: string): Promise<ImportResult> {
     mediaAssets: Object.keys(payload.mediaAssets ?? {}).length,
     ...(payload.canvases ? { canvases: payload.canvases.canvases.length } : {}),
     ...(freeformCanvases > 0 ? { freeformCanvases } : {}),
-    ...(freeformSkipped > 0 ? { freeformSkipped } : {}),
     ...(payload.conversations && !Array.isArray(payload.conversations)
       ? { conversations: Object.keys(payload.conversations).length }
       : {}),

@@ -36,6 +36,32 @@ const TEMPLATES_KEY = 'cys-stift.canvas-templates.v1'
 const SAMPLES_KEY = 'cys-stift.ai-samples.v1'
 const CONVERSATION_PREFIX = 'cys-stift.conversation.'
 const CONVERSATION_SUFFIX = '.v2'
+const FREEFORM_PREFIX = 'cys-stift.canvas-freeform.'
+const FREEFORM_SUFFIX = '.v1'
+
+function makeImageAsset(id = 'ma-1') {
+  return {
+    id,
+    kind: 'image',
+    mimeType: 'image/png',
+    dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    byteSize: 8,
+    createdAt: '2026-06-20T00:00:00.000Z',
+    checksum: 'abc',
+  }
+}
+
+function makeFileAsset(id = 'ma-file') {
+  return {
+    id,
+    kind: 'file',
+    mimeType: 'application/pdf',
+    dataUrl: 'data:application/pdf;base64,JVBERiA=',
+    byteSize: 5,
+    createdAt: '2026-06-20T00:00:00.000Z',
+    checksum: 'def',
+  }
+}
 
 function makeCard(overrides: Partial<Card> = {}): Card {
   return {
@@ -204,6 +230,31 @@ describe('buildExportPayload', () => {
     expect(payload.cards).toEqual([])
     expect(payload.mediaAssets).toEqual({})
     expect(payload.version).toBe(mod.EXPORT_FORMAT_VERSION)
+  })
+
+  it('redacts API keys from the final serialized export payload', async () => {
+    const secret = 'sk-export-must-never-leak-unique'
+    seedStores({
+      settings: {
+        profiles: [
+          {
+            id: 'p1',
+            name: 'Remote',
+            provider: 'openai',
+            apiKey: secret,
+            baseUrl: 'https://api.openai.com/v1',
+            model: 'gpt-4o-mini',
+            enabled: true,
+          },
+        ],
+        activeProfileId: 'p1',
+      },
+    })
+
+    const serialized = JSON.stringify(await mod.buildExportPayload())
+
+    expect(serialized).not.toContain(secret)
+    expect(JSON.parse(serialized).settings.profiles[0].apiKey).toBe('')
   })
 })
 
@@ -409,9 +460,7 @@ describe('export → import round-trip (no data loss)', () => {
       pinned: true,
       quotes: [{ text: 'q', attribution: 'me' }],
     })
-    const media = {
-      'ma-1': { id: 'ma-1', kind: 'image', mimeType: 'image/png', dataUrl: 'x', byteSize: 10 },
-    }
+    const media = { 'ma-1': makeImageAsset('ma-1') }
     const drafts = { 'draft-1': { title: 'wip' } }
     const settings = { theme: 'dark', locale: 'en' }
     seedStores({ cards: [cardA, cardB], mediaAssets: media, drafts, settings })
@@ -650,6 +699,81 @@ describe('importFromJson — validation', () => {
     expect(result.cards).toBe(1)
   })
 
+  it.each([
+    [
+      'javascript URL',
+      { ...makeFileAsset(), dataUrl: 'javascript:alert(1)' },
+    ],
+    [
+      'SVG image',
+      {
+        ...makeImageAsset(),
+        mimeType: 'image/svg+xml',
+        dataUrl: 'data:image/svg+xml;base64,PHN2Zz4=',
+      },
+    ],
+    [
+      'HTML document',
+      {
+        ...makeFileAsset(),
+        mimeType: 'text/html',
+        dataUrl: 'data:text/html;base64,PGh0bWw+',
+      },
+    ],
+    [
+      'kind/MIME mismatch',
+      { ...makeFileAsset(), mimeType: 'image/png', dataUrl: makeImageAsset().dataUrl },
+    ],
+    [
+      'declared file over 5 MB',
+      { ...makeFileAsset(), byteSize: 5_000_001 },
+    ],
+  ])('rejects unsafe imported media: %s', async (_label, asset) => {
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      cards: [
+        {
+          id: 'c1',
+          title: 't',
+          body: 'b',
+          capturedAt: '2026-06-20T00:00:00.000Z',
+        },
+      ],
+      mediaAssets: { [asset.id]: asset },
+    })
+
+    const result = await mod.importFromJson(json)
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/mediaAssets/i)
+    expect(window.localStorage.getItem(CARDS_KEY)).toBeNull()
+    expect(window.localStorage.getItem(MEDIA_KEY)).toBeNull()
+  })
+
+  it.each([makeImageAsset(), makeFileAsset()])(
+    'accepts a valid imported $kind asset',
+    async (asset) => {
+      const json = JSON.stringify({
+        version: mod.EXPORT_FORMAT_VERSION,
+        exportedAt: 'x',
+        app: 'a',
+        cards: [
+          {
+            id: 'c1',
+            title: 't',
+            body: 'b',
+            capturedAt: '2026-06-20T00:00:00.000Z',
+          },
+        ],
+        mediaAssets: { [asset.id]: asset },
+      })
+
+      expect((await mod.importFromJson(json)).ok).toBe(true)
+    },
+  )
+
   it('does not write any store when validation fails (atomic: nothing touched)', async () => {
     seedStores({ cards: [makeCard()] }) // pre-existing data
     const originalCardsRaw = window.localStorage.getItem(CARDS_KEY)
@@ -702,7 +826,7 @@ describe('importFromJson — write failure rollback', () => {
       exportedAt: 'x',
       app: 'a',
       cards: [{ id: 'c-new', title: 'new', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
-      mediaAssets: { 'ma-new': {} },
+      mediaAssets: { 'ma-new': makeImageAsset('ma-new') },
     })
 
     const result = await mod.importFromJson(json)
@@ -716,6 +840,155 @@ describe('importFromJson — write failure rollback', () => {
     // stores hold the original envelopes again.
     expect(store.get(CARDS_KEY)).toBe(prevCards)
     expect(store.get(MEDIA_KEY)).toBe(prevMedia)
+  })
+})
+
+describe('importFromJson — replace / merge transaction', () => {
+  const minimalPayload = (extra: Record<string, unknown> = {}) =>
+    JSON.stringify({
+      version: 1,
+      exportedAt: '2026-07-18T00:00:00.000Z',
+      app: "cy's Stift",
+      cards: [
+        {
+          id: 'incoming-card',
+          title: 'incoming',
+          body: '',
+          capturedAt: '2026-06-20T00:00:00.000Z',
+        },
+      ],
+      mediaAssets: {},
+      ...extra,
+    })
+
+  it('replace removes every owned target entry missing from the snapshot', async () => {
+    const staleCanvas = 'stale-canvas' as unknown as CanvasId
+    seedStores({
+      cards: [makeCard({ id: 'stale-card' as unknown as CardId })],
+      drafts: { stale: { title: 'draft' } },
+      settings: { stale: true },
+    })
+    seedCanvases([makeCanvas({ id: staleCanvas })], String(staleCanvas))
+    seedCanvasView({ [String(staleCanvas)]: { zoom: 2 } })
+    seedTemplates([{ name: 'stale-template', dsl: '[text #x]' }])
+    seedSamples([{ id: 'stale-sample' }])
+    seedConversation(String(staleCanvas), [{ role: 'user', content: 'stale' }])
+    window.localStorage.setItem(
+      `${FREEFORM_PREFIX}${String(staleCanvas)}${FREEFORM_SUFFIX}`,
+      JSON.stringify({ v: 1, app: 'cys-stift', elements: [] }),
+    )
+    window.localStorage.setItem('another-app.unowned', 'keep-me')
+
+    const result = await mod.importFromJson(minimalPayload())
+
+    expect(result.ok).toBe(true)
+    expect(window.localStorage.getItem(DRAFTS_KEY)).toBeNull()
+    expect(window.localStorage.getItem(SETTINGS_KEY)).toBeNull()
+    expect(window.localStorage.getItem(CANVASES_KEY)).toBeNull()
+    expect(window.localStorage.getItem(CANVAS_VIEW_KEY)).toBeNull()
+    expect(window.localStorage.getItem(TEMPLATES_KEY)).toBeNull()
+    expect(window.localStorage.getItem(SAMPLES_KEY)).toBeNull()
+    expect(window.localStorage.getItem(conversationStorageKey(String(staleCanvas)))).toBeNull()
+    expect(
+      window.localStorage.getItem(
+        `${FREEFORM_PREFIX}${String(staleCanvas)}${FREEFORM_SUFFIX}`,
+      ),
+    ).toBeNull()
+    expect(window.localStorage.getItem('another-app.unowned')).toBe('keep-me')
+  })
+
+  it('merge preserves target entries that are absent from the snapshot', async () => {
+    seedStores({
+      cards: [makeCard({ id: 'target-card' as unknown as CardId, title: 'target' })],
+      mediaAssets: { targetMedia: makeFileAsset('targetMedia') },
+      drafts: { targetDraft: { title: 'keep' } },
+    })
+    seedTemplates([{ name: 'target-template', dsl: '[text #target]' }])
+    seedSamples([
+      {
+        id: 'target-sample',
+        ts: 1,
+        source: 'ask',
+        kind: 'qa',
+        outcome: 'answered',
+        context: 'c',
+        aiOutput: 'o',
+      },
+    ])
+    seedConversation('target-canvas', [{ role: 'user', content: 'keep' }])
+    window.localStorage.setItem(
+      `${FREEFORM_PREFIX}target-canvas${FREEFORM_SUFFIX}`,
+      JSON.stringify({ v: 1, app: 'cys-stift', elements: [] }),
+    )
+
+    const result = await mod.importFromJson(
+      minimalPayload({
+        mediaAssets: { incomingMedia: makeImageAsset('incomingMedia') },
+        drafts: { incomingDraft: { title: 'new' } },
+        canvasTemplates: [{ name: 'incoming-template', dsl: '[text #incoming]' }],
+        aiSamples: [
+          {
+            id: 'incoming-sample',
+            ts: 2,
+            source: 'ask',
+            kind: 'qa',
+            outcome: 'answered',
+            context: 'c',
+            aiOutput: 'o',
+          },
+        ],
+        conversations: {
+          'incoming-canvas': [{ role: 'assistant', content: 'new' }],
+        },
+      }),
+      { mode: 'merge' },
+    )
+
+    expect(result.ok).toBe(true)
+    const cards = JSON.parse(window.localStorage.getItem(CARDS_KEY)!).cards
+    expect(cards.map((card: Card) => card.id).sort()).toEqual([
+      'incoming-card',
+      'target-card',
+    ])
+    const media = JSON.parse(window.localStorage.getItem(MEDIA_KEY)!).assets
+    expect(Object.keys(media).sort()).toEqual(['incomingMedia', 'targetMedia'])
+    const drafts = JSON.parse(window.localStorage.getItem(DRAFTS_KEY)!).drafts
+    expect(Object.keys(drafts).sort()).toEqual(['incomingDraft', 'targetDraft'])
+    expect(JSON.parse(window.localStorage.getItem(TEMPLATES_KEY)!)).toHaveLength(2)
+    expect(JSON.parse(window.localStorage.getItem(SAMPLES_KEY)!)).toHaveLength(2)
+    expect(window.localStorage.getItem(conversationStorageKey('target-canvas'))).not.toBeNull()
+    expect(window.localStorage.getItem(conversationStorageKey('incoming-canvas'))).not.toBeNull()
+    expect(
+      window.localStorage.getItem(`${FREEFORM_PREFIX}target-canvas${FREEFORM_SUFFIX}`),
+    ).not.toBeNull()
+  })
+
+  it('preserves a target-device API key when importing a redacted profile', async () => {
+    const targetSecret = 'sk-target-device-only'
+    const profile = {
+      id: 'p1',
+      name: 'Remote',
+      provider: 'openai',
+      apiKey: targetSecret,
+      baseUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+      enabled: true,
+    }
+    seedStores({ settings: { profiles: [profile], activeProfileId: 'p1' } })
+
+    const result = await mod.importFromJson(
+      minimalPayload({
+        settings: {
+          profiles: [{ ...profile, apiKey: '' }],
+          activeProfileId: 'p1',
+        },
+      }),
+    )
+
+    expect(result.ok).toBe(true)
+    const restored = JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!)
+    expect(restored.settings.profiles[0].apiKey).toBe(targetSecret)
+    expect(JSON.stringify(await mod.buildExportPayload())).not.toContain(targetSecret)
   })
 })
 
@@ -857,7 +1130,7 @@ describe('importFromJson — canvases + freeform round-trip', () => {
       exportedAt: '2026-01-01T00:00:00.000Z',
       app: "cy's Stift",
       cards: [{ id: 'legacy-1', title: 'old', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
-      mediaAssets: { 'ma-1': { id: 'ma-1', kind: 'image' } },
+      mediaAssets: { 'ma-1': makeImageAsset('ma-1') },
     })
 
     const result = await mod.importFromJson(json)
@@ -915,25 +1188,24 @@ describe('importFromJson — freeform save 失败诚实回报', () => {
     })
   }
 
-  it('canvasFreeformStore.save 返回 false → freeformSkipped 计数,不整体失败', async () => {
+  it('canvasFreeformStore.save 返回 false → 整体失败并回滚 localStorage', async () => {
     const json = buildTwoFreeformPayload()
     // 必须用 mod 同一模块实例的 canvasFreeformStore(beforeEach 的
     // vi.resetModules 会让 mod 拿到新实例,与顶部静态 import 不是同一个)。
     const { canvasFreeformStore: store } = await import('../canvas-freeform-store')
-    // cv1 save 成功(true),cv2 save 失败(false —— OPFS+localStorage 双失败模拟)。
-    const spy = vi
-      .spyOn(store, 'save')
-      .mockImplementation(async (id) => id === 'cv1')
+    const originalCards = JSON.stringify({ cards: [makeCard({ title: 'before' })] })
+    window.localStorage.setItem(CARDS_KEY, originalCards)
+    const spy = vi.spyOn(store, 'save').mockResolvedValue(false)
 
     const result = await mod.importFromJson(json)
 
-    expect(result.ok).toBe(true) // 核心数据成功,不整体失败
-    expect(result.freeformCanvases).toBe(1) // 只计成功的
-    expect(result.freeformSkipped).toBe(1) // 失败的诚实计
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/freeform|rollback/i)
+    expect(window.localStorage.getItem(CARDS_KEY)).toBe(originalCards)
     spy.mockRestore()
   })
 
-  it('全部 freeform save 成功 → freeformSkipped 不出现(向后兼容)', async () => {
+  it('全部 freeform save 成功 → 返回成功计数', async () => {
     const json = buildTwoFreeformPayload()
     const { canvasFreeformStore: store } = await import('../canvas-freeform-store')
     const spy = vi.spyOn(store, 'save').mockResolvedValue(true)
@@ -942,8 +1214,6 @@ describe('importFromJson — freeform save 失败诚实回报', () => {
 
     expect(result.ok).toBe(true)
     expect(result.freeformCanvases).toBe(2)
-    // 全成功 → freeformSkipped 不出现(向后兼容:全成功不报 skipped)
-    expect(result.freeformSkipped).toBeUndefined()
     spy.mockRestore()
   })
 })

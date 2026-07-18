@@ -171,7 +171,11 @@
 > 判断"这一步该不该做"先读 **[`docs/development/polish-phase.md`](development/polish-phase.md)**(打磨 vs 修缝判据 + 反馈驱动流程 + 退出标准)。
 > 燃料 = 你手测的真实反馈。每轮主线开工走 brainstorming,严守「一次一问 + 逐段确认」(skill-checklist-discipline 记忆)。
 
-### 当前焦点(2026-07-14,apps/web review 完 + bug 修)
+### 当前焦点(2026-07-18,稳定性 Lane A)
+
+统一交接包 Lane A 已实施:N01 CI 补 web/canvas-engine 测试;N02 export/archive 最终边界清空 API key;N03 replace/merge 导入计划覆盖 owned stores + conversation + freeform,异步失败全量回滚;N04 导入媒体严格校验 + 渲染二次防线。全仓 lint/test + web build 与 Lane A gate 全绿。**GitHub PR mutation check 尚未执行,不作为已通过证据。**
+
+### 历史焦点(2026-07-14,apps/web review 完 + bug 修)
 
 **apps/web review**(2026-07-14,用户选全量+4 维度):8 批 13 文件 + i18n。2 中 bug 修(workbench 切卡丢编辑 + bar 全透明,`fc913ee`)+ 5 stale 注释清(page/self-canvas/settings-store/card-detail/settings-page)+ **bug 2b open**(TAG_COLORS 5 色 teal/pink/orange/purple/green 无 token → 全局 tag 50% 透明;用户定收敛 6 原色,含迁移 + tag chip 文字色 a11y,留下次)。报告 `cys-stift-docs/docs/reviews/2026-07-14-apps-web-code-review.md`。
 

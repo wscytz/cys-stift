@@ -62,7 +62,12 @@ import {
 } from './editors'
 import { MarkdownBody } from '@/app/inbox/markdown'
 import { mediaStore } from '@/lib/media-store'
-import { safeHref, isSafeImageDataUrl } from '@/lib/safe-href'
+import {
+  safeHref,
+  isSafeFileDataUrl,
+  isSafeImageDataUrl,
+  MAX_SAFE_MEDIA_BYTES,
+} from '@/lib/safe-href'
 import { useI18n } from '@/lib/i18n'
 import { typeKeyOf } from '@/lib/type-label'
 import { downloadCardMarkdown } from '@/lib/export-card'
@@ -620,7 +625,8 @@ export function CardDetailModal({
                         // (no SVG/script vectors, size-bounded). Imported
                         // assets are untrusted; a non-image or oversized data
                         // URL renders a fallback label instead of an <img>.
-                        return isSafeImageDataUrl(asset.dataUrl) ? (
+                        return asset.byteSize <= MAX_SAFE_MEDIA_BYTES &&
+                          isSafeImageDataUrl(asset.dataUrl) ? (
                           <li
                             key={String(m.assetId)}
                             className="cd__media-item"
@@ -636,28 +642,33 @@ export function CardDetailModal({
                             key={String(m.assetId)}
                             className="cd__media-item"
                           >
-                            <a
-                              href={safeHref(asset.dataUrl)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
+                            <span>
                               {asset.mimeType} ({(asset.byteSize / 1024).toFixed(1)} KB)
-                            </a>
+                            </span>
                           </li>
                         )
                       }
+                      const safeFile =
+                        asset.byteSize <= MAX_SAFE_MEDIA_BYTES &&
+                        isSafeFileDataUrl(asset.dataUrl)
                       return (
                         <li
                           key={String(m.assetId)}
                           className="cd__media-item"
                         >
-                          <a
-                            href={asset.dataUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            {asset.mimeType} ({(asset.byteSize / 1024).toFixed(1)} KB)
-                          </a>
+                          {safeFile ? (
+                            <a
+                              href={asset.dataUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {asset.mimeType} ({(asset.byteSize / 1024).toFixed(1)} KB)
+                            </a>
+                          ) : (
+                            <span>
+                              {asset.mimeType} ({(asset.byteSize / 1024).toFixed(1)} KB)
+                            </span>
+                          )}
                         </li>
                       )
                     })}

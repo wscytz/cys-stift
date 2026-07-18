@@ -139,11 +139,13 @@ provider 的服务端会按它的[隐私政策](https://openai.com/policies/row-
 
 ### API key 怎么存
 
-**明文存在浏览器 localStorage**(key 名 `cys-stift.settings.v1`)。
+**明文存在浏览器 localStorage**(key 名 `cys-stift.settings.v2`)。
 
 设置面板里有显式警告 banner:
 
-> ⚠ API key 以明文存储在本地(localStorage),仅保存在本机浏览器。不上传到任何服务器。请勿在公共设备上启用。
+> ⚠ API key 以明文存储在本地(localStorage),仅用于客户端直接请求你选择的 provider,不会发送给 cy's Stift 自有服务器。请勿在公共设备上启用。
+
+默认 JSON 备份和本地开发存档都会在最终载荷边界把 `apiKey` 清空,因此导出的文件不含密钥。把这类文件导入另一台设备后,需要重新输入密钥;若目标设备已有同 ID 的 provider profile,导入会保留该设备本地已有的密钥。
 
 **为什么不加密**:
 - 加密需要密码,密码不能本地存(否则失去意义),要用户每次输入 → 体验差

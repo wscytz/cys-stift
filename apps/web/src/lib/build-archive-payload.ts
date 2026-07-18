@@ -3,6 +3,7 @@
 import { buildExportPayload } from './export-service'
 import type { ArchivePayload, MediaAssetMeta } from './archive-store'
 import type { MediaAssetData } from './media-store'
+import { redactExportSecrets } from './export-redaction'
 
 /**
  * 构建存档 payload(spec D3):复用 buildExportPayload(已读全量含 freeform OPFS),
@@ -21,9 +22,9 @@ export async function buildArchivePayload(): Promise<ArchivePayload> {
     const { dataUrl: _drop, ...meta } = a // 剥 dataUrl,留元数据
     mediaAssets[id] = meta as MediaAssetMeta
   }
-  return {
+  return redactExportSecrets({
     ...(exp as unknown as Record<string, unknown>),
     cards: exp.cards,
     mediaAssets,
-  } as unknown as ArchivePayload
+  } as unknown as ArchivePayload)
 }

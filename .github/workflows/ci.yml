@@ -40,6 +40,12 @@ jobs:
       - name: db test
         run: pnpm --filter db test
 
+      - name: canvas-engine test
+        run: pnpm --filter @cys-stift/canvas-engine test
+
+      - name: web test
+        run: pnpm --filter web test
+
       - name: web build (includes web typecheck)
         run: pnpm --filter web build
   build-tauri-windows:

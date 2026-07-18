@@ -45,8 +45,9 @@ function makeFakeStore(loadResult: CanvasFreeformSnapshot | null = null) {
       this.saveCalls.push(els)
       return true
     },
-    async remove(id: CanvasId): Promise<void> {
+    async remove(id: CanvasId): Promise<boolean> {
       this.removeCalls.push(id)
+      return true
     },
   }
 }

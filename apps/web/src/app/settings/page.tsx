@@ -307,12 +307,7 @@ export default function SettingsPage() {
                       mediaAssets: importResult.mediaAssets,
                       canvases: importResult.canvases ?? 0,
                       freeform: importResult.freeformCanvases ?? 0,
-                    }) +
-                    (importResult.freeformSkipped && importResult.freeformSkipped > 0
-                      ? t('settings.importFreeformSkipped', {
-                          n: importResult.freeformSkipped,
-                        })
-                      : '')
+                    })
                   : t('settings.importFail', { error: importResult.error ?? '' })}
               </p>
             )}
