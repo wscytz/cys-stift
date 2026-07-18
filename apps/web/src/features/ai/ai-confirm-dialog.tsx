@@ -172,7 +172,7 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
             .then((p) => archiveStore.append('ai-layout', `AI 重排 ${applied} 张`, p, VERSION))
             .catch((err) => console.warn('[archive] ai-layout append failed', err))
         }
-        if (props.sampleContext) {
+        if (props.sampleContext && applied > 0) {
           const edited = editing && editedDsl && editedDsl !== props.dsl
           addSample(
             { id: genSampleId(), ts: Date.now(), kind: 'dsl', source: 'canvasLayout', context: props.sampleContext.context, aiOutput: props.dsl, editedOutput: edited ? editedDsl : undefined, outcome: edited ? 'applied_edited' : 'applied', targetCanvasId: props.sampleContext.targetCanvasId },

@@ -42,24 +42,25 @@ export interface SanitizeCtx {
 
 /** card/rect/frame 的 w/h MAX 上限(防 LLM 生成超大跑出可视区)。
  *  不设 MIN 下界 —— 合法小卡(如 10×10)必须原样往返(commit fac88bb 负坐标契约的同理)。 */
-const MAX_SIZE = 2000
+export const DSL_MAX_SIZE = 2000
+export const DSL_MAX_GAP = 2000
 
 /** w/h sanitize:非正(≤0)/非有限 → undefined(让 apply 用 shape 默认 240×120 等);
  *  超大 → MAX;合法正数(含小卡)原样保留。 */
 function sanitizeSize(n: number | undefined): number | undefined {
   if (n === undefined) return undefined
   if (!Number.isFinite(n) || n <= 0) return undefined
-  return Math.min(MAX_SIZE, n)
+  return Math.min(DSL_MAX_SIZE, n)
 }
 
 /** x/y 坐标 MAX 绝对值(防 LLM 生成 1e6 跑出可视区)。保负向 —— 负坐标合法(画布 pan 允许,
  *  commit fac88bb 契约),只钳极端有限值,不钳合理负值(如 -100)。 */
-const MAX_COORD = 10000
+export const DSL_MAX_COORD = 10000
 
 /** 坐标钳位:n 已是有限数(parse POS_RE 保证) → 钳 [-MAX_COORD, MAX_COORD];防御性防非有限(→0)。 */
 function clampCoord(n: number): number {
   if (!Number.isFinite(n)) return 0
-  return Math.min(MAX_COORD, Math.max(-MAX_COORD, n))
+  return Math.min(DSL_MAX_COORD, Math.max(-DSL_MAX_COORD, n))
 }
 
 /** card op:case 6(size)+ case 1/11(id 不存在)+ case 2b(create id 冲突预检)diagnostic。 */
@@ -77,20 +78,35 @@ function sanitizeCard(
       message: `card #${op.cardId} 不存在于画布(若想新建需加 create 标记)`,
     })
   }
-  // case 2b:create flag + id 已在 existingCardIds → diagnostic(预检 id 冲突,apply 时 createWithId 会失败;case 2a 计数 cardsFailed 兜底)
+  // create flag + id 已存在 → plan 阶段跳过,不把 create 偷换成 update。
   if (op.create && ctx?.existingCardIds !== undefined && ctx.existingCardIds.has(String(op.cardId))) {
     diagnostics.push({
       opIndex: idx,
       message: `create card #${op.cardId} id 已存在(冲突,建卡将失败)`,
     })
   }
+  // 关系间距必须非负且有上限。solver 会沿关系轴累加 gap,所以它与坐标本身
+  // 一样属于输入边界,不能等 solve 后才处理。
+  let rel = op.rel
+  if (op.rel) {
+    const gap = Number.isFinite(op.rel.gap)
+      ? Math.min(DSL_MAX_GAP, Math.max(0, op.rel.gap))
+      : 0
+    if (gap !== op.rel.gap) {
+      diagnostics.push({
+        opIndex: idx,
+        message: `card #${op.cardId} 的 gap 已限制到 0..${DSL_MAX_GAP}`,
+      })
+      rel = { ...op.rel, gap }
+    }
+  }
   // case 6:size 修正 + case 5:坐标钳位
   const w = sanitizeSize(op.w)
   const h = sanitizeSize(op.h)
   const x = clampCoord(op.x)
   const y = clampCoord(op.y)
-  if (w === op.w && h === op.h && x === op.x && y === op.y) return op
-  return { ...op, w, h, x, y }
+  if (w === op.w && h === op.h && x === op.x && y === op.y && rel === op.rel) return op
+  return { ...op, w, h, x, y, rel }
 }
 
 /** free shape(rect/text/frame)op:case 6(size)+ case 3(跨 kind 告警)。
@@ -182,6 +198,14 @@ export function sanitizeDslOps(ops: DslOp[], ctx?: SanitizeCtx): SanitizeResult 
     existingIds = new Set<string>()
     ctx.existingCardIds?.forEach((id) => existingIds!.add(id))
     ctx.existingFreeIds?.forEach((id) => existingIds!.add(id))
+  }
+  // Same-batch declarations are valid arrow endpoints. Persistence may still
+  // fail later; commitApplyPlan handles that dependency failure explicitly.
+  if (existingIds) {
+    for (const op of src) {
+      if (op.type === 'card' && op.create) existingIds.add(String(op.cardId))
+      if (op.type === 'free' && op.id) existingIds.add(op.id)
+    }
   }
 
   let i = 0

@@ -24,7 +24,7 @@ import { InMemoryCanvasHost, type CanvasHost, type CanvasElement } from '@cys-st
 import type { CanvasId, CardId, CardService, Card, ColorToken } from '@cys-stift/domain'
 import { canvasFreeformStore } from '@/lib/canvas-freeform-store'
 import { loadCardsIntoEditor, cardToElement, elementToCardPosition } from './canvas-binding'
-import { applyLayout } from './apply-layout'
+import { applyLayout, type ApplyOpResult } from './apply-layout'
 import type { SanitizeDiagnostic } from '@/features/ai/dsl-sanitize'
 import type { DslOp } from '@/features/ai/dsl-parser'
 import { freeformElementsOf } from './canvas-freeform-binding'
@@ -54,8 +54,11 @@ export async function buildCanvasHostForCanvas(
 
 /** applyOpsAndPersist 的结果(复用 applyLayout 的 ApplyResult + 落库计数)。 */
 export interface PersistResult {
+  total: number
   applied: number
   skipped: number
+  failed: number
+  opResults: ApplyOpResult[]
   /** card 位置/颜色回写数。 */
   cardsUpdated: number
   /** 新建 card 数(create 指令)。 */
@@ -89,8 +92,6 @@ export async function applyOpsAndPersist(
 ): Promise<PersistResult> {
   // onCardCreate:create 指令落 service.createWithId(空标题卡,几何 + 颜色来自 DSL)。
   // 后续 applyLayout 会在 host 里 upsert 该 card 元素,统一进 after 回写。
-  let cardsCreated = 0
-  let cardsFailed = 0
   const result = applyLayout(host, ops, undefined, ({ cardId, x, y, w, h, color }) => {
     // createWithId:DSL 指定 id 建卡。空标题 + 空 body,用户后续编辑。
     try {
@@ -102,13 +103,19 @@ export async function applyOpsAndPersist(
         ...(color ? { color: color as ColorToken } : {}),
         source: { kind: 'manual', deviceId: 'ask-agent' },
       })
-      cardsCreated++
+      return { ok: true }
     } catch (err) {
-      // case 2a(修 createWithId swallow):不再静默,累加 cardsFailed → 调用方 toast。
-      cardsFailed++
       console.error('[canvas-host-builder] createWithId failed', cardId, err)
+      return {
+        ok: false,
+        reason: err instanceof Error ? err.message : String(err),
+      }
     }
   })
+  const cardsCreated = result.cardsCreated
+  const cardsFailed = result.opResults.filter(
+    (entry) => entry.status === 'failed' && entry.op.type === 'card' && entry.op.create,
+  ).length
 
   const after = host.getElements()
 
@@ -157,8 +164,11 @@ export async function applyOpsAndPersist(
   }
 
   const persistResult: PersistResult = {
+    total: result.total,
     applied: result.applied,
     skipped: result.skipped,
+    failed: result.failed,
+    opResults: result.opResults,
     cardsUpdated,
     cardsCreated,
     cardsFailed,

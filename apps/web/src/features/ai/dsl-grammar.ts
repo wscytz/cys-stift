@@ -11,7 +11,7 @@
  * bump 规则:增删指令种类 / 增删属性 / 改颜色枚举 → bump DSL_VERSION。
  * 纯改 prompt 措辞、改 parser 正则细节(不动语法)→ 不 bump。
  */
-export const DSL_VERSION = 3
+export const DSL_VERSION = 4
 
 /**
  * `@text("...")` / `@label("...")` 值的最大字符数。
@@ -44,12 +44,13 @@ export const DSL_COLOR_ALIASES: Record<string, DslColor> = { grey: 'gray' }
  */
 export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one element per line):
   [card #id] @pos(x, y) @size(w, h) @color(red|yellow|blue|black|white|gray|grey)
+  [card #id create] @pos(x, y) @size(w, h) @color(c)   # create an empty card; id must not exist
   # relational placement — PREFER for structured layouts (trees, lists, grids, hierarchies;
   #   anything row/column-shaped). The engine computes coords AND avoids overlaps, so you skip
   #   error-prone coordinate math. Reserve @pos for free/scattered positioning only:
   #   [card #id] right-of #anchor @gap(20)   # right of anchor, same row (x=anchor.x+w+gap; y=anchor.y)
   #   [card #id] below #anchor @gap(20)      # below anchor, same column (y=anchor.y+h+gap; x=anchor.x)
-  #   (@gap defaults to 20; anchor must be a card placed earlier in this block or already on canvas)
+  #   (@gap defaults to 20 and is limited to 0..2000; anchor must be placed earlier or already exist)
   [rect #id] @pos(x, y) @size(w, h) @color(c)
   [text #id] @pos(x, y) @text("...") @color(c)
   [frame #id] @pos(x, y) @size(w, h) @text("title") @color(c)   # themed group/section container
@@ -62,5 +63,6 @@ export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one eleme
   # @wikilink (optional, relation/free arrow): only on wikilink-auto arrows
   #   (meta.wikilink===true); distinguishes auto-built wikilink arrows from
   #   manual references arrows so the marker survives DSL round-trip.
-Rules: card is update-only (content comes from elsewhere, you may reposition but not create orphan cards);
-  lines starting with # are comments and ignored; colors are the ${DSL_COLORS.length} Bauhaus tokens only.`
+Rules: card updates are the default; explicit create makes an empty card only after persistence succeeds.
+  IDs use letters, digits, underscore, hyphen, and colon. Lines starting with # are comments and ignored;
+  colors are the ${DSL_COLORS.length} Bauhaus tokens only.`

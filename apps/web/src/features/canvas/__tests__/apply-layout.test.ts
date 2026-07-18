@@ -219,20 +219,21 @@ describe('applyLayout', () => {
     })
   })
 
-  it('updates existing card when create=true and id already exists (no duplicate)', () => {
+  it('reports an id conflict when create=true and the card already exists', () => {
     const host = new InMemoryCanvasHost()
     seedCard(host, 'existing', 0, 0) // w:240, h:120
     expect(host.getElements()).toHaveLength(1)
 
-    applyLayout(host, [{ type: 'card', cardId: 'existing' as CardId, x: 100, y: 200, color: 'red', create: true }])
+    const report = applyLayout(host, [{ type: 'card', cardId: 'existing' as CardId, x: 100, y: 200, color: 'red', create: true }])
 
     expect(host.getElements()).toHaveLength(1)
     expect(host.getElement('existing')).toMatchObject({
-      x: 100,
-      y: 200,
-      color: 'red',
+      x: 0,
+      y: 0,
       w: 240, // preserved
     })
+    expect(report).toMatchObject({ applied: 0, skipped: 1, failed: 0 })
+    expect(report.opResults[0]).toMatchObject({ status: 'skipped', reason: expect.stringMatching(/id conflict/) })
   })
 
   it('does NOT create when no create flag (old behavior preserved)', () => {
@@ -463,7 +464,7 @@ describe('applyLayout', () => {
 
   it('empty ops returns zeros', () => {
     const host = new InMemoryCanvasHost()
-    expect(applyLayout(host, [])).toEqual({ applied: 0, skipped: 0, newlyApplied: [] })
+    expect(applyLayout(host, [])).toMatchObject({ total: 0, applied: 0, skipped: 0, failed: 0, newlyApplied: [] })
   })
 
   it('per-op throw counts as skipped', () => {
@@ -479,7 +480,7 @@ describe('applyLayout', () => {
       { type: 'free', shape: 'rect', x: 0, y: 0 },
       { type: 'free', shape: 'rect', x: 10, y: 10 },
     ])
-    expect(res).toEqual({ applied: 0, skipped: 2, newlyApplied: [] })
+    expect(res).toMatchObject({ total: 2, applied: 0, skipped: 0, failed: 2, newlyApplied: [] })
   })
 
   // ── arrow route (curve/elbow) apply ──────────────────────────────────────
@@ -678,7 +679,7 @@ describe('applyLayout', () => {
 
     const result = applyLayout(host, [{ type: 'card', cardId: 'c1' as CardId, x: 100, y: 200 }])
 
-    expect(result).toEqual({ applied: 1, skipped: 0, newlyApplied: [] })
+    expect(result).toMatchObject({ total: 1, applied: 1, skipped: 0, failed: 0, newlyApplied: [] })
     expect(host.getElement('c1')).toMatchObject({ x: 100, y: 200 })
   })
 
@@ -708,7 +709,7 @@ describe('applyLayout — card create + onCardCreate', () => {
     const host = new InMemoryCanvasHost()
     const created: { cardId: string; x: number; y: number; w: number; h: number; color?: string }[] = []
     const op: DslCardOp = { type: 'card', cardId: 'c1' as CardId, x: 100, y: 200, w: 80, h: 60, create: true, color: 'blue' }
-    applyLayout(host, [op], undefined, (p) => created.push(p))
+    applyLayout(host, [op], undefined, (p) => { created.push(p) })
     expect(created).toEqual([{ cardId: 'c1', x: 100, y: 200, w: 80, h: 60, color: 'blue' }])
     expect(host.getElement('c1')).toMatchObject({ kind: 'card', x: 100, y: 200, w: 80, h: 60, color: 'blue' })
   })
@@ -720,13 +721,13 @@ describe('applyLayout — card create + onCardCreate', () => {
     expect(host.getElement('c9')).toMatchObject({ kind: 'card', x: 10, y: 20 })
   })
 
-  it('does not invoke onCardCreate when card already exists (update path)', () => {
+  it('does not invoke onCardCreate when create id already exists', () => {
     const host = new InMemoryCanvasHost()
     host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 240, h: 120, rotation: 0 })
     let calls = 0
-    applyLayout(host, [{ type: 'card', cardId: 'c1' as CardId, x: 5, y: 6, create: true }], undefined, () => calls++)
+    applyLayout(host, [{ type: 'card', cardId: 'c1' as CardId, x: 5, y: 6, create: true }], undefined, () => { calls++ })
     expect(calls).toBe(0)
-    expect(host.getElement('c1')).toMatchObject({ x: 5, y: 6 })
+    expect(host.getElement('c1')).toMatchObject({ x: 0, y: 0 })
   })
 })
 
@@ -787,7 +788,7 @@ describe('applyLayout — relational card (right-of / below)', () => {
         },
       ],
       undefined,
-      (p) => created.push(p.cardId),
+      (p) => { created.push(p.cardId) },
     )
     expect(host.getElement('c1')).toMatchObject({ x: 360, y: 100, w: 240, h: 120 })
     expect(created).toEqual(['c0', 'c1'])

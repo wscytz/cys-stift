@@ -51,6 +51,12 @@ vi.mock('@/lib/toast-store', () => ({
   pushToast: (...args: unknown[]) => pushToastSpy(...args),
 }))
 
+const addSampleSpy = vi.fn()
+vi.mock('@/features/ai/sample-store', () => ({
+  addSample: (...args: unknown[]) => addSampleSpy(...args),
+  genSampleId: () => 'sample-test',
+}))
+
 // ── mock canvas-host-builder: 拦截 buildCanvasHostForCanvas / applyOpsAndPersist,
 //    让 /ask 分支可观测(且不依赖真 CardService/store)。──
 const buildCanvasHostForCanvasSpy = vi.fn()
@@ -428,6 +434,50 @@ describe('AgentConfirmCard — T5 archive trigger (ai-agent)', () => {
 
     // 失败路径:phase 转 'error',archive 不调。
     expect(archiveAppendSpy).not.toHaveBeenCalled()
+
+    unmount()
+  })
+
+  it('final report 全失败 → 无成功 toast/sample/archive/onApplied', async () => {
+    archiveAppendSpy.mockClear()
+    pushToastSpy.mockClear()
+    addSampleSpy.mockClear()
+    const { service } = makeMockService()
+    const onApplied = vi.fn()
+    buildCanvasHostForCanvasSpy.mockResolvedValue({
+      host: { getElements: () => [] },
+      before: [],
+    })
+    applyOpsAndPersistSpy.mockResolvedValue({
+      total: 1,
+      applied: 0,
+      skipped: 0,
+      failed: 1,
+      cardsCreated: 0,
+      cardsUpdated: 0,
+      cardsFailed: 1,
+      freeformChanged: 0,
+      opResults: [{ opIndex: 0, status: 'failed', reason: 'quota' }],
+    })
+
+    const { host: domHost, unmount } = mount(
+      <AgentConfirmCard
+        dsl={'[card #new create] @pos(10,10)'}
+        targetCanvasId={'canvas-ask' as never}
+        service={service}
+        onApplied={onApplied}
+        onRejected={() => {}}
+        sampleContext={{ source: 'ask', context: 'ctx' }}
+      />,
+    )
+    await act(async () => { await flushMicro() })
+    await act(async () => { byText(domHost, /^应用$|^Apply$/)!.click() })
+    await act(async () => { await flushMicro() })
+
+    expect(onApplied).not.toHaveBeenCalled()
+    expect(archiveAppendSpy).not.toHaveBeenCalled()
+    expect(addSampleSpy).not.toHaveBeenCalled()
+    expect(pushToastSpy.mock.calls.some(([toast]) => (toast as { kind?: string }).kind === 'success')).toBe(false)
 
     unmount()
   })

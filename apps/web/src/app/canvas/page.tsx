@@ -557,15 +557,31 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     return () => window.removeEventListener('keydown', onKey)
   }, [zoomBy, toggleSnap, t, focusMode])
 
-  // BUG-A:applyLayout 的 onCardCreate 回调——create 类 op 落库为真实 Card。
-  // 走 createCardOnCanvas(service, adapter, activeCanvasId, ...),复用 createWithId,
-  // cardId 来自 DSL 的 #id,坐标/尺寸来自 op。paste 监听 + DslDialog 共用。
+  // create 类 op 先落 CardService,applyLayout 收到成功结果后才写 host。
   const onCardCreate = useCallback((p: { cardId: string; x: number; y: number; w: number; h: number; color?: string }) => {
-    if (!handle.current.adapter) return
-    createCardOnCanvas(service, handle.current.adapter, activeCanvasId, {
-      id: p.cardId, title: '', x: p.x, y: p.y, w: p.w, h: p.h,
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    try {
+      service.createWithId(p.cardId as CardId, {
+        title: '',
+        body: '',
+        type: 'note',
+        canvasPosition: {
+          canvasId: activeCanvasId,
+          x: p.x,
+          y: p.y,
+          w: p.w,
+          h: p.h,
+          z: Date.now(),
+          rotation: 0,
+        },
+        source: { kind: 'manual', deviceId: 'dsl-apply' },
+      })
+      return { ok: true } as const
+    } catch (error) {
+      return {
+        ok: false,
+        reason: error instanceof Error ? error.message : String(error),
+      } as const
+    }
   }, [service, activeCanvasId])
 
   // BUG-B + BUG-A:把"疑似 DSL 文本 → 应用"抽成组件级回调,paste 监听和右键菜单(T6)共用。
@@ -581,11 +597,11 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     }
     const adapter = handle.current.adapter
     if (!adapter) return
-    const { applied, skipped } = applyLayout(adapter, ops, undefined, onCardCreate)
+    const { applied, skipped, failed } = applyLayout(adapter, ops, undefined, onCardCreate)
     if (applied === 0) {
       pushToast({ kind: 'info', message: t('canvas.pasteDslNone') })
-    } else if (skipped > 0 || errors.length > 0) {
-      pushToast({ kind: 'info', message: t('canvas.pasteDslPartial', { applied: String(applied), skipped: String(skipped + errors.length) }) })
+    } else if (skipped > 0 || failed > 0 || errors.length > 0) {
+      pushToast({ kind: 'info', message: t('canvas.pasteDslPartial', { applied: String(applied), skipped: String(skipped + failed + errors.length) }) })
     } else {
       pushToast({ kind: 'success', message: t('canvas.pasteDslApplied', { n: String(applied) }) })
     }
@@ -883,15 +899,12 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
     if (!template) return
     const ops = parseDsl(template.dsl)
     if (ops.length === 0) return
-    applyLayout(adapterLocal, ops, undefined, (p) => {
-      // onCardCreate 走 createCardOnCanvas:模板含 [card #id create] → 建空卡。
-      // 复用 page 现有 onCardCreate 逻辑(同 activeCanvasId / service)。
-      if (!handle.current.adapter) return
-      createCardOnCanvas(service, handle.current.adapter, activeCanvasId, {
-        id: p.cardId, title: '', x: p.x, y: p.y, w: p.w, h: p.h,
-      })
-    })
-    pushToast({ kind: 'success', message: t('canvas.template.applied', { name: tplName === 'blank' ? '' : tplName }) })
+    const report = applyLayout(adapterLocal, ops, undefined, onCardCreate)
+    if (report.applied > 0) {
+      pushToast({ kind: 'success', message: t('canvas.template.applied', { name: tplName === 'blank' ? '' : tplName }) })
+    } else {
+      pushToast({ kind: 'info', message: t('canvas.pasteDslNone') })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adapter])
 

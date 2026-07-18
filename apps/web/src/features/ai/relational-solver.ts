@@ -17,6 +17,7 @@
  */
 import type { DslOp, DslCardOp } from './dsl-parser'
 import type { SanitizeDiagnostic } from './dsl-sanitize'
+import { DSL_MAX_COORD } from './dsl-sanitize'
 
 /** 已知几何(anchor 查找用)。来自画布现有 card 或同批更早 op。 */
 export interface ExistingGeom {
@@ -119,7 +120,11 @@ export function solveRelational(
     out.push(op)
   }
 
-  return { ops: out, diagnostics }
+  const validated = validateSolvedCoordinates(out, existingGeometry)
+  return {
+    ops: validated.ops,
+    diagnostics: [...diagnostics, ...validated.diagnostics],
+  }
 }
 
 /** 仅供测试/类型导出:从 DslCardOp 判定是否 relational(apply 层不直接用)。 */
@@ -173,4 +178,50 @@ function resolveCollision(
     if (!bumped) break
   }
   return { x, y }
+}
+
+/**
+ * solve 后的第二道坐标门。关系偏移和碰撞推进都可能把已 sanitize 的输入重新推到
+ * 边界外；这里钳回统一坐标域，并在钳位造成重叠时明确诊断。
+ */
+function validateSolvedCoordinates(
+  ops: DslOp[],
+  existingGeometry?: Map<string, ExistingGeom>,
+): SolveResult {
+  const diagnostics: SanitizeDiagnostic[] = []
+  const geom = new Map<string, ExistingGeom>(existingGeometry)
+  const validated = ops.map((op, opIndex) => {
+    if (op.type !== 'card') return op
+
+    const id = String(op.cardId)
+    const existing = geom.get(id)
+    const w = op.w ?? existing?.w ?? DEFAULT_CARD_W
+    const h = op.h ?? existing?.h ?? DEFAULT_CARD_H
+    const x = Math.min(DSL_MAX_COORD, Math.max(-DSL_MAX_COORD, op.x))
+    const y = Math.min(DSL_MAX_COORD, Math.max(-DSL_MAX_COORD, op.y))
+    const changed = x !== op.x || y !== op.y
+    const next = { x, y, w, h }
+
+    if (changed) {
+      diagnostics.push({
+        opIndex,
+        message: `relational card #${id} 的坐标已限制到 +/-${DSL_MAX_COORD} 边界`,
+      })
+      for (const [otherId, other] of geom) {
+        if (otherId === id) continue
+        if (rectsOverlap(next, other)) {
+          diagnostics.push({
+            opIndex,
+            message: `card #${id} 在坐标边界钳位后与 #${otherId} 碰撞`,
+          })
+          break
+        }
+      }
+    }
+
+    geom.set(id, next)
+    return changed ? { ...op, x, y } : op
+  })
+
+  return { ops: validated, diagnostics }
 }

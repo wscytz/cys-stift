@@ -186,7 +186,7 @@ function truncate(v: string): string {
   return v.length > DSL_MAX_TEXT_LEN ? v.slice(0, DSL_MAX_TEXT_LEN) : v
 }
 
-/** @text 双步 unescape(顺序锁定:\"→" 先,\\→\ 后)—— serializeCanvas escapeQuoted 的逆。 */
+/** @text/@label 共用的 canonical quoted-string 解码,是 escapeQuoted 的逆。 */
 function unescapeQuoted(v: string): string {
   return v.replace(/\\"/g, '"').replace(/\\\\/g, '\\')
 }
@@ -233,7 +233,7 @@ function fold(ds: unknown[]): Folded {
       case 'pos': if (!a.pos) a.pos = [finiteNum(String(v1)), finiteNum(String(v2))]; break
       case 'size': if (!a.size) a.size = { w: finiteNum(String(v1)), h: finiteNum(String(v2)) }; break
       case 'color': if (a.color === undefined) a.color = validColor(String(v1)); break
-      case 'label': if (a.label === undefined) a.label = truncate(String(v1)); break // 不 unescape(复刻 LABEL_RE)
+      case 'label': if (a.label === undefined) a.label = truncate(unescapeQuoted(String(v1))); break
       case 'text': if (a.text === undefined) a.text = truncate(unescapeQuoted(String(v1))); break
       case 'dash': if (!a.dash) a.dash = validEnum(String(v1), ['solid', 'dashed', 'dotted']); break
       case 'arrowhead': if (!a.arrowhead) a.arrowhead = validEnum(String(v1), ['arrow', 'triangle', 'none']); break

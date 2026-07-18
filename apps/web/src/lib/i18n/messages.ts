@@ -280,7 +280,7 @@ export const messages = {
   'canvas.dslTitle': { zh: '画布转义', en: 'Canvas DSL' },
   'canvas.dslLede': { zh: '画布的文字形态。编辑或粘贴 DSL 指令,应用回画布。每行一个元素;# 开头的注释行会被忽略。', en: 'The canvas as text. Edit or paste DSL directives and apply them back. One element per line; lines starting with # are ignored.' },
   'canvas.dslSyntaxTitle': { zh: '语法速查', en: 'Syntax cheat sheet' },
-  'canvas.dslSyntaxBody': { zh: '每行一个元素。带已有 #id 的更新该元素;省略 #id 新建(rect/text/自由箭头可新建,card 只能更新——内容来自收件箱)。', en: 'One element per line. With an existing #id it updates; omit #id to create (rect/text/free arrow create; cards are update-only — content comes from the inbox).' },
+  'canvas.dslSyntaxBody': { zh: '每行一个元素。已有 #id 默认更新;rect/text/arrow 可按 ID 新建。卡片需显式写 create,且持久化成功后才进入画布。', en: 'One element per line. Existing #ids update by default; rect, text, and arrow ids can be created. Cards require an explicit create marker and enter the canvas only after persistence succeeds.' },
   'canvas.dslSyntaxFreeArrow': { zh: '自由箭头(无 from/to; w/h 可负表方向)', en: 'Free arrow (no from/to; w/h can be negative to indicate direction)' },
   'canvas.dslApply': { zh: '应用', en: 'Apply' },
   'canvas.dslApplied': { zh: '已应用 {n} 条指令', en: 'Applied {n} directives' },

@@ -56,9 +56,9 @@ prose
   = .* { return null }
 
 // ─── directives(返回 [tag, ...rawArgs] 元组;TS 层 coerce)───
-// #id(header id,允许冒号 card:1)—— 作为 directive 进循环,等价旧行政 parser 整行任意位置提取
+// 唯一 ID primitive:header/anchor/from/to 全部接受相同字符集。
 idDir
-  = '#' id:$idChars tail:$(':' idChars)? { return ['id', tail ? id + tail : id] }
+  = id:idRef { return ['id', id] }
 
 posDir
   = '@pos(' x:$num ',' ws y:$num ')' { return ['pos', x, y] }
@@ -72,7 +72,7 @@ colorDir
 
 // relation 关键字后必接 #id(防散文里的 below 误命中)
 relationDir
-  = dir:$('right-of' / 'below') sp '#' anchor:$idChars { return ['rel', dir, anchor] }
+  = dir:$('right-of' / 'below') sp anchor:idRef { return ['rel', dir, anchor] }
 
 gapDir
   = '@gap(' g:$num ')' { return ['gap', g] }
@@ -81,21 +81,17 @@ gapDir
 createDir
   = 'create' !idChar { return ['create', true] }
 
-// from/to 的 id 字符集**不含冒号**(复刻旧 regex #[a-zA-Z0-9_-]+;遇冒号截断,
-// 残余 :1 由 skipChunk 吃掉,让后续 to 仍命中 —— 见 from #card:1 to #nope)
 fromDir
-  = 'from' sp '#' id:$idChars { return ['from', id] }
+  = 'from' sp id:idRef { return ['from', id] }
 
 toDir
-  = 'to' sp '#' id:$idChars { return ['to', id] }
+  = 'to' sp id:idRef { return ['to', id] }
 
 labelDir
-  // 不处理转义(复刻旧 LABEL_RE [^"]*);TS 层也不 unescape,只截断
-  = '@label("' v:$([^"]*) '"' { return ['label', v] }
+  = '@label(' v:quotedString ')' { return ['label', v] }
 
 textDir
-  // 处理转义(复刻旧 TEXT_RE (?:[^"\\]|\\.)*);TS 层双步 unescape
-  = '@text("' v:$(escChar*) '"' { return ['text', v] }
+  = '@text(' v:quotedString ')' { return ['text', v] }
 
 dashDir
   = '@dash(' c:$([^)]+) ')' { return ['dash', c] }
@@ -124,11 +120,17 @@ num
 escChar
   = '\\' . / [^"\\]
 
+quotedString
+  = '"' v:$(escChar*) '"' { return v }
+
+idRef
+  = '#' id:$idChars { return id }
+
 idChars
-  = [a-zA-Z0-9_-]+
+  = [a-zA-Z0-9_:-]+
 
 idChar
-  = [a-zA-Z0-9_-]
+  = [a-zA-Z0-9_:-]
 
 // skipChunk:消费一个非空白串(未知指令残余 / ] 等),返回 null(被 directive* 收集后 TS 过滤)。
 // 用 [^ \t] 而非 [^\s]:行已按 \n 切(Peggy 行级解析),内部只剩空格/制表符作分隔。

@@ -212,6 +212,30 @@ describe('applyOpsAndPersist', () => {
     const res = await applyOpsAndPersist(host, before, ops, CANVAS, svc)
     expect(res.cardsFailed).toBe(2)
     expect(res.cardsCreated).toBe(0)
+    expect(res.applied).toBe(0)
+    expect(res.failed).toBe(2)
+    expect(host.getElement('new1')).toBeUndefined()
+    expect(host.getElement('new2')).toBeUndefined()
+  })
+
+  it('create persistence failure leaves no ghost card and skips its dependent arrow', async () => {
+    const svc = makeService([])
+    vi.spyOn(svc, 'createWithId').mockImplementation(() => { throw new Error('quota exceeded') })
+    const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
+    const ops: DslOp[] = [
+      { type: 'card', cardId: 'new1' as never, x: 0, y: 0, create: true },
+      { type: 'free', shape: 'rect', id: 'target', x: 300, y: 0, w: 100, h: 100 },
+      { type: 'arrow', id: 'dependent', from: 'new1', to: 'target' },
+    ]
+
+    const res = await applyOpsAndPersist(host, before, ops, CANVAS, svc)
+
+    expect(host.getElement('new1')).toBeUndefined()
+    expect(host.getElement('dependent')).toBeUndefined()
+    expect(res.opResults).toEqual(expect.arrayContaining([
+      expect.objectContaining({ opIndex: 0, status: 'failed' }),
+      expect.objectContaining({ opIndex: 2, status: 'skipped' }),
+    ]))
   })
 
   it('透出 sanitizeDiagnostics(ops 引用不存在的 card → diagnostic 挂 PersistResult)', async () => {

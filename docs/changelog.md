@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-07-18 · v0.59.0 · 稳定性 Lane B（DSL v4 / ApplyReport）
+
+关闭 N05-N07、N15-N16,把 DSL 从“解析后直接执行”收敛为可预演、可逐条报告的交换协议。
+
+- **DSL v4 可逆性**:Peggy grammar 建立共享 `idRef` 与 `quotedString`;header/anchor/from/to 统一接受冒号 ID,text/label 统一解码引号与反斜杠;重新生成 parser,`DSL_VERSION` 升到 4,prompt/help 同步真实 create 语义和 ID/gap 边界。
+- **双阶段坐标防护**:输入 sanitize 把 `gap` 限制在 0..2000;relational solve 后再次把派生坐标限制在 +/-10000。边缘 anchor 或长碰撞链发生钳位/重叠时返回 diagnostic,不再静默越界。
+- **Plan/commit + ApplyReport**:`buildApplyPlan` 只读 host 并用 shadow state 预演;`commitApplyPlan` 为每条 op 返回 `applied | skipped | failed(reason)`,并汇总 total/card create/card update/freeform change。显式 create 的 ID 冲突与 arrow ID 冲突都诊断,不静默换 ID。
+- **持久化真实性**:card create 先持久化、成功后才写 host;配额/ID 失败不产生 ghost card,依赖失败 card 的 arrow 不提交。relation/free arrow 在空 freeform host 保留 DSL 请求 ID。
+- **最终副作用**:DSL dialog、paste、template、AI confirm 与 agent 的 toast/sample/archive 只依赖最终 report;全失败不再发 success、不记 applied sample、不建 archive、不调用 `onApplied`。
+- **验证**:web 123 文件 / 1611 tests 全绿,`pnpm --filter web lint` 通过;Lane B 的 `web-dsl-tests` 与 `web-build` 独立 gate PASS。证据:`cys-stability-evidence/20260718T121502Z/gates-B`。
+
 ## 2026-07-18 · v0.59.0 · 稳定性 Lane A（CI / 备份安全 / 导入恢复）
 
 按统一稳定性交接包复核并关闭 N01-N04 的当前实现缺口。

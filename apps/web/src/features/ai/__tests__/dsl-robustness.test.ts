@@ -137,7 +137,7 @@ describe('applyLayout — 永不抛错 + 垃圾中的合法 op 仍生效', () =>
   it('空 ops → no-op,不抛错', () => {
     const host = new InMemoryCanvasHost()
     expect(() => applyLayout(host, [])).not.toThrow()
-    expect(applyLayout(host, [])).toEqual({ applied: 0, skipped: 0, newlyApplied: [] })
+    expect(applyLayout(host, [])).toMatchObject({ total: 0, applied: 0, skipped: 0, failed: 0, newlyApplied: [] })
   })
 
   it('纯垃圾解析结果 apply:啥也不建,不抛错', () => {
