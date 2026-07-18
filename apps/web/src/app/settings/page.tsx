@@ -13,6 +13,7 @@ import { AISettingsPanel } from '@/features/settings/ai-settings-panel'
 import { SampleExportPanel } from '@/features/settings/sample-export-panel'
 import { LabToggle } from '@/features/ai/lab-toggle'
 import { LAB_REGISTRY } from '@/features/ai/labs-registry'
+import { CaptureShortcutSettings } from '@/features/capture/capture-shortcut-settings'
 import {
   buildExportPayload,
   downloadExport,
@@ -33,7 +34,6 @@ export default function SettingsPage() {
   // =false,直读会 hydration mismatch(capture 快捷键配置段闪现又消失)。pre-mount
   // =true 与 SSG 一致;移动端整段隐藏(无系统全局热键概念)。
   const isDesktopVal = useIsDesktop()
-  const sc = settings.captureShortcut
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
 
@@ -74,15 +74,6 @@ export default function SettingsPage() {
     reader.onerror = () =>
       setImportResult({ ok: false, cards: 0, mediaAssets: 0, error: t('settings.importReadFailed') })
     reader.readAsText(file)
-  }
-
-  const labelFor = (code: string) => {
-    if (code === 'Space') return t('settings.key.space')
-    if (code === 'Comma') return t('settings.key.comma')
-    if (code === 'Period') return t('settings.key.period')
-    if (code.startsWith('Key')) return code.slice(3)
-    if (code.startsWith('Digit')) return code.slice(5)
-    return code
   }
 
   const formatBytes = (b: number): string => {
@@ -143,65 +134,10 @@ export default function SettingsPage() {
         </section>
 
         {isDesktopVal && (
-        <section className="section">
-          <h2 className="section__h">{t('settings.captureShortcut')}</h2>
-          <p className="section__lede">{t('settings.captureShortcutLede')}</p>
-          <div className="field-row">
-            <label className="mono-label" htmlFor="set-mod">{t('settings.modifier')}</label>
-            <select
-              id="set-mod"
-              className="set__select"
-              value={sc.modKey}
-              onChange={(e) =>
-                settingsStore.updateCaptureShortcut({
-                  modKey: e.target.value as 'meta' | 'ctrl',
-                })
-              }
-            >
-              <option value="meta">{t('settings.modifierMeta')}</option>
-              <option value="ctrl">{t('settings.modifierCtrl')}</option>
-            </select>
-          </div>
-          <div className="field-row">
-            <label className="mono-label" htmlFor="set-shift">{t('settings.shift')}</label>
-            <input
-              id="set-shift"
-              type="checkbox"
-              checked={sc.shift}
-              onChange={(e) =>
-                settingsStore.updateCaptureShortcut({ shift: e.target.checked })
-              }
-            />
-          </div>
-          <div className="field-row">
-            <label className="mono-label" htmlFor="set-key">{t('settings.key')}</label>
-            <select
-              id="set-key"
-              className="set__select"
-              value={sc.code}
-              onChange={(e) =>
-                settingsStore.updateCaptureShortcut({ code: e.target.value })
-              }
-            >
-              {['KeyE', 'KeyC', 'KeyN', 'KeyI', 'Comma', 'Period'].map((c) => (
-                <option key={c} value={c}>
-                  {labelFor(c)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <p className="mono">
-            {t('settings.current')}:{' '}
-            <code className="set__current-code">
-              {(sc.modKey === 'meta' ? '⌘' : 'Ctrl') +
-                (sc.shift ? '+⇧' : '') +
-                '+' +
-                labelFor(sc.code)}
-            </code>{' '}
-            {ready ? '' : t('settings.currentSuffix')}
-          </p>
-          <p className="mono mono--xs">{t('settings.captureHint')}</p>
-        </section>
+          <CaptureShortcutSettings
+            shortcut={settings.captureShortcut}
+            ready={ready}
+          />
         )}
 
         <AISettingsPanel />

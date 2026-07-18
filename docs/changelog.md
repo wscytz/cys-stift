@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-07-18 · v0.59.0 · 稳定性 Lane D（桌面快捷键状态）
+
+关闭 N18,把快捷键设置从“先持久化、异步碰运气注册”改为 native-first 两阶段提交，确保 UI、settings/localStorage 与系统 active accelerator 一致。
+
+- **候选值提交**:设置控件本地显示 pending candidate；native 注册成功后才调用 `settingsStore.updateCaptureShortcut`。冲突失败立即恢复 durable 值，CaptureHost 不再监听 store 重复 invoke。
+- **持久化回退**:`updateCaptureShortcut` 返回写入结果；localStorage/quota 失败时 coordinator 重新注册旧 durable accelerator，避免只回滚前端。
+- **请求顺序**:每个 webview 先向 Rust 申请 session generation，每次更新携带递增 request ID；Rust 在同一 mutex 临界区拒绝旧 session/旧请求。连续修改即使 IPC 响应乱序，旧响应也不能覆盖最新候选。
+- **明确 fallback**:每次 native 请求同时携带 durable fallback；若最新候选冲突，即使旧候选已临时注册成功，Rust 仍恢复持久化真值而非旧候选。启动 hydration 后只同步一次 durable 值。
+- **默认一致**:Tauri 启动默认由遗留 `CmdOrCtrl+Shift+Space` 对齐当前 web 默认 `CmdOrCtrl+Shift+E`；相同 accelerator 重绑直接成功，避免重复注册。
+- **验证**:Web desktop contract 11 文件 / 83 tests、Cargo 2 tests、web lint 全绿；Lane D `web-desktop-contract-tests` 与 `cargo-tests` 独立 gate PASS。证据:`cys-stability-evidence/20260718T130722Z/gates-D`。
+
 ## 2026-07-18 · v0.59.0 · 稳定性 Lane C（画布算法 / 交互状态机）
 
 关闭 N10-N14、N17、N21,修正几何真值、pointer 生命周期、同帧渲染、undo 粒度与快速橡皮连续性。

@@ -1,6 +1,6 @@
 // cy's Stift — Tauri shell entry.
 //
-// Phase C (v0.25.0): registers a global shortcut (CmdOrCtrl+Shift+Space)
+// Phase C (v0.25.0): registers a global shortcut (CmdOrCtrl+Shift+E)
 // so the user can invoke capture even when the window is unfocused or
 // minimised. The handler shows + focuses the main window and emits a
 // `global-capture-open` event; the web CaptureHost listens for it (via
@@ -18,39 +18,66 @@ use tauri::{Emitter, Manager};
 #[cfg(desktop)]
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
-/// 当前已注册的快捷键 accelerator。update_shortcut 时先注销它再注册新的。
-/// 用 Mutex 保护(invoke 跨线程);初始 = 默认快捷键。
+/// 当前 accelerator + 前端会话/请求顺序。一个 webview session 内只接受递增
+/// request_id；新 webview 先 begin session，使旧 IPC 响应不能覆盖新值。
 // global-shortcut 是桌面专属(安卓无系统全局热键概念),整套守 cfg(desktop)。
 #[cfg(desktop)]
-static CURRENT_SHORTCUT: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+struct ShortcutRegistrationState {
+    active: Option<String>,
+    session_id: u64,
+    latest_request_id: u64,
+}
+
+#[cfg(desktop)]
+static SHORTCUT_STATE: std::sync::Mutex<ShortcutRegistrationState> =
+    std::sync::Mutex::new(ShortcutRegistrationState {
+        active: None,
+        session_id: 0,
+        latest_request_id: 0,
+    });
 
 /// 默认快捷键(仅桌面注册;安卓无系统全局热键概念)。
 #[cfg(desktop)]
-const DEFAULT_SHORTCUT: &str = "CmdOrCtrl+Shift+Space";
+const DEFAULT_SHORTCUT: &str = "CmdOrCtrl+Shift+E";
 
-/// 注册一个快捷键:注销当前(若有)、注册新的、更新 CURRENT_SHORTCUT。
+/// 注册一个快捷键:注销当前(若有)、注册新的、更新 active accelerator。
 /// 失败 emit `global-shortcut-error`。返回 Ok(()) 让前端知道成功。
 #[cfg(desktop)]
-fn rebind_shortcut(app: &tauri::AppHandle, accelerator: &str) -> Result<(), String> {
+fn rebind_shortcut(
+    app: &tauri::AppHandle,
+    accelerator: &str,
+    fallback_accelerator: &str,
+    state: &mut ShortcutRegistrationState,
+) -> Result<(), String> {
     let gs = app.global_shortcut();
-    let mut current = CURRENT_SHORTCUT.lock().map_err(|e| e.to_string())?;
+    let previous = state.active.clone();
+    if previous.as_deref() == Some(accelerator) {
+        return Ok(());
+    }
     // 注销旧的(若与新的不同)。
-    if let Some(prev) = current.as_ref() {
+    if let Some(prev) = previous.as_ref() {
         if prev != accelerator {
             let _ = gs.unregister(prev.as_str()); // 旧的可能已失效,忽略错误
         }
     }
     match gs.register(accelerator) {
         Ok(()) => {
-            *current = Some(String::from(accelerator));
+            state.active = Some(String::from(accelerator));
             Ok(())
         }
         Err(e) => {
-            let msg = e.to_string();
-            // 新注册失败:若 prev 已被注销(与新不同分支),尝试重新注册旧的保命。
-            if let Some(prev) = current.as_ref() {
-                if prev != accelerator {
-                    let _ = gs.register(prev.as_str());
+            let mut msg = e.to_string();
+            // previous 可能是刚成功的旧候选。失败时必须恢复前端随请求带来的
+            // durable fallback，而不是恢复 previous，否则乱序请求仍会三端分叉。
+            match gs.register(fallback_accelerator) {
+                Ok(()) => {
+                    state.active = Some(String::from(fallback_accelerator));
+                }
+                Err(rollback_error) => {
+                    state.active = None;
+                    msg = format!(
+                        "{msg}; failed to restore {fallback_accelerator}: {rollback_error}"
+                    );
                 }
             }
             let _ = app.emit("global-shortcut-error", msg.clone());
@@ -61,8 +88,46 @@ fn rebind_shortcut(app: &tauri::AppHandle, accelerator: &str) -> Result<(), Stri
 
 #[cfg(desktop)]
 #[tauri::command]
-fn update_shortcut(app: tauri::AppHandle, accelerator: String) -> Result<(), String> {
-    rebind_shortcut(&app, &accelerator)
+fn begin_shortcut_session() -> Result<u64, String> {
+    let mut state = SHORTCUT_STATE.lock().map_err(|e| e.to_string())?;
+    state.session_id = state.session_id.saturating_add(1);
+    state.latest_request_id = 0;
+    Ok(state.session_id)
+}
+
+#[cfg(desktop)]
+fn accept_shortcut_request(
+    state: &mut ShortcutRegistrationState,
+    session_id: u64,
+    request_id: u64,
+) -> bool {
+    if session_id != state.session_id || request_id <= state.latest_request_id {
+        return false;
+    }
+    state.latest_request_id = request_id;
+    true
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+fn update_shortcut(
+    app: tauri::AppHandle,
+    accelerator: String,
+    fallback_accelerator: String,
+    session_id: u64,
+    request_id: u64,
+) -> Result<bool, String> {
+    let mut state = SHORTCUT_STATE.lock().map_err(|e| e.to_string())?;
+    if !accept_shortcut_request(&mut state, session_id, request_id) {
+        return Ok(false);
+    }
+    rebind_shortcut(
+        &app,
+        &accelerator,
+        &fallback_accelerator,
+        &mut state,
+    )?;
+    Ok(true)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -78,6 +143,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
+            #[cfg(desktop)] begin_shortcut_session,
             #[cfg(desktop)] update_shortcut,
         ])
         // dialog + fs:导出 helper(Android)用 dialog save(SAF picker)+ fs
@@ -115,8 +181,8 @@ pub fn run() {
                 // matches the web-side default capture shortcut.
                 match app.global_shortcut().register(DEFAULT_SHORTCUT) {
                     Ok(()) => {
-                        if let Ok(mut c) = CURRENT_SHORTCUT.lock() {
-                            *c = Some(String::from(DEFAULT_SHORTCUT));
+                        if let Ok(mut state) = SHORTCUT_STATE.lock() {
+                            state.active = Some(String::from(DEFAULT_SHORTCUT));
                         }
                     }
                     Err(e) => {
@@ -133,4 +199,32 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(all(test, desktop))]
+mod tests {
+    use super::{accept_shortcut_request, ShortcutRegistrationState};
+
+    fn state(session_id: u64) -> ShortcutRegistrationState {
+        ShortcutRegistrationState {
+            active: None,
+            session_id,
+            latest_request_id: 0,
+        }
+    }
+
+    #[test]
+    fn older_request_cannot_follow_a_newer_request() {
+        let mut state = state(4);
+        assert!(accept_shortcut_request(&mut state, 4, 2));
+        assert!(!accept_shortcut_request(&mut state, 4, 1));
+        assert_eq!(state.latest_request_id, 2);
+    }
+
+    #[test]
+    fn previous_webview_session_cannot_mutate_current_state() {
+        let mut state = state(8);
+        assert!(!accept_shortcut_request(&mut state, 7, 99));
+        assert!(accept_shortcut_request(&mut state, 8, 1));
+    }
 }

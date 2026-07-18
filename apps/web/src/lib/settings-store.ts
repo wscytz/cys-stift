@@ -335,18 +335,29 @@ export const settingsStore = {
     }
     notify()
   },
-  updateCaptureShortcut(patch: Partial<CaptureShortcut>): void {
+  updateCaptureShortcut(patch: Partial<CaptureShortcut>): boolean {
     hydrateOnce()
+    const next = { ..._settings.captureShortcut, ...patch }
+    if (
+      next.modKey === _settings.captureShortcut.modKey &&
+      next.shift === _settings.captureShortcut.shift &&
+      next.code === _settings.captureShortcut.code
+    ) {
+      return true
+    }
     const prev = _settings
     _settings = {
       ..._settings,
-      captureShortcut: { ..._settings.captureShortcut, ...patch },
+      captureShortcut: next,
     }
     if (!saveSettings(_settings)) {
       _settings = prev
       notifyQuota()
+      notify()
+      return false
     }
     notify()
+    return true
   },
   updateLocale(l: 'zh' | 'en'): void {
     hydrateOnce()

@@ -29,45 +29,14 @@ import { pushToast } from '@/lib/toast-store'
 import { useI18n } from '@/lib/i18n'
 import { useCanvases } from '@/lib/canvas-store'
 import { buildCaptureRedirectActions } from './capture-redirect'
+import { captureShortcutCommitCoordinator } from './capture-shortcut-commit'
 
 export const CAPTURE_OPEN_EVENT = 'cys-stift:open-capture'
-
-/**
- * 把 web 端 CaptureShortcut(modKey + shift + KeyboardEvent.code)转成 Tauri
- * accelerator 字符串(如 "CmdOrCtrl+Shift+E")。modKey meta→CmdOrCtrl 跨平台
- * (Tauri 自动 Cmd on macOS / Ctrl on Win+Linux);code 归一化(KeyC→C、Digit1→1)。
- * 用于桌面壳跟随用户改的快捷键(修补轮:此前 Rust 写死,web 可改但不联动)。
- */
-export function captureShortcutToAccelerator(sc: {
-  modKey: 'meta' | 'ctrl'
-  shift: boolean
-  code: string
-}): string {
-  const parts: string[] = [sc.modKey === 'meta' ? 'CmdOrCtrl' : 'Ctrl']
-  if (sc.shift) parts.push('Shift')
-  // KeyC → C, Digit1 → 1, Space/Comma/... 原样。
-  let key = sc.code
-  if (key.startsWith('Key')) key = key.slice(3)
-  else if (key.startsWith('Digit')) key = key.slice(5)
-  parts.push(key)
-  return parts.join('+')
-}
-
-/** 在桌面壳里调 update_shortcut。非桌面(无 __TAURI__)静默 no-op。 */
-function invokeUpdateShortcut(accelerator: string): void {
-  type TauriCoreAPI = { invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> }
-  type TauriGlobal = { core?: TauriCoreAPI }
-  const tauri = (window as unknown as { __TAURI__?: TauriGlobal }).__TAURI__
-  if (!tauri?.core?.invoke) return
-  tauri.core.invoke('update_shortcut', { accelerator }).catch(() => {
-    // Rust 端已 emit global-shortcut-error 事件,这里不重复 toast。
-  })
-}
 
 export function CaptureHost() {
   const { service } = useDb()
   const { t } = useI18n()
-  const { settings } = useSettings()
+  const { settings, ready } = useSettings()
   const { snapshot } = useCanvases()
   const sc = settings.captureShortcut
   const [open, setOpen] = useState(false)
@@ -239,11 +208,12 @@ export function CaptureHost() {
     }
   }, [t])
 
-  // 用户改快捷键 → 推给桌面壳重新注册(修补轮:此前 Rust 写死,web 可改但不联动,
-  // 全局热键永远还是默认键)。非桌面 no-op(浏览器走 keydown 监听,不依赖此)。
+  // Hydration 后只同步一次 durable 值。设置页本身负责 native-first 的两阶段
+  // commit；这里若再跟随 store invoke，会重复注册并重新引入响应竞态。
   useEffect(() => {
-    invokeUpdateShortcut(captureShortcutToAccelerator(sc))
-  }, [sc.modKey, sc.shift, sc.code])
+    if (!ready) return
+    void captureShortcutCommitCoordinator.synchronize(sc)
+  }, [ready])
 
   // Register the web sinks on mount. Other sinks (Phase 6.5g MenuCaptureSink,
   // Phase 8 TauriCaptureSink) can also register against the same registry.

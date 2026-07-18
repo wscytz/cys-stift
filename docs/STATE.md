@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:2026-07-18 稳定性大迭代进行中,Lane A（CI/备份/导入安全）、Lane B（DSL v4/ApplyReport）与 Lane C（画布算法/状态机）已完成并通过独立 gate;后续 Lane D-F 与最终桌面/浏览器验收未完成。当前只做本地 commits,不 push/tag/release。**v0.58.0 / v0.58.1 / v0.59.0 已 commit 未 tag**(版本表由 git tag 生成,tag 前不显行 —— 故下表断在 v0.57.3,非缺失)。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:2026-07-18 稳定性大迭代进行中,Lane A（CI/备份/导入安全）、Lane B（DSL v4/ApplyReport）、Lane C（画布算法/状态机）与 Lane D（桌面快捷键状态）已完成并通过独立 gate;后续 Lane E-F 与最终桌面/浏览器验收未完成。当前只做本地 commits,不 push/tag/release。**v0.58.0 / v0.58.1 / v0.59.0 已 commit 未 tag**(版本表由 git tag 生成,tag 前不显行 —— 故下表断在 v0.57.3,非缺失)。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 
@@ -171,9 +171,9 @@
 > 判断"这一步该不该做"先读 **[`docs/development/polish-phase.md`](development/polish-phase.md)**(打磨 vs 修缝判据 + 反馈驱动流程 + 退出标准)。
 > 燃料 = 你手测的真实反馈。每轮主线开工走 brainstorming,严守「一次一问 + 逐段确认」(skill-checklist-discipline 记忆)。
 
-### 当前焦点(2026-07-18,稳定性 Lane A)
+### 当前焦点(2026-07-18,稳定性 Lane A-D)
 
-统一交接包 Lane A 已实施:N01 CI 补 web/canvas-engine 测试;N02 export/archive 最终边界清空 API key;N03 replace/merge 导入计划覆盖 owned stores + conversation + freeform,异步失败全量回滚;N04 导入媒体严格校验 + 渲染二次防线。全仓 lint/test + web build 与 Lane A gate 全绿。**GitHub PR mutation check 尚未执行,不作为已通过证据。**
+统一交接包 Lane A-D 已实施并分批本地提交:N01-N07、N10-N18、N21 已关闭。最新 Lane D 将桌面快捷键改为 native-first 两阶段提交；冲突、localStorage 失败、连续请求乱序与 webview 重启时，UI/settings/native 保持同一 durable 值。A-D 独立 gate 均全绿；后续继续 Lane E（可访问性/触屏）与 Lane F（文档真值/版本）。**GitHub PR mutation check、最终桌面/浏览器验收尚未执行,不作为已通过证据。**
 
 ### 历史焦点(2026-07-14,apps/web review 完 + bug 修)
 
