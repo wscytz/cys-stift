@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseDsl, parseDslWithDiagnostics, type DslOp } from '../dsl-parser'
+import { parseDsl, parseDslStrictWithDiagnostics, parseDslWithDiagnostics, type DslOp } from '../dsl-parser'
 import { DSL_MAX_TEXT_LEN } from '../dsl-grammar'
 
 describe('parseDsl', () => {
@@ -442,6 +442,21 @@ describe('parseDslWithDiagnostics', () => {
     expect(ops).toHaveLength(2)
     expect(errors).toHaveLength(1)
     expect(errors[0]!.line).toBe(2)
+  })
+})
+
+describe('parseDslStrictWithDiagnostics', () => {
+  it('rejects prose and markdown fences in AI output', () => {
+    const result = parseDslStrictWithDiagnostics('Here is the layout:\n```dsl\n[card #a] @pos(1,2)\n```')
+    expect(result.ops).toHaveLength(1)
+    expect(result.errors).toHaveLength(3)
+  })
+
+  it('rejects unknown residual and duplicate directives', () => {
+    const residual = parseDslStrictWithDiagnostics('[card #a] @pos(1,2) surprise')
+    expect(residual.errors[0]?.message).toContain('residual')
+    const duplicate = parseDslStrictWithDiagnostics('[card #a] @pos(1,2) @pos(3,4)')
+    expect(duplicate.errors[0]?.message).toContain('duplicate pos')
   })
 })
 

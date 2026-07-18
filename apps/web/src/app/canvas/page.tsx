@@ -35,8 +35,11 @@ import { syncAllWikiLinks } from '@/features/canvas/wiki-links'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { serializeCanvas } from '@/features/ai/canvas-dsl'
 import { parseDsl, parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
-import { DSL_GRAMMAR_REFERENCE } from '@/features/ai/dsl-grammar'
-import { retryUntilValid, buildDslCorrection } from '@/features/ai/retry-until-valid'
+import { retryUntilValid, buildIntentCorrection } from '@/features/ai/retry-until-valid'
+import { INTENT_IR_SCHEMA } from '@/features/ai/intent-schema'
+import { decodeIntentJson } from '@/features/ai/intent-validation'
+import { compileIntent } from '@/features/ai/intent-compiler'
+import { intentSnapshotFromHost } from '@/features/ai/intent-host-adapter'
 import { SaveStatusBadge } from '@/features/canvas/save-status-badge'
 import { TemplatePicker, type TemplateChoice } from '@/features/canvas/template-picker'
 import { allTemplates, saveCustomTemplate, addCustomTemplate } from '@/lib/canvas-templates'
@@ -356,22 +359,19 @@ export default function CanvasPage() {
 
       const snap = snapshotCanvas(adapter, service, activeCanvasId)
       const formatted = formatCanvasSnapshot(snap)
+      const intentSnapshot = intentSnapshotFromHost(adapter)
 
-      const systemPrompt = `${DSL_GRAMMAR_REFERENCE}
+      const systemPrompt = `You are an active canvas layout organizer. Return exactly one CYS Intent IR v1 JSON object that conforms to this schema. No prose, comments, or markdown fences.
 
-You are an active canvas layout organizer. The user clicked "AI layout" because they WANT the canvas reorganized — do not preserve the current layout unless it is already a clean, non-overlapping arrangement. Read each card's current position (provided in the snapshot) and substantially REPOSITION cards into a readable, well-spaced layout: group semantically related cards (by title keywords / tags) into clusters, align cards into a clear grid or DAG flow with consistent column widths, and ELIMINATE all overlap (no two cards may overlap). Use the full canvas: spread cards out with comfortable spacing (cards ~240x120, gap ~40-60px between neighbors). It IS expected and correct to substantially move cards from their current positions. You may reposition/resize cards and change colors; refine existing arrow relation signatures (dash style + arrowhead) where appropriate. IRON RULES (never break): (1) Cards are UPDATE-only — never create or delete cards; card content comes from the inbox. Reuse each existing #id to UPDATE. (2) Output one UPDATE directive for EVERY input card (reuse its #id) — never omit a card. (3) Do NOT create new relation arrows — only refine signatures of existing arrows (from/to are kept). (4) Free arrows (no from/to) keep their bbox. Output DSL directives ONLY: one per line, each starting with "[", no markdown fences (no \`\`\`), no explanations, no preamble.`
+${JSON.stringify(INTENT_IR_SCHEMA)}
+
+Use mode "layout". Only layout, place, align, distribute, and pin operations are allowed. Never create, delete, connect, or update card content. Use existing IDs exactly. Prefer bounded layout primitives over hand-authored coordinates. The user expects a substantial, readable, non-overlapping arrangement with 40-60px gaps.`
 
       const userPrompt = `Reorganize this canvas into a clean, non-overlapping, well-spaced layout. Group related cards into clusters, align into a readable grid/DAG flow, and spread cards out across the canvas. Substantially reposition cards that are overlapping, cramped, or scattered — do not just nudge them.
 
-${formatted}
+Base revision: ${intentSnapshot.revision}
 
-Output DSL (one directive per line):
-[card #id] @pos(x, y) @size(w, h) @color(c)
-[rect #id] @pos(x, y) @size(w, h) @color(c)
-[text #id] @pos(x, y) @text("...") @color(c)
-[arrow #id] from #a to #b @label("...") @color(c) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none)
-[arrow #id] @pos(x, y) @size(w, h) @color(c) @dash(...) @arrowhead(...)   (free arrow: no from/to; w/h may be negative for direction)
-Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbox kept for free arrows); cards are update-only — output one UPDATE per input card; do NOT create new relation arrows.`
+${formatted}`
 
       // maxTokens 提到 4096:排版 DSL 需要完整结构化输出,默认 1024 对思考模式模型
       // (DeepSeek-v4-pro 等)不够 —— 思考吃掉大半,DSL 还没输出完就被截断 → 解析 0 条。
@@ -387,10 +387,14 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           streamText(ready, { system: systemPrompt, user: userPrompt, messages, maxTokens: 4096, structuredOutput: true, timeoutMs: 60_000 }, () => {}, signal)
             .then((x) => x?.content ?? ''),
         parse: (text) => {
-          const { ops, errors } = parseDslWithDiagnostics(text)
-          return { ok: ops.length > 0, errors }
+          const decoded = decodeIntentJson(text)
+          if (!decoded.ok) return { ok: false, errors: decoded.diagnostics.map((error) => ({ line: 0, text: error.path ?? '$', message: error.message })) }
+          const compiled = compileIntent(decoded.value, intentSnapshot)
+          if (!compiled.ok) return { ok: false, errors: compiled.diagnostics.map((error) => ({ line: 0, text: error.path ?? '$', message: error.message })) }
+          const readyOps = compiled.plan.ops.filter((op) => op.status === 'ready').length
+          return { ok: readyOps > 0, errors: compiled.diagnostics.map((error) => ({ line: 0, text: error.path ?? '$', message: error.message })) }
         },
-        buildCorrection: buildDslCorrection,
+        buildCorrection: buildIntentCorrection,
       })
       if (!r.text) {
         pushToast({ kind: 'info', message: t('canvas.aiLayoutEmpty') })
@@ -398,19 +402,20 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
       }
       // 重试闭环后重 parse:r.accepted=true → ops>0 开确认门;accepted=false → 也开
       // 确认门(parseError 态,让用户看错误 + 编辑/重试,而非直接 toast 失败)。
-      const { ops } = parseDslWithDiagnostics(r.text)
-      if (ops.length === 0) {
+      const decoded = decodeIntentJson(r.text)
+      const compiled = decoded.ok ? compileIntent(decoded.value, intentSnapshot) : null
+      if (!compiled?.ok || compiled.plan.ops.every((op) => op.status !== 'ready')) {
         addSample(
           { id: genSampleId(), ts: Date.now(), kind: 'dsl', source: 'canvasLayout', context: formatted, aiOutput: r.text, outcome: 'parse_failed', attempts: r.attempts, parseErrors: r.lastErrors, targetCanvasId: activeCanvasId },
           settingsStore.get().aiSampleCapture,
         )
         // 仍开确认门(parseError 态):用户可看错误 + 手改 DSL + 应用,或重试。
-        setAiConfirm({ mode: 'dsl', dsl: r.text, targetCanvasId: activeCanvasId, service, liveHost: adapter, sampleContext: { source: 'layout', context: formatted, targetCanvasId: activeCanvasId }, onApplied: () => setAiConfirm(null), onRejected: () => setAiConfirm(null) })
+        setAiConfirm({ mode: 'intent', intent: r.text, targetCanvasId: activeCanvasId, service, liveHost: adapter, sampleContext: { source: 'layout', context: formatted, targetCanvasId: activeCanvasId }, onApplied: () => setAiConfirm(null), onRejected: () => setAiConfirm(null) })
         return
       }
       // ops>0:开确认门(before/after 缩略图 + 摘要 + 应用/编辑/拒绝)。
       // 不直接 applyLayout —— 位移反馈/archive/sample 全在确认门 apply 内。
-      setAiConfirm({ mode: 'dsl', dsl: r.text, targetCanvasId: activeCanvasId, service, liveHost: adapter, sampleContext: { source: 'layout', context: formatted, targetCanvasId: activeCanvasId }, onApplied: () => setAiConfirm(null), onRejected: () => setAiConfirm(null) })
+      setAiConfirm({ mode: 'intent', intent: r.text, targetCanvasId: activeCanvasId, service, liveHost: adapter, sampleContext: { source: 'layout', context: formatted, targetCanvasId: activeCanvasId }, onApplied: () => setAiConfirm(null), onRejected: () => setAiConfirm(null) })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCanvasId, service, t, runAI, aiConfirm])
@@ -1048,7 +1053,10 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
         <button
           type="button"
           className="tb-btn"
-          onClick={() => router.push('/workbench')}
+          onClick={() => {
+            workbenchStore.setOrigin('/canvas')
+            router.push('/workbench')
+          }}
           aria-label={t('canvas.workbench.entry')}
           title={t('canvas.workbench.entry')}
         >
@@ -1085,7 +1093,10 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           tool={tool}
           eraserMode={eraserMode}
           onEraseCard={onEraseCard}
-          onOpenCard={(card) => { workbenchStore.open(card.id); router.push('/workbench') }}
+          onOpenCard={(card) => {
+            workbenchStore.open(card.id, '/canvas')
+            router.push('/workbench')
+          }}
           onDoubleClickEmpty={(px, py, cx, cy) => setCtxMenu({ x: cx, y: cy, px, py, creating: true })}
           adapterRef={handle}
           canvasElRef={canvasElRef}
@@ -1129,8 +1140,8 @@ Rules: reuse an existing #id to UPDATE it (from/to kept for relation arrows, bbo
           onAutoRelate={handleAutoRelate}
           onAIOutline={handleAIOutline}
           onFrame={handleFrame}
-          onOutline={() => setOutlineOpen((o) => !o)}
-          onCompanion={() => setCompanionOpen((o) => !o)}
+          onOutline={() => { setOutlineOpen((o) => !o); setCompanionOpen(false) }}
+          onCompanion={() => { setCompanionOpen((o) => !o); setOutlineOpen(false) }}
           onOverview={() => setOverviewOpen(true)}
           onDsl={() => setDslOpen(true)}
           onExport={() => setExportOpen(true)}
@@ -1479,24 +1490,12 @@ function CanvasSideRail({
       <RailButton label={t('canvas.redo')} short={t('canvas.rail.redo')} onClick={onRedo} disabled={!adapterReady || !canRedo} icon="redo" />
       <span className="cv-rail__sep" aria-hidden="true" />
       <span className="cv-rail__sep" aria-hidden="true" />
-      {aiEnabled && (
-        <>
-          <RailButton label={t('canvas.aiLayout')} short={t('canvas.rail.aiLayout')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'layout'} ariaBusy={aiBusy === 'layout'} busyTitle={t('canvas.aiRunning')} onClick={onAILayout} icon="ai" />
-          {/* AI 工作流 popover:聚类重排 / 生成关系 / 总结大纲。3 项分别是现有
-              handler 的分组入口。菜单项 disabled 同各自前置(cluster/relate 走
-              现有 handler,内含选中/卡片数门控;outline 走 generateOutline + 确认门)。 */}
-          <div className="cv-rail__group">
-            <RailButton label={t('ai.workflow.title')} short={t('canvas.rail.aiWorkflow')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'outline'} ariaBusy={aiBusy === 'outline'} busyTitle={t('canvas.aiRunning')} onClick={() => { wfInitialFocus.current = 'first'; setExportMenuOpen(false); setWfMenuOpen((o) => !o) }} expanded={wfMenuOpen} controls="canvas-workflow-menu" hasPopup onKeyDown={(event) => menuTriggerKeyDown(event, wfInitialFocus, () => { setExportMenuOpen(false); setWfMenuOpen(true) })} icon="workflow" buttonRef={wfTriggerRef} />
-          </div>
-        </>
-      )}
-      {showAutoRelate && (
-        <RailButton label={t('canvas.autoRelate')} short={t('canvas.rail.autoRelate')} onClick={onAutoRelate} icon="relation" />
-      )}
+      <div className="cv-rail__group">
+        <RailButton label={t('ai.workflow.title')} short={t('canvas.rail.aiWorkflow')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy !== null} ariaBusy={aiBusy !== null} busyTitle={t('canvas.aiRunning')} onClick={() => { wfInitialFocus.current = 'first'; setExportMenuOpen(false); setWfMenuOpen((o) => !o) }} expanded={wfMenuOpen} controls="canvas-workflow-menu" hasPopup onKeyDown={(event) => menuTriggerKeyDown(event, wfInitialFocus, () => { setExportMenuOpen(false); setWfMenuOpen(true) })} icon="workflow" buttonRef={wfTriggerRef} />
+      </div>
       <RailButton label={t('canvas.frameSelection')} short={t('canvas.rail.frame')} disabled={!adapterReady} onClick={onFrame} icon="frame" />
-      {aiEnabled && <span className="cv-rail__sep" aria-hidden="true" />}
+      <span className="cv-rail__sep" aria-hidden="true" />
       <RailButton label={t('canvas.outline')} short={t('canvas.rail.outline')} disabled={!adapterReady} onClick={onOutline} pressed={outlineOpen} icon="outline" />
-      <RailButton label={t('canvas.companion')} short={t('canvas.rail.companion')} disabled={!adapterReady} onClick={onCompanion} pressed={companionOpen} icon="outline" />
       <RailButton label={t('canvas.overview')} short={t('canvas.rail.overview')} disabled={!adapterReady} onClick={onOverview} icon="overview" />
       {/* 转义(DSL)是核心卖点,提一级独立按钮(双向:编辑画布文本/导出 DSL)。
           导出菜单里保留同名项(作为「导出 DSL」入口),两条路都通 DslDialog。 */}
@@ -1557,9 +1556,11 @@ function CanvasSideRail({
         triggerRef={wfTriggerRef}
         onClose={() => setWfMenuOpen(false)}
         items={[
-          { id: 'cluster', label: t('ai.workflow.cluster'), disabled: aiBusy !== null, onSelect: onAICluster },
-          { id: 'relate', label: t('ai.workflow.relate'), disabled: aiBusy !== null, onSelect: onAutoRelate },
-          { id: 'outline', label: t('ai.workflow.outline'), disabled: aiBusy !== null, onSelect: onAIOutline },
+          { id: 'layout', label: t('canvas.aiLayout'), disabled: !aiEnabled || aiBusy !== null, onSelect: onAILayout },
+          { id: 'cluster', label: t('ai.workflow.cluster'), disabled: !aiEnabled || aiBusy !== null, onSelect: onAICluster },
+          { id: 'relate', label: t('ai.workflow.relate'), disabled: !aiEnabled || aiBusy !== null || !showAutoRelate, onSelect: onAutoRelate },
+          { id: 'outline', label: t('ai.workflow.outline'), disabled: !aiEnabled || aiBusy !== null, onSelect: onAIOutline },
+          { id: 'companion', label: t('canvas.companion'), onSelect: onCompanion },
         ]}
       />
     </nav>

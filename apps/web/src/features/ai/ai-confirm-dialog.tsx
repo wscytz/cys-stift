@@ -19,7 +19,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { Button, Modal } from '@cys-stift/ui'
 import type { CanvasId, CardService } from '@cys-stift/domain'
 import { InMemoryCanvasHost, type CanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
-import { parseDslWithDiagnostics } from './dsl-parser'
+import { parseDslStrictWithDiagnostics } from './dsl-parser'
 import { applyLayout } from '@/features/canvas/apply-layout'
 import { applyClusters, type CardCluster } from './cluster'
 import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
@@ -33,6 +33,10 @@ import { settingsStore } from '@/lib/settings-store'
 import { archiveStore } from '@/lib/archive-store'
 import { buildArchivePayload } from '@/lib/build-archive-payload'
 import { VERSION } from '@/lib/version'
+import { decodeIntentJson } from './intent-validation'
+import { compileIntent } from './intent-compiler'
+import { commitIntentPlan } from './apply-plan'
+import { intentSnapshotFromHost, makeIntentCommitPort, previewIntentPlan } from './intent-host-adapter'
 
 type Phase = 'confirming' | 'applying' | 'applied' | 'error'
 
@@ -56,6 +60,13 @@ interface DslProps extends BaseProps {
   liveHost: CanvasHost
 }
 
+interface IntentProps extends BaseProps {
+  mode: 'intent'
+  intent: string
+  targetCanvasId: CanvasId
+  liveHost: CanvasHost
+}
+
 interface ClusterProps extends BaseProps {
   mode: 'cluster'
   clusters: CardCluster[]
@@ -70,13 +81,13 @@ interface OutlineProps extends BaseProps {
 }
 
 // Task 4 加 ClusterProps;Task 5 加 OutlineProps。
-export type AiConfirmDialogProps = DslProps | ClusterProps | OutlineProps
+export type AiConfirmDialogProps = DslProps | IntentProps | ClusterProps | OutlineProps
 
 export function AiConfirmDialog(props: AiConfirmDialogProps) {
   const { t } = useI18n()
   const [phase, setPhase] = useState<Phase>('confirming')
   const [editing, setEditing] = useState(false)
-  const dslInitial = props.mode === 'dsl' ? props.dsl : ''
+  const dslInitial = props.mode === 'dsl' ? props.dsl : props.mode === 'intent' ? props.intent : ''
   const [editedDsl, setEditedDsl] = useState(dslInitial)
   const mdInitial = props.mode === 'outline' ? props.outlineMarkdown : ''
   const [editedMarkdown, setEditedMarkdown] = useState(mdInitial)
@@ -91,11 +102,20 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
   const deferredDsl = useDeferredValue(editedDsl)
   const preview = useMemo(() => {
     if (props.mode !== 'dsl') return null
-    const { ops, errors } = parseDslWithDiagnostics(editing ? deferredDsl : props.dsl)
+    const { ops, errors } = parseDslStrictWithDiagnostics(editing ? deferredDsl : props.dsl)
     if (errors.length > 0 && ops.length === 0) return { kind: 'parseError' as const, errors }
     return { kind: 'ok' as const, ops, errors }
     // editing 仍非 deferred(切换编辑态应立即重算);deferredDsl 是 debounced 值。
     // props 在依赖里保持原有行为(父组件换 DSL 立即重算)。
+  }, [props, editing, deferredDsl])
+
+  const intentPreview = useMemo(() => {
+    if (props.mode !== 'intent') return null
+    const decoded = decodeIntentJson(editing ? deferredDsl : props.intent)
+    if (!decoded.ok) return { kind: 'parseError' as const, errors: decoded.diagnostics }
+    const compiled = compileIntent(decoded.value, intentSnapshotFromHost(props.liveHost))
+    if (!compiled.ok) return { kind: 'parseError' as const, errors: compiled.diagnostics }
+    return { kind: 'ok' as const, plan: compiled.plan, diagnostics: compiled.diagnostics }
   }, [props, editing, deferredDsl])
 
   const [beforeState, setBeforeState] = useState<CanvasElement[] | null>(null)
@@ -114,6 +134,13 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
       setAfterState(afterHost.getElements())
       return () => { cancelled = true }
     }
+    if (props.mode === 'intent') {
+      if (intentPreview?.kind !== 'ok') { setBeforeState(null); setAfterState(null); return }
+      const before = props.liveHost.getElements()
+      setBeforeState(before)
+      setAfterState(previewIntentPlan(props.liveHost, intentPreview.plan))
+      return
+    }
     if (props.mode === 'cluster') {
       let cancelled = false
       const before = props.liveHost.getElements()
@@ -125,7 +152,7 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
       setAfterState(afterHost.getElements())
       return () => { cancelled = true }
     }
-  }, [props, preview])
+  }, [props, preview, intentPreview])
 
   const diff = useMemo(() => {
     if (!beforeState || !afterState) return null
@@ -136,9 +163,9 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
 
   const recordReject = () => {
     if (!props.sampleContext) return
-    if (props.mode === 'dsl') {
+    if (props.mode === 'dsl' || props.mode === 'intent') {
       addSample(
-        { id: genSampleId(), ts: Date.now(), kind: 'dsl', source: 'canvasLayout', context: props.sampleContext.context, aiOutput: props.dsl, outcome: 'rejected', targetCanvasId: props.sampleContext.targetCanvasId },
+        { id: genSampleId(), ts: Date.now(), kind: 'dsl', source: 'canvasLayout', context: props.sampleContext.context, aiOutput: props.mode === 'dsl' ? props.dsl : props.intent, outcome: 'rejected', targetCanvasId: props.sampleContext.targetCanvasId },
         settingsStore.get().aiSampleCapture,
       )
     }
@@ -148,7 +175,31 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
     if (phase === 'applying') return
     setPhase('applying')
     try {
-      if (props.mode === 'dsl') {
+      if (props.mode === 'intent') {
+        if (intentPreview?.kind !== 'ok') { setPhase('confirming'); return }
+        const report = await commitIntentPlan(
+          intentPreview.plan,
+          makeIntentCommitPort({ host: props.liveHost, service: props.service, canvasId: props.targetCanvasId }),
+        )
+        if (report.applied > 0) {
+          void buildArchivePayload()
+            .then((payload) => archiveStore.append('ai-layout', `Intent layout ${report.applied}/${report.totalOps}`, payload, VERSION))
+            .catch((error) => console.warn('[archive] intent layout append failed', error))
+        }
+        if (props.sampleContext && report.applied > 0) {
+          const edited = editing && editedDsl !== props.intent
+          addSample(
+            { id: genSampleId(), ts: Date.now(), kind: 'dsl', source: 'canvasLayout', context: props.sampleContext.context, aiOutput: props.intent, editedOutput: edited ? editedDsl : undefined, outcome: edited ? 'applied_edited' : 'applied', targetCanvasId: props.sampleContext.targetCanvasId },
+            settingsStore.get().aiSampleCapture,
+          )
+        }
+        if (report.failed > 0) {
+          pushToast({ kind: 'error', message: t('agent.applyFailed') })
+          if (report.applied === 0) { setPhase('error'); return }
+        }
+        else if (report.blocked > 0) pushToast({ kind: 'info', message: t('canvas.pasteDslPartial', { applied: String(report.applied), skipped: String(report.blocked + report.skipped) }) })
+        else pushToast({ kind: 'success', message: t('canvas.pasteDslApplied', { n: String(report.applied) }) })
+      } else if (props.mode === 'dsl') {
         if (preview?.kind !== 'ok' || !afterState) { setPhase('confirming'); return }
         // 诚实位移反馈(迁自 page handleAILayout):apply 前后快照卡位置 → summarizeMovement。
         const cardIdsInOps = new Set(
@@ -217,14 +268,19 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
     }
   }
 
-  const title = props.mode === 'dsl' ? t('ai.confirm.layoutTitle') : props.mode === 'cluster' ? t('ai.confirm.clusterTitle') : t('ai.confirm.outlineTitle')
+  const title = props.mode === 'dsl' || props.mode === 'intent' ? t('ai.confirm.layoutTitle') : props.mode === 'cluster' ? t('ai.confirm.clusterTitle') : t('ai.confirm.outlineTitle')
 
   // parseError 态:显示错误 + 编辑/重试(retry = onRejected,用户手动重跑 AI)。
-  if (props.mode === 'dsl' && preview?.kind === 'parseError') {
+  const proposalErrors = props.mode === 'dsl' && preview?.kind === 'parseError'
+    ? preview.errors.map((error) => ({ line: error.line, text: error.text, message: error.message }))
+    : props.mode === 'intent' && intentPreview?.kind === 'parseError'
+      ? intentPreview.errors.map((error) => ({ line: 0, text: error.path ?? '', message: error.message }))
+      : null
+  if (proposalErrors) {
     return (
       <Modal open onClose={props.onRejected} title={t('agent.parseError')} closeLabel={t('common.close')}>
         <ul className="ac__errors">
-          {preview.errors.slice(0, 5).map((e) => (<li key={e.line}>L{e.line}: {e.text}</li>))}
+          {proposalErrors.slice(0, 5).map((e, index) => (<li key={`${e.line}-${index}`}>{e.line > 0 ? `L${e.line}: ` : ''}{e.text || e.message}</li>))}
         </ul>
         <div className="ac__actions">
           <Button variant="ghost" onClick={() => setEditing((v) => !v)}>{t('agent.edit')}</Button>
@@ -281,7 +337,7 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
           </div>
         )}
 
-        {props.mode === 'dsl' && editing && (
+        {(props.mode === 'dsl' || props.mode === 'intent') && editing && (
           <textarea className="ac__edit" value={editedDsl} onChange={(e) => setEditedDsl(e.target.value)} rows={Math.min(8, editedDsl.split('\n').length)} />
         )}
 

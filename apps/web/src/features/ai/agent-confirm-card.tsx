@@ -22,7 +22,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@cys-stift/ui'
 import type { CanvasId, CardId, CardService, ColorToken } from '@cys-stift/domain'
 import { InMemoryCanvasHost, type CanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
-import { parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
+import { parseDslStrictWithDiagnostics } from '@/features/ai/dsl-parser'
 import type { SanitizeDiagnostic } from './dsl-sanitize'
 import { applyLayout, type CardCreateHandler } from '@/features/canvas/apply-layout'
 import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
@@ -95,7 +95,7 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
 
   // 解析 + 预演 diff(目标画布状态变化)。
   const preview = useMemo(() => {
-    const { ops, errors } = parseDslWithDiagnostics(editing ? editedDsl : dsl)
+    const { ops, errors } = parseDslStrictWithDiagnostics(editing ? editedDsl : dsl)
     if (errors.length > 0 && ops.length === 0) {
       return { kind: 'parseError' as const, errors }
     }

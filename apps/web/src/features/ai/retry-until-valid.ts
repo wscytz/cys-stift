@@ -70,3 +70,8 @@ export function buildDslCorrection(errors: DslDiagnostic[]): string {
     .join('\n')
   return `Your previous output was invalid cys-dsl. Fix these errors and regenerate the FULL output (same format, ONLY dsl directives):\n${list}`
 }
+
+export function buildIntentCorrection(errors: DslDiagnostic[]): string {
+  const list = errors.slice(0, 8).map((error) => `${error.text || '$'}: ${error.message}`).join('\n')
+  return `Your previous output was invalid CYS Intent IR v1. Fix these errors and regenerate the FULL JSON object. Return JSON only, without prose or markdown fences:\n${list}`
+}

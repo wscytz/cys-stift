@@ -15,6 +15,7 @@
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
+    "benchmark:intent": "pnpm --filter web test -- src/features/ai/__tests__/intent-benchmark.test.ts src/features/ai/__tests__/intent-compiler.test.ts",
     "docs:links": "node scripts/check-doc-links.mjs",
     "tauri": "pnpm --filter desktop tauri",
     "clean": "pnpm -r exec rm -rf .next out dist node_modules/.cache"

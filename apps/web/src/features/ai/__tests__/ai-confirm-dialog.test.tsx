@@ -47,6 +47,7 @@ vi.mock('@/app/inbox/markdown', () => ({
 }))
 
 import { AiConfirmDialog } from '../ai-confirm-dialog'
+import { intentSnapshotFromHost } from '../intent-host-adapter'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -111,6 +112,41 @@ describe('AiConfirmDialog — dsl mode(layout)', () => {
     )
     await act(async () => { await flushMicro() })
     expect(byText(dom, /^应用$|^Apply$/)).toBeNull() // 应用按钮不出现(parseError)
+    unmount()
+  })
+})
+
+describe('AiConfirmDialog — intent mode', () => {
+  it('合法 Intent 显示变更预览并允许应用', async () => {
+    const initial: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 180, h: 90, rotation: 0, color: 'white' } as CanvasElement,
+    ]
+    const { host: mockHost } = makeMockHost(initial)
+    const intent = JSON.stringify({
+      kind: 'cys-intent',
+      version: 1,
+      baseRevision: intentSnapshotFromHost(mockHost).revision,
+      mode: 'edit',
+      ops: [{ op: 'update', target: 'c1', patch: { color: 'red' } }],
+    })
+    const service = { get: vi.fn() } as never
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog mode="intent" intent={intent} targetCanvasId={'cv' as never} service={service} liveHost={mockHost} onApplied={() => {}} onRejected={() => {}} />,
+    )
+    await act(async () => { await flushMicro() })
+    expect(dom.textContent).toMatch(/修改|changed/i)
+    expect(byText(dom, /^应用$|^Apply$/)?.disabled).toBe(false)
+    unmount()
+  })
+
+  it('非法 Intent 不显示应用按钮', async () => {
+    const { host: mockHost } = makeMockHost([])
+    const service = { get: vi.fn() } as never
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog mode="intent" intent={'{"kind":"cys-intent"} trailing'} targetCanvasId={'cv' as never} service={service} liveHost={mockHost} onApplied={() => {}} onRejected={() => {}} />,
+    )
+    await act(async () => { await flushMicro() })
+    expect(byText(dom, /^应用$|^Apply$/)).toBeNull()
     unmount()
   })
 })

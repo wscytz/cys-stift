@@ -411,6 +411,70 @@ export function parseDslWithDiagnostics(dslText: string): {
 }
 
 /**
+ * Strict AI mode. User-pasted legacy text keeps using the compatibility parser,
+ * while model output must contain only complete directives. Unknown residual
+ * chunks and duplicate directives are errors instead of being swallowed by
+ * Peggy's compatibility skipChunk rule.
+ */
+export function parseDslStrictWithDiagnostics(dslText: string): {
+  ops: DslOp[]
+  errors: DslDiagnostic[]
+} {
+  const ops: DslOp[] = []
+  const errors: DslDiagnostic[] = []
+  const rawLines = dslText.split('\n')
+  for (let index = 0; index < rawLines.length; index += 1) {
+    const line = rawLines[index]!.trim()
+    const lineNo = index + 1
+    if (!line) continue
+    if (!line.startsWith('[')) {
+      errors.push({ line: lineNo, text: line, message: 'unexpected prose or markdown' })
+      continue
+    }
+    let result: LineResult
+    try {
+      result = parseLine(line, { startRule: 'Line' }) as LineResult
+    } catch {
+      errors.push({ line: lineNo, text: line, message: 'malformed directive' })
+      continue
+    }
+    if (result === null || result.kind === 'unknown' || result.kind === 'freedraw') {
+      errors.push({ line: lineNo, text: line, message: result?.kind === 'freedraw' ? 'freedraw is not mutable through AI DSL' : 'unrecognized directive' })
+      continue
+    }
+    const tuples = result.ds.filter(Array.isArray) as DirectiveTuple[]
+    const seen = new Set<string>()
+    const duplicate = tuples.find(([tag]) => {
+      if (seen.has(tag)) return true
+      seen.add(tag)
+      return false
+    })
+    if (duplicate) {
+      errors.push({ line: lineNo, text: line, message: `duplicate ${duplicate[0]} directive` })
+      continue
+    }
+    const headerClosed = result.kind === 'arrow'
+      ? /^\[arrow(?:\s+#[a-zA-Z0-9_:-]+)?\]/.test(line)
+      : new RegExp(`^\\[${result.kind}\\s+#[a-zA-Z0-9_:-]+(?:\\s+create)?\\]`).test(line)
+    const allowedClosingChunk = line.startsWith('[arrow]') ? 0 : 1
+    const unknownChunks = result.ds.filter((entry) => entry === null).length
+    if (!headerClosed || unknownChunks > allowedClosingChunk) {
+      errors.push({ line: lineNo, text: line, message: 'unknown residual text' })
+      continue
+    }
+    const built = buildOp(result)
+    if (built === null) {
+      errors.push({ line: lineNo, text: line, message: 'unsupported directive' })
+    } else if ('op' in built) {
+      ops.push(built.op)
+    } else {
+      errors.push({ line: lineNo, text: line, message: built.diag })
+    }
+  }
+  return { ops, errors }
+}
+
+/**
  * Parse a DSL block (the AI's output) into a list of layout operations.
  *
  * Graceful: unrecognized lines are skipped (no throw). The DSL is

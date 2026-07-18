@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cys-stift.local/benchmark/intent-case-v1.json",
+  "title": "CYS Intent benchmark case v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "schemaVersion", "split", "request", "snapshot", "oracle"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "const": 1 },
+    "split": { "enum": ["seed", "held-out"] },
+    "request": { "type": "string", "minLength": 1 },
+    "snapshot": { "type": "object" },
+    "oracle": { "type": "object" }
+  }
+}

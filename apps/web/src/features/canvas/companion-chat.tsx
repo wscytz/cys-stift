@@ -23,7 +23,7 @@ import { pushToast } from '@/lib/toast-store'
 import { isAIReady, getCurrentAI } from '@/features/ai/ai-settings-provider'
 import { streamText } from '@/features/ai/stream-text'
 import { retryUntilValid, buildDslCorrection } from '@/features/ai/retry-until-valid'
-import { parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
+import { parseDslStrictWithDiagnostics } from '@/features/ai/dsl-parser'
 import { AiSetupCard } from '@/features/ai/ai-setup-card'
 import {
   AGENT_SYSTEM_PROMPT,
@@ -161,7 +161,7 @@ export function CompanionChat({
           // 有 dsl 块且全坏才重试;无块(Q&A)或部分好 → 接受。
           const blocks = extractDslBlocks(text)
           if (blocks.length === 0) return { ok: true, errors: [] }
-          const parsed = blocks.map((b) => parseDslWithDiagnostics(b))
+          const parsed = blocks.map((b) => parseDslStrictWithDiagnostics(b))
           const allBad = parsed.every((p) => p.errors.length > 0 && p.ops.length === 0)
           return allBad
             ? { ok: false, errors: parsed.flatMap((p) => p.errors) }
