@@ -196,6 +196,8 @@
   color: var(--color-black);
   border: none;
   cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
 }
 .cv-chrome-toggle:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 /* companion tab 按钮(选中态走 inline 动态值;此处只锚 :focus-visible)。 */

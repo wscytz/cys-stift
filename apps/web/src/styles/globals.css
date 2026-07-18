@@ -2,14 +2,6 @@
 @import 'tailwindcss';
 @import './shared.css';
 
-/* AppMenu (position:sticky) occupies normal flow space at the top of
- * <body>. Canvas page subtracts this so it doesn't overflow by
- * AppMenu's height. Measured once — keep in sync if .app-menu
- * padding/font changes. (App-level layout var, not a design token.) */
-:root {
-  --app-menu-height: 69px;
-}
-
 /* Base reset — kept minimal so the design system stays the source of truth. */
 *,
 *::before,
@@ -30,6 +22,14 @@ body {
   overflow-x: clip; /* clip(非 visible)不触发对侧 axis 的 scroll container,
                         AppMenu position:sticky 相对视口生效;hidden 会让 body 成
                         不滚的 scroll container,sticky 退化成 relative 失效 */
+}
+
+html { min-height: 100%; }
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Bauhaus 滚动条(v0.39.1 跨平台适配):硬色块、无圆角、无渐变,贴合 6 原色气质。
@@ -225,4 +225,3 @@ h1.crumb {
   font-size: inherit;
   font-weight: inherit;
 }
-

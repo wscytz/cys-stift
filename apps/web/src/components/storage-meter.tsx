@@ -126,6 +126,11 @@ const styles = `
   height: 100%;
   transition: width 200ms ease-out, background 200ms ease-out;
 }
+.sm > .mono-label {
+  align-self: flex-start;
+  min-height: 44px;
+  padding-block: var(--space-1);
+}
 .sm__warn {
   margin: 0;
   padding: var(--space-2);

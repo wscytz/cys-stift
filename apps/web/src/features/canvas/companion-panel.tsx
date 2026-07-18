@@ -190,7 +190,7 @@ export function CanvasCompanionPanel({
         position: 'absolute',
         ...(positioned && pos
           ? { left: pos.left, top: pos.top, right: 'auto', bottom: 'auto' }
-          : { right: 'var(--space-1)', top: 'calc(var(--app-menu-height) + 3px)', left: 'auto', bottom: 'auto' }),
+          : { right: 'var(--space-1)', top: 'var(--space-1)', left: 'auto', bottom: 'auto' }),
         width: isNarrow ? 'min(360px, calc(100vw - 60px))' : PANEL_WIDTH,
         zIndex: 30,
         background: 'var(--color-white)',
@@ -443,7 +443,6 @@ const styles = `
 .cv-companion__backdrop {
   position: fixed;
   inset: 0;
-  top: var(--app-menu-height, 69px);
   background: var(--color-scrim);
   border: none;
   padding: 0;

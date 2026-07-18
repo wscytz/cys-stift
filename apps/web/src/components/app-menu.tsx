@@ -209,6 +209,8 @@ const styles = `
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-sm);
   cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
 }
 .app-menu__capture:hover { box-shadow: 2px 2px 0 0 var(--color-black); }
 .app-menu__capture:active { transform: translate(2px, 2px); box-shadow: none; }
@@ -224,6 +226,8 @@ const styles = `
   cursor: pointer;
   padding: 0 var(--space-1);
   line-height: 1;
+  min-width: 44px;
+  min-height: 44px;
 }
 .app-menu__burger:hover { color: var(--color-red); }
 .app-menu__burger:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
@@ -232,7 +236,6 @@ const styles = `
 .app-menu__backdrop {
   position: fixed;
   inset: 0;
-  top: var(--app-menu-height, 69px);
   background: var(--color-scrim);
   border: none;
   padding: 0;

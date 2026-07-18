@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-07-18 · v0.59.0 · 稳定性 Lane E（可访问性 / 触屏 / 动态视口）
+
+关闭 N08、N19-N20、N24,把 Canvas 可访问性从单一标签收敛为与 renderer 共用状态和命令的可操作对象树，并修复菜单键盘模式、动态视口和核心触控命中区。
+
+- **共享命令总线**:`SelfBuiltAdapter.executeCommand` 统一 select/nudge/delete/undo/redo；窗口快捷键与 DOM 对象树不再各自复制 mutation。`onElementsChange` 同时覆盖用户写入与 echo-suppressed hydrate，辅助视图不会静默过期。
+- **DOM 对象树**:始终提供 kind、label、坐标、incoming/outgoing relation；支持上下/Home/End 选择、Enter 打开卡、Alt+方向移动、Delete 与撤销/重做，并用 polite live region 读出选择、移动、删除和历史结果。Canvas host 本身可聚焦并声明 `role="region"`。
+- **菜单语义**:导出与 AI workflow 共用 menu-button pattern；打开时聚焦首/末项，方向键循环，Home/End 跳转，Escape 关闭并回焦 trigger，Tab 正常退出。用 microtask 修复浏览器 click 默认焦点覆盖 React effect 的竞态。
+- **动态视口**:页面改为 flex column + `100dvh`，Canvas 占剩余高度；bitmap canvas 绝对铺满 host，移除 `69px/100vh` 手工同步，避免 390↔1440 反复 resize 时 intrinsic height 累积撑高 body。
+- **44px 命中区**:Canvas 核心工具/rail/菜单/折叠控件，以及首页提示、Settings 明细、AI profile、新建 provider 与两类 JSON 导出按钮全部达到短边 44px。
+- **验证**:Web/Canvas engine 新增命令与对象树测试 7 tests、web lint、22 route production build 全绿；真实键盘旅程与菜单焦点旅程通过；production UI audit 覆盖 4 routes × 4 viewports = 16 cases，0 overflow / 0 small target / 0 console error。Lane E gate 的 `web-accessibility-tests` 与 `web-build` PASS。证据:`cys-stability-evidence/20260718T140754Z/gates-E`、`cys-stability-evidence/20260718T140229Z/ui-audit-E-prod`。VoiceOver 留到最终桌面验收，不在本条中冒充已通过。
+
 ## 2026-07-18 · v0.59.0 · 稳定性 Lane D（桌面快捷键状态）
 
 关闭 N18,把快捷键设置从“先持久化、异步碰运气注册”改为 native-first 两阶段提交，确保 UI、settings/localStorage 与系统 active accelerator 一致。

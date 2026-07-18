@@ -284,7 +284,7 @@ const panelStyles = `
 .aip__keyWrap { display: flex; flex: 1 1 auto; gap: var(--space-1); }
 .aip__btnGhost { padding: var(--space-1) var(--space-2); border: var(--border-hairline); background: transparent; font-family: var(--font-mono); font-size: var(--font-size-xs); cursor: pointer; }
 .aip__profileRow { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: 0 var(--space-3) var(--space-3); }
-.aip__profileChip { display: inline-flex; align-items: center; gap: var(--space-1); padding: var(--space-1) var(--space-2); border: var(--border-thick); border-color: var(--color-gray); background: var(--color-white); font-family: var(--font-body); font-size: var(--font-size-sm); cursor: pointer; }
+.aip__profileChip { display: inline-flex; align-items: center; min-height: 44px; gap: var(--space-1); padding: var(--space-1) var(--space-2); border: var(--border-thick); border-color: var(--color-gray); background: var(--color-white); font-family: var(--font-body); font-size: var(--font-size-sm); cursor: pointer; }
 .aip__profileChip--selected { border-color: var(--color-black); box-shadow: 4px 4px 0 var(--color-black); }
 .aip__profileChip--new { border-style: dashed; color: var(--color-gray); }
 .aip__profileName { font-family: var(--font-display); }

@@ -22,6 +22,7 @@ export { ACTIVE_CANVAS_KINDS, KIND_LAYER, sortByLayer, sanitizeView, ZOOM_MIN, Z
 
 // ── 实现 ────────────────────────────────────────────────────────────────────
 export { SelfBuiltAdapter } from './self-built-adapter'
+export type { CanvasCommand } from './self-built-adapter'
 export { InMemoryCanvasHost } from './in-memory-host'
 
 // ── 渲染 ────────────────────────────────────────────────────────────────────

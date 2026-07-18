@@ -39,7 +39,7 @@ export function CaptureHint() {
 .capture-hint__text { flex: 1 1 auto; }
 .capture-hint__dismiss {
   background: var(--color-black); color: var(--color-white); border: 0;
-  padding: var(--space-1) var(--space-2); font-family: var(--font-display);
+  min-height: 44px; padding: var(--space-1) var(--space-2); font-family: var(--font-display);
   cursor: pointer; text-transform: lowercase;
 }
 .capture-hint__dismiss:focus-visible { outline: 2px solid var(--color-blue); outline-offset: 2px; }

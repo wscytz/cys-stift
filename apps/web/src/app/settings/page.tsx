@@ -183,6 +183,7 @@ export default function SettingsPage() {
           <Button
             variant="primary"
             type="button"
+            className="set__export-btn"
             onClick={async () => {
               try {
                 const includeDeleted = settings.export?.includeDeleted ?? true
@@ -288,6 +289,7 @@ export default function SettingsPage() {
   background-size: 4px 4px, 4px 4px; background-repeat: no-repeat;
 }
 .set__current-code { background: var(--color-gray-soft); padding: 2px var(--space-1); border-radius: var(--radius-sm); }
+.set__export-btn { min-height: 44px; }
 .set__import { margin-top: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); }
 .set__file { margin-top: var(--space-1); font-family: var(--font-body); font-size: var(--font-size-sm); }
 .set__import-result--error { color: var(--color-red); }

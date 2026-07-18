@@ -116,7 +116,7 @@ export function OutlinePanel({
         position: 'absolute',
         ...(positioned && pos
           ? { left: pos.left, top: pos.top, right: 'auto', bottom: 'auto' }
-          : { left: 'var(--space-1)', top: 'calc(var(--app-menu-height) + 3px)', right: 'auto', bottom: 'auto' }),
+          : { left: 'var(--space-1)', top: 'var(--space-1)', right: 'auto', bottom: 'auto' }),
         width: PANEL_WIDTH,
         zIndex: 30,
         background: 'var(--color-white)',

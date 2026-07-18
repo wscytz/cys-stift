@@ -28,6 +28,7 @@ import { readToken } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
 import { CardPreviewPopover } from './card-preview-popover'
 import { pushToast } from '@/lib/toast-store'
+import { CanvasAccessibleOutline } from './canvas-accessible-outline'
 
 /** 浮动 textarea 编辑会话:屏幕锚点(textarea 定位)+ 页锚点(text 元素落点)。 */
 interface EditSession {
@@ -90,6 +91,7 @@ export function SelfCanvas({
   // 画布 hover 只读速览:hoveredCardId(命中卡)+ popoverPos(屏幕坐标)+ 防抖 timer。
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null)
   const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(null)
+  const [accessibleAdapter, setAccessibleAdapter] = useState<SelfBuiltAdapter | null>(null)
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Bug 7: mirror the in-progress edit state into refs so an unmount cleanup
   // (canvas switch) can commit the latest typed text. `commitEdit` reads
@@ -136,6 +138,7 @@ export function SelfCanvas({
     })
     adapter.setEraserMode(eraserMode)
     adapterInner.current = adapter
+    setAccessibleAdapter(adapter)
     adapterRef.current = { adapter }
     onAdapterReady?.(adapter)
 
@@ -183,6 +186,7 @@ export function SelfCanvas({
       unbind()
       adapter.detach()
       adapterInner.current = null
+      setAccessibleAdapter(null)
       adapterRef.current = { adapter: null }
       onAdapterReady?.(null)
       if (canvasElRef) canvasElRef.current = null
@@ -399,9 +403,16 @@ export function SelfCanvas({
         onDoubleClick={onDoubleClick}
         onPointerMove={onPointerMove}
         onPointerLeave={onPointerLeave}
-        role="img"
+        role="region"
+        tabIndex={0}
         aria-label={t('canvas.srLabel')}
+        aria-describedby="canvas-accessible-summary"
         style={{ width: '100%', height: '100%', display: 'block', touchAction: 'none' }}
+      />
+      <CanvasAccessibleOutline
+        host={accessibleAdapter}
+        getCard={(id) => service.get(id as never)}
+        onOpenCard={onOpenCard}
       />
       {hoveredCardId && popoverPos && (() => {
         const c = service.get(hoveredCardId as never)

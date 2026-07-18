@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import type { CanvasId, Card, CardId, TagRef } from '@cys-stift/domain'
@@ -22,6 +21,7 @@ import { DiffDialog } from '@/features/canvas/diff-dialog'
 import { applyLayout } from '@/features/canvas/apply-layout'
 import { nextFocusStates } from '@/features/canvas/focus-mode-transition'
 import { OrganizePopover } from '@/features/canvas/organize-popover'
+import { CanvasCommandMenu, canvasMenuTriggerIntent } from '@/features/canvas/canvas-command-menu'
 import { canvasToMarkdown, markdownFileName } from '@/features/canvas/canvas-to-markdown'
 import { RelationPanel } from '@/features/canvas/relation-panel'
 import { FreedrawPanel } from '@/features/canvas/freedraw-panel'
@@ -1452,56 +1452,24 @@ function CanvasSideRail({
 }) {
   const { t } = useI18n()
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const exportInitialFocus = useRef<'first' | 'last'>('first')
   // AI 工作流 popover(聚类重排 / 生成关系 / 总结大纲)。复用导出菜单同款 portal
   // + fixed 定位模式(逃离 rail 的 overflow 裁剪)。
   const [wfMenuOpen, setWfMenuOpen] = useState(false)
+  const wfInitialFocus = useRef<'first' | 'last'>('first')
   const wfTriggerRef = useRef<HTMLButtonElement | null>(null)
-  const [wfMenuPos, setWfMenuPos] = useState<{ left: number; top: number } | null>(null)
-  // P0 #1: 渲染到 body 的 portal,让导出二级菜单逃离 .cv-rail 的 overflow-y:auto
-  // (overflow-y:auto 会让 overflow-x 计算成 auto,横向裁掉左侧弹出的菜单)。
-  // 用 fixed 定位 + trigger 的 getBoundingClientRect;开/关 + 窗口 resize 时重测。
   const exportTriggerRef = useRef<HTMLButtonElement | null>(null)
-  const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null)
-  const measureMenu = (
-    open: boolean,
-    triggerRef: React.RefObject<HTMLButtonElement | null>,
-    setPos: (updater: (prev: { left: number; top: number } | null) => { left: number; top: number } | null) => void,
-    menuWidth = 168,
+  const menuTriggerKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    initialFocus: React.MutableRefObject<'first' | 'last'>,
+    openMenu: () => void,
   ) => {
-    if (!open) {
-      setPos(() => null)
-      return
-    }
-    const el = triggerRef.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    // 菜单宽 + 8 间距;左边沿 = trigger 左沿 - 菜单宽 - 间距。顶对齐 trigger 顶沿。
-    const left = Math.max(8, rect.left - menuWidth - 8)
-    const top = rect.top
-    setPos((prev) => (prev && prev.left === left && prev.top === top ? prev : { left, top }))
+    const intent = canvasMenuTriggerIntent(event.key)
+    if (!intent) return
+    event.preventDefault()
+    initialFocus.current = intent
+    openMenu()
   }
-  useLayoutEffect(() => {
-    if (!exportMenuOpen) {
-      setMenuPos(null)
-      return
-    }
-    const measure = () => measureMenu(exportMenuOpen, exportTriggerRef, setMenuPos)
-    measure()
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [exportMenuOpen])
-  useLayoutEffect(() => {
-    if (!wfMenuOpen) {
-      setWfMenuPos(null)
-      return
-    }
-    const measure = () => measureMenu(wfMenuOpen, wfTriggerRef, setWfMenuPos)
-    measure()
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wfMenuOpen])
   return (
     <nav className="cv-rail" aria-label={t('canvas.sideRail')}>
       <RailButton label={t('canvas.undo')} short={t('canvas.rail.undo')} onClick={onUndo} disabled={!adapterReady || !canUndo} icon="undo" />
@@ -1520,7 +1488,7 @@ function CanvasSideRail({
               handler 的分组入口。菜单项 disabled 同各自前置(cluster/relate 走
               现有 handler,内含选中/卡片数门控;outline 走 generateOutline + 确认门)。 */}
           <div className="cv-rail__group">
-            <RailButton label={t('ai.workflow.title')} short={t('canvas.rail.aiWorkflow')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'outline'} ariaBusy={aiBusy === 'outline'} busyTitle={t('canvas.aiRunning')} onClick={() => setWfMenuOpen((o) => !o)} pressed={wfMenuOpen} icon="workflow" buttonRef={wfTriggerRef} />
+            <RailButton label={t('ai.workflow.title')} short={t('canvas.rail.aiWorkflow')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy === 'outline'} ariaBusy={aiBusy === 'outline'} busyTitle={t('canvas.aiRunning')} onClick={() => { wfInitialFocus.current = 'first'; setExportMenuOpen(false); setWfMenuOpen((o) => !o) }} expanded={wfMenuOpen} controls="canvas-workflow-menu" hasPopup onKeyDown={(event) => menuTriggerKeyDown(event, wfInitialFocus, () => { setExportMenuOpen(false); setWfMenuOpen(true) })} icon="workflow" buttonRef={wfTriggerRef} />
           </div>
         </>
       )}
@@ -1537,61 +1505,57 @@ function CanvasSideRail({
       <RailButton label={t('canvas.dslTitle')} short={t('canvas.rail.dsl')} disabled={!adapterReady} onClick={onDsl} icon="dsl" />
       {/* 导出:一个按钮 + 二级拓展(图片/Markdown/DSL)。Diff(版本对比)不是导出,留独立按钮。 */}
       <div className="cv-rail__group">
-        <RailButton label={t('canvas.export')} short={t('canvas.rail.export')} disabled={!adapterReady} onClick={() => setExportMenuOpen((o) => !o)} pressed={exportMenuOpen} icon="export" buttonRef={exportTriggerRef} />
+        <RailButton label={t('canvas.export')} short={t('canvas.rail.export')} disabled={!adapterReady} onClick={() => { exportInitialFocus.current = 'first'; setWfMenuOpen(false); setExportMenuOpen((o) => !o) }} expanded={exportMenuOpen} controls="canvas-export-menu" hasPopup onKeyDown={(event) => menuTriggerKeyDown(event, exportInitialFocus, () => { setWfMenuOpen(false); setExportMenuOpen(true) })} icon="export" buttonRef={exportTriggerRef} />
       </div>
       <RailButton label={t('canvas.diffTitle')} short={t('canvas.rail.diff')} disabled={!adapterReady} onClick={onDiff} icon="diff" />
       <span className="cv-rail__sep" aria-hidden="true" />
       <RailButton label={t('canvas.shortcuts')} short={t('canvas.rail.shortcuts')} onClick={onShortcuts} icon="shortcuts" />
-      {exportMenuOpen && typeof document !== 'undefined' && createPortal(
-        <>
-          <div className="cv-rail__menu-backdrop" onClick={() => setExportMenuOpen(false)} aria-hidden="true" />
-          <div
-            className="cv-rail__menu"
-            role="menu"
-            aria-label={t('canvas.export')}
-            style={menuPos ? { left: `${menuPos.left}px`, top: `${menuPos.top}px` } : { visibility: 'hidden' }}
-          >
-            <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={!adapterReady} onClick={() => { setExportMenuOpen(false); onExport() }}>{t('canvas.exportImage')}</button>
-            <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={!adapterReady} onClick={() => { setExportMenuOpen(false); onMarkdown() }}>{t('canvas.markdown')}</button>
-            <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={!adapterReady} onClick={() => { setExportMenuOpen(false); onDsl() }}>{t('canvas.dslTitle')}</button>
-          </div>
-        </>,
-        document.body,
-      )}
-      {wfMenuOpen && typeof document !== 'undefined' && createPortal(
-        <>
-          <div className="cv-rail__menu-backdrop" onClick={() => setWfMenuOpen(false)} aria-hidden="true" />
-          <div
-            className="cv-rail__menu"
-            role="menu"
-            aria-label={t('ai.workflow.title')}
-            style={wfMenuPos ? { left: `${wfMenuPos.left}px`, top: `${wfMenuPos.top}px` } : { visibility: 'hidden' }}
-          >
-            {/* 聚类重排 / 生成关系 复用现有 handler(内含选中/卡片数门控);
-                总结大纲走 generateOutline + 确认门(AI 未就绪时 handler 弹 AiSetupCard)。 */}
-            <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={aiBusy !== null} onClick={() => { setWfMenuOpen(false); onAICluster() }}>{t('ai.workflow.cluster')}</button>
-            <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={aiBusy !== null} onClick={() => { setWfMenuOpen(false); onAutoRelate() }}>{t('ai.workflow.relate')}</button>
-            <button type="button" role="menuitem" className="cv-rail__menu-item" disabled={aiBusy !== null} onClick={() => { setWfMenuOpen(false); onAIOutline() }}>{t('ai.workflow.outline')}</button>
-          </div>
-        </>,
-        document.body,
-      )}
+      <CanvasCommandMenu
+        id="canvas-export-menu"
+        label={t('canvas.export')}
+        open={exportMenuOpen}
+        initialFocus={exportInitialFocus.current}
+        triggerRef={exportTriggerRef}
+        onClose={() => setExportMenuOpen(false)}
+        items={[
+          { id: 'image', label: t('canvas.exportImage'), disabled: !adapterReady, onSelect: onExport },
+          { id: 'markdown', label: t('canvas.markdown'), disabled: !adapterReady, onSelect: onMarkdown },
+          { id: 'dsl', label: t('canvas.dslTitle'), disabled: !adapterReady, onSelect: onDsl },
+        ]}
+      />
+      <CanvasCommandMenu
+        id="canvas-workflow-menu"
+        label={t('ai.workflow.title')}
+        open={wfMenuOpen}
+        initialFocus={wfInitialFocus.current}
+        triggerRef={wfTriggerRef}
+        onClose={() => setWfMenuOpen(false)}
+        items={[
+          { id: 'cluster', label: t('ai.workflow.cluster'), disabled: aiBusy !== null, onSelect: onAICluster },
+          { id: 'relate', label: t('ai.workflow.relate'), disabled: aiBusy !== null, onSelect: onAutoRelate },
+          { id: 'outline', label: t('ai.workflow.outline'), disabled: aiBusy !== null, onSelect: onAIOutline },
+        ]}
+      />
     </nav>
   )
 }
 
-function RailButton({ label, short, icon, onClick, disabled, busy, busyTitle, ariaBusy, pressed, buttonRef }: { label: string; short?: string; icon: CanvasIconName; onClick: () => void; disabled?: boolean; busy?: boolean; busyTitle?: string; ariaBusy?: boolean; pressed?: boolean; buttonRef?: React.RefObject<HTMLButtonElement | null> }) {
+function RailButton({ label, short, icon, onClick, onKeyDown, disabled, busy, busyTitle, ariaBusy, pressed, expanded, controls, hasPopup, buttonRef }: { label: string; short?: string; icon: CanvasIconName; onClick: () => void; onKeyDown?: React.KeyboardEventHandler<HTMLButtonElement>; disabled?: boolean; busy?: boolean; busyTitle?: string; ariaBusy?: boolean; pressed?: boolean; expanded?: boolean; controls?: string; hasPopup?: boolean; buttonRef?: React.RefObject<HTMLButtonElement | null> }) {
   return (
     <button
       ref={buttonRef}
       type="button"
       className={`cv-rail__btn${pressed ? ' cv-rail__btn--pressed' : ''}`}
       onClick={onClick}
+      onKeyDown={onKeyDown}
       disabled={disabled}
       title={busy && busyTitle ? busyTitle : label}
       aria-label={label}
       aria-busy={ariaBusy ? true : undefined}
       aria-pressed={pressed ? true : undefined}
+      aria-expanded={hasPopup ? expanded : undefined}
+      aria-controls={hasPopup ? controls : undefined}
+      aria-haspopup={hasPopup ? 'menu' : undefined}
     >
       <span className="cv-rail__btn-icon" aria-hidden="true">{busy ? <CanvasBusyIcon /> : <CanvasIcon name={icon} />}</span>
       {short ? <span className="cv-rail__btn-label">{short}</span> : null}
@@ -1600,7 +1564,7 @@ function RailButton({ label, short, icon, onClick, disabled, busy, busyTitle, ar
 }
 
 const styles = `
-.page { height: calc(100vh - var(--app-menu-height)); display: flex; flex-direction: column; background: var(--color-white); color: var(--color-black); }
+.page { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--color-white); color: var(--color-black); }
 /* 焦点模式:画布占满整个 page 高度(Toolbar 隐藏了),cv-host flex:1 撑开。 */
 .page--focus { }
 .page--focus .cv-host { flex: 1; }
@@ -1612,11 +1576,16 @@ const styles = `
   background: var(--color-white); color: var(--color-black);
   border: var(--border-hairline); border-radius: var(--radius-sm);
   cursor: pointer; opacity: 0.85;
+  min-width: 44px; min-height: 44px;
 }
 .cv-focus-exit:hover { opacity: 1; border-color: var(--color-black); }
 .cv-focus-exit:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 /* 根据当前工具显示不同光标 — 让用户知道正在用 select/freedraw/eraser/text/connect 哪种模式 */
 .cv-host { position: relative; flex: 1; min-height: 0; }
+/* Canvas bitmap width/height attributes are renderer state, not layout input.
+   Keep the bitmap out of normal flow so viewport changes cannot inflate the
+   flex item's min-content height on each resize. */
+.cv-host > canvas { position: absolute; inset: 0; }
 /* T5:工作台 dock 容器 —— flex 行,画布主区(flex:1) + 工作台右栏。
    工作台关时只有 cv-host,正常铺满;开时 cv-host 让出右栏宽度。 */
 .cv-dock { display: flex; flex: 1; min-height: 0; }
@@ -1661,11 +1630,11 @@ const styles = `
 .cv-empty__cta:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tb-divider { width: 1px; height: 24px; background: var(--color-gray-soft); margin: 0 var(--space-2); flex: 0 0 auto; }
 /* ── 工具按钮(选/画/擦/文/连)— Bauhaus 设计语言统一 ──
-   图标+中文标签两行,44×40px 目标区;激活态黄底黑边(Bauhaus 强调色,表示「在用」);
+   图标+中文标签两行,至少 44×44px 目标区;激活态黄底黑边(Bauhaus 强调色,表示「在用」);
    hover 浅灰;按下黄底+缩放触感。透明边框占位防 hover/active 布局跳动。 */
 .tb-tool {
   display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
-  height: 40px; min-width: 44px; padding: 2px var(--space-2);
+  height: 44px; min-width: 44px; padding: 2px var(--space-2);
   font-family: var(--font-mono); font-size: var(--font-size-xs);
   background: var(--color-white); color: var(--color-black);
   border: 2px solid var(--color-gray-soft); border-radius: var(--radius-sm); cursor: pointer;
@@ -1682,15 +1651,15 @@ const styles = `
 .tb-tool__label { font-size: var(--font-size-xs); letter-spacing: 0; color: var(--color-gray); line-height: 1; }
 .tb-tool--active { background: var(--color-yellow); border-color: var(--color-black); color: var(--color-black); }
 .tb-tool--active .tb-tool__label { color: var(--color-black); }
-/* 橡皮子模式:比主工具略小(36×34),与主工具激活态同黄底黑边,视觉连贯。 */
-.tb-tool--sub { height: 36px; min-width: 38px; padding: 2px var(--space-0.5); }
+/* 橡皮子模式图标更小,命中区仍守 44×44。 */
+.tb-tool--sub { height: 44px; min-width: 44px; padding: 2px var(--space-0.5); }
 .tb-tool--sub .tb-tool__icon { font-size: var(--font-size-sm); }
 .tb-tool--sub .tb-tool__label { font-size: var(--font-size-xs); }
 .tb-tool:hover:not(:disabled):not(.tb-tool--active) { background: var(--color-gray-soft); border-color: var(--color-gray); }
 .tb-tool:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none; }
 .tb-tool:disabled { opacity: 0.5; cursor: not-allowed; }
 .tb-tool:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-.tb-snap { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.16em; text-transform: uppercase; background: var(--color-white); color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
+.tb-snap { display: inline-flex; align-items: center; justify-content: center; height: 44px; min-width: 44px; padding: 0 var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.16em; text-transform: uppercase; background: var(--color-white); color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
 .tb-snap--snap { background: var(--color-black); color: var(--color-white); }
 .tb-snap--free { background: var(--color-white); color: var(--color-black); }
 /* P1 #6: 5 个工具按钮(↖✎⌫T⇄)补 hover,与 .tb-icon-btn 对齐;排除激活态
@@ -1702,7 +1671,7 @@ const styles = `
 /* SnapToggle 默认显示文字 label,glyph 隐藏;≤900px 反转(见响应式断点)。 */
 .tb-snap__glyph { display: none; }
 .tb-zoom { display: inline-flex; align-items: center; gap: 0; }
-.tb-icon-btn { display: inline-flex; align-items: center; justify-content: center; height: 32px; min-width: 32px; padding: 0 var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.12em; text-transform: uppercase; background: transparent; color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
+.tb-icon-btn { display: inline-flex; align-items: center; justify-content: center; height: 44px; min-width: 44px; padding: 0 var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.12em; text-transform: uppercase; background: transparent; color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
 .tb-icon-btn--fit { padding: 0 var(--space-3); }
 .tb-icon-btn:hover { background: var(--color-black); color: var(--color-white); }
 .tb-icon-btn:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none; }
@@ -1710,10 +1679,10 @@ const styles = `
 .tb-icon-btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 /* 对齐工具条:选中≥2 卡时出现。复用 .tb-icon-btn 视觉;组容器内联排布。 */
 .tb-align { display: inline-flex; align-items: center; gap: 0; }
-.tb-align__btn { min-width: 34px; padding: 0 var(--space-1); }
+.tb-align__btn { min-width: 44px; padding: 0 var(--space-1); }
 .tb-align__icon { font-size: var(--font-size-base); line-height: 1; letter-spacing: 0; }
 .cselect {
-  height: 32px; padding: 0 var(--space-6) 0 var(--space-2);
+  height: 44px; padding: 0 var(--space-6) 0 var(--space-2);
   background: var(--color-white); color: var(--color-black);
   font-family: var(--font-mono); font-size: var(--font-size-sm);
   border: var(--border-hairline); border-radius: var(--radius-sm);
@@ -1725,9 +1694,11 @@ const styles = `
   background-size: 4px 4px, 4px 4px; background-repeat: no-repeat;
 }
 .cselect:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-.cselect-edit { height: 32px; width: 32px; background: transparent; color: var(--color-gray); border: 0; cursor: pointer; font-size: var(--font-size-base); }
+.cselect-edit { height: 44px; width: 44px; background: transparent; color: var(--color-gray); border: 0; cursor: pointer; font-size: var(--font-size-base); }
 .cselect-edit:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-.crename { height: 32px; padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-sm); border: var(--border-hairline); border-radius: var(--radius-sm); outline: none; min-width: 200px; }
+.crename { height: 44px; padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-sm); border: var(--border-hairline); border-radius: var(--radius-sm); outline: none; min-width: 200px; }
+.tb-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
+.tb-btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cinput { display: block; width: 100%; height: 32px; margin-top: var(--space-2); padding: 0 var(--space-2); background: var(--color-white); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-base); border: var(--border-hairline); border-radius: var(--radius-sm); outline: none; }
 .crename:focus-visible, .cinput:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .confirm__type {
@@ -1745,11 +1716,9 @@ const styles = `
      20 side rail (this)  — above minimap so rail buttons stay clickable
      30 floating panels (relation/freedraw) — above rail
      100 modals / toasts  — above all canvas chrome */
-  position: absolute; top: calc(var(--app-menu-height) + 3px); right: var(--space-1); z-index: 20;
-  /* rail 从 top:72 往下延伸,要给右下角 minimap(高约 155px:120 canvas + 标题栏 + 边框)
-     让出完整空间。rail 底部 = 72 + max-height ≤ 容器高 - 155 → max-height ≤ 容器高 - 227。
-     取 calc(100% - 230px) 留余量,确保 rail 底按钮永不压在 minimap 上。内部仍可滚。 */
-  max-height: calc(100% - 230px); overflow-y: auto;
+  position: absolute; top: var(--space-1); bottom: 158px; right: var(--space-1); z-index: 20;
+  /* bottom 给右下 minimap 留位；top/bottom 都由 cv-host 自身布局推导。 */
+  overflow-y: auto;
   display: flex; flex-direction: column; align-items: center; gap: var(--space-1);
   padding: var(--space-1);
   background: var(--color-white);
@@ -1793,7 +1762,7 @@ const styles = `
   display: flex; flex-direction: column; gap: 2px;
 }
 .cv-rail__menu-item {
-  text-align: left; padding: var(--space-1) var(--space-2);
+  min-height: 44px; text-align: left; padding: var(--space-1) var(--space-2);
   background: transparent; border: 0; border-radius: var(--radius-sm);
   font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black);
   cursor: pointer; white-space: nowrap;
@@ -1820,7 +1789,7 @@ const styles = `
 .cv-organize__grid { display: grid; gap: 2px; }
 .cv-organize__grid--2x2 { grid-template-columns: 1fr 1fr; }
 .cv-organize__seg {
-  padding: var(--space-1) var(--space-1); min-height: 32px;
+  padding: var(--space-1) var(--space-1); min-height: 44px;
   background: var(--color-white); border: 2px solid var(--color-black); border-radius: var(--radius-sm);
   font-family: var(--font-body); font-size: var(--font-size-xs); color: var(--color-black);
   cursor: pointer; text-align: center; line-height: 1;
@@ -1843,7 +1812,7 @@ const styles = `
 }
 .cv-organize__range:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cv-organize__apply {
-  margin-top: 2px; padding: var(--space-1) var(--space-2); min-height: 36px;
+  margin-top: 2px; padding: var(--space-1) var(--space-2); min-height: 44px;
   background: var(--color-black); color: var(--color-white);
   border: 2px solid var(--color-black); border-radius: var(--radius-sm);
   font-family: var(--font-body); font-size: var(--font-size-sm); font-weight: 600;
@@ -1856,19 +1825,19 @@ const styles = `
 
 /* ── 响应式断点(约定值见 tokens.css:bp-sm 768 / bp-md 1024)─────
    画布页窄 Tauri 窗口 / 平板适配:顶栏溢出 + rail 占画布宽度。
-   - ≤1023px(bp-md,平板横/窄桌面):rail 收成纯图标,按钮缩到 40×40(rail 按钮标准尺寸,非 token),腾回画布宽度(图标靠 tooltip 仍可辨)。
+   - ≤1023px(bp-md,平板横/窄桌面):rail 收成纯图标,命中区仍为 44×44。
    - ≤767px(bp-sm,平板竖):顶栏 SnapToggle 与 ZoomGroup 的 Fit 文字收掉,顶栏靠 toolbar overflow-x:auto 兜底不再横向滚。
    ─────────────────────────────────────────────────────────────── */
 @media (max-width: 1023px) {
   .cv-rail { padding: var(--space-0.5); }
-  .cv-rail__btn { width: 40px; min-height: 40px; gap: 0; padding: var(--space-0.5) 0; }
+  .cv-rail__btn { width: 44px; min-height: 44px; gap: 0; padding: var(--space-0.5) 0; }
   .cv-rail__btn-label { display: none; }
   .cv-rail__sep { width: var(--space-4); margin: var(--space-0.5) 0; }
 }
 @media (max-width: 767px) {
   /* SnapToggle:文字隐藏、改符号按钮,保留 aria-pressed + title。 */
   .tb-snap--toggle .tb-snap__label { display: none; }
-  .tb-snap--toggle { min-width: var(--space-4); padding: 0 var(--space-2); }
+  .tb-snap--toggle { min-width: 44px; padding: 0 var(--space-2); }
   .tb-snap--toggle .tb-snap__glyph { display: inline; }
   /* ZoomGroup Fit:文字隐藏,留按钮(仍 + / − 同列)。 */
   .tb-icon-btn--fit .tb-icon-btn__label { display: none; }

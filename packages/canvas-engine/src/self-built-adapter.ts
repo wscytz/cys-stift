@@ -24,10 +24,26 @@ import { arrowPreviewEndpoints, arrowEndpoints, arrowRoute } from './self-built-
 import { arrowKeyDelta, selectAllIds, parseKeyboardAction } from './self-built-keyboard'
 import { intersectsBounds, viewportBounds, normalizeBox } from './bounds'
 
+export type CanvasCommand =
+  | { type: 'select'; ids: string[] }
+  | { type: 'clearSelection' }
+  | { type: 'selectAll' }
+  | { type: 'deleteSelection' }
+  | { type: 'undo' }
+  | { type: 'redo' }
+  | { type: 'endHistoryGroup' }
+  | {
+      type: 'nudgeSelection'
+      dx: number
+      dy: number
+      history: 'start' | 'continue' | 'single'
+    }
+
 export class SelfBuiltAdapter implements CanvasHost {
   private elements = new Map<string, CanvasElement>()
   private view: CanvasView = { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }
   private userListeners = new Set<(c: UserChange) => void>()
+  private elementListeners = new Set<() => void>()
   private viewListeners = new Set<(v: CanvasView) => void>()
   private selectionListeners = new Set<(ids: string[]) => void>()
   /** undo/redo 栈变化时触发(pushUndo/undo/redo)。供 UI 刷新 undo/redo 按钮 disabled 态。
@@ -319,6 +335,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     }
     this.elements.set(el.id, el)
     if (this.echoing) this.emitUser({ updated: [el], removed: [] })
+    this.emitElements()
     this.scheduleRender()
   }
 
@@ -347,6 +364,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       }
     }
     if (this.echoing) this.emitUser({ updated: [], removed: [id, ...cascade] })
+    this.emitElements()
     this.scheduleRender()
   }
 
@@ -380,6 +398,14 @@ export class SelfBuiltAdapter implements CanvasHost {
     this.userListeners.add(cb)
     return () => {
       this.userListeners.delete(cb)
+    }
+  }
+
+  /** Subscribe to the live element model, including echo-suppressed hydration. */
+  onElementsChange(cb: () => void): () => void {
+    this.elementListeners.add(cb)
+    return () => {
+      this.elementListeners.delete(cb)
     }
   }
 
@@ -497,6 +523,83 @@ export class SelfBuiltAdapter implements CanvasHost {
     }
   }
 
+  /** Shared mutation path for window keyboard handling and DOM accessibility UI. */
+  executeCommand(command: CanvasCommand): boolean {
+    if (command.type === 'select') {
+      const before = this.getSelectedIds()
+      this.setSelectedIds(command.ids.filter((id) => this.elements.has(id)))
+      const after = this.getSelectedIds()
+      return before.length !== after.length || before.some((id, index) => id !== after[index])
+    }
+    if (command.type === 'clearSelection') {
+      if (this.selectedIds.size === 0) return false
+      this.setSelectedIds([])
+      return true
+    }
+    if (command.type === 'selectAll') {
+      const ids = selectAllIds(this.getElements())
+      if (ids.length === 0) return false
+      this.setSelectedIds(ids)
+      return true
+    }
+    if (command.type === 'deleteSelection') {
+      const ids = [...this.selectedIds].filter((id) => this.elements.has(id))
+      if (ids.length === 0) return false
+      this.setSelectedIds([])
+      this.batch(() => {
+        for (const id of ids) this.remove(id)
+      })
+      return true
+    }
+    if (command.type === 'undo') {
+      if (!this.canUndo()) return false
+      this.undo()
+      return true
+    }
+    if (command.type === 'redo') {
+      if (!this.canRedo()) return false
+      this.redo()
+      return true
+    }
+    if (command.type === 'endHistoryGroup') {
+      const active = this.coalescing
+      this.coalescing = false
+      return active
+    }
+
+    const ids = [...this.selectedIds].filter((id) => this.elements.has(id))
+    if (ids.length === 0 || (command.dx === 0 && command.dy === 0)) return false
+    const wasCoalescing = this.coalescing
+    if (command.history === 'single') {
+      this.pushUndo()
+      this.coalescing = true
+    } else if (command.history === 'start' || !this.coalescing) {
+      this.pushUndo()
+      this.coalescing = true
+    }
+    const dx =
+      this.view.gridMode === 'snap'
+        ? command.dx * SelfBuiltAdapter.GRID
+        : command.dx
+    const dy =
+      this.view.gridMode === 'snap'
+        ? command.dy * SelfBuiltAdapter.GRID
+        : command.dy
+    for (const id of ids) {
+      const el = this.getElement(id)
+      if (!el) continue
+      if (el.kind === 'freedraw') {
+        const moved = translateFreedraw(el, dx, dy)
+        if (moved) this.upsert(moved)
+      } else {
+        this.upsert({ ...el, x: el.x + dx, y: el.y + dy })
+      }
+    }
+    if (command.history === 'single') this.coalescing = wasCoalescing
+    this.scheduleRender()
+    return true
+  }
+
   /** 订阅选区变更(setSelectedIds 实际改变时触发)。返回取消订阅。 */
   onSelectionChange(cb: (ids: string[]) => void): () => void {
     this.selectionListeners.add(cb)
@@ -520,6 +623,10 @@ export class SelfBuiltAdapter implements CanvasHost {
   protected emitUser(c: UserChange): void {
     // pushUndo 已在 upsert/remove 的 echo 分支(变更前)调过;此处只广播。
     for (const l of this.userListeners) l(c)
+  }
+
+  private emitElements(): void {
+    for (const listener of this.elementListeners) listener()
   }
 
   private pushUndo(): void {
@@ -678,6 +785,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       const selSnapshot = [...this.selectedIds]
       for (const l of this.selectionListeners) l(selSnapshot)
     }
+    this.emitElements()
     this.scheduleRender()
   }
 
@@ -1255,7 +1363,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       // 无需阻止默认行为,去掉 preventDefault 让模态正常关(画布选区被清无害,模态已遮住)。
       if (e.key === 'Escape') {
         if (this.selectedIds.size === 0) return
-        this.setSelectedIds([])
+        this.executeCommand({ type: 'clearSelection' })
         return
       }
       // modal 打开时(CardDetailModal/DSL/Export 等)画布 Delete/方向键/⌘Z/⌘A 全让位 ——
@@ -1268,24 +1376,14 @@ export class SelfBuiltAdapter implements CanvasHost {
       if (action) {
         if (e.isComposing) return
         e.preventDefault()
-        if (action === 'undo') this.undo()
-        else if (action === 'redo') this.redo()
-        else if (action === 'selectAll') this.setSelectedIds(selectAllIds(this.getElements()))
+        this.executeCommand({ type: action })
         return
       }
       // Delete/Backspace(现有)
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (this.selectedIds.size === 0) return
         e.preventDefault()
-        const ids = [...this.selectedIds]
-        this.setSelectedIds([])
-        // Wrap the multi-card delete in batch() so all N removes share one
-        // lazy snapshot (first remove pushes; later removes are coalesced). Without
-        // this, deleting N cards pushed N undo steps (Undo N times). Single-
-        // element delete is still 1 step (batch with one remove).
-        this.batch(() => {
-          for (const id of ids) this.remove(id) // echo → onUserChange
-        })
+        this.executeCommand({ type: 'deleteSelection' })
         return
       }
       // 方向键微移
@@ -1293,27 +1391,12 @@ export class SelfBuiltAdapter implements CanvasHost {
       if (delta) {
         if (this.selectedIds.size === 0) return
         e.preventDefault()
-        // undo 粒度:按住方向键 OS 自动重复 fire keydown,若每次推快照 → undo 栈爆炸
-        // (按 2 秒 = 几十步,用户得按几十次 Ctrl+Z)。首次按下(repeat=false)推一次快照 +
-        // 开 coalescing;重复事件不再推。keyup 关 coalescing(见 keyUpHandler)。
-        if (!e.repeat) {
-          this.pushUndo()
-          this.coalescing = true
-        }
-        for (const id of this.selectedIds) {
-          const el = this.getElement(id)
-          if (!el) continue
-          const dx = this.view.gridMode === 'snap' ? delta.dx * SelfBuiltAdapter.GRID : delta.dx
-          const dy = this.view.gridMode === 'snap' ? delta.dy * SelfBuiltAdapter.GRID : delta.dy
-          if (el.kind === 'freedraw') {
-            // freedraw 真身=点序列:微移也须平移 points(同 drag,别只移 bbox)
-            const moved = translateFreedraw(el, dx, dy)
-            if (moved) this.upsert(moved)
-          } else {
-            this.upsert({ ...el, x: el.x + dx, y: el.y + dy })
-          }
-        }
-        this.scheduleRender()
+        this.executeCommand({
+          type: 'nudgeSelection',
+          dx: delta.dx,
+          dy: delta.dy,
+          history: e.repeat ? 'continue' : 'start',
+        })
         return
       }
     }
@@ -1321,7 +1404,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     this.keyUpHandler = (e: KeyboardEvent) => {
       // 方向键松开 → 关 coalescing(本轮连续微移结束,后续操作正常推快照)。
       if (arrowKeyDelta(e.key, e.shiftKey) && this.coalescing) {
-        this.coalescing = false
+        this.executeCommand({ type: 'endHistoryGroup' })
       }
     }
     window.addEventListener('keyup', this.keyUpHandler)
