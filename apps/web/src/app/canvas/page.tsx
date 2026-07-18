@@ -1453,12 +1453,15 @@ function CanvasSideRail({
   const { t } = useI18n()
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const exportInitialFocus = useRef<'first' | 'last'>('first')
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false)
+  const moreInitialFocus = useRef<'first' | 'last'>('first')
   // AI 工作流 popover(聚类重排 / 生成关系 / 总结大纲)。复用导出菜单同款 portal
   // + fixed 定位模式(逃离 rail 的 overflow 裁剪)。
   const [wfMenuOpen, setWfMenuOpen] = useState(false)
   const wfInitialFocus = useRef<'first' | 'last'>('first')
   const wfTriggerRef = useRef<HTMLButtonElement | null>(null)
   const exportTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const moreTriggerRef = useRef<HTMLButtonElement | null>(null)
   const menuTriggerKeyDown = (
     event: React.KeyboardEvent<HTMLButtonElement>,
     initialFocus: React.MutableRefObject<'first' | 'last'>,
@@ -1475,11 +1478,6 @@ function CanvasSideRail({
       <RailButton label={t('canvas.undo')} short={t('canvas.rail.undo')} onClick={onUndo} disabled={!adapterReady || !canUndo} icon="undo" />
       <RailButton label={t('canvas.redo')} short={t('canvas.rail.redo')} onClick={onRedo} disabled={!adapterReady || !canRedo} icon="redo" />
       <span className="cv-rail__sep" aria-hidden="true" />
-      <RailButton label={t('canvas.newTitle')} short={t('canvas.rail.new')} onClick={onNewCanvas} icon="new-canvas" />
-      <RailButton label={t('canvas.renameTitle')} short={t('canvas.rail.rename')} onClick={onRename} disabled={!canRename} icon="rename" />
-      <RailButton label={t('canvas.deleteTitle')} short={t('canvas.rail.delete')} onClick={onDelete} disabled={!canDelete} icon="delete" />
-      <RailButton label={t('canvas.template.saveAs')} short={t('canvas.rail.template')} disabled={!adapterReady} onClick={onSaveAsTemplate} icon="template" />
-      <RailButton label={t('canvas.template.import')} short={t('canvas.rail.importTpl')} onClick={onImportTemplate} icon="import" />
       <span className="cv-rail__sep" aria-hidden="true" />
       {aiEnabled && (
         <>
@@ -1509,7 +1507,35 @@ function CanvasSideRail({
       </div>
       <RailButton label={t('canvas.diffTitle')} short={t('canvas.rail.diff')} disabled={!adapterReady} onClick={onDiff} icon="diff" />
       <span className="cv-rail__sep" aria-hidden="true" />
-      <RailButton label={t('canvas.shortcuts')} short={t('canvas.rail.shortcuts')} onClick={onShortcuts} icon="shortcuts" />
+      <div className="cv-rail__group">
+        <RailButton
+          label={t('canvas.more')}
+          short={t('canvas.rail.more')}
+          onClick={() => { moreInitialFocus.current = 'first'; setExportMenuOpen(false); setWfMenuOpen(false); setMoreMenuOpen((o) => !o) }}
+          expanded={moreMenuOpen}
+          controls="canvas-more-menu"
+          hasPopup
+          onKeyDown={(event) => menuTriggerKeyDown(event, moreInitialFocus, () => { setExportMenuOpen(false); setWfMenuOpen(false); setMoreMenuOpen(true) })}
+          icon="more"
+          buttonRef={moreTriggerRef}
+        />
+      </div>
+      <CanvasCommandMenu
+        id="canvas-more-menu"
+        label={t('canvas.more')}
+        open={moreMenuOpen}
+        initialFocus={moreInitialFocus.current}
+        triggerRef={moreTriggerRef}
+        onClose={() => setMoreMenuOpen(false)}
+        items={[
+          { id: 'new', label: t('canvas.newTitle'), onSelect: onNewCanvas },
+          { id: 'rename', label: t('canvas.renameTitle'), disabled: !canRename, onSelect: onRename },
+          { id: 'delete', label: t('canvas.deleteTitle'), disabled: !canDelete, onSelect: onDelete },
+          { id: 'save-template', label: t('canvas.template.saveAs'), disabled: !adapterReady, onSelect: onSaveAsTemplate },
+          { id: 'import-template', label: t('canvas.template.import'), onSelect: onImportTemplate },
+          { id: 'shortcuts', label: t('canvas.shortcuts'), onSelect: onShortcuts },
+        ]}
+      />
       <CanvasCommandMenu
         id="canvas-export-menu"
         label={t('canvas.export')}

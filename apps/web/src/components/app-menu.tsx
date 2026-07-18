@@ -74,6 +74,7 @@ export function AppMenu() {
     { href: '/inbox', key: 'nav.inbox' },
     { href: '/canvas', key: 'nav.canvas' },
     { href: '/workbench', key: 'nav.workbench' },
+    { href: '/ask', key: 'nav.ask' },
     { href: '/graph', key: 'nav.graph' },
     { href: '/archive', key: 'nav.archive' },
     { href: '/tags', key: 'nav.tags' },
@@ -82,7 +83,9 @@ export function AppMenu() {
     { href: '/trash', key: 'nav.trash' },
     { href: '/settings', key: 'nav.settings' },
     // dev 工具:低调放底部,--dev modifier 降对比度(spec D7 入口;dev-only)。
-    { href: '/dev/archive', key: 'nav.devArchive', dev: true },
+    ...(process.env.NODE_ENV !== 'production'
+      ? [{ href: '/dev/archive', key: 'nav.devArchive' as MessageKey, dev: true }]
+      : []),
   ]
 
   const activeKey = entries.find((e) => pathname.startsWith(e.href))?.key

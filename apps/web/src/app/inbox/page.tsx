@@ -17,6 +17,7 @@ import { useI18n } from '@/lib/i18n'
 import { useIsMobile } from '@/lib/use-platform'
 import { PageLoading } from '@/components/page-loading'
 import { typeKeyOf } from '@/lib/type-label'
+import { markdownPreview } from '@/features/card/markdown-preview'
 import { getDeviceId } from '@/lib/device-id'
 import { pushToast } from '@/lib/toast-store'
 
@@ -603,7 +604,7 @@ function CardTile({
   onTogglePin: () => void
 }) {
   const { t } = useI18n()
-  const preview = card.body.slice(0, 120)
+  const preview = markdownPreview(card.body)
   const totalMedia =
     (card.links ?? []).length + (card.codeSnippets ?? []).length + (card.quotes ?? []).length
   return (

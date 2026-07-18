@@ -5,6 +5,7 @@ import { Tag } from '@cys-stift/ui'
 import type { Card } from '@cys-stift/domain'
 import { useI18n } from '@/lib/i18n'
 import { typeKeyOf } from '@/lib/type-label'
+import { markdownPreview } from '@/features/card/markdown-preview'
 import type { MessageKey } from '@/lib/i18n/messages'
 
 interface ArchiveCardTileProps {
@@ -60,7 +61,7 @@ export function ArchiveCardTile({
   onTogglePin,
 }: ArchiveCardTileProps) {
   const { t } = useI18n()
-  const preview = card.body.slice(0, 120)
+  const preview = markdownPreview(card.body)
   const totalMedia = (card.links ?? []).length + (card.codeSnippets ?? []).length + (card.quotes ?? []).length
   const titleText = card.title || t('card.untitled')
   const cls = [

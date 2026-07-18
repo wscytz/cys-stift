@@ -3,9 +3,8 @@
 /**
  * cy's Stift — Phase 0 + Phase 4 + Phase 6 + Phase 7. A Bauhaus-styled
  * home page so we can verify tokens, fonts and the 8px grid are wired.
- * Phase 6 adds the capture entry hint (Cmd/Ctrl+Shift+E) — the
- * button itself is decorative; the actual Mini Input is global and
- * launched from anywhere.
+ * Phase 6 adds the capture entry hint (Cmd/Ctrl+Shift+E). The same entry is
+ * clickable so first-time users do not need to discover the shortcut.
  * Phase 7 adds the Archive entry (blue region stripe).
  */
 import { useEffect, useState } from 'react'
@@ -15,6 +14,7 @@ import { VERSION } from '@/lib/version'
 import { isMac as detectIsMac, isDesktop } from '@/lib/platform'
 import { CaptureHint } from '@/features/capture/capture-hint'
 import { CaptureSampleHint } from '@/components/capture-sample-hint'
+import { CAPTURE_OPEN_EVENT } from '@/features/capture/capture-host'
 
 export default function HomePage() {
   const { t } = useI18n()
@@ -57,11 +57,16 @@ export default function HomePage() {
         </dl>
         <nav className="home__nav" aria-label={t('nav.homeNav')}>
           {showCapture && (
-          <div className="home__capture" aria-label="Quick capture">
+          <button
+            type="button"
+            className="home__capture"
+            aria-label="Quick capture"
+            onClick={() => window.dispatchEvent(new CustomEvent(CAPTURE_OPEN_EVENT))}
+          >
             <div className="home__capture-arrow" aria-hidden="true">{isMac ? '⌘' : '^'}</div>
             <div className="home__capture-label">{t('home.feature.capture.title')}</div>
             <div className="home__capture-note">{isMac ? t('home.hint.mac') : t('home.hint.win')}</div>
-          </div>
+          </button>
           )}
           <Link href="/inbox" className="home__nav-link">
             <span className="home__nav-arrow" aria-hidden="true">→</span>
@@ -211,7 +216,12 @@ export default function HomePage() {
           border-color: var(--color-black);
           border-radius: var(--radius-sm);
           box-shadow: var(--shadow-md);
+          cursor: pointer;
+          text-align: left;
+          font: inherit;
         }
+        .home__capture:hover { box-shadow: 4px 4px 0 0 var(--color-black); }
+        .home__capture:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
         .home__capture-arrow {
           display: inline-flex; align-items: center; justify-content: center;
           width: 48px; height: 48px;

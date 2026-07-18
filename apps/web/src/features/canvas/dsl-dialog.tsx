@@ -28,6 +28,12 @@ import { archiveStore } from '@/lib/archive-store'
 import { buildArchivePayload } from '@/lib/build-archive-payload'
 import { VERSION } from '@/lib/version'
 
+const DSL_EXAMPLES = {
+  starter: '[text #welcome] @pos(80, 80) @text("从文字开始") @color(yellow)\n[rect #frame] @pos(60, 60) @size(260, 120) @color(blue)',
+  create: '[card #new-note create] @pos(120, 120) @size(260, 120) @color(red)',
+  relation: '[card #parent create] @pos(120, 120) @size(240, 100) @color(blue)\n[card #child create] below #parent @gap(24)',
+} as const
+
 export function DslDialog({
   open,
   onClose,
@@ -52,7 +58,7 @@ export function DslDialog({
   // 不必等点 Apply。只在有可说之事时渲染(ok 或 warn),其余不渲染。
   const preview = useMemo(() => {
     const { ops, errors: parseErrors } = parseDslWithDiagnostics(text)
-    return { opCount: ops.length, errCount: parseErrors.length }
+    return { ops, opCount: ops.length, errCount: parseErrors.length }
   }, [text])
 
   // Escape 关闭模态(与 CardDetailModal 一致;Modal 组件只处理 backdrop 点击,
@@ -190,6 +196,28 @@ export function DslDialog({
   return (
     <Modal open={open} onClose={onClose} title={t('canvas.dslTitle')} closeLabel={t('common.close')}>
       <p className="dsl-lede">{t('canvas.dslLede')}</p>
+      <div className="dsl-bridge" role="note">
+        <span className="dsl-bridge__label">Canvas</span>
+        <span aria-hidden="true">↔</span>
+        <span className="dsl-bridge__label">Text DSL</span>
+        <span className="dsl-bridge__hint">{t('canvas.dslBridgeHint')}</span>
+      </div>
+      <div className="dsl-examples" aria-label={t('canvas.dslExamples')}>
+        <span className="dsl-examples__label">{t('canvas.dslExamples')}</span>
+        {(Object.keys(DSL_EXAMPLES) as (keyof typeof DSL_EXAMPLES)[]).map((key) => (
+          <button
+            key={key}
+            type="button"
+            className="dsl-example"
+            onClick={() => {
+              setText(DSL_EXAMPLES[key])
+              setErrors([])
+            }}
+          >
+            {t(`canvas.dslExample.${key}` as never)}
+          </button>
+        ))}
+      </div>
       <details className="dsl-syntax">
         <summary className="mono-label mono-label--wide">{t('canvas.dslSyntaxTitle')}</summary>
         <p className="dsl-syntax__body">{t('canvas.dslSyntaxBody')}</p>
@@ -203,9 +231,15 @@ export function DslDialog({
         aria-label={t('canvas.dslTitle')}
       />
       {text.trim() !== '' && preview.opCount > 0 && preview.errCount === 0 && (
-        <p className="dsl-preview dsl-preview--ok">
-          {t('canvas.dslPreviewOk', { n: String(preview.opCount) })}
-        </p>
+        <div className="dsl-preview dsl-preview--ok">
+          <p>{t('canvas.dslPreviewOk', { n: String(preview.opCount) })}</p>
+          <ul>
+            {preview.ops.slice(0, 5).map((op, i) => (
+              <li key={i}>{op.type === 'free' ? op.shape : op.type}{'id' in op && op.id ? ` #${op.id}` : ''}</li>
+            ))}
+            {preview.ops.length > 5 && <li>+{preview.ops.length - 5}</li>}
+          </ul>
+        </div>
       )}
       {text.trim() !== '' && preview.errCount > 0 && (
         <p className="dsl-preview dsl-preview--warn">
@@ -250,6 +284,14 @@ export function DslDialog({
 
 const styles = `
 .dsl-lede { margin: 0 0 var(--space-3); font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black-soft); line-height: 1.5; }
+.dsl-bridge { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-2); padding: var(--space-2); border: var(--border-hairline); background: var(--color-yellow-soft); font-family: var(--font-mono); font-size: var(--font-size-xs); }
+.dsl-bridge__label { font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.dsl-bridge__hint { margin-left: auto; color: var(--color-gray); font-family: var(--font-body); }
+.dsl-examples { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin: 0 0 var(--space-3); }
+.dsl-examples__label { margin-right: var(--space-1); font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
+.dsl-example { min-height: 36px; padding: 0 var(--space-2); border: var(--border-hairline); border-radius: var(--radius-sm); background: var(--color-white); color: var(--color-black); font-family: var(--font-body); font-size: var(--font-size-xs); cursor: pointer; }
+.dsl-example:hover { background: var(--color-yellow); }
+.dsl-example:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .dsl-syntax { margin: 0 0 var(--space-3); border: var(--border-hairline); border-radius: var(--radius-sm); background: var(--color-gray-soft); }
 .dsl-syntax__body { margin: 0 var(--space-2) var(--space-2); font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black-soft); line-height: 1.5; }
 .dsl-syntax__code {
@@ -267,7 +309,9 @@ const styles = `
   resize: vertical; line-height: 1.5;
 }
 .dsl-text:focus { border-color: var(--color-red); }
-.dsl-preview { margin: 0 0 var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-xs); }
+.dsl-preview { margin: 0 0 var(--space-2); padding: var(--space-1) var(--space-2); border-left: 3px solid var(--color-blue); font-family: var(--font-mono); font-size: var(--font-size-xs); }
+.dsl-preview p { margin: 0; }
+.dsl-preview ul { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin: var(--space-1) 0 0; padding: 0; list-style: none; color: var(--color-gray); }
 .dsl-preview--ok { color: var(--color-gray); }
 .dsl-preview--warn { color: var(--color-red); }
 .dsl-errors {

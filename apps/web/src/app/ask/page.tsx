@@ -305,6 +305,12 @@ export default function AskPage() {
     if (n > 0) pushToast({ kind: 'info', message: t('ask.cleared', { n: String(n) }) })
   }
 
+  const starters = [
+    { key: 'ask.starter.summarize', text: t('ask.starter.summarize') },
+    { key: 'ask.starter.organize', text: t('ask.starter.organize') },
+    { key: 'ask.starter.find', text: t('ask.starter.find') },
+  ]
+
   const liveDetail = detailCard ? (service.get(detailCard.id) ?? null) : null
   const effectiveDetail = liveDetail && !liveDetail.deletedAt ? liveDetail : null
 
@@ -343,7 +349,14 @@ export default function AskPage() {
           <option value={NEW_CANVAS_SENTINEL}>➕ {t('ask.newCanvas')}</option>
         </select>
         {messages.length > 0 && (
-          <Button variant="ghost" onClick={handleClear}>{t('ask.clear')}</Button>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              if (window.confirm(`${t('ask.clearConfirmTitle')}\n\n${t('ask.clearConfirmBody')}`)) handleClear()
+            }}
+          >
+            {t('ask.clear')}
+          </Button>
         )}
       </Toolbar>
 
@@ -364,7 +377,24 @@ export default function AskPage() {
           <div className="ask">
             <div className="ask__thread" ref={scrollRef}>
               {messages.length === 0 && (
-                <p className="ask__empty">{t('ask.empty')}</p>
+                <div className="ask__empty-state">
+                  <p className="ask__empty">{t('ask.empty')}</p>
+                  <div className="ask__starters" aria-label={t('ask.starters')}>
+                    {starters.map((starter) => (
+                      <button
+                        key={starter.key}
+                        type="button"
+                        className="ask__starter"
+                        onClick={() => {
+                          setInput(starter.text)
+                          requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('.ask__input')?.focus())
+                        }}
+                      >
+                        {starter.text}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
               {messages.map((m, i) => (
                 <div key={i} className={`ask__msg ask__msg--${m.role}`}>
@@ -534,6 +564,11 @@ const styles = `
 .ask { display: flex; flex-direction: column; gap: var(--space-3); }
 .ask__thread { max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-2); border: var(--border-hairline); border-radius: var(--radius-sm); background: var(--color-white); min-height: 200px; }
 .ask__empty { color: var(--color-gray); font-family: var(--font-mono); font-size: var(--font-size-sm); margin: var(--space-3) auto; max-width: 50ch; text-align: center; line-height: 1.6; }
+.ask__empty-state { display: grid; gap: var(--space-2); justify-items: center; padding: var(--space-3); }
+.ask__starters { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-1); }
+.ask__starter { min-height: 44px; max-width: 260px; padding: 0 var(--space-2); border: var(--border-hairline); border-radius: var(--radius-sm); background: var(--color-white); color: var(--color-black); font-family: var(--font-body); font-size: var(--font-size-sm); text-align: left; cursor: pointer; }
+.ask__starter:hover { background: var(--color-yellow); }
+.ask__starter:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .ask__msg { display: flex; flex-direction: column; gap: var(--space-1); }
 .ask__msg--user { align-self: flex-end; align-items: flex-end; max-width: 80%; }
 .ask__msg--assistant { align-self: flex-start; max-width: 92%; }
