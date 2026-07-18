@@ -1093,9 +1093,11 @@ describe('syncAllWikiLinks', () => {
     const first = syncAllWikiLinks(opts)
     expect(first.created).toBe(1)
 
+    const historyBeforeSecond = (host as unknown as { undoStack: unknown[] }).undoStack.length
     const second = syncAllWikiLinks(opts)
     expect(second.created).toBe(0)
     expect(second.removed).toBe(0)
+    expect((host as unknown as { undoStack: unknown[] }).undoStack.length).toBe(historyBeforeSecond)
     // 箭头不重复
     expect(host.getElements().filter((e) => e.kind === 'arrow')).toHaveLength(1)
   })

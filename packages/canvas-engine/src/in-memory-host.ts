@@ -16,9 +16,11 @@ export class InMemoryCanvasHost implements CanvasHost {
   private viewListeners = new Set<(v: CanvasView) => void>()
   private historyListeners = new Set<() => void>()
   private echoing = true
-  /** coalescing=true 期间,echo 的 upsert/remove 不推快照(连续操作合并为 1 undo 步)。
-   *  batch() 用此门控实现分组(对齐 SelfBuiltAdapter)。 */
+  /** coalescing=true 期间,echo 的 upsert/remove 不重复推快照。
+   * batch() 在首次真实 mutation 时才推一次。 */
   private coalescing = false
+  /** Outermost batch has not recorded its pre-mutation snapshot yet. */
+  private batchUndoPending = false
   /** 最小 undo 栈:每个 echoed upsert/remove 前推一份快照(供测试 host.undo)。 */
   private undoStack: CanvasElement[][] = []
   private redoStack: CanvasElement[][] = []
@@ -57,14 +59,28 @@ export class InMemoryCanvasHost implements CanvasHost {
   }
 
   upsert(el: CanvasElement): void {
-    if (this.echoing && !this.coalescing) this.pushUndo()
+    if (this.echoing) {
+      if (this.batchUndoPending) {
+        this.pushUndo()
+        this.batchUndoPending = false
+      } else if (!this.coalescing) {
+        this.pushUndo()
+      }
+    }
     this.elements.set(el.id, el)
     if (this.echoing) this.emit({ updated: [el], removed: [] })
   }
 
   remove(id: string): void {
     if (!this.elements.has(id)) return
-    if (this.echoing && !this.coalescing) this.pushUndo()
+    if (this.echoing) {
+      if (this.batchUndoPending) {
+        this.pushUndo()
+        this.batchUndoPending = false
+      } else if (!this.coalescing) {
+        this.pushUndo()
+      }
+    }
     this.elements.delete(id)
     // 级联删悬空关系箭头(from/to 指向被删 id),与 SelfBuiltAdapter 同契约 ——
     // 否则 AI 用 InMemoryHost 预演删 card 的 after 状态含悬空 arrow,真实 apply
@@ -159,16 +175,18 @@ export class InMemoryCanvasHost implements CanvasHost {
   }
 
   batch(fn: () => void): void {
-    // undo 分组(对齐 SelfBuiltAdapter.batch):批前推一次快照,批内所有变更合并为
-    // 1 undo 步。嵌套 batch 不重复推(用 wasCoalescing 门控)。批内 upsert/remove 因
-    // coalescing=true 不再各自推快照。
     const wasCoalescing = this.coalescing
-    if (!wasCoalescing) this.pushUndo()
-    this.coalescing = true
+    if (!wasCoalescing) {
+      this.coalescing = true
+      this.batchUndoPending = this.echoing
+    }
     try {
       fn()
     } finally {
-      this.coalescing = wasCoalescing
+      if (!wasCoalescing) {
+        this.batchUndoPending = false
+        this.coalescing = false
+      }
     }
   }
 

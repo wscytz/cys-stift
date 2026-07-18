@@ -90,6 +90,36 @@ function setRouteViaPanel(host: SelfBuiltAdapter, arrowId: string, route: 'strai
 // [症状 1] 弯曲箭头没办法用 — 选中 arrow → 切 curve → 拖中点手柄 → curve 应更新
 // ─────────────────────────────────────────────────────────────────────────────
 describe('[症状1] 弯曲箭头 — curve 手柄拖动', () => {
+  it('显式 straight 箭头首次实际拖动后切为 curve,且只增加一步 undo', () => {
+    const { host, canvas } = makeHost({
+      selectArrow: true,
+      arrow: { route: 'straight', curve: { cx: 200, cy: 10 } },
+    })
+    const before = (host as unknown as { undoStack: unknown[] }).undoStack.length
+    dispatch(canvas, 'pointerdown', 200, 50)
+    dispatch(canvas, 'pointermove', 200, 90)
+    dispatch(canvas, 'pointerup', 200, 90)
+
+    expect(host.getElement('ar')).toMatchObject({
+      route: 'curve',
+      curve: { cx: 200, cy: 130 },
+    })
+    expect((host as unknown as { undoStack: unknown[] }).undoStack.length - before).toBe(1)
+  })
+
+  it('curve/elbow handle 按下后原位松开不增加 undo', () => {
+    for (const arrow of [
+      { route: 'curve' as const, curve: { cx: 200, cy: 50 } },
+      { route: 'elbow' as const, elbow: [{ x: 200, y: 50 }] },
+    ]) {
+      const { host, canvas } = makeHost({ selectArrow: true, arrow })
+      const before = (host as unknown as { undoStack: unknown[] }).undoStack.length
+      dispatch(canvas, 'pointerdown', 200, 50)
+      dispatch(canvas, 'pointerup', 200, 50)
+      expect((host as unknown as { undoStack: unknown[] }).undoStack.length).toBe(before)
+    }
+  })
+
   it('RelationPanel setRoute(curve) → arrow.route=curve + curve 默认中点数据', () => {
     const { host } = makeHost({ selectArrow: true })
     setRouteViaPanel(host, 'ar', 'curve')

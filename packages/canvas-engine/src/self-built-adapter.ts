@@ -56,6 +56,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     move: (e: PointerEvent) => void
     up: (e: PointerEvent) => void
     cancel: (e: PointerEvent) => void
+    lost: (e: PointerEvent) => void
   } | null = null
   private wheelHandler: ((e: WheelEvent) => void) | null = null
   /** visibilitychange handler(Tab 切走/失焦清交互态)。null=未挂。 */
@@ -68,9 +69,9 @@ export class SelfBuiltAdapter implements CanvasHost {
   private marquee: { startX: number; startY: number; curX: number; curY: number } | null = null
   private connecting: { fromId: string; pointer: { x: number; y: number }; toId: string | null } | null = null
   /** 拖动箭头弯曲手柄(设 curve 控制点)。null=未在拖。 */
-  private curveDragging: { id: string } | null = null
+  private curveDragging: { id: string; start: { x: number; y: number } } | null = null
   /** 拖动折线箭头折点手柄(改 elbow[index] 位置)。null=未在拖。 */
-  private elbowDragging: { id: string; index: number } | null = null
+  private elbowDragging: { id: string; index: number; start: { x: number; y: number } } | null = null
   /** 橡皮擦按住拖拽连续擦除态。pointerdown 命中即置 true,pointermove 持续命中删除,
    *  pointerup 置 false。null=未在擦。true 时记录上一次擦的 id 防同点重复 remove。 */
   private erasing: { lastId: string | null; lastPoint: { x: number; y: number } | null } | null = null
@@ -86,10 +87,11 @@ export class SelfBuiltAdapter implements CanvasHost {
   private redoStack: CanvasElement[][] = []
   private static readonly UNDO_LIMIT = 50
   private static readonly GRID = 8
-  /** coalescing=true 期间,echo 的 upsert/remove 不推快照(连续操作合并为 1 undo 步)。
-   *  drag / resize 开始时置 true(批前已 pushUndo 一次),onUp 置 false。
-   *  batch() 也用此门控实现分组。 */
+  /** coalescing=true 期间,echo 的 upsert/remove 不重复推快照。
+   * drag/resize/handle 在首次位移时 push;batch 在首次 mutation 时 push。 */
   private coalescing = false
+  /** Outermost batch waits until its first echoed mutation before snapshotting. */
+  private batchUndoPending = false
   /** 元素集版本:每次 upsert/remove/restore 递增,用于 O(1) 缓存失效判定。 */
   private _elementsVersion = 0
   /** 静态层缓存:层排序后的元素数组。_sortedVersion === _elementsVersion 时命中。 */
@@ -129,8 +131,8 @@ export class SelfBuiltAdapter implements CanvasHost {
    * 同步卡高到模式派生值(静默:不推 undo、不 emit 持久化--派生值每次 render 重算,self-heal)。
    * @param targets 要同步的卡集合(renderNow 传 visible 省全量 wrap;setCardMode 传全集)。
    */
-  protected syncCardHeights(targets: CanvasElement[]): void {
-    if (!this.ctx) return
+  protected syncCardHeights(targets: CanvasElement[]): boolean {
+    if (!this.ctx) return false
     let changed = false
     for (const el of targets) {
       if (el.kind !== 'card') continue
@@ -143,6 +145,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       }
     }
     if (changed) this._elementsVersion++
+    return changed
   }
 
   protected scheduleRender(): void {
@@ -177,10 +180,14 @@ export class SelfBuiltAdapter implements CanvasHost {
     // arrow 无条件保留(不过滤)。自由箭头(无 from/to、bbox 非零)走正常剔除。
     // freedraw 预览(__preview,用户正画的)也无条件保留。
     const vp = viewportBounds(this.view, w, h)
-    const visible = this.getVisibleElements(vp, w, h)
+    let visible = this.getVisibleElements(vp, w, h)
     // 卡高同步(模式派生):每帧只同步 visible 卡(省全量 wrap);body/width 改走 upsert->
     // scheduleRender->此行,选中卡(可见)高度跟随。模式变由 setCardMode 全量同步。
-    this.syncCardHeights(visible)
+    if (this.syncCardHeights(visible)) {
+      // sync replaces map entries and invalidates the visibility cache. Render
+      // the refreshed objects in this same frame, not the stale pre-sync array.
+      visible = this.getVisibleElements(vp, w, h)
+    }
     // allForResolution = 全集(getSortedElements 缓存):关系箭头端点靠 from/to id
     // 在元素集里 find 出来。视锥剔除会丢掉屏外端点 card → 若箭头从「被剔除后的
     // 列表」里 resolve 端点会 find 不到 → 不画 → 高倍放大时长箭头凭空消失。
@@ -302,7 +309,14 @@ export class SelfBuiltAdapter implements CanvasHost {
 
   upsert(el: CanvasElement): void {
     this._elementsVersion++
-    if (this.echoing && !this.coalescing) this.pushUndo() // 变更前快照(供 undo 恢复到本次 upsert 前);coalescing 期间不推(由 drag/resize/batch 批前推一次)
+    if (this.echoing) {
+      if (this.batchUndoPending) {
+        this.pushUndo()
+        this.batchUndoPending = false
+      } else if (!this.coalescing) {
+        this.pushUndo()
+      }
+    }
     this.elements.set(el.id, el)
     if (this.echoing) this.emitUser({ updated: [el], removed: [] })
     this.scheduleRender()
@@ -311,7 +325,14 @@ export class SelfBuiltAdapter implements CanvasHost {
   remove(id: string): void {
     if (!this.elements.has(id)) return
     this._elementsVersion++
-    if (this.echoing && !this.coalescing) this.pushUndo() // 变更前快照;coalescing 期间不推
+    if (this.echoing) {
+      if (this.batchUndoPending) {
+        this.pushUndo()
+        this.batchUndoPending = false
+      } else if (!this.coalescing) {
+        this.pushUndo()
+      }
+    }
     this.elements.delete(id)
     // 级联删:所有 from===id 或 to===id 的关系箭头一并删(drawio/tldraw 惯例)。
     // 关系箭头 bbox w=h=0、端点靠 from/to 引用;删端点后箭头变悬空 → 从画布消失但
@@ -330,15 +351,18 @@ export class SelfBuiltAdapter implements CanvasHost {
   }
 
   batch(fn: () => void): void {
-    // undo 分组:批前推一次快照(批内所有变更合并为 1 undo 步)。嵌套 batch 不重复推。
     const wasCoalescing = this.coalescing
-    if (!wasCoalescing) this.pushUndo()
-    this.coalescing = true
+    if (!wasCoalescing) {
+      this.coalescing = true
+      this.batchUndoPending = this.echoing
+    }
     try {
       fn()
     } finally {
-      this.coalescing = wasCoalescing
-      this._elementsVersion++
+      if (!wasCoalescing) {
+        this.batchUndoPending = false
+        this.coalescing = false
+      }
     }
   }
 
@@ -588,6 +612,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     this.elbowDragging = null
     this.erasing = null
     this.coalescing = false
+    this.batchUndoPending = false
   }
 
   /** 计算当前双指几何(两指距离 + 中点)。不足两指 → null。
@@ -748,9 +773,7 @@ export class SelfBuiltAdapter implements CanvasHost {
               (ep) => Math.hypot(p.x - ep.x, p.y - ep.y) <= 8 / this.view.zoom,
             )
             if (idx >= 0) {
-              this.elbowDragging = { id: selId, index: idx }
-              this.pushUndo()
-              this.coalescing = true
+              this.elbowDragging = { id: selId, index: idx, start: { x: p.x, y: p.y } }
               try { this.canvas.setPointerCapture(e.pointerId) } catch { /* jsdom */ }
               return
             }
@@ -767,9 +790,7 @@ export class SelfBuiltAdapter implements CanvasHost {
                 my = (from.y + to.y) / 2
               }
               if (Math.hypot(p.x - mx, p.y - my) <= 8 / this.view.zoom) {
-                this.curveDragging = { id: selId }
-                this.pushUndo()
-                this.coalescing = true
+                this.curveDragging = { id: selId, start: { x: p.x, y: p.y } }
                 try { this.canvas.setPointerCapture(e.pointerId) } catch { /* jsdom */ }
                 return
               }
@@ -832,7 +853,9 @@ export class SelfBuiltAdapter implements CanvasHost {
       const sx = e.clientX - rect.left
       const sy = e.clientY - rect.top
       // 更新当前指位置;pinch 中 → 用相对增量 zoom/pan 并 return(不让单指态介入)。
-      this.activePointers.set(e.pointerId, { x: sx, y: sy })
+      if (this.activePointers.has(e.pointerId)) {
+        this.activePointers.set(e.pointerId, { x: sx, y: sy })
+      }
       if (this.pinch) {
         this.updatePinch()
         return
@@ -841,14 +864,14 @@ export class SelfBuiltAdapter implements CanvasHost {
         // 连续擦除:拖拽路径上每命中一个新元素就删(lastId 防同点重复 remove)。
         // 走 eraseAt 以遵守当前 eraserMode(text/card/all 的命中过滤 + card 进回收桶)。
         const p = screenToPage(this.view, sx, sy)
-        // 线段擦:上一点到当前点之间采样(快速拖拽防跳过细线)。~4px 屏幕/步,封顶 8 步。
+        // 线段擦:上一点到当前点之间按约 4px 屏幕间距完整采样,不设固定步数上限。
         const pts: { x: number; y: number }[] = []
         if (this.erasing.lastPoint) {
           const a = this.erasing.lastPoint
           const dx = p.x - a.x,
             dy = p.y - a.y
           const distPx = Math.hypot(dx, dy) * this.view.zoom
-          const steps = Math.min(8, Math.max(1, Math.ceil(distPx / 4)))
+          const steps = Math.max(1, Math.ceil(distPx / 4))
           for (let s = 1; s <= steps; s++) {
             const t = s / steps
             pts.push({ x: a.x + dx * t, y: a.y + dy * t })
@@ -948,15 +971,26 @@ export class SelfBuiltAdapter implements CanvasHost {
         // 拖动弯曲手柄:指针 = 想要的曲线中点。反算控制点 C = 2*M - (P0+P1)/2。
         // 从 straight 拉出曲线时一并设 route='curve'(否则渲染仍看 route=straight 不画曲线)。
         const p = screenToPage(this.view, sx, sy)
+        if (
+          !this.coalescing &&
+          p.x === this.curveDragging.start.x &&
+          p.y === this.curveDragging.start.y
+        ) {
+          return
+        }
         const el = this.getElement(this.curveDragging.id)
         if (el && el.kind === 'arrow') {
           const { from, to } = arrowEndpoints(el, this.getElements())
           if (from && to) {
+            if (!this.coalescing) {
+              this.pushUndo()
+              this.coalescing = true
+            }
             const cx = 2 * p.x - (from.x + to.x) / 2
             const cy = 2 * p.y - (from.y + to.y) / 2
             this.upsert({
               ...el,
-              route: el.route ?? 'curve',
+              route: 'curve',
               curve: { cx: Math.round(cx), cy: Math.round(cy) },
             })
           }
@@ -966,8 +1000,19 @@ export class SelfBuiltAdapter implements CanvasHost {
       if (this.elbowDragging) {
         // 拖动折点手柄:指针位置 = 折点新位置(改 elbow[index])。
         const p = screenToPage(this.view, sx, sy)
+        if (
+          !this.coalescing &&
+          p.x === this.elbowDragging.start.x &&
+          p.y === this.elbowDragging.start.y
+        ) {
+          return
+        }
         const el = this.getElement(this.elbowDragging.id)
         if (el && el.kind === 'arrow' && el.elbow) {
+          if (!this.coalescing) {
+            this.pushUndo()
+            this.coalescing = true
+          }
           const elbows = el.elbow.slice()
           elbows[this.elbowDragging.index] = { x: Math.round(p.x), y: Math.round(p.y) }
           this.upsert({ ...el, elbow: elbows })
@@ -1143,11 +1188,15 @@ export class SelfBuiltAdapter implements CanvasHost {
       }
       onUp(e)
     }
-    this.pointerHandlers = { down: onDown, move: onMove, up: onUp, cancel: onCancel }
+    const onLost = (e: PointerEvent) => {
+      if (this.activePointers.has(e.pointerId)) onCancel(e)
+    }
+    this.pointerHandlers = { down: onDown, move: onMove, up: onUp, cancel: onCancel, lost: onLost }
     this.canvas.addEventListener('pointerdown', onDown)
     this.canvas.addEventListener('pointermove', onMove)
     this.canvas.addEventListener('pointerup', onUp)
     this.canvas.addEventListener('pointercancel', onCancel)
+    this.canvas.addEventListener('lostpointercapture', onLost)
 
     // visibilitychange:Tab 切走/页面失焦时浏览器不发 pointerup/cancel,交互态
     // (dragGroup/currentStroke/connecting/…)会残留,回来后首个 pointermove 用陈旧
@@ -1230,9 +1279,8 @@ export class SelfBuiltAdapter implements CanvasHost {
         e.preventDefault()
         const ids = [...this.selectedIds]
         this.setSelectedIds([])
-        // Wrap the multi-card delete in batch() so all N removes share ONE
-        // undo snapshot (batch pushes a snapshot before the callback + sets
-        // coalescing so each remove()'s pushUndo is suppressed). Without
+        // Wrap the multi-card delete in batch() so all N removes share one
+        // lazy snapshot (first remove pushes; later removes are coalesced). Without
         // this, deleting N cards pushed N undo steps (Undo N times). Single-
         // element delete is still 1 step (batch with one remove).
         this.batch(() => {
@@ -1314,6 +1362,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       this.canvas.removeEventListener('pointermove', this.pointerHandlers.move)
       this.canvas.removeEventListener('pointerup', this.pointerHandlers.up)
       this.canvas.removeEventListener('pointercancel', this.pointerHandlers.cancel)
+      this.canvas.removeEventListener('lostpointercapture', this.pointerHandlers.lost)
       this.pointerHandlers = null
     }
     if (this.wheelHandler) {
@@ -1332,6 +1381,9 @@ export class SelfBuiltAdapter implements CanvasHost {
       window.removeEventListener('visibilitychange', this.visibilityHandler)
       this.visibilityHandler = null
     }
+    this.clearInteractionState()
+    this.activePointers.clear()
+    this.pinch = null
   }
 
   private snapCoord(n: number): number {

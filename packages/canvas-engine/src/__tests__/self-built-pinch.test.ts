@@ -7,7 +7,49 @@ function dispatch(canvas: HTMLCanvasElement, type: string, x: number, y: number,
   )
 }
 
+function dispatchAs(
+  canvas: HTMLCanvasElement,
+  type: string,
+  x: number,
+  y: number,
+  pointerId: number,
+  pointerType: string,
+) {
+  canvas.dispatchEvent(
+    new PointerEvent(type, { pointerId, pointerType, bubbles: true, clientX: x, clientY: y }),
+  )
+}
+
 describe('self-built pinch', () => {
+  it('mouse hover 不注册 pressed pointer,随后单指 touch 不误进 pinch', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    dispatchAs(canvas, 'pointermove', 30, 30, 99, 'mouse')
+    expect((host as unknown as { activePointers: Map<number, unknown> }).activePointers.size).toBe(0)
+    dispatch(canvas, 'pointerdown', 100, 100, 1)
+    expect((host as unknown as { pinch: unknown }).pinch).toBeNull()
+  })
+
+  it('pen hover 不参与两指手势,只有两个 pressed touch 才进 pinch', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    dispatchAs(canvas, 'pointermove', 30, 30, 99, 'pen')
+    dispatch(canvas, 'pointerdown', 100, 100, 1)
+    expect((host as unknown as { pinch: unknown }).pinch).toBeNull()
+    dispatch(canvas, 'pointerdown', 200, 100, 2)
+    expect((host as unknown as { pinch: unknown }).pinch).not.toBeNull()
+  })
+
+  it('lostpointercapture 清理 pressed pointer;下一次单指仍不是 pinch', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    dispatch(canvas, 'pointerdown', 100, 100, 1)
+    dispatch(canvas, 'lostpointercapture', 100, 100, 1)
+    expect((host as unknown as { activePointers: Map<number, unknown> }).activePointers.size).toBe(0)
+    dispatch(canvas, 'pointerdown', 120, 100, 2)
+    expect((host as unknown as { pinch: unknown }).pinch).toBeNull()
+  })
+
   it('双指拉开 → zoom 放大;双指捏合 → zoom 缩小', () => {
     const host = new SelfBuiltAdapter(document.createElement('canvas'))
     const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas

@@ -28,6 +28,28 @@ function makeAdapter(body: string): SelfBuiltAdapter {
 }
 
 describe('cardHeight sync (mode A: 模式管高度)', () => {
+  it('renderNow 首帧绘制同步后的 card 高度,不需要第二帧', () => {
+    const roundRects: number[][] = []
+    const body = 'a'.repeat(100)
+    const host = new SelfBuiltAdapter(document.createElement('canvas'), {
+      getCardInfo: (id): CardInfo | null =>
+        id === 'c1' ? { title: 'T', body, type: 'note', pinned: false } : null,
+    })
+    const ctx = mockCtx()
+    ctx.roundRect = (...args: unknown[]) => {
+      roundRects.push((args.slice(0, 4) as number[]))
+    }
+    ;(host as unknown as { ctx: unknown }).ctx = ctx
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 240, h: 10, rotation: 0 })
+
+    ;(host as unknown as { renderNow: () => void }).renderNow()
+
+    const syncedHeight = host.getElement('c1')!.h
+    expect(syncedHeight).toBe(106)
+    expect(roundRects.some(([, , , height]) => height === syncedHeight)).toBe(true)
+    expect(roundRects.some(([, , , height]) => height === 10)).toBe(false)
+  })
+
   it('setCardMode=auto:长 body -> 卡高增长(4 wrapped 行)', () => {
     const host = makeAdapter('a'.repeat(100)) // 100 字 -> 4 行
     host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 240, h: 100, rotation: 0 })

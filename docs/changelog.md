@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-07-18 · v0.59.0 · 稳定性 Lane C（画布算法 / 交互状态机）
+
+关闭 N10-N14、N17、N21,修正几何真值、pointer 生命周期、同帧渲染、undo 粒度与快速橡皮连续性。
+
+- **精确折角**:RDP 与 freedraw arrow classifier 都把转向前后有效段的共享顶点作为 corner;短抖动段被跳过时选择前一有效段端点。三点 L、抖动 L、Z 形均断言精确坐标。
+- **真实 arrow route 框选**:新增共享 `arrowPathPoints`,hit-test 与 marquee 共用 straight/curve/elbow 路径;曲线鼓包、弦假阳性、elbow 每段、角点和共线边接触均覆盖。
+- **handle 与 pointer 状态**:显式 straight 箭头首次实际拖动强制切 `route:curve`;curve/elbow handle 按下未移动不建 undo。hover pointer 不进入 pressed map,`pointercancel`/`lostpointercapture`/`visibilitychange`/detach 统一清理。
+- **单帧卡高**:visible card 高度同步后立即重取失效缓存,当前 RAF 就把新对象交给 renderer,不再等待第二次交互或下一帧。
+- **lazy history**:InMemory 与 SelfBuilt host 的 batch 都在首次 echoed mutation 才建快照;空 batch、只读 batch、remove missing、hydrate、幂等 wikilink sync、cached apply 均不污染 undo。
+- **连续 eraser**:移除固定 8 步上限,按约 4px 屏幕距离覆盖完整 sweep;0.5/1/2 zoom 下 50/200/1000px jump 扫过 1px text 均命中。
+- **验证**:canvas-engine 33 文件 / 564 tests 全绿,package lint 通过;Lane C `canvas-tests` 独立 gate PASS。证据:`cys-stability-evidence/20260718T122914Z/gates-C`。
+
 ## 2026-07-18 · v0.59.0 · 稳定性 Lane B（DSL v4 / ApplyReport）
 
 关闭 N05-N07、N15-N16,把 DSL 从“解析后直接执行”收敛为可预演、可逐条报告的交换协议。

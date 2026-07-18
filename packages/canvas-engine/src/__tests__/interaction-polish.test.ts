@@ -212,6 +212,38 @@ describe('[B4-T2] eraser 线段擦 — 快速拖拽不漏擦', () => {
     // 线段采样应在 (200,50) 附近命中 mid 并删除;不做线段擦则 mid 残留
     expect(host.getElement('mid')).toBeUndefined()
   })
+
+  for (const { zoom, distance, fraction } of [
+    { zoom: 0.5, distance: 50, fraction: 0.53 },
+    { zoom: 1, distance: 200, fraction: 0.5625 },
+    { zoom: 2, distance: 1000, fraction: 0.5625 },
+  ]) {
+    it(`zoom=${zoom}, ${distance}px sweep 擦过 1px text 即删除`, () => {
+      const host = new SelfBuiltAdapter(document.createElement('canvas'))
+      const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+      host.setView({ panX: 0, panY: 0, zoom, gridMode: 'free' })
+      const startX = 10
+      const endX = startX + distance
+      const screenY = 50
+      const hitX = (startX + distance * fraction) / zoom
+      const hitY = screenY / zoom
+      host.upsert({
+        id: 'thin',
+        kind: 'text',
+        x: hitX,
+        y: hitY,
+        w: 1 / zoom,
+        h: 1 / zoom,
+        rotation: 0,
+        text: '',
+      })
+      host.setTool('eraser')
+      dispatch(canvas, 'pointerdown', startX, screenY)
+      dispatch(canvas, 'pointermove', endX, screenY)
+      dispatch(canvas, 'pointerup', endX, screenY)
+      expect(host.getElement('thin')).toBeUndefined()
+    })
+  }
 })
 
 describe('[B4-T3] connect 模式 card 可连暗示', () => {

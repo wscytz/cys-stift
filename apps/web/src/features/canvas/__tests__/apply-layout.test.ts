@@ -613,10 +613,12 @@ describe('applyLayout', () => {
     expect(appliedHashes.size).toBe(2)
 
     // Second apply with same cache: both skipped, zero applied
+    const historyBeforeSecond = (host as unknown as { undoStack: unknown[] }).undoStack.length
     const result2 = applyLayout(host, ops, appliedHashes)
     expect(result2.applied).toBe(0)
     expect(result2.skipped).toBe(2)
     expect(result2.newlyApplied.length).toBe(0)
+    expect((host as unknown as { undoStack: unknown[] }).undoStack.length).toBe(historyBeforeSecond)
   })
 
   it('only changed op is applied on second incremental apply', () => {

@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:2026-07-18 稳定性大迭代进行中,Lane A（CI/备份/导入安全）与 Lane B（DSL v4/ApplyReport）已完成并通过独立 gate;后续 Lane C-F 与最终桌面/浏览器验收未完成。当前只做本地 commits,不 push/tag/release。**v0.58.0 / v0.58.1 / v0.59.0 已 commit 未 tag**(版本表由 git tag 生成,tag 前不显行 —— 故下表断在 v0.57.3,非缺失)。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:2026-07-18 稳定性大迭代进行中,Lane A（CI/备份/导入安全）、Lane B（DSL v4/ApplyReport）与 Lane C（画布算法/状态机）已完成并通过独立 gate;后续 Lane D-F 与最终桌面/浏览器验收未完成。当前只做本地 commits,不 push/tag/release。**v0.58.0 / v0.58.1 / v0.59.0 已 commit 未 tag**(版本表由 git tag 生成,tag 前不显行 —— 故下表断在 v0.57.3,非缺失)。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 
