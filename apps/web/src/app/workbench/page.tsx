@@ -141,6 +141,20 @@ function EmptyState() {
 
 const styles = `
 .page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
+.crumb-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-1);
+  border: 0;
+  background: transparent;
+  color: var(--color-blue);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.crumb-link:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .wb-page {
   display: grid;
   grid-template-columns: clamp(220px, 22vw, 280px) minmax(0, 1fr);

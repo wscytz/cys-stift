@@ -4,6 +4,7 @@ import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments
 import { normalizeBox } from './bounds'
 import { freedrawPointsOf } from './self-built-freedraw'
 import { smoothBezierSegments } from './smooth-path'
+import { markdownPreview } from './markdown-preview'
 /**
  * 纯渲染函数:把元素画到 ctx 上,带相机(pan/zoom)变换。
  * - 先 clearRect 整个画布(背景色)。
@@ -151,7 +152,8 @@ function drawElement(
       ctx.font = `500 15px ${tokenResolver('--font-content', 'Inter, "PingFang SC", "Microsoft YaHei UI", sans-serif')}`
       ctx.fillText(info.title || '(untitled)', el.x + pad, el.y + pad + 16)
       // body(content 字体,按 cardMode 渲染:title=0 行 / subtitle=1 行副标题 / compact=3 / auto=全行截断)
-      if (info.body && cardMode !== 'title') {
+      const displayBody = markdownPreview(info.body, Number.POSITIVE_INFINITY)
+      if (displayBody && cardMode !== 'title') {
         ctx.fillStyle = tokenResolver('--color-black-soft', '#475569')
         ctx.font = `12px ${tokenResolver('--font-content', 'Inter, "PingFang SC", "Microsoft YaHei UI", sans-serif')}`
         if (cardMode === 'subtitle') {
@@ -164,7 +166,7 @@ function drawElement(
           }
         } else {
           // compact / auto:wrap 行,cap 截断(compact=3,auto=CARD_AUTO_MAX_LINES)。
-          const lines = wrapLines(info.body, el.w - pad * 2, ctx)
+          const lines = wrapLines(displayBody, el.w - pad * 2, ctx)
           const cap = cardMode === 'compact' ? 3 : CARD_AUTO_MAX_LINES
           const lineCount = Math.min(cap, lines.length)
           for (let i = 0; i < lineCount; i++) {
@@ -499,10 +501,11 @@ export function resolveCardLayout(
   ctx: CanvasRenderingContext2D,
 ): { lineCount: number; height: number } {
   const baseH = CARD_TITLE_AREA + CARD_BOTTOM_PAD
-  if (mode === 'title' || !body) return { lineCount: 0, height: baseH }
+  const displayBody = markdownPreview(body, Number.POSITIVE_INFINITY)
+  if (mode === 'title' || !displayBody) return { lineCount: 0, height: baseH }
   if (mode === 'subtitle') return { lineCount: 1, height: baseH + CARD_LINE_H }
   const cap = mode === 'compact' ? 3 : CARD_AUTO_MAX_LINES
-  const wrapped = wrapLines(body, width - CARD_PAD * 2, ctx)
+  const wrapped = wrapLines(displayBody, width - CARD_PAD * 2, ctx)
   const lineCount = Math.min(cap, wrapped.length)
   return { lineCount, height: baseH + lineCount * CARD_LINE_H }
 }

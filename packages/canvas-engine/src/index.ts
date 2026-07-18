@@ -36,6 +36,7 @@ export {
   wrapLines,
 } from './self-built-render'
 export type { TokenResolver, CardInfo } from './self-built-render'
+export { markdownPreview } from './markdown-preview'
 
 // ── 文本 ────────────────────────────────────────────────────────────────────
 export { measureText, textEditKeyAction } from './self-built-text'

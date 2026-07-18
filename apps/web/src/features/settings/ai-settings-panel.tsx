@@ -431,4 +431,19 @@ const panelStyles = `
 .aip__empty { margin: 0 var(--space-3) var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
 .aip__confirmBody { line-height: 1.5; }
 .aip__confirmActions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-3); }
+@media (max-width: 480px) {
+  .aip__lede, .aip__warn, .aip__state, .aip__profileRow, .aip__providerRow,
+  .aip__row, .aip__advanced, .aip__actions, .aip__empty {
+    margin-left: var(--space-1);
+    margin-right: var(--space-1);
+  }
+  .aip__providerRow { grid-template-columns: minmax(0, 1fr); }
+  .aip__row { align-items: stretch; }
+  .aip__label { flex: 1 1 100%; }
+  .aip__input { width: 100%; min-width: 0; box-sizing: border-box; }
+  .aip__keyWrap { flex: 1 1 100%; min-width: 0; flex-direction: column; }
+  .aip__hint { margin-left: 0; margin-right: 0; }
+  .aip__advancedToggle { min-height: 44px; margin-left: var(--space-1); margin-right: var(--space-1); }
+  .aip__confirmActions { flex-wrap: wrap; }
+}
 `

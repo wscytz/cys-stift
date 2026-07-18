@@ -127,6 +127,23 @@ describe('renderElements', () => {
     expect(ft.length).toBe(6) // type + title + 4 body
   })
 
+  it('renders readable card text instead of Markdown source markers', () => {
+    const ctx = mockCtx()
+    const els: CanvasElement[] = [{ id: 'c1', kind: 'card', x: 0, y: 0, w: 240, h: 160, rotation: 0 }]
+    renderElements(
+      ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600,
+      () => ({ title: 'T', body: '###Heading\n- **First**\n[Second](https://example.com)', type: 'note', pinned: false }),
+      '#ffffff', domTokenResolver, els, 'compact',
+    )
+    const text = ctx._calls.filter((call) => call.startsWith('fillText')).join('\n')
+    expect(text).toContain('fillText(Heading@')
+    expect(text).toContain('fillText(First@')
+    expect(text).toContain('fillText(Second@')
+    expect(text).not.toContain('###')
+    expect(text).not.toContain('**')
+    expect(text).not.toContain('https://')
+  })
+
   it('draws a freedraw stroke as a smoothed bézier (not a bare polyline)', () => {
     const ctx = mockCtx()
     const els = [

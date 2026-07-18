@@ -2,7 +2,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 40px; /* space-5 */
+  min-height: 44px;
   padding: 0 var(--space-3);
   border: var(--border-hairline);
   border-radius: var(--radius-sm);

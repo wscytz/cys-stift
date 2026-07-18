@@ -243,8 +243,8 @@ export const editorStyles = `
 }
 .le__input:focus { border-bottom-color: var(--color-red); }
 .le__remove {
-  width: 24px;
-  height: 24px;
+  width: 44px;
+  height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -261,7 +261,8 @@ export const editorStyles = `
   align-self: flex-start;
   background: transparent;
   border: 0;
-  padding: 0;
+  min-height: 44px;
+  padding: 0 var(--space-1);
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   text-transform: uppercase;

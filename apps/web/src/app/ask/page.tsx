@@ -47,6 +47,7 @@ import { buildCanvasHostForCanvas } from '@/features/canvas/canvas-host-builder'
 import { pushToast } from '@/lib/toast-store'
 import { addSample, genSampleId } from '@/features/ai/sample-store'
 import { settingsStore } from '@/lib/settings-store'
+import type { AIProfile } from '@/features/ai/types'
 
 interface ChatMessage extends PersistedConversationMessage {
   /** 捕获样本用:该 assistant 消息对应的 userPrompt(RAG+snapshot) + question。send 时存。 */
@@ -54,6 +55,20 @@ interface ChatMessage extends PersistedConversationMessage {
 }
 
 const MAX_HISTORY = 20
+
+function aiProfileSignature(profile: AIProfile | null): string {
+  if (!profile) return ''
+  return JSON.stringify([
+    profile.id,
+    profile.provider,
+    profile.baseUrl,
+    profile.model,
+    profile.apiKey,
+    profile.enabled,
+    profile.temperature,
+    profile.maxTokens,
+  ])
+}
 
 /**
  * Sentinel value for the 「➕ 新画布」 option in the canvas-select.
@@ -76,6 +91,9 @@ export default function AskPage() {
   const [busy, setBusy] = useState(false)
   const [detailCard, setDetailCard] = useState<Card | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const requestSeqRef = useRef(0)
+  const targetCanvasIdRef = useRef(targetCanvasId)
+  targetCanvasIdRef.current = targetCanvasId
   const scrollRef = useRef<HTMLDivElement>(null)
   // Track canvases created from /ask's picker (Task 4). Populated on create;
   // Task 5 uses this set to auto-clean empty ask-created canvases on unmount.
@@ -135,9 +153,20 @@ export default function AskPage() {
       skipReloadRef.current = false
       return
     }
+    requestSeqRef.current += 1
     abortRef.current?.abort()
+    abortRef.current = null
+    setBusy(false)
     setMessages(loadConversation(targetCanvasId))
   }, [targetCanvasId])
+
+  useEffect(() => {
+    return () => {
+      requestSeqRef.current += 1
+      abortRef.current?.abort()
+      abortRef.current = null
+    }
+  }, [])
 
   // 历史持久化:debounce ~400ms 写入,避免每个流式 token 都打 localStorage。
   // 镜像 companion-chat.tsx 的 setTimeout + ref 单飞范式。卸载时 flush 最后一次。
@@ -166,6 +195,13 @@ export default function AskPage() {
     const question = input.trim()
     if (!question || busy || !aiReady) return
     const cfg = getCurrentAI()!
+    const requestCanvasId = targetCanvasId
+    const requestProfileSignature = aiProfileSignature(cfg)
+    const requestId = ++requestSeqRef.current
+    const isRequestCurrent = () =>
+      requestSeqRef.current === requestId &&
+      targetCanvasIdRef.current === requestCanvasId &&
+      aiProfileSignature(getCurrentAI()) === requestProfileSignature
     setInput('')
     setBusy(true)
 
@@ -183,8 +219,9 @@ export default function AskPage() {
     try {
       // RAG + 目标画布快照(改画布时让 AI 看到当前布局)。
       const allCards = service.listAll()
-      const { host } = await buildCanvasHostForCanvas(targetCanvasId, service)
-      const canvasSnapshot = formatCanvasSnapshot(snapshotCanvas(host, service, targetCanvasId))
+      const { host } = await buildCanvasHostForCanvas(requestCanvasId, service)
+      if (!isRequestCurrent()) return
+      const canvasSnapshot = formatCanvasSnapshot(snapshotCanvas(host, service, requestCanvasId))
       const userPrompt = buildAgentUserPrompt(question, allCards, canvasSnapshot)
 
       let acc = ''
@@ -193,10 +230,14 @@ export default function AskPage() {
           ? [...history, { role: 'user' as const, content: userPrompt }]
           : [{ role: 'user' as const, content: userPrompt }],
         produce: (messages, attempt) => {
+          if (!isRequestCurrent()) {
+            throw new DOMException('stale AI request', 'AbortError')
+          }
           if (attempt > 0) {
             // 重试:清 acc,显「重新生成中…」占位;onDelta 静默(不流中间版)。
             acc = ''
             setMessages((prev) => {
+              if (!isRequestCurrent()) return prev
               const next = [...prev]
               next[next.length - 1] = { ...next[next.length - 1]!, content: t('ask.retrying'), streaming: true }
               return next
@@ -205,8 +246,10 @@ export default function AskPage() {
           const onDelta =
             attempt === 0
               ? (chunk: string) => {
+                  if (!isRequestCurrent()) return
                   acc += chunk
                   setMessages((prev) => {
+                    if (!isRequestCurrent()) return prev
                     const next = [...prev]
                     next[next.length - 1] = { ...next[next.length - 1]!, content: acc, streaming: true }
                     return next
@@ -236,11 +279,31 @@ export default function AskPage() {
         },
         buildCorrection: buildDslCorrection,
       })
+      if (!isRequestCurrent()) {
+        if (
+          requestSeqRef.current === requestId &&
+          targetCanvasIdRef.current === requestCanvasId
+        ) {
+          setMessages((prev) => {
+            const next = [...prev]
+            const last = next[next.length - 1]
+            if (last?.role === 'assistant' && last.streaming) {
+              next[next.length - 1] = {
+                ...last,
+                content: t('ai.error', { error: 'cancelled' }),
+                streaming: false,
+              }
+            }
+            return next
+          })
+        }
+        return
+      }
       // 失败样本采集(c2):retry 耗尽仍 parse 失败 → 记 parse_failed(坏输出+错误+尝试数)。
       // 失败案例是最值钱的调优/训练数据。开关关时 addSample 内部 no-op。
       if (!r.accepted) {
         addSample(
-          { id: genSampleId(), ts: Date.now(), kind: 'dsl', source: 'ask', question, context: userPrompt, aiOutput: r.text, outcome: 'parse_failed', attempts: r.attempts, parseErrors: r.lastErrors, targetCanvasId },
+          { id: genSampleId(), ts: Date.now(), kind: 'dsl', source: 'ask', question, context: userPrompt, aiOutput: r.text, outcome: 'parse_failed', attempts: r.attempts, parseErrors: r.lastErrors, targetCanvasId: requestCanvasId },
           settingsStore.get().aiSampleCapture,
         )
       }
@@ -249,16 +312,18 @@ export default function AskPage() {
       // Q&A 捕获:无 DSL 块 = 纯问答,记 qa 样本。开关关时 addSample 内部 no-op。
       if (dslBlocks.length === 0) {
         addSample(
-          { id: genSampleId(), ts: Date.now(), kind: 'qa', source: 'ask', question, context: userPrompt, aiOutput: final, outcome: 'answered', targetCanvasId },
+          { id: genSampleId(), ts: Date.now(), kind: 'qa', source: 'ask', question, context: userPrompt, aiOutput: final, outcome: 'answered', targetCanvasId: requestCanvasId },
           settingsStore.get().aiSampleCapture,
         )
       }
       setMessages((prev) => {
+        if (!isRequestCurrent()) return prev
         const next = [...prev]
         next[next.length - 1] = { role: 'assistant', content: final, dslBlocks, streaming: false, sampleContext: { question, context: userPrompt } }
         return next
       })
     } catch (e) {
+      if (!isRequestCurrent()) return
       if ((e as Error).name === 'AbortError') {
         pushToast({ kind: 'info', message: t('ai.error', { error: 'cancelled' }) })
       } else {
@@ -273,9 +338,32 @@ export default function AskPage() {
         return next
       })
     } finally {
-      setBusy(false)
-      abortRef.current = null
+      if (requestSeqRef.current === requestId) {
+        setBusy(false)
+        if (abortRef.current === ac) abortRef.current = null
+      }
     }
+  }
+
+  const stopActiveRequest = () => {
+    if (!abortRef.current) return
+    requestSeqRef.current += 1
+    abortRef.current.abort()
+    abortRef.current = null
+    setBusy(false)
+    setMessages((prev) => {
+      const next = [...prev]
+      const last = next[next.length - 1]
+      if (last?.role === 'assistant' && last.streaming) {
+        next[next.length - 1] = {
+          ...last,
+          content: last.content || t('ai.error', { error: 'cancelled' }),
+          streaming: false,
+        }
+      }
+      return next
+    })
+    pushToast({ kind: 'info', message: t('ai.error', { error: 'cancelled' }) })
   }
 
   const onApplied = (msgIdx: number) => {
@@ -435,7 +523,7 @@ export default function AskPage() {
                 disabled={busy}
               />
               {busy ? (
-                <Button variant="ghost" onClick={() => abortRef.current?.abort()}>
+                <Button variant="ghost" onClick={stopActiveRequest}>
                   {t('ask.stop')}
                 </Button>
               ) : (

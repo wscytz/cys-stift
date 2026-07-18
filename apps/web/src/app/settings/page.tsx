@@ -327,6 +327,7 @@ export default function SettingsPage() {
     linear-gradient(135deg, var(--color-gray) 50%, transparent 50%);
   background-position: calc(100% - 14px) calc(50% - 2px), calc(100% - 10px) calc(50% - 2px);
   background-size: 4px 4px, 4px 4px; background-repeat: no-repeat;
+  width: 100%; max-width: 100%; min-width: 0; min-height: 44px; box-sizing: border-box;
 }
 .set__index { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; gap: var(--space-1); padding: var(--space-2) 0; background: var(--color-white); border-bottom: var(--border-hairline); }
 .set__index a { min-height: 44px; display: inline-flex; align-items: center; padding: 0 var(--space-2); color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-xs); text-decoration: none; border: 1px solid var(--color-black); }
@@ -334,7 +335,7 @@ export default function SettingsPage() {
 .set__current-code { background: var(--color-gray-soft); padding: 2px var(--space-1); border-radius: var(--radius-sm); }
 .set__export-btn { min-height: 44px; }
 .set__import { margin-top: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); }
-.set__file { margin-top: var(--space-1); font-family: var(--font-body); font-size: var(--font-size-sm); }
+.set__file { margin-top: var(--space-1); width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; font-family: var(--font-body); font-size: var(--font-size-sm); }
 .set__import-result--error { color: var(--color-red); }
 .set__confirm-body { margin: 0 0 var(--space-3); font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black-soft); line-height: 1.5; }
 .set__confirm-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }

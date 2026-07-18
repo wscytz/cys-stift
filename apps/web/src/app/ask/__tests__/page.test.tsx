@@ -16,13 +16,22 @@ import type { CanvasId } from '@cys-stift/domain'
 // --- Mocks (must be before component import; vitest hoists vi.mock) ---
 
 const streamTextMock = vi.fn()
+let currentAIProfile = {
+  id: 'p1',
+  name: 'Profile 1',
+  provider: 'openai' as const,
+  apiKey: 'k',
+  baseUrl: 'https://example.invalid/v1',
+  model: 'm',
+  enabled: true,
+}
 vi.mock('@/features/ai/stream-text', () => ({
   streamText: (...args: unknown[]) => streamTextMock(...args),
 }))
 
 vi.mock('@/features/ai/ai-settings-provider', () => ({
   isAIReady: () => true,
-  getCurrentAI: () => ({ provider: 'openai', apiKey: 'k', model: 'm' }),
+  getCurrentAI: () => currentAIProfile,
 }))
 
 vi.mock('@/features/ai/canvas-snapshot', () => ({
@@ -194,6 +203,12 @@ function render(el: React.ReactElement) {
   return { host, unmount: () => act(() => root.unmount()) }
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => { resolve = done })
+  return { promise, resolve }
+}
+
 /** Drive the canvas-select to a new value. */
 async function switchCanvas(host: HTMLDivElement, value: string) {
   const select = host.querySelector('select.ask__canvas-select') as HTMLSelectElement
@@ -230,6 +245,15 @@ beforeEach(() => {
   deleteMock.mockClear()
   listOnCanvasMock.mockReturnValue([])
   freeformLoadMock.mockResolvedValue(null)
+  currentAIProfile = {
+    id: 'p1',
+    name: 'Profile 1',
+    provider: 'openai',
+    apiKey: 'k',
+    baseUrl: 'https://example.invalid/v1',
+    model: 'm',
+    enabled: true,
+  }
 })
 
 describe('/ask page — per-canvas conversation store (Task 3)', () => {
@@ -286,6 +310,87 @@ describe('/ask page — per-canvas conversation store (Task 3)', () => {
     // And NOT written to the legacy global key.
     expect(window.localStorage.getItem('cys-stift.ask-chat.v1')).toBeNull()
     unmount()
+  })
+})
+
+describe('/ask page — request ownership and cancellation', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    streamTextMock.mockReset()
+  })
+
+  it('Stop aborts the active signal and ignores a provider response that arrives late', async () => {
+    const pending = deferred<{ content: string }>()
+    streamTextMock.mockImplementation(() => pending.promise)
+    const { host, unmount } = render(<AskPage />)
+    await typeAndSend(host, 'cancel this')
+
+    const signal = streamTextMock.mock.calls[0]![3] as AbortSignal
+    const stop = [...host.querySelectorAll('button')].find((button) => button.textContent === 'ask.stop')!
+    await act(async () => { stop.click() })
+    expect(signal.aborted).toBe(true)
+
+    await act(async () => {
+      pending.resolve({ content: 'LATE STOPPED RESPONSE' })
+      await Promise.resolve()
+    })
+    expect(host.textContent).not.toContain('LATE STOPPED RESPONSE')
+    expect(host.textContent).toContain('ai.error')
+    unmount()
+  })
+
+  it('switching canvas aborts and prevents a late old-canvas response from landing', async () => {
+    const pending = deferred<{ content: string }>()
+    streamTextMock.mockImplementation(() => pending.promise)
+    saveConversation(CV_B, [{ role: 'user', content: 'new-canvas-message' }])
+    const { host, unmount } = render(<AskPage />)
+    await typeAndSend(host, 'old canvas request')
+
+    const signal = streamTextMock.mock.calls[0]![3] as AbortSignal
+    await switchCanvas(host, CV_B)
+    expect(signal.aborted).toBe(true)
+
+    await act(async () => {
+      pending.resolve({ content: 'LATE OLD CANVAS RESPONSE' })
+      await Promise.resolve()
+    })
+    expect(host.textContent).toContain('new-canvas-message')
+    expect(host.textContent).not.toContain('LATE OLD CANVAS RESPONSE')
+    unmount()
+  })
+
+  it('discards a response when the active AI profile changes mid-request', async () => {
+    const pending = deferred<{ content: string }>()
+    streamTextMock.mockImplementation(() => pending.promise)
+    const { host, unmount } = render(<AskPage />)
+    await typeAndSend(host, 'profile-bound request')
+
+    currentAIProfile = {
+      ...currentAIProfile,
+      id: 'p2',
+      name: 'Profile 2',
+      model: 'other-model',
+    }
+    await act(async () => {
+      pending.resolve({ content: 'STALE PROFILE RESPONSE' })
+      await Promise.resolve()
+    })
+    expect(host.textContent).not.toContain('STALE PROFILE RESPONSE')
+    expect(host.textContent).toContain('ai.error')
+    unmount()
+  })
+
+  it('unmount aborts the active request and accepts no later writes', async () => {
+    const pending = deferred<{ content: string }>()
+    streamTextMock.mockImplementation(() => pending.promise)
+    const { host, unmount } = render(<AskPage />)
+    await typeAndSend(host, 'leave page')
+    const signal = streamTextMock.mock.calls[0]![3] as AbortSignal
+
+    unmount()
+    expect(signal.aborted).toBe(true)
+    pending.resolve({ content: 'AFTER UNMOUNT' })
+    await Promise.resolve()
   })
 })
 

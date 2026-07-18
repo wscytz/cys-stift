@@ -334,7 +334,7 @@ const styles = `
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  height: 32px;
+  min-height: 44px;
   padding: 0 var(--space-2);
   background: var(--color-white);
   border: var(--border-hairline);

@@ -6,6 +6,7 @@ import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments
 import { unionBounds, expandBounds, normalizeBox, type Bounds } from './bounds'
 import { freedrawPointsOf } from './self-built-freedraw'
 import { buildSmoothPath } from './smooth-path'
+import { markdownPreview } from './markdown-preview'
 
 /** SVG 无 ctx.measureText,用字符宽度估算软换行(近似实时渲染 wrapLines 的视觉)。
  *  CJK/全角(code≥0x1100)按字号(12px),latin 按约 0.58 字号(7px)。
@@ -117,8 +118,9 @@ function elementToSvg(
         if (info.pinned) parts.push(`<text x="${x + el.w - 14}" y="${y + 16}" fill="${c.yellow}" font-family="${c.fontMono}" font-size="14">★</text>`)
         parts.push(`<text x="${x + 10}" y="${y + 14}" fill="${c.grayCol}" font-family="${c.fontMono}" font-size="10">${esc(info.type.toUpperCase())}</text>`)
         parts.push(`<text x="${x + 10}" y="${y + 32}" fill="${c.textCol}" font-family="${c.fontDisplay}" font-size="15" font-weight="500">${esc(info.title || '(untitled)')}</text>`)
-        if (info.body) {
-          const lines = estimateSoftWrap(info.body, el.w - 20, 3)
+        const displayBody = markdownPreview(info.body, Number.POSITIVE_INFINITY)
+        if (displayBody) {
+          const lines = estimateSoftWrap(displayBody, el.w - 20, 3)
           lines.forEach((ln, i) => {
             parts.push(`<text x="${x + 10}" y="${y + 50 + i * 16}" fill="${c.textCol}" font-family="${c.fontBody}" font-size="12">${esc(ln)}</text>`)
           })

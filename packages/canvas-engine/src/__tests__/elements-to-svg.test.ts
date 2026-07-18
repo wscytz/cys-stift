@@ -24,6 +24,22 @@ describe('elementsToSvg', () => {
     expect(r.svg).toContain('NOTE') // 类型标
   })
 
+  it('card SVG strips Markdown preview markers', () => {
+    const els: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 240, h: 120, rotation: 0 },
+    ]
+    const r = elementsToSvg(
+      els,
+      view,
+      () => ({ title: 'T', body: '###Heading\n- **First**', type: 'note', pinned: false }),
+      { background: true, border: 0 },
+    )
+    expect(r.svg).toContain('Heading')
+    expect(r.svg).toContain('First')
+    expect(r.svg).not.toContain('###')
+    expect(r.svg).not.toContain('**')
+  })
+
   it('rect → SVG <rect>', () => {
     const els: CanvasElement[] = [
       { id: 'r1', kind: 'rect', x: 10, y: 10, w: 50, h: 30, rotation: 0, color: 'black' },

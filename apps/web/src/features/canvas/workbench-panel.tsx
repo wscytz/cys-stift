@@ -272,7 +272,7 @@ const styles = `
 }
 .wb-panel__done {
   padding: 0 var(--space-2);
-  height: 28px;
+  min-height: 44px;
   display: grid;
   place-items: center;
   border: 1.5px solid var(--color-black);
@@ -307,7 +307,7 @@ const styles = `
   cursor: pointer;
   border-radius: 1px;
 }
-.wb-panel__tag-remove { border: 0; background: transparent; cursor: pointer; font-size: inherit; padding: 0 0 0 var(--space-1); min-width: 24px; min-height: 24px; }
+.wb-panel__tag-remove { border: 0; background: transparent; cursor: pointer; font-size: inherit; padding: 0 var(--space-1); min-width: 44px; min-height: 44px; }
 .wb-panel__back { border: 1px solid var(--color-black); background: var(--color-white); min-height: 44px; padding: 0 var(--space-2); cursor: pointer; }
 .wb-panel__tag-chip:hover { opacity: 0.8; }
 .wb-panel__tag-input {
@@ -325,7 +325,7 @@ const styles = `
 @media (max-width: 1023px) {
   .wb-panel__head { flex-wrap: wrap; padding-top: var(--space-2); }
   .wb-panel__title { flex: 1 0 100%; width: 100%; padding: var(--space-1) 0; }
-  .wb-panel__done { height: 40px; }
+  .wb-panel__done { min-height: 44px; }
 }
 .wb-panel__body {
   flex: 1;

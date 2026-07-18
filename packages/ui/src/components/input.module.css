@@ -22,6 +22,7 @@
   font-size: var(--font-size-base);
   color: var(--color-black);
   outline: none;
+  min-height: 44px;
   transition: border-color 200ms ease-out;
 }
 

@@ -181,6 +181,11 @@ const styles = `
   background: var(--color-red);
 }
 .app-menu__brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
   font-family: var(--font-display);
   font-size: var(--font-size-sm);
   font-weight: 500;
@@ -201,6 +206,9 @@ const styles = `
 .app-menu__group:first-child { border-left: 0; padding-left: 0; }
 .app-menu__group-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .app-menu__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--color-gray);

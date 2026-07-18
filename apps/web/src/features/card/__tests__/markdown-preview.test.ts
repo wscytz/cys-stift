@@ -4,6 +4,7 @@ import { markdownPreview } from '../markdown-preview'
 describe('markdownPreview', () => {
   it('removes markdown markers while preserving readable paragraph spacing', () => {
     expect(markdownPreview('### Heading\n\n- **First**\n- [Second](https://example.com)')).toBe('Heading\nFirst\nSecond')
+    expect(markdownPreview('###Heading\n##No space')).toBe('Heading\nNo space')
   })
 
   it('turns code fences into their useful text instead of exposing fence syntax', () => {
