@@ -1,4 +1,4 @@
-# cy's Stift 1.0.0-preview.1
+# cy's Stift 1.0.0-preview.2
 
 This is an installable preview for the core local-first workflow:
 

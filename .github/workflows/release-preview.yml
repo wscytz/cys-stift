@@ -116,8 +116,10 @@ jobs:
           path: release-assets/macos
       - name: generate asset checksums
         run: |
-          cd release-assets
-          sha256sum windows/*.exe macos/*.dmg > SHA256SUMS.txt
+          {
+            (cd release-assets/windows && sha256sum *.exe)
+            (cd release-assets/macos && sha256sum *.dmg)
+          } > release-assets/SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
           body_path: .github/release-preview.md

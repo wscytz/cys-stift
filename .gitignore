@@ -58,6 +58,7 @@ docs/audit/
 
 # AI assistant skill scratch dir (session-local, not shipped)
 .superpowers/
+ralph-loop.local.md
 
 # Isolated Git worktrees created for release and feature work
 .worktrees/

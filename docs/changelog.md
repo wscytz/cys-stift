@@ -5,6 +5,15 @@
 
 ---
 
+## 2026-07-19 · 1.0.0-preview.2 · 发布资产校验修复
+
+修复 preview release 的 `SHA256SUMS.txt`：校验和现在只记录资产文件名，用户把 Windows NSIS、macOS DMG 和清单下载到同一目录后可直接执行 `shasum -a 256 -c SHA256SUMS.txt`。此前 `preview.1` 的清单保留 CI 临时 `windows/`、`macos/` 路径，资产完整但不能在平铺下载目录直接校验。
+
+- **发布工作流**:分别从资产目录计算 Windows 和 macOS 的校验和，输出不含临时路径的可移植清单；本地回归脚本验证下载布局可通过。
+- **本地状态文件**:忽略 `ralph-loop.local.md`，避免 AI 执行循环状态混入版本控制。
+
+---
+
 ## 2026-07-19 · 1.0.0-preview.1 · 核心流程浏览器验收修复
 
 真实 Capture → Inbox → Canvas 和 AI 失败路径演练补出两个单测未覆盖的状态回归；`v1.0.0-preview.1` prerelease tag 由 release workflow 重新验证 Linux gate、生成 Windows NSIS 和 macOS Apple Silicon DMG。macOS DMG 是经 strict codesign 验证的 ad-hoc preview，不是 Apple Developer ID 签名或 notarized stable build。
