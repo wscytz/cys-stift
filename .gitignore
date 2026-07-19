@@ -59,6 +59,9 @@ docs/audit/
 # AI assistant skill scratch dir (session-local, not shipped)
 .superpowers/
 
+# Isolated Git worktrees created for release and feature work
+.worktrees/
+
 # Undocumented UX-audit scratch screenshots (auto-generated, no doc reference)
 docs/design/screenshots/phase-ux-mmxa/
 
