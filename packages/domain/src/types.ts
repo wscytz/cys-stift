@@ -24,21 +24,57 @@ export type CardType = 'note' | 'image' | 'link' | 'code' | 'quote'
 
 // ── Tags (P4 v0.32.0) ───────────────────────────────────────────────────────
 
-/** 10-color fixed palette — chips never accept arbitrary hex. */
+/** Canonical palette — chips never accept arbitrary hex or unavailable CSS vars. */
 export const TAG_COLORS = [
   'var(--color-red)',
-  'var(--color-teal)',
   'var(--color-blue)',
   'var(--color-yellow)',
-  'var(--color-pink)',
+  'var(--color-black)',
   'var(--color-white)',
   'var(--color-gray)',
+] as const
+
+/** Values written by older previews. They remain in the input type so old
+ * exports/tests can be read, but all persistence boundaries normalize them. */
+export const LEGACY_TAG_COLORS = [
+  'var(--color-teal)',
+  'var(--color-pink)',
   'var(--color-orange)',
   'var(--color-purple)',
   'var(--color-green)',
 ] as const
 
-export type TagColor = (typeof TAG_COLORS)[number]
+export type CanonicalTagColor = (typeof TAG_COLORS)[number]
+export type TagColor = CanonicalTagColor | (typeof LEGACY_TAG_COLORS)[number]
+
+/** Map historical tag vars (and bare color names from hand-edited exports) to
+ * tokens that are actually present in the UI. */
+export function normalizeTagColor(value: unknown): CanonicalTagColor {
+  const raw = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  const name = raw.match(/^var\(--color-([a-z]+)\)$/)?.[1] ?? raw
+  switch (name) {
+    case 'red':
+    case 'pink':
+      return 'var(--color-red)'
+    case 'blue':
+    case 'teal':
+    case 'purple':
+      return 'var(--color-blue)'
+    case 'yellow':
+    case 'orange':
+      return 'var(--color-yellow)'
+    case 'black':
+      return 'var(--color-black)'
+    case 'white':
+      return 'var(--color-white)'
+    case 'gray':
+    case 'grey':
+    case 'green':
+      return 'var(--color-gray)'
+    default:
+      return 'var(--color-gray)'
+  }
+}
 
 export interface TagRef {
   value: string

@@ -53,13 +53,20 @@ describe('plainPreview', () => {
   it('混合:标题+粗体+双链(典型卡片首行)', () => {
     expect(plainPreview('# **重点** 见 [[概念A]]', 60)).toBe('重点 见 概念A')
   })
+
+  it('与画布预览规则一致:闭合标题/任务列表/表格', () => {
+    expect(plainPreview('### 标题 ###\n- [x] 完成', 60)).toBe('标题')
+    expect(plainPreview('| 名称 | 状态 |\n| --- | --- |\n| A | ready |', 60)).toBe('名称 · 状态')
+  })
 })
 
 describe('subtitleOf', () => {
   it('取首个 ## 副标题(不取 H1 / H3)', () => {
     expect(subtitleOf('# H1\n## 副标题\n正文')).toBe('副标题')
     expect(subtitleOf('## 直接副标题')).toBe('直接副标题')
+    expect(subtitleOf('##No space')).toBe('No space')
     expect(subtitleOf('### H3\n## H2')).toBe('H2') // 跳过 H3,取首个 H2
+    expect(subtitleOf('## 副标题 ###\n正文')).toBe('副标题')
   })
   it('无 ## -> 首行 plainPreview(剥 markdown)', () => {
     expect(subtitleOf('**粗** 首行')).toBe('粗 首行')

@@ -203,7 +203,7 @@ const styles = `
   word-break: break-word;
 }
 .md--empty { color: var(--color-gray); font-style: italic; margin: 0; }
-.md h1, .md h2, .md h3 {
+.md h1, .md h2, .md h3, .md h4, .md h5, .md h6 {
   font-family: var(--font-content);
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -213,6 +213,19 @@ const styles = `
 .md h1 { font-size: var(--font-size-2xl); }
 .md h2 { font-size: var(--font-size-xl); }
 .md h3 { font-size: var(--font-size-lg); }
+.md h4 { font-size: var(--font-size-base); }
+.md h5 { font-size: var(--font-size-sm); }
+.md h6 { font-size: var(--font-size-xs); }
+.md p,
+.md li,
+.md blockquote,
+.md th,
+.md td {
+  /* Notes are captured as plain text first. Keep intentional single line
+     breaks visible in the reading surface instead of silently joining two
+     thoughts into one row (the source editor remains the Markdown source). */
+  white-space: pre-line;
+}
 .md p { margin: 0 0 var(--space-2); }
 .md a { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; }
 .md a:hover { color: var(--color-black); }
@@ -226,8 +239,8 @@ const styles = `
   position: absolute;
   left: 0;
   top: 0.6em;
-  width: 6px;
-  height: 6px;
+  width: var(--space-1);
+  height: var(--space-1);
   background: var(--color-red);
 }
 .md ol { list-style: decimal; }

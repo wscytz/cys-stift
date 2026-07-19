@@ -65,4 +65,45 @@ describe('SelfBuiltAdapter shared command bus', () => {
     expect(host.getElement('card-1')).toMatchObject({ x: 1, y: 0 })
     host.detach()
   })
+
+  it('lets an open modal own canvas editing keys', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({
+      id: 'card-modal-guard',
+      kind: 'card',
+      x: 0,
+      y: 0,
+      w: 100,
+      h: 60,
+      rotation: 0,
+    })
+    host.setSelectedIds(['card-modal-guard'])
+    const execute = vi.spyOn(host, 'executeCommand')
+    const modal = document.createElement('div')
+    modal.setAttribute('role', 'dialog')
+    modal.setAttribute('aria-modal', 'true')
+    document.body.appendChild(modal)
+
+    const guardedEvents = [
+      new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }),
+      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
+      new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }),
+      new KeyboardEvent('keydown', { key: 'a', metaKey: true, bubbles: true }),
+    ]
+    for (const event of guardedEvents) window.dispatchEvent(event)
+
+    expect(execute).not.toHaveBeenCalled()
+    expect(host.getElement('card-modal-guard')).toBeDefined()
+
+    // Escape is intentionally allowed through so the modal's own close
+    // handler can run; clearing the covered canvas selection is harmless.
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(execute).toHaveBeenCalledWith({ type: 'clearSelection' })
+
+    modal.remove()
+    host.setSelectedIds(['card-modal-guard'])
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }))
+    expect(host.getElement('card-modal-guard')).toBeUndefined()
+    host.detach()
+  })
 })

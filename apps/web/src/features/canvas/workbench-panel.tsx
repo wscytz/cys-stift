@@ -14,8 +14,10 @@ import type { Card, TagRef } from '@cys-stift/domain'
 import { TAG_COLORS } from '@cys-stift/domain'
 import { Tag } from '@cys-stift/ui'
 import { MarkdownEditor } from '@/features/card/markdown-editor'
+import { solidTagChipStyle } from '@/lib/tag-color'
 import { typeKeyOf } from '@/lib/type-label'
 import { useI18n } from '@/lib/i18n'
+import type { MessageKey } from '@/lib/i18n/messages'
 
 export interface WorkbenchPanelProps {
   card: Card
@@ -176,7 +178,7 @@ export function WorkbenchPanel({
       </header>
       <div className="wb-panel__tags">
         {tags.map((tag) => (
-          <span key={tag.value} className="wb-panel__tag-chip" style={{ background: tag.color }}>
+          <span key={tag.value} className="wb-panel__tag-chip" style={solidTagChipStyle(tag.color)}>
             {tag.value}
             <button
               type="button"
@@ -195,20 +197,48 @@ export function WorkbenchPanel({
           value={tagInput}
           onChange={(e) => setTagInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' || e.key === ',') {
               e.preventDefault()
               addTag(tagInput)
             }
           }}
+          onBlur={() => addTag(tagInput)}
           placeholder={t('tag.placeholder')}
           aria-label={t('tag.add')}
         />
+      </div>
+      <div className="wb-panel__provenance" aria-label={t('card.detail.provenance')}>
+        <span>{t('card.detail.source')}: {t(workbenchSourceKey(card.source?.kind))}</span>
+        <span>{t('card.detail.capturedAt')}: {workbenchCapturedAt(card.capturedAt)}</span>
+        <span>
+          {card.canvasPosition
+            ? `${t('card.detail.canvas')}: ${String(card.canvasPosition.canvasId)} · ${t('card.detail.canvasPosition', { x: String(Math.round(card.canvasPosition.x)), y: String(Math.round(card.canvasPosition.y)) })}`
+            : `${t('card.detail.canvas')}: ${t('card.detail.inbox')}`}
+        </span>
       </div>
       <div className="wb-panel__body">
         <MarkdownEditor value={body} onChange={setBody} />
       </div>
     </aside>
   )
+}
+
+function workbenchSourceKey(kind: string | undefined): MessageKey {
+  switch (kind) {
+    case 'shortcut': return 'card.detail.source.shortcut'
+    case 'menubar': return 'card.detail.source.menubar'
+    case 'paste': return 'card.detail.source.paste'
+    case 'drag-drop': return 'card.detail.source.drag-drop'
+    case 'webhook': return 'card.detail.source.webhook'
+    case 'manual': return 'card.detail.source.manual'
+    default: return 'card.detail.source.unknown'
+  }
+}
+
+function workbenchCapturedAt(value: Date): string {
+  return value instanceof Date && Number.isFinite(value.getTime())
+    ? value.toISOString().slice(0, 19).replace('T', ' ')
+    : '—'
 }
 
 function stableTagColor(value: string): TagRef['color'] {
@@ -297,13 +327,17 @@ const styles = `
   border-bottom: var(--border-hairline);
   flex-shrink: 0;
 }
+.wb-panel__provenance {
+  display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2);
+  padding: var(--space-1) var(--space-2); border-bottom: var(--border-hairline);
+  color: var(--color-gray); font-family: var(--font-mono); font-size: var(--font-size-xs); line-height: 1.45;
+}
 .wb-panel__tag-chip {
   font-family: var(--font-display);
   font-weight: 600;
   font-size: var(--font-size-xs);
   border: 0;
   padding: var(--space-quarter) var(--space-1);
-  color: var(--color-black);
   cursor: pointer;
   border-radius: 1px;
 }

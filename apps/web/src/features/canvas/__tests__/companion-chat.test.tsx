@@ -19,6 +19,7 @@ import type { CanvasId } from '@cys-stift/domain'
 // --- Mocks (must be before component import; vitest hoists vi.mock) ---
 
 const streamTextMock = vi.fn()
+const pushToastMock = vi.fn()
 vi.mock('@/features/ai/stream-text', () => ({
   streamText: (...args: unknown[]) => streamTextMock(...args),
 }))
@@ -34,6 +35,7 @@ vi.mock('@/features/ai/canvas-snapshot', () => ({
 }))
 
 vi.mock('@/features/ai/agent-prompt', () => ({
+  RAG_TOP_N: 8,
   AGENT_SYSTEM_PROMPT: 'sys',
   buildAgentUserPrompt: (q: string) => `PROMPT:${q}`,
   extractDslBlocks: () => [],
@@ -55,7 +57,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/lib/toast-store', () => ({
-  pushToast: vi.fn(),
+  pushToast: (...args: unknown[]) => pushToastMock(...args),
 }))
 
 vi.mock('@/features/ai/sample-store', () => ({
@@ -125,6 +127,7 @@ describe('CompanionChat — sends conversation history to AI (Task 2)', () => {
   beforeEach(() => {
     window.localStorage.clear()
     streamTextMock.mockReset()
+    pushToastMock.mockReset()
     streamTextMock.mockResolvedValue({ content: 'Just a plain answer.' })
   })
 
@@ -188,6 +191,21 @@ describe('CompanionChat — sends conversation history to AI (Task 2)', () => {
     expect(historyMsg).toBeDefined()
     expect(historyMsg).not.toHaveProperty('dslBlocks')
 
+    unmount()
+  })
+
+  it('shows a terminal truncation message instead of the generic format retry', async () => {
+    streamTextMock.mockResolvedValue({
+      content: 'partial',
+      finishReason: 'length',
+      stopReason: 'length',
+    })
+    const { host, unmount } = render(<CompanionChat {...makeProps()} />)
+    await typeAndSend(host, 'long request')
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+    expect(host.textContent).toContain('ai.outputTruncated')
+    expect(host.textContent).not.toContain('ask.retrying')
+    expect(pushToastMock).toHaveBeenCalledWith({ kind: 'info', message: 'ai.outputTruncated' })
     unmount()
   })
 })

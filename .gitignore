@@ -92,6 +92,7 @@ docs/reference.md
 # development/ 只跟踪 setup.md,其余过程文档不进 public
 docs/development/*
 !docs/development/setup.md
+!docs/development/showcase.md
 # design/ 只跟踪 tokens.md
 docs/design/*
 !docs/design/tokens.md

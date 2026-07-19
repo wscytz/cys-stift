@@ -112,9 +112,9 @@ describe('db-client — storage envelope format round-trip', () => {
 // History (docs/changelog.md L19): loadSnapshot() always returns a fresh array,
 // so a naive `next.cards !== _cards` identity check would ALWAYS fire —
 // causing every cross-tab storage event to notify every useDb() consumer even
-// when the parsed content is identical. The fix compares a cheap signature
-// (length + first/last id). See the Observable-surface note at the top of this
-// file for why we cannot directly assert "no notify" here.
+// when the parsed content is identical. The fix compares serialised card
+// content. See the Observable-surface note at the top of this file for why we
+// cannot directly assert "no notify" here.
 describe('rehydrateCards — content-signature stability (v0.37.0 regression guard)', () => {
   it('is idempotent: re-running rehydrate with identical content does not throw or lose data', () => {
     const card = makeCard({ id: toCardId('aaa') })
@@ -170,8 +170,8 @@ describe('rehydrateCards — content-signature stability (v0.37.0 regression gua
 // and last id, but a middle card's title/updatedAt changed) produces an
 // identical signature → rehydrate treats it as "no change" → the in-memory
 // cache is never updated → stale data in the current tab. The fix makes the
-// signature cover every card's updatedAt (sum + count), so any content change
-// is detected while still avoiding the array-identity false-fire. This test
+// signature cover every card's serialised content, so any content change is
+// detected while still avoiding the array-identity false-fire. This test
 // asserts the OBSERVABLE consequence: after rehydrate, the in-memory cardRepo
 // reflects the middle-card change (it did not with the old weak signature).
 describe('rehydrateCards — middle-card edit (R2.5)', () => {

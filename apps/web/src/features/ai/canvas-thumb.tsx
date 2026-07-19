@@ -93,7 +93,7 @@ export const confirmStyles = `
 .ac--error { border-color: var(--color-red); }
 .ac__title { margin: 0 0 var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); }
 .ac__diff { display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-2); }
-.ac__group { padding: var(--space-1) var(--space-2); border-left: 3px solid var(--color-gray); }
+.ac__group { padding: var(--space-1) var(--space-2); border-left: var(--space-quarter) solid var(--color-gray); }
 .ac__group--blue { border-left-color: var(--color-blue); }
 .ac__group--red { border-left-color: var(--color-red); }
 .ac__group--yellow { border-left-color: var(--color-yellow); }

@@ -48,6 +48,7 @@ import type {
   TagRef,
 } from '@cys-stift/domain'
 import { TAG_COLORS } from '@cys-stift/domain'
+import { solidTagChipStyle } from '@/lib/tag-color'
 import {
   CodeEditor,
   ListEditor,
@@ -465,12 +466,22 @@ export function CardDetailModal({
               <div className="cd__meta">
                 <Tag color="red">{t(typeKeyOf(card.type))}</Tag>
                 {(card.tags ?? []).map((tag) => (
-                  <span key={tag.value} className="cd__tag-chip" style={{ background: tag.color }}>
+                  <span key={tag.value} className="cd__tag-chip" style={solidTagChipStyle(tag.color)}>
                     {tag.value}
                   </span>
                 ))}
-                <span className="cd__time">
-                  {card.capturedAt.toISOString().slice(0, 19).replace('T', ' ')}
+              </div>
+              <div className="cd__provenance" aria-label={t('card.detail.provenance')}>
+                <span>
+                  {t('card.detail.source')}: {sourceLabel(card.source?.kind, t)}
+                </span>
+                <span>
+                  {t('card.detail.capturedAt')}: {formatCapturedAt(card.capturedAt)}
+                </span>
+                <span>
+                  {card.canvasPosition
+                    ? `${t('card.detail.canvas')}: ${String(card.canvasPosition.canvasId)} · ${t('card.detail.canvasPosition', { x: String(Math.round(card.canvasPosition.x)), y: String(Math.round(card.canvasPosition.y)) })}`
+                    : `${t('card.detail.canvas')}: ${t('card.detail.inbox')}`}
                 </span>
               </div>
               <MarkdownBody source={card.body} resolveEmbed={resolveEmbed} />
@@ -801,7 +812,7 @@ export function CardDetailModal({
                       key={tag.value}
                       type="button"
                       className="cd__tag-chip"
-                      style={{ background: tag.color }}
+                      style={solidTagChipStyle(tag.color)}
                       aria-label={t('tag.remove') + ': ' + tag.value}
                       onClick={() =>
                         setTags((prev) => prev.filter((x) => x.value !== tag.value))
@@ -1065,6 +1076,24 @@ function reasonToKey(reason: RecommendReason | undefined): MessageKey {
   }
 }
 
+function sourceLabel(kind: string | undefined, t: (key: MessageKey) => string): string {
+  switch (kind) {
+    case 'shortcut': return t('card.detail.source.shortcut')
+    case 'menubar': return t('card.detail.source.menubar')
+    case 'paste': return t('card.detail.source.paste')
+    case 'drag-drop': return t('card.detail.source.drag-drop')
+    case 'webhook': return t('card.detail.source.webhook')
+    case 'manual': return t('card.detail.source.manual')
+    default: return t('card.detail.source.unknown')
+  }
+}
+
+function formatCapturedAt(value: Date): string {
+  return value instanceof Date && Number.isFinite(value.getTime())
+    ? value.toISOString().slice(0, 19).replace('T', ' ')
+    : '—'
+}
+
 function Section({
   label,
   children,
@@ -1088,8 +1117,14 @@ const styles = `
    first child feel detached; pulling it up by space-2 (16px) hugs
    the title. */
 .cd > :first-child { margin-top: calc(-1 * var(--space-2)); }
-.cd__meta { display: flex; align-items: center; gap: var(--space-2); }
+.cd__meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .cd__time { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black-soft); }
+.cd__provenance {
+  display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3);
+  margin: var(--space-1) 0 var(--space-3); padding: var(--space-1) var(--space-2);
+  border-left: var(--space-quarter) solid var(--color-gray-soft); color: var(--color-gray);
+  font-family: var(--font-mono); font-size: var(--font-size-xs); line-height: 1.5;
+}
 .cd__field { display: flex; flex-direction: column; gap: var(--space-1); }
 .cd__label { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-black-soft); }
 .cd__textarea {
@@ -1229,7 +1264,7 @@ const styles = `
   display: inline-flex; align-items: center; gap: 4px;
   padding: 2px var(--space-1); border-radius: var(--radius-sm);
   font-family: var(--font-mono); font-size: var(--font-size-xs);
-  color: var(--color-black); border: 2px solid var(--color-black);
+  border: 2px solid var(--color-black);
   cursor: pointer; user-select: none; line-height: 1.3;
 }
 /* Reset native <button> defaults so the removable tag chip renders

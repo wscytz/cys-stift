@@ -3,7 +3,7 @@
 /**
  * MinimapPreview —— 工作台专注编辑态的画布预览(独立组件,**不复用** Minimap)。
  *
- * 与右下原 Minimap 区分:更大(~240×180)/ 默认右上角 / 收起剩一个小角(不条状)。
+ * 与右下原 Minimap 区分:更大(~240×180)/ 默认编辑正文右上角 / 收起剩一个小角(不条状)。
  * 复用 `minimap.ts` 投影纯函数 + `minimap-component` 的 `drawElementMark`;组件壳
  * + 收起/拖拽逻辑自建。**被动参考**:不响应 click-to-center(专注态画布隐,无 canvas
  * 可 recenter);退出专注走 dock 头部按钮。
@@ -16,7 +16,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
-import { readToken } from '@cys-stift/canvas-engine'
+import { normalizeBox, readToken } from '@cys-stift/canvas-engine'
+import { ChevronDown, Map } from 'lucide-react'
 import { computeMinimapProjection } from './minimap'
 import { drawElementMark } from './minimap-component'
 import { useI18n } from '@/lib/i18n'
@@ -28,8 +29,11 @@ const COLLAPSED_KEY = 'cys-stift.workbench-preview-collapsed.v1'
 const POSITION_KEY = 'cys-stift.workbench-preview-pos.v1'
 
 function loadCollapsed(): boolean {
-  if (typeof window === 'undefined') return false
-  return window.localStorage.getItem(COLLAPSED_KEY) === '1'
+  if (typeof window === 'undefined') return true
+  const stored = window.localStorage.getItem(COLLAPSED_KEY)
+  // The preview is a reference aid, not the editor. Keep it out of the text
+  // surface for first-time users; an explicit expand click persists the choice.
+  return stored === null ? true : stored === '1'
 }
 
 /** 拖拽位置:left/top 二选一锚定(双 null = 用默认右上角)。镜像 minimap-component 的 MinimapPos。 */
@@ -62,7 +66,13 @@ function savePos(p: PreviewPos): void {
   try { window.localStorage.setItem(POSITION_KEY, JSON.stringify(p)) } catch { /* quota */ }
 }
 
-export function MinimapPreview({ host }: { host: CanvasHost | null }) {
+export function MinimapPreview({
+  host,
+  activeElementId,
+}: {
+  host: CanvasHost | null
+  activeElementId?: string
+}) {
   const { t } = useI18n()
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const rafRef = useRef<number | null>(null)
@@ -97,7 +107,21 @@ export function MinimapPreview({ host }: { host: CanvasHost | null }) {
     ctx.fillStyle = readToken('--color-canvas', '#ffffff')
     ctx.fillRect(0, 0, PREVIEW_W, PREVIEW_H)
     for (const el of elements) drawElementMark(ctx, el as CanvasElement, proj, elements as CanvasElement[])
-  }, [host])
+    const active = activeElementId ? elements.find((el) => el.id === activeElementId) : undefined
+    if (active) {
+      const box = normalizeBox(active)
+      ctx.save()
+      ctx.strokeStyle = readToken('--color-red', '#e53935')
+      ctx.lineWidth = 3
+      ctx.strokeRect(
+        box.x * proj.scale + proj.offsetX - 2,
+        box.y * proj.scale + proj.offsetY - 2,
+        Math.max(5, box.w * proj.scale + 4),
+        Math.max(5, box.h * proj.scale + 4),
+      )
+      ctx.restore()
+    }
+  }, [activeElementId, host])
 
   const scheduleDraw = useCallback(() => {
     if (rafRef.current != null) return
@@ -132,6 +156,16 @@ export function MinimapPreview({ host }: { host: CanvasHost | null }) {
 
   // mount 读 localStorage 还原位置。同 minimap-component.tsx:83 范式(SSR 安全)。
   useEffect(() => { setPos(loadPos()) }, [])
+
+  useEffect(() => {
+    if (
+      window.localStorage.getItem(COLLAPSED_KEY) === null &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(max-width: 640px)').matches
+    ) {
+      setCollapsed(true)
+    }
+  }, [])
 
   // pos 变化 → 持久化(跳过首次 DEFAULT_POS,避免初始化也写一次)。
   // 同 minimap-component.tsx:243-246 的 wroteInitialRef 范式。
@@ -200,17 +234,20 @@ export function MinimapPreview({ host }: { host: CanvasHost | null }) {
   const positioned = pos.left !== null && pos.top !== null
   const positionStyle: React.CSSProperties = positioned
     ? { left: pos.left!, top: pos.top!, right: 'auto', bottom: 'auto' }
-    : { right: 'var(--space-2)', top: 'var(--space-2)', left: 'auto', bottom: 'auto' }
+    : { right: 'var(--space-2)', top: '184px', left: 'auto', bottom: 'auto' }
 
   if (collapsed) {
-    // 收起剩一个小角(~32×32 chip 贴右上),不占整条边
+    // 收起剩一个 44px 总览按钮贴右上,不占整条边
+    const collapsedPositionStyle = positioned
+      ? positionStyle
+      : { ...positionStyle, top: 'var(--space-2)' }
     return (
       <div
         ref={containerRef}
         data-testid="mp-chip"
         style={{
-          position: 'absolute', ...positionStyle, zIndex: 30,
-          width: '32px', height: '32px',
+          position: 'absolute', ...collapsedPositionStyle, zIndex: 30,
+          width: '44px', height: '44px',
           background: 'var(--color-white)', border: '2px solid var(--color-black)',
           boxShadow: '4px 4px 0 0 var(--color-black)', borderRadius: 'var(--radius-sm)',
           display: 'grid', placeItems: 'center', cursor: 'pointer',
@@ -218,7 +255,7 @@ export function MinimapPreview({ host }: { host: CanvasHost | null }) {
         role="button" tabIndex={0} aria-label={t('canvas.preview.expand')}
         onClick={toggleCollapse}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCollapse() } }}
-      >▸</div>
+      ><Map size={18} aria-hidden="true" /></div>
     )
   }
 
@@ -243,13 +280,13 @@ export function MinimapPreview({ host }: { host: CanvasHost | null }) {
         <span style={{
           fontFamily: 'var(--font-mono)', fontSize: 'var(--font-size-xs)',
           letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-black-soft)',
-        }}>canvas</span>
+        }}>{t('canvas.preview.title')}</span>
         <button
           type="button" data-testid="mp-collapse"
           className="cv-chrome-toggle"
           onClick={toggleCollapse}
           aria-label={t('canvas.preview.collapse')} aria-expanded={!collapsed} title={t('canvas.preview.collapse')}
-        >▾</button>
+        ><ChevronDown size={16} aria-hidden="true" /></button>
       </div>
       <canvas
         ref={canvasRef}

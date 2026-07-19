@@ -1,6 +1,6 @@
 # 转义(Transliteration)手册
 
-> **cy's Stift 的核心卖点。** 画布上的结构元素,能用一段确定的文字描述;这段文字,能反向改画布。
+> **cy's Stift 的核心卖点。** 画布上的可转义结构元素,能用一段确定的文字描述;这段文字,能反向改画布。
 > 所以**任何 AI(或任何人)都能靠读写一段文字来提出画布编辑**——不必碰几何 API、不必连某个 SDK、不必发手绘点序列。
 >
 > 这份手册给"想理解 / 想用好转义"的人:是什么 / 语法 / 双向闭环 / AI 与人怎么驱动 / 边界与隐私。
@@ -23,7 +23,7 @@
 - **画布 → 文字**:序列化(serialize)。整张画布压成一段可读文本。
 - **文字 → 画布**:解析 + 应用(parse + apply)。一段文本变回画布上的几何。
 
-这两向**对称、确定**:卡片、自由形状和关系可往返;手绘只保留位置/形状元数据,不把点序列放进 DSL(见 §六隐私)。这就是"转义"。
+这两向**对称、确定**:卡片几何/颜色、文本/框、关系签名和自由箭头可往返;卡片正文、媒体和手绘点序列有意留在本地存储,不进入 DSL(见 §六隐私)。这就是"转义"。
 
 ---
 
@@ -45,7 +45,7 @@
 每行一个元素。`#id` 是元素标识(往返用),`@pos/@size/@color` 是几何与样式。当前语法是 **cys-dsl v4**。
 
 ```
-# 卡片(内容来自卡片库,DSL 只改几何/颜色——见 §五"update-only")
+# 卡片(内容来自卡片库,DSL 只改几何/颜色——见 §六"update-only")
 [card #<id>] @pos(<x>,<y>) @size(<w>,<h>) @color(red|yellow|blue|black|white|gray)
 
 # 矩形等自由形状
@@ -109,7 +109,7 @@
 > 这套闭环是**可复跑、有测试证明**的,不是宣传话。见
 > `apps/web/src/features/ai/__tests__/transliteration-walkthrough.test.ts`(上面这个场景的端到端断言)。
 > 脏输入的优雅降级见 `dsl-robustness.test.ts`(28 对抗输入 + 500 随机 fuzz);
-> 干净往返无损见 `dsl-e2e-roundtrip.test.ts`(逐字节比对)。
+> 已覆盖字段的干净往返见 `dsl-e2e-roundtrip.test.ts`(逐字节比对);这不是对卡片正文、媒体或 freedraw 点序列的承诺。
 
 ---
 
@@ -117,8 +117,10 @@
 
 1. **画布工具栏 →「DSL」按钮**(模态编辑器,所有用户可用,**不门控 AI**):
    - 打开即显示当前画布的文字形态(`serializeCanvasReadable`,带 title 注释)
+   - 先在画布按顺序选中两张卡(第一张是参照,第二张会移动),打开后直接点「放到右侧」或「放到下方」；编辑器会改写目标卡那一行并立即显示真实 diff
    - 直接编辑 textarea / 粘贴一段 DSL →「应用」→ 画布变
-   - 诊断列表告诉你哪行错了(行号 + 原因);ApplyReport 反馈 applied / skipped / failed 的逐条结果与汇总
+   - 诊断列表在输入时就告诉你哪行错了(行号 + 原因);ApplyReport 反馈 applied / skipped / failed 的逐条结果与汇总
+   - 如果编辑期间画布变化,旧文本不会覆盖新状态；可在模态内「载入最新画布」重新开始
    - 还能「复制」(到剪贴板)/「下载」(.txt,拿走发任何地方)
 
 2. **AI 排版按钮**(画布侧栏):把允许的画布上下文喂给你配的 AI(OpenAI / Anthropic / 本地兼容),AI 回一段 DSL,然后打开确认门。你先看预览,确认后才应用;拒绝不会改画布。
@@ -131,9 +133,19 @@
 
 - **卡片默认 update-only**:普通 `[card #id]` 只能改已存在卡片的**几何和颜色**,内容(title/body/媒体)仍来自卡片库(单一可信源)。显式 `[card #id create]` 是例外:它只创建空标题/空正文卡,先持久化成功再写入画布;ID 冲突或持久化失败会报告失败,不会留下 ghost card。
 - **关系箭头端点必须存在**:`from`/`to` 指向不存在的卡 → 那条 op 跳过(不崩,诊断会报)。
-- **手绘(freedraw)单向**:DSL 只输出 `[freedraw #id] @pos(...)` 位置元数据 + 形状描述(如"像圆圈 85%"),**绝不输出点序列**。这是 **R2 隐私硬边界**:手绘是矢量,点数据留在本地引擎存储,永不进 AI prompt。所以 AI 看得到"这里有个像圆的手绘",改不了它,也不会拿走你的笔迹数据。
+- **手绘(freedraw)单向**:DSL 只输出 `[freedraw #id] @pos(...)` 位置元数据,**绝不输出点序列**。画布 AI 快照可额外附上本地计算的离散形状标签/标量特征,但不带笔迹点；这是 **R2 隐私硬边界**，AI 不能通过 DSL 改写笔迹。
 - **颜色固定 6+1**:越界色回退默认,不静默变黑。
-- **vision 默认关闭**:默认只发 `kind`(image/pdf)元数据,二进制永不外发。Settings 的 vision 实验室开关仍是附加能力入口,当前视觉理解实现仍 defer;详见 [`privacy.md`](privacy.md)。
+- **vision 当前未接入**:默认只保留 `kind`(image/pdf)元数据,二进制永不外发。Settings 的 Labs 区会明确显示没有可开启的 Vision consumer;详见 [`privacy.md`](privacy.md)。
+
+### DSL coverage（当前 v4）
+
+| 字段 | DSL 状态 |
+|---|---|
+| card/rect/frame/text 的 id、位置、尺寸、颜色 | 可序列化、可解析、可回写 |
+| relation/free arrow 的端点、标签、颜色、线型、箭头头、curve/elbow route、wikilink 标记 | 可序列化、可解析、可回写 |
+| `create` 卡 | 仅显式 `create`；持久化失败会标为 failed,不会留下 ghost |
+| card title/body、links、code、quotes、media 二进制 | 不属于 DSL；从 CardService/导出数据读取 |
+| freedraw 点序列 | 不属于 DSL；位置元数据可见,笔迹只留本地 |
 
 ---
 

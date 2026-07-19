@@ -416,6 +416,17 @@ describe('settingsStore — multi-profile CRUD', () => {
 })
 
 describe('settingsStore — v1→v2 migration', () => {
+  it('prefers canonical v2 when a stale v1 key also exists', async () => {
+    store.update({ locale: 'en' })
+    window.localStorage.setItem(
+      'cys-stift.settings.v1',
+      JSON.stringify({ settings: { locale: 'zh', ai: null } }),
+    )
+    vi.resetModules()
+    const store2 = (await import('../settings-store')).settingsStore
+    expect(store2.get().locale).toBe('en')
+  })
+
   it('migrates a legacy v1 payload (settings.ai) into profiles[0] + active', async () => {
     window.localStorage.setItem(
       'cys-stift.settings.v1',

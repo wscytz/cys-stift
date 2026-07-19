@@ -95,4 +95,21 @@ describe('buildCaptureRedirectActions', () => {
     expect(() => toCanvas.onClick()).not.toThrow()
     expect(onError).toHaveBeenCalled()
   })
+
+  it('→ canvas returning false calls onError instead of silently dismissing the toast', () => {
+    const moveToCanvas = vi.fn(() => false)
+    const onError = vi.fn()
+    const service = { moveToCanvas, archive: vi.fn() } as unknown as CardService
+    const actions = buildCaptureRedirectActions({
+      cardId: fakeCardId('c6'),
+      service,
+      activeCanvasId: 'cv' as CanvasId,
+      openCard: () => {},
+      onError,
+    })
+
+    actions.find((a) => a.label === '→ canvas')!.onClick()
+
+    expect(onError).toHaveBeenCalledWith('The card could not be moved to the canvas')
+  })
 })

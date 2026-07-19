@@ -131,16 +131,22 @@ function buildSearchable(card: Card): Searchable {
  * Extract a highlighted snippet from the card body, centred on the
  * first matching token. Max 200 chars; ellipsis on both ends if truncated.
  */
-export function bodySnippet(card: Card, query: string): string | null {
+export function bodySnippet(card: Pick<Card, 'body'>, query: string): string | null {
   const tokens = tokenise(normalise(query))
   if (tokens.length === 0) return null
-  const body = normalise(card.body)
+  // Collapse whitespace for a one-line excerpt, but keep the user's casing in
+  // the returned text. Matching uses a separate normalized copy.
+  const body = card.body
+    .replace(/[\x00-\x1f\x7f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
   if (!body) return null
+  const searchableBody = body.toLowerCase()
 
   // Find first matching token position
   let bestIdx = -1
   for (const token of tokens) {
-    const idx = body.indexOf(token)
+    const idx = searchableBody.indexOf(token)
     if (idx !== -1 && (bestIdx === -1 || idx < bestIdx)) {
       bestIdx = idx
     }

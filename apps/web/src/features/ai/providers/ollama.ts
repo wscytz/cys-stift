@@ -14,7 +14,13 @@
  * error message so users don't get a silent failure.
  */
 
-import type { AIProvider, AIRequest, AIResponse } from '../types'
+import {
+  normalizeAIFinishReason,
+  type AIFinishReason,
+  type AIProvider,
+  type AIRequest,
+  type AIResponse,
+} from '../types'
 import { consumeStream } from './stream-reader'
 
 interface OllamaConfig {
@@ -57,6 +63,44 @@ export function createOllamaProvider(cfg: OllamaConfig): AIProvider {
       const decoder = new TextDecoder()
       let content = ''
       let buffer = ''
+      let finishReason: AIFinishReason | undefined
+      let stopReason: string | undefined
+      let refusal = ''
+      let promptTokens: number | undefined
+      let completionTokens: number | undefined
+
+      const processLine = (line: string) => {
+        if (!line.trim()) return
+        try {
+          const json = JSON.parse(line)
+          const delta = json.message?.content
+          if (typeof delta === 'string' && delta.length > 0) {
+            content += delta
+            onDelta(delta)
+          }
+          const refusalChunk = json.message?.refusal ?? json.refusal
+          if (typeof refusalChunk === 'string' && refusalChunk.length > 0) {
+            refusal += refusalChunk
+            finishReason = 'refusal'
+            stopReason = 'refusal'
+          }
+          const rawDoneReason = json.done_reason
+          if (typeof rawDoneReason === 'string' && !refusal) {
+            stopReason = rawDoneReason
+            finishReason = normalizeAIFinishReason(rawDoneReason)
+          } else if (json.done === true) {
+            // Older Ollama versions only expose `done: true`.
+            stopReason ??= 'stop'
+            finishReason ??= 'stop'
+          }
+          const prompt = Number(json.prompt_eval_count)
+          const completion = Number(json.eval_count)
+          if (Number.isFinite(prompt)) promptTokens = prompt
+          if (Number.isFinite(completion)) completionTokens = completion
+        } catch (e) {
+          console.debug('[ollama] skipping unparseable NDJSON line', e)
+        }
+      }
       await consumeStream(
         reader,
         decoder,
@@ -64,25 +108,29 @@ export function createOllamaProvider(cfg: OllamaConfig): AIProvider {
           buffer += chunk
           const lines = buffer.split('\n')
           buffer = lines.pop() ?? ''
-          for (const line of lines) {
-            if (!line.trim()) continue
-            try {
-              const json = JSON.parse(line)
-              const delta = json.message?.content
-              if (delta) {
-                content += delta
-                onDelta(delta)
-              }
-              // json.done is the terminal NDJSON line; the server closes
-              // the stream right after, so consumeStream finishes naturally.
-            } catch (e) {
-              console.debug('[ollama] skipping unparseable NDJSON line', e)
-            }
-          }
+          for (const line of lines) processLine(line)
         },
         signal,
       )
-      return { content }
+      if (!signal?.aborted) {
+        const decoderTail = decoder.decode()
+        if (decoderTail) buffer += decoderTail
+      }
+      if (!signal?.aborted && buffer) processLine(buffer)
+      const usage: AIResponse['usage'] | undefined =
+        promptTokens !== undefined || completionTokens !== undefined
+          ? {
+              promptTokens: promptTokens ?? 0,
+              completionTokens: completionTokens ?? 0,
+            }
+          : undefined
+      return {
+        content,
+        ...(usage ? { usage } : {}),
+        ...(finishReason ? { finishReason } : {}),
+        ...(stopReason ? { stopReason } : {}),
+        ...(refusal ? { refusal } : {}),
+      }
     },
     async testConnection(signal) {
       const t0 = performance.now()

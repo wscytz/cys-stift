@@ -19,6 +19,8 @@ export interface BuildRedirectArgs {
   activeCanvasId: CanvasId
   openCard: (id: CardId) => void
   onError: (message: string) => void
+  /** Localized message for a persistence API that reports failure as false. */
+  moveToCanvasFailedMessage?: string
 }
 
 /** Default placement geometry for a freshly-moved card (matches timeline). */
@@ -38,10 +40,19 @@ function nextZ(service: CardService, canvasId: CanvasId): number {
 }
 
 export function buildCaptureRedirectActions(args: BuildRedirectArgs): ToastAction[] {
-  const { cardId, service, activeCanvasId, openCard, onError } = args
-  const safe = (fn: () => void) => () => {
+  const {
+    cardId,
+    service,
+    activeCanvasId,
+    openCard,
+    onError,
+    moveToCanvasFailedMessage,
+  } = args
+  const safe = (fn: () => void | boolean, falseMessage?: string) => () => {
     try {
-      fn()
+      if (fn() === false) {
+        onError(falseMessage ?? 'The action could not be completed')
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       onError(msg)
@@ -52,8 +63,8 @@ export function buildCaptureRedirectActions(args: BuildRedirectArgs): ToastActio
   return [
     {
       label: '→ canvas',
-      onClick: safe(() =>
-        service.moveToCanvas(cardId, {
+      onClick: safe(
+        () => service.moveToCanvas(cardId, {
           canvasId: activeCanvasId,
           x: 100 + stagger * 40,
           y: 100 + stagger * 40,
@@ -61,6 +72,7 @@ export function buildCaptureRedirectActions(args: BuildRedirectArgs): ToastActio
           h: PLACE_H,
           z,
         }),
+        moveToCanvasFailedMessage ?? 'The card could not be moved to the canvas',
       ),
     },
     {

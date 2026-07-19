@@ -20,9 +20,28 @@ describe('graph-view-store', () => {
     expect(graphViewStore.getView().zoom).toBe(2)
   })
 
+  it('忽略运行时 NaN/Infinity 视口写入,不污染当前图谱', () => {
+    graphViewStore.updateView({ zoom: 2, panX: 10, panY: 20 })
+    graphViewStore.updateView({ zoom: Number.NaN, panX: Number.POSITIVE_INFINITY })
+    expect(graphViewStore.getView()).toEqual({ zoom: 2, panX: 10, panY: 20 })
+  })
+
   it('节点坐标:setPosition / getPosition', () => {
     graphViewStore.setPosition('n1', { x: 10, y: 20, fx: 10, fy: 20 })
     expect(graphViewStore.getPosition('n1')).toEqual({ x: 10, y: 20, fx: 10, fy: 20 })
+  })
+
+  it('拒绝非有限节点坐标并丢弃半截固定点', () => {
+    graphViewStore.setPosition('bad', { x: Number.NaN, y: 2 })
+    expect(graphViewStore.getPosition('bad')).toBeNull()
+    graphViewStore.setPosition('partial', { x: 1, y: 2, fx: 3, fy: Number.NaN })
+    expect(graphViewStore.getPosition('partial')).toEqual({ x: 1, y: 2 })
+    graphViewStore.setPositions({
+      good: { x: 4, y: 5, fx: 6, fy: 7 },
+      bad: { x: Number.POSITIVE_INFINITY, y: 8 },
+    })
+    expect(graphViewStore.getPosition('good')).toEqual({ x: 4, y: 5, fx: 6, fy: 7 })
+    expect(graphViewStore.getPosition('bad')).toBeNull()
   })
 
   it('节点坐标:批量覆盖 setPositions(过滤掉传入但不在 knownIds 的? — 不过滤,全存)', () => {

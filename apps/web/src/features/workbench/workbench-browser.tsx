@@ -2,9 +2,11 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import type { Card } from '@cys-stift/domain'
+import { X } from 'lucide-react'
 import { useI18n } from '@/lib/i18n'
 import { workbenchStore, useWorkbench } from '@/lib/workbench-store'
 import { aggregateTags } from '@/features/tags/tag-ops'
+import { solidTagChipStyle } from '@/lib/tag-color'
 import {
   DEFAULT_WORKBENCH_MODE,
   WORKBENCH_MODES,
@@ -73,6 +75,17 @@ export function WorkbenchBrowser({ cards, onOpenCard: onOpenCardProp }: { cards:
             onChange={(e) => setQuery(e.target.value)}
             aria-label={t('workbench.searchPlaceholder')}
           />
+          {query && (
+            <button
+              type="button"
+              className="wb__search-clear"
+              aria-label={t('workbench.clearSearch')}
+              title={t('workbench.clearSearch')}
+              onClick={() => setQuery('')}
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          )}
         </div>
         <div className="wb__modes" role="tablist" aria-label={t('workbench.modesLabel')}>
           {WORKBENCH_MODES.map((m) => (
@@ -90,6 +103,12 @@ export function WorkbenchBrowser({ cards, onOpenCard: onOpenCardProp }: { cards:
         </div>
       </div>
 
+      {query.trim() && (
+        <div className="wb__result-count" role="status">
+          {t('workbench.searchResults', { n: String(filtered.length) })}
+        </div>
+      )}
+
       {/* 标签模式:多选 chip 栏(任一匹配)。空标签 → 提示。 */}
       {mode === 'tag' && (
         <div className="wb__tagbar">
@@ -98,12 +117,15 @@ export function WorkbenchBrowser({ cards, onOpenCard: onOpenCardProp }: { cards:
           ) : (
             tagAgg.map((t) => {
               const on = selectedTags.includes(t.value)
+              const chipStyle = solidTagChipStyle(t.color)
               return (
                 <button
                   key={t.value}
                   type="button"
                   className={`wb__tagchip${on ? ' wb__tagchip--on' : ''}`}
-                  style={on ? { background: t.color, borderColor: t.color } : { borderColor: t.color }}
+                  style={on
+                    ? { ...chipStyle, borderColor: chipStyle.background }
+                    : { borderColor: chipStyle.background, color: 'var(--color-black)' }}
                   aria-pressed={on}
                   onClick={() => toggleTag(t.value)}
                 >
@@ -157,6 +179,16 @@ const styles = `
   color: var(--color-black); flex: 1; min-width: 0;
 }
 .wb__search-input:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.wb__search-clear {
+  width: 44px; height: 44px; flex: 0 0 44px; display: grid; place-items: center;
+  border: 0; background: transparent; color: var(--color-gray); cursor: pointer;
+}
+.wb__search-clear:hover { color: var(--color-red); background: var(--color-red-soft); }
+.wb__search-clear:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.wb__result-count {
+  padding: var(--space-1) var(--space-3); border-bottom: var(--border-hairline);
+  color: var(--color-gray); font-family: var(--font-mono); font-size: var(--font-size-xs);
+}
 .wb__modes { display: flex; gap: var(--space-1); flex-wrap: wrap; }
 .wb__mode {
   font-family: var(--font-display); font-weight: 600;
@@ -174,7 +206,7 @@ const styles = `
 .wb__tagbar {
   display: flex; gap: var(--space-1); flex-wrap: wrap;
   padding: var(--space-2) var(--space-3);
-  border-bottom: 1.5px solid var(--color-gray-soft);
+  border-bottom: 1px solid var(--color-gray-soft);
 }
 .wb__tagempty { color: var(--color-gray); font-style: italic; font-size: var(--font-size-sm); }
 .wb__tagchip {
@@ -186,7 +218,6 @@ const styles = `
 }
 .wb__tagchip:hover { background: var(--color-gray-soft); }
 .wb__tagchip:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-.wb__tagchip--on { color: var(--color-white); }
 .wb__tagcnt {
   font-family: var(--font-mono); font-size: var(--font-size-xs); opacity: 0.8;
   margin-left: var(--space-1);

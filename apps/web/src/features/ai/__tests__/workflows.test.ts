@@ -72,6 +72,18 @@ describe('generateOutline', () => {
     expect(streamTextSpy).toHaveBeenCalledTimes(3)
   })
 
+  it('provider reports length → stops once and exposes terminal reason', async () => {
+    streamTextSpy.mockResolvedValue({
+      content: 'partial markdown',
+      finishReason: 'length',
+      stopReason: 'max_tokens',
+    })
+    const svc = makeService([{ id: '1' }, { id: '2' }], [])
+    const res = await generateOutline({ service: svc, canvasId: 'c' as never })
+    expect(res).toEqual({ ok: true, empty: true, failureReason: 'truncated' })
+    expect(streamTextSpy).toHaveBeenCalledTimes(1)
+  })
+
   it('网络错重试成功(Task 3 + Task 1 网络 retry)', async () => {
     streamTextSpy
       .mockRejectedValueOnce(new Error('network'))

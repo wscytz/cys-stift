@@ -50,6 +50,15 @@ describe('aggregateTags', () => {
     const agg = aggregateTags([mk('1', [['b', RED]]), mk('2', [['a', BLUE]])])
     expect(agg.map((t) => t.value)).toEqual(['a', 'b'])
   })
+
+  it('把旧版 CSS 颜色折叠到当前色板再聚合', () => {
+    const legacyPurple = 'var(--color-purple)' as TagColor
+    const agg = aggregateTags([
+      mk('1', [['a', BLUE]]),
+      mk('2', [['a', legacyPurple]]),
+    ])
+    expect(agg).toEqual([{ value: 'a', color: BLUE, count: 2 }])
+  })
 })
 
 describe('renameTag', () => {

@@ -5,9 +5,24 @@
 
 ---
 
+## 2026-07-19 · 1.0.0-preview.1 · 核心流程浏览器验收修复
+
+真实 Capture → Inbox → Canvas 和 AI 失败路径演练补出两个单测未覆盖的状态回归；均已进入 preview 源码，尚未 tag/release。
+
+- **连续捕获**:`MiniInput` 成功保存后只隐藏、不卸载，`submitting=true` 会跨下一次打开保留，导致第二条标题已输入但保存永久 disabled。现在每个新的 open session 复位提交锁，同一次打开仍防双击；真实浏览器完成 A→B 连续保存。
+- **`/ask` profile hydration**:AI profile 已保存、测试并设为当前后，直接进入 `/ask` 仍可能显示“AI 尚未启用”；页面原先只读不触发重渲染的 module cache。现在首屏订阅 settings，流中 stale guard 直接读取同步 store；请求前 profile 变化仍会取消旧请求。
+- **`/ask` SSR hydration**:持久化对话原先在 `useState` lazy initializer 读取，服务端首帧为空、客户端首帧有历史，真实浏览器触发 React hydration mismatch 并重建页面。现在 SSR/客户端首帧统一为空，挂载 effect 再恢复当前画布对话；新增 `renderToString` → `hydrateRoot` 回归。
+- **失败/恢复路径**:不可达 Ollama 显示明确连接失败；本地挂起端点让 `/ask` 进入 pending，停止后显示 cancelled、输入恢复且画布元素数不变。Inbox 真实完成 2 卡投放和一次性撤销。
+- **成功 AI apply/undo**:使用完全本机、无真实 key 的 Ollama 兼容模拟端点完成 Saved→Tested→Active→`/ask` 提案“新增 1”→确认应用→toast“撤销本次修改”；画布对象树证明被撤销的测试元素未残留。模拟 profile、对话和临时元素均已清理。
+- **Trash 恢复**:Inbox 测试卡经详情确认门软删除，列表 2→1、Trash 0→1；点击恢复后 Trash 回到 0、Inbox 回到 2，原卡标题与待整理位置保留。
+- **移动 Canvas**:390×844 下 26 个可见核心按钮均至少 44×44，Canvas host 占满剩余 719px，无页面横向/纵向溢出；DOM 对象树读出对象数、标题、坐标和关系。
+- **DSL 可用性桥接**:两张卡按顺序选中后可直接生成 `right-of`/`below` 关系式，替换目标卡现有行并立即显示单元素 diff；示例追加到当前画布文本而非覆盖，解析错误实时显示；stale 编辑可在模态内载入最新画布，不必关闭重开。
+- **设计/文档真值**:删除无人引用的 web token 副本，补齐 `tokens.ts` 的 `shadow.lg`；设计守卫按已登记 z-index 和真实孤儿值检查并恢复零违规。私有过程文档同步 DSL v4/Intent IR/replace-merge/a11y 真值及四份 ADR/decision。
+- **验证**:新增连续捕获、响应式 AI settings 与 `/ask` hydration 回归；Web 145 个测试文件/1755 项、web TypeScript、Rust 2 tests 通过。当前源码在逐文件一致的临时只读镜像完成 production build，静态生成 23/23 页面（含 `/ask`、`/showcase`）。
+
 ## 2026-07-18 · 1.0.0-preview.1 · 稳定性 Lane F（文档与版本真值）
 
-关闭 N09、N22-N23,把公开文档、版本元数据和自动检查对齐到当前源码事实。此版本是本地 preview,未 tag、未 push、未 release。
+关闭 N09、N22-N23,把公开文档、版本元数据和自动检查对齐到当前源码事实。此版本是 preview,尚未 tag/release。
 
 - **DSL 真值**:用户转义手册更新为 cys-dsl v4,补充显式 `[card #id create]`、关系式坐标、ApplyReport 与 AI/Agent before-after 确认门；不再声称 update-only 或静默应用。
 - **隐私真值**:隐私说明区分 prompt、per-canvas conversation、AI sample、用户主动 export 和本地 archive。明确 settings v2、样本默认累积/可关闭、对话最多 100 条、样本最多 500 条、export/archive 的 API key redaction 与 archive 媒体元数据边界。

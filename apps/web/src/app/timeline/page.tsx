@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { BauhausMotif, Card as UICard, Tag, Toolbar } from '@cys-stift/ui'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
@@ -17,6 +18,7 @@ import { captureSinkRegistry } from '@/features/capture/capture-sink'
 import { getDeviceId } from '@/lib/device-id'
 import { pushToast } from '@/lib/toast-store'
 import { groupCardsByDay } from '@/lib/group-by-day'
+import { openCardFromOverview } from '@/features/card/card-reentry'
 
 const DEVICE_ID = getDeviceId()
 
@@ -32,6 +34,7 @@ const DEVICE_ID = getDeviceId()
  */
 export default function TimelinePage() {
   const { t } = useI18n()
+  const router = useRouter()
   const { snap, service, ready } = useDb()
   // 跨画布 backlinks(只读):聚合全局边后过滤端点已软删的(G7 防泄露),传 CardDetailModal
   // 显示「这张卡和谁有关系」。canEditRelations 不传(默认 false=只读,无 × 删除/+ 添加钮)。
@@ -138,7 +141,11 @@ export default function TimelinePage() {
                         card={c}
                         variant="row"
                         badge={stateBadgeOf(c)}
-                        onClick={() => setDetail(c)}
+                        onClick={() => openCardFromOverview(
+                          c,
+                          (href) => router.push(href),
+                          setDetail,
+                        )}
                       />
                     </li>
                   ))}

@@ -1,10 +1,10 @@
 'use client'
 
 import { useDeferredValue, useMemo, useState } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Toolbar, Tag } from '@cys-stift/ui'
 import type { Card, CardId, SearchResult } from '@cys-stift/domain'
-import { searchCards, bodySnippet } from '@cys-stift/domain'
+import { searchCards } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
 import { PageLoading } from '@/components/page-loading'
@@ -12,6 +12,8 @@ import { CardDetailModal } from '@/features/card/card-detail'
 import { useGlobalEdges } from '@/features/graph/use-global-edges'
 import { liveEdgesOnly } from '@/features/graph/aggregate-edges'
 import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
+import { openCardFromOverview } from '@/features/card/card-reentry'
+import { readableBodySnippet } from './search-result'
 
 /**
  * /search — v0.22.5-search restore / P11 v0.36.0 enhance.
@@ -21,6 +23,7 @@ import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
  */
 export default function SearchPage() {
   const { t } = useI18n()
+  const router = useRouter()
   const { snap, service, ready } = useDb()
   // 跨画布 backlinks(只读):聚合全局边后过滤端点已软删的(G7 防泄露),传 CardDetailModal
   // 显示「这张卡和谁有关系」。canEditRelations 不传(默认 false=只读,无 × 删除/+ 添加钮)。
@@ -94,7 +97,11 @@ export default function SearchPage() {
                     variant="tile"
                     selected={false}
                     selectMode={false}
-                    onClick={() => setDetail({ card: r.card })}
+                    onClick={() => openCardFromOverview(
+                      r.card,
+                      (href) => router.push(href),
+                      (card) => setDetail({ card }),
+                    )}
                     onToggleSelect={() => {}}
                   />
                   {query.trim() !== '' && r.score > 0 && (
@@ -139,7 +146,7 @@ export default function SearchPage() {
 
 /** Per-result snippet line: shows body excerpt centred on first match. */
 function SnippetLine({ result, query }: { result: SearchResult; query: string }) {
-  const snippet = bodySnippet(result.card, query)
+  const snippet = readableBodySnippet(result.card, query)
   if (!snippet) return null
   return (
     <p className="search-snippet">{snippet}</p>

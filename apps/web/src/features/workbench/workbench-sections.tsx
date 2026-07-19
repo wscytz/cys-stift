@@ -191,7 +191,7 @@ function WorkbenchSectionRow({
 
 const styles = `
 .wb__sections { display: flex; flex-direction: column; }
-.wb__sec { border-top: 1.5px solid var(--color-black); }
+.wb__sec { border-top: 1px solid var(--color-black); }
 .wb__sec:first-child { border-top: 0; }
 /* 已固定置顶区(跨模式常驻最顶,黄底) */
 .wb__sec--pinned { background: var(--color-yellow-soft); }
@@ -248,14 +248,14 @@ const styles = `
   box-shadow: var(--shadow-md); border-radius: 1px;
 }
 .wb__deck .wb__minicard:nth-child(1) { top: 16px; left: 10px; z-index: 1; }
-.wb__deck .wb__minicard:nth-child(2) { top: 8px; left: 5px; z-index: 2; }
+.wb__deck .wb__minicard:nth-child(2) { top: var(--space-1); left: var(--space-0.5); z-index: 2; }
 .wb__deck .wb__minicard:nth-child(3) { top: 0; left: 0; z-index: 3; }
 /* 单卡折叠态:只有一张卡时不应用堆叠偏移,居正。 */
 .wb__deck > .wb__minicard:only-child { top: 0; left: 0; }
 .wb__mcbar { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
 .wb__mctitle {
   font-family: var(--font-display); font-weight: 600; font-size: var(--font-size-xs);
-  padding: 7px 8px 0 12px;
+  padding: var(--space-1) var(--space-1) 0 var(--space-2);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .wb__mcpreview {

@@ -27,6 +27,7 @@ import { RelationPanel } from '@/features/canvas/relation-panel'
 import { FreedrawPanel } from '@/features/canvas/freedraw-panel'
 import { Minimap } from '@/features/canvas/minimap-component'
 import { OutlinePanel } from '@/features/canvas/outline-panel'
+import { CanvasSearchPanel } from '@/features/canvas/canvas-search-panel'
 import { CanvasCompanionPanel } from '@/features/canvas/companion-panel'
 import { autoRelate } from '@/features/canvas/auto-relate'
 import { CanvasContextMenu } from '@/features/canvas/canvas-context-menu'
@@ -35,7 +36,7 @@ import { syncAllWikiLinks } from '@/features/canvas/wiki-links'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { serializeCanvas } from '@/features/ai/canvas-dsl'
 import { parseDsl, parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
-import { retryUntilValid, buildIntentCorrection } from '@/features/ai/retry-until-valid'
+import { retryFailureMessageKey, retryUntilValid, buildIntentCorrection } from '@/features/ai/retry-until-valid'
 import { INTENT_IR_SCHEMA } from '@/features/ai/intent-schema'
 import { decodeIntentJson } from '@/features/ai/intent-validation'
 import { compileIntent } from '@/features/ai/intent-compiler'
@@ -51,7 +52,6 @@ import {
   CLUSTER_SYSTEM_PROMPT,
 } from '@/features/ai/cluster'
 import { AiConfirmDialog, type AiConfirmDialogProps } from '@/features/ai/ai-confirm-dialog'
-import { useAIEnabled } from '@/features/ai/ai-settings-provider'
 import { AiSetupCard } from '@/features/ai/ai-setup-card'
 import { useAIAction } from '@/features/ai/use-ai-action'
 import { addSample, genSampleId } from '@/features/ai/sample-store'
@@ -138,11 +138,13 @@ export default function CanvasPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [exportOpen, setExportOpen] = useState(false)
   const [outlineOpen, setOutlineOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [companionOpen, setCompanionOpen] = useState(false)
   // 焦点模式(Batch A / 方向 5):隐藏所有 chrome(Toolbar/SideRail/Minimap/Outline),
   // 只留画布 + 一个最小「退出」提示。整理/写作时减少干扰。⌘. 切入,Escape 退出。
   const [focusMode, setFocusMode] = useState(false)
   const [dslOpen, setDslOpen] = useState(false)
+  const [dslSeedText, setDslSeedText] = useState<string | null>(null)
   const [shortcutOpen, setShortcutOpen] = useState(false)
   const [diffOpen, setDiffOpen] = useState(false)
   const [overviewOpen, setOverviewOpen] = useState(false)
@@ -196,8 +198,6 @@ export default function CanvasPage() {
     },
     [],
   )
-
-  const aiEnabled = useAIEnabled()
 
   const handleAutoRelate = useCallback(() => {
     const adapter = handle.current.adapter
@@ -385,7 +385,7 @@ ${formatted}`
           // (types.ts:provider 走 [system, ...messages]),这里仅为满足 AIRequest.user 必填。
           // 重试时 messages 末尾追加 correction,provider 用 messages 全量,user 死字段不参与。
           streamText(ready, { system: systemPrompt, user: userPrompt, messages, maxTokens: 4096, structuredOutput: true, timeoutMs: 60_000 }, () => {}, signal)
-            .then((x) => x?.content ?? ''),
+            .then((x) => x),
         parse: (text) => {
           const decoded = decodeIntentJson(text)
           if (!decoded.ok) return { ok: false, errors: decoded.diagnostics.map((error) => ({ line: 0, text: error.path ?? '$', message: error.message })) }
@@ -396,6 +396,14 @@ ${formatted}`
         },
         buildCorrection: buildIntentCorrection,
       })
+      const failureKey = retryFailureMessageKey(r.failureReason)
+      if (failureKey) {
+        // Provider already told us this is a terminal failure (length,
+        // refusal, safety filter, or exhausted network retries). Do not open
+        // the normal format-error confirmation dialog with misleading DSL.
+        pushToast({ kind: 'info', message: t(failureKey) })
+        return
+      }
       if (!r.text) {
         pushToast({ kind: 'info', message: t('canvas.aiLayoutEmpty') })
         return
@@ -450,7 +458,7 @@ ${formatted}`
         initialMessages: [{ role: 'user', content: userPrompt }],
         produce: (messages) =>
           streamText(ready, { system: CLUSTER_SYSTEM_PROMPT, user: userPrompt, messages, maxTokens: 2048, temperature: 0.2, structuredOutput: true, timeoutMs: 60_000 }, () => {}, signal)
-            .then((x) => x?.content ?? ''),
+            .then((x) => x),
         parse: (text) => {
           const { clusters, errors } = parseClusters(text, knownIds)
           return {
@@ -461,6 +469,11 @@ ${formatted}`
         buildCorrection: (errs) =>
           `Your previous cluster output was invalid: ${errs.map((e) => e.message).join('; ')}. Regenerate the JSON array using ONLY these known card ids: ${[...knownIds].join(', ')}.`,
       })
+      const failureKey = retryFailureMessageKey(r.failureReason)
+      if (failureKey) {
+        pushToast({ kind: 'info', message: t(failureKey) })
+        return
+      }
       const { clusters } = parseClusters(r.text, knownIds)
       if (clusters.length === 0) {
         pushToast({ kind: 'info', message: t('canvas.aiClusterNone') })
@@ -485,6 +498,11 @@ ${formatted}`
       const res = await generateOutline({ service, canvasId: activeCanvasId, signal })
       if (!res.ok) {
         pushToast({ kind: 'info', message: t('ai.workflow.outlineTooFew') })
+        return
+      }
+      const failureKey = retryFailureMessageKey(res.failureReason)
+      if (failureKey) {
+        pushToast({ kind: 'info', message: t(failureKey) })
         return
       }
       if (res.empty || !res.markdown) {
@@ -527,6 +545,16 @@ ${formatted}`
       // 否则模态里按 +/g/v 等会在背后偷改画布视图/工具。⌘. 焦点模式也在让位之列 ——
       // 否则 modal 里按 ⌘. 会切焦点,关闭 modal 后画布意外进入焦点模式。
       if (document.querySelector('[role="dialog"][aria-modal="true"]')) return
+      // Canvas-local find: Cmd/Ctrl+F and `/` open the same bounded search
+      // panel, while editable controls and modal dialogs retain native text
+      // search/input behavior.
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setSearchOpen(true)
+        setOutlineOpen(false)
+        setCompanionOpen(false)
+        return
+      }
       // ⌘. / Ctrl+. 切换焦点模式(隐藏所有 chrome,只留画布)。在 modal 守卫之后,
       // input/textarea 让位之前(编辑态按 ⌘. 不切)。
       if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key === '.') {
@@ -542,6 +570,13 @@ ${formatted}`
       if (tgt) {
         const tag = tgt.tagName
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tgt.isContentEditable) return
+      }
+      if (e.key === '/') {
+        e.preventDefault()
+        setSearchOpen(true)
+        setOutlineOpen(false)
+        setCompanionOpen(false)
+        return
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return
       const key = e.key.toLowerCase()
@@ -589,7 +624,7 @@ ${formatted}`
     }
   }, [service, activeCanvasId])
 
-  // BUG-B + BUG-A:把"疑似 DSL 文本 → 应用"抽成组件级回调,paste 监听和右键菜单(T6)共用。
+  // BUG-B + BUG-A:把"疑似 DSL 文本 → 审核"抽成组件级回调,paste 监听和右键菜单(T6)共用。
   // 放宽检测:任何含 `[` 开头的行都算疑似 DSL(不再只认 5 种 kind)。
   // 整段疑似但 parse 出 0 ops → pasteDslNoneParsed(不静默);纯文本无 `[` 行 → 不打扰。
   const applyDslFromText = useCallback((text: string) => {
@@ -600,18 +635,13 @@ ${formatted}`
       pushToast({ kind: 'info', message: t('canvas.pasteDslNoneParsed', { errors: String(errors.length) }) })
       return
     }
-    const adapter = handle.current.adapter
-    if (!adapter) return
-    const { applied, skipped, failed } = applyLayout(adapter, ops, undefined, onCardCreate)
-    if (applied === 0) {
-      pushToast({ kind: 'info', message: t('canvas.pasteDslNone') })
-    } else if (skipped > 0 || failed > 0 || errors.length > 0) {
-      pushToast({ kind: 'info', message: t('canvas.pasteDslPartial', { applied: String(applied), skipped: String(skipped + failed + errors.length) }) })
-    } else {
-      pushToast({ kind: 'success', message: t('canvas.pasteDslApplied', { n: String(applied) }) })
-    }
+    if (!handle.current.adapter) return
+    // Pasted DSL follows the same frozen-baseline diff and stale-revision
+    // guard as manually edited DSL. Nothing mutates until the user confirms.
+    setDslSeedText(text)
+    setDslOpen(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onCardCreate, t])
+  }, [t])
 
   // 转义双向桥入口:画布页粘贴纯文本 DSL → 直接应用(不必打开 DSL 模态)。
   // 与全局 FileDropHandler 并存:它只处理文件项,纯文本 early-return;本监听
@@ -626,6 +656,10 @@ ${formatted}`
     }
     const onPaste = (e: ClipboardEvent) => {
       if (isEditable(e.target)) return
+      // A detail/export/overview modal owns the current interaction. Do not
+      // stack a paste confirmation behind it; the user can close the active
+      // modal and paste again without losing the clipboard contents.
+      if (document.querySelector('[aria-modal="true"]')) return
       // FileDropHandler (layout-level, registered first) may have already
       // handled this paste (e.g. pasted a file) and called preventDefault.
       // Skip to avoid redundant processing — explicit priority guard.
@@ -785,6 +819,31 @@ ${formatted}`
 
 
   const activeCanvas = canvases.find((c) => c.id === activeCanvasId)
+  const searchableCards = useMemo(
+    () => service.listOnCanvas(activeCanvasId).filter((c) => !c.deletedAt && !c.archived),
+    [service, activeCanvasId, snap],
+  )
+
+  // 搜索结果回到画布时使用与大纲/伴侣面板相同的 page→screen 居中规则。
+  // 选区是引擎的统一高亮状态，避免另造一套短暂 overlay 状态在刷新后失真。
+  const focusSearchCard = useCallback((card: Card) => {
+    const current = handle.current.adapter
+    if (!current) return
+    const element = current.getElement(String(card.id))
+    if (!element) return
+    const view = current.getView()
+    const zoom = view.zoom || 1
+    const canvas = canvasElRef.current
+    const cx = canvas?.clientWidth ? canvas.clientWidth / 2 : 400
+    const cy = canvas?.clientHeight ? canvas.clientHeight / 2 : 300
+    const center = elementCenter(element)
+    current.setView({
+      ...view,
+      panX: cx - center.x * zoom,
+      panY: cy - center.y * zoom,
+    })
+    current.setSelectedIds([String(card.id)])
+  }, [])
   const cardCountOnTarget = confirmDeleteId
     ? service.listOnCanvas(confirmDeleteId).filter((c) => !c.deletedAt).length
     : 0
@@ -816,7 +875,10 @@ ${formatted}`
     const unsub = adapter.onSelectionChange(recount)
     return () => unsub()
   }, [adapter])
-  const showAutoRelate = aiEnabled && selectedCardCount >= 2
+  // Relationship inference has a local, zero-network path. Keep it
+  // discoverable even when the optional AI provider is disabled; the other
+  // workflow actions use runAI's setup guard when they are invoked.
+  const showAutoRelate = selectedCardCount >= 2
 
   // adapter ready 时同步工具(切 canvas 重建 adapter 后恢复当前 tool)。
   useEffect(() => {
@@ -1118,12 +1180,12 @@ ${formatted}`
         {!chromeHidden && (
         <>
         <CanvasSideRail
-          aiEnabled={aiEnabled}
           aiBusy={aiBusy}
           showAutoRelate={showAutoRelate}
           adapterReady={adapterReady}
           outlineOpen={outlineOpen}
           companionOpen={companionOpen}
+          searchOpen={searchOpen}
           canUndo={canUndo}
           canRedo={canRedo}
           canRename={!!activeCanvas}
@@ -1142,8 +1204,9 @@ ${formatted}`
           onFrame={handleFrame}
           onOutline={() => { setOutlineOpen((o) => !o); setCompanionOpen(false) }}
           onCompanion={() => { setCompanionOpen((o) => !o); setOutlineOpen(false) }}
+          onSearch={() => { setSearchOpen((o) => !o); setOutlineOpen(false); setCompanionOpen(false) }}
           onOverview={() => setOverviewOpen(true)}
-          onDsl={() => setDslOpen(true)}
+          onDsl={() => { setDslSeedText(null); setDslOpen(true) }}
           onExport={() => setExportOpen(true)}
           onMarkdown={handleMarkdown}
           onDiff={() => setDiffOpen(true)}
@@ -1167,6 +1230,12 @@ ${formatted}`
             canvasId={activeCanvasId}
           />
         )}
+        <CanvasSearchPanel
+          open={searchOpen && !chromeHidden}
+          cards={searchableCards}
+          onClose={() => setSearchOpen(false)}
+          onLocate={focusSearchCard}
+        />
         <Minimap host={adapter} canvasEl={canvasElRef.current} />
         </>
         )}
@@ -1238,11 +1307,12 @@ ${formatted}`
 
       <DslDialog
         open={dslOpen}
-        onClose={() => setDslOpen(false)}
+        onClose={() => { setDslOpen(false); setDslSeedText(null) }}
         host={adapter}
         service={service}
         canvasName={activeCanvas?.name ?? ''}
         onCardCreate={onCardCreate}
+        initialText={dslSeedText ?? undefined}
       />
 
       <ShortcutHelpDialog open={shortcutOpen} onClose={() => setShortcutOpen(false)} />
@@ -1399,12 +1469,12 @@ function ZoomGroup({ adapterReady, onZoom }: { adapterReady: boolean; onZoom: (o
  *  顶栏只留高频(导航/画布管理/工具/吸附/缩放)。Figma/Excalidraw 风格,
  *  避免顶栏 18 元素平铺溢出。 */
 function CanvasSideRail({
-  aiEnabled,
   aiBusy,
   showAutoRelate,
   adapterReady,
   outlineOpen,
   companionOpen,
+  searchOpen,
   canUndo,
   canRedo,
   canRename,
@@ -1423,6 +1493,7 @@ function CanvasSideRail({
   onFrame,
   onOutline,
   onCompanion,
+  onSearch,
   onDsl,
   onOverview,
   onExport,
@@ -1430,12 +1501,12 @@ function CanvasSideRail({
   onDiff,
   onShortcuts,
 }: {
-  aiEnabled: boolean
   aiBusy: null | 'layout' | 'cluster' | 'outline'
   showAutoRelate: boolean
   adapterReady: boolean
   outlineOpen: boolean
   companionOpen: boolean
+  searchOpen: boolean
   canUndo: boolean
   canRedo: boolean
   canRename: boolean
@@ -1454,6 +1525,7 @@ function CanvasSideRail({
   onFrame: () => void
   onOutline: () => void
   onCompanion: () => void
+  onSearch: () => void
   onOverview: () => void
   onDsl: () => void
   onExport: () => void
@@ -1497,6 +1569,7 @@ function CanvasSideRail({
       <span className="cv-rail__sep" aria-hidden="true" />
       <RailButton label={t('canvas.outline')} short={t('canvas.rail.outline')} disabled={!adapterReady} onClick={onOutline} pressed={outlineOpen} icon="outline" />
       <RailButton label={t('canvas.overview')} short={t('canvas.rail.overview')} disabled={!adapterReady} onClick={onOverview} icon="overview" />
+      <RailButton label={t('canvas.search.title')} short={t('canvas.rail.search')} disabled={!adapterReady} onClick={onSearch} pressed={searchOpen} icon="search" />
       {/* 转义(DSL)是核心卖点,提一级独立按钮(双向:编辑画布文本/导出 DSL)。
           导出菜单里保留同名项(作为「导出 DSL」入口),两条路都通 DslDialog。 */}
       <RailButton label={t('canvas.dslTitle')} short={t('canvas.rail.dsl')} disabled={!adapterReady} onClick={onDsl} icon="dsl" />
@@ -1556,10 +1629,10 @@ function CanvasSideRail({
         triggerRef={wfTriggerRef}
         onClose={() => setWfMenuOpen(false)}
         items={[
-          { id: 'layout', label: t('canvas.aiLayout'), disabled: !aiEnabled || aiBusy !== null, onSelect: onAILayout },
-          { id: 'cluster', label: t('ai.workflow.cluster'), disabled: !aiEnabled || aiBusy !== null, onSelect: onAICluster },
-          { id: 'relate', label: t('ai.workflow.relate'), disabled: !aiEnabled || aiBusy !== null || !showAutoRelate, onSelect: onAutoRelate },
-          { id: 'outline', label: t('ai.workflow.outline'), disabled: !aiEnabled || aiBusy !== null, onSelect: onAIOutline },
+          { id: 'layout', label: t('canvas.aiLayout'), disabled: aiBusy !== null, onSelect: onAILayout },
+          { id: 'cluster', label: t('ai.workflow.cluster'), disabled: aiBusy !== null, onSelect: onAICluster },
+          { id: 'relate', label: t('ai.workflow.relate'), disabled: aiBusy !== null || !showAutoRelate, onSelect: onAutoRelate },
+          { id: 'outline', label: t('ai.workflow.outline'), disabled: aiBusy !== null, onSelect: onAIOutline },
           { id: 'companion', label: t('canvas.companion'), onSelect: onCompanion },
         ]}
       />

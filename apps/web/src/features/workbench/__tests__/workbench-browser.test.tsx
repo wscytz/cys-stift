@@ -158,6 +158,18 @@ describe('WorkbenchBrowser', () => {
     expect(host.querySelector('.wb__sections')).toBeNull()
   })
 
+  it('搜索显示命中数，并可一键清空恢复全部卡片', () => {
+    const cards = [mk('1', { title: '包豪斯' }), mk('2', { title: '其他' })]
+    const { host } = render(<WorkbenchBrowser cards={cards} />)
+    const input = host.querySelector('.wb__search-input') as HTMLInputElement
+    act(() => setInputValue(input, '包豪斯'))
+    expect(host.querySelector('.wb__result-count')).toBeTruthy()
+    const clear = host.querySelector('button[aria-label="workbench.clearSearch"]') as HTMLButtonElement
+    act(() => clear.click())
+    expect(input.value).toBe('')
+    expect(host.querySelector('.wb__result-count')).toBeNull()
+  })
+
   it('类型模式:type 不同的卡进不同分区', () => {
     const cards = [
       mk('1', { type: 'code' }),

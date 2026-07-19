@@ -109,6 +109,8 @@ export default function HomePage() {
           </Link>
         </nav>
         <nav className="home__secondary" aria-label="Secondary">
+          <Link href="/showcase" className="home__secondary-link">{t('nav.showcase')}</Link>
+          <span className="home__secondary-sep" aria-hidden="true">/</span>
           <Link href="/ask" className="home__secondary-link home__secondary-link--accent">{t('nav.ask')}</Link>
           <span className="home__secondary-sep" aria-hidden="true">/</span>
           <Link href="/search" className="home__secondary-link">{t('nav.search')}</Link>

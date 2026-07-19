@@ -19,6 +19,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
+import { workbenchStore } from '@/lib/workbench-store'
 
 // Mark the env as an act environment so React doesn't warn about act() usage.
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -31,6 +32,16 @@ const { mockSettings } = vi.hoisted(() => {
   }
   return { mockSettings }
 })
+
+const { mockPush, mockSubmit, mockPushToast } = vi.hoisted(() => ({
+  mockPush: vi.fn(),
+  mockSubmit: vi.fn(),
+  mockPushToast: vi.fn(),
+}))
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mockPush }),
+}))
 
 // ── mock 依赖(只 mock capture-host.tsx 顶层 import 链必需的)──
 vi.mock('@/lib/i18n', () => ({
@@ -52,8 +63,21 @@ vi.mock('@/lib/canvas-store', () => ({
 
 // MiniInput mock:把 open prop 落到 DOM(测断言它),阻断 draft-store/Input 链。
 vi.mock('../mini-input', () => ({
-  MiniInput: ({ open }: { open: boolean }) => (
-    <div data-testid="mini-input" data-open={open ? 'true' : 'false'} />
+  MiniInput: ({
+    open,
+    onSubmit,
+  }: {
+    open: boolean
+    onSubmit: (input: { title: string; body?: string }) => Promise<boolean>
+  }) => (
+    <>
+      <div data-testid="mini-input" data-open={open ? 'true' : 'false'} />
+      <button
+        type="button"
+        data-testid="mini-input-submit"
+        onClick={() => void onSubmit({ title: 'captured title' })}
+      />
+    </>
   ),
 }))
 
@@ -64,7 +88,7 @@ vi.mock('../capture-sink', () => ({
     setFallbackService: vi.fn(),
     register: vi.fn(),
     unregister: vi.fn(),
-    submit: vi.fn(),
+    submit: mockSubmit,
   },
   WebCaptureSink: vi.fn(() => ({})),
 }))
@@ -73,10 +97,12 @@ vi.mock('../menu-capture-sink', () => ({
   MenuCaptureSink: vi.fn(() => ({})),
 }))
 
-vi.mock('@/lib/toast-store', () => ({ pushToast: vi.fn() }))
+vi.mock('@/lib/toast-store', () => ({ pushToast: mockPushToast }))
 vi.mock('@/lib/device-id', () => ({ getDeviceId: () => 'test-device' }))
 vi.mock('../capture-redirect', () => ({
-  buildCaptureRedirectActions: () => [],
+  buildCaptureRedirectActions: (args: { openCard: (id: string) => void }) => [
+    { label: 'open', onClick: () => args.openCard('captured-card') },
+  ],
 }))
 
 import { CaptureHost } from '../capture-host'
@@ -134,6 +160,12 @@ beforeEach(() => {
   // 每测重置默认快捷键(测 5 可能改成 KeyC)
   mockSettings.captureShortcut = { modKey: 'meta', shift: true, code: 'KeyE' }
   document.body.innerHTML = ''
+  mockPush.mockClear()
+  mockPushToast.mockClear()
+  mockSubmit.mockReset()
+  mockSubmit.mockResolvedValue({ cardId: 'captured-card' })
+  workbenchStore.close()
+  workbenchStore.setOrigin('/canvas')
 })
 
 describe('CaptureHost keydown — ⌘⇧E 触发 MiniInput open', () => {
@@ -272,6 +304,32 @@ describe('CaptureHost keydown — shift 缺失/修饰键缺失守卫', () => {
     })
     expect(ev.defaultPrevented).toBe(false)
     expect(isOpen(host)).toBe(false)
+    unmount()
+  })
+})
+
+describe('CaptureHost capture success — global open action', () => {
+  it('toast 的打开动作直接选择工作台卡片并导航,不依赖 Inbox listener', async () => {
+    const { host, unmount } = mount()
+    act(() => {
+      window.dispatchEvent(new CustomEvent('cys-stift:open-capture'))
+    })
+    expect(isOpen(host)).toBe(true)
+
+    await act(async () => {
+      ;(host.querySelector('[data-testid="mini-input-submit"]') as HTMLButtonElement).click()
+      await Promise.resolve()
+    })
+
+    const success = mockPushToast.mock.calls
+      .map((call) => call[0] as { kind?: string; actions?: Array<{ onClick: () => void }> })
+      .find((toast) => toast.kind === 'success')
+    expect(success?.actions).toHaveLength(1)
+    act(() => success?.actions?.[0]?.onClick())
+
+    expect(workbenchStore.getCardId()).toBe('captured-card')
+    expect(workbenchStore.getOrigin()).toBe('/')
+    expect(mockPush).toHaveBeenCalledWith('/workbench')
     unmount()
   })
 })

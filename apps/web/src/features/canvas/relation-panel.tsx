@@ -274,7 +274,7 @@ const styles = `
   width: 16px;
   height: 0;
   /* 线型预览:3px 顶边,样式/颜色由 inline style 按关系类型设置(solid/dashed/dotted)。 */
-  border-top: 3px solid var(--color-black);
+  border-top: var(--space-quarter) solid var(--color-black);
   flex: 0 0 auto;
 }
 .cv-relation__label {

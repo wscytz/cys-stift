@@ -49,6 +49,62 @@ export interface AIRequest {
 export interface AIResponse {
   content: string
   usage?: { promptTokens: number; completionTokens: number }
+  /**
+   * Normalized provider termination category.  Providers expose different
+   * names for the same condition (`length` vs `max_tokens`, for example), so
+   * callers should branch on this field rather than parsing provider payloads.
+   */
+  finishReason?: AIFinishReason
+  /** Raw provider stop/finish reason, retained for diagnostics. */
+  stopReason?: string
+  /** Provider refusal text, when one was returned. */
+  refusal?: string
+}
+
+/** Cross-provider termination categories used by retry and UI layers. */
+export type AIFinishReason =
+  | 'stop'
+  | 'length'
+  | 'content_filter'
+  | 'tool_calls'
+  | 'refusal'
+  | 'error'
+  | 'unknown'
+
+/**
+ * Map provider-specific termination names to the small shared vocabulary.
+ * Unknown non-empty values remain observable as `unknown` through
+ * `finishReason`, while `stopReason` keeps the original value.
+ */
+export function normalizeAIFinishReason(reason: unknown): AIFinishReason | undefined {
+  if (typeof reason !== 'string' || reason.trim() === '') return undefined
+  switch (reason.toLowerCase()) {
+    case 'stop':
+    case 'end_turn':
+    case 'stop_sequence':
+    case 'done':
+      return 'stop'
+    case 'length':
+    case 'max_tokens':
+    case 'max_output_tokens':
+    case 'token_limit':
+      return 'length'
+    case 'content_filter':
+    case 'content-filter':
+    case 'safety':
+      return 'content_filter'
+    case 'tool_calls':
+    case 'tool_use':
+    case 'function_call':
+      return 'tool_calls'
+    case 'refusal':
+    case 'safety_refusal':
+      return 'refusal'
+    case 'error':
+      return 'error'
+    default:
+      return 'unknown'
+  }
 }
 
 export interface AIProvider {

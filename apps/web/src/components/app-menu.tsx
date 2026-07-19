@@ -23,14 +23,16 @@ import { useMatchMedia } from '@/lib/use-match-media'
 /**
  * AppMenu — global top menu bar.
  *
- * 响应式(v0.48):≥1024 横向导航(现状);<1024 平板态收成 ☰ 汉堡抽屉
- * (entries 变竖向覆盖列表 + backdrop 点关闭),version/sep 藏。useMatchMedia
+ * 响应式(v0.48):宽屏横向导航;窄于 1200px 收成 ☰ 汉堡抽屉
+ * (entries 变竖向覆盖列表 + backdrop 点关闭),version/sep 藏。1200px 是内容
+ * 宽度阈值:完整导航在 1024px 会把中文链接压成逐字竖排,比标准 bp-md 更窄的
+ * 设备应优先保证可读和可点。useMatchMedia
  * 读断点,open state 控抽屉;路由切换 / 回桌面自动关。
  */
 export function AppMenu() {
   const pathname = usePathname() ?? '/'
   const { t } = useI18n()
-  const isNarrow = useMatchMedia('(max-width: 1023px)')
+  const isNarrow = useMatchMedia('(max-width: 1199px)')
   const [open, setOpen] = useState(false)
 
   // 审计 H1 + R2.3/2.4 + quota-silence fix:所有非 React store(db-client /
@@ -239,7 +241,7 @@ const styles = `
 .app-menu__capture:active { transform: translate(2px, 2px); box-shadow: none; }
 .app-menu__capture:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 
-/* 汉堡按钮(<1024 显;桌面不 render) */
+/* 汉堡按钮(<1200 显;宽屏不 render) */
 .app-menu__burger {
   font-family: var(--font-mono);
   font-size: var(--font-size-base);
@@ -255,7 +257,7 @@ const styles = `
 .app-menu__burger:hover { color: var(--color-red); }
 .app-menu__burger:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 
-/* 抽屉 backdrop(open 时 render;<1024) */
+/* 抽屉 backdrop(open 时 render;<1200) */
 .app-menu__backdrop {
   position: fixed;
   inset: 0;
@@ -266,8 +268,8 @@ const styles = `
   z-index: 39;
 }
 
-/* <1024:entries 变竖向覆盖抽屉(--open 控显隐) */
-@media (max-width: 1023px) {
+/* <1200:entries 变竖向覆盖抽屉(--open 控显隐) */
+@media (max-width: 1199px) {
   .app-menu__entries {
     position: absolute;
     top: 100%;
@@ -297,7 +299,7 @@ const styles = `
   /* 竖向抽屉里 active 用左条而非下划线 */
   .app-menu__link--active {
     border-bottom: none;
-    border-left: 3px solid var(--color-black);
+    border-left: var(--space-quarter) solid var(--color-black);
     padding-left: var(--space-2);
   }
 }

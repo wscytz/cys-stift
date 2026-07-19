@@ -85,3 +85,10 @@
   overflow-y: auto;
   min-height: 0;
 }
+
+@media (max-width: 767px) {
+  .closeBtn {
+    width: 44px;
+    height: 44px;
+  }
+}

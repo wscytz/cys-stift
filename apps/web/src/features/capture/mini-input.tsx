@@ -82,6 +82,10 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
   // are applied exactly once per open.
   useEffect(() => {
     if (open && ready) {
+      // CaptureHost keeps MiniInput mounted and only toggles `open`. A
+      // successful submit intentionally latches `submitting` for the current
+      // open session, but the next capture session must be able to submit.
+      setSubmitting(false)
       setTitle(restored?.title ?? '')
       setBody(restored?.body ?? '')
       setBodyOpen(Boolean(restored?.body && restored.body.trim().length > 0))
@@ -217,6 +221,7 @@ if (
           </Button>
           <Button
             variant="danger"
+            data-testid="mini-save"
             disabled={submitting || title.trim().length === 0}
             onClick={submit}
           >

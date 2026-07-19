@@ -1,6 +1,6 @@
 # 设计 token · 包豪斯约束
 
-> 摘自 [`docs/specs/2026-06-19-cys-stift-design.md` §5](../specs/2026-06-19-cys-stift-design.md#5-ui-与设计系统包豪斯)。本文件是"规则 + 用法"，完整推理见 spec。
+> 运行时权威源是 `packages/ui/src/tokens.css`，TypeScript 镜像是 `packages/ui/src/tokens.ts`。本文件是公开的“规则 + 用法”；完整设计推理位于私有过程文档仓库，访问方式见 [`docs/INTERNAL-DOCS.md`](../INTERNAL-DOCS.md)，不在公开文档中保留失效链接。
 
 ---
 

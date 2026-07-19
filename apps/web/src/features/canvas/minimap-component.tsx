@@ -120,19 +120,38 @@ export function Minimap({
       host.onUserChange(scheduleDraw),
       host.onSelectionChange(scheduleDraw),
     ]
-    // 初始一帧 + resize 时重绘。
-    scheduleDraw()
+    // 初始一帧 + layout 完成后的几帧重绘。首次挂载时主 canvas 常还没有
+    // clientWidth，draw 会安全返回；没有重试的话小地图会一直白到下一次
+    // 用户缩放/平移才出现内容。
+    // Use the DOM timer id explicitly. `ReturnType<typeof window.setTimeout>`
+    // resolves to NodeJS.Timeout when the app's mixed Node/DOM typings are
+    // loaded, while browser `window.clearTimeout` expects a number.
+    const retryTimers: number[] = []
+    const retry = (remaining: number) => {
+      scheduleDraw()
+      if (remaining > 0) {
+        retryTimers.push(window.setTimeout(() => retry(remaining - 1), 40))
+      }
+    }
+    retry(4)
     const onResize = () => scheduleDraw()
     window.addEventListener('resize', onResize)
+    let observer: ResizeObserver | null = null
+    if (canvasEl && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(onResize)
+      observer.observe(canvasEl)
+    }
     return () => {
       window.removeEventListener('resize', onResize)
+      observer?.disconnect()
+      for (const timer of retryTimers) window.clearTimeout(timer)
       for (const u of unsubs) u()
       if (rafRef.current != null) {
         cancelAnimationFrame(rafRef.current)
         rafRef.current = null
       }
     }
-  }, [host, scheduleDraw])
+  }, [canvasEl, host, scheduleDraw])
 
   // 展开后画布是新挂载的空 canvas,host 事件不会自动触发重绘——这里补一帧。
   useEffect(() => {
@@ -360,7 +379,9 @@ export function drawElementMark(
     const w = el.w * proj.scale
     const h = el.h * proj.scale
     ctx.save()
-    ctx.fillStyle = colorOf(el.color)
+    ctx.fillStyle = el.color
+      ? colorOf(el.color)
+      : readToken('--color-gray-soft', '#e5e5e5')
     ctx.fillRect(x, y, Math.max(w, 2), Math.max(h, 2))
     ctx.strokeStyle = readToken('--color-black', '#0a0a0a')
     ctx.lineWidth = 0.5

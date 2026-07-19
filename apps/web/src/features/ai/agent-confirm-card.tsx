@@ -26,13 +26,13 @@ import { parseDslStrictWithDiagnostics } from '@/features/ai/dsl-parser'
 import type { SanitizeDiagnostic } from './dsl-sanitize'
 import { applyLayout, type CardCreateHandler } from '@/features/canvas/apply-layout'
 import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
-import { buildCanvasHostForCanvas, applyOpsAndPersist } from '@/features/canvas/canvas-host-builder'
+import { buildCanvasHostForCanvas, applyOpsAndPersist, type PersistResult } from '@/features/canvas/canvas-host-builder'
 import { useI18n } from '@/lib/i18n'
 import { pushToast } from '@/lib/toast-store'
 import { addSample, genSampleId } from './sample-store'
 import { Thumb, DiffGroup, summarizeEl, confirmStyles } from './canvas-thumb'
 import { settingsStore } from '@/lib/settings-store'
-import { archiveStore } from '@/lib/archive-store'
+import { archiveStore, type ArchivePayload, type ArchiveStateSnapshot } from '@/lib/archive-store'
 import { buildArchivePayload } from '@/lib/build-archive-payload'
 import { VERSION } from '@/lib/version'
 
@@ -50,6 +50,55 @@ interface Props {
 }
 
 type Phase = 'confirming' | 'applying' | 'applied' | 'error'
+
+type ApplyOutcome = Pick<PersistResult, 'applied' | 'failed' | 'cardsUpdated' | 'cardsCreated' | 'cardsFailed'> & {
+  /** Legacy/live mocks may omit this; only an explicit false is failure. */
+  ok?: boolean
+  committed?: boolean
+  cardUpdatesFailed?: number
+  sanitizeDiagnostics?: SanitizeDiagnostic[]
+  undo?: () => Promise<boolean>
+  rollback?: () => Promise<boolean>
+}
+
+/** Full element revision for the legacy DSL confirmation path.  The intent
+ * path has its own revision helper; this one deliberately includes `meta`
+ * (freedraw points and future element fields) so a manual edit cannot be
+ * hidden by the narrower visual diff contract. */
+function canvasRevision(elements: readonly CanvasElement[]): string {
+  return JSON.stringify(
+    elements
+      .slice()
+      .sort((a, b) => a.id.localeCompare(b.id)),
+  )
+}
+
+/**
+ * Hosts are allowed to return their live element objects. Keep the preview
+ * snapshot detached so a later in-place drag/upsert cannot silently mutate the
+ * baseline used by the stale-proposal guard or the before/after diff.
+ */
+function cloneCanvasElements(elements: readonly CanvasElement[]): CanvasElement[] {
+  return elements.map((element) => ({
+    ...element,
+    ...(element.curve ? { curve: { ...element.curve } } : {}),
+    ...(element.elbow ? { elbow: element.elbow.map((point) => ({ ...point })) } : {}),
+    ...(element.meta
+      ? {
+          meta: {
+            ...element.meta,
+            ...(Array.isArray(element.meta.points)
+              ? {
+                  points: (element.meta.points as unknown[]).map((point) =>
+                    Array.isArray(point) ? [...point] : point,
+                  ),
+                }
+              : {}),
+          },
+        }
+      : {}),
+  }))
+}
 
 /**
  * DSL create op 建新卡(空卡 + 几何)—— live 与 temp 路径共用。
@@ -112,9 +161,11 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
     void (async () => {
       // live 模式:before 直接读 live host(同步,反映当前画布含未存改动)。
       // temp 模式(/ask):重建 temp host(async load)。
-      const before = liveHost
-        ? liveHost.getElements()
-        : (await buildCanvasHostForCanvas(targetCanvasId, service)).before
+      const before = cloneCanvasElements(
+        liveHost
+          ? liveHost.getElements()
+          : (await buildCanvasHostForCanvas(targetCanvasId, service)).before,
+      )
       if (cancelled) return
       // afterHost 仍是 InMemoryCanvasHost 克隆(预演绝不改 live host)。
       const afterHost = new InMemoryCanvasHost()
@@ -157,29 +208,96 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
     if (preview.kind !== 'ok' || !afterState) return
     setPhase('applying')
     try {
-      let res: { applied: number; failed: number; cardsUpdated: number; cardsCreated: number; cardsFailed: number; sanitizeDiagnostics?: SanitizeDiagnostic[] }
+      // The preview is a snapshot. Re-read the target immediately before the
+      // destructive write and refuse a stale proposal; otherwise a user edit
+      // made while the confirmation card was open would be overwritten.
+      const currentBefore = liveHost
+        ? liveHost.getElements()
+        : (await buildCanvasHostForCanvas(targetCanvasId, service)).before
+      if (canvasRevision(currentBefore) !== canvasRevision(beforeState ?? [])) {
+        setPhase('error')
+        pushToast({ kind: 'info', message: t('agent.staleRevision') })
+        onRejected()
+        return
+      }
+
+      // Capture the operation's before-state while the stale revision still
+      // matches. The after-state is captured only after a committed apply; both
+      // are stored in one archive payload for an auditable before/after pair.
+      let archiveBefore: ArchiveStateSnapshot | undefined
+      try {
+        archiveBefore = archiveState(await buildArchivePayload())
+      } catch (error) {
+        // Archiving is observability, not a reason to block a user mutation.
+        console.warn('[archive] ai-agent before snapshot failed', error)
+      }
+
+      // Building a full archive snapshot is asynchronous. Re-check immediately
+      // before mutation so a manual edit made during that await cannot revive a
+      // stale proposal.
+      let tempCommitHost: Awaited<ReturnType<typeof buildCanvasHostForCanvas>> | undefined
+      const beforeCommit = liveHost
+        ? liveHost.getElements()
+        : (tempCommitHost = await buildCanvasHostForCanvas(targetCanvasId, service)).before
+      if (canvasRevision(beforeCommit) !== canvasRevision(beforeState ?? [])) {
+        setPhase('error')
+        pushToast({ kind: 'info', message: t('agent.staleRevision') })
+        onRejected()
+        return
+      }
+
+      let res: ApplyOutcome
       if (liveHost) {
         // live:host.batch 单 undo;onCardCreate 建卡;画布页 bindCardWriteback + freeform
         // binding 持久化。不调 applyOpsAndPersist(会双写)。
         const creator = makeOnCardCreate(targetCanvasId, service)
         const r = applyLayout(liveHost, preview.ops, undefined, creator.onCardCreate)
-        res = { applied: r.applied, failed: r.failed, cardsUpdated: r.cardsUpdated, cardsCreated: r.cardsCreated, cardsFailed: creator.getFailed(), ...(r.sanitizeDiagnostics ? { sanitizeDiagnostics: r.sanitizeDiagnostics } : {}) }
+        res = { ok: true, committed: true, applied: r.applied, failed: r.failed, cardsUpdated: r.cardsUpdated, cardsCreated: r.cardsCreated, cardsFailed: creator.getFailed(), ...(r.sanitizeDiagnostics ? { sanitizeDiagnostics: r.sanitizeDiagnostics } : {}) }
       } else {
-        // /ask 原 temp 路径(不变):重建 host(before)再 applyOpsAndPersist(内部再 applyLayout 一次落库)。
-        const { host, before } = await buildCanvasHostForCanvas(targetCanvasId, service)
+        // /ask temp 路径:复用刚通过 revision 检查的 host，避免检查后再异步
+        // rebuild 留出新的竞态窗口；applyOpsAndPersist 在该 host 上应用并落库。
+        const { host, before } = tempCommitHost ?? await buildCanvasHostForCanvas(targetCanvasId, service)
         const p = await applyOpsAndPersist(host, before, preview.ops, targetCanvasId, service)
-        res = { applied: p.applied, failed: p.failed ?? p.cardsFailed ?? 0, cardsUpdated: p.cardsUpdated, cardsCreated: p.cardsCreated, cardsFailed: p.cardsFailed ?? 0, ...(p.sanitizeDiagnostics ? { sanitizeDiagnostics: p.sanitizeDiagnostics } : {}) }
+        res = {
+          ok: p.ok,
+          committed: p.committed,
+          applied: p.applied,
+          failed: p.failed ?? p.cardsFailed ?? 0,
+          cardsUpdated: p.cardsUpdated,
+          cardsCreated: p.cardsCreated,
+          cardsFailed: p.cardsFailed ?? 0,
+          cardUpdatesFailed: p.cardUpdatesFailed,
+          undo: p.undo,
+          rollback: p.rollback,
+          ...(p.sanitizeDiagnostics ? { sanitizeDiagnostics: p.sanitizeDiagnostics } : {}),
+        }
       }
-      setPhase(res.applied > 0 ? 'applied' : 'error')
+      const committed = res.ok !== false && res.committed !== false
+      const appliedSuccessfully = committed && res.applied > 0
+      setPhase(appliedSuccessfully ? 'applied' : 'error')
       // T5:风险 op 存档 —— agent apply 成功(res.applied > 0)后落档(b 类,
       // fire-and-forget,不阻塞 UI;append 失败 console.warn 不影响用户流程)。
-      if (res.applied > 0) {
-        void buildArchivePayload()
-          .then((p) => archiveStore.append('ai-agent', `agent: ${dsl.split('\n').filter(Boolean).length} 行`, p, VERSION))
-          .catch((err) => console.warn('[archive] ai-agent append failed', err))
+      if (appliedSuccessfully) {
+        try {
+          // Await snapshot construction before exposing Undo. append itself stays
+          // fire-and-forget, but `after` can no longer race the toast action.
+          const afterPayload = await buildArchivePayload()
+          const after = archiveState(afterPayload)
+          const payload: ArchivePayload = archiveBefore
+            ? {
+                ...afterPayload,
+                operation: { kind: 'ai-agent', before: archiveBefore, after },
+              }
+            : afterPayload
+          void archiveStore
+            .append('ai-agent', `agent: ${dsl.split('\n').filter(Boolean).length} 行`, payload, VERSION)
+            .catch((err) => console.warn('[archive] ai-agent append failed', err))
+        } catch (error) {
+          console.warn('[archive] ai-agent after snapshot failed', error)
+        }
       }
       // 捕获样本:apply/apply_edited。开关关时 addSample 内部 no-op。
-      if (sampleContext && res.applied > 0) {
+      if (sampleContext && appliedSuccessfully) {
         const edited = editing && editedDsl && editedDsl !== dsl
         addSample(
           {
@@ -197,13 +315,40 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
           settingsStore.get().aiSampleCapture,
         )
       }
-      if (res.applied > 0) {
+      if (appliedSuccessfully) {
+        const restore = res.undo ?? res.rollback
+        let undoUsed = false
+        const undo = restore
+          ? async (): Promise<boolean> => {
+              if (undoUsed) return false
+              undoUsed = true
+              return restore()
+            }
+          : undefined
+        const actions = undo
+          ? [{
+              label: t('agent.undo'),
+              onClick: () => {
+                void undo().then((undone) => {
+                  if (undone) setPhase('confirming')
+                  pushToast({
+                    kind: undone ? 'info' : 'error',
+                    message: t(undone ? 'agent.undone' : 'agent.undoFailed'),
+                  })
+                }).catch((error) => {
+                  console.error('[AgentConfirmCard] undo failed', error)
+                  pushToast({ kind: 'error', message: t('agent.undoFailed') })
+                })
+              },
+            }]
+          : undefined
         pushToast({
           kind: res.failed > 0 ? 'info' : 'success',
           message: t('agent.applied', {
             n: String(res.applied),
             cards: String(res.cardsUpdated + res.cardsCreated),
           }),
+          ...(actions ? { actions } : {}),
         })
       } else {
         pushToast({ kind: 'error', message: t('agent.applyFailed') })
@@ -216,7 +361,7 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
       if (res.sanitizeDiagnostics && res.sanitizeDiagnostics.length > 0) {
         pushToast({ kind: 'info', message: t('agent.sanitizeDiagnostics', { n: String(res.sanitizeDiagnostics.length) }) })
       }
-      if (res.applied > 0) {
+      if (appliedSuccessfully) {
         onApplied({ applied: res.applied, cardsUpdated: res.cardsUpdated, cardsCreated: res.cardsCreated })
       }
     } catch (err) {
@@ -303,4 +448,12 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
 
 function canvasName(id: CanvasId): string {
   return String(id)
+}
+
+/** Strip nested operation metadata before embedding a state as one side of a
+ * new operation. This keeps archive before/after snapshots composable and
+ * prevents accidental recursive growth when a caller reuses a payload. */
+function archiveState(payload: ArchivePayload): ArchiveStateSnapshot {
+  const { operation: _operation, ...state } = payload
+  return state
 }

@@ -92,6 +92,12 @@ describe('MarkdownBody — 富 Markdown (remark-gfm)', () => {
     const html = renderHtml('见 ((包豪斯背景)) 详述')
     expect(html).toContain('((包豪斯背景))')
   })
+
+  it('保留正文中的单换行，避免阅读预览把两行合并', () => {
+    const html = renderHtml('第一行\n第二行')
+    expect(html).toContain('第一行\n第二行')
+    expect(html).toContain('white-space: pre-line')
+  })
 })
 
 describe('MarkdownBody — katex + 脚注', () => {

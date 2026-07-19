@@ -23,7 +23,10 @@ function mockHost(els: CanvasElement[] = []): CanvasHost {
   } as unknown as CanvasHost
 }
 
-function render(host: CanvasHost | null) {
+function render(host: CanvasHost | null, options: { expanded?: boolean } = {}) {
+  if (options.expanded !== false) {
+    window.localStorage.setItem('cys-stift.workbench-preview-collapsed.v1', '0')
+  }
   const h = document.createElement('div')
   document.body.appendChild(h)
   const root = createRoot(h)
@@ -53,6 +56,13 @@ describe('MinimapPreview', () => {
     } as unknown as HTMLCanvasElement['getContext']
   })
 
+  it('starts collapsed when the user has not chosen a preview state', () => {
+    const r = render(mockHost(), { expanded: false })
+    expect(r.canvas()).toBeNull()
+    expect(r.chip()).not.toBeNull()
+    r.unmount()
+  })
+
   it('renders a canvas when host given and not collapsed', () => {
     const { canvas, unmount } = render(mockHost())
     expect(canvas()).not.toBeNull()
@@ -70,6 +80,7 @@ describe('MinimapPreview', () => {
     act(() => { collapseBtn()!.click() })
     expect(canvas()).toBeNull()
     expect(chip()).not.toBeNull()
+    expect((chip() as HTMLElement).style.width).toBe('44px')
     unmount()
   })
 
@@ -96,7 +107,7 @@ describe('MinimapPreview', () => {
     vi.useFakeTimers()
     try {
       window.localStorage.setItem('cys-stift.workbench-preview-collapsed.v1', '1')
-      const { chip, canvas, unmount } = render(mockHost())
+      const { chip, canvas, unmount } = render(mockHost(), { expanded: false })
       expect(canvas()).toBeNull() // 收起态:只剩 chip
       // 把初始 mount 排的 rAF 全部 flush(此时 canvas 还没挂载 → draw 空跑到早返回)
       // 这一步把「展开后偶然被初始 rAF 画到」的逃生路径堵掉。

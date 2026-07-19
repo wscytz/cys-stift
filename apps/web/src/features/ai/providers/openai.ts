@@ -7,7 +7,13 @@
  * because the data format is simple and we want the accumulator visible.
  */
 
-import type { AIProvider, AIRequest, AIResponse } from '../types'
+import {
+  normalizeAIFinishReason,
+  type AIFinishReason,
+  type AIProvider,
+  type AIRequest,
+  type AIResponse,
+} from '../types'
 import { consumeStream } from './stream-reader'
 
 interface OpenAIConfig {
@@ -72,6 +78,55 @@ export function createOpenAIProvider(cfg: OpenAIConfig): AIProvider {
       const decoder = new TextDecoder()
       let content = ''
       let buffer = ''
+      let finishReason: AIFinishReason | undefined
+      let stopReason: string | undefined
+      let refusal = ''
+      let usage: AIResponse['usage'] | undefined
+
+      const processLine = (line: string) => {
+        const trimmed = line.trim()
+        if (!trimmed.startsWith('data:')) return
+        const data = trimmed.slice(5).trim()
+        if (data === '[DONE]' || data === '') return
+        try {
+          const json = JSON.parse(data)
+          const choice = json.choices?.[0]
+          const rawFinish = choice?.finish_reason
+          if (typeof rawFinish === 'string' && !refusal) {
+            stopReason = rawFinish
+            finishReason = normalizeAIFinishReason(rawFinish)
+          }
+          const refusalChunk = choice?.delta?.refusal ?? choice?.message?.refusal
+          if (typeof refusalChunk === 'string' && refusalChunk.length > 0) {
+            refusal += refusalChunk
+            // Some OpenAI-compatible endpoints provide refusal text without a
+            // separate finish_reason. Treat the signal as authoritative.
+            finishReason = 'refusal'
+            stopReason = 'refusal'
+          }
+          const delta = choice?.delta?.content
+          if (typeof delta === 'string' && delta.length > 0) {
+            content += delta
+            onDelta(delta)
+          }
+          const u = json.usage
+          if (u && typeof u === 'object') {
+            const promptTokens = Number(u.prompt_tokens)
+            const completionTokens = Number(u.completion_tokens)
+            if (Number.isFinite(promptTokens) || Number.isFinite(completionTokens)) {
+              usage = {
+                promptTokens: Number.isFinite(promptTokens) ? promptTokens : usage?.promptTokens ?? 0,
+                completionTokens: Number.isFinite(completionTokens) ? completionTokens : usage?.completionTokens ?? 0,
+              }
+            }
+          }
+        } catch (e) {
+          // Partial JSON mid-stream is normal (a line split across
+          // chunks is held in buffer); a genuinely malformed line is
+          // rare — log at debug rather than swallow silently.
+          console.debug('[openai] skipping unparseable SSE line', e)
+        }
+      }
       await consumeStream(
         reader,
         decoder,
@@ -80,29 +135,24 @@ export function createOpenAIProvider(cfg: OpenAIConfig): AIProvider {
           const lines = buffer.split('\n')
           // Keep the trailing partial line in the buffer; emit full lines.
           buffer = lines.pop() ?? ''
-          for (const line of lines) {
-            const trimmed = line.trim()
-            if (!trimmed.startsWith('data:')) continue
-            const data = trimmed.slice(5).trim()
-            if (data === '[DONE]') continue
-            try {
-              const json = JSON.parse(data)
-              const delta = json.choices?.[0]?.delta?.content
-              if (delta) {
-                content += delta
-                onDelta(delta)
-              }
-            } catch (e) {
-              // Partial JSON mid-stream is normal (a line split across
-              // chunks is held in buffer); a genuinely malformed line is
-              // rare — log at debug rather than swallow silently.
-              console.debug('[openai] skipping unparseable SSE line', e)
-            }
-          }
+          for (const line of lines) processLine(line)
         },
         signal,
       )
-      return { content }
+      // A few OpenAI-compatible gateways omit the final newline. Process the
+      // residual line after the reader closes, but never emit post-abort data.
+      if (!signal?.aborted) {
+        const decoderTail = decoder.decode()
+        if (decoderTail) buffer += decoderTail
+      }
+      if (!signal?.aborted && buffer) processLine(buffer)
+      return {
+        content,
+        ...(usage ? { usage } : {}),
+        ...(finishReason ? { finishReason } : {}),
+        ...(stopReason ? { stopReason } : {}),
+        ...(refusal ? { refusal } : {}),
+      }
     },
     async testConnection(signal) {
       const t0 = performance.now()

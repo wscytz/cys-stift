@@ -25,6 +25,7 @@ import {
   buildEmptyHost,
 } from '../canvas-host-builder'
 import type { DslOp } from '@/features/ai/dsl-parser'
+import { canvasFreeformStore } from '@/lib/canvas-freeform-store'
 
 /** 造一张在 canvasId 上的卡(带 canvasPosition)。 */
 function cardOnCanvas(id: string, canvasId: string, x: number, y: number, color?: string): Card {
@@ -69,13 +70,22 @@ function makeService(cards: Card[] = []): CardService {
     }),
     moveToCanvas: vi.fn((id: string, position: any) => {
       const c = store.get(id)
-      if (c) store.set(id, { ...c, canvasPosition: position })
+      if (!c) return false
+      store.set(id, { ...c, canvasPosition: position })
+      return true
+    }),
+    removeFromCanvas: vi.fn((id: string) => {
+      const c = store.get(id)
+      if (!c) return false
+      store.set(id, { ...c, canvasPosition: undefined })
+      return true
     }),
     createWithId: vi.fn((id: string, input: any) => {
       const c = { ...input, id } as Card
       store.set(id, c)
       return c
     }),
+    hardDelete: vi.fn((id: string) => store.delete(id)),
   }
   return svc as unknown as CardService
 }
@@ -198,6 +208,7 @@ describe('applyOpsAndPersist', () => {
     ]
     const res = await applyOpsAndPersist(host, before, ops, CANVAS, svc)
     expect(res.cardsCreated).toBe(1)
+    expect(res.cardsUpdated).toBe(0)
     expect(svc.createWithId).toHaveBeenCalledWith('new1', expect.objectContaining({ canvasPosition: expect.objectContaining({ x: 50, y: 50 }) }))
   })
 
@@ -267,6 +278,144 @@ describe('applyOpsAndPersist', () => {
     const res = await applyOpsAndPersist(host, before, [], CANVAS, svc)
     expect(res.applied).toBe(0)
     expect(res.cardsUpdated).toBe(0)
+  })
+
+  it('freeform save 返回 false → 整体失败并回滚 host/store/card', async () => {
+    const svc = makeService([cardOnCanvas('c1', String(CANVAS), 100, 100)])
+    freeformStore.set(String(CANVAS), [
+      { id: 'r1', kind: 'rect', x: 0, y: 0, w: 10, h: 10, rotation: 0 },
+    ])
+    const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
+    const save = vi.mocked(canvasFreeformStore.save)
+    save.mockResolvedValueOnce(false)
+
+    const res = await applyOpsAndPersist(
+      host,
+      before,
+      [
+        { type: 'free', shape: 'rect', id: 'r1', x: 99, y: 99, w: 10, h: 10 } as DslOp,
+        { type: 'card', cardId: 'c1' as never, x: 300, y: 200 },
+        { type: 'card', cardId: 'new1' as never, x: 500, y: 200, create: true },
+      ],
+      CANVAS,
+      svc,
+    )
+
+    expect(res.ok).toBe(false)
+    expect(res.committed).toBe(false)
+    expect(res.applied).toBe(0)
+    expect(res.failureReason).toMatch(/freeform save/i)
+    expect(host.getElements()).toEqual(before)
+    expect(freeformStore.get(String(CANVAS))).toEqual([
+      { id: 'r1', kind: 'rect', x: 0, y: 0, w: 10, h: 10, rotation: 0 },
+    ])
+    expect(svc.get('c1' as never)!.canvasPosition?.x).toBe(100)
+    expect(svc.get('new1' as never)).toBeNull()
+  })
+
+  it('moveToCanvas 返回 false → 不计 cardsUpdated,暴露失败并回滚', async () => {
+    const svc = makeService([cardOnCanvas('c1', String(CANVAS), 100, 100)])
+    vi.spyOn(svc, 'moveToCanvas').mockReturnValue(false)
+    const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
+    const res = await applyOpsAndPersist(
+      host,
+      before,
+      [{ type: 'card', cardId: 'c1' as never, x: 300, y: 200 }],
+      CANVAS,
+      svc,
+    )
+
+    expect(res.ok).toBe(false)
+    expect(res.cardsUpdated).toBe(0)
+    expect(res.cardUpdatesFailed).toBe(1)
+    expect(res.applied).toBe(0)
+    expect(svc.get('c1' as never)!.canvasPosition?.x).toBe(100)
+    expect(host.getElement('c1')).toMatchObject({ x: 100, y: 100 })
+  })
+
+  it('update 返回 false → 颜色不计入 cardsUpdated,结果暴露失败', async () => {
+    const svc = makeService([cardOnCanvas('c1', String(CANVAS), 100, 100)])
+    vi.spyOn(svc, 'update').mockReturnValue(false as never)
+    const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
+    const res = await applyOpsAndPersist(
+      host,
+      before,
+      [{ type: 'card', cardId: 'c1' as never, x: 100, y: 100, color: 'red' }],
+      CANVAS,
+      svc,
+    )
+
+    expect(res.ok).toBe(false)
+    expect(res.cardsUpdated).toBe(0)
+    expect(res.cardUpdatesFailed).toBe(1)
+    expect(res.failed).toBe(1)
+    expect(svc.get('c1' as never)!.color).toBeUndefined()
+    expect(host.getElement('c1')?.color).not.toBe('red')
+  })
+
+  it('成功结果提供一次性 undo/rollback,第二次调用不再改数据', async () => {
+    const svc = makeService([cardOnCanvas('c1', String(CANVAS), 100, 100)])
+    const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
+    const res = await applyOpsAndPersist(
+      host,
+      before,
+      [{ type: 'card', cardId: 'c1' as never, x: 300, y: 200 }],
+      CANVAS,
+      svc,
+    )
+
+    expect(res.ok).toBe(true)
+    expect(res.undo).toBeTypeOf('function')
+    expect(svc.get('c1' as never)!.canvasPosition?.x).toBe(300)
+    expect(await res.undo!()).toBe(true)
+    expect(svc.get('c1' as never)!.canvasPosition?.x).toBe(100)
+    expect(host.getElement('c1')).toMatchObject({ x: 100, y: 100 })
+    expect(await res.rollback!()).toBe(false)
+    expect(svc.get('c1' as never)!.canvasPosition?.x).toBe(100)
+  })
+
+  it('undo 能恢复 freeform 快照并删除本次新建卡', async () => {
+    freeformStore.set(String(CANVAS), [
+      { id: 'r1', kind: 'rect', x: 0, y: 0, w: 10, h: 10, rotation: 0 },
+    ])
+    const svc = makeService([])
+    const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
+    const res = await applyOpsAndPersist(
+      host,
+      before,
+      [
+        { type: 'free', shape: 'rect', id: 'r1', x: 80, y: 80, w: 10, h: 10 } as DslOp,
+        { type: 'card', cardId: 'new-card' as never, x: 120, y: 80, create: true },
+      ],
+      CANVAS,
+      svc,
+    )
+
+    expect(res.ok).toBe(true)
+    expect(svc.get('new-card' as never)).not.toBeNull()
+    expect(await res.undo!()).toBe(true)
+    expect(svc.get('new-card' as never)).toBeNull()
+    expect(freeformStore.get(String(CANVAS))).toEqual([
+      { id: 'r1', kind: 'rect', x: 0, y: 0, w: 10, h: 10, rotation: 0 },
+    ])
+    expect(host.getElements()).toEqual(before)
+  })
+
+  it('undo 遇到提交后用户改动时拒绝覆盖,且仍只消费一次', async () => {
+    const svc = makeService([cardOnCanvas('c1', String(CANVAS), 100, 100)])
+    const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
+    const res = await applyOpsAndPersist(
+      host,
+      before,
+      [{ type: 'card', cardId: 'c1' as never, x: 300, y: 200 }],
+      CANVAS,
+      svc,
+    )
+    // 模拟用户在 toast 出现后再次移动同一张卡。
+    svc.moveToCanvas('c1' as never, { ...svc.get('c1' as never)!.canvasPosition!, x: 500 })
+    expect(await res.undo!()).toBe(false)
+    expect(svc.get('c1' as never)!.canvasPosition?.x).toBe(500)
+    expect(await res.undo!()).toBe(false)
   })
 })
 

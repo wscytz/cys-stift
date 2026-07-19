@@ -25,15 +25,20 @@ vi.mock('@/lib/i18n', () => ({
 // is called on dismiss. `vi.mock` factories are hoisted above top-level
 // `const`s (TDZ), so the mutable state + spy must be created via
 // `vi.hoisted` — those bindings exist at the factory's hoist time.
-const { mockState, markCaptureHintSeen } = vi.hoisted(() => {
+const { mockState, mockMobile, markCaptureHintSeen } = vi.hoisted(() => {
   const mockState: { seenCaptureHint: boolean } = { seenCaptureHint: false }
+  const mockMobile = { value: false }
   const markCaptureHintSeen = vi.fn()
-  return { mockState, markCaptureHintSeen }
+  return { mockState, mockMobile, markCaptureHintSeen }
 })
 
 vi.mock('@/lib/settings-store', () => ({
   useSettings: () => ({ settings: mockState, ready: true }),
   settingsStore: { markCaptureHintSeen },
+}))
+
+vi.mock('@/lib/use-platform', () => ({
+  useIsMobile: () => mockMobile.value,
 }))
 
 import { CaptureHint } from '../capture-hint'
@@ -61,6 +66,7 @@ function renderToDOM(): { host: HTMLDivElement; unmount: () => void } {
 describe('CaptureHint', () => {
   beforeEach(() => {
     mockState.seenCaptureHint = false
+    mockMobile.value = false
     markCaptureHintSeen.mockReset()
     document.body.innerHTML = ''
   })
@@ -68,6 +74,7 @@ describe('CaptureHint', () => {
   it('renders when seenCaptureHint is false', () => {
     const { host, unmount } = renderToDOM()
     expect(host.querySelector('[data-testid="capture-hint"]')).not.toBeNull()
+    expect(host.textContent).toContain('capture.hintFlow')
     expect(host.textContent).toContain('capture.hint')
     unmount()
   })
@@ -89,6 +96,15 @@ describe('CaptureHint', () => {
       btn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     expect(markCaptureHintSeen).toHaveBeenCalledTimes(1)
+    unmount()
+  })
+
+  it('keeps the workflow hint on mobile but hides the desktop shortcut', () => {
+    mockMobile.value = true
+    const { host, unmount } = renderToDOM()
+    expect(host.querySelector('[data-testid="capture-hint"]')).not.toBeNull()
+    expect(host.textContent).toContain('capture.hintFlow')
+    expect(host.querySelector('.capture-hint__text > span')).toBeNull()
     unmount()
   })
 })

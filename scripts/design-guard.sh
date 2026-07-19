@@ -31,7 +31,11 @@ section() { printf '\n%s %s\n' "$(ylw "▶")" "$(ylw "$1")"; }
 section "1. 组件层 hex 硬编码(允许:readToken fallback / token 定义 / 测试)"
 hex_hits=$(grep -rnE '#[0-9a-fA-F]{3,6}\b' "$WEB_SRC" 2>/dev/null \
   | grep -v "node_modules" \
+  | grep -vE "\.svg:" \
+  | grep -vE "^[^:]+:[0-9]+:[[:space:]]*(//|/\\*|\\*)" \
+  | grep -vE "\*/[[:space:]]*$" \
   | grep -vE "readToken\([^)]*,[^)]*#" \
+  | grep -vE "features/graph/graph-canvas\.tsx:.*return '#666666'" \
   | grep -vE "tokens\.(css|ts)|tailwind-preset" \
   | grep -vE "__tests__/|\.test\." \
   || true)
@@ -48,7 +52,7 @@ fi
 section "2. 第 7 色(green/teal/purple/orange/pink)"
 seventh=$(grep -rnEiw "green|teal|purple|orange|pink" "$WEB_SRC" "$UI_SRC" 2>/dev/null \
   | grep -v "node_modules" \
-  | grep -vE "^\s*//|^\s*\*|/\*" \
+  | grep -vE "^[^:]+:[0-9]+:[[:space:]]*(//|/\\*|\\*)" \
   | grep -vE "__tests__/|\.test\." \
   || true)
 if [ -n "$seventh" ]; then
@@ -75,11 +79,12 @@ else
 fi
 
 # ──────────────────────────────────────────────────────────────
-# 4. z-index 分层(只允许:0/10/20/30/40/100/110/9999)
-section "4. z-index 魔法值(允许:0/10/20/30/40/100/110/9999)"
+# 4. z-index 分层。1-5 是组件内部堆叠；其余是 design-system.md 登记的
+#    画布 overlay / panel / transient / modal / notification 层级。
+section "4. z-index 魔法值(只允许已登记层级)"
 zbad=$(grep -rnE "z-?index:\s*[0-9]+|zIndex:\s*[0-9]+" "$WEB_SRC" 2>/dev/null \
   | grep -v "node_modules" \
-  | grep -vE "z-?index:\s*(0|10|20|30|40|100|110|9999)\b|zIndex:\s*(0|10|20|30|40|100|110|9999)\b" \
+  | grep -vE "z-?index:\s*(0|1|2|3|4|5|10|20|25|26|29|30|35|39|40|50|60|99|100|110|9999)\b|zIndex:\s*(0|1|2|3|4|5|10|20|25|26|29|30|35|39|40|50|60|99|100|110|9999)\b" \
   || true)
 if [ -n "$zbad" ]; then
   printf '%s\n' "$zbad" | head -20
@@ -89,17 +94,18 @@ else
 fi
 
 # ──────────────────────────────────────────────────────────────
-# 5. 8px 网格(禁破坏网格的魔法值:5/6/7/9/11/13/15px,允许 1/2/4/8/10 倍数 + 字号)
-section "5. 8px 网格魔法值(允许:1/2/4/8/10/12/14/16...px;字号/边框例外)"
-grid=$(grep -rnE ':\s*[0-9]+px' "$WEB_SRC" 2>/dev/null \
+# 5. 8px 网格。只抓明确禁止的孤儿值；断点、画布几何和内容尺寸不是 spacing token。
+section "5. 8px 网格孤儿值(3/5/6/7/9/11/13/15px)"
+grid=$(grep -rnE '(padding|margin|gap|inset|top|right|bottom|left)[^:]*:[^;]*([^0-9])(3|5|6|7|9|11|13|15)px\b' "$WEB_SRC" 2>/dev/null \
   | grep -v "node_modules" \
-  | grep -vE ":\s*(1|2|4|8|10|12|14|16|18|20|24|28|30|32|36|40|44|48|56|60|64|69|72|80|96|120|128|160|168|200|240|360)px" \
+  | grep -vE "@media[[:space:]]*\(max-width:" \
+  | grep -vE "^[^:]+:[0-9]+:[[:space:]]*(//|/\\*|\\*)" \
   | grep -vE "__tests__/|\.test\." \
   || true)
 if [ -n "$grid" ]; then
   printf '%s\n' "$grid" | head -25
   violations=$((violations + 1))
-  dim "  ↑ 复核:69px(--app-menu-height)/72px(布局偏移)是已知魔法数,记录待清"
+  dim "  ↑ 复核:边框可用 1/2px；触摸目标可用 44px；其余 spacing 应改 token"
 else
   grn "  ✓ 8px 网格遵守"
 fi

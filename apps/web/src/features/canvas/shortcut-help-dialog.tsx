@@ -54,6 +54,7 @@ export function ShortcutHelpDialog({
         ['- / _', t('canvas.scZoomOut')],
         ['0 / 1', t('canvas.scFit')],
         ['g', t('canvas.scSnap')],
+        ['/ · ⌘/Ctrl+F', t('canvas.scSearch')],
       ],
     },
     {

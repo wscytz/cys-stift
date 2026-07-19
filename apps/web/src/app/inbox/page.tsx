@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { BauhausMotif, Button, Card as UICard, Modal, Tag, Toolbar } from '@cys-stift/ui'
-import type { Card, CardId } from '@cys-stift/domain'
+import type { Card, CardId, CanvasId } from '@cys-stift/domain'
 import { findDuplicateGroups, type DuplicateGroup } from '@cys-stift/domain'
 import { CreateCardForm } from './create-card-form'
 import { CardDetailModal } from '@/features/card/card-detail'
@@ -20,6 +20,15 @@ import { typeKeyOf } from '@/lib/type-label'
 import { markdownPreview } from '@/features/card/markdown-preview'
 import { getDeviceId } from '@/lib/device-id'
 import { pushToast } from '@/lib/toast-store'
+import {
+  applyInboxCardPlacements,
+  applyInboxCanvasPlacements,
+  buildInboxCardCreateInput,
+  nextCanvasZ,
+  planInboxCanvasPlacements,
+  parseInboxCardCreateLines,
+  sortCardsByCapturedAtDesc,
+} from './inbox-logic'
 
 type View = 'inbox' | 'archived'
 
@@ -47,6 +56,9 @@ export default function InboxPage() {
   // 批量删除确认门(与 archive.batch 一致):点删除先弹 Modal 确认,防误删多张。
   // softDelete 可从 /trash 恢复,但误删多张要逐张找回,确认门值得。
   const [confirmDeleteIds, setConfirmDeleteIds] = useState<string[] | null>(null)
+  // Batch send uses an explicit target instead of silently using whichever
+  // canvas happened to be active when the user selected the cards.
+  const [batchCanvasId, setBatchCanvasId] = useState<CanvasId | null>(null)
   const toggleSelect = useCallback((id: string) => {
     setSelected((prev) => {
       const next = new Set(prev)
@@ -56,17 +68,16 @@ export default function InboxPage() {
     })
   }, [])
   const clearSelection = useCallback(() => setSelected(new Set()), [])
-  // v0.15 follow-up: "Send to canvas" routes to the user's currently
-  // active canvas (read from canvasStore), not the hardcoded default.
+  // Canvas list powers the explicit target picker; the active canvas is only
+  // the initial suggestion and is never used as an invisible destination.
   const { snapshot: canvasesSnap } = useCanvases()
 
   // Inbox = no canvasPosition, not archived, not soft-deleted
   const inbox = pinFirst(service.listInbox())
   const archived = pinFirst(
-    service
-      .listAll()
-      .filter((c) => c.archived && !c.deletedAt)
-      .sort((a, b) => b.capturedAt.getTime() - a.capturedAt.getTime()),
+    sortCardsByCapturedAtDesc(
+      service.listAll().filter((c) => c.archived && !c.deletedAt),
+    ),
   )
   const visible = view === 'inbox' ? inbox : archived
 
@@ -74,20 +85,6 @@ export default function InboxPage() {
   useEffect(() => {
     clearSelection()
   }, [view, clearSelection])
-
-  // CaptureHost dispatches cys-stift:open-card when the user taps "打开" on the
-  // capture success toast (plan Task 8). Resolve the id to a live card and
-  // open the detail modal.
-  useEffect(() => {
-    const onOpenCard = (e: Event) => {
-      const id = (e as CustomEvent<{ id: string }>).detail?.id
-      if (!id) return
-      const card = snap.cards.find((c) => c.id === id)
-      if (card) setDetail(card)
-    }
-    window.addEventListener('cys-stift:open-card', onOpenCard as EventListener)
-    return () => window.removeEventListener('cys-stift:open-card', onOpenCard as EventListener)
-  }, [snap])
 
   // DR2-T2: inbox 粘贴桥。inbox 没有画布 host(它是捕获入口),所以不能调
   // createCardOnCanvas(它要 host 加几何)。直接用 service.createWithId 落 DB +
@@ -108,35 +105,20 @@ export default function InboxPage() {
       const looksLikeDsl = text.split('\n').some((ln) => /^\s*\[/.test(ln))
       if (!looksLikeDsl) return
       e.preventDefault()
-      const cardLines = text.split('\n').filter((ln) => /^\s*\[card\b/i.test(ln) && /\bcreate\b/.test(ln))
-      let created = 0
-      for (const ln of cardLines) {
-        const idMatch = ln.match(/#([a-zA-Z0-9_-]+)/)
-        const posMatch = ln.match(/@pos\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/)
-        const sizeMatch = ln.match(/@size\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/)
-        if (!idMatch) continue
-        const id = idMatch[1] as CardId
-        if (service.get(id)) continue
-        const x = posMatch ? Number(posMatch[1]) : 0
-        const y = posMatch ? Number(posMatch[2]) : 0
-        const w = sizeMatch ? Number(sizeMatch[1]) : 240
-        const h = sizeMatch ? Number(sizeMatch[2]) : 120
-        try {
-          service.createWithId(id, {
-            title: '',
-            source: { kind: 'manual', deviceId: DEVICE_ID },
-            canvasPosition: { canvasId: DEFAULT_CANVAS_ID, x, y, w, h, z: 0, rotation: 0 },
-          })
-          created++
-        } catch {
-          // 配额满:createWithId 内 repo.insert 已 notifyQuota 弹 toast + throw。
-          // break 不续建(原无 catch 会冒泡炸 paste effect + 静默丢后续行)。
-          break
-        }
-      }
+      const placements = parseInboxCardCreateLines(text)
+      const result = applyInboxCardPlacements(placements, (placement) => {
+        const id = placement.id as CardId
+        if (service.get(id)) return false
+        service.createWithId(
+          id,
+          buildInboxCardCreateInput(placement, DEFAULT_CANVAS_ID, DEVICE_ID),
+        )
+        return true
+      })
+      const created = result.created
       if (created > 0) {
         pushToast({ kind: 'success', message: t('canvas.inboxPasteCreated', { n: String(created) }) })
-      } else if (cardLines.length === 0) {
+      } else if (placements.length === 0) {
         pushToast({ kind: 'info', message: t('canvas.inboxPasteGuide') })
       }
     }
@@ -184,27 +166,71 @@ export default function InboxPage() {
       message: t('inbox.batch.deletedN', { n: String(n) }),
     })
   }
+  const requestBatchSendToCanvas = () => {
+    if (selectedArr.length === 0) return
+    const activeIsKnown = canvasesSnap.canvases.some(
+      (canvas) => canvas.id === canvasesSnap.activeCanvasId,
+    )
+    setBatchCanvasId(
+      activeIsKnown
+        ? canvasesSnap.activeCanvasId
+        : canvasesSnap.canvases[0]?.id ?? DEFAULT_CANVAS_ID,
+    )
+  }
   const batchSendToCanvas = () => {
-    const n = selectedArr.length
-    const targetCanvasId = canvasesSnap.activeCanvasId ?? DEFAULT_CANVAS_ID
-    // 算 baseZ = 已有卡 max(z)+1,批量卡用 baseZ+i(原 z:i 从 0 起,与已有卡 z 堆叠;
-    // single 路径 onSendToCanvas 正确算 nextZ,此处对齐)。
+    if (!batchCanvasId) return
+    const targetCanvas =
+      canvasesSnap.canvases.find((canvas) => canvas.id === batchCanvasId) ??
+      canvasesSnap.canvases[0]
+    const targetCanvasId = targetCanvas?.id ?? DEFAULT_CANVAS_ID
+    const targetCanvasName = targetCanvas?.name ?? String(targetCanvasId)
     const existing = service.listOnCanvas(targetCanvasId)
-    const baseZ = existing.length === 0 ? 0 : Math.max(...existing.map((c) => c.canvasPosition?.z ?? 0)) + 1
-    selectedArr.forEach((id, i) => {
-      service.moveToCanvas(id as CardId, {
-        canvasId: targetCanvasId,
-        x: 100 + (i % 5) * 40,
-        y: 100 + (i % 5) * 40,
-        w: 200,
-        h: 80,
-        z: baseZ + i,
-      })
-    })
+    const placements = planInboxCanvasPlacements(selectedArr, existing, targetCanvasId)
+    const result = applyInboxCanvasPlacements(
+      placements,
+      ({ cardId, position }) => service.moveToCanvas(cardId as CardId, position),
+      ({ cardId, position }) => {
+        // Do not remove a card the user moved again before clicking Undo.
+        const current = service.get(cardId as CardId)?.canvasPosition
+        if (!current || !sameCanvasPosition(current, position)) return false
+        return service.removeFromCanvas(cardId as CardId)
+      },
+    )
+    const moved = result.movedIds.length
+    setBatchCanvasId(null)
     clearSelection()
+    if (moved === 0) {
+      pushToast({ kind: 'error', message: t('inbox.batch.sentToCanvasFailed') })
+      return
+    }
+    const undo = () => {
+      const undoResult = result.undo()
+      if (undoResult.alreadyUndone) return
+      pushToast({
+        kind: undoResult.failed === 0 ? 'success' : 'info',
+        message:
+          undoResult.failed === 0
+            ? t('inbox.batch.undoSentToCanvas', { n: String(undoResult.restored) })
+            : t('inbox.batch.undoSentToCanvasPartial', {
+                ok: String(undoResult.restored),
+                failed: String(undoResult.failed),
+              }),
+      })
+    }
     pushToast({
-      kind: 'success',
-      message: t('inbox.batch.sentToCanvasN', { n: String(n) }),
+      kind: result.failedIds.length === 0 ? 'success' : 'info',
+      message:
+        result.failedIds.length === 0
+          ? t('inbox.batch.sentToCanvasNamed', {
+              n: String(moved),
+              canvas: targetCanvasName,
+            })
+          : t('inbox.batch.sentToCanvasNamedPartial', {
+              ok: String(moved),
+              failed: String(result.failedIds.length),
+              canvas: targetCanvasName,
+            }),
+      actions: [{ label: t('inbox.batch.undo'), onClick: undo }],
     })
   }
   const selectAll = () => setSelected(new Set(visible.map((c) => c.id)))
@@ -403,7 +429,7 @@ export default function InboxPage() {
             {view === 'inbox' ? t('inbox.batch.archive') : t('inbox.batch.unarchive')}
           </button>
           {view === 'inbox' && (
-            <button type="button" className="batch-bar__btn" onClick={batchSendToCanvas}>
+            <button type="button" className="batch-bar__btn" onClick={requestBatchSendToCanvas}>
               {t('inbox.batch.sendToCanvas')}
             </button>
           )}
@@ -441,6 +467,44 @@ export default function InboxPage() {
         </Modal>
       )}
 
+      {batchCanvasId && (
+        <Modal
+          open
+          onClose={() => setBatchCanvasId(null)}
+          title={t('inbox.batch.sendToCanvasTitle')}
+          closeLabel={t('common.close')}
+        >
+          <p className="confirm__body">
+            {t('inbox.batch.sendToCanvasBody', { n: String(liveSelected.size) })}
+          </p>
+          <label className="batch-canvas-picker__label" htmlFor="batch-canvas-target">
+            {t('inbox.batch.targetCanvas')}
+          </label>
+          <select
+            id="batch-canvas-target"
+            data-testid="batch-canvas-target"
+            className="batch-canvas-picker"
+            value={batchCanvasId}
+            onChange={(event) => setBatchCanvasId(event.target.value as CanvasId)}
+            aria-label={t('inbox.batch.targetCanvas')}
+          >
+            {canvasesSnap.canvases.map((canvas) => (
+              <option key={canvas.id} value={canvas.id}>
+                {canvas.name}
+              </option>
+            ))}
+          </select>
+          <div className="confirm__actions">
+            <Button variant="ghost" onClick={() => setBatchCanvasId(null)}>
+              {t('common.cancel')}
+            </Button>
+            <Button variant="primary" onClick={batchSendToCanvas}>
+              {t('inbox.batch.sendToCanvasConfirm')}
+            </Button>
+          </div>
+        </Modal>
+      )}
+
       {effectiveDetail && (
         <CardDetailModal
           card={effectiveDetail}
@@ -472,10 +536,8 @@ export default function InboxPage() {
             // yet (first render / SSR).
             const targetCanvasId = canvasesSnap.activeCanvasId ?? DEFAULT_CANVAS_ID
             const existing = service.listOnCanvas(targetCanvasId)
-            const nextZ = existing.length === 0
-              ? 0
-              : Math.max(...existing.map((c) => c.canvasPosition?.z ?? 0)) + 1
-            service.moveToCanvas(effectiveDetail.id, {
+            const nextZ = nextCanvasZ(existing)
+            const moved = service.moveToCanvas(effectiveDetail.id, {
               canvasId: targetCanvasId,
               x: 100 + (nextZ % 5) * 40,
               y: 100 + (nextZ % 5) * 40,
@@ -483,6 +545,10 @@ export default function InboxPage() {
               h: 80,
               z: nextZ,
             })
+            if (moved === false) {
+              pushToast({ kind: 'info', message: t('storage.quotaExceeded') })
+              return
+            }
             const updated = service.get(effectiveDetail.id)
             if (updated) setDetail(updated)
           }}
@@ -592,6 +658,16 @@ const styles = `
 .batch-bar__btn--danger:hover { background: var(--color-red); border-color: var(--color-red); }
 .batch-bar__spacer { width: var(--space-3); }
 .batch-bar__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.batch-canvas-picker__label {
+  display: block; margin-bottom: var(--space-1); font-family: var(--font-mono);
+  font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0;
+}
+.batch-canvas-picker {
+  width: 100%; min-height: 44px; padding: 0 var(--space-1);
+  border: var(--border-hairline); border-radius: var(--radius-sm);
+  background: var(--color-white); color: var(--color-black); font: inherit;
+}
+.batch-canvas-picker:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 @media (max-width: 767px) {
   .batch-bar {
     left: var(--space-2);
@@ -606,6 +682,18 @@ const styles = `
   .batch-bar__spacer { display: none; }
 }
 `
+
+function sameCanvasPosition(a: NonNullable<Card['canvasPosition']>, b: NonNullable<Card['canvasPosition']>): boolean {
+  return (
+    a.canvasId === b.canvasId &&
+    a.x === b.x &&
+    a.y === b.y &&
+    a.w === b.w &&
+    a.h === b.h &&
+    a.z === b.z &&
+    (a.rotation ?? 0) === (b.rotation ?? 0)
+  )
+}
 
 // ── Subcomponents ──────────────────────────────────────────────────────────
 

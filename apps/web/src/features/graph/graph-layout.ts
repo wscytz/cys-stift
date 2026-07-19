@@ -55,15 +55,18 @@ export function createGraphSimulation(
 ): SimulationHandle {
   const positioned: PositionedNode[] = nodes.map((n) => {
     const cached = opts.initialPositions?.[n.id]
-    if (cached) {
+    if (cached && Number.isFinite(cached.x) && Number.isFinite(cached.y)) {
+      // Keep fixed coordinates only when both members of the pair are finite;
+      // a malformed half-pair otherwise makes d3-force propagate NaN ticks.
+      const fixed = Number.isFinite(cached.fx) && Number.isFinite(cached.fy)
       return {
         ...n,
         x: cached.x,
         y: cached.y,
         vx: 0,
         vy: 0,
-        fx: cached.fx ?? null,
-        fy: cached.fy ?? null,
+        fx: fixed ? cached.fx! : null,
+        fy: fixed ? cached.fy! : null,
       }
     }
     // 无缓存:中心附近抖动(避免完全重叠导致 charge 力方向随机)。

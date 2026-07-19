@@ -1,46 +1,23 @@
+import { markdownPreview } from '@cys-stift/canvas-engine'
+
 /**
- * preview-text - 把 markdown body 剥成单行纯文本预览(库页堆叠卡/行预览用)。
- *
- * 为什么:body 是 markdown 源,直接 `slice` 会裸露 `#`/`**`/`[[]`/代码符,预览不可读。
- * 这里做**轻量剥离**(正则,非完整 markdown 解析,YAGNI):取首非空行,剥标记,截断。
- * 不追求完美还原,只要比裸 markdown 可读;详情/工作台编辑器仍看完整渲染。
+ * preview-text - 工作台卡片只显示首行，但剥离规则必须和画布/收件箱
+ * 共用同一个 Markdown 预览器，避免不同页面分别露出 `###`、任务框或表格符号。
  */
 
 /**
  * 剥 markdown 标记 -> 单行纯文本预览。
- * 取首非空行(跳过空行 / hr 分隔线 / 代码围栏开口),剥内联标记,按 maxLen 截断。
+ * 取首个可读行(跳过空行 / hr / 代码围栏标记),剥内联标记,按 maxLen 截断。
  * 空 body 或全空 -> ''。
  */
 export function plainPreview(md: string, maxLen: number): string {
   if (!md) return ''
-  const lines = md.split('\n')
-  let first = ''
-  for (const raw of lines) {
-    const s = raw.trim()
-    if (!s) continue
-    if (/^[-*_]{3,}$/.test(s)) continue // hr 分隔线
-    if (/^`{3,}/.test(s)) continue // 代码围栏开口(```ts),取下一行作预览
-    first = s
-    break
-  }
-  if (!first) return ''
-  let t = first
-  t = t.replace(/^#{1,6}\s*/, '') // 标题 #/##/…
-  t = t.replace(/^>\s*/, '') // 引用 >
-  t = t.replace(/^[-*+]\s+/, '') // 无序列表 -/*/+
-  t = t.replace(/^\d+\.\s+/, '') // 有序列表 1.
-  t = t.replace(/^!\[([^\]]*)\]\([^)]*\)/, '$1') // 图片 ![alt](url) -> alt
-  t = t.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1') // 链接 [text](url) -> text
-  t = t.replace(/\[\[([^\]]+)\]\]/g, '$1') // wikilink [[x]] -> x
-  t = t.replace(/`{1,3}([^`]+)`{1,3}/g, '$1') // `code` / ```code```
-  t = t.replace(/\*\*([^*]+)\*\*/g, '$1') // **粗**
-  t = t.replace(/__([^_]+)__/g, '$1') // __粗__
-  t = t.replace(/\*([^*]+)\*/g, '$1') // *斜*
-  t = t.replace(/_([^_]+)_/g, '$1') // _斜_
-  t = t.replace(/~~([^~]+)~~/g, '$1') // ~~删~~
-  t = t.replace(/\s+/g, ' ').trim()
-  if (t.length > maxLen) return t.slice(0, maxLen) + '…'
-  return t
+  const preview = markdownPreview(md, Number.POSITIVE_INFINITY)
+  const first = preview.split('\n').find((line) => line.trim())?.trim() ?? ''
+  if (first.length <= maxLen) return first
+  // plainPreview's public maxLen contract counts source characters and adds
+  // the ellipsis as a separate visual marker (legacy callers rely on this).
+  return first.slice(0, Math.max(0, maxLen)).trimEnd() + '…'
 }
 
 /**
@@ -49,7 +26,14 @@ export function plainPreview(md: string, maxLen: number): string {
  */
 export function subtitleOf(body: string): string {
   if (!body) return ''
-  const m = body.match(/^##\s+(.+?)\s*$/m)
-  if (m && m[1]) return m[1].replace(/[*`~_]/g, '').trim().slice(0, 60)
+  const heading = body
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => /^##(?!#)(?:[ \t]*).+/.test(line))
+  if (heading) {
+    const value = plainPreview(heading.replace(/^##[ \t]*/, ''), 60)
+    if (value) return value
+  }
   return plainPreview(body, 60)
 }

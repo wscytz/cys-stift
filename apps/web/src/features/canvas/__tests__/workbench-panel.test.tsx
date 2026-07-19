@@ -123,6 +123,26 @@ describe('WorkbenchPanel', () => {
     )
   })
 
+  it('标签输入失焦也会提交，避免点击别处时丢失', () => {
+    const onSave = vi.fn()
+    const { host } = render(<WorkbenchPanel card={card} onSave={onSave} onClose={vi.fn()} />)
+    const tagInput = host.querySelector('.wb-panel__tag-input') as HTMLInputElement
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    act(() => {
+      setter.call(tagInput, '失焦标签')
+      tagInput.dispatchEvent(new Event('input', { bubbles: true }))
+      tagInput.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+    })
+    const btn = host.querySelector('button[aria-label="workbench.done"]') as HTMLButtonElement
+    act(() => btn.click())
+    expect(onSave).toHaveBeenCalledWith(
+      card.id,
+      expect.objectContaining({
+        tags: expect.arrayContaining([expect.objectContaining({ value: '失焦标签' })]),
+      }),
+    )
+  })
+
   it('保存状态:初始空;编辑后显「保存中…」(autosave 可见化)', () => {
     const { host } = render(<WorkbenchPanel card={card} onSave={vi.fn()} onClose={vi.fn()} />)
     const status = host.querySelector('[data-testid="wb-status"]') as HTMLElement

@@ -250,6 +250,74 @@ describe('AiConfirmDialog edge — dsl 无变更 → 应用 disabled', () => {
   })
 })
 
+describe('AiConfirmDialog edge — stale canvas revision', () => {
+  it('DSL proposal closes without applying when the canvas changed after preview', async () => {
+    const { host: mockHost, calls } = makeMockHost([])
+    const service = { createWithId: vi.fn() } as never
+    const onApplied = vi.fn()
+    const onRejected = vi.fn()
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog
+        mode="dsl"
+        dsl="[rect #r1] @pos(100,200) @size(300,400)"
+        targetCanvasId={'cv' as never}
+        service={service}
+        liveHost={mockHost}
+        onApplied={onApplied}
+        onRejected={onRejected}
+      />,
+    )
+    await act(async () => { await flushMicro() })
+    const applyBtn = byText(dom, /^应用$|^Apply$/)!
+    expect(applyBtn.disabled).toBe(false)
+
+    // Simulate a manual edit made while the confirmation modal is open.
+    mockHost.upsert({ id: 'manual', kind: 'rect', x: 4, y: 5, w: 20, h: 20, rotation: 0 } as CanvasElement)
+    const upsertsBeforeApply = calls.upserts.length
+    await act(async () => { applyBtn.click() })
+
+    expect(calls.upserts).toHaveLength(upsertsBeforeApply)
+    expect(onApplied).not.toHaveBeenCalled()
+    expect(onRejected).toHaveBeenCalledTimes(1)
+    expect(pushToastSpy).toHaveBeenCalledWith(expect.objectContaining({ kind: 'info' }))
+    unmount()
+  })
+
+  it('cluster proposal closes without adding relations when the canvas changed after preview', async () => {
+    const initial: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 50, rotation: 0, color: 'white' } as CanvasElement,
+      { id: 'c2', kind: 'card', x: 200, y: 0, w: 100, h: 50, rotation: 0, color: 'white' } as CanvasElement,
+    ]
+    const { host: mockHost, calls } = makeMockHost(initial)
+    const service = { get: () => ({ id: 'c1' }) } as never
+    const onApplied = vi.fn()
+    const onRejected = vi.fn()
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog
+        mode="cluster"
+        clusters={[{ ids: ['c1', 'c2'], kind: 'related', reason: 'x' }]}
+        targetCanvasId={'cv' as never}
+        service={service}
+        liveHost={mockHost}
+        onApplied={onApplied}
+        onRejected={onRejected}
+      />,
+    )
+    await act(async () => { await flushMicro() })
+    const applyBtn = byText(dom, /^应用$|^Apply$/)!
+    expect(applyBtn.disabled).toBe(false)
+
+    mockHost.upsert({ id: 'manual', kind: 'text', x: 4, y: 5, w: 20, h: 20, rotation: 0, text: 'manual' } as CanvasElement)
+    const upsertsBeforeApply = calls.upserts.length
+    await act(async () => { applyBtn.click() })
+
+    expect(calls.upserts).toHaveLength(upsertsBeforeApply)
+    expect(onApplied).not.toHaveBeenCalled()
+    expect(onRejected).toHaveBeenCalledTimes(1)
+    unmount()
+  })
+})
+
 // ── Fix 3:cluster 0 变更(applyClusters 无 arrow)→ Apply disabled ──
 
 describe('AiConfirmDialog edge — Fix 3 cluster 0 变更 → Apply disabled', () => {

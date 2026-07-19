@@ -171,6 +171,23 @@ function hydrateOnce() {
 }
 
 /**
+ * Re-read the canvas list after an external storage restore/import.
+ *
+ * The normal store is hydrate-once; importFromJson replaces the persisted
+ * envelope directly, so without an explicit rehydrate this tab could keep an
+ * old active canvas/list and later persist it over the imported snapshot.
+ * Deliberately do not persist the seed here: a replace import that omits the
+ * optional canvases field should clear the old persisted list, while the
+ * normal `get()` path still supplies the in-memory default canvas.
+ */
+export function rehydrateCanvases(): void {
+  if (typeof window === 'undefined') return
+  _hydrated = true
+  _snap = loadSnapshot()
+  notify()
+}
+
+/**
  * 持久化当前 _snap 到 localStorage。返回 true=写入成功,false=配额满
  * (此时调用方负责回滚 _snap 到写入前的值,否则内存与 localStorage
  * 不一致——UI 显示了改动,reload 后消失)。
@@ -236,6 +253,10 @@ export const canvasStore = {
   get(): CanvasesSnapshot {
     hydrateOnce()
     return _snap
+  },
+  /** Re-read canvases after an external storage restore/import. */
+  rehydrate(): void {
+    rehydrateCanvases()
   },
   /** Switch the active canvas. No-op if id is unknown. */
   setActive(id: CanvasId): void {

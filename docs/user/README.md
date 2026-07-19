@@ -21,8 +21,8 @@
 
 ### 全局快捷键
 
-- **mac**: `⌘ + ⇧ + Space`
-- **win/linux**: `Ctrl + ⇧ + Space`
+- **mac**: `⌘ + ⇧ + E`（默认，可在 Settings → Capture shortcut 修改）
+- **win/linux**: `Ctrl + ⇧ + E`（默认，可在 Settings → Capture shortcut 修改）
 - 任意路由(首页 / inbox / canvas / archive)按下 → 屏幕中央弹出 Mini Input
 - **桌面 app 后台也工作**:切换到别的 app 后按快捷键,cy's Stift 自动唤回前台并弹出 Mini Input(不需要先切回 app;安卓无系统全局热键,走 AppMenu)
 - 输入标题 → `Enter` 展开 body → `⌘/Ctrl + Enter` 保存
@@ -62,12 +62,12 @@
 ### 三种创建方式
 
 1. **双击空白** → 在该位置建灵感卡(带 body 预览 + 类型标签 + pinned 黄星)
-2. **底部工具栏** → 选工具(选择/手绘/文本/连接/橡皮),点画布拖出
+2. **画布顶栏工具栏** → 选工具(选择/手绘/文本/连接/橡皮),点画布拖出；窄屏可横向滚动工具栏
 3. **键盘快捷键**:`v`/`p`/`t`/`c`/`e`(对应 5 个工具)
 
 ### 工具栏(包豪斯)
 
-底部居中浮动,5 个 SVG 线条图标(跨平台一致渲染):
+顶栏工具栏使用 5 个 SVG 线条图标(跨平台一致渲染):
 
 | 工具 | 快捷键 | 图标 |
 |---|---|---|
@@ -141,7 +141,7 @@
 - **库页**:默认画布 / 自定义标签 / 堆叠分区,快速跳到要编辑的卡
 - **编辑器**:富 Markdown 编辑器(toolbar + split 预览,GFM 表格 / 任务列表 / 代码高亮 / 数学公式 / 脚注 实时预览)
 - **画布侧 dock**:画布展开工作台 dock,不用离开画布就能深度编辑当前卡
-- **专注编辑态**:dock 头部 **⤢** 按钮 → 编辑器撑满,画布缩成可拖拽 / 可收起的浮 minimap 预览(收起剩一个小角不碍事)。给长文全屏沉浸空间,画布仍作被动参考常驻一角;再按 ⤢ 退出
+- **画布预览**:工作台默认优先显示正文；需要时按「展开画布预览」打开 240×180 的只读预览，用户选择会记住，卡片或自由元素变化后会自动刷新
 
 ---
 
@@ -206,7 +206,7 @@
 
 ## 标签墙(`/tags`)
 
-`/tags` —— 标签云 + 卡网格。10 色固定调色板,点标签看该标签下所有卡。
+`/tags` —— 标签云 + 卡网格。六色固定调色板(兼容迁移旧颜色),点标签看该标签下所有卡。
 
 ---
 
@@ -223,11 +223,11 @@
 - **本地存储仪表盘**:实时显示 localStorage 用量。**60% 黄 / 80% 红**警告 → 建议导出 JSON 备份。防"刷新全丢"的关键防线
 - **Capture shortcut**:改全局快捷键(桌面)
 - **Language**:中/英切换,实时刷新
-- **Appearance / Theme**:Light / Dark / Follow system
+- **Appearance**:当前版本固定为 Bauhaus light；历史导入中的 dark/system 值会兼容读取,但不会切换主题
 - **AI provider**:OpenAI / Anthropic / DeepSeek / Ollama(本地)等多 provider + 多 profile
-- **实验室区**:vision / autoCurate / autoTag / autoCapture / agentToolCalling 五个实验室,默认关,确认门 + 守卫
+- **实验室区**:当前为空状态；Vision、自动整理/建卡/打标签和主动检索尚未接入,不会在后台修改或外发数据
 - **Data → Export JSON**:导出全部数据为开放格式 JSON(包含 cards / media / drafts / settings / canvases / freeform 几何)
-- **Data → Import JSON**:从 JSON 备份恢复(覆盖当前,二次确认)
+- **Data → Import JSON**:先预检并二次确认,可选择 Replace(清理备份中不存在的本地数据)或 Merge(按 ID 合并);写入前自动保存本机完整恢复点，完成后当前页面直接刷新各 store,不强制整页重载；成功恢复后恢复点才清理
 
 ---
 
@@ -245,7 +245,7 @@
 
 | 动作 | 快捷键 |
 |---|---|
-| 全局捕获(桌面前台/后台) | `⌘/Ctrl + ⇧ + Space` |
+| 全局捕获(桌面前台/后台) | `⌘/Ctrl + ⇧ + E`（默认，可自定义） |
 | 搜索页 | `⌘/` / `Ctrl+/` |
 | 命令面板 | `⌘K` |
 | Mini Input 保存 | `⌘/Ctrl + Enter` |
@@ -260,7 +260,7 @@
 
 ## 已知限制
 
-- **macOS 全局快捷键**:`⌘+⇧+Space` 可能被 Spotlight 系统级拦截,需在系统设置改键
+- **桌面全局快捷键**:默认 `⌘/Ctrl+⇧+E`。如果注册失败（可能被其他应用占用）,请在 Settings → Capture shortcut 换一个组合键；桌面壳会在应用内提示失败原因。
 - **安卓全局快捷键**:安卓无系统级全局热键概念,捕获走 AppMenu
 - **多设备同步**:不在 MVP(数据 schema 已支持,接入 Yjs/Automerge 留后)
 - **视频 / PDF / Excel**:未支持(用户搁置)
@@ -268,3 +268,5 @@
 ---
 
 详见 [当前状态](../STATE.md) 与 [架构总览](../architecture/overview.md)。
+
+产品工作流展示见 [`/showcase`](http://localhost:3000/showcase/)；它只展示功能边界，不替代用户指南。

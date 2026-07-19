@@ -15,7 +15,7 @@
  *
  * 不改 AgentConfirmCard —— /ask + companion 继续用它(它内联在对话流里,非 Modal)。
  */
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Modal } from '@cys-stift/ui'
 import type { CanvasId, CardService } from '@cys-stift/domain'
 import { InMemoryCanvasHost, type CanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
@@ -36,7 +36,7 @@ import { VERSION } from '@/lib/version'
 import { decodeIntentJson } from './intent-validation'
 import { compileIntent } from './intent-compiler'
 import { commitIntentPlan } from './apply-plan'
-import { intentSnapshotFromHost, makeIntentCommitPort, previewIntentPlan } from './intent-host-adapter'
+import { intentRevision, intentSnapshotFromHost, makeIntentCommitPort, previewIntentPlan } from './intent-host-adapter'
 
 type Phase = 'confirming' | 'applying' | 'applied' | 'error'
 
@@ -83,6 +83,20 @@ interface OutlineProps extends BaseProps {
 // Task 4 加 ClusterProps;Task 5 加 OutlineProps。
 export type AiConfirmDialogProps = DslProps | IntentProps | ClusterProps | OutlineProps
 
+/**
+ * A confirmation dialog is a snapshot, not a live editor. Keep a stable
+ * identity for the proposal so unrelated parent renders do not silently move
+ * its base revision forward. Editing the DSL/JSON changes the preview, but it
+ * must still be applied against the canvas that was visible when the dialog
+ * opened.
+ */
+function proposalIdentity(props: AiConfirmDialogProps): string | null {
+  if (props.mode === 'dsl') return `dsl:${props.dsl}`
+  if (props.mode === 'intent') return `intent:${props.intent}`
+  if (props.mode === 'cluster') return `cluster:${JSON.stringify(props.clusters)}`
+  return null
+}
+
 export function AiConfirmDialog(props: AiConfirmDialogProps) {
   const { t } = useI18n()
   const [phase, setPhase] = useState<Phase>('confirming')
@@ -91,6 +105,17 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
   const [editedDsl, setEditedDsl] = useState(dslInitial)
   const mdInitial = props.mode === 'outline' ? props.outlineMarkdown : ''
   const [editedMarkdown, setEditedMarkdown] = useState(mdInitial)
+
+  // DSL and cluster used to apply directly to the live host after the modal
+  // had been open for an arbitrary amount of time. Capture the host revision
+  // once per proposal and reject stale commits; Intent has the same contract
+  // inside commitIntentPlan.
+  const proposalKey = proposalIdentity(props)
+  const proposalRevisionRef = useRef<{ key: string; host: CanvasHost; revision: string } | null>(null)
+  if (proposalKey && (proposalRevisionRef.current === null || proposalRevisionRef.current.key !== proposalKey || proposalRevisionRef.current.host !== (props as DslProps | IntentProps | ClusterProps).liveHost)) {
+    const liveHost = (props as DslProps | IntentProps | ClusterProps).liveHost
+    proposalRevisionRef.current = { key: proposalKey, host: liveHost, revision: intentRevision(liveHost.getElements()) }
+  }
 
   // ── dsl mode: parse + 预演 diff ──
   // useDeferredValue: 用户逐键编辑 textarea 时,editedDsl 每键变化;若 preview
@@ -201,6 +226,15 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
         else pushToast({ kind: 'success', message: t('canvas.pasteDslApplied', { n: String(report.applied) }) })
       } else if (props.mode === 'dsl') {
         if (preview?.kind !== 'ok' || !afterState) { setPhase('confirming'); return }
+        const proposalRevision = proposalRevisionRef.current?.revision
+        if (proposalRevision && intentRevision(props.liveHost.getElements()) !== proposalRevision) {
+          // Do not let a stale preview overwrite a manual edit made while the
+          // confirmation dialog was open. Closing the dialog leaves the live
+          // canvas untouched and makes the next action start from fresh state.
+          pushToast({ kind: 'info', message: t('agent.staleRevision') })
+          props.onRejected()
+          return
+        }
         // 诚实位移反馈(迁自 page handleAILayout):apply 前后快照卡位置 → summarizeMovement。
         const cardIdsInOps = new Set(
           preview.ops
@@ -236,6 +270,12 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
         else if (summary.moved > 0) pushToast({ kind: 'success', message: t('canvas.aiLayoutMoved', { moved: String(summary.moved), avgPx: String(summary.avgPx) }) })
         else pushToast({ kind: 'info', message: t('canvas.aiLayoutUnchanged') })
       } else if (props.mode === 'cluster') {
+        const proposalRevision = proposalRevisionRef.current?.revision
+        if (proposalRevision && intentRevision(props.liveHost.getElements()) !== proposalRevision) {
+          pushToast({ kind: 'info', message: t('agent.staleRevision') })
+          props.onRejected()
+          return
+        }
         // cluster apply:applyClusters 内部无 batch → 外部包 batch 保单 undo。
         let res = { arrowsCreated: 0, clustersApplied: 0 }
         props.liveHost.batch(() => {

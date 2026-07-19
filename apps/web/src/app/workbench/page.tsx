@@ -1,15 +1,19 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import { BauhausMotif, Card as UICard, Modal, Tag, Toolbar, Button } from '@cys-stift/ui'
 import type { Card, CardId, TagRef } from '@cys-stift/domain'
+import type { CanvasHost } from '@cys-stift/canvas-engine'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
 import { useWorkbench, workbenchStore } from '@/lib/workbench-store'
 import { PageLoading } from '@/components/page-loading'
 import { WorkbenchBrowser } from '@/features/workbench/workbench-browser'
 import { WorkbenchPanel } from '@/features/canvas/workbench-panel'
+import { MinimapPreview } from '@/features/canvas/minimap-preview'
+import { buildCanvasHostForCanvas } from '@/features/canvas/canvas-host-builder'
+import { getFreeformVersion, subscribeFreeformChanges } from '@/lib/canvas-freeform-store'
 
 /**
  * 工作台页 /workbench — 左库(找/切卡)+ 右编辑器(就地编辑)。
@@ -21,6 +25,11 @@ import { WorkbenchPanel } from '@/features/canvas/workbench-panel'
 export default function WorkbenchPage() {
   const { t } = useI18n()
   const { snap, service, ready } = useDb()
+  const freeformVersion = useSyncExternalStore(
+    subscribeFreeformChanges,
+    getFreeformVersion,
+    getFreeformVersion,
+  )
   const router = useRouter()
   const { cardId, origin } = useWorkbench()
   // Entries that already selected a card (home recent items, canvas cards)
@@ -28,7 +37,7 @@ export default function WorkbenchPage() {
   const [mobileLibrary, setMobileLibrary] = useState(() => cardId === null)
   const [editorDirty, setEditorDirty] = useState(false)
   const [pendingCardId, setPendingCardId] = useState<string | null>(null)
-  void snap
+  const [canvasPreviewHost, setCanvasPreviewHost] = useState<CanvasHost | null>(null)
 
   const cards = useMemo(
     () => service.listAll().filter((c) => !c.deletedAt),
@@ -37,6 +46,21 @@ export default function WorkbenchPage() {
 
   const card = cardId ? service.get(cardId as CardId) : undefined
   const active = card && !card.deletedAt ? card : undefined
+  const previewCanvasId = active?.canvasPosition?.canvasId
+
+  useEffect(() => {
+    let stale = false
+    setCanvasPreviewHost(null)
+    if (!previewCanvasId) return () => { stale = true }
+    void buildCanvasHostForCanvas(previewCanvasId, service)
+      .then(({ host }) => {
+        if (!stale) setCanvasPreviewHost(host)
+      })
+      .catch(() => {
+        if (!stale) setCanvasPreviewHost(null)
+      })
+    return () => { stale = true }
+  }, [previewCanvasId, service, snap, freeformVersion])
 
   const wbSave = (id: CardId | string, patch: { title: string; body: string; tags: TagRef[] }) => {
     return service.update(id as CardId, patch) !== null
@@ -105,6 +129,7 @@ export default function WorkbenchPage() {
                     requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'auto' }))
                   }}
                 />
+                <MinimapPreview host={canvasPreviewHost} activeElementId={String(active.id)} />
               </div>
             ) : (
               <div className="wb-page__empty">{t('workbench.selectHint')}</div>
@@ -162,7 +187,7 @@ const styles = `
   height: calc(100vh - 180px);
 }
 .wb-page__lib { overflow: auto; min-height: 0; }
-.wb-page__editor { min-width: 0; min-height: 0; }
+.wb-page__editor { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
 .wb-page__confirm-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-3); }
 .wb-page__empty {
   display: grid; place-items: center;

@@ -1,21 +1,23 @@
 /**
  * Task 3 regression: /ask must use the unified per-canvas conversation store
  * (loadConversation / saveConversation / clearConversation), reload the
- * conversation when the canvas-select changes, and must NOT persist a
- * `targetCanvasId` field on chat messages (the per-canvas localStorage key
- * already encodes the canvas).
+ * conversation when the canvas-select changes, and persist message-level
+ * `targetCanvasId` provenance so a stale proposal cannot be applied after a
+ * canvas switch. The per-canvas localStorage key remains the primary scope.
  *
  * Mirrors companion-chat.test.tsx: no @testing-library/react in devDeps
  * (codebase policy); mounts via react-dom/client + act (React 19 built-in).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import React, { act } from 'react'
-import { createRoot } from 'react-dom/client'
+import { createRoot, hydrateRoot } from 'react-dom/client'
+import { renderToString } from 'react-dom/server'
 import type { CanvasId } from '@cys-stift/domain'
 
 // --- Mocks (must be before component import; vitest hoists vi.mock) ---
 
 const streamTextMock = vi.fn()
+const pushToastMock = vi.fn()
 let currentAIProfile = {
   id: 'p1',
   name: 'Profile 1',
@@ -30,8 +32,9 @@ vi.mock('@/features/ai/stream-text', () => ({
 }))
 
 vi.mock('@/features/ai/ai-settings-provider', () => ({
-  isAIReady: () => true,
-  getCurrentAI: () => currentAIProfile,
+  isAIReady: (profile: unknown) => profile !== null,
+  // The page must not depend on this non-reactive cache for its first render.
+  getCurrentAI: () => null,
 }))
 
 vi.mock('@/features/ai/canvas-snapshot', () => ({
@@ -40,6 +43,7 @@ vi.mock('@/features/ai/canvas-snapshot', () => ({
 }))
 
 vi.mock('@/features/ai/agent-prompt', () => ({
+  RAG_TOP_N: 8,
   AGENT_SYSTEM_PROMPT: 'sys',
   buildAgentUserPrompt: (q: string) => `PROMPT:${q}`,
   extractDslBlocks: () => [],
@@ -62,7 +66,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', rest, children),
 }))
 
-vi.mock('@/lib/toast-store', () => ({ pushToast: vi.fn() }))
+vi.mock('@/lib/toast-store', () => ({ pushToast: (...args: unknown[]) => pushToastMock(...args) }))
 
 vi.mock('@/features/ai/sample-store', () => ({
   addSample: vi.fn(),
@@ -70,7 +74,20 @@ vi.mock('@/features/ai/sample-store', () => ({
 }))
 
 vi.mock('@/lib/settings-store', () => ({
-  settingsStore: { get: () => ({ aiSampleCapture: false }) },
+  useSettings: () => ({
+    settings: {
+      profiles: [currentAIProfile],
+      activeProfileId: currentAIProfile.id,
+    },
+    ready: true,
+  }),
+  settingsStore: {
+    get: () => ({
+      aiSampleCapture: false,
+      profiles: [currentAIProfile],
+      activeProfileId: currentAIProfile.id,
+    }),
+  },
 }))
 
 vi.mock('@/lib/db-client', () => ({
@@ -260,7 +277,14 @@ describe('/ask page — per-canvas conversation store (Task 3)', () => {
   beforeEach(() => {
     window.localStorage.clear()
     streamTextMock.mockReset()
+    pushToastMock.mockReset()
     streamTextMock.mockResolvedValue({ content: 'plain answer' })
+  })
+
+  it('renders the composer from reactive settings when the module cache is empty', () => {
+    const { host, unmount } = render(<AskPage />)
+    expect(host.querySelector('textarea.ask__input')).not.toBeNull()
+    unmount()
   })
 
   it('renders messages from the current targetCanvasId conversation on mount', () => {
@@ -273,6 +297,48 @@ describe('/ask page — per-canvas conversation store (Task 3)', () => {
     expect(text).toContain('hello-A')
     expect(text).toContain('world-A')
     unmount()
+  })
+
+  it('hydrates persisted history without a server/client first-frame mismatch', async () => {
+    saveConversation(CV_A, [
+      { role: 'user', content: 'persisted-before-hydration' },
+    ])
+
+    const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window')!
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: undefined,
+      writable: true,
+    })
+    let markup = ''
+    try {
+      markup = renderToString(<AskPage />)
+    } finally {
+      Object.defineProperty(globalThis, 'window', windowDescriptor)
+    }
+    expect(markup).not.toContain('persisted-before-hydration')
+
+    const host = document.createElement('div')
+    host.innerHTML = markup
+    document.body.appendChild(host)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    let root: ReturnType<typeof hydrateRoot> | null = null
+    try {
+      await act(async () => {
+        root = hydrateRoot(host, <AskPage />)
+        await Promise.resolve()
+      })
+      expect(host.textContent).toContain('persisted-before-hydration')
+      expect(
+        consoleError.mock.calls.some((args) =>
+          args.some((arg) => String(arg).includes('Hydration failed')),
+        ),
+      ).toBe(false)
+    } finally {
+      consoleError.mockRestore()
+      if (root) act(() => root?.unmount())
+      host.remove()
+    }
   })
 
   it('switching the canvas-select reloads the new canvas conversation (old gone)', async () => {
@@ -290,7 +356,7 @@ describe('/ask page — per-canvas conversation store (Task 3)', () => {
     unmount()
   })
 
-  it('send writes to current targetCanvasId key; persisted messages have NO targetCanvasId field', async () => {
+  it('send writes to current targetCanvasId key and persists message provenance', async () => {
     const { host, unmount } = render(<AskPage />)
     await typeAndSend(host, 'test question')
     // Wait for the 400ms debounced save to fire.
@@ -303,12 +369,28 @@ describe('/ask page — per-canvas conversation store (Task 3)', () => {
     expect(raw).not.toBeNull()
     const stored = JSON.parse(raw!) as Record<string, unknown>[]
     expect(stored.length).toBeGreaterThanOrEqual(2)
-    // Every persisted message must omit targetCanvasId (the key encodes canvas).
+    // Every newly written message carries the canvas provenance as a second
+    // guard against a delayed render/apply crossing a canvas switch.
     for (const m of stored) {
-      expect(m).not.toHaveProperty('targetCanvasId')
+      expect(m.targetCanvasId).toBe(String(CV_A))
     }
     // And NOT written to the legacy global key.
     expect(window.localStorage.getItem('cys-stift.ask-chat.v1')).toBeNull()
+    unmount()
+  })
+
+  it('shows an actionable truncation message instead of a format-retry result', async () => {
+    streamTextMock.mockResolvedValue({
+      content: 'partial',
+      finishReason: 'length',
+      stopReason: 'length',
+    })
+    const { host, unmount } = render(<AskPage />)
+    await typeAndSend(host, 'long request')
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+    expect(host.textContent).toContain('ai.outputTruncated')
+    expect(host.textContent).not.toContain('ask.retrying')
+    expect(pushToastMock).toHaveBeenCalledWith({ kind: 'info', message: 'ai.outputTruncated' })
     unmount()
   })
 })

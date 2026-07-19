@@ -16,7 +16,7 @@ import {
   AlignHorizontalJustifyStart, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd,
   AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
   AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, Expand,
-  MoreHorizontal,
+  MoreHorizontal, Search,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -33,7 +33,7 @@ export type CanvasIconName =
   | 'undo' | 'redo' | 'new-canvas' | 'rename' | 'delete'
   | 'template' | 'import' | 'ai' | 'workflow' | 'relation'
   | 'frame' | 'outline' | 'overview' | 'auto-layout'
-  | 'dsl' | 'export' | 'diff' | 'shortcuts'
+  | 'dsl' | 'export' | 'diff' | 'shortcuts' | 'search'
   | 'more'
 
 const MAP: Record<CanvasIconName, LucideIcon> = {
@@ -45,7 +45,7 @@ const MAP: Record<CanvasIconName, LucideIcon> = {
   undo: Undo2, redo: Redo2, 'new-canvas': Plus, rename: Pencil, delete: Trash2,
   template: LayoutTemplate, import: Download, ai: Sparkles, workflow: Workflow, relation: Link,
   frame: Frame, outline: List, overview: LayoutGrid, 'auto-layout': Network,
-  dsl: Braces, export: Upload, diff: GitCompare, shortcuts: Keyboard, more: MoreHorizontal,
+  dsl: Braces, export: Upload, diff: GitCompare, shortcuts: Keyboard, more: MoreHorizontal, search: Search,
 }
 
 /** 画布图标。size 默认跟随 CSS(.tb-tool__icon 等);传 size 覆盖。 */

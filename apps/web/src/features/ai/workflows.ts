@@ -24,7 +24,7 @@
 import type { CanvasId, CardService } from '@cys-stift/domain'
 import { serializeCardsForAI } from './ai-context'
 import { getCurrentAI, isAIReady } from './ai-settings-provider'
-import { retryUntilValid } from './retry-until-valid'
+import { isTerminalRetryFailure, retryUntilValid, type RetryFailureReason } from './retry-until-valid'
 import { streamText } from './stream-text'
 
 export interface GenerateOutlineResult {
@@ -34,6 +34,8 @@ export interface GenerateOutlineResult {
   empty?: boolean
   /** ok=true 且非空:大纲 markdown(调用方开确认门;确认后才建卡)。 */
   markdown?: string
+  /** Provider terminal failure, when the model was truncated/refused/unreachable. */
+  failureReason?: RetryFailureReason
 }
 
 /**
@@ -64,7 +66,7 @@ export async function generateOutline(
     initialMessages: [{ role: 'user', content: userPrompt }],
     produce: (messages) =>
       streamText(cfg, { system: systemPrompt, user: userPrompt, messages, temperature: 0.3 }, () => {}, opts.signal)
-        .then((x) => x?.content ?? ''),
+        .then((x) => x),
     parse: (text) => ({
       ok: text.trim().length > 0,
       errors: text.trim() ? [] : [{ line: 0, text: '', message: 'empty output' }],
@@ -72,6 +74,9 @@ export async function generateOutline(
     buildCorrection: () =>
       'Your previous output was empty. Regenerate the Markdown outline grouping the cards by theme.',
   })
+  if (isTerminalRetryFailure(r.failureReason)) {
+    return { ok: true, empty: true, failureReason: r.failureReason }
+  }
   const content = r.text.trim()
   if (!content) return { ok: true, empty: true }
   return { ok: true, markdown: content }

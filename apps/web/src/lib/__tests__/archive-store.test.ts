@@ -21,6 +21,25 @@ beforeEach(() => {
 })
 
 describe('archive-store CRUD', () => {
+  it('redacts provider keys even when append bypasses the payload builder', async () => {
+    const { archiveStore } = await import('../archive-store')
+    const secret = 'sk-direct-archive-call-must-not-persist'
+    await archiveStore.append(
+      'manual',
+      'secret boundary',
+      {
+        cards: [],
+        mediaAssets: {},
+        settings: { profiles: [{ id: 'p1', apiKey: secret }] },
+      } as ArchivePayload,
+      '0.0.0',
+    )
+
+    const persisted = await archiveStore.loadPayload(1)
+    expect(JSON.stringify(persisted)).not.toContain(secret)
+    expect(persisted?.settings?.profiles).toEqual([{ id: 'p1', apiKey: '' }])
+  })
+
   it('append 单调递增 archiveVersion + 返回 meta', async () => {
     const { archiveStore } = await import('../archive-store')
     let now = 1_000_000

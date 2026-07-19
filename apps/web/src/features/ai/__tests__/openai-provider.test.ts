@@ -97,6 +97,41 @@ describe('openai provider — structuredOutput 思考模式适配', () => {
     await p.streamText({ system: 's', user: 'u', structuredOutput: true }, () => {}, undefined)
     expect(calls[0]!.body.thinking).toBeUndefined()
   })
+
+  it('保留流末帧 finish_reason=length，避免上层把截断当普通格式错', async () => {
+    const calls = mockFetch(
+      'data: {"choices":[{"delta":{"content":"[card #a"},"finish_reason":null}]}\n\n' +
+        'data: {"choices":[{"delta":{},"finish_reason":"length"}]}\n\n' +
+        'data: [DONE]\n\n',
+    )
+    const p = createOpenAIProvider({ apiKey: 'sk-test', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' })
+    const response = await p.streamText({ system: 's', user: 'u' }, () => {}, undefined)
+    expect(response.content).toBe('[card #a')
+    expect(response.finishReason).toBe('length')
+    expect(response.stopReason).toBe('length')
+    expect(calls).toHaveLength(1)
+  })
+
+  it('读取 OpenAI-compatible refusal delta，并保留 refusal 文本', async () => {
+    const body =
+      'data: {"choices":[{"delta":{"refusal":"不能处理"},"finish_reason":null}]}\n\n' +
+      'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n' +
+      'data: [DONE]\n\n'
+    mockFetch(body)
+    const p = createOpenAIProvider({ apiKey: 'sk-test', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' })
+    const response = await p.streamText({ system: 's', user: 'u' }, () => {}, undefined)
+    expect(response.refusal).toBe('不能处理')
+    expect(response.finishReason).toBe('refusal')
+    expect(response.stopReason).toBe('refusal')
+  })
+
+  it('无换行的末帧也会被解析', async () => {
+    mockFetch('data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}')
+    const p = createOpenAIProvider({ apiKey: 'sk-test', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' })
+    const response = await p.streamText({ system: 's', user: 'u' }, () => {}, undefined)
+    expect(response.content).toBe('ok')
+    expect(response.finishReason).toBe('stop')
+  })
 })
 
 // isDeepSeekEndpoint 纯函数单测(Fix 4a 拓宽:baseUrl OR model)。

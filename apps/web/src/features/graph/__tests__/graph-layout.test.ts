@@ -39,6 +39,25 @@ describe('createGraphSimulation 参数化初始坐标', () => {
     expect(n2.fx).toBeNull() // 无 fx → 不固定
   })
 
+  it('损坏的缓存坐标回落且不会把 NaN 固定点送进 d3', () => {
+    const handle = createGraphSimulation(nodes, edges, {
+      width: 800,
+      height: 600,
+      initialPositions: {
+        n1: { x: 100, y: 200, fx: 100, fy: Number.NaN },
+        n2: { x: Number.NaN, y: 200, fx: 100, fy: 200 },
+      },
+    })
+    const n1 = handle.nodes.find((node) => node.id === 'n1')!
+    const n2 = handle.nodes.find((node) => node.id === 'n2')!
+    expect(n1).toMatchObject({ x: 100, y: 200, fx: null, fy: null })
+    expect(Number.isFinite(n2.x)).toBe(true)
+    expect(Number.isFinite(n2.y)).toBe(true)
+    expect(n2.fx).toBeNull()
+    expect(n2.fy).toBeNull()
+    handle.stop()
+  })
+
   it('initialPositions 部分节点有缓存,缺失节点 fallback 抖动', () => {
     const handle = createGraphSimulation(nodes, edges, {
       width: 800,

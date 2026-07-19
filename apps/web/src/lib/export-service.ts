@@ -1,6 +1,7 @@
 'use client'
 
-import type { Card, Canvas, CanvasId } from '@cys-stift/domain'
+import { normalizeTagColor, type Card, type Canvas, type CanvasId } from '@cys-stift/domain'
+import { ACTIVE_CANVAS_KINDS, type CanvasElement } from '@cys-stift/canvas-engine'
 import { canvasFreeformStore, type CanvasFreeformSnapshot } from './canvas-freeform-store'
 import { downloadFile } from './download'
 import type { CanvasTemplate } from './canvas-templates'
@@ -8,6 +9,12 @@ import type { PersistedConversationMessage } from './conversation-store'
 import type { Sample } from '@/features/ai/sample-store'
 import { redactExportSecrets, restoreDeviceProfileSecrets } from './export-redaction'
 import { isSafeMediaDataUrl, MAX_SAFE_MEDIA_BYTES } from './safe-href'
+import { rehydrateCards } from './db-client'
+import { rehydrateDrafts } from './draft-store'
+import { rehydrateSettings } from './settings-store'
+import { rehydrateCanvases } from './canvas-store'
+import { rehydrateCanvasViews } from './canvas-view-store'
+import { rehydrateConversations } from './conversation-store'
 
 // ── Export (spec §1.2 信念4 "数据可迁移") ──────────────────────────────────
 // Serialise the user's local data to an open JSON format. The browser
@@ -223,14 +230,18 @@ export async function downloadExport(
 
 // ── Import (Phase 9.1) ─────────────────────────────────────────────────────
 // Reverse of export: validate a JSON string and write it back to the
-// browser stores. Merge strategy is OVERWRITE (the exported snapshot
-// becomes the source of truth). Callers should prompt the user to
-// export first as a backup.
+// browser stores. Replace makes the exported snapshot the source of truth;
+// merge preserves local-only records. Real imports first persist a complete
+// device-local checkpoint, while dry-run validation remains read-only.
 
 export interface ImportResult {
   ok: boolean
   cards: number
   mediaAssets: number
+  /** Whether a pre-import recovery snapshot was persisted for this attempt. */
+  checkpointCreated?: boolean
+  /** Set by restoreImportCheckpoint after the recovery slot is removed. */
+  checkpointCleared?: boolean
   /** 导入的 canvas 数(写入 canvases localStorage key 的条数)。 */
   canvases?: number
   /** 导入成功 freeform 几何的 canvas 数(OPFS/localStorage)。 */
@@ -250,6 +261,14 @@ export interface ImportOptions {
   mode?: ImportMode
   /** Validate and build the complete write plan without mutating storage. */
   dryRun?: boolean
+  /**
+   * Persist the current complete device-local state before writing an import.
+   * Portable exports remain secret-redacted, while this local recovery copy
+   * retains settings credentials so a replace can be reversed faithfully.
+   * Enabled by default for real imports; dryRun never writes it. Recovery
+   * imports pass `false` so restoring cannot replace its own checkpoint.
+   */
+  checkpoint?: boolean
 }
 
 type JsonObject = Record<string, unknown>
@@ -260,6 +279,7 @@ const STORE_KEYS = {
   media: 'cys-stift.media.v1',
   drafts: 'cys-stift.drafts.v1',
   settings: 'cys-stift.settings.v2',
+  settingsLegacy: 'cys-stift.settings.v1',
   canvases: 'cys-stift.canvases.v1',
   canvasView: 'cys-stift.canvas-view.v1',
   templates: 'cys-stift.canvas-templates.v1',
@@ -270,6 +290,49 @@ const CONVERSATION_PREFIX = 'cys-stift.conversation.'
 const CONVERSATION_SUFFIX = '.v2'
 const FREEFORM_PREFIX = 'cys-stift.canvas-freeform.'
 const FREEFORM_SUFFIX = '.v1'
+
+/**
+ * The last state before a user import. This is deliberately separate from
+ * the normal export stores so an import rollback can never remove it. Keep a
+ * single slot: the useful recovery target is the state immediately before
+ * the most recent import attempt.
+ */
+export const IMPORT_CHECKPOINT_VERSION = 1 as const
+export const IMPORT_CHECKPOINT_STORAGE_KEY = 'cys-stift.import-checkpoint.v1'
+/** Short alias for callers that refer to the key as a checkpoint key. */
+export const IMPORT_CHECKPOINT_KEY = IMPORT_CHECKPOINT_STORAGE_KEY
+
+export interface ImportCheckpoint {
+  version: typeof IMPORT_CHECKPOINT_VERSION
+  createdAt: string
+  mode: ImportMode
+  payload: ExportPayload
+}
+
+export interface ImportCheckpointMeta {
+  version: typeof IMPORT_CHECKPOINT_VERSION
+  createdAt: string
+  mode: ImportMode
+  cards: number
+  mediaAssets: number
+  canvases: number
+}
+
+/**
+ * Import writes the backing keys directly so it can commit one transaction
+ * across stores. Refresh every hydrate-once store only after both the
+ * localStorage and freeform portions have succeeded; otherwise a partial
+ * import could expose a half-restored in-memory view or let a stale mutator
+ * overwrite the rollback.
+ */
+function rehydrateImportedStores(): void {
+  rehydrateCards()
+  rehydrateSettings()
+  rehydrateDrafts()
+  rehydrateCanvases()
+  rehydrateCanvasViews()
+  rehydrateConversations()
+}
 
 function isObject(value: unknown): value is JsonObject {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -366,6 +429,87 @@ function validateMediaAssets(value: unknown): string | null {
   return null
 }
 
+const IMPORTABLE_CANVAS_KINDS = new Set<string>([
+  ...ACTIVE_CANVAS_KINDS,
+  // Keep legacy shapes readable when an older export still contains them.
+  'ellipse',
+  'line',
+  'note',
+  'image',
+])
+
+function finiteGeometry(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 10_000_000
+}
+
+/**
+ * Validate freeform geometry before it reaches OPFS/localStorage. Checking
+ * only id/kind lets NaN-like values, malformed elbow points, and dangling
+ * arrow references survive import and fail later in render/hit-test code.
+ */
+function validateFreeformElements(
+  canvasId: string,
+  elements: unknown[],
+  knownIds: Set<string>,
+): string | null {
+  const ids = new Set<string>()
+  for (let index = 0; index < elements.length; index++) {
+    const raw = elements[index]
+    if (!isObject(raw)) return `freeform.${canvasId}.elements[${index}] must be an object`
+    const element = raw as Partial<CanvasElement> & { meta?: Record<string, unknown> }
+    if (typeof element.id !== 'string' || element.id.length === 0 || element.id.length > 256) {
+      return `freeform.${canvasId}.elements[${index}].id is invalid`
+    }
+    if (ids.has(element.id)) return `freeform.${canvasId}.elements has duplicate id ${element.id}`
+    ids.add(element.id)
+    if (typeof element.kind !== 'string' || !IMPORTABLE_CANVAS_KINDS.has(element.kind)) {
+      return `freeform.${canvasId}.elements[${index}].kind is invalid`
+    }
+    for (const field of ['x', 'y', 'w', 'h', 'rotation'] as const) {
+      if (!finiteGeometry(element[field])) {
+        return `freeform.${canvasId}.elements[${index}].${field} is invalid`
+      }
+    }
+    if (element.text !== undefined && typeof element.text !== 'string') {
+      return `freeform.${canvasId}.elements[${index}].text is invalid`
+    }
+    if (element.from !== undefined || element.to !== undefined) {
+      if (typeof element.from !== 'string' || typeof element.to !== 'string') {
+        return `freeform.${canvasId}.elements[${index}] arrow endpoints are invalid`
+      }
+    }
+    if (element.curve !== undefined) {
+      if (!isObject(element.curve) || !finiteGeometry(element.curve.cx) || !finiteGeometry(element.curve.cy)) {
+        return `freeform.${canvasId}.elements[${index}].curve is invalid`
+      }
+    }
+    if (element.elbow !== undefined) {
+      if (!Array.isArray(element.elbow) || element.elbow.length > 2 || element.elbow.some((point) =>
+        !isObject(point) || !finiteGeometry(point.x) || !finiteGeometry(point.y))) {
+        return `freeform.${canvasId}.elements[${index}].elbow is invalid`
+      }
+    }
+    if (element.kind === 'freedraw' && element.meta?.points !== undefined) {
+      const points = element.meta.points
+      if (!Array.isArray(points) || points.length > 100_000 || points.some((point) =>
+        !Array.isArray(point) || point.length < 2 || !finiteGeometry(point[0]) || !finiteGeometry(point[1]))) {
+        return `freeform.${canvasId}.elements[${index}].meta.points is invalid`
+      }
+    }
+  }
+
+  const allIds = new Set([...knownIds, ...ids])
+  for (let index = 0; index < elements.length; index++) {
+    const element = elements[index] as Partial<CanvasElement>
+    if (element.kind === 'arrow' && (element.from !== undefined || element.to !== undefined)) {
+      if (!allIds.has(String(element.from)) || !allIds.has(String(element.to))) {
+        return `freeform.${canvasId}.elements[${index}] arrow endpoint is missing`
+      }
+    }
+  }
+  return null
+}
+
 function restoreStorageSnapshot(
   snapshot: Array<{ key: string; previous: string | null }>,
 ): boolean {
@@ -395,6 +539,114 @@ function currentCanvasIds(): Set<string> {
     ids.add(key.slice(FREEFORM_PREFIX.length, -FREEFORM_SUFFIX.length))
   }
   return ids
+}
+
+function parseImportCheckpoint(raw: string | null): ImportCheckpoint | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!isObject(parsed)) return null
+    if (parsed.version !== IMPORT_CHECKPOINT_VERSION) return null
+    if (typeof parsed.createdAt !== 'string' || Number.isNaN(new Date(parsed.createdAt).getTime())) {
+      return null
+    }
+    if (parsed.mode !== 'replace' && parsed.mode !== 'merge') return null
+    if (!isObject(parsed.payload)) return null
+    const payload = parsed.payload as Partial<ExportPayload>
+    if (payload.version !== EXPORT_FORMAT_VERSION || !Array.isArray(payload.cards)) return null
+    if (!isObject(payload.mediaAssets)) return null
+    return parsed as unknown as ImportCheckpoint
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Read the persisted pre-import snapshot. Invalid data is treated as absent
+ * but is left in place so a transient parse problem cannot silently destroy a
+ * user's only recovery copy.
+ */
+export function getImportCheckpoint(): ImportCheckpoint | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return parseImportCheckpoint(window.localStorage.getItem(IMPORT_CHECKPOINT_STORAGE_KEY))
+  } catch {
+    return null
+  }
+}
+
+/** Compatibility/readability alias for callers that use an imperative name. */
+export const readImportCheckpoint = getImportCheckpoint
+
+export function getImportCheckpointMeta(): ImportCheckpointMeta | null {
+  const checkpoint = getImportCheckpoint()
+  if (!checkpoint) return null
+  return {
+    version: checkpoint.version,
+    createdAt: checkpoint.createdAt,
+    mode: checkpoint.mode,
+    cards: checkpoint.payload.cards.length,
+    mediaAssets: Object.keys(checkpoint.payload.mediaAssets ?? {}).length,
+    canvases: checkpoint.payload.canvases?.canvases.length ?? 0,
+  }
+}
+
+export function hasImportCheckpoint(): boolean {
+  return getImportCheckpoint() !== null
+}
+
+/** Remove the recovery slot. Returns false only when storage rejected it. */
+export function clearImportCheckpoint(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    window.localStorage.removeItem(IMPORT_CHECKPOINT_STORAGE_KEY)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Restore the checkpoint slot captured before an import attempt. */
+function restoreCheckpointRaw(previous: string | null): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    if (previous === null) window.localStorage.removeItem(IMPORT_CHECKPOINT_STORAGE_KEY)
+    else window.localStorage.setItem(IMPORT_CHECKPOINT_STORAGE_KEY, previous)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Build and persist a complete device-local snapshot of the current state.
+ * Normal exports stay secret-redacted; this recovery slot restores the same
+ * local settings that the import may replace, including provider credentials.
+ * The checkpoint key is never included by buildExportPayload/downloadExport.
+ * The write is intentionally a single localStorage operation: if it throws
+ * (usually quota), no import writes have started and the existing checkpoint
+ * remains untouched.
+ */
+export async function saveImportCheckpoint(
+  mode: ImportMode = 'replace',
+): Promise<ImportCheckpoint> {
+  if (typeof window === 'undefined') throw new Error('not in browser')
+  const payload = await buildExportPayload()
+  const settingsEnvelope = readJson(STORE_KEYS.settings)
+  if (isObject(settingsEnvelope) && isObject(settingsEnvelope.settings)) {
+    // buildExportPayload deliberately redacts API keys at the portable export
+    // boundary. A device-local rollback must restore the exact settings that
+    // Replace import is about to remove, so reattach the already-local value.
+    payload.settings = settingsEnvelope.settings
+  }
+  const checkpoint: ImportCheckpoint = {
+    version: IMPORT_CHECKPOINT_VERSION,
+    createdAt: new Date().toISOString(),
+    mode,
+    payload,
+  }
+  window.localStorage.setItem(IMPORT_CHECKPOINT_STORAGE_KEY, JSON.stringify(checkpoint))
+  return checkpoint
 }
 
 export async function importFromJson(
@@ -575,6 +827,13 @@ export async function importFromJson(
     if (!isObject(payload.freeform)) {
       return { ok: false, cards: 0, mediaAssets: 0, error: 'freeform must be an object' }
     }
+    const knownCardIds = new Set<string>(
+      payload.cards
+        .map((card): string | null =>
+          isObject(card) && typeof card.id === 'string' ? String(card.id) : null,
+        )
+        .filter((id): id is string => id !== null),
+    )
     for (const [canvasId, snapshot] of Object.entries(payload.freeform)) {
       if (!isObject(snapshot) || !Array.isArray(snapshot.elements)) {
         return {
@@ -584,18 +843,13 @@ export async function importFromJson(
           error: `freeform.${canvasId} is invalid`,
         }
       }
-      const invalidElement = snapshot.elements.some(
-        (element) =>
-          !isObject(element) ||
-          typeof element.id !== 'string' ||
-          typeof element.kind !== 'string',
-      )
-      if (invalidElement) {
+      const geometryError = validateFreeformElements(canvasId, snapshot.elements, knownCardIds)
+      if (geometryError) {
         return {
           ok: false,
           cards: 0,
           mediaAssets: 0,
-          error: `freeform.${canvasId}.elements contains an invalid element`,
+          error: geometryError,
         }
       }
       incomingFreeform.set(canvasId, snapshot as unknown as CanvasFreeformSnapshot)
@@ -609,10 +863,19 @@ export async function importFromJson(
   }
 
   try {
+    // Normalize legacy tag vars at the import boundary.  This keeps old
+    // backups readable while ensuring the current UI never receives a CSS var
+    // that does not exist in the design token set.
+    const incomingCards = payload.cards.map((card) => ({
+      ...card,
+      tags: Array.isArray(card.tags)
+        ? card.tags.map((tag) => ({ ...tag, color: normalizeTagColor(tag?.color) }))
+        : [],
+    }))
     const cards =
       mode === 'merge'
-        ? mergeByStringKey(storedArray(STORE_KEYS.cards, 'cards'), payload.cards, 'id')
-        : payload.cards
+        ? mergeByStringKey(storedArray(STORE_KEYS.cards, 'cards'), incomingCards, 'id')
+        : incomingCards
     operations.push({
       key: STORE_KEYS.cards,
       value: JSON.stringify({ cards }),
@@ -651,6 +914,13 @@ export async function importFromJson(
       planOptional(STORE_KEYS.settings, true, { settings })
     } else {
       planOptional(STORE_KEYS.settings, false, null)
+    }
+    // v1 is a one-time migration source, never an independent user store.
+    // Remove it when replacing the snapshot (or when a v2 settings payload is
+    // supplied) so rehydration cannot resurrect obsolete settings over the
+    // imported canonical v2 value.
+    if (mode === 'replace' || isObject(payload.settings)) {
+      operations.push({ key: STORE_KEYS.settingsLegacy, value: null })
     }
 
     const hasCanvases = isObject(payload.canvases) && Array.isArray(payload.canvases.canvases)
@@ -753,6 +1023,33 @@ export async function importFromJson(
     }
   }
 
+  // Save the recovery copy only after validation and dry-run planning have
+  // completed, but immediately before the first import write. A failed
+  // transaction restores the previous checkpoint (or removes this new slot
+  // if there was no previous one). The recovery path opts out explicitly so
+  // it can clear the slot only after a successful restore.
+  let previousCheckpointRaw: string | null = null
+  try {
+    previousCheckpointRaw = window.localStorage.getItem(IMPORT_CHECKPOINT_STORAGE_KEY)
+  } catch {
+    // saveImportCheckpoint below will return a useful failure if storage is
+    // unavailable; treat the previous slot as absent for the rollback path.
+  }
+  let checkpointCreated = false
+  if (options?.checkpoint !== false) {
+    try {
+      await saveImportCheckpoint(mode)
+      checkpointCreated = true
+    } catch (error) {
+      return {
+        ok: false,
+        cards: 0,
+        mediaAssets: 0,
+        error: `checkpoint failed: ${(error as Error).message}`,
+      }
+    }
+  }
+
   const storageSnapshot = operations.map((operation) => ({
     key: operation.key,
     previous: window.localStorage.getItem(operation.key),
@@ -764,11 +1061,12 @@ export async function importFromJson(
     }
   } catch (error) {
     const restored = restoreStorageSnapshot(storageSnapshot)
+    const checkpointRestored = restoreCheckpointRaw(previousCheckpointRaw)
     return {
       ok: false,
       cards: 0,
       mediaAssets: 0,
-      error: `write failed: ${(error as Error).message}; rollback ${restored ? 'complete' : 'partial'}`,
+      error: `write failed: ${(error as Error).message}; rollback ${restored && checkpointRestored ? 'complete' : 'partial'}`,
     }
   }
 
@@ -791,18 +1089,26 @@ export async function importFromJson(
       if (!ok) freeformRestored = false
     }
     const storageRestored = restoreStorageSnapshot(storageSnapshot)
+    const checkpointRestored = restoreCheckpointRaw(previousCheckpointRaw)
     return {
       ok: false,
       cards: 0,
       mediaAssets: 0,
-      error: `freeform write failed: ${(error as Error).message}; rollback ${storageRestored && freeformRestored ? 'complete' : 'partial'}`,
+      error: `freeform write failed: ${(error as Error).message}; rollback ${storageRestored && freeformRestored && checkpointRestored ? 'complete' : 'partial'}`,
     }
   }
+
+  // All storage and freeform writes are committed. Replace the in-memory
+  // hydrate-once snapshots before returning so direct callers (and any
+  // current tab) immediately observe the imported state without relying on a
+  // page reload.
+  rehydrateImportedStores()
 
   return {
     ok: true,
     cards: payload.cards.length,
     mediaAssets: Object.keys(payload.mediaAssets ?? {}).length,
+    ...(checkpointCreated ? { checkpointCreated: true } : {}),
     ...(payload.canvases ? { canvases: payload.canvases.canvases.length } : {}),
     ...(freeformCanvases > 0 ? { freeformCanvases } : {}),
     ...(payload.conversations && !Array.isArray(payload.conversations)
@@ -810,5 +1116,35 @@ export async function importFromJson(
       : {}),
     ...(payload.canvasTemplates ? { canvasTemplates: payload.canvasTemplates.length } : {}),
     ...(payload.aiSamples ? { aiSamples: payload.aiSamples.length } : {}),
+  }
+}
+
+/**
+ * Restore the state captured immediately before the latest import. The
+ * checkpoint is kept if validation or any write fails, and is removed only
+ * after the complete replace transaction has succeeded.
+ */
+export async function restoreImportCheckpoint(): Promise<ImportResult> {
+  if (typeof window === 'undefined') {
+    return { ok: false, cards: 0, mediaAssets: 0, error: 'not in browser' }
+  }
+  const checkpoint = getImportCheckpoint()
+  if (!checkpoint) {
+    return { ok: false, cards: 0, mediaAssets: 0, error: 'no import checkpoint available' }
+  }
+
+  const result = await importFromJson(JSON.stringify(checkpoint.payload), {
+    mode: 'replace',
+    checkpoint: false,
+  })
+  if (!result.ok) return result
+
+  const cleared = clearImportCheckpoint()
+  return {
+    ...result,
+    checkpointCleared: cleared,
+    ...(cleared
+      ? {}
+      : { error: 'state restored, but the recovery checkpoint could not be cleared' }),
   }
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { CardService, type CardRepository } from '../services/card-service'
 import type { Card, CardId, CanvasId, MediaAssetId, MediaRef, WorkspaceId, TagRef } from '../types'
-import { TAG_COLORS } from '../types'
+import { TAG_COLORS, normalizeTagColor } from '../types'
 import { toCardId } from '../codec'
 import { StorageQuotaError } from '../errors'
 
@@ -414,6 +414,31 @@ describe('CardService', () => {
   })
 })
 
+describe('tag color migration', () => {
+  it('maps legacy and malformed values to available tokens', () => {
+    expect(normalizeTagColor('var(--color-teal)')).toBe('var(--color-blue)')
+    expect(normalizeTagColor('purple')).toBe('var(--color-blue)')
+    expect(normalizeTagColor('var(--color-green)')).toBe('var(--color-gray)')
+    expect(normalizeTagColor('not-a-color')).toBe('var(--color-gray)')
+    for (const color of TAG_COLORS) expect(normalizeTagColor(color)).toBe(color)
+  })
+
+  it('normalizes legacy colors on create and update', () => {
+    const repo = new InMemoryCardRepository()
+    const svc = new CardService(repo)
+    const card = svc.create({
+      title: 'legacy',
+      source: dummySource,
+      tags: [{ value: 'old', color: 'var(--color-purple)' as never }],
+    })
+    expect(card.tags[0]!.color).toBe('var(--color-blue)')
+    const updated = svc.update(card.id, {
+      tags: [{ value: 'new', color: 'var(--color-orange)' as never }],
+    })!
+    expect(updated.tags[0]!.color).toBe('var(--color-yellow)')
+  })
+})
+
 describe('CardService.createWithId', () => {
   it('creates a card with the given id', () => {
     const svc = new CardService(new InMemoryCardRepository())
@@ -493,11 +518,10 @@ describe('CardService quota failure (write helper)', () => {
     expect(() => service.archive(c.id)).not.toThrow()
   })
 
-  it('moveToCanvas is a silent no-op on quota failure', () => {
+  it('moveToCanvas returns false on quota failure and keeps the card in place', () => {
     const c = service.listAll()[0]!
-    expect(() =>
-      service.moveToCanvas(c.id, { canvasId: 'other' as CanvasId, x: 1, y: 2, w: 240, h: 120, z: 0 }),
-    ).not.toThrow()
+    expect(service.moveToCanvas(c.id, { canvasId: 'other' as CanvasId, x: 1, y: 2, w: 240, h: 120, z: 0 })).toBe(false)
+    expect(service.get(c.id)?.canvasPosition?.canvasId).toBe('default-canvas')
   })
 
   it('write re-throws non-quota errors (does not swallow programming errors)', () => {

@@ -1,10 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Toolbar, Modal, Button } from '@cys-stift/ui'
 import { settingsStore, useSettings } from '@/lib/settings-store'
-import { rehydrateCards } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
 import { useIsDesktop } from '@/lib/use-platform'
 import { pushToast } from '@/lib/toast-store'
@@ -17,8 +16,12 @@ import { CaptureShortcutSettings } from '@/features/capture/capture-shortcut-set
 import {
   buildExportPayload,
   downloadExport,
+  getImportCheckpointMeta,
+  IMPORT_CHECKPOINT_STORAGE_KEY,
   importFromJson,
+  restoreImportCheckpoint,
   type ImportMode,
+  type ImportCheckpointMeta,
   type ImportResult,
 } from '@/lib/export-service'
 
@@ -43,6 +46,34 @@ export default function SettingsPage() {
   } | null>(null)
   const [importMode, setImportMode] = useState<ImportMode>('replace')
   const [importing, setImporting] = useState(false)
+  const [resultAction, setResultAction] = useState<'import' | 'restore'>('import')
+  const [checkpointMeta, setCheckpointMeta] = useState<ImportCheckpointMeta | null>(null)
+  const [restorePending, setRestorePending] = useState(false)
+  const [restoring, setRestoring] = useState(false)
+
+  const refreshCheckpointMeta = () => {
+    setCheckpointMeta(getImportCheckpointMeta())
+  }
+
+  useEffect(() => {
+    // localStorage is client-only; defer the read until after hydration so a
+    // persisted recovery slot cannot change the server-rendered tree.
+    refreshCheckpointMeta()
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === IMPORT_CHECKPOINT_STORAGE_KEY) refreshCheckpointMeta()
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
+  const checkpointTime = (value: string): string => {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+    return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(date)
+  }
 
   // 选文件后先弹确认门(覆盖不可撤销),确认后才真正导入。
   const handleImportFile = async (files: FileList | null) => {
@@ -51,6 +82,7 @@ export default function SettingsPage() {
     if (!file) return
     try {
       const text = await file.text()
+      setResultAction('import')
       const summary = await importFromJson(text, { mode: 'replace', dryRun: true })
       if (!summary.ok) {
         setImportResult(summary)
@@ -73,29 +105,37 @@ export default function SettingsPage() {
     const pending = pendingImport
     if (!pending || importing) return
     setImporting(true)
+    setResultAction('import')
     try {
       const result = await importFromJson(pending.text, { mode: importMode })
       setImportResult(result)
+      refreshCheckpointMeta()
       if (result.ok) {
-        // Re-sync the in-memory card store from the freshly written
-        // localStorage BEFORE the reload. Without this, any in-tab mutation
-        // during the reload window would call persist() and overwrite the
-        // imported cards with the stale pre-import list (silent data loss —
-        // the cross-tab 'storage' event doesn't fire in the same tab).
-        rehydrateCards()
-        // Reload immediately — no setTimeout delay. importFromJson completes
-        // all synchronous localStorage writes (writes[] loop) before resolving,
-        // so localStorage is fully consistent at this point. A delayed reload
-        // would leave a window where other in-memory stores (settings /
-        // canvas-view / drafts) still hold stale caches; any user action in
-        // that window would persist() the stale cache and overwrite the just-
-        // imported data. Immediate reload forces every store to re-hydrate
-        // from the authoritative localStorage with zero window.
-        window.location.reload()
+        // importFromJson commits localStorage/freeform atomically and
+        // rehydrates every in-memory store before resolving. Keep the page
+        // alive so the user can read the result and continue working; a full
+        // reload used to hide the success report and could interrupt a
+        // capture that happened immediately after import.
       }
     } finally {
       setImporting(false)
       setPendingImport(null)
+    }
+  }
+
+  const confirmRestore = async () => {
+    if (restoring) return
+    setRestoring(true)
+    setResultAction('restore')
+    try {
+      const result = await restoreImportCheckpoint()
+      setImportResult(result)
+      refreshCheckpointMeta()
+      if (result.ok && result.checkpointCleared !== false) {
+        setRestorePending(false)
+      }
+    } finally {
+      setRestoring(false)
     }
   }
 
@@ -189,14 +229,38 @@ export default function SettingsPage() {
                 role={importResult.ok === false ? 'alert' : 'status'}
               >
                 {importResult.ok
-                  ? t('settings.importOk', {
-                      cards: importResult.cards,
-                      mediaAssets: importResult.mediaAssets,
-                      canvases: importResult.canvases ?? 0,
-                      freeform: importResult.freeformCanvases ?? 0,
-                    })
+                  ? resultAction === 'restore'
+                    ? importResult.checkpointCleared === false
+                      ? t('settings.importCheckpointClearFailed')
+                      : t('settings.importCheckpointRestored')
+                    : t('settings.importOk', {
+                        cards: importResult.cards,
+                        mediaAssets: importResult.mediaAssets,
+                        canvases: importResult.canvases ?? 0,
+                        freeform: importResult.freeformCanvases ?? 0,
+                      })
                   : t('settings.importFail', { error: importResult.error ?? '' })}
               </p>
+            )}
+            {checkpointMeta && (
+              <div className="set__import-recovery" data-testid="import-recovery">
+                <p className="mono mono--xs">
+                  {t('settings.importCheckpointAvailable', {
+                    createdAt: checkpointTime(checkpointMeta.createdAt),
+                    cards: checkpointMeta.cards,
+                    media: checkpointMeta.mediaAssets,
+                  })}
+                </p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="set__recovery-btn"
+                  onClick={() => setRestorePending(true)}
+                  disabled={restoring || importing}
+                >
+                  {t('settings.importCheckpointRestore')}
+                </Button>
+              </div>
             )}
           </div>
         </section>
@@ -265,10 +329,24 @@ export default function SettingsPage() {
         {/* 实验室 / Labs — 附加能力,默认全关。开启 = 用户显式接受附加风险。
             从 LAB_REGISTRY 渲染;每个 lab 走确认门(不可撤销风险让步);关闭直接生效。
             分层判据见 docs/specs/2026-06-30-ai-labs-strategy.md。 */}
-        <section className="section section--labs" id="settings-labs">
+        <section className={`section section--labs${LAB_REGISTRY.length === 0 ? ' section--labs-empty' : ''}`} id="settings-labs">
           <h2 className="section__h">{t('settings.labs.title')}</h2>
           <p className="section__lede">{t('settings.labs.lede')}</p>
-          {LAB_REGISTRY.length === 0 && <p className="mono mono--xs">{t('settings.labs.none')}</p>}
+          {LAB_REGISTRY.length === 0 && (
+            <div className="set__labs-status" role="status">
+              <strong>{t('settings.labs.none')}</strong>
+              <dl>
+                <div>
+                  <dt>{t('settings.labs.visionLabel')}</dt>
+                  <dd>{t('settings.labs.visionUnavailable')}</dd>
+                </div>
+                <div>
+                  <dt>{t('settings.labs.automationLabel')}</dt>
+                  <dd>{t('settings.labs.automationUnavailable')}</dd>
+                </div>
+              </dl>
+            </div>
+          )}
           {LAB_REGISTRY.map((meta) => (
             <LabToggle
               key={meta.id}
@@ -297,6 +375,7 @@ export default function SettingsPage() {
           media: pendingImport?.summary.mediaAssets ?? 0,
           canvases: pendingImport?.summary.canvases ?? 0,
         })}</p>
+        <p className="set__confirm-body">{t('settings.importConfirmBody')}</p>
         <div className="set__import-modes" role="radiogroup" aria-label={t('settings.importMode')}>
           <button type="button" role="radio" aria-checked={importMode === 'replace'} className={importMode === 'replace' ? 'set__mode set__mode--active' : 'set__mode'} onClick={() => setImportMode('replace')}>
             <strong>{t('settings.importReplace')}</strong><span>{t('settings.importReplaceHint')}</span>
@@ -311,6 +390,27 @@ export default function SettingsPage() {
           </Button>
           <Button variant="primary" onClick={() => void confirmImport()} disabled={importing}>
             {importing ? t('settings.importing') : t('settings.importJson')}
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={restorePending}
+        onClose={() => !restoring && setRestorePending(false)}
+        title={t('settings.importCheckpointConfirmTitle')}
+        closeLabel={t('common.close')}
+      >
+        <p className="set__confirm-body">
+          {t('settings.importCheckpointConfirmBody')}
+        </p>
+        <div className="set__confirm-actions">
+          <Button variant="ghost" onClick={() => setRestorePending(false)} disabled={restoring}>
+            {t('common.cancel')}
+          </Button>
+          <Button variant="primary" onClick={() => void confirmRestore()} disabled={restoring}>
+            {restoring
+              ? t('settings.importCheckpointRestoring')
+              : t('settings.importCheckpointRestore')}
           </Button>
         </div>
       </Modal>
@@ -337,17 +437,30 @@ export default function SettingsPage() {
 .set__import { margin-top: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); }
 .set__file { margin-top: var(--space-1); width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; font-family: var(--font-body); font-size: var(--font-size-sm); }
 .set__import-result--error { color: var(--color-red); }
+.set__import-recovery { display: flex; flex-direction: column; gap: var(--space-1); border: var(--border-hairline); border-left-width: var(--space-quarter); border-left-color: var(--color-blue); background: var(--color-gray-soft); padding: var(--space-2); }
+.set__import-recovery p { margin: 0; line-height: 1.45; }
+.set__recovery-btn { align-self: flex-start; min-height: 40px; }
 .set__confirm-body { margin: 0 0 var(--space-3); font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black-soft); line-height: 1.5; }
 .set__confirm-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
 .set__import-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: var(--space-3) 0; }
 .set__mode { min-height: 88px; display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); text-align: left; padding: var(--space-2); border: var(--border-thick); background: var(--color-white); cursor: pointer; }
 .set__mode span { font-size: var(--font-size-xs); color: var(--color-gray); line-height: 1.4; }
-.set__mode--active { border-color: var(--color-blue); box-shadow: 3px 3px 0 var(--color-blue); }
+.set__mode--active { border-color: var(--color-blue); box-shadow: var(--space-quarter) var(--space-quarter) 0 var(--color-blue); }
 @media (max-width: 560px) { .set__import-modes { grid-template-columns: 1fr; } }
 /* 实验室区:红色左边框 + 警告底色,视觉上区别于普通设置区(暗示附加风险)。 */
-.section--labs { border-left: 3px solid var(--color-red); padding-left: var(--space-3); background: var(--color-red-soft); padding-top: var(--space-3); padding-bottom: var(--space-3); padding-right: var(--space-3); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.section--labs { border-left: var(--space-quarter) solid var(--color-red); padding-left: var(--space-3); background: var(--color-red-soft); padding-top: var(--space-3); padding-bottom: var(--space-3); padding-right: var(--space-3); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.section--labs-empty { border-left-color: var(--color-black); background: var(--color-gray-soft); }
+.set__labs-status { border: var(--border-hairline); background: var(--color-white); padding: var(--space-2); }
+.set__labs-status > strong { font-family: var(--font-display); font-size: var(--font-size-sm); }
+.set__labs-status dl { margin: var(--space-2) 0 0; display: grid; gap: var(--space-1); }
+.set__labs-status dl > div { display: grid; grid-template-columns: minmax(110px, 0.35fr) minmax(0, 1fr); gap: var(--space-2); padding-top: var(--space-1); border-top: var(--border-hairline); }
+.set__labs-status dt { font-family: var(--font-mono); font-size: var(--font-size-xs); }
+.set__labs-status dd { margin: 0; color: var(--color-gray); font-size: var(--font-size-sm); line-height: 1.5; }
 .set__lab-item { display: flex; gap: var(--space-2); align-items: flex-start; }
 .set__lab-warn { display: block; margin-top: 2px; color: var(--color-red); }
+@media (max-width: 560px) {
+  .set__labs-status dl > div { grid-template-columns: 1fr; gap: var(--space-quarter); }
+}
 `}</style>
     </main>
   )

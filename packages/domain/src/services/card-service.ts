@@ -20,7 +20,7 @@ import type {
   TagRef,
   TagColor,
 } from '../types'
-import { TAG_COLORS } from '../types'
+import { TAG_COLORS, normalizeTagColor } from '../types'
 import { generateId } from '../codec'
 import { StorageQuotaError } from '../errors'
 
@@ -75,6 +75,13 @@ export interface UpdateCardPatch {
   tags?: TagRef[]
 }
 
+function normalizeTags(tags: readonly TagRef[] | undefined): TagRef[] {
+  return (tags ?? []).map((tag) => ({
+    ...tag,
+    color: normalizeTagColor(tag.color),
+  }))
+}
+
 export class CardService {
   constructor(private repo: CardRepository) {}
 
@@ -111,7 +118,7 @@ export class CardService {
       updatedAt: now,
       canvasPosition: input.canvasPosition,
       color: input.color,
-      tags: input.tags ?? [],
+      tags: normalizeTags(input.tags),
       pinned: input.pinned ?? false,
       archived: input.archived ?? false,
     }
@@ -144,7 +151,7 @@ export class CardService {
       updatedAt: now,
       canvasPosition: input.canvasPosition,
       color: input.color,
-      tags: input.tags ?? [],
+      tags: normalizeTags(input.tags),
       pinned: input.pinned ?? false,
       archived: input.archived ?? false,
     }
@@ -189,7 +196,7 @@ export class CardService {
       ...(patch.type !== undefined ? { type: patch.type } : {}),
       ...(patch.color !== undefined ? { color: patch.color ?? undefined } : {}),
       ...(patch.pinned !== undefined ? { pinned: patch.pinned } : {}),
-      ...(patch.tags !== undefined ? { tags: patch.tags } : {}),
+      ...(patch.tags !== undefined ? { tags: normalizeTags(patch.tags) } : {}),
       ...(patch.media !== undefined ? { media: patch.media } : {}),
       ...(patch.links !== undefined ? { links: patch.links } : {}),
       ...(patch.codeSnippets !== undefined
@@ -226,9 +233,9 @@ export class CardService {
     this.write(() => this.repo.update({ ...card, archived: false, updatedAt: new Date() }))
   }
 
-  moveToCanvas(id: CardId, position: CanvasPosition): void {
+  moveToCanvas(id: CardId, position: CanvasPosition): boolean {
     const card = this.repo.getById(id)
-    if (!card) return
+    if (!card) return false
     // 数值有限性守卫(防 NaN/Infinity 进 localStorage → JSON.stringify 变 null →
     // reload 后 null.toFixed() 崩)。与 auto-layout/organize-popover 的 finiteRound
     // 同族防御;w/h 兜底默认卡尺寸 240×120,其余兜底 0。
@@ -244,7 +251,7 @@ export class CardService {
         ? { rotation: Number.isFinite(position.rotation) ? position.rotation : 0 }
         : {}),
     }
-    this.write(() => {
+    return this.write(() => {
       this.repo.update({
         ...card,
         canvasPosition: safePos,
@@ -314,10 +321,12 @@ export class CardService {
     const tags = card.tags ?? []
     const existing = tags.find((t) => t.value === value)
     if (existing) return card
-    const chosen = color ?? TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)]!
+    const chosen = color
+      ? normalizeTagColor(color)
+      : TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)]!
     const next: Card = {
       ...card,
-      tags: [...tags, { value: value.trim(), color: chosen }],
+      tags: [...normalizeTags(tags), { value: value.trim(), color: chosen }],
       updatedAt: new Date(),
     }
     if (!this.write(() => this.repo.update(next))) return null
@@ -354,7 +363,7 @@ export class CardService {
         if (entry) {
           entry.count++
         } else {
-          map.set(t.value, { color: t.color, count: 1 })
+          map.set(t.value, { color: normalizeTagColor(t.color), count: 1 })
         }
       }
     }

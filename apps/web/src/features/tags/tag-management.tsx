@@ -20,6 +20,7 @@ import {
 } from './tag-ops'
 import { WorkbenchIcon } from '@/features/canvas/workbench-icons'
 import { useI18n } from '@/lib/i18n'
+import { solidTagChipStyle } from '@/lib/tag-color'
 
 export interface TagManagementProps {
   cards: Card[]
@@ -139,7 +140,7 @@ export function TagManagement({ cards, onApplyChanges }: TagManagementProps) {
                 <button
                   type="button"
                   className="tm__swatch"
-                  style={{ background: tag.color }}
+                  style={solidTagChipStyle(tag.color)}
                   aria-label={t('tags.recolorTag', { value: tag.value })}
                   onClick={() => setColorFor(popoverOpen ? null : tag.value)}
                 >

@@ -32,24 +32,35 @@ const card1 = {
   archived: false,
 } as unknown as Card
 
-const { pushMock, closeMock, cardIdMock, updateMock } = vi.hoisted(() => ({
+const {
+  pushMock,
+  closeMock,
+  cardIdMock,
+  updateMock,
+  buildHostMock,
+  freeformState,
+  freeformSubscribers,
+} = vi.hoisted(() => ({
   pushMock: vi.fn(),
   closeMock: vi.fn(),
   cardIdMock: { current: null as string | null },
   updateMock: vi.fn(),
+  buildHostMock: vi.fn(async () => ({ host: { marker: 'preview-host' } })),
+  freeformState: { version: 0 },
+  freeformSubscribers: new Set<() => void>(),
 }))
 
-vi.mock('@/lib/db-client', () => ({
-  useDb: () => ({
-    snap: { v: 1 },
-    ready: true,
-    service: {
-      listAll: () => [card1],
-      get: (id: string) => (id === 'c1' ? card1 : undefined),
-      update: updateMock,
-    },
-  }),
-}))
+vi.mock('@/lib/db-client', () => {
+  const snap = { v: 1 }
+  const service = {
+    listAll: () => [card1],
+    get: (id: string) => (id === 'c1' ? card1 : undefined),
+    update: updateMock,
+  }
+  return {
+    useDb: () => ({ snap, ready: true, service }),
+  }
+})
 vi.mock('@/lib/canvas-store', () => ({
   useCanvases: () => ({
     snapshot: { canvases: [], activeCanvasId: 'default' },
@@ -62,6 +73,20 @@ vi.mock('@/lib/workbench-store', () => ({
 }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock }),
+}))
+vi.mock('@/lib/canvas-freeform-store', () => ({
+  subscribeFreeformChanges: (callback: () => void) => {
+    freeformSubscribers.add(callback)
+    return () => freeformSubscribers.delete(callback)
+  },
+  getFreeformVersion: () => freeformState.version,
+}))
+vi.mock('@/features/canvas/canvas-host-builder', () => ({
+  buildCanvasHostForCanvas: buildHostMock,
+}))
+vi.mock('@/features/canvas/minimap-preview', () => ({
+  MinimapPreview: ({ host }: { host: unknown }) =>
+    React.createElement('div', { 'data-testid': 'preview-host' }, host ? 'ready' : 'loading'),
 }))
 // 隔离:不渲染真实 MarkdownEditor(避免深层 store 依赖)
 vi.mock('@/features/card/markdown-editor', () => ({
@@ -92,7 +117,11 @@ describe('WorkbenchPage', () => {
     pushMock.mockClear()
     closeMock.mockClear()
     updateMock.mockClear()
+    buildHostMock.mockClear()
+    freeformState.version = 0
+    freeformSubscribers.clear()
     cardIdMock.current = null
+    delete (card1 as Card & { canvasPosition?: unknown }).canvasPosition
   })
 
   it('cardId=null → 渲染库 + 空状态提示(selectHint),无编辑器', () => {
@@ -119,5 +148,23 @@ describe('WorkbenchPage', () => {
     expect(btn).toBeTruthy()
     act(() => btn.click())
     expect(pushMock).toHaveBeenCalledWith('/canvas')
+  })
+
+  it('rebuilds the canvas preview after freeform persistence changes', async () => {
+    cardIdMock.current = 'c1'
+    ;(card1 as unknown as { canvasPosition: unknown }).canvasPosition = {
+      canvasId: 'canvas-1' as never, x: 10, y: 20, w: 200, h: 80, z: 1, rotation: 0,
+    }
+    const { host } = render(<WorkbenchPage />)
+    await act(async () => { await Promise.resolve() })
+    expect(buildHostMock).toHaveBeenCalledTimes(1)
+    expect(host.querySelector('[data-testid="preview-host"]')?.textContent).toBe('ready')
+
+    await act(async () => {
+      freeformState.version++
+      for (const callback of freeformSubscribers) callback()
+      await Promise.resolve()
+    })
+    expect(buildHostMock).toHaveBeenCalledTimes(2)
   })
 })

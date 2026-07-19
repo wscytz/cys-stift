@@ -91,6 +91,20 @@ function hydrateOnce() {
   notify()
 }
 
+/**
+ * Re-read drafts after an external storage restore/import.
+ * Drafts are hydrate-once in normal operation, but importFromJson writes the
+ * backing key directly. Replacing the module snapshot here prevents a stale
+ * in-memory draft from being written back over the restored data.
+ */
+export function rehydrateDrafts(): void {
+  if (typeof window === 'undefined') return
+  _hydrated = true
+  _drafts = loadDrafts()
+  _lastSaveOk = true
+  notify()
+}
+
 // Stable snapshot cache — only reallocate when _drafts reference changes,
 // mirroring the pattern in db-client.ts so useSyncExternalStore stays happy.
 let _cachedSnapshot: DraftMap = _drafts
@@ -115,6 +129,10 @@ function subscribe(cb: () => void) {
 // ── Public API ─────────────────────────────────────────────────────────────
 
 export const draftStore = {
+  /** Re-read drafts after an external storage restore/import. */
+  rehydrate(): void {
+    rehydrateDrafts()
+  },
   get<P = unknown>(kind: DraftKind): Draft & { payload: P } | null {
     hydrateOnce()
     const d = _drafts[kind]

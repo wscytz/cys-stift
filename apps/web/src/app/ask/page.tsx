@@ -21,6 +21,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { BauhausMotif, Card as UICard, Tag, Toolbar, Button } from '@cys-stift/ui'
+import { searchCards } from '@cys-stift/domain'
 import type { Card, CardId, CanvasId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
 import { canvasStore, useCanvases } from '@/lib/canvas-store'
@@ -29,9 +30,9 @@ import { PageLoading } from '@/components/page-loading'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import { CardDetailModal } from '@/features/card/card-detail'
 import { AiSetupCard } from '@/features/ai/ai-setup-card'
-import { isAIReady, getCurrentAI } from '@/features/ai/ai-settings-provider'
+import { isAIReady } from '@/features/ai/ai-settings-provider'
 import { streamText } from '@/features/ai/stream-text'
-import { retryUntilValid, buildDslCorrection } from '@/features/ai/retry-until-valid'
+import { retryFailureMessageKey, retryUntilValid, buildDslCorrection } from '@/features/ai/retry-until-valid'
 import { parseDslStrictWithDiagnostics } from '@/features/ai/dsl-parser'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import {
@@ -39,14 +40,15 @@ import {
   buildAgentUserPrompt,
   extractDslBlocks,
   extractCardRefs,
+  RAG_TOP_N,
 } from '@/features/ai/agent-prompt'
 import { AgentConfirmCard } from '@/features/ai/agent-confirm-card'
-import { loadConversation, saveConversation, clearConversation, type PersistedConversationMessage } from '@/lib/conversation-store'
+import { loadConversation, saveConversation, clearConversation, type PersistedConversationMessage, type ConversationContextMeta } from '@/lib/conversation-store'
 import { canvasFreeformStore } from '@/lib/canvas-freeform-store'
 import { buildCanvasHostForCanvas } from '@/features/canvas/canvas-host-builder'
 import { pushToast } from '@/lib/toast-store'
 import { addSample, genSampleId } from '@/features/ai/sample-store'
-import { settingsStore } from '@/lib/settings-store'
+import { settingsStore, useSettings } from '@/lib/settings-store'
 import type { AIProfile } from '@/features/ai/types'
 
 interface ChatMessage extends PersistedConversationMessage {
@@ -70,6 +72,10 @@ function aiProfileSignature(profile: AIProfile | null): string {
   ])
 }
 
+function activeAIProfile(settings: { profiles: AIProfile[]; activeProfileId: string | null }): AIProfile | null {
+  return settings.profiles.find((profile) => profile.id === settings.activeProfileId) ?? null
+}
+
 /**
  * Sentinel value for the 「➕ 新画布」 option in the canvas-select.
  * Selecting it triggers canvasStore.create + binds the conversation to
@@ -82,11 +88,17 @@ export default function AskPage() {
   const router = useRouter()
   const { service, ready } = useDb()
   const { snapshot: canvasesSnap } = useCanvases()
+  const { settings: runtimeSettings, ready: aiSettingsReady } = useSettings()
+  const currentAI = useMemo(
+    () => activeAIProfile(runtimeSettings),
+    [runtimeSettings.profiles, runtimeSettings.activeProfileId],
+  )
   // 对话按 targetCanvasId 隔离 —— 每个画布有自己的上下文(per-canvas localStorage key)。
-  // targetCanvasId 先声明:messages 的 lazy init 引用它作为 conversation key。
   const [targetCanvasId, setTargetCanvasId] = useState<CanvasId>(DEFAULT_CANVAS_ID)
-  // 初始从 localStorage 读取;切画布时 reload(见下方 effect)。lazy init 只跑一次。
-  const [messages, setMessages] = useState<ChatMessage[]>(() => loadConversation(targetCanvasId))
+  // SSR 与客户端首帧必须同为 []。若在 lazy initializer 读 localStorage，服务端
+  // 渲染空对话、客户端首帧渲染历史，会触发 hydration mismatch 并重建整页。
+  // 持久历史统一在下方 effect（挂载 + 切画布）载入。
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [detailCard, setDetailCard] = useState<Card | null>(null)
@@ -130,7 +142,7 @@ export default function AskPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const aiReady = isAIReady(getCurrentAI())
+  const aiReady = aiSettingsReady && isAIReady(currentAI)
   const canvasNameById = useMemo(() => {
     const m = new Map<string, string>()
     for (const c of canvasesSnap.canvases) m.set(c.id, c.name)
@@ -142,17 +154,12 @@ export default function AskPage() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages])
 
-  // 切画布时 reload 对话(per-canvas key 隔离)。
-  // 用 ref 跳过首次运行(lazy init 已在 useState 里加载了,避免 mount 双载)。
+  // 挂载和切画布时 reload 对话(per-canvas key 隔离)。首屏 state 保持 SSR-safe，
+  // effect 再从 localStorage 恢复历史，避免 hydration mismatch。
   // 同时 abort 任何在飞的 stream —— 切画布后旧 stream 属于旧画布,不应写入新画布的 messages
   // (abort 后 send 的 catch 会看到新 messages 列表,但 loadConversation 清了 streaming flag,
   // 所以 catch 的 if-last-streaming 分支不命中,no-op)。
-  const skipReloadRef = useRef(true)
   useEffect(() => {
-    if (skipReloadRef.current) {
-      skipReloadRef.current = false
-      return
-    }
     requestSeqRef.current += 1
     abortRef.current?.abort()
     abortRef.current = null
@@ -194,14 +201,14 @@ export default function AskPage() {
   const send = async () => {
     const question = input.trim()
     if (!question || busy || !aiReady) return
-    const cfg = getCurrentAI()!
+    const cfg = currentAI!
     const requestCanvasId = targetCanvasId
     const requestProfileSignature = aiProfileSignature(cfg)
     const requestId = ++requestSeqRef.current
     const isRequestCurrent = () =>
       requestSeqRef.current === requestId &&
       targetCanvasIdRef.current === requestCanvasId &&
-      aiProfileSignature(getCurrentAI()) === requestProfileSignature
+      aiProfileSignature(activeAIProfile(settingsStore.get())) === requestProfileSignature
     setInput('')
     setBusy(true)
 
@@ -210,15 +217,21 @@ export default function AskPage() {
       role: m.role,
       content: m.content,
     }))
-    const userMsg: ChatMessage = { role: 'user', content: question }
-    const asstMsg: ChatMessage = { role: 'assistant', content: '', streaming: true }
+    const allCards = service.listAll()
+    const matchedCards = searchCards(allCards, question)
+    const contextMeta: ConversationContextMeta = {
+      retrievedCount: matchedCards.length,
+      sentCount: Math.min(matchedCards.length, RAG_TOP_N),
+      cardIds: matchedCards.slice(0, RAG_TOP_N).map((result) => String(result.card.id)),
+    }
+    const userMsg: ChatMessage = { role: 'user', content: question, targetCanvasId: String(requestCanvasId) }
+    const asstMsg: ChatMessage = { role: 'assistant', content: '', streaming: true, targetCanvasId: String(requestCanvasId), contextMeta }
     setMessages((prev) => [...prev, userMsg, asstMsg])
 
     const ac = new AbortController()
     abortRef.current = ac
     try {
       // RAG + 目标画布快照(改画布时让 AI 看到当前布局)。
-      const allCards = service.listAll()
       const { host } = await buildCanvasHostForCanvas(requestCanvasId, service)
       if (!isRequestCurrent()) return
       const canvasSnapshot = formatCanvasSnapshot(snapshotCanvas(host, service, requestCanvasId))
@@ -265,7 +278,7 @@ export default function AskPage() {
             { system: AGENT_SYSTEM_PROMPT, user: userPrompt, messages, maxTokens: 4096, structuredOutput: true, timeoutMs: 60_000 },
             onDelta,
             ac.signal,
-          ).then((x) => x?.content ?? '')
+          )
         },
         parse: (text) => {
           // 有 dsl 块且全坏才重试;无块(Q&A)或部分好 → 接受。
@@ -299,6 +312,21 @@ export default function AskPage() {
         }
         return
       }
+      const failureKey = retryFailureMessageKey(r.failureReason)
+      if (failureKey) {
+        const failureMessage = t(failureKey)
+        pushToast({ kind: 'info', message: failureMessage })
+        setMessages((prev) => {
+          if (!isRequestCurrent()) return prev
+          const next = [...prev]
+          const last = next[next.length - 1]
+          if (last?.role === 'assistant') {
+            next[next.length - 1] = { ...last, content: failureMessage, streaming: false }
+          }
+          return next
+        })
+        return
+      }
       // 失败样本采集(c2):retry 耗尽仍 parse 失败 → 记 parse_failed(坏输出+错误+尝试数)。
       // 失败案例是最值钱的调优/训练数据。开关关时 addSample 内部 no-op。
       if (!r.accepted) {
@@ -319,7 +347,7 @@ export default function AskPage() {
       setMessages((prev) => {
         if (!isRequestCurrent()) return prev
         const next = [...prev]
-        next[next.length - 1] = { role: 'assistant', content: final, dslBlocks, streaming: false, sampleContext: { question, context: userPrompt } }
+        next[next.length - 1] = { role: 'assistant', content: final, dslBlocks, streaming: false, targetCanvasId: String(requestCanvasId), contextMeta, sampleContext: { question, context: userPrompt } }
         return next
       })
     } catch (e) {
@@ -492,7 +520,8 @@ export default function AskPage() {
                     content={m.content}
                     streaming={m.streaming}
                     dslBlocks={m.dslBlocks}
-                    targetCanvasId={targetCanvasId}
+                    contextMeta={m.contextMeta}
+                    targetCanvasId={(m.targetCanvasId ?? String(targetCanvasId)) as CanvasId}
                     service={service}
                     getCardTitle={(id) => service.get(id as CardId)?.title ?? id}
                     onCardRefClick={(id) => {
@@ -501,7 +530,7 @@ export default function AskPage() {
                     }}
                     onApplied={() => onApplied(i)}
                     onRejected={() => { void onRejected(i) }}
-                    sampleContext={m.sampleContext ? { source: 'ask', question: m.sampleContext.question, context: m.sampleContext.context, targetCanvasId } : undefined}
+                    sampleContext={m.sampleContext ? { source: 'ask', question: m.sampleContext.question, context: m.sampleContext.context, targetCanvasId: m.targetCanvasId ?? String(targetCanvasId) } : undefined}
                   />
                 </div>
               ))}
@@ -575,6 +604,7 @@ function MessageContent({
   content,
   streaming,
   dslBlocks,
+  contextMeta,
   targetCanvasId,
   service,
   getCardTitle,
@@ -586,6 +616,7 @@ function MessageContent({
   content: string
   streaming?: boolean
   dslBlocks?: string[]
+  contextMeta?: ConversationContextMeta
   targetCanvasId: CanvasId
   service: ReturnType<typeof useDb>['service']
   getCardTitle: (id: string) => string
@@ -594,6 +625,7 @@ function MessageContent({
   onRejected: () => void
   sampleContext?: { source: 'ask' | 'companion'; question?: string; context: string; targetCanvasId?: string }
 }) {
+  const { t } = useI18n()
   // 把 [card #id] 渲染成可点链接。简化:按引用分段。
   const refs = useMemo(() => new Set(extractCardRefs(content)), [content])
   const parts = useMemo(() => {
@@ -637,13 +669,23 @@ function MessageContent({
         <AgentConfirmCard
           key={i}
           dsl={dsl}
-          targetCanvasId={targetCanvasId}
+          targetCanvasId={(targetCanvasId) as CanvasId}
           service={service}
           onApplied={() => onApplied()}
           onRejected={() => onRejected()}
-          sampleContext={sampleContext ? { source: 'ask', question: sampleContext.question, context: sampleContext.context, targetCanvasId } : undefined}
+          sampleContext={sampleContext ? { source: 'ask', question: sampleContext.question, context: sampleContext.context, targetCanvasId: sampleContext.targetCanvasId ?? String(targetCanvasId) } : undefined}
         />
       ))}
+      {contextMeta && (
+        <div className="ask__context-meta" role="status">
+          <span>{t('ask.contextMeta', { retrieved: String(contextMeta.retrievedCount), sent: String(contextMeta.sentCount) })}</span>
+          {contextMeta.cardIds.map((id) => (
+            <button key={id} type="button" className="ask__context-source" onClick={() => onCardRefClick(id)} title={getCardTitle(id)}>
+              #{getCardTitle(id)}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -669,6 +711,10 @@ const styles = `
 .ask__msg--user .ask__card-ref { color: var(--color-yellow); }
 .ask__msg--assistant .ask__card-ref { color: var(--color-blue); }
 .ask__card-ref:hover { opacity: 0.7; }
+.ask__context-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin-top: var(--space-1); color: var(--color-gray); font-family: var(--font-mono); font-size: var(--font-size-xs); }
+.ask__context-source { border: 0; padding: 0 2px; background: transparent; color: var(--color-blue); font: inherit; text-decoration: underline; cursor: pointer; }
+.ask__context-source:hover { color: var(--color-black); }
+.ask__context-source:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .ask__cursor { animation: ask-blink 1s steps(2) infinite; }
 @keyframes ask-blink { 50% { opacity: 0; } }
 .ask__input-row { display: flex; gap: var(--space-2); align-items: flex-end; }

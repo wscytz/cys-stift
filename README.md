@@ -21,7 +21,7 @@
 
 ## 下载
 
-版本状态：源码当前为 **1.0.0-preview.1**（本地预览，尚未 tag/release）；最近公开 release/tag 是 [**v0.57.3**](https://github.com/wscytz/cys-stift/releases/tag/v0.57.3)。预览版不提供发布下载，稳定版二进制请从该 release 页面获取：
+版本状态：源码当前为 **1.0.0-preview.1**（预览版，尚未 tag/release）；最近公开 release/tag 是 [**v0.57.3**](https://github.com/wscytz/cys-stift/releases/tag/v0.57.3)。预览版不提供发布下载，稳定版二进制请从该 release 页面获取：
 
 | 平台 | 文件 | 说明 |
 |---|---|---|
@@ -31,6 +31,8 @@
 
 > iPad/iOS 不做。Windows 版走 CI(本地 macOS 不能 cross-compile)。Android release 签名版待 keystore 配置(debug 版功能完整,仅缺签名 + 体积大)。
 
+本地已生成 `1.0.0-preview.1` 的 Apple Silicon `.app`（14MB）和 `.dmg`（7.4MB），并完成原生进程启动烟测。它们仅为 adhoc 签名、未公证，也未完成原生 UI/安装验收，因此不作为 README 下载项或公开 release。
+
 ---
 
 ## 特性
@@ -39,7 +41,7 @@
 
 **inbox** —— 多媒介编辑(链接/代码/引用/媒体)+ 草稿自动保存 + 发送到画布。
 
-**canvas(自研 Canvas 2D)** —— 6 种元素(card/arrow/freedraw/text/rect/frame)+ 多画布 + 视图持久化 + 关系箭头(straight/curve/elbow + 手绘识别)+ 工具栏(选择/手绘/文本/连接/橡皮)+ AI 排版 + 导出(图片 SVG/PNG + Markdown + DSL)+ Outline / Minimap / 全局缩略图 + 双链 `[[]]` 自动建箭头 + **DSL 模态编辑器(转义)** + 对齐分布 9 操作 + 画布模板 + 整理范式(思维导图/流程图/网格/紧凑 × 四方向)+ 焦点模式 + frame + 手绘规范化(保角 RDP + 贝塞尔平滑 + $1 形状识别)+ **关系式坐标 DSL**(right-of/below + 碰撞避让)+ **卡片密度模式**(紧凑/自适应/仅标题/副标题)+ 双击空白建卡 + **DSL sanitize 兜底**(AI 非法值不崩)。
+**canvas(自研 Canvas 2D)** —— 6 种元素(card/arrow/freedraw/text/rect/frame)+ 多画布 + 视图持久化 + 关系箭头(straight/curve/elbow + 手绘识别)+ 工具栏(选择/手绘/文本/连接/橡皮)+ AI 排版 + 导出(图片 SVG/PNG + Markdown + DSL)+ Outline / Minimap / 全局缩略图 + 双链 `[[]]` 自动建箭头 + **DSL 模态编辑器(转义,两卡选择可直接生成关系式 + 实时 diff/诊断/stale 恢复)** + 对齐分布 9 操作 + 画布模板 + 整理范式(思维导图/流程图/网格/紧凑 × 四方向)+ 焦点模式 + frame + 手绘规范化(保角 RDP + 贝塞尔平滑 + $1 形状识别)+ **关系式坐标 DSL**(right-of/below + 碰撞避让)+ **卡片密度模式**(紧凑/自适应/仅标题/副标题)+ 双击空白建卡 + **DSL sanitize 兜底**(AI 非法值不崩)。
 
 **工作台** —— per-card 深度编辑(`/workbench` 库页 + canvas 右栏编辑器);画布 hover 只读速览,双击或侧栏入口进入工作台。当前版本已移除旧的 focusEdit 专注编辑态,避免把独立工作台和画布焦点模式混为一谈。
 
@@ -53,15 +55,19 @@
 
 **画板适配** —— 响应式(<1024 汉堡抽屉 + companion 覆盖 + canvas 断点归一)+ 触摸手势(双指 pinch zoom + 双指平移 + 触摸目标 44px)+ Android 运行时(rustls ring provider + 平台检测 SSR-safe hooks)。
 
-**其他** —— 命令面板(⌘K)+ 标签墙 `/tags`(10 色)+ 时间线 `/timeline`(全局)+ 全文搜索(title 加权 + 摘要)+ 软删恢复 + JSON 导出/导入(含画布几何 + freeform)+ 中英双语。
+**其他** —— 命令面板(⌘K)+ 标签墙 `/tags`(六色 canonical 调色板)+ 时间线 `/timeline`(全局)+ 全文搜索(title 加权 + 摘要)+ 软删恢复 + JSON 导出/导入(含画布几何 + freeform + 本机恢复点)+ 中英双语。
 
 完整能力见 [`docs/STATE.md`](docs/STATE.md)「当前能力」段。
+
+产品工作流展示：本地应用内 [`/showcase`](http://localhost:3000/showcase/)；独立静态预览页为 [wscytz.com/cys-stift](https://wscytz.com/cys-stift/)。两者均展示 **1.0.0-preview.1** 能力边界，不代表稳定版已经发布。
 
 ---
 
 ## 状态
 
 **1.0.0-preview.1** — 本地稳定性预览版(版本源见根 `package.json`)。A–F 稳定性门禁完成后等待最终桌面 / VoiceOver / 数据恢复验收；不代表已发布。
+
+DSL 的实现与内部稳定性验证已经具备，但“普通用户是否愿意学习并重复使用”仍是待外部研究验证的产品假设；README 和展示页不会把内部测试写成用户价值结论。
 
 当前状态、版本里程碑、下一步、已知 debt 全见 [`docs/STATE.md`](docs/STATE.md) — 单一可信源。历史见 [`docs/changelog.md`](docs/changelog.md)。
 
@@ -94,10 +100,13 @@ cys-stift/
 | 架构总览 | [`docs/architecture/overview.md`](./docs/architecture/overview.md) |
 | 设计 token / 包豪斯规则 | [`docs/design/tokens.md`](./docs/design/tokens.md) |
 | 如何搭建开发环境 | [`docs/development/setup.md`](./docs/development/setup.md) |
+| 如何预览 / 部署产品展示页 | [`docs/development/showcase.md`](./docs/development/showcase.md) |
 | 用户指南 | [`docs/user/README.md`](./docs/user/README.md) |
 | 隐私说明(AI 隐私必读) | [`docs/user/privacy.md`](./docs/user/privacy.md) |
 | 转义手册(画布 ↔ DSL) | [`docs/user/transliteration.md`](./docs/user/transliteration.md) |
 | 当前状态 / 版本里程碑 | [`docs/STATE.md`](./docs/STATE.md) |
+| 产品展示 / 核心工作流 | [`/showcase`](http://localhost:3000/showcase/) |
+| 独立静态预览页 | [wscytz.com/cys-stift](https://wscytz.com/cys-stift/) |
 | 阶段变更历史 | [`docs/changelog.md`](./docs/changelog.md) |
 | AI 方向文档 | [`docs/ai-direction.md`](./docs/ai-direction.md) |
 | 内部过程文档(已迁私有仓) | [`docs/INTERNAL-DOCS.md`](./docs/INTERNAL-DOCS.md) |

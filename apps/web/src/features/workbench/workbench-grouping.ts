@@ -7,6 +7,7 @@
  * 纯函数 = 不碰 service/storage,单测直接喂 Card[]。
  */
 import type { Card, CanvasId } from '@cys-stift/domain'
+import { solidTagBarColor } from '@/lib/tag-color'
 import type { WorkbenchModeId } from './workbench-modes'
 
 /** 一个分区(画布/类型/标签 的某一组,或收件箱)。 */
@@ -151,7 +152,7 @@ export function groupByTag(
       key: `tag:${tag}`,
       label: tag,
       cards: buckets.get(tag)!,
-      colorBar: tagColors.get(tag) ?? INBOX_COLOR,
+      colorBar: solidTagBarColor(tagColors.get(tag) ?? INBOX_COLOR),
     }))
 }
 

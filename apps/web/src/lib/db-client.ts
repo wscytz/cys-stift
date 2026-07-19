@@ -7,6 +7,7 @@ import {
   type CardId,
   type CanvasId,
   StorageQuotaError,
+  normalizeTagColor,
 } from '@cys-stift/domain'
 
 // ── Storage adapter (localStorage on web; Tauri fs in Phase 6/8) ─────────────
@@ -31,6 +32,10 @@ function loadSnapshot(): Snapshot {
       // 数组字段防御性归一化(导入坏数据/旧版迁移/解析异常):非数组 → 空数组,
       // 防后续渲染 .map 崩(tags 非数组时 card-detail (card.tags ?? []).map 仍炸)。
       if (!Array.isArray(c.tags)) c.tags = []
+      else c.tags = c.tags.map((tag) => ({
+        ...tag,
+        color: normalizeTagColor(tag?.color),
+      }))
       if (c.media != null && !Array.isArray(c.media)) c.media = []
       if (c.links != null && !Array.isArray(c.links)) c.links = []
       if (c.codeSnippets != null && !Array.isArray(c.codeSnippets)) c.codeSnippets = []
@@ -130,21 +135,26 @@ if (typeof window !== 'undefined') {
  */
 export function rehydrateCards(): void {
   if (typeof window === 'undefined') return
+  _hydrated = true
   const next = loadSnapshot()
   // loadSnapshot() always returns a fresh array, so an identity check
   // (`next.cards !== _cards`) would ALWAYS fire — causing every cross-tab
   // storage event to notify every useDb() consumer, even when the parsed
-  // content is identical. Compare a cheap signature instead. (v0.37.0 review.)
+  // content is identical. Compare serialised content instead. (v0.37.0 review.)
   //
-  // R2.5: the old signature (length + first/last id) missed cross-tab edits to
-  // a MIDDLE card — same length, same endpoints, but a middle card's content
-  // changed. Summing every card's updatedAt timestamp catches any content
-  // change (any card mutation bumps its updatedAt) while staying a pure cheap
-  // string that does not false-fire on the fresh array identity.
+  // Compare content rather than array identity. A length/updatedAt-only
+  // signature misses valid imports (or cross-tab edits) that retain the same
+  // timestamp, and it also misses an edit to a card that does not bump that
+  // optional field. JSON is already the persistence format, so a serialised
+  // snapshot gives us a complete cache comparison.
   const sig = (cs: Card[]): string => {
-    let sum = 0
-    for (const c of cs) sum += c.updatedAt.getTime()
-    return `${cs.length}:${sum}`
+    try {
+      return JSON.stringify(cs)
+    } catch {
+      // Card data should be JSON-safe; retain a defensive fallback rather
+      // than allowing a malformed value to break an import refresh.
+      return `${cs.length}:${cs.map((c) => String(c.id)).join('|')}`
+    }
   }
   if (sig(next.cards) !== sig(_cards)) {
     _cards = next.cards

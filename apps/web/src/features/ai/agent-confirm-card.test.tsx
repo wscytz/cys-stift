@@ -280,6 +280,32 @@ describe('AgentConfirmCard — live 模式(liveHost 提供)', () => {
 
     unmount()
   })
+
+  it('画布在确认门期间被手动修改时阻止 stale proposal 覆盖', async () => {
+    const { host: mockHost, calls: hostCalls } = makeMockHost({ elements: emptyEls() })
+    const { service } = makeMockService()
+    const onRejected = vi.fn()
+    const { host: domHost, unmount } = mount(
+      <AgentConfirmCard
+        dsl="[rect #r1] @pos(100,200) @size(300,400)"
+        targetCanvasId={'canvas-live' as never}
+        service={service}
+        liveHost={mockHost}
+        onApplied={() => {}}
+        onRejected={onRejected}
+      />,
+    )
+    await act(async () => { await flushMicro() })
+    // 模拟用户在确认门外手动画了一个元素。
+    mockHost.upsert({ id: 'manual', kind: 'rect', x: 1, y: 2, w: 3, h: 4, rotation: 0 } as CanvasElement)
+    const applyBtn = byText(domHost, /^应用$|^Apply$/)
+    expect(applyBtn).toBeTruthy()
+    await act(async () => { applyBtn!.click() })
+    expect(onRejected).toHaveBeenCalledTimes(1)
+    // stale guard 在 applyLayout 前返回，旧 rect 不会写入 live host。
+    expect(hostCalls.upserts.filter((e) => e.id === 'r1')).toHaveLength(0)
+    unmount()
+  })
 })
 
 // ───────────────────────────────────────────────────────────────────
@@ -325,6 +351,93 @@ describe('AgentConfirmCard — /ask temp 模式(无 liveHost,不回归)', () => 
       applied: 1, cardsUpdated: 0, cardsCreated: 0,
     })
 
+    unmount()
+  })
+
+  it('temp 持久化明确失败(ok=false)时不误报成功/onApplied/archive', async () => {
+    archiveAppendSpy.mockClear()
+    pushToastSpy.mockClear()
+    const { service } = makeMockService()
+    const onApplied = vi.fn()
+    buildCanvasHostForCanvasSpy.mockResolvedValue({
+      host: { getElements: () => [] },
+      before: [],
+    })
+    // 即使底层遗留/错误报告带了 applied>0，明确的事务失败仍必须优先。
+    applyOpsAndPersistSpy.mockResolvedValue({
+      ok: false,
+      committed: false,
+      applied: 1,
+      failed: 1,
+      cardsCreated: 0,
+      cardsUpdated: 0,
+      cardsFailed: 0,
+      cardUpdatesFailed: 0,
+      freeformChanged: 0,
+    })
+
+    const { host: domHost, unmount } = mount(
+      <AgentConfirmCard
+        dsl={'[rect #r1] @pos(10,10) @size(50,50)'}
+        targetCanvasId={'canvas-ask' as never}
+        service={service}
+        onApplied={onApplied}
+        onRejected={() => {}}
+      />,
+    )
+    await act(async () => { await flushMicro() })
+    await act(async () => { byText(domHost, /^应用$|^Apply$/)!.click() })
+    await act(async () => { await flushMicro() })
+
+    expect(onApplied).not.toHaveBeenCalled()
+    expect(archiveAppendSpy).not.toHaveBeenCalled()
+    expect(pushToastSpy.mock.calls.some(([toast]) => (toast as { kind?: string }).kind === 'success')).toBe(false)
+    expect(pushToastSpy.mock.calls.some(([toast]) => (toast as { kind?: string }).kind === 'error')).toBe(true)
+    unmount()
+  })
+
+  it('temp 成功 toast 提供一次性撤销 action', async () => {
+    pushToastSpy.mockClear()
+    const { service } = makeMockService()
+    const undo = vi.fn().mockResolvedValue(true)
+    buildCanvasHostForCanvasSpy.mockResolvedValue({
+      host: { getElements: () => [] },
+      before: [],
+    })
+    applyOpsAndPersistSpy.mockResolvedValue({
+      ok: true,
+      committed: true,
+      applied: 1,
+      failed: 0,
+      cardsCreated: 0,
+      cardsUpdated: 0,
+      cardsFailed: 0,
+      cardUpdatesFailed: 0,
+      freeformChanged: 1,
+      undo,
+    })
+
+    const { host: domHost, unmount } = mount(
+      <AgentConfirmCard
+        dsl={'[rect #r1] @pos(10,10) @size(50,50)'}
+        targetCanvasId={'canvas-ask' as never}
+        service={service}
+        onApplied={() => {}}
+        onRejected={() => {}}
+      />,
+    )
+    await act(async () => { await flushMicro() })
+    await act(async () => { byText(domHost, /^应用$|^Apply$/)!.click() })
+    await act(async () => { await flushMicro() })
+
+    const success = pushToastSpy.mock.calls
+      .map(([toast]) => toast as { kind?: string; actions?: { label: string; onClick: () => void }[] })
+      .find((toast) => toast.kind === 'success')
+    expect(success?.actions?.[0]?.label).toMatch(/撤销/)
+    success!.actions![0]!.onClick()
+    success!.actions![0]!.onClick()
+    await act(async () => { await flushMicro() })
+    expect(undo).toHaveBeenCalledTimes(1)
     unmount()
   })
 })
@@ -404,6 +517,13 @@ describe('AgentConfirmCard — T5 archive trigger (ai-agent)', () => {
     expect(archiveAppendSpy.mock.calls[0]![0]).toBe('ai-agent')
     // 2 行 DSL → note 'agent: 2 行'
     expect(archiveAppendSpy.mock.calls[0]![1]).toBe('agent: 2 行')
+    expect(archiveAppendSpy.mock.calls[0]![2]).toMatchObject({
+      operation: {
+        kind: 'ai-agent',
+        before: { cards: [], mediaAssets: {} },
+        after: { cards: [], mediaAssets: {} },
+      },
+    })
 
     unmount()
   })

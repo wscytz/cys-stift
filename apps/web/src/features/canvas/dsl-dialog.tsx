@@ -15,15 +15,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Modal, Button } from '@cys-stift/ui'
 import type { CardId, CardService } from '@cys-stift/domain'
-import type { CanvasHost } from '@cys-stift/canvas-engine'
+import { InMemoryCanvasHost, type CanvasElement, type CanvasHost } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
 import { downloadFile } from '@/lib/download'
 import { pushToast } from '@/lib/toast-store'
 import { serializeCanvasReadable, serializeCanvas } from '../ai/canvas-dsl'
-import { parseDslWithDiagnostics, type DslDiagnostic } from '../ai/dsl-parser'
+import { parseDslWithDiagnostics } from '../ai/dsl-parser'
 import { buildCanvasPrompt } from '../ai/canvas-prompt'
 import { DSL_GRAMMAR_REFERENCE } from '../ai/dsl-grammar'
 import { applyLayout, type CardCreateHandler } from './apply-layout'
+import { diffCanvasSnapshots } from './canvas-diff'
 import { archiveStore } from '@/lib/archive-store'
 import { buildArchivePayload } from '@/lib/build-archive-payload'
 import { VERSION } from '@/lib/version'
@@ -34,6 +35,52 @@ const DSL_EXAMPLES = {
   relation: '[card #parent create] @pos(120, 120) @size(240, 100) @color(blue)\n[card #child create] below #parent @gap(24)',
 } as const
 
+export function appendDslBlock(current: string, block: string): string {
+  const existing = current.trimEnd()
+  return existing ? `${existing}\n${block}` : block
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+export function replaceOrAppendCardRelation(
+  source: string,
+  targetId: string,
+  anchorId: string,
+  direction: 'right-of' | 'below',
+): string {
+  const relation = `[card #${targetId}] ${direction} #${anchorId} @gap(24)`
+  const lines = source.split('\n')
+  const cardLine = new RegExp(`^\\s*\\[card\\s+#${escapeRegExp(targetId)}(?:\\s+create)?\\]`)
+  const index = lines.findIndex((line) => cardLine.test(line))
+  if (index === -1) return appendDslBlock(source, relation)
+  lines[index] = relation
+  return lines.join('\n')
+}
+
+function cloneElements(elements: readonly CanvasElement[]): CanvasElement[] {
+  return elements.map((element) => ({
+    ...element,
+    ...(element.curve ? { curve: { ...element.curve } } : {}),
+    ...(element.elbow ? { elbow: element.elbow.map((point) => ({ ...point })) } : {}),
+    ...(element.meta
+      ? {
+          meta: {
+            ...element.meta,
+            ...(Array.isArray(element.meta.points)
+              ? { points: (element.meta.points as unknown[]).map((point) => (Array.isArray(point) ? [...point] : point)) }
+              : {}),
+          },
+        }
+      : {}),
+  }))
+}
+
+function revisionOf(elements: readonly CanvasElement[]): string {
+  return JSON.stringify(cloneElements(elements).sort((a, b) => a.id.localeCompare(b.id)))
+}
+
 export function DslDialog({
   open,
   onClose,
@@ -41,6 +88,7 @@ export function DslDialog({
   service,
   canvasName,
   onCardCreate,
+  initialText,
 }: {
   open: boolean
   onClose: () => void
@@ -48,18 +96,46 @@ export function DslDialog({
   service: CardService
   canvasName: string
   onCardCreate?: CardCreateHandler
+  /** Text supplied by the paste bridge; it is reviewed before being applied. */
+  initialText?: string
 }) {
   const { t } = useI18n()
   const [text, setText] = useState('')
-  const [errors, setErrors] = useState<DslDiagnostic[]>([])
   const [appliedHashes, setAppliedHashes] = useState<Set<string>>(new Set())
+  const [base, setBase] = useState<{ elements: CanvasElement[]; revision: string } | null>(null)
+  const [revisionTick, setRevisionTick] = useState(0)
+  const [stale, setStale] = useState(false)
 
   // 实时预览:用户输入时即重新 parse,给出"待应用 N 条 / M 行无效"计数,
   // 不必等点 Apply。只在有可说之事时渲染(ok 或 warn),其余不渲染。
   const preview = useMemo(() => {
     const { ops, errors: parseErrors } = parseDslWithDiagnostics(text)
-    return { ops, opCount: ops.length, errCount: parseErrors.length }
-  }, [text])
+    if (!base || ops.length === 0) {
+      return {
+        ops,
+        errors: parseErrors,
+        opCount: ops.length,
+        errCount: parseErrors.length,
+        diff: null as ReturnType<typeof diffCanvasSnapshots> | null,
+      }
+    }
+    const before = cloneElements(base.elements)
+    const afterHost = new InMemoryCanvasHost()
+    afterHost.applyWithoutEcho(() => {
+      for (const element of before) afterHost.upsert(element)
+    })
+    // A preview has no persistence side effects. The successful callback only
+    // makes card-create operations visible in the projected host.
+    applyLayout(afterHost, ops, undefined, () => ({ ok: true }))
+    const after = cloneElements(afterHost.getElements())
+    return {
+      ops,
+      errors: parseErrors,
+      opCount: ops.length,
+      errCount: parseErrors.length,
+      diff: diffCanvasSnapshots(before, after),
+    }
+  }, [text, base])
 
   // Escape 关闭模态(与 CardDetailModal 一致;Modal 组件只处理 backdrop 点击,
   // Escape 由调用方负责)。textarea 里 Escape 仍关模态——DSL 编辑器的「完成」手势。
@@ -86,16 +162,55 @@ export function DslDialog({
   // 也清空增量应用缓存:每次打开模态都是全新编辑会话。
   useEffect(() => {
     if (!open || !host) return
-    const els = host.getElements()
-    setText(serializeCanvasReadable(els, (id) => service.get(id as CardId)?.title))
-    setErrors([])
+    const els = cloneElements(host.getElements())
+    setBase({ elements: els, revision: revisionOf(els) })
+    setText(initialText ?? serializeCanvasReadable(els, (id) => service.get(id as CardId)?.title))
     setAppliedHashes(new Set())
-  }, [open, host, service])
+    setStale(false)
+  }, [open, host, service, initialText])
+
+  // Surface a live revision change while the dialog is open. A drag, undo, or
+  // another panel can mutate the host without changing this component's props.
+  useEffect(() => {
+    if (!open || !host) return
+    return host.onUserChange(() => setRevisionTick((value) => value + 1))
+  }, [open, host])
+
+  const liveStale = !!base && !!host && revisionOf(host.getElements()) !== base.revision
+
+  const selectedCards = useMemo(() => {
+    if (!host) return []
+    return host
+      .getSelectedIds()
+      .map((id) => host.getElement(id))
+      .filter((element): element is CanvasElement => element?.kind === 'card')
+      .slice(0, 2)
+  }, [host, open, revisionTick])
+
+  const reloadFromCanvas = () => {
+    if (!host) return
+    const elements = cloneElements(host.getElements())
+    setBase({ elements, revision: revisionOf(elements) })
+    setText(serializeCanvasReadable(elements, (id) => service.get(id as CardId)?.title))
+    setAppliedHashes(new Set())
+    setStale(false)
+  }
+
+  const arrangeSelected = (direction: 'right-of' | 'below') => {
+    const [anchor, target] = selectedCards
+    if (!anchor || !target) return
+    setText((current) => replaceOrAppendCardRelation(current, target.id, anchor.id, direction))
+  }
 
   const apply = () => {
     if (!host) return
+    const hostRevisionChanged = !base || revisionOf(host.getElements()) !== base.revision
+    if (hostRevisionChanged || stale) {
+      setStale(true)
+      pushToast({ kind: 'info', message: t('agent.staleRevision') })
+      return
+    }
     const { ops, errors: parseErrors } = parseDslWithDiagnostics(text)
-    setErrors(parseErrors)
 
     if (ops.length === 0) {
       // 无可应用的指令。区分两种:全行无法解析 vs 输入为空。
@@ -110,7 +225,10 @@ export function DslDialog({
     const { applied, skipped, failed } = applyLayout(host, ops, appliedHashes, onCardCreate)
     // 合并新应用的 hash 到现有集合触发状态更新
     if (applied > 0) {
-      setAppliedHashes(new Set(appliedHashes))
+      const nextBase = cloneElements(host.getElements())
+      setBase({ elements: nextBase, revision: revisionOf(nextBase) })
+      setAppliedHashes(new Set())
+      setStale(false)
       // T5:风险 op 存档 —— DSL apply 成功(applied > 0)后落档(b 类,fire-and-forget,
       // 不阻塞 UI;apply 是同步函数,用 .then() 链接 append)。
       void buildArchivePayload()
@@ -202,6 +320,29 @@ export function DslDialog({
         <span className="dsl-bridge__label">Text DSL</span>
         <span className="dsl-bridge__hint">{t('canvas.dslBridgeHint')}</span>
       </div>
+      <section className="dsl-guide" aria-labelledby="dsl-guide-title">
+        <div>
+          <p id="dsl-guide-title" className="dsl-guide__title">{t('canvas.dslGuideTitle')}</p>
+          {selectedCards.length === 2 ? (
+            <p className="dsl-guide__selection">
+              {t('canvas.dslGuideSelection', {
+                target: service.get(selectedCards[1]!.id as CardId)?.title || `#${selectedCards[1]!.id}`,
+                anchor: service.get(selectedCards[0]!.id as CardId)?.title || `#${selectedCards[0]!.id}`,
+              })}
+            </p>
+          ) : (
+            <p className="dsl-guide__selection">{t('canvas.dslGuideHint')}</p>
+          )}
+        </div>
+        <div className="dsl-guide__actions">
+          <Button variant="ghost" onClick={() => arrangeSelected('right-of')} disabled={selectedCards.length !== 2}>
+            {t('canvas.dslGuideRight')}
+          </Button>
+          <Button variant="ghost" onClick={() => arrangeSelected('below')} disabled={selectedCards.length !== 2}>
+            {t('canvas.dslGuideBelow')}
+          </Button>
+        </div>
+      </section>
       <div className="dsl-examples" aria-label={t('canvas.dslExamples')}>
         <span className="dsl-examples__label">{t('canvas.dslExamples')}</span>
         {(Object.keys(DSL_EXAMPLES) as (keyof typeof DSL_EXAMPLES)[]).map((key) => (
@@ -210,8 +351,7 @@ export function DslDialog({
             type="button"
             className="dsl-example"
             onClick={() => {
-              setText(DSL_EXAMPLES[key])
-              setErrors([])
+              setText((current) => appendDslBlock(current, DSL_EXAMPLES[key]))
             }}
           >
             {t(`canvas.dslExample.${key}` as never)}
@@ -230,16 +370,34 @@ export function DslDialog({
         spellCheck={false}
         aria-label={t('canvas.dslTitle')}
       />
-      {text.trim() !== '' && preview.opCount > 0 && preview.errCount === 0 && (
-        <div className="dsl-preview dsl-preview--ok">
-          <p>{t('canvas.dslPreviewOk', { n: String(preview.opCount) })}</p>
-          <ul>
-            {preview.ops.slice(0, 5).map((op, i) => (
-              <li key={i}>{op.type === 'free' ? op.shape : op.type}{'id' in op && op.id ? ` #${op.id}` : ''}</li>
+      {(liveStale || stale) && (
+        <div className="dsl-preview dsl-preview--warn dsl-preview--stale" role="alert">
+          <p>{t('canvas.dslPreviewStale')}</p>
+          <Button variant="ghost" onClick={reloadFromCanvas}>{t('canvas.dslReload')}</Button>
+        </div>
+      )}
+      {text.trim() !== '' && preview.opCount > 0 && preview.diff && preview.diff.added.length + preview.diff.removed.length + preview.diff.changed.length > 0 && (
+        <div className="dsl-preview dsl-preview--ok" aria-live="polite">
+          <p>{t('canvas.dslPreviewChanges', {
+            added: String(preview.diff.added.length),
+            removed: String(preview.diff.removed.length),
+            changed: String(preview.diff.changed.length),
+          })}</p>
+          <ul className="dsl-preview__changes">
+            {preview.diff.added.slice(0, 8).map((element) => (
+              <li key={`added-${element.id}`} className="dsl-preview__added">+ {element.kind} #{element.id}</li>
             ))}
-            {preview.ops.length > 5 && <li>+{preview.ops.length - 5}</li>}
+            {preview.diff.removed.slice(0, 8).map((element) => (
+              <li key={`removed-${element.id}`} className="dsl-preview__removed">- {element.kind} #{element.id}</li>
+            ))}
+            {preview.diff.changed.slice(0, 8).map((change) => (
+              <li key={`changed-${change.id}`} className="dsl-preview__changed">~ {change.after.kind} #{change.id} · {change.fields.join(', ')}</li>
+            ))}
           </ul>
         </div>
+      )}
+      {text.trim() !== '' && preview.opCount > 0 && preview.diff && preview.diff.added.length + preview.diff.removed.length + preview.diff.changed.length === 0 && (
+        <p className="dsl-preview dsl-preview--ok">{t('canvas.dslPreviewNoChanges')}</p>
       )}
       {text.trim() !== '' && preview.errCount > 0 && (
         <p className="dsl-preview dsl-preview--warn">
@@ -249,11 +407,11 @@ export function DslDialog({
           })}
         </p>
       )}
-      {errors.length > 0 && (
+      {preview.errors.length > 0 && (
         <div className="dsl-errors">
-          <p className="dsl-errors__title">{t('canvas.dslErrorsTitle', { n: String(errors.length) })}</p>
+          <p className="dsl-errors__title">{t('canvas.dslErrorsTitle', { n: String(preview.errors.length) })}</p>
           <ul className="dsl-errors__list">
-            {errors.map((e, i) => (
+            {preview.errors.map((e, i) => (
               <li key={i} className="dsl-errors__item">
                 <span className="dsl-errors__line">{t('canvas.dslErrorLine', { line: String(e.line) })}</span>
                 <span className="dsl-errors__msg">{e.message}</span>
@@ -275,7 +433,7 @@ export function DslDialog({
         <Button variant="ghost" onClick={download}>{t('canvas.dslDownload')}</Button>
         <span className="dsl-spacer" />
         <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
-        <Button variant="primary" onClick={apply} disabled={!host}>{t('canvas.dslApply')}</Button>
+        <Button variant="primary" onClick={apply} disabled={!host || liveStale || stale}>{t('canvas.dslApply')}</Button>
       </div>
       <style>{styles}</style>
     </Modal>
@@ -287,6 +445,10 @@ const styles = `
 .dsl-bridge { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-2); padding: var(--space-2); border: var(--border-hairline); background: var(--color-yellow-soft); font-family: var(--font-mono); font-size: var(--font-size-xs); }
 .dsl-bridge__label { font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
 .dsl-bridge__hint { margin-left: auto; color: var(--color-gray); font-family: var(--font-body); }
+.dsl-guide { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: 0 0 var(--space-2); padding: var(--space-2); border: var(--border-hairline); background: var(--color-white); }
+.dsl-guide__title { margin: 0 0 var(--space-0.5); font-family: var(--font-display); font-size: var(--font-size-sm); }
+.dsl-guide__selection { margin: 0; color: var(--color-gray); font-family: var(--font-body); font-size: var(--font-size-xs); }
+.dsl-guide__actions { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .dsl-examples { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin: 0 0 var(--space-3); }
 .dsl-examples__label { margin-right: var(--space-1); font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
 .dsl-example { min-height: 36px; padding: 0 var(--space-2); border: var(--border-hairline); border-radius: var(--radius-sm); background: var(--color-white); color: var(--color-black); font-family: var(--font-body); font-size: var(--font-size-xs); cursor: pointer; }
@@ -309,11 +471,17 @@ const styles = `
   resize: vertical; line-height: 1.5;
 }
 .dsl-text:focus { border-color: var(--color-red); }
-.dsl-preview { margin: 0 0 var(--space-2); padding: var(--space-1) var(--space-2); border-left: 3px solid var(--color-blue); font-family: var(--font-mono); font-size: var(--font-size-xs); }
+.dsl-preview { margin: 0 0 var(--space-2); padding: var(--space-1) var(--space-2); border-left: var(--space-quarter) solid var(--color-blue); font-family: var(--font-mono); font-size: var(--font-size-xs); }
 .dsl-preview p { margin: 0; }
 .dsl-preview ul { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin: var(--space-1) 0 0; padding: 0; list-style: none; color: var(--color-gray); }
+.dsl-preview__changes { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-1) var(--space-2) !important; }
+.dsl-preview__changes li { overflow-wrap: anywhere; }
+.dsl-preview__added { color: var(--color-blue); }
+.dsl-preview__removed { color: var(--color-red); }
+.dsl-preview__changed { color: var(--color-black-soft); }
 .dsl-preview--ok { color: var(--color-gray); }
 .dsl-preview--warn { color: var(--color-red); }
+.dsl-preview--stale { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .dsl-errors {
   margin-top: var(--space-2);
   padding: var(--space-2) var(--space-3);
@@ -339,4 +507,13 @@ const styles = `
 .dsl-errors__msg { word-break: break-word; }
 .dsl-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); align-items: center; }
 .dsl-spacer { flex: 1; min-width: 0; }
+@media (max-width: 767px) {
+  .dsl-bridge { align-items: flex-start; flex-wrap: wrap; }
+  .dsl-bridge__hint { width: 100%; margin-left: 0; }
+  .dsl-guide { align-items: stretch; flex-direction: column; }
+  .dsl-guide__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dsl-example { min-height: 44px; }
+  .dsl-preview--stale { align-items: stretch; flex-direction: column; }
+  .dsl-text { min-height: 200px; }
+}
 `

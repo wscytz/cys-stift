@@ -18,12 +18,22 @@
 import type { CanvasId } from '@cys-stift/domain'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 
-/** 持久化的对话消息(无 targetCanvasId —— per-canvas key 已隔离画布)。 */
+/** 持久化的对话消息。通常按画布分 key；targetCanvasId 仍保留作消息级
+ * provenance，避免切换画布的过渡 render 把旧提议应用到新画布。 */
 export interface PersistedConversationMessage {
   role: 'user' | 'assistant'
   content: string
   dslBlocks?: string[]
   streaming?: boolean
+  targetCanvasId?: string
+  /** Local RAG accounting only: counts + source ids, never card content. */
+  contextMeta?: ConversationContextMeta
+}
+
+export interface ConversationContextMeta {
+  retrievedCount: number
+  sentCount: number
+  cardIds: string[]
 }
 
 const KEY_PREFIX = 'cys-stift.conversation.'
@@ -33,9 +43,62 @@ const COMPANION_OLD_SUFFIX = '.v1'
 const ASK_OLD_KEY = 'cys-stift.ask-chat.v1'
 const CAP = 100
 
+// Conversation history is persisted under one key per canvas and is read on
+// demand, so it has no message cache to invalidate. We still expose a small
+// change signal: consumers that keep a local React message array (ask and
+// companion) can re-read after an import/restore instead of waiting for a full
+// page reload.
+let _conversationVersion = 0
+const _conversationSubscribers = new Set<() => void>()
+
+function notifyConversationChange(): void {
+  _conversationVersion += 1
+  for (const cb of _conversationSubscribers) cb()
+}
+
+/** Subscribe to conversation persistence/import changes. */
+export function subscribeConversationChanges(cb: () => void): () => void {
+  _conversationSubscribers.add(cb)
+  return () => {
+    _conversationSubscribers.delete(cb)
+  }
+}
+
+/** Stable monotonically increasing snapshot for external-store consumers. */
+export function getConversationVersion(): number {
+  return _conversationVersion
+}
+
+/**
+ * Notify conversation consumers after an external storage restore/import.
+ * Conversation messages are loaded per canvas, so there is no in-memory map
+ * to replace; the signal is the invalidation contract.
+ */
+export function rehydrateConversations(): void {
+  if (typeof window === 'undefined') return
+  notifyConversationChange()
+}
+
 /** 构造 per-canvas 的 localStorage key。 */
 export function conversationKey(canvasId: CanvasId): string {
   return `${KEY_PREFIX}${String(canvasId)}${KEY_SUFFIX}`
+}
+
+// Keep the invalidation signal consistent across tabs. localStorage does not
+// dispatch a `storage` event in the tab that performed the write, so imports
+// call rehydrateConversations() explicitly; this listener covers writes made
+// by another tab/window.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (
+      event.key === null ||
+      (typeof event.key === 'string' &&
+        event.key.startsWith(KEY_PREFIX) &&
+        event.key.endsWith(KEY_SUFFIX))
+    ) {
+      notifyConversationChange()
+    }
+  })
 }
 
 /** 宽松校验:只留形如 { role, content } 的项,丢弃畸形数据(防坏数据炸 UI)。 */
@@ -44,8 +107,19 @@ function isValidMessage(m: unknown): m is PersistedConversationMessage {
   const msg = m as Record<string, unknown>
   return (
     (msg.role === 'user' || msg.role === 'assistant') &&
-    typeof msg.content === 'string'
+    typeof msg.content === 'string' &&
+    (msg.targetCanvasId === undefined || typeof msg.targetCanvasId === 'string') &&
+    (msg.contextMeta === undefined || isValidContextMeta(msg.contextMeta))
   )
+}
+
+function isValidContextMeta(value: unknown): value is ConversationContextMeta {
+  if (!value || typeof value !== 'object') return false
+  const meta = value as Record<string, unknown>
+  return typeof meta.retrievedCount === 'number' && Number.isFinite(meta.retrievedCount) && meta.retrievedCount >= 0 &&
+    typeof meta.sentCount === 'number' && Number.isFinite(meta.sentCount) && meta.sentCount >= 0 &&
+    Array.isArray(meta.cardIds) && meta.cardIds.length <= 8 &&
+    meta.cardIds.every((id) => typeof id === 'string' && id.length <= 200)
 }
 
 /**
@@ -268,10 +342,19 @@ export function saveConversation(
 ): boolean {
   if (typeof window === 'undefined') return false
   try {
-    window.localStorage.setItem(
-      conversationKey(canvasId),
-      JSON.stringify(messages.slice(-CAP)),
-    )
+    // Persist only the conversation contract. Components may attach
+    // ephemeral render/sample fields (for example `sampleContext`); letting
+    // those leak into the store would bloat exports and expose prompt text.
+    const persisted = messages.slice(-CAP).map((message) => ({
+      role: message.role,
+      content: message.content,
+      ...(message.dslBlocks ? { dslBlocks: message.dslBlocks } : {}),
+      ...(message.streaming ? { streaming: true } : {}),
+      ...(message.targetCanvasId ? { targetCanvasId: message.targetCanvasId } : {}),
+      ...(message.contextMeta ? { contextMeta: message.contextMeta } : {}),
+    }))
+    window.localStorage.setItem(conversationKey(canvasId), JSON.stringify(persisted))
+    notifyConversationChange()
     return true
   } catch {
     // QuotaExceededError 或隐私模式禁用 storage —— 跳过,不阻塞对话 + 提示配额。
@@ -285,6 +368,7 @@ export function clearConversation(canvasId: CanvasId): void {
   if (typeof window === 'undefined') return
   try {
     window.localStorage.removeItem(conversationKey(canvasId))
+    notifyConversationChange()
   } catch {
     // 隐私模式禁用 storage 等 —— 跳过
   }

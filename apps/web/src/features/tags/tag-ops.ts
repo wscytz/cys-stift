@@ -5,7 +5,7 @@
  * 返回「受影响卡的 id + 新 tags」，由 /tags 页面 forEach 调 service.update 落库。
  * 纯函数 = 不碰 service / storage，单测直接喂 Card[]。
  */
-import type { Card, TagColor, TagRef } from '@cys-stift/domain'
+import { normalizeTagColor, type Card, type TagColor, type TagRef } from '@cys-stift/domain'
 
 /** 聚合后的标签（/tags 管理表一行）。 */
 export interface TagAggregate {
@@ -30,7 +30,11 @@ export function aggregateTags(cards: Card[]): TagAggregate[] {
   for (const c of cards) {
     for (const t of c.tags ?? []) {
       const cc = map.get(t.value) ?? new Map<string, number>()
-      cc.set(t.color, (cc.get(t.color) ?? 0) + 1)
+      // Older exports may still contain a removed CSS token. Fold those
+      // values into the canonical palette before counting so one logical tag
+      // cannot appear as separate colors in the management/workbench views.
+      const color = normalizeTagColor(t.color)
+      cc.set(color, (cc.get(color) ?? 0) + 1)
       map.set(t.value, cc)
     }
   }

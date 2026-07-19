@@ -114,6 +114,25 @@ describe('saveConversation — cap 100', () => {
   })
 })
 
+describe('saveConversation — persistence boundary', () => {
+  it('keeps bounded RAG metadata but strips component-only prompt state', () => {
+    const CID = 'context-meta' as CanvasId
+    saveConversation(CID, [
+      {
+        role: 'assistant',
+        content: 'answer',
+        targetCanvasId: String(CID),
+        contextMeta: { retrievedCount: 12, sentCount: 8, cardIds: ['a', 'b'] },
+        sampleContext: { question: 'private question', context: 'private prompt' },
+      } as PersistedConversationMessage & { sampleContext: unknown },
+    ])
+    const raw = JSON.parse(window.localStorage.getItem(conversationKey(CID)) ?? '[]') as Record<string, unknown>[]
+    expect(raw[0]).toMatchObject({ targetCanvasId: String(CID), contextMeta: { retrievedCount: 12, sentCount: 8, cardIds: ['a', 'b'] } })
+    expect(raw[0]).not.toHaveProperty('sampleContext')
+    expect(loadConversation(CID)[0]?.contextMeta?.sentCount).toBe(8)
+  })
+})
+
 describe('migration — legacy companion v1 → new v2', () => {
   it('migrates old companion-chat key to conversation key on first load', () => {
     const CID = 'old-comp' as CanvasId

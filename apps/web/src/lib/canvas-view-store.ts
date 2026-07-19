@@ -128,6 +128,19 @@ function hydrateOnce() {
   notify()
 }
 
+/**
+ * Re-read persisted per-canvas views after an external storage
+ * restore/import. The regular store hydrates once, so importFromJson must
+ * explicitly replace this in-memory map before any later user interaction
+ * can persist the stale pre-import view over the restored snapshot.
+ */
+export function rehydrateCanvasViews(): void {
+  if (typeof window === 'undefined') return
+  _hydrated = true
+  _views = loadViewMap()
+  notify()
+}
+
 // ── Cross-tab sync (P1, 2026-07-12) ──────────────────────────────────────────
 // 镜像 db-client.ts / canvas-store.ts 的 storage 监听:其它 tab 写 canvas-view.v1
 // 时本 tab 收到 storage 事件 → 重新 loadViewMap + notify,否则本 tab 内存缓存
@@ -184,6 +197,10 @@ export function subscribe(cb: () => void) {
 // ── Public API ─────────────────────────────────────────────────────────────
 
 export const canvasViewStore = {
+  /** Re-read views after an external storage restore/import. */
+  rehydrate(): void {
+    rehydrateCanvasViews()
+  },
   /** Read a canvas's view (default view if the canvas has none yet). */
   get(id: CanvasId): CanvasView {
     hydrateOnce()

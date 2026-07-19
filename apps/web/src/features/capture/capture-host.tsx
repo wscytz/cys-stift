@@ -20,6 +20,7 @@
  * CaptureHost to open the Mini Input. Same instance, same onSubmit.
  */
 import { useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useDb } from '@/lib/db-client'
 import { useSettings } from '@/lib/settings-store'
 import { MiniInput } from './mini-input'
@@ -30,10 +31,12 @@ import { useI18n } from '@/lib/i18n'
 import { useCanvases } from '@/lib/canvas-store'
 import { buildCaptureRedirectActions } from './capture-redirect'
 import { captureShortcutCommitCoordinator } from './capture-shortcut-commit'
+import { openCapturedCardInWorkbench, routeFromLocation } from './open-captured-card'
 
 export const CAPTURE_OPEN_EVENT = 'cys-stift:open-capture'
 
 export function CaptureHost() {
+  const router = useRouter()
   const { service } = useDb()
   const { t } = useI18n()
   const { settings, ready } = useSettings()
@@ -69,12 +72,15 @@ export function CaptureHost() {
             service,
             activeCanvasId: snapshot.activeCanvasId,
             openCard: (id) => {
-              window.dispatchEvent(
-                new CustomEvent('cys-stift:open-card', { detail: { id } }),
-              )
+              openCapturedCardInWorkbench({
+                cardId: id,
+                origin: routeFromLocation(window.location),
+                navigate: (href) => router.push(href),
+              })
             },
             onError: (msg) =>
               pushToast({ kind: 'error', message: t('capture.redirectFailed', { error: msg }) }),
+            moveToCanvasFailedMessage: t('capture.moveToCanvasFailed'),
           }).map((a, i) => ({
             // Localize the label for display (machine label → i18n).
             label:
@@ -97,7 +103,7 @@ export function CaptureHost() {
           return false
         })
     },
-    [openKind, t, service, snapshot.activeCanvasId],
+    [openKind, t, service, snapshot.activeCanvasId, router],
   )
 
   useEffect(() => {

@@ -161,6 +161,31 @@ function isValid(v: unknown): v is Settings {
 function loadSettings(): Settings {
   if (typeof window === 'undefined') return DEFAULT_SETTINGS
   try {
+    // ── v2 正常读取 ──
+    // The v2 key is canonical. A stale v1 key can remain after an interrupted
+    // migration or an import; reading it first would overwrite a valid v2
+    // restore with obsolete settings.
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as { settings?: unknown }
+        if (isValid(parsed.settings)) {
+          const loaded = parsed.settings as Settings
+          // B1 迁移:Space 注册必败(Carbon 限制 + 输入法冲突)→ 一次性迁移 KeyE。
+          if (loaded.captureShortcut?.code === 'Space') {
+            loaded.captureShortcut = { ...loaded.captureShortcut, code: 'KeyE' }
+            window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings: loaded }))
+          }
+          if (typeof loaded.seenCaptureHint !== 'boolean') loaded.seenCaptureHint = false
+          if (!loaded.profiles) loaded.profiles = []
+          if (!loaded.labs || typeof loaded.labs !== 'object') loaded.labs = {}
+          return loaded
+        }
+      } catch {
+        // Corrupt v2 → try the legacy migration below, then fall back to defaults.
+      }
+    }
+
     // ── v1→v2 migration:旧 key 的 {settings:{ai:...}} → profiles+activeProfileId ──
     const v1raw = window.localStorage.getItem('cys-stift.settings.v1')
     if (v1raw) {
@@ -194,21 +219,7 @@ function loadSettings(): Settings {
         // v1 corrupt → 走默认
       }
     }
-    // ── v2 正常读取 ──
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return DEFAULT_SETTINGS
-    const parsed = JSON.parse(raw) as { settings?: unknown }
-    if (!isValid(parsed.settings)) return DEFAULT_SETTINGS
-    const loaded = parsed.settings as Settings
-    // B1 迁移:Space 注册必败(Carbon 限制 + 输入法冲突)→ 一次性迁移 KeyE。
-    if (loaded.captureShortcut?.code === 'Space') {
-      loaded.captureShortcut = { ...loaded.captureShortcut, code: 'KeyE' }
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings: loaded }))
-    }
-    if (typeof loaded.seenCaptureHint !== 'boolean') loaded.seenCaptureHint = false
-    if (!loaded.profiles) loaded.profiles = []
-    if (!loaded.labs || typeof loaded.labs !== 'object') loaded.labs = {}
-    return loaded
+    return DEFAULT_SETTINGS
   } catch {
     return DEFAULT_SETTINGS
   }
@@ -284,6 +295,21 @@ function hydrateOnce() {
   notify()
 }
 
+/**
+ * Re-read the persisted settings and replace the in-memory snapshot.
+ *
+ * Import/restore writes localStorage directly, so the hydrate-once guard would
+ * otherwise leave this tab serving the pre-import settings until a full page
+ * reload. Keep this operation side-effect free beyond replacing the snapshot:
+ * callers invoke it only after the complete import transaction succeeds.
+ */
+export function rehydrateSettings(): void {
+  if (typeof window === 'undefined') return
+  _hydrated = true
+  _settings = loadSettings()
+  notify()
+}
+
 // ── Cross-tab sync (P1, 2026-07-12) ──────────────────────────────────────────
 // 镜像 db-client.ts / canvas-store.ts 的 storage 监听:其它 tab 写 settings.v2
 // 时本 tab 收到 storage 事件 → 重新 loadSettings + notify,否则本 tab 内存缓存
@@ -318,6 +344,10 @@ export const settingsStore = {
   get(): Settings {
     hydrateOnce()
     return _settings
+  },
+  /** Re-read settings after an external storage restore/import. */
+  rehydrate(): void {
+    rehydrateSettings()
   },
   /** Subscribe to settings changes. Returns an unsubscribe function.
    * Exposed for consumers (e.g. theme.ts) that need to react to

@@ -59,13 +59,13 @@ vi.mock('@/lib/build-archive-payload', () => ({
 }))
 
 import { VERSION } from '@/lib/version'
-import { DslDialog } from '../dsl-dialog'
+import { appendDslBlock, DslDialog, replaceOrAppendCardRelation } from '../dsl-dialog'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-function makeService() {
+function makeService(titles: Record<string, string> = {}) {
   return {
-    get: () => undefined,
+    get: (id: string) => titles[id] ? { title: titles[id] } : undefined,
   } as unknown as Parameters<typeof DslDialog>[0]['service']
 }
 
@@ -93,6 +93,31 @@ function applyBtn(domHost: HTMLElement): HTMLButtonElement | undefined {
     /canvas\.dslApply/.test(b.textContent ?? ''),
   ) as HTMLButtonElement | undefined
 }
+
+function changeTextarea(domHost: HTMLElement, value: string) {
+  const textarea = domHost.querySelector('textarea')!
+  act(() => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    setter.call(textarea, value)
+    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+}
+
+describe('DSL guided editing helpers', () => {
+  it('replaces the selected target card line without deleting its readable title comment', () => {
+    const source = '[card #anchor] @pos(0,0)\n  # title: Anchor\n[card #target:2] @pos(200,0)\n  # title: Target'
+    expect(replaceOrAppendCardRelation(source, 'target:2', 'anchor', 'below')).toBe(
+      '[card #anchor] @pos(0,0)\n  # title: Anchor\n[card #target:2] below #anchor @gap(24)\n  # title: Target',
+    )
+  })
+
+  it('appends a relation or example block without replacing the current canvas text', () => {
+    expect(replaceOrAppendCardRelation('[rect #r] @pos(0,0)', 'target', 'anchor', 'right-of')).toBe(
+      '[rect #r] @pos(0,0)\n[card #target] right-of #anchor @gap(24)',
+    )
+    expect(appendDslBlock('one\n', 'two')).toBe('one\ntwo')
+  })
+})
 
 describe('DslDialog — T5 archive trigger (dsl-apply)', () => {
   beforeEach(() => {
@@ -246,6 +271,139 @@ describe('DslDialog — T5 archive trigger (dsl-apply)', () => {
 
     expect(archiveAppendSpy).not.toHaveBeenCalled()
 
+    unmount()
+  })
+
+  it('shows the actual affected element instead of listing every parsed op', () => {
+    const host = new InMemoryCanvasHost()
+    host.applyWithoutEcho(() => {
+      host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 80, rotation: 0 })
+      host.upsert({ id: 'b', kind: 'card', x: 200, y: 0, w: 100, h: 80, rotation: 0 })
+      host.upsert({ id: 'edge', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b', text: 'old' })
+    })
+    const { host: domHost, unmount } = mount(
+      <DslDialog
+        open={true}
+        onClose={() => {}}
+        host={host as unknown as CanvasHost}
+        service={makeService()}
+        canvasName="cv"
+      />,
+    )
+
+    const textarea = domHost.querySelector('textarea')!
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+      setter.call(
+        textarea,
+        '[card #a] @pos(0,0) @size(100,80)\n' +
+          '[card #b] @pos(200,0) @size(100,80)\n' +
+          '[arrow #edge] from #a to #b @label("new")',
+      )
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+
+    const changes = [...domHost.querySelectorAll('.dsl-preview__changes li')].map((node) => node.textContent)
+    expect(changes).toEqual([expect.stringMatching(/arrow #edge.*text/)])
+    unmount()
+  })
+
+  it('refuses an edited DSL when the canvas revision changed after opening', async () => {
+    const host = new InMemoryCanvasHost()
+    host.applyWithoutEcho(() => {
+      host.upsert({ id: 'r1', kind: 'rect', x: 0, y: 0, w: 100, h: 80, rotation: 0 })
+    })
+    const { host: domHost, unmount } = mount(
+      <DslDialog
+        open={true}
+        onClose={() => {}}
+        host={host as unknown as CanvasHost}
+        service={makeService()}
+        canvasName="cv"
+      />,
+    )
+
+    const textarea = domHost.querySelector('textarea')!
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+      setter.call(textarea, '[rect #r1] @pos(20,20) @size(100,80)')
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+      host.applyWithoutEcho(() => {
+        host.upsert({ id: 'r1', kind: 'rect', x: 999, y: 0, w: 100, h: 80, rotation: 0 })
+      })
+    })
+
+    await act(async () => {
+      applyBtn(domHost)!.click()
+    })
+
+    expect(host.getElement('r1')?.x).toBe(999)
+    expect(pushToastSpy).toHaveBeenCalledWith({ kind: 'info', message: 'agent.staleRevision' })
+    expect(archiveAppendSpy).not.toHaveBeenCalled()
+    unmount()
+  })
+
+  it('turns a two-card selection into a relational DSL edit with a one-element preview', () => {
+    const host = new InMemoryCanvasHost()
+    host.applyWithoutEcho(() => {
+      host.upsert({ id: 'anchor', kind: 'card', x: 0, y: 0, w: 100, h: 80, rotation: 0 })
+      host.upsert({ id: 'target', kind: 'card', x: 300, y: 200, w: 100, h: 80, rotation: 0 })
+    })
+    host.setSelectedIds(['anchor', 'target'])
+    const { host: domHost, unmount } = mount(
+      <DslDialog
+        open={true}
+        onClose={() => {}}
+        host={host as unknown as CanvasHost}
+        service={makeService({ anchor: 'Anchor', target: 'Target' })}
+        canvasName="cv"
+      />,
+    )
+
+    const rightButton = [...domHost.querySelectorAll('button')].find((button) =>
+      button.textContent === 'canvas.dslGuideRight',
+    ) as HTMLButtonElement
+    expect(rightButton.disabled).toBe(false)
+    act(() => rightButton.click())
+
+    expect((domHost.querySelector('textarea') as HTMLTextAreaElement).value).toContain(
+      '[card #target] right-of #anchor @gap(24)',
+    )
+    const changes = [...domHost.querySelectorAll('.dsl-preview__changes li')].map((node) => node.textContent)
+    expect(changes).toEqual([expect.stringMatching(/card #target.*x.*y/)])
+    unmount()
+  })
+
+  it('shows line diagnostics while typing, before Apply is pressed', () => {
+    const host = new InMemoryCanvasHost()
+    const { host: domHost, unmount } = mount(
+      <DslDialog open={true} onClose={() => {}} host={host as unknown as CanvasHost} service={makeService()} canvasName="cv" />,
+    )
+    changeTextarea(domHost, '[unknown #x] @pos(0,0)')
+    expect(domHost.querySelector('.dsl-errors__line')?.textContent).toBe('canvas.dslErrorLine')
+    expect(archiveAppendSpy).not.toHaveBeenCalled()
+    unmount()
+  })
+
+  it('can discard stale text and load the latest canvas without closing the dialog', () => {
+    const host = new InMemoryCanvasHost()
+    host.applyWithoutEcho(() => {
+      host.upsert({ id: 'r1', kind: 'rect', x: 0, y: 0, w: 100, h: 80, rotation: 0 })
+    })
+    const { host: domHost, unmount } = mount(
+      <DslDialog open={true} onClose={() => {}} host={host as unknown as CanvasHost} service={makeService()} canvasName="cv" />,
+    )
+    act(() => {
+      host.upsert({ id: 'r1', kind: 'rect', x: 999, y: 0, w: 100, h: 80, rotation: 0 })
+    })
+
+    const reload = [...domHost.querySelectorAll('button')].find((button) =>
+      button.textContent === 'canvas.dslReload',
+    ) as HTMLButtonElement
+    expect(reload).toBeTruthy()
+    act(() => reload.click())
+    expect((domHost.querySelector('textarea') as HTMLTextAreaElement).value).toContain('@pos(999.0,0.0)')
+    expect(applyBtn(domHost)?.disabled).toBe(false)
     unmount()
   })
 })

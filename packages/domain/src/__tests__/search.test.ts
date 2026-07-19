@@ -201,9 +201,10 @@ describe('bodySnippet', () => {
 
   it('returns centred snippet around first matching token', () => {
     const c = card('1', '', 'The quick brown fox jumps over the lazy dog and then runs away')
-    const s = bodySnippet(c, 'fox')
+    const s = bodySnippet(c, 'FOX')
     expect(s).toBeTruthy()
     expect(s!).toContain('fox')
+    expect(s!).toContain('The quick')
     expect((s as string).length).toBeLessThanOrEqual(203) // 200 + ellipsis
   })
 

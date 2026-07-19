@@ -33,13 +33,34 @@ function isValidView(v: unknown): v is GraphView {
   if (!v || typeof v !== 'object') return false
   const o = v as Record<string, unknown>
   // Number.isFinite 而非 typeof === 'number':NaN 会通过 typeof 但让整张图爆炸不可恢复。
-  return Number.isFinite(o.zoom) && Number.isFinite(o.panX) && Number.isFinite(o.panY)
+  return finiteNumber(o.zoom) && finiteNumber(o.panX) && finiteNumber(o.panY)
 }
 
 function isValidPosition(v: unknown): v is NodePosition {
   if (!v || typeof v !== 'object') return false
   const o = v as Record<string, unknown>
-  return Number.isFinite(o.x) && Number.isFinite(o.y)
+  if (!finiteNumber(o.x) || !finiteNumber(o.y)) return false
+  // A half-fixed node is not a valid d3-force position. Optional fixed
+  // coordinates are accepted only as a finite pair; malformed values are
+  // dropped during hydration rather than reaching the simulation.
+  return (
+    (o.fx === undefined && o.fy === undefined) ||
+    (finiteNumber(o.fx) && finiteNumber(o.fy))
+  )
+}
+
+function finiteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+function sanitizePosition(pos: NodePosition): NodePosition | null {
+  if (!finiteNumber(pos.x) || !finiteNumber(pos.y)) return null
+  const next: NodePosition = { x: pos.x, y: pos.y }
+  if (finiteNumber(pos.fx) && finiteNumber(pos.fy)) {
+    next.fx = pos.fx
+    next.fy = pos.fy
+  }
+  return next
 }
 
 function loadState(): GraphState {
@@ -52,7 +73,15 @@ function loadState(): GraphState {
     const positions: Record<string, NodePosition> = {}
     if (parsed.positions && typeof parsed.positions === 'object') {
       for (const [id, p] of Object.entries(parsed.positions as Record<string, unknown>)) {
-        if (isValidPosition(p)) positions[id] = p
+        if (isValidPosition(p)) {
+          const position = sanitizePosition(p)
+          if (position) positions[id] = position
+        } else if (p && typeof p === 'object') {
+          // Preserve valid x/y from a legacy half-fixed record, but never its
+          // malformed fx/fy values.
+          const position = sanitizePosition(p as NodePosition)
+          if (position) positions[id] = position
+        }
       }
     }
     return { view, positions }
@@ -122,7 +151,16 @@ export const graphViewStore = {
   },
   updateView(patch: Partial<GraphView>): void {
     hydrateOnce()
-    const next = { ..._state, view: { ..._state.view, ...patch } }
+    const current = _state.view
+    // Public store callers include pointer/AI code, so validate writes too;
+    // checking only localStorage on the next reload leaves the live graph
+    // poisoned for the rest of the current session.
+    const view: GraphView = {
+      zoom: finiteNumber(patch.zoom) ? patch.zoom : current.zoom,
+      panX: finiteNumber(patch.panX) ? patch.panX : current.panX,
+      panY: finiteNumber(patch.panY) ? patch.panY : current.panY,
+    }
+    const next = { ..._state, view }
     const prev = _state
     _state = next
     if (!persist()) {
@@ -141,8 +179,10 @@ export const graphViewStore = {
   },
   setPosition(id: string, pos: NodePosition): void {
     hydrateOnce()
+    const safe = sanitizePosition(pos)
+    if (!safe) return
     const prev = _state
-    _state = { ..._state, positions: { ..._state.positions, [id]: pos } }
+    _state = { ..._state, positions: { ..._state.positions, [id]: safe } }
     if (!persist()) {
       _state = prev
       notifyQuota()
@@ -151,8 +191,13 @@ export const graphViewStore = {
   },
   setPositions(positions: Record<string, NodePosition>): void {
     hydrateOnce()
+    const safePositions: Record<string, NodePosition> = {}
+    for (const [id, pos] of Object.entries(positions)) {
+      const safe = sanitizePosition(pos)
+      if (safe) safePositions[id] = safe
+    }
     const prev = _state
-    _state = { ..._state, positions: { ...positions } }
+    _state = { ..._state, positions: safePositions }
     if (!persist()) {
       _state = prev
       notifyQuota()

@@ -12,6 +12,7 @@
 import type { Card, MediaAssetId } from '@cys-stift/domain'
 import type { CanvasesEnvelope } from './export-service'
 import type { CanvasFreeformSnapshot } from './canvas-freeform-store'
+import { redactExportSecrets } from './export-redaction'
 
 export type ArchiveTrigger =
   | 'release'
@@ -33,7 +34,8 @@ export interface MediaAssetMeta {
   checksum: string
 } // = Omit<MediaAssetData, 'dataUrl'>
 
-export interface ArchivePayload {
+/** A complete state snapshot without operation metadata. */
+export interface ArchiveStateSnapshot {
   cards: Card[]
   canvases?: CanvasesEnvelope
   freeform?: Record<string, CanvasFreeformSnapshot>
@@ -41,6 +43,19 @@ export interface ArchivePayload {
   drafts?: Record<string, unknown>
   canvasView?: Record<string, unknown>
   mediaAssets: Record<string, MediaAssetMeta>
+}
+
+/**
+ * Full archive payload. Risky AI mutations carry both sides of the mutation in
+ * one archive entry so a later audit can answer "what did this operation
+ * change?" without relying on adjacent archive versions.
+ */
+export interface ArchivePayload extends ArchiveStateSnapshot {
+  operation?: {
+    kind: 'ai-agent'
+    before: ArchiveStateSnapshot
+    after: ArchiveStateSnapshot
+  }
 }
 
 export interface ArchiveEntryMeta {
@@ -204,6 +219,10 @@ export const archiveStore = {
     appVersion: string,
   ): Promise<ArchiveEntryMeta> {
     if (typeof window !== 'undefined') await loadIndex()
+    // Keep the archive store safe even when a future/manual caller bypasses
+    // buildArchivePayload. Archives are local but routinely exported for
+    // debugging, so a plaintext provider key must never be persisted here.
+    const safePayload = redactExportSecrets(payload)
     const idx = _indexCache ?? emptyIndex()
     const version = idx.nextVersion
     const meta: ArchiveEntryMeta = {
@@ -216,7 +235,7 @@ export const archiveStore = {
     idx.entries.push(meta)
     idx.nextVersion = version + 1
     _indexCache = idx
-    await persistPayload(version, payload)
+    await persistPayload(version, safePayload)
     await applyRetention(idx) // 分层 FIFO:b 类超 cap 丢旧 + 删 payload;release/manual 永久
     await persistIndex(idx)
     notify()

@@ -16,13 +16,14 @@
  */
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
+import { searchCards } from '@cys-stift/domain'
 import type { Card, CanvasId, CardId, CardService } from '@cys-stift/domain'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
 import { pushToast } from '@/lib/toast-store'
 import { isAIReady, getCurrentAI } from '@/features/ai/ai-settings-provider'
 import { streamText } from '@/features/ai/stream-text'
-import { retryUntilValid, buildDslCorrection } from '@/features/ai/retry-until-valid'
+import { retryFailureMessageKey, retryUntilValid, buildDslCorrection } from '@/features/ai/retry-until-valid'
 import { parseDslStrictWithDiagnostics } from '@/features/ai/dsl-parser'
 import { AiSetupCard } from '@/features/ai/ai-setup-card'
 import {
@@ -30,11 +31,12 @@ import {
   buildAgentUserPrompt,
   extractDslBlocks,
   extractCardRefs,
+  RAG_TOP_N,
 } from '@/features/ai/agent-prompt'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import { AgentConfirmCard } from '@/features/ai/agent-confirm-card'
 import { CardDetailModal } from '@/features/card/card-detail'
-import { loadConversation, saveConversation, type PersistedConversationMessage } from '@/lib/conversation-store'
+import { loadConversation, saveConversation, type PersistedConversationMessage, type ConversationContextMeta } from '@/lib/conversation-store'
 import { addSample, genSampleId } from '@/features/ai/sample-store'
 import { settingsStore } from '@/lib/settings-store'
 
@@ -104,15 +106,21 @@ export function CompanionChat({
       role: m.role,
       content: m.content,
     }))
-    const userMsg: ChatMessage = { role: 'user', content: question }
-    const asstMsg: ChatMessage = { role: 'assistant', content: '', streaming: true }
+    const allCards = service.listAll()
+    const matchedCards = searchCards(allCards, question)
+    const contextMeta: ConversationContextMeta = {
+      retrievedCount: matchedCards.length,
+      sentCount: Math.min(matchedCards.length, RAG_TOP_N),
+      cardIds: matchedCards.slice(0, RAG_TOP_N).map((result) => String(result.card.id)),
+    }
+    const userMsg: ChatMessage = { role: 'user', content: question, targetCanvasId: String(canvasId) }
+    const asstMsg: ChatMessage = { role: 'assistant', content: '', streaming: true, targetCanvasId: String(canvasId), contextMeta }
     setMessages((prev) => [...prev.slice(-MAX_HISTORY), userMsg, asstMsg])
 
     const ac = new AbortController()
     abortRef.current = ac
     try {
       // RAG + 当前画布 live snapshot(改画布时让 AI 看到当前布局,含未存改动)。
-      const allCards = service.listAll()
       const canvasSnapshot = formatCanvasSnapshot(snapshotCanvas(host, service, canvasId))
       const userPrompt = buildAgentUserPrompt(question, allCards, canvasSnapshot)
 
@@ -155,7 +163,7 @@ export function CompanionChat({
             { system: AGENT_SYSTEM_PROMPT, user: userPrompt, messages, maxTokens: 4096, structuredOutput: true, timeoutMs: 60_000 },
             onDelta,
             ac.signal,
-          ).then((x) => x?.content ?? '')
+          )
         },
         parse: (text) => {
           // 有 dsl 块且全坏才重试;无块(Q&A)或部分好 → 接受。
@@ -169,6 +177,20 @@ export function CompanionChat({
         },
         buildCorrection: buildDslCorrection,
       })
+      const failureKey = retryFailureMessageKey(r.failureReason)
+      if (failureKey) {
+        const failureMessage = t(failureKey)
+        pushToast({ kind: 'info', message: failureMessage })
+        setMessages((prev) => {
+          const next = [...prev]
+          const last = next[next.length - 1]
+          if (last?.role === 'assistant') {
+            next[next.length - 1] = { ...last, content: failureMessage, streaming: false }
+          }
+          return next
+        })
+        return
+      }
       // 失败样本采集(c2):retry 耗尽仍 parse 失败 → 记 parse_failed(坏输出+错误+尝试数)。
       // 失败案例是最值钱的调优/训练数据。开关关时 addSample 内部 no-op。
       if (!r.accepted) {
@@ -190,7 +212,7 @@ export function CompanionChat({
         const next = [...prev]
         const last = next[next.length - 1]
         if (last && last.role === 'assistant') {
-          next[next.length - 1] = { role: 'assistant', content: final, dslBlocks, streaming: false, sampleContext: { question, context: userPrompt } }
+          next[next.length - 1] = { role: 'assistant', content: final, dslBlocks, streaming: false, targetCanvasId: String(canvasId), contextMeta, sampleContext: { question, context: userPrompt } }
         }
         return next
       })
@@ -219,13 +241,18 @@ export function CompanionChat({
   }
 
   const onRejected = (msgIdx: number) => {
-    // 镜像 /ask:append 一条 user 消息「用户拒绝了,换方案」,让 AI 下一轮重试。
+    // 追加一条 user 消息「用户拒绝了,换方案」,让下一轮 AI 能看到反馈。
+    // 不截断拒绝消息之后的对话，也不把占位文本偷偷塞回输入框。
     const rejectMsg: ChatMessage = {
       role: 'user',
       content: t('canvas.companion.chat.rejected'),
+      targetCanvasId: String(canvasId),
     }
-    setMessages((prev) => [...prev.slice(0, msgIdx + 1), rejectMsg])
-    setInput(t('agent.rejected'))
+    setMessages((prev) => {
+      const next = [...prev]
+      next.splice(msgIdx + 1, 0, rejectMsg)
+      return next
+    })
   }
 
   const liveDetail = detailCard ? (service.get(detailCard.id) ?? null) : null
@@ -249,7 +276,8 @@ export function CompanionChat({
               content={m.content}
               streaming={m.streaming}
               dslBlocks={m.dslBlocks}
-              canvasId={canvasId}
+              contextMeta={m.contextMeta}
+              canvasId={(m.targetCanvasId ?? String(canvasId)) as CanvasId}
               service={service}
               host={host}
               getCardTitle={getCardTitle}
@@ -259,7 +287,7 @@ export function CompanionChat({
               }}
               onApplied={() => { /* useDb 订阅自动 re-render;确认门内部已切 applied 态 */ }}
               onRejected={() => { void onRejected(i) }}
-              sampleContext={m.sampleContext ? { source: 'companion', question: m.sampleContext.question, context: m.sampleContext.context, targetCanvasId: canvasId } : undefined}
+              sampleContext={m.sampleContext ? { source: 'companion', question: m.sampleContext.question, context: m.sampleContext.context, targetCanvasId: m.targetCanvasId ?? String(canvasId) } : undefined}
             />
           </div>
         ))}
@@ -328,6 +356,7 @@ function MessageContent({
   content,
   streaming,
   dslBlocks,
+  contextMeta,
   canvasId,
   service,
   host,
@@ -340,6 +369,7 @@ function MessageContent({
   content: string
   streaming?: boolean
   dslBlocks?: string[]
+  contextMeta?: ConversationContextMeta
   canvasId: CanvasId
   service: CardService
   host: CanvasHost
@@ -349,6 +379,7 @@ function MessageContent({
   onRejected: () => void
   sampleContext?: { source: 'ask' | 'companion'; question?: string; context: string; targetCanvasId?: string }
 }) {
+  const { t } = useI18n()
   const refs = useMemo(() => new Set(extractCardRefs(content)), [content])
   const parts = useMemo(() => {
     const re = /\[card\s+#([a-zA-Z0-9_-]+)\]/gi
@@ -400,6 +431,16 @@ function MessageContent({
           sampleContext={sampleContext ? { source: 'companion', question: sampleContext.question, context: sampleContext.context, targetCanvasId: canvasId } : undefined}
         />
       ))}
+      {contextMeta && (
+        <div className="cc-chat__context-meta" role="status">
+          <span>{t('ask.contextMeta', { retrieved: String(contextMeta.retrievedCount), sent: String(contextMeta.sentCount) })}</span>
+          {contextMeta.cardIds.map((id) => (
+            <button key={id} type="button" className="cc-chat__context-source" onClick={() => onCardRefClick(id)} title={getCardTitle(id)}>
+              #{getCardTitle(id)}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -489,6 +530,10 @@ const styles = `
 .cc-chat__msg--user .cc-chat__card-ref { color: var(--color-yellow); }
 .cc-chat__msg--assistant .cc-chat__content { background: var(--color-gray-soft); }
 .cc-chat__card-ref:hover { opacity: 0.7; }
+.cc-chat__context-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin-top: var(--space-1); color: var(--color-gray); font-family: var(--font-mono); font-size: var(--font-size-xs); }
+.cc-chat__context-source { border: 0; padding: 0 2px; background: transparent; color: var(--color-blue); font: inherit; text-decoration: underline; cursor: pointer; }
+.cc-chat__context-source:hover { color: var(--color-black); }
+.cc-chat__context-source:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cc-chat__cursor { animation: cc-chat-blink 1s steps(2) infinite; }
 @keyframes cc-chat-blink { 50% { opacity: 0; } }
 .cc-chat__send:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }

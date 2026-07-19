@@ -135,6 +135,62 @@ describe('retryUntilValid — network errors', () => {
     })
     expect(result.accepted).toBe(false)
     expect(result.attempts).toBe(3)
+    expect(result.failureReason).toBe('network')
+  })
+})
+
+describe('retryUntilValid — provider termination reasons', () => {
+  it('stops immediately on length truncation instead of burning all retries', async () => {
+    const produce = vi.fn().mockResolvedValue({
+      content: 'partial dsl',
+      finishReason: 'length' as const,
+      stopReason: 'length',
+    })
+    const result = await retryUntilValid({
+      initialMessages: [{ role: 'user', content: 'q' }],
+      produce,
+      parse: () => ({ ok: false, errors: [ERR(1, 'partial', 'unterminated')] }),
+      buildCorrection: () => 'fix',
+    })
+    expect(result.accepted).toBe(false)
+    expect(result.attempts).toBe(1)
+    expect(result.failureReason).toBe('truncated')
+    expect(result.finishReason).toBe('length')
+    expect(result.stopReason).toBe('length')
+    expect(produce).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops immediately on refusal and exposes the provider message', async () => {
+    const produce = vi.fn().mockResolvedValue({
+      content: '',
+      finishReason: 'refusal' as const,
+      stopReason: 'refusal',
+      refusal: '内容无法处理',
+    })
+    const result = await retryUntilValid({
+      initialMessages: [{ role: 'user', content: 'q' }],
+      produce,
+      parse: () => ({ ok: false, errors: [ERR(0, '', 'empty output')] }),
+      buildCorrection: () => 'fix',
+    })
+    expect(result.accepted).toBe(false)
+    expect(result.attempts).toBe(1)
+    expect(result.failureReason).toBe('refusal')
+    expect(result.refusal).toBe('内容无法处理')
+    expect(produce).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not silently accept even parseable text when provider reports length', async () => {
+    const result = await retryUntilValid({
+      initialMessages: [{ role: 'user', content: 'q' }],
+      produce: async () => ({ content: 'complete', stopReason: 'max_tokens' }),
+      parse: () => ({ ok: true, errors: [] }),
+      buildCorrection: () => 'fix',
+    })
+    expect(result.accepted).toBe(false)
+    expect(result.failureReason).toBe('truncated')
+    expect(result.finishReason).toBe('length')
+    expect(result.stopReason).toBe('max_tokens')
   })
 })
 

@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:2026-07-18 稳定性大迭代进行中,Lane A（CI/备份/导入安全）、Lane B（DSL v4/ApplyReport）、Lane C（画布算法/状态机）、Lane D（桌面快捷键状态）与 Lane E（可访问性/触屏/动态视口）已完成并通过独立 gate,Lane F（文档真值/版本）进行中;最终桌面/VoiceOver/数据恢复验收未完成。当前源码版本为 **1.0.0-preview.1**（根 `package.json` 单一来源）,最近公开 release/tag 为 **v0.57.3**；v0.58–v0.59 稳定性提交均未 tag。当前只做本地 commits,不 push/tag/release。(版本表由 git tag 生成,tag 前不显 preview —— 故下表断在 v0.57.3,非缺失)。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:2026-07-19。当前源码版本为 **1.0.0-preview.1**（根 `package.json` 单一来源）,已整理进入 `main` 供预览，但尚未 tag、未发布；最近公开 release/tag 仍为 **v0.57.3**。自动化门禁和浏览器回归见下方“当前执行快照”;macOS arm64 `.app`/`.dmg` 已完成本地构建和启动烟测，但未签名公证、未完成原生 UI 安装验收；Windows/Android 安装包、VoiceOver、真实系统 200% 缩放、provider/`/ask` 配额演练与外部用户研究仍未完成。(版本表由 git tag 生成,tag 前不显 preview —— 故下表断在 v0.57.3,非缺失)。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 
@@ -10,6 +10,21 @@
 
 **cy's Stift** — 本地优先的灵感画布,包豪斯风格 UI。你的灵感,在画布上生长。
 (Next.js 15 静态导出 + 自研 Canvas 2D + React 19 + TS strict;桌面壳 Tauri v2;数据 localStorage + OPFS,离线可用。)
+
+## 当前执行快照（2026-07-19）
+
+本轮重构围绕一条可恢复主线：捕获 → 待整理 → 画布组织 → 搜索定位 → 工作台继续编辑 → 导出/导入恢复。当前工作树已落地：
+
+- 首次捕获提供可关闭的“先捕获，稍后整理”提示；草稿和持久化失败会保留，默认快捷键统一为 `⌘/Ctrl + ⇧ + E`；成功关闭再打开会复位提交锁，连续捕获第二条不再永久禁用保存。
+- Inbox 批量投放先选择明确目标画布，按避让已有元素的网格分配位置，逐项报告失败并提供一次性撤销；失败卡仍留在 Inbox。
+- 画布内标题/正文搜索、命中后居中选中、视口持久化、工作台来源/捕获时间/画布坐标 provenance。
+- Workbench 预览默认收起；用户展开后选择会持久化，卡片/freeform 版本变化会触发预览重建，避免陈旧截图。
+- DSL v4 的 parse → sanitize → relational solve → plan → confirm/apply 报告；手动编辑器显示实际新增/删除/修改元素，记录打开时 base revision，画布变化会阻止旧文本覆盖并可在模态内载入最新状态；按顺序选中两张卡可直接生成“右侧/下方”关系式，行级错误实时显示；画布粘贴 DSL 进入同一确认门。
+- Canvas、Companion、`/ask` 的 AI 提案遵循 stale revision guard；`/ask` 直接订阅当前 settings profile，不再因模块缓存晚于页面首屏而误报未启用；临时 host 的 freeform/card 落库是事务式的，失败会回滚，成功后提供一次性撤销并记录 before/after。
+- 导入 replace/merge 预检、事务回滚、全 store rehydrate；真实导入前保存设备内完整恢复快照（包括本机 settings 凭据），恢复成功后才清理。对外 JSON/archive 导出仍剥离 API key 和媒体二进制，恢复快照不随导出文件外带。
+- Markdown 阅读预览隐藏标题/列表语法并保留正文单换行；工作台提供 source/split/preview 三态编辑。
+
+自动化证据（2026-07-19 收尾 gate）：web 145 个测试文件/1755 项、canvas-engine 34 个文件/569 项、domain 3 个文件/85 项和 Rust 2 项均通过；本轮新增 DSL diff/stale/paste/两卡关系式向导/实时诊断/模态内恢复、Inbox batch、Workbench freshness/minimap、连续捕获、`/ask` settings/SSR hydration 与事务撤销、导入 checkpoint 和 Settings 导入交互测试已纳入计数。web TypeScript、lint 和当前源码 production build（临时只读镜像，23 个静态页面，含 `/ask` 与 `/showcase`）、`pnpm docs:links`（5 份公开 Markdown）及两仓 `git diff --check` 均通过；镜像内 `apps/web/src` 与四个 packages 排除构建缓存后逐文件一致。浏览器已手测连续捕获 A→B、Inbox 2 卡目标确认/投放/撤销、测试卡软删除→Trash→恢复、画布搜索、未配置 AI 引导、Labs 空状态、DSL 实际 diff/粘贴确认门、Workbench 默认收起/展开、工作台 Markdown `h3`/单换行，以及 AI profile Saved→Tested→Active、不可达连接反馈、`/ask` pending→Stop/cancelled 和完全本机模拟 provider 的提案→应用→一次性撤销；撤销后画布对象树回到原 2 元素。390/768/1024/1440 视口无页面级横向溢出；390×844 当前复核 26 个可见 Canvas 核心按钮均至少 44×44，host 高 719px 且页面横纵向无溢出。Settings 已用真实 JSON 完成 dry-run → Replace → checkpoint 可见 → 恢复 → 成功后清理；损坏 JSON 会显示错误且不创建恢复点；12MB 导入触发 localStorage quota 后显示 `rollback complete`，旧状态保持且临时 checkpoint 按事务规则清理。展示页在 1440/390 通过设计 token、CTA、核心工作流和响应式复核。macOS arm64 `.app`（14MB）和 `.dmg`（7.4MB）已本地构建，原生进程完成启动烟测；产物仅 adhoc 签名，未公证，也未完成原生 UI/安装验收。尚未完成外部 5–8 人用户研究与 DSL 产品价值结论、Windows/Android 安装包、VoiceOver/真实系统 200% 缩放实机验收，以及真实 provider/`/ask` 配额演练。
 
 ## 版本里程碑(从 git tag)
 
@@ -157,13 +172,13 @@
 - **trash**:软删恢复
 - **search**:全文检索(title 1.5x 权重 + body 摘要 + pinned 前置)
 - **命令面板**:⌘K 跳转项 + 卡片搜索 + **最近编辑跳转**(空 query 显 updatedAt 前 8,点卡智能开卡:在画布跳画布定位+开详情,否则开详情)
-- **标签**:10 色固定调色板,卡片标签 + 过滤 + **标签墙 `/tags`**(标签云 + 卡网格)
+- **标签**:六色 canonical 调色板(兼容迁移旧 token),卡片标签 + 过滤 + **标签墙 `/tags`**(标签云 + 卡网格)
 - **关系网络**:块引用 `((标题))` 嵌入(embeds 关系)+ 详情建/删关系(relation-picker)+ 跨画布 backlinks(useGlobalEdges 聚合所有画布)+ **智能关系推荐**(graph 详情页「建议关联」,本地零 AI 四信号打分 + 可选「AI 再找找」语义粗筛,一键即建)+ **AI 对话 agent**(`/ask` 页:对话提需求 → AI 输出 cys-dsl 块 → 确认门 before/after 缩略图 + 变更摘要 → 应用/拒绝;RAG 引用卡片;改任意目标画布)+ **v0.46 对话打通**(/ask 全屏 + companion 共享 per-canvas 对话 store;全屏可切所有画布 + ➕新建画布「新建即出生」)+ **wikilink `[[标题]]` 自动建 references 箭头**(已增强:**跨画布** title→id 全局索引,同画布优先 + 跨画布 fallback;**模糊匹配** Levenshtein≤2 容忍拼写/简写;**重命名追踪** 改标题自动 re-sync 引用旧/新标题的卡;**load 批量同步** hydrate 完跑一次 `syncAllWikiLinks`;**DSL `@wikilink` round-trip** arrow 序列化→parse→apply 不丢 meta.wikilink;跨画布 arrow 在 source 画布画到 portal 点(目标卡右外侧 + 「→ 目标标题 (画布X)」标签))
 - **AI 伴侣面板**:画布常驻 AI 浮面板(rail ✨ 开关,发现/对话两 tab,折叠+tab 持久)—— 发现 tab 本地预筛零成本常驻(重复/可关联/孤立卡)+ 选中定位/建立关联/AI 深挖三动作;对话 tab = /ask agent 上画布(live host 应用 + 确认门 + 引用点开)+ **历史持久化 + v0.46 现发给 AI**(不再"没上下文";与 /ask 共享同一段 per-canvas 对话)+ 缩略图窄面板横向滚不溢出,非破坏性默认开
 - **AI 排版**:诚实反馈(apply 前后位移对比 → "重排 N 张平均 Xpx" / "AI 认为已合理未改动")+ 主动重排 prompt + 拓宽思考抑制(deepseek 镜像/model 名)+ 60s 超时 + **DSL sanitize 兜底**(apply 前修非法 size/越界坐标,纯函数永不抛错;丢卡/引用幽灵端点 → diagnostic toast 可见)
 - **版本号**:单一可信源(`scripts/gen-version.mjs` 读 root package.json → version.ts + 同步 tauri.conf),主菜单 + 首页实时显示
 - **开发存档**(dev 工具,非用户向):release/风险 op/手动 checkpoint 落 OPFS 全量快照(版号区分,mediaAssets 剥 dataUrl),`/dev/archive` 列表+浏览+导出 JSON 外部 diff(查错误)+ release 自修自查;分层 retention(风险 op cap 100 FIFO,release/手动永久)
-- **settings**:快捷键自定义 + 导入/导出 + AI provider 配置 + **卡片显示模式**(v0.57.2,4 档密度:紧凑/自适应/仅标题/副标题)+ **实验室区**(vision/autoCurate/autoTag/autoCapture/agentToolCalling 五个实验室,默认关,LAB_REGISTRY 注册表 + useLabEnabled 守卫 + 确认门;分层判据见 ai-labs-strategy spec)
+- **settings**:快捷键自定义 + 导入/导出 + AI provider 配置 + **卡片显示模式**(v0.57.2,4 档密度:紧凑/自适应/仅标题/副标题)+ **实验室空状态**(当前没有已接入 consumer;未实现能力不显示伪开关)
 
 ## 下一步
 
@@ -171,13 +186,13 @@
 > 判断"这一步该不该做"先读 **[`docs/development/polish-phase.md`](development/polish-phase.md)**(打磨 vs 修缝判据 + 反馈驱动流程 + 退出标准)。
 > 燃料 = 你手测的真实反馈。每轮主线开工走 brainstorming,严守「一次一问 + 逐段确认」(skill-checklist-discipline 记忆)。
 
-### 当前焦点(2026-07-18,稳定性 Lane A-F)
+### 当前焦点(2026-07-19,展示与文档收尾)
 
-统一交接包 Lane A-F 已实施并分批本地提交:N01-N09、N10-N24 已关闭。Lane E 让 Canvas renderer、DOM 对象树与窗口键盘共用 `SelfBuiltAdapter.executeCommand`；对象树暴露 kind/label/position/relations 和完整键盘旅程，导出/AI 菜单采用完整 menu-button pattern，Canvas 改为 flex + `100dvh` 自适应剩余高度，390/768/1024/1440 生产态 UI 审计 16/16 零失败。Lane F 将公开文档改到 DSL v4/create/确认门/本地数据分层真值，新增入口文档断链检查并把版本源统一为 `1.0.0-preview.1`。A-F 独立 gate 均全绿；剩余为最终桌面壳、VoiceOver 与数据恢复验收。**GitHub PR mutation check 尚未执行,不作为已通过证据。**
+统一交接包的 N01-N24 已按当前源码重新分类并有实现/回归覆盖，逐项矩阵见私有核心闭环测试报告；交接包结构与标准化 CRLF 后的 SHA 清单均通过，但原 `VERIFY-PACKAGE.sh` 在 macOS 会把清单行尾 `\r` 当成文件名，不能把其 247 条 `MISSING` 误报当源码缺失。核心闭环已补上连续捕获、目标画布、实际撤销、DSL diff/stale、Workbench freshness、`/ask` profile/SSR hydration、事务回滚和导入 checkpoint。真实 JSON 的 Replace/checkpoint 恢复、损坏 JSON、导入配额回滚、AI 断网/abort、成功 AI apply→undo 与 Trash 恢复均已在浏览器完成；现在暂停继续扩核心功能。`/showcase` 已从首页可发现，README、用户指南、状态文档和 `docs/development/showcase.md` 已对齐当前能力、静态部署和验收边界。私有仓已准备五任务主持脚本、逐人记录和 go/no-go 空白模板，但尚无真实参与者结果。macOS arm64 本地产物已构建并完成启动烟测，但仍应把其签名公证和原生 UI/安装验收，以及 Windows/Android 安装包、VoiceOver/真实系统 200% 缩放、真实 provider/`/ask` 配额和外部 5–8 人用户研究视为开放项；DSL 是否值得普通用户学习仍是待验证假设，不把历史 gate 报告当作本轮发布证据。
 
 ### 历史焦点(2026-07-14,apps/web review 完 + bug 修)
 
-**apps/web review**(2026-07-14,用户选全量+4 维度):8 批 13 文件 + i18n。2 中 bug 修(workbench 切卡丢编辑 + bar 全透明,`fc913ee`)+ 5 stale 注释清(page/self-canvas/settings-store/card-detail/settings-page)+ **bug 2b open**(TAG_COLORS 5 色 teal/pink/orange/purple/green 无 token → 全局 tag 50% 透明;用户定收敛 6 原色,含迁移 + tag chip 文字色 a11y,留下次)。报告 `cys-stift-docs/docs/reviews/2026-07-14-apps-web-code-review.md`。
+**apps/web review**(2026-07-14,用户选全量+4 维度):8 批 13 文件 + i18n。workbench 切卡丢编辑、bar 透明和旧注释已修；历史发现的 tag 颜色失效值也已在导入、聚合和 chip 渲染边界归一为六色 canonical。报告 `cys-stift-docs/docs/reviews/2026-07-14-apps-web-code-review.md`。
 
 ### 历史焦点(2026-07-13,工作台重设计 + 两 bug 修,待手测)
 
@@ -215,13 +230,13 @@ product-idea 大方向四块**全闭合**:#1 大卡搁置 / #2 DSL 版本号 v0.
 
 ## 已知 debt(有意 defer,非 bug)
 
-- **颜色类型双轨制**:`ColorToken`(6 色 Bauhaus)vs `TagColor`(10 个 CSS var)未统一 — 稳定版内不做重构(风险大)。详见 v0.37.0 review D 段。
-- **Tauri 未签名**:DMG 可本地构建(36MB,Apple Silicon),分发需签名公证。
+- **颜色类型双轨制**:`ColorToken`(6 色 Bauhaus)与历史 `TagColor` 输入仍需兼容读取；当前边界已在导入/标签 chip 归一化,不再把失效 CSS token 直接交给 UI。
+- **Tauri 未签名**:当前 preview 已本地构建 Apple Silicon `.app`（14MB）和 `.dmg`（7.4MB），仅完成原生进程启动烟测；产物是 adhoc 签名、无 Team ID、未公证，不能作为可分发 release 或完整安装验收。
 - **B3b frame 拖框创建**:触及引擎 tool union 类型 + 全 pointer 链,L 级;现有「框住选中」按钮 + DSL/Outline 两条建 frame 路够用。
 - **Batch C 智能关系推荐(已落地)**:`relation-recommend.ts` 本地启发式四信号 + `relation-recommend-ai.ts` 可选 AI 语义粗筛,均在 graph 详情页接入。**剩余**:inbox/timeline 详情页只读看推荐(目前仅 graph 页可建关系)。
-- **AI agent /ask 二期**:画布侧边栏版(画布内对话,上下文=当前画布);tool-calling 主动检索(目前 RAG 预注入被动);对话持久化(reload 清空);历史摘要(超阈值直接丢老消息)。
-- **vision 三能力实装**:看图描述/OCR、画布视觉理解、图转 DSL —— 实验室骨架已就位(labs-registry 注册表 + useLabEnabled 守卫),实装 defer(用户判非必要,等真实需求)。
-- **新实验室实装(基础设施已就位)**:autoCurate(自动整理)/autoTag(自动打标签)/autoCapture(自动建卡)/agentToolCalling(/ask 主动检索)——labs 类型 + LAB_REGISTRY + LabToggle 已落地,功能实装按 spec 顺序 autoCurate→autoTag→toolCalling→autoCapture。
+- **AI agent /ask 二期**:tool-calling 主动检索和历史摘要仍 defer；当前 `/ask` 与 companion 已按画布持久化对话，并显示本轮检索/实际发送数量及来源回链。
+- **vision 与 auto-* 实验室**:当前没有已注册 consumer，Settings 只显示空状态；等真实用户证据和完整隐私确认后再公开开关。
+- **恢复快照的安全边界**:导入前 checkpoint 仅存本机 localStorage、用于本机回滚（为完整恢复而保留本机 provider 凭据）；`buildExportPayload`/下载 JSON 仍走脱敏边界，checkpoint 不会进入外部导出。跨设备迁移仍只能依赖脱敏导出，需用户重新配置 provider。
 - **图层 / 卡片版本 / 引擎 npm 化**:打磨计划书方向 8-10,L 级 defer。
 
 ## 约束(不可遗忘,详见根 `CLAUDE.md`)

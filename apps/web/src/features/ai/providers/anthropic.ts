@@ -13,7 +13,13 @@
 
 import { createParser, type ParseEvent } from 'eventsource-parser'
 import { consumeStream } from './stream-reader'
-import type { AIProvider, AIRequest, AIResponse } from '../types'
+import {
+  normalizeAIFinishReason,
+  type AIFinishReason,
+  type AIProvider,
+  type AIRequest,
+  type AIResponse,
+} from '../types'
 
 interface AnthropicConfig {
   apiKey: string
@@ -57,15 +63,50 @@ export function createAnthropicProvider(cfg: AnthropicConfig): AIProvider {
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let content = ''
+      let finishReason: AIFinishReason | undefined
+      let stopReason: string | undefined
+      let refusal = ''
+      let promptTokens: number | undefined
+      let completionTokens: number | undefined
       const parser = createParser((ev: ParseEvent) => {
         if (ev.type !== 'event') return
-        if (ev.event !== 'content_block_delta') return
         try {
           const json = JSON.parse(ev.data)
-          const chunk = json.delta?.text
-          if (chunk) {
-            content += chunk
-            onDelta(chunk)
+          if (ev.event === 'content_block_delta') {
+            const delta = json.delta ?? {}
+            const chunk = delta.text
+            if (typeof chunk === 'string' && chunk.length > 0) {
+              content += chunk
+              onDelta(chunk)
+            }
+            const refusalChunk = delta.refusal ?? delta.reason
+            if (typeof refusalChunk === 'string' && refusalChunk.length > 0) {
+              refusal += refusalChunk
+              finishReason = 'refusal'
+              stopReason = 'refusal'
+            }
+          } else if (ev.event === 'message_start') {
+            const n = Number(json.message?.usage?.input_tokens)
+            if (Number.isFinite(n)) promptTokens = n
+          } else if (ev.event === 'message_delta') {
+            const rawStop = json.delta?.stop_reason
+            if (typeof rawStop === 'string' && !refusal) {
+              stopReason = rawStop
+              finishReason = normalizeAIFinishReason(rawStop)
+            }
+            const n = Number(json.usage?.output_tokens)
+            if (Number.isFinite(n)) completionTokens = n
+          } else if (ev.event === 'error') {
+            const rawError = json.error?.type ?? json.type
+            if (typeof rawError === 'string') {
+              stopReason = rawError
+              finishReason = 'error'
+            }
+          } else if (ev.event === 'message_stop' && !finishReason) {
+            // Older Anthropic gateways omit message_delta.stop_reason but
+            // still emit message_stop; treat a clean stream close as stop.
+            stopReason = 'stop'
+            finishReason = 'stop'
           }
         } catch (e) {
           console.debug('[anthropic] skipping unparseable SSE event', e)
@@ -77,7 +118,24 @@ export function createAnthropicProvider(cfg: AnthropicConfig): AIProvider {
         (chunk) => parser.feed(chunk),
         signal,
       )
-      return { content }
+      if (!signal?.aborted) {
+        const decoderTail = decoder.decode()
+        if (decoderTail) parser.feed(decoderTail)
+      }
+      const usage =
+        promptTokens !== undefined || completionTokens !== undefined
+          ? {
+              promptTokens: promptTokens ?? 0,
+              completionTokens: completionTokens ?? 0,
+            }
+          : undefined
+      return {
+        content,
+        ...(usage ? { usage } : {}),
+        ...(finishReason ? { finishReason } : {}),
+        ...(stopReason ? { stopReason } : {}),
+        ...(refusal ? { refusal } : {}),
+      }
     },
     async testConnection(signal) {
       const t0 = performance.now()
