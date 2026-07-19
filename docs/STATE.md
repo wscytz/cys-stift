@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:2026-07-19。当前源码版本为 **1.0.0-preview.1**（根 `package.json` 单一来源）,已整理进入 `main` 供预览，但尚未 tag、未发布；最近公开 release/tag 仍为 **v0.57.3**。自动化门禁和浏览器回归见下方“当前执行快照”;macOS arm64 `.app`/`.dmg` 已完成本地构建和启动烟测，但未签名公证、未完成原生 UI 安装验收；Windows/Android 安装包、VoiceOver、真实系统 200% 缩放、provider/`/ask` 配额演练与外部用户研究仍未完成。(版本表由 git tag 生成,tag 前不显 preview —— 故下表断在 v0.57.3,非缺失)。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:2026-07-19。当前源码版本为 **1.0.0-preview.1**（根 `package.json` 单一来源）；`v1.0.0-preview.1` 是 GitHub prerelease tag，tag workflow 会重新跑 Linux gate、生成 Windows x64 NSIS，并生成经 strict codesign 验证的 macOS Apple Silicon ad-hoc DMG。macOS 仍无 Apple Developer ID/Team ID 和 notarization，首次启动会被 Gatekeeper 拒绝；Windows/Android 安装包、VoiceOver、真实系统 200% 缩放、provider/`/ask` 配额演练与外部用户研究仍不是已完成证据。Android 不在本次 preview 发布范围。(版本表由 git tag 生成,tag 前不显 preview —— 故下表断在 v0.57.3,非缺失)。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 

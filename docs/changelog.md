@@ -7,7 +7,7 @@
 
 ## 2026-07-19 · 1.0.0-preview.1 · 核心流程浏览器验收修复
 
-真实 Capture → Inbox → Canvas 和 AI 失败路径演练补出两个单测未覆盖的状态回归；均已进入 preview 源码，尚未 tag/release。
+真实 Capture → Inbox → Canvas 和 AI 失败路径演练补出两个单测未覆盖的状态回归；`v1.0.0-preview.1` prerelease tag 由 release workflow 重新验证 Linux gate、生成 Windows NSIS 和 macOS Apple Silicon DMG。macOS DMG 是经 strict codesign 验证的 ad-hoc preview，不是 Apple Developer ID 签名或 notarized stable build。
 
 - **连续捕获**:`MiniInput` 成功保存后只隐藏、不卸载，`submitting=true` 会跨下一次打开保留，导致第二条标题已输入但保存永久 disabled。现在每个新的 open session 复位提交锁，同一次打开仍防双击；真实浏览器完成 A→B 连续保存。
 - **`/ask` profile hydration**:AI profile 已保存、测试并设为当前后，直接进入 `/ask` 仍可能显示“AI 尚未启用”；页面原先只读不触发重渲染的 module cache。现在首屏订阅 settings，流中 stale guard 直接读取同步 store；请求前 profile 变化仍会取消旧请求。
