@@ -123,14 +123,37 @@ jobs:
             (cd release-assets/windows && sha256sum *.exe)
             (cd release-assets/macos && sha256sum *.dmg)
           } > release-assets/SHA256SUMS.txt
-      - uses: softprops/action-gh-release@v2
-        with:
-          body_path: .github/release-stable.md
-          prerelease: false
-          make_latest: true
-          generate_release_notes: false
-          fail_on_unmatched_files: true
-          files: |
+      - name: publish stable GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          title="cy's Stift $tag"
+          assets=(
             release-assets/windows/*.exe
             release-assets/macos/*.dmg
             release-assets/SHA256SUMS.txt
+          )
+
+          # A failed upload may leave a draft behind. Make reruns idempotent:
+          # replace all assets, then publish the same verified tag.
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --title "$title" \
+              --notes-file .github/release-stable.md \
+              --draft=false \
+              --prerelease=false \
+              --latest
+          else
+            gh release create "$tag" "${assets[@]}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --title "$title" \
+              --notes-file .github/release-stable.md \
+              --latest
+          fi

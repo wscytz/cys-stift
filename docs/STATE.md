@@ -158,6 +158,7 @@
 | v0.57.1 | feat(workbench): 编辑打磨 + bump 0.57.1 | v0.57.1 |
 | v0.57.2 | chore(desktop): sync Cargo.lock | v0.57.2 |
 | v0.57.3 | feat(theme): 删 dark 模式,聚焦 Bauhaus light-only + bump 0.57.3 | v0.57.3 |
+| v1.0.0 | release: publish 1.0.0 stable | v1.0.0 |
 | v1.0.0-preview.1 | release: prepare 1.0.0-preview.1 | v1.0.0-preview.1 |
 | v1.0.0-preview.2 | release: fix preview checksum manifest | v1.0.0-preview.2 |
 <!-- gen-state:end -->
