@@ -21,17 +21,17 @@
 
 ## 下载
 
-版本状态：源码当前为 **1.0.0-preview.1**（预览版，尚未 tag/release）；最近公开 release/tag 是 [**v0.57.3**](https://github.com/wscytz/cys-stift/releases/tag/v0.57.3)。预览版不提供发布下载，稳定版二进制请从该 release 页面获取：
+当前稳定版为 [**v1.0.0**](https://github.com/wscytz/cys-stift/releases/tag/v1.0.0)。桌面安装包和 `SHA256SUMS.txt` 均从该 Release 页面下载：
 
 | 平台 | 文件 | 说明 |
 |---|---|---|
 | **macOS**(Apple Silicon) | release 页面中的 `.dmg` | 拖到 Applications |
-| **Windows** | release 页面中的 `.zip` / `.exe` | 需 WebView2(Win11 自带;Win10 手动装) |
-| **Android**(arm64) | release 页面中的 APK(若该 release 提供) | 安装时允许"未知来源" |
+| **Windows** x64 | release 页面中的 NSIS `.exe` | 需 WebView2(Win11 自带;Win10 可单独安装) |
+| **Android** | 1.0.0 不提供 | 不在本次稳定版支持范围 |
 
-> iPad/iOS 不做。Windows 版走 CI(本地 macOS 不能 cross-compile)。Android release 签名版待 keystore 配置(debug 版功能完整,仅缺签名 + 体积大)。
+> iPad/iOS 不做。Windows 安装包未经 Authenticode 签名，macOS 安装包为 ad-hoc 签名且未公证，系统可能显示“未知开发者/发布者”警告；安装前请先核对 Release 中的 SHA256。
 
-本地已生成 `1.0.0-preview.1` 的 Apple Silicon `.app`（14MB）和 `.dmg`（7.4MB），并完成原生进程启动烟测。它们仅为 adhoc 签名、未公证，也未完成原生 UI/安装验收，因此不作为 README 下载项或公开 release。
+`v1.0.0` 冻结核心工作流、数据格式、cys-dsl v4 和 AI 修改确认门。外部 5-8 人研究、VoiceOver、真实系统 200% 缩放、代表性设备安装升级以及真实 provider 配额/拒绝演练没有在发布前伪装成已完成证据，列为发布后加固项。
 
 ---
 
@@ -59,13 +59,13 @@
 
 完整能力见 [`docs/STATE.md`](docs/STATE.md)「当前能力」段。
 
-产品工作流展示：本地应用内 [`/showcase`](http://localhost:3000/showcase/)；独立静态预览页为 [wscytz.com/cys-stift](https://wscytz.com/cys-stift/)。两者均展示 **1.0.0-preview.1** 能力边界，不代表稳定版已经发布。
+产品工作流展示：本地应用内 [`/showcase`](http://localhost:3000/showcase/)；独立静态预览页为 [wscytz.com/cys-stift](https://wscytz.com/cys-stift/)。两者展示 **1.0.0** 的核心能力边界。
 
 ---
 
 ## 状态
 
-**1.0.0-preview.1** — 本地稳定性预览版(版本源见根 `package.json`)。A–F 稳定性门禁完成后等待最终桌面 / VoiceOver / 数据恢复验收；不代表已发布。
+**1.0.0** — 首个稳定版(版本源见根 `package.json`)。核心闭环、恢复事务、DSL v4 与跨平台构建流水线已冻结；签名/公证、实机无障碍与真实 provider 证据继续作为发布后加固工作。
 
 DSL 的实现与内部稳定性验证已经具备，但“普通用户是否愿意学习并重复使用”仍是待外部研究验证的产品假设；README 和展示页不会把内部测试写成用户价值结论。
 

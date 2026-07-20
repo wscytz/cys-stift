@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:2026-07-19。当前源码版本为 **1.0.0-preview.2**（根 `package.json` 单一来源）；`v1.0.0-preview.1` 是 GitHub prerelease tag，`preview.2` 会以同一流程重发 Windows x64 NSIS 和经 strict codesign 验证的 macOS Apple Silicon ad-hoc DMG，修复发布资产 `SHA256SUMS.txt` 的平铺下载校验路径。macOS 仍无 Apple Developer ID/Team ID 和 notarization，首次启动会被 Gatekeeper 拒绝；Windows/Android 安装包、VoiceOver、真实系统 200% 缩放、provider/`/ask` 配额演练与外部用户研究仍不是已完成证据。Android 不在本次 preview 发布范围。(版本表由 git tag 生成,tag 前不显 preview —— 故下表断在 v0.57.3,非缺失)。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:2026-07-20。当前源码版本为 **1.0.0**（根 `package.json` 单一来源）；`v1.0.0` 是 GitHub stable release，tag workflow 重新运行 Linux gate、生成 Windows x64 NSIS、生成并验证 macOS Apple Silicon ad-hoc DMG，并发布平铺可校验的 `SHA256SUMS.txt`。本次正式发布冻结核心工作流、数据格式与 cys-dsl v4；它不冒充平台认证或外部研究证据。macOS 无 Apple Developer ID/Team ID 和 notarization，Windows 无 Authenticode 签名；Android 不在 1.0.0 支持范围。VoiceOver、真实系统 200% 缩放、代表性设备安装升级、真实 provider quota/refusal 和外部用户研究仍是发布后加固项。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 
@@ -11,7 +11,7 @@
 **cy's Stift** — 本地优先的灵感画布,包豪斯风格 UI。你的灵感,在画布上生长。
 (Next.js 15 静态导出 + 自研 Canvas 2D + React 19 + TS strict;桌面壳 Tauri v2;数据 localStorage + OPFS,离线可用。)
 
-## 当前执行快照（2026-07-19）
+## 当前执行快照（2026-07-20）
 
 本轮重构围绕一条可恢复主线：捕获 → 待整理 → 画布组织 → 搜索定位 → 工作台继续编辑 → 导出/导入恢复。当前工作树已落地：
 
@@ -158,6 +158,8 @@
 | v0.57.1 | feat(workbench): 编辑打磨 + bump 0.57.1 | v0.57.1 |
 | v0.57.2 | chore(desktop): sync Cargo.lock | v0.57.2 |
 | v0.57.3 | feat(theme): 删 dark 模式,聚焦 Bauhaus light-only + bump 0.57.3 | v0.57.3 |
+| v1.0.0-preview.1 | release: prepare 1.0.0-preview.1 | v1.0.0-preview.1 |
+| v1.0.0-preview.2 | release: fix preview checksum manifest | v1.0.0-preview.2 |
 <!-- gen-state:end -->
 
 ## 当前能力(用户视角)
@@ -231,7 +233,7 @@ product-idea 大方向四块**全闭合**:#1 大卡搁置 / #2 DSL 版本号 v0.
 ## 已知 debt(有意 defer,非 bug)
 
 - **颜色类型双轨制**:`ColorToken`(6 色 Bauhaus)与历史 `TagColor` 输入仍需兼容读取；当前边界已在导入/标签 chip 归一化,不再把失效 CSS token 直接交给 UI。
-- **Tauri 未签名**:当前 preview 已本地构建 Apple Silicon `.app`（14MB）和 `.dmg`（7.4MB），仅完成原生进程启动烟测；产物是 adhoc 签名、无 Team ID、未公证，不能作为可分发 release 或完整安装验收。
+- **桌面分发未做商业签名**:`v1.0.0` 分发 Windows NSIS 与 macOS Apple Silicon DMG；macOS 仅 ad-hoc 签名、无 Team ID/未公证，Windows 未做 Authenticode。两端必须在 Release 明示系统警告并提供 SHA256；这不是完整设备矩阵安装/升级认证。
 - **B3b frame 拖框创建**:触及引擎 tool union 类型 + 全 pointer 链,L 级;现有「框住选中」按钮 + DSL/Outline 两条建 frame 路够用。
 - **Batch C 智能关系推荐(已落地)**:`relation-recommend.ts` 本地启发式四信号 + `relation-recommend-ai.ts` 可选 AI 语义粗筛,均在 graph 详情页接入。**剩余**:inbox/timeline 详情页只读看推荐(目前仅 graph 页可建关系)。
 - **AI agent /ask 二期**:tool-calling 主动检索和历史摘要仍 defer；当前 `/ask` 与 companion 已按画布持久化对话，并显示本轮检索/实际发送数量及来源回链。

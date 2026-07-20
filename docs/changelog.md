@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-07-20 · 1.0.0 · 首个稳定版
+
+将 `preview.2` 已验证的核心闭环正式冻结为 `v1.0.0`：版本源、README、STATE 与安装说明同步；新增 stable tag workflow，重新执行完整 Linux gate，分别生成 Windows x64 NSIS 与 macOS Apple Silicon DMG，验证 DMG/包内应用并发布平铺 `SHA256SUMS.txt`。
+
+- **稳定契约**:冻结 Capture → Inbox → Canvas → Search/Workbench → Export/recovery、数据格式、cys-dsl v4、plan/confirm/apply 与 stale revision guard；不在 1.0.0 混入 DSL v5 或 post-1.0 功能。
+- **发布诚实性**:macOS 为 ad-hoc 签名且未公证，Windows 未 Authenticode 签名，Android 不提供；外部 5-8 人研究、VoiceOver、真实系统 200% 缩放、安装升级矩阵与真实 provider quota/refusal 未写成已通过。
+- **后续边界**:稳定版之后按私有 post-1.0 路线先做锚点任务与审查模型计划，用户复核前不启动功能实现。
+
+---
+
 ## 2026-07-19 · 1.0.0-preview.2 · 发布资产校验修复
 
 修复 preview release 的 `SHA256SUMS.txt`：校验和现在只记录资产文件名，用户把 Windows NSIS、macOS DMG 和清单下载到同一目录后可直接执行 `shasum -a 256 -c SHA256SUMS.txt`。此前 `preview.1` 的清单保留 CI 临时 `windows/`、`macos/` 路径，资产完整但不能在平铺下载目录直接校验。
