@@ -8,7 +8,9 @@
  */
 
 import {
+  AIProviderHttpError,
   normalizeAIFinishReason,
+  parseRetryAfterMs,
   type AIFinishReason,
   type AIProvider,
   type AIRequest,
@@ -35,12 +37,14 @@ export function isDeepSeekEndpoint(baseUrl: string, model: string): boolean {
 }
 
 export function createOpenAIProvider(cfg: OpenAIConfig): AIProvider {
+  const jsonSchemaResponse = /^https:\/\/api\.openai\.com(?:\/|$)/i.test(cfg.baseUrl)
   return {
     id: 'openai',
     name: 'OpenAI',
     defaultBaseUrl: 'https://api.openai.com/v1',
     defaultModel: 'gpt-4o-mini',
     models: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+    capabilities: { jsonSchemaResponse },
     async streamText(req, onDelta, signal) {
       // 结构化输出任务(排版/cluster/关系推荐):对支持「思考模式」的 OpenAI 兼容
       // 端点(DeepSeek 及其镜像)发 thinking:disabled,避免思考吃光 token 导致 DSL
@@ -50,6 +54,9 @@ export function createOpenAIProvider(cfg: OpenAIConfig): AIProvider {
       const isDeepSeek = isDeepSeekEndpoint(cfg.baseUrl, cfg.model)
       const extraBody =
         req.structuredOutput && isDeepSeek ? { thinking: { type: 'disabled' } } : {}
+      const responseFormat = req.responseSchema && jsonSchemaResponse
+        ? { response_format: { type: 'json_schema', json_schema: { name: req.responseSchema.name, strict: req.responseSchema.strict ?? true, schema: req.responseSchema.schema } } }
+        : {}
       const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -68,11 +75,16 @@ export function createOpenAIProvider(cfg: OpenAIConfig): AIProvider {
           temperature: req.temperature ?? 0.7,
           stream: true,
           ...extraBody,
+          ...responseFormat,
         }),
         signal,
       })
       if (!res.ok || !res.body) {
-        throw new Error(openAiErrorMessage(res.status, await res.text().catch(() => '')))
+        throw new AIProviderHttpError(
+          openAiErrorMessage(res.status, await res.text().catch(() => '')),
+          res.status,
+          parseRetryAfterMs(res.headers?.get?.('Retry-After')),
+        )
       }
       const reader = res.body.getReader()
       const decoder = new TextDecoder()

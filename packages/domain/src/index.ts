@@ -4,6 +4,7 @@ export * from './codec'
 export {
   CardService,
   type CardRepository,
+  type CardBatchChange,
   type CreateCardInput,
   type UpdateCardPatch,
 } from './services/card-service'

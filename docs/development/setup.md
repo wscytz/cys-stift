@@ -104,6 +104,7 @@ pnpm tauri dev
 - **大小写**：仓库目录全小写，Windows 不敏感但 mac/Linux 敏感，**统一小写**最稳
 - **行尾**：仓库强制 LF，不要让 IDE 改 CRLF
 - **Tauri 编译**：各自平台编译各自产物，CI 用 GitHub Actions 双平台构建（Phase 8 引入）
+- **桌面 CSP**：`apps/desktop/src-tauri/tauri.conf.json` 使用显式 CSP；AI provider 只能连接 HTTPS 或本机 `localhost/127.0.0.1/[::1]` 端点。若配置了远程 HTTP provider，需要改为 HTTPS，不能把 CSP 恢复为 `null`。
 - **不要在同一工作树同时跑 `next dev` 和 `next build`**：两者共享 `apps/web/.next`。生产构建会重写开发服务器正在读取的 CSS/类型缓存，旧 dev 进程可能继续响应但丢失全局 token 样式。构建后请停止旧进程并重新启动；并行预览请使用另一份 worktree。
 
 产品展示页的独立预览、静态导出和发布前检查见 [`showcase.md`](showcase.md)。

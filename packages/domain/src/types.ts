@@ -155,6 +155,9 @@ export type CaptureSource =
   | { kind: 'paste'; deviceId: string; originalApp?: string }
   | { kind: 'drag-drop'; deviceId: string; fileCount: number }
   | { kind: 'webhook'; endpoint: string; externalId?: string }
+  /** A user-accepted proposal candidate. Carries local provenance only; never
+   * provider credentials, raw prompt text, or a remote account identifier. */
+  | { kind: 'ai-proposal'; proposalId: string; itemId: string }
   | { kind: 'manual'; deviceId: string }
   | { kind: 'unknown' }
 

@@ -33,6 +33,13 @@ class InMemoryCardRepository implements CardRepository {
   listAll() {
     return [...this.store.values()]
   }
+  applyBatch(changes: Array<{ id: CardId; expected: Card | null; next: Card | null }>) {
+    const next = new Map(this.store)
+    for (const change of changes) if (JSON.stringify(this.store.get(change.id) ?? null) !== JSON.stringify(change.expected)) return false
+    for (const change of changes) change.next ? next.set(change.id, change.next) : next.delete(change.id)
+    this.store = next
+    return true
+  }
 }
 
 const dummySource = { kind: 'manual' as const, deviceId: 'test-device' }
@@ -57,6 +64,14 @@ describe('CardService', () => {
     expect(card.archived).toBe(false)
     expect(card.pinned).toBe(false)
     expect(card.canvasPosition).toBeUndefined()
+  })
+
+  it('applies expected/next batches atomically', () => {
+    const card = service.create({ title: 'before', source: dummySource })
+    expect(service.applyBatch([{ id: card.id, expected: { ...card, title: 'wrong' }, next: { ...card, title: 'after' } }])).toBe(false)
+    expect(service.get(card.id)?.title).toBe('before')
+    expect(service.applyBatch([{ id: card.id, expected: card, next: { ...card, title: 'after' } }])).toBe(true)
+    expect(service.get(card.id)?.title).toBe('after')
   })
 
   it('lists inbox (no canvasPosition, not archived)', () => {

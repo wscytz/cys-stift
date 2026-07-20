@@ -17,7 +17,7 @@ import type { AIConfig } from '@/features/ai/types'
 import { pushToast } from '@/lib/toast-store'
 
 /** 哪个 AI action 在跑(用于 rail 按钮 spinner / 互斥禁用)。null = 空闲。 */
-export type AIActionKind = 'layout' | 'cluster' | 'outline'
+export type AIActionKind = 'layout' | 'cluster' | 'outline' | 'audit'
 
 /**
  * @param onNotReady AI 未就绪时的回调(由 page 提供,通常是 setShowAiSetup(true))。

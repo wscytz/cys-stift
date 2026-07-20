@@ -1,6 +1,6 @@
 import type { CanvasElement } from '@cys-stift/canvas-engine'
-import { normalizeBox } from '@cys-stift/canvas-engine'
 import { inferRelationType } from './relation-types'
+import { isFullyInsideFrame } from './frame-membership'
 
 /**
  * 画布 → Markdown 文档(数据可迁移,信念4「本地数据随时可导出开放格式,不做锁定」)。
@@ -55,10 +55,9 @@ export function canvasToMarkdown(
   // 标记每张卡属于哪个 frame(取首个几何包含的 frame;z 序 frame 在底,先建的先匹配)。
   const cardFrame = new Map<string, CanvasElement | null>() // cardId → frame(null=散卡)
   for (const card of cards) {
-    const cb = normalizeBox(card)
     let belongs: CanvasElement | null = null
     for (const frame of frames) {
-      if (belongsTo(card, frame)) {
+      if (isFullyInsideFrame(card, frame)) {
         belongs = frame
         break
       }
@@ -107,18 +106,6 @@ export function canvasToMarkdown(
   }
 
   return lines.join('\n')
-}
-
-/** 几何包含判定(card bbox 在 frame bbox 内)。 */
-function belongsTo(card: CanvasElement, frame: CanvasElement): boolean {
-  const cb = normalizeBox(card)
-  const fb = normalizeBox(frame)
-  return (
-    cb.x >= fb.x &&
-    cb.y >= fb.y &&
-    cb.x + cb.w <= fb.x + fb.w &&
-    cb.y + cb.h <= fb.y + fb.h
-  )
 }
 
 function pushRel(

@@ -220,6 +220,34 @@
 /* companion tab 按钮(选中态走 inline 动态值;此处只锚 :focus-visible)。 */
 .cv-companion-tab:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 
+.cv-proposal-review {
+  position: absolute;
+  right: var(--space-1);
+  top: var(--space-1);
+  z-index: 35;
+  width: min(400px, calc(100vw - 32px));
+  max-height: calc(100% - 32px);
+}
+
+.cv-proposal-review button {
+  min-height: 44px;
+}
+
+.cv-proposal-review button:focus-visible {
+  outline: 2px solid var(--color-red);
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .cv-proposal-review {
+    inset: 0;
+    width: 100%;
+    max-height: none;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
 /* ── 15. Card tile (inbox red bar / archive-family blue bar shared) ──────────
  * inbox .tile 默认 red bar;archive-family 加 .tile--bar-blue;
  * .tile--pinned bar→yellow 赢。结构:.tile 是 div,内含 .tile__select/

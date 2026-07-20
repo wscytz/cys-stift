@@ -50,6 +50,14 @@ export function attachCanvasFreeformPersistence(
   let hydrated = false
   let dirtyDuringHydrate = false
   let timer: ReturnType<typeof setTimeout> | null = null
+  const signature = (elements: CanvasElement[]) => JSON.stringify(freeformElementsOf(elements))
+  let lastPersistedSignature: string | null = null
+  let lastQueuedSignature: string | null = null
+  let saveSequence = 0
+  // OPFS writes are async. Serialize them so an undo snapshot queued after a
+  // pre-undo save cannot finish first and then be overwritten by the older
+  // write when the two writable handles resolve out of order.
+  let saveChain: Promise<void> = Promise.resolve()
   // 已知的 freeform 元素 id —— 用来判定 removed 的 id 是 freeform 还是 card。
   const knownFreeformIds = new Set<string>()
   // hydrate 前用户已绘制但 unbind 时 load 未回:捕获当前 host 的 freeform 元素,
@@ -57,10 +65,32 @@ export function attachCanvasFreeformPersistence(
   // (load .then 在 disposed 后短路 return,cleanup 又因 !hydrated 不 flush)。
   let pendingAtDisposal: CanvasElement[] | null = null
 
+  const enqueueSave = (elements: CanvasElement[]) => {
+    const nextSignature = signature(elements)
+    const sequence = ++saveSequence
+    lastQueuedSignature = nextSignature
+    saveChain = saveChain
+      .catch(() => undefined)
+      .then(async () => {
+        try {
+          const ok = await store.save(canvasId, elements)
+          if (ok !== false) {
+            lastPersistedSignature = nextSignature
+          } else if (sequence === saveSequence) {
+            // Allow a later history event to retry after a quota/IO failure.
+            lastQueuedSignature = lastPersistedSignature
+          }
+        } catch (error) {
+          console.warn('[canvas-freeform-binding] save failed', error)
+          if (sequence === saveSequence) lastQueuedSignature = lastPersistedSignature
+        }
+      })
+  }
+
   const doSave = () => {
     timer = null
     if (disposed && !flushing) return
-    void store.save(canvasId, freeformElementsOf(host.getElements()))
+    enqueueSave(freeformElementsOf(host.getElements()))
   }
 
   // cleanup 时允许在 disposed 之后再 flush 一次(见下方 unbind)。
@@ -69,6 +99,11 @@ export function attachCanvasFreeformPersistence(
   const scheduleSave = () => {
     if (timer) clearTimeout(timer)
     timer = setTimeout(doSave, debounceMs)
+  }
+
+  const refreshKnownFreeformIds = (elements: CanvasElement[]) => {
+    knownFreeformIds.clear()
+    for (const el of freeformElementsOf(elements)) knownFreeformIds.add(el.id)
   }
 
   // 订阅用户源变更。立即建立(hydrate 期间也收,但只标记 dirty 不 save)。
@@ -96,6 +131,26 @@ export function attachCanvasFreeformPersistence(
     scheduleSave()
   })
 
+  // Undo/redo restores through applyWithoutEcho, so onUserChange is silent.
+  // Replace any pending pre-undo snapshot with the current host state and
+  // persist that state through the same debounce path.
+  const unsubHistory = host.onHistoryChange?.((change) => {
+    if (disposed) return
+    // push is emitted before the user mutation. The ordinary onUserChange
+    // listener owns debounce scheduling; treating push as a restore would
+    // cancel an unrelated pending freeform write.
+    if (change === 'push') return
+    const elements = host.getElements()
+    // applyWithoutEcho restore bypasses onUserChange, so refresh the removal
+    // index as well as scheduling persistence. Otherwise undoing a deletion
+    // followed by deleting the restored element again is silently lost.
+    refreshKnownFreeformIds(elements)
+    if (!hydrated) { dirtyDuringHydrate = true; return }
+    if (timer) { clearTimeout(timer); timer = null }
+    if (signature(elements) === lastQueuedSignature) return
+    scheduleSave()
+  }) ?? (() => {})
+
   // 异步 hydrate:load → restore 非 card(applyWithoutEcho)→ 标记 hydrated。
   void store.load(canvasId).then((snapshot) => {
     if (disposed) {
@@ -119,6 +174,8 @@ export function attachCanvasFreeformPersistence(
         }
       })
     }
+    lastPersistedSignature = signature(host.getElements())
+    lastQueuedSignature = lastPersistedSignature
     hydrated = true
     // hydrate 期间用户已改过 → 保存合并态(持久化 + 新建)。
     if (dirtyDuringHydrate) {
@@ -130,6 +187,7 @@ export function attachCanvasFreeformPersistence(
   return () => {
     disposed = true
     unsub()
+    unsubHistory()
     if (timer) {
       clearTimeout(timer)
       timer = null

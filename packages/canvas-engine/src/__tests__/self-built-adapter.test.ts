@@ -831,6 +831,16 @@ describe('SelfBuiltAdapter onHistoryChange', () => {
     expect(fired).toBe(2)
   })
 
+  it('reports whether history changed by push, undo, or redo', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'), { getCardInfo: () => null })
+    const changes: string[] = []
+    host.onHistoryChange((change) => changes.push(change))
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    host.undo()
+    host.redo()
+    expect(changes).toEqual(['push', 'undo', 'redo'])
+  })
+
   it('取消订阅后不再触发', () => {
     const host = new SelfBuiltAdapter(document.createElement('canvas'), { getCardInfo: () => null })
     let fired = 0

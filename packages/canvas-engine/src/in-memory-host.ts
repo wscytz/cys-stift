@@ -1,6 +1,6 @@
 
 import { sortByLayer, sanitizeView } from './canvas-host'
-import type { CanvasElement, CanvasHost, CanvasView, UserChange } from './canvas-host'
+import type { CanvasElement, CanvasHost, CanvasView, UserChange, CanvasHistoryChange } from './canvas-host'
 /**
  * InMemoryCanvasHost — 纯内存 CanvasHost,单测用,无 tldraw 依赖。
  *
@@ -14,7 +14,7 @@ export class InMemoryCanvasHost implements CanvasHost {
   private listeners = new Set<(c: UserChange) => void>()
   private selectionListeners = new Set<(ids: string[]) => void>()
   private viewListeners = new Set<(v: CanvasView) => void>()
-  private historyListeners = new Set<() => void>()
+  private historyListeners = new Set<(change: CanvasHistoryChange) => void>()
   private echoing = true
   /** coalescing=true 期间,echo 的 upsert/remove 不重复推快照。
    * batch() 在首次真实 mutation 时才推一次。 */
@@ -101,7 +101,7 @@ export class InMemoryCanvasHost implements CanvasHost {
     if (!prev) return
     this.redoStack.push(this.snapshot())
     this.restore(prev)
-    this.emitHistory()
+    this.emitHistory('undo')
   }
 
   /** 测试用最小 redo:对称的 undo 反操作。 */
@@ -110,7 +110,7 @@ export class InMemoryCanvasHost implements CanvasHost {
     if (!next) return
     this.undoStack.push(this.snapshot())
     this.restore(next)
-    this.emitHistory()
+    this.emitHistory('redo')
   }
 
   private snapshot(): CanvasElement[] {
@@ -143,7 +143,7 @@ export class InMemoryCanvasHost implements CanvasHost {
     // 与 SelfBuiltAdapter 同契约:pushUndo / undo / redo 都广播 onHistoryChange
     // (真实 adapter 上每个 echoed 编辑都会 pushUndo → 广播,故此处也广播,
     //  让 InMemoryCanvasHost 能测到「正常编辑触发 reconcile 但幂等 no-op」)。
-    this.emitHistory()
+    this.emitHistory('push')
   }
 
   private restore(snap: CanvasElement[]): void {
@@ -163,11 +163,11 @@ export class InMemoryCanvasHost implements CanvasHost {
     }
   }
 
-  private emitHistory(): void {
-    for (const l of this.historyListeners) l()
+  private emitHistory(change: CanvasHistoryChange): void {
+    for (const l of this.historyListeners) l(change)
   }
 
-  onHistoryChange(cb: () => void): () => void {
+  onHistoryChange(cb: (change: CanvasHistoryChange) => void): () => void {
     this.historyListeners.add(cb)
     return () => {
       this.historyListeners.delete(cb)

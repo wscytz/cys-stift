@@ -15,7 +15,9 @@
  */
 
 import {
+  AIProviderHttpError,
   normalizeAIFinishReason,
+  parseRetryAfterMs,
   type AIFinishReason,
   type AIProvider,
   type AIRequest,
@@ -35,6 +37,7 @@ export function createOllamaProvider(cfg: OllamaConfig): AIProvider {
     defaultBaseUrl: 'http://localhost:11434',
     defaultModel: 'llama3.2:3b',
     models: ['llama3.2:3b', 'llama3.1:8b', 'qwen2.5:7b', 'phi-3.5:3.8b'],
+    capabilities: { jsonSchemaResponse: true },
     async streamText(req, onDelta, signal) {
       const res = await fetch(`${cfg.baseUrl}/api/chat`, {
         method: 'POST',
@@ -52,12 +55,13 @@ export function createOllamaProvider(cfg: OllamaConfig): AIProvider {
             num_predict: req.maxTokens ?? 1024,
             temperature: req.temperature ?? 0.7,
           },
+          ...(req.responseSchema ? { format: req.responseSchema.schema } : {}),
         }),
         signal,
       })
       if (!res.ok || !res.body) {
         const errText = await res.text().catch(() => '')
-        throw new Error(`Ollama ${res.status}: ${errText}`)
+        throw new AIProviderHttpError(`Ollama ${res.status}: ${errText}`, res.status, parseRetryAfterMs(res.headers?.get?.('Retry-After')))
       }
       const reader = res.body.getReader()
       const decoder = new TextDecoder()

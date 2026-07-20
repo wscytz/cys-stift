@@ -16,6 +16,8 @@
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
     "benchmark:intent": "pnpm --filter web test -- src/features/ai/__tests__/intent-benchmark.test.ts src/features/ai/__tests__/intent-compiler.test.ts",
+    "benchmark:proposal": "pnpm --filter web test -- src/features/ai/coauthor/__tests__/proposal-benchmark.test.ts",
+    "smoke:proposal": "node scripts/smoke-proposal-coauthor.mjs",
     "docs:links": "node scripts/check-doc-links.mjs",
     "tauri": "pnpm --filter desktop tauri",
     "clean": "pnpm -r exec rm -rf .next out dist node_modules/.cache"

@@ -3,7 +3,10 @@ import { createOllamaProvider } from '../providers/ollama'
 
 function mockFetch(body: string) {
   const encoder = new TextEncoder()
-  vi.stubGlobal('fetch', vi.fn(async () => ({
+  const calls: any[] = []
+  vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+    calls.push(JSON.parse(String(init?.body ?? '{}')))
+    return ({
     ok: true,
     status: 200,
     body: new ReadableStream({
@@ -13,7 +16,9 @@ function mockFetch(body: string) {
       },
     }),
     text: async () => body,
-  })))
+    })
+  }))
+  return calls
 }
 
 const provider = () =>
@@ -43,5 +48,13 @@ describe('ollama provider — NDJSON termination metadata', () => {
     expect(response.content).toBe('ok')
     expect(response.finishReason).toBe('stop')
     expect(response.stopReason).toBe('stop')
+  })
+
+  it('advertises and sends Ollama format schema', async () => {
+    const calls = mockFetch('{"message":{"content":"{}"},"done":true,"done_reason":"stop"}')
+    const p = provider()
+    await p.streamText({ system: 's', user: 'u', responseSchema: { name: 'proposal', schema: { type: 'object' } } }, () => {}, undefined)
+    expect(p.capabilities).toEqual({ jsonSchemaResponse: true })
+    expect(calls[0]?.format).toEqual({ type: 'object' })
   })
 })

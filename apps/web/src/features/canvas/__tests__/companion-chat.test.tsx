@@ -157,6 +157,16 @@ describe('CompanionChat — sends conversation history to AI (Task 2)', () => {
     unmount()
   })
 
+  it('exposes the conversation as a polite live log', () => {
+    const { host, unmount } = render(<CompanionChat {...makeProps()} />)
+    const thread = host.querySelector('.cc-chat__thread')
+    expect(thread?.getAttribute('role')).toBe('log')
+    expect(thread?.getAttribute('aria-live')).toBe('polite')
+    expect(thread?.getAttribute('aria-relevant')).toBe('additions text')
+    expect(thread?.getAttribute('aria-label')).toBe('canvas.companion.chat.threadLabel')
+    unmount()
+  })
+
   it('sends only current turn when no prior history', async () => {
     const { host, unmount } = render(<CompanionChat {...makeProps()} />)
     await typeAndSend(host, 'first question')

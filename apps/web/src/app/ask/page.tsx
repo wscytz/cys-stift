@@ -491,7 +491,7 @@ export default function AskPage() {
           </UICard>
         ) : (
           <div className="ask">
-            <div className="ask__thread" ref={scrollRef}>
+            <div className="ask__thread" ref={scrollRef} role="log" aria-live="polite" aria-relevant="additions text" aria-label={t('ask.threadLabel')}>
               {messages.length === 0 && (
                 <div className="ask__empty-state">
                   <p className="ask__empty">{t('ask.empty')}</p>

@@ -289,6 +289,54 @@ describe('bindCardWriteback: undo reconciles DB canvasPosition (no desync)', () 
     unbind()
   })
 
+  it('a later history push does not discard another card pending in the debounce window', () => {
+    vi.useFakeTimers()
+    try {
+      const canvasId = 'canvas-1' as unknown as CanvasId
+      const first = makeCardOnCanvas('card-first', 'canvas-1')
+      const second = makeCardOnCanvas('card-second', 'canvas-1')
+      const cards = new Map([[String(first.id), first], [String(second.id), second]])
+      const { service } = makeFakeService(cards)
+      const host = new InMemoryCanvasHost()
+      host.applyWithoutEcho(() => {
+        host.upsert(cardToElement(first))
+        host.upsert(cardToElement(second))
+      })
+      const unbind = bindCardWriteback(host, service, canvasId)
+
+      host.upsert({ ...cardToElement(first), x: 111, y: 222 })
+      host.upsert({ ...cardToElement(second), x: 333, y: 444 })
+      vi.advanceTimersByTime(350)
+
+      expect(cards.get('card-first')?.canvasPosition).toMatchObject({ x: 111, y: 222 })
+      expect(cards.get('card-second')?.canvasPosition).toMatchObject({ x: 333, y: 444 })
+      unbind()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('undo cancels a pending drag write and keeps the restored geometry in the DB', () => {
+    vi.useFakeTimers()
+    try {
+      const canvasId = 'canvas-1' as unknown as CanvasId
+      const card = makeCardOnCanvas('card-drag', 'canvas-1')
+      const cards = new Map([['card-drag', card]])
+      const { service } = makeFakeService(cards)
+      const host = new InMemoryCanvasHost()
+      host.applyWithoutEcho(() => host.upsert(cardToElement(card)))
+      const unbind = bindCardWriteback(host, service, canvasId)
+      host.upsert({ ...cardToElement(card), x: 900, y: 700 })
+      host.undo()
+      vi.advanceTimersByTime(350)
+      expect(cards.get('card-drag')?.canvasPosition?.x).toBe(10)
+      expect(cards.get('card-drag')?.canvasPosition?.y).toBe(20)
+      unbind()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('redo re-removes the card: reconcile finds nothing in host to restore', () => {
     const canvasId = 'canvas-1' as unknown as CanvasId
     const cards = new Map([['card-e', makeCardOnCanvas('card-e', 'canvas-1')]])
@@ -572,6 +620,16 @@ describe('reconcileCanvasHistory (pure): host → DB direction', () => {
     expect(svc.moveToCanvas).not.toHaveBeenCalled()
     expect(svc.removeFromCanvas).not.toHaveBeenCalled()
     expect(svc.restore).not.toHaveBeenCalled()
+  })
+
+  it('reconciles geometry drift even when the card remains on the same canvas', () => {
+    const canvasId = 'canvas-1' as unknown as CanvasId
+    const card = makeCardLike({ id: 'drift', canvasPosition: { canvasId, x: 5, y: 6, w: 240, h: 120, z: 4, rotation: 0 } })
+    const { host } = makeHostMock([{ id: 'drift', kind: 'card', x: 55, y: 66, w: 240, h: 120, rotation: 0.25 }])
+    const moveToCanvas = vi.fn()
+    const svc = { get: vi.fn(() => card), listOnCanvas: vi.fn(() => [card]), moveToCanvas, removeFromCanvas: vi.fn(), restore: vi.fn() } as unknown as CardService
+    reconcileCanvasHistory(host, svc, canvasId)
+    expect(moveToCanvas).toHaveBeenCalledWith('drift', expect.objectContaining({ x: 55, y: 66, z: 4, rotation: 0.25 }))
   })
 
   it('undo after eraser softDelete: host restored the element but DB deletedAt still set → restore then moveToCanvas', () => {

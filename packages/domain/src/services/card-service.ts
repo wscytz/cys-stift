@@ -38,7 +38,12 @@ export interface CardRepository {
   listInbox(): Card[]
   listOnCanvas(canvasId: CanvasId): Card[]
   listAll(): Card[]
+  /** Optional atomic replacement port for transaction-aware adapters. */
+  replaceAll?(cards: Card[]): void
+  applyBatch?(changes: CardBatchChange[]): boolean
 }
+
+export interface CardBatchChange { id: CardId; expected: Card | null; next: Card | null }
 
 export interface CreateCardInput {
   title: string
@@ -135,6 +140,14 @@ export class CardService {
    * moveToCanvas for the update path).
    */
   createWithId(id: CardId, input: CreateCardInput): Card {
+    const card = this.materializeWithId(id, input)
+    this.repo.insert(card)
+    return card
+  }
+
+  /** Build a fully materialized card without persistence. Proposal
+   * transactions use this to put a create into their expected/next batch. */
+  materializeWithId(id: CardId, input: CreateCardInput): Card {
     const now = new Date()
     const card: Card = {
       id,
@@ -155,7 +168,6 @@ export class CardService {
       pinned: input.pinned ?? false,
       archived: input.archived ?? false,
     }
-    this.repo.insert(card)
     return card
   }
 
@@ -219,6 +231,18 @@ export class CardService {
 
   listAll(): Card[] {
     return this.repo.listAll()
+  }
+
+  replaceAll(cards: Card[]): boolean {
+    if (!this.repo.replaceAll) return false
+    return this.write(() => this.repo.replaceAll!(cards))
+  }
+
+  applyBatch(changes: CardBatchChange[]): boolean {
+    if (!this.repo.applyBatch) return false
+    return this.write(() => {
+      if (!this.repo.applyBatch!(changes)) throw new StorageQuotaError()
+    })
   }
 
   archive(id: CardId): void {

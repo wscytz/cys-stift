@@ -111,6 +111,27 @@ describe('SQLite repository', () => {
     expect(fetched?.deletedAt).toBeInstanceOf(Date)
   })
 
+  it('applies expected/next card changes atomically', () => {
+    const first = service.create({ title: 'first', source })
+    const second = service.create({ title: 'second', source })
+    const firstStored = service.get(first.id)!
+    const secondStored = service.get(second.id)!
+    const firstNext = { ...firstStored, title: 'first updated', updatedAt: new Date(firstStored.updatedAt.getTime() + 1_000) }
+    expect(service.applyBatch([
+      { id: first.id, expected: firstStored, next: firstNext },
+      { id: second.id, expected: { ...secondStored, title: 'stale' }, next: null },
+    ])).toBe(false)
+    expect(service.get(first.id)?.title).toBe('first')
+    expect(service.get(second.id)?.title).toBe('second')
+
+    expect(service.applyBatch([
+      { id: first.id, expected: firstStored, next: firstNext },
+      { id: second.id, expected: secondStored, next: null },
+    ])).toBe(true)
+    expect(service.get(first.id)?.title).toBe('first updated')
+    expect(service.get(second.id)).toBeNull()
+  })
+
   it('listInbox excludes archived and on-canvas cards', () => {
     service.create({ title: 'inbox A', source })
     service.create({ title: 'inbox B', source })

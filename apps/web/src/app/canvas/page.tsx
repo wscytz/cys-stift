@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import type { CanvasId, Card, CardId, TagRef } from '@cys-stift/domain'
@@ -29,6 +29,20 @@ import { Minimap } from '@/features/canvas/minimap-component'
 import { OutlinePanel } from '@/features/canvas/outline-panel'
 import { CanvasSearchPanel } from '@/features/canvas/canvas-search-panel'
 import { CanvasCompanionPanel } from '@/features/canvas/companion-panel'
+import { ProposalReviewPanel } from '@/features/ai/coauthor/proposal-review-panel'
+import { buildWorkingSet } from '@/features/ai/coauthor/working-set'
+import { createProposalEnvelope, generateStructureAudit } from '@/features/ai/coauthor/structure-audit-workflow'
+import { createProposalReviewState, reduceProposalReview } from '@/features/ai/coauthor/proposal-reducer'
+import { compileProposalPlan } from '@/features/ai/coauthor/proposal-compiler'
+import { detectProposalStaleness } from '@/features/ai/coauthor/proposal-staleness'
+import { recordReviewMetric } from '@/features/ai/coauthor/review-metrics'
+import { useLabEnabled } from '@/features/ai/labs-registry'
+import { buildProposalReport, proposalReportMarkdown } from '@/features/ai/coauthor/proposal-report'
+import { commitProposalPlan, proposalPlanChangedIds, recoverProposalTransactions, undoCommittedProposal, type ProposalCommitPlanV1 } from '@/features/ai/coauthor/proposal-transaction'
+import { ProposalGhostOverlay } from '@/features/ai/coauthor/proposal-ghost-overlay'
+import { proposalReceiptStore, type CommitReceiptV1 } from '@/lib/proposal-transaction-journal'
+import { proposalStore, reconcileSubscribedProposalReview } from '@/lib/proposal-store'
+import type { WorkingSetBuildResultV1 } from '@/features/ai/coauthor/working-set-types'
 import { autoRelate } from '@/features/canvas/auto-relate'
 import { CanvasContextMenu } from '@/features/canvas/canvas-context-menu'
 import { CanvasEmptyMotif } from '@/features/canvas/canvas-empty-motif'
@@ -103,6 +117,8 @@ export default function CanvasPage() {
   // 后 runAI 只在 aiBusy/t 变时变,handler 稳定性回到原 aiBusy-dep 语义。
   const handleAiNotReady = useCallback(() => setShowAiSetup(true), [])
   const { aiBusy, runAI } = useAIAction(handleAiNotReady)
+  const proposalCoauthorEnabled = useLabEnabled('proposalCoauthorLab')
+  const proposalStoreVersion = useSyncExternalStore(proposalStore.subscribe, proposalStore.getVersion, () => 0)
 
   const { snapshot: canvasesSnap } = useCanvases()
   const activeCanvasId = canvasesSnap.activeCanvasId
@@ -140,6 +156,11 @@ export default function CanvasPage() {
   const [outlineOpen, setOutlineOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [companionOpen, setCompanionOpen] = useState(false)
+  const [proposalReview, setProposalReview] = useState<{ envelope: import('@/features/ai/coauthor/proposal-contract').ProposalEnvelopeV1; sources: import('@/features/ai/coauthor/working-set-types').SourceRefV1[]; review: import('@/features/ai/coauthor/proposal-contract').ProposalReviewRecordV1 } | null>(null)
+  const [proposalPlan, setProposalPlan] = useState<ProposalCommitPlanV1 | null>(null)
+  const [proposalCommit, setProposalCommit] = useState<{ receipt: CommitReceiptV1; undo: () => Promise<import('@/features/ai/coauthor/proposal-transaction').ProposalUndoResult> } | null>(null)
+  const [dismissedProposalId, setDismissedProposalId] = useState<string | null>(null)
+  const [auditScope, setAuditScope] = useState<WorkingSetBuildResultV1 | null>(null)
   // 焦点模式(Batch A / 方向 5):隐藏所有 chrome(Toolbar/SideRail/Minimap/Outline),
   // 只留画布 + 一个最小「退出」提示。整理/写作时减少干扰。⌘. 切入,Escape 退出。
   const [focusMode, setFocusMode] = useState(false)
@@ -514,6 +535,107 @@ ${formatted}`
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCanvasId, service, t, runAI, aiConfirm])
+
+  const handleStructureAudit = useCallback(async () => {
+    if (!proposalCoauthorEnabled) return
+    const adapter = handle.current.adapter
+    if (!adapter) return
+    const selectedCardIds = adapter.getSelectedIds().filter((id) => adapter.getElement(id)?.kind === 'card')
+    if (selectedCardIds.length < 2) {
+      pushToast({ kind: 'info', message: t('canvas.audit.selectTwo') })
+      return
+    }
+    const result = await buildWorkingSet({ host: adapter, service, canvasId: String(activeCanvasId), scope: { kind: 'selection' } })
+    if (result.records.length === 0) {
+      pushToast({ kind: 'info', message: t('canvas.audit.noReadableSources') })
+      return
+    }
+    setAuditScope(result)
+  }, [activeCanvasId, proposalCoauthorEnabled, service, t])
+
+  const confirmStructureAudit = useCallback(async () => {
+    const result = auditScope
+    if (!result) return
+    recordReviewMetric({ type: 'scope-confirmed' })
+    setAuditScope(null)
+    await runAI('audit', async (ready, signal) => {
+      const generationId = proposalStore.beginGeneration(String(activeCanvasId))
+      if (!generationId) { pushToast({ kind: 'error', message: t('canvas.audit.saveFailed') }); return }
+      try {
+        const generated = await generateStructureAudit(result, ready, signal)
+        if (!generated.ok) {
+          pushToast({ kind: 'error', message: t('canvas.audit.failed', { reason: generated.failure }) })
+          return
+        }
+        const envelope = await createProposalEnvelope(result, generated.payload, ready, generated)
+        const initial = createProposalReviewState(envelope.proposalId, envelope.payload)
+        const generating = reduceProposalReview(envelope.payload, initial, { type: 'begin-generation' })
+        const reviewing = generating.ok ? reduceProposalReview(envelope.payload, generating.state, { type: 'begin-review' }) : initial
+        const review = 'state' in reviewing ? reviewing.state.record : initial.record
+        if (!await proposalStore.save(envelope, review)) {
+          pushToast({ kind: 'error', message: t('canvas.audit.saveFailed') })
+          return
+        }
+        proposalStore.linkGeneration(generationId, envelope.proposalId)
+        setProposalReview({ envelope, sources: result.snapshot.sources, review })
+        setDismissedProposalId(null)
+        setProposalPlan(null)
+        setProposalCommit(null)
+        setOutlineOpen(false)
+        setCompanionOpen(false)
+      } finally { proposalStore.endGeneration(generationId) }
+    })
+  }, [activeCanvasId, auditScope, t, runAI])
+
+  useEffect(() => {
+    if (!proposalCoauthorEnabled) return
+    const candidates = proposalStore.list().filter((item) => item.canvasId === String(activeCanvasId) && item.proposalId !== dismissedProposalId)
+    const currentId = proposalReview?.envelope.proposalId
+    const entry = candidates.find((item) => item.proposalId === currentId)
+      ?? (proposalReview ? undefined : candidates.find((item) => item.state === 'reviewing' || item.state === 'interrupted') ?? candidates.find((item) => item.state === 'committed' || item.state === 'undo-available'))
+    if (!entry) return
+    let cancelled = false
+    void proposalStore.load(entry.proposalId).then((stored) => {
+      if (cancelled || !stored) return
+      if (proposalReview && proposalReview.envelope.proposalId !== stored.envelope.proposalId) return
+      if (proposalReview) {
+        const reconciled = reconcileSubscribedProposalReview(proposalReview.review, stored.review)
+        if (JSON.stringify(proposalReview.review) === JSON.stringify(reconciled.review)) return
+        if (reconciled.planChanged) setProposalPlan(null)
+        setProposalReview({ envelope: stored.envelope, sources: stored.envelope.sourceRefs, review: reconciled.review })
+        return
+      }
+      setProposalReview({ envelope: stored.envelope, sources: stored.envelope.sourceRefs, review: stored.review })
+    })
+    return () => { cancelled = true }
+  }, [activeCanvasId, dismissedProposalId, proposalCoauthorEnabled, proposalReview?.envelope.proposalId, proposalStoreVersion])
+
+  useEffect(() => {
+    if (!proposalCoauthorEnabled || !adapter || !proposalReview || proposalCommit) return
+    const receipt = proposalReceiptStore.list().find((item) => item.proposalId === proposalReview.envelope.proposalId && !item.undoneAt)
+    if (!receipt) return
+    setProposalCommit({ receipt, undo: () => undoCommittedProposal(receipt.receiptId, { service, host: adapter }) })
+  }, [adapter, proposalCoauthorEnabled, proposalCommit, proposalReview, service])
+
+  useEffect(() => {
+    if (!adapter) return
+    if (proposalCoauthorEnabled && proposalStore.recoverInterruptedGenerations(String(activeCanvasId)) > 0) pushToast({ kind: 'info', message: t('canvas.audit.interrupted') })
+    void recoverProposalTransactions({ service, host: adapter, canvasId: String(activeCanvasId) }).then(async (report) => {
+      if (report.required.length > 0) pushToast({ kind: 'error', message: `Proposal recovery required: ${report.required.join(', ')}` })
+      else {
+        const pending = proposalStore.list().find((item) => item.canvasId === String(activeCanvasId) && item.state === 'committing')
+        if (pending) {
+          const stored = await proposalStore.load(pending.proposalId)
+          if (stored) {
+            const receipt = proposalReceiptStore.list().find((item) => item.proposalId === pending.proposalId && !item.undoneAt)
+            await proposalStore.save(stored.envelope, stored.review, receipt ? 'committed' : 'reviewing')
+            setProposalReview({ envelope: stored.envelope, sources: stored.envelope.sourceRefs, review: stored.review })
+            if (receipt) setProposalCommit({ receipt, undo: () => undoCommittedProposal(receipt.receiptId, { service, host: adapter }) })
+          }
+        }
+      }
+    })
+  }, [adapter, activeCanvasId, proposalCoauthorEnabled, service, t])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // ⌘C / Ctrl+C 复制选中元素为 DSL(剪贴板交换格式)。必须在下面
@@ -1181,6 +1303,7 @@ ${formatted}`
         <>
         <CanvasSideRail
           aiBusy={aiBusy}
+          proposalCoauthorEnabled={proposalCoauthorEnabled}
           showAutoRelate={showAutoRelate}
           adapterReady={adapterReady}
           outlineOpen={outlineOpen}
@@ -1201,6 +1324,7 @@ ${formatted}`
           onAICluster={handleAICluster}
           onAutoRelate={handleAutoRelate}
           onAIOutline={handleAIOutline}
+          onStructureAudit={handleStructureAudit}
           onFrame={handleFrame}
           onOutline={() => { setOutlineOpen((o) => !o); setCompanionOpen(false) }}
           onCompanion={() => { setCompanionOpen((o) => !o); setOutlineOpen(false) }}
@@ -1230,6 +1354,85 @@ ${formatted}`
             canvasId={activeCanvasId}
           />
         )}
+        {proposalReview && adapter && (
+          <>
+          {proposalPlan && !proposalCommit && <ProposalGhostOverlay host={adapter} plan={proposalPlan} />}
+          <ProposalReviewPanel
+            payload={proposalReview.envelope.payload}
+            sourceRefs={proposalReview.sources}
+            host={adapter}
+            canvasEl={canvasElRef.current}
+            initialReview={proposalReview.review}
+            onReviewChange={(review) => {
+              setProposalReview((current) => current ? { ...current, review } : current)
+              setProposalPlan(null)
+              void proposalStore.save(proposalReview.envelope, review)
+            }}
+            onExecutionChange={(review) => {
+              setProposalReview((current) => current ? { ...current, review } : current)
+              void proposalStore.save(proposalReview.envelope, review)
+            }}
+            previewChangedIds={proposalPlan ? proposalPlanChangedIds(proposalPlan) : undefined}
+            commitReceipt={proposalCommit?.receipt}
+            onPreview={async (review) => {
+              const stale = await detectProposalStaleness(proposalReview.envelope, review, adapter, service)
+              if (stale.staleItemIds.length) return { ok: false, message: `Accepted evidence changed: ${stale.staleItemIds.join(', ')}`, code: 'STALE_EVIDENCE', itemIds: stale.staleItemIds }
+              const compiled = await compileProposalPlan(adapter, proposalReview.envelope, review, service)
+              if (!compiled.ok) return { ok: false, message: `Cannot preview: ${compiled.code} (${compiled.itemIds.join(', ')})`, code: compiled.code, itemIds: compiled.itemIds }
+              setProposalPlan(compiled.plan)
+              return { ok: true }
+            }}
+            onApply={async () => {
+              if (!proposalPlan) return { ok: false, message: 'Preview is missing or stale.' }
+              const stale = await detectProposalStaleness(proposalReview.envelope, proposalReview.review, adapter, service)
+              if (stale.staleItemIds.length) return { ok: false, message: `Accepted evidence changed: ${stale.staleItemIds.join(', ')}` }
+              const owner = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}`
+              if (!await proposalStore.acquireCommitLease(proposalReview.envelope.proposalId, owner)) return { ok: false, message: 'Apply is already running in another tab.' }
+              try {
+                if (!await proposalStore.save(proposalReview.envelope, proposalReview.review, 'committing')) return { ok: false, message: 'Could not persist committing state.' }
+                const result = await commitProposalPlan(proposalPlan, { service, host: adapter })
+                if (!result.ok) {
+                  await proposalStore.save(proposalReview.envelope, proposalReview.review, result.committed || result.recoveryRequired ? 'committing' : 'reviewing')
+                  return { ok: false, message: result.recoveryRequired ? `Apply needs recovery: ${result.code}` : result.committed ? `Applied; recovery must finish: ${result.code}` : `Apply blocked: ${result.code}` }
+                }
+                setProposalCommit({ receipt: result.receipt, undo: result.undo })
+                await proposalStore.save(proposalReview.envelope, proposalReview.review, 'committed')
+                return { ok: true }
+              } finally { proposalStore.releaseCommitLease(proposalReview.envelope.proposalId, owner) }
+            }}
+            onUndo={async () => {
+              if (!proposalCommit) return { ok: false, message: 'No undo receipt is available.' }
+              const result = await proposalCommit.undo()
+              if (!result.ok) return { ok: false, message: `Undo blocked: ${result.code}` }
+              await proposalStore.save(proposalReview.envelope, proposalReview.review, 'archived')
+              setDismissedProposalId(proposalReview.envelope.proposalId)
+              setProposalReview(null)
+              setProposalPlan(null)
+              setProposalCommit(null)
+              return { ok: true }
+            }}
+            onExportJson={() => {
+              if (!proposalCommit) return
+              const report = buildProposalReport(proposalReview.envelope, proposalReview.review, proposalCommit.receipt)
+              void downloadFile(`${proposalReview.envelope.proposalId.replace(/[^A-Za-z0-9._-]/g, '_')}.proposal.json`, new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }))
+            }}
+            onExportMarkdown={() => {
+              if (!proposalCommit) return
+              const report = buildProposalReport(proposalReview.envelope, proposalReview.review, proposalCommit.receipt)
+              void downloadFile(`${proposalReview.envelope.proposalId.replace(/[^A-Za-z0-9._-]/g, '_')}.proposal.md`, new Blob([proposalReportMarkdown(report)], { type: 'text/markdown' }))
+            }}
+            onChangeScope={async () => {
+              await proposalStore.save(proposalReview.envelope, proposalReview.review, 'archived')
+              setDismissedProposalId(proposalReview.envelope.proposalId)
+              setProposalReview(null)
+              setProposalPlan(null)
+              setProposalCommit(null)
+              await handleStructureAudit()
+            }}
+            onClose={() => { setDismissedProposalId(proposalReview.envelope.proposalId); setProposalReview(null); setProposalPlan(null); setProposalCommit(null) }}
+          />
+          </>
+        )}
         <CanvasSearchPanel
           open={searchOpen && !chromeHidden}
           cards={searchableCards}
@@ -1254,6 +1457,23 @@ ${formatted}`
         )}
       </div>
       </div>
+
+      <Modal open={auditScope !== null} onClose={() => { recordReviewMetric({ type: 'scope-cancelled' }); setAuditScope(null) }} title={t('canvas.audit.scopeTitle')} closeLabel={t('common.close')}>
+        {auditScope && <>
+          <p className="confirm__body">{t('canvas.audit.scopeBody')}</p>
+          <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 'var(--space-1) var(--space-2)', margin: 'var(--space-2) 0' }}>
+            <dt>{t('canvas.audit.scopeCards')}</dt><dd>{auditScope.snapshot.geometry.filter((element) => element.kind === 'card').length}</dd>
+            <dt>{t('canvas.audit.scopeSources')}</dt><dd>{auditScope.snapshot.manifest.includedRefIds.length}</dd>
+            <dt>{t('canvas.audit.scopeGeometry')}</dt><dd>{auditScope.snapshot.manifest.geometryOnlyEntityIds.length}</dd>
+            <dt>{t('canvas.audit.scopeOmitted')}</dt><dd>{auditScope.snapshot.manifest.omitted.length}</dd>
+            <dt>{t('canvas.audit.scopeTruncated')}</dt><dd>{auditScope.snapshot.manifest.truncated ? t('canvas.audit.yes') : t('canvas.audit.no')}</dd>
+          </dl>
+          <div className="confirm__actions">
+            <Button variant="ghost" onClick={() => { recordReviewMetric({ type: 'scope-cancelled' }); setAuditScope(null) }}>{t('common.cancel')}</Button>
+            <Button variant="primary" onClick={confirmStructureAudit}>{t('canvas.audit.confirm')}</Button>
+          </div>
+        </>}
+      </Modal>
 
       <Modal open={creatingName !== null} onClose={() => setCreatingName(null)} title={t('canvas.newModalTitle')} closeLabel={t('common.close')}>
         <p className="confirm__body">{t('canvas.newModalBody')}</p>
@@ -1470,6 +1690,7 @@ function ZoomGroup({ adapterReady, onZoom }: { adapterReady: boolean; onZoom: (o
  *  避免顶栏 18 元素平铺溢出。 */
 function CanvasSideRail({
   aiBusy,
+  proposalCoauthorEnabled,
   showAutoRelate,
   adapterReady,
   outlineOpen,
@@ -1490,6 +1711,7 @@ function CanvasSideRail({
   onAICluster,
   onAutoRelate,
   onAIOutline,
+  onStructureAudit,
   onFrame,
   onOutline,
   onCompanion,
@@ -1501,7 +1723,8 @@ function CanvasSideRail({
   onDiff,
   onShortcuts,
 }: {
-  aiBusy: null | 'layout' | 'cluster' | 'outline'
+  aiBusy: null | 'layout' | 'cluster' | 'outline' | 'audit'
+  proposalCoauthorEnabled: boolean
   showAutoRelate: boolean
   adapterReady: boolean
   outlineOpen: boolean
@@ -1522,6 +1745,7 @@ function CanvasSideRail({
   onAICluster: () => void
   onAutoRelate: () => void
   onAIOutline: () => void
+  onStructureAudit: () => void
   onFrame: () => void
   onOutline: () => void
   onCompanion: () => void
@@ -1633,6 +1857,7 @@ function CanvasSideRail({
           { id: 'cluster', label: t('ai.workflow.cluster'), disabled: aiBusy !== null, onSelect: onAICluster },
           { id: 'relate', label: t('ai.workflow.relate'), disabled: aiBusy !== null || !showAutoRelate, onSelect: onAutoRelate },
           { id: 'outline', label: t('ai.workflow.outline'), disabled: aiBusy !== null, onSelect: onAIOutline },
+          ...(proposalCoauthorEnabled ? [{ id: 'structure-audit', label: t('canvas.audit.launch'), disabled: aiBusy !== null || !adapterReady, onSelect: onStructureAudit }] : []),
           { id: 'companion', label: t('canvas.companion'), onSelect: onCompanion },
         ]}
       />

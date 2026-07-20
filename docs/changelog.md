@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-07-20 · 1.0.0 · 可审计 AI 共编实验链路
+
+在不修改 DSL v4 的前提下，新增默认关闭的 Labs 实验入口“可审计 AI 共编”：范围确认 → strict Proposal Bundle → 来源回链与三 lane 审查 → immutable preview → WAL 事务 Apply → CommitReceipt / guarded Undo / restart recovery。
+
+- **读取边界**：复用 AI allowlist，发送前显示卡片、文本来源、geometry-only、omitted 与 truncated；provider 失败统一分类，terminal failure 不创建 proposal。
+- **审查与执行**：Logic 仅开放关系 add/remove/reverse；Layout 在投影语义状态上走 Intent IR solver，未实现的 tree/dag 明确拒绝；Idea 接受后由 proposal/item 身份稳定派生本地卡 ID并保留 `ai-proposal` provenance，同一提议在重复预览或另一标签页得到相同 plan hash。
+- **事务与恢复**：Web 与 SQLite 均提供 expected/next batch；Card/freeform 用 PREPARED/COMMITTED journal 收敛，启动恢复 mixed state，一次性 Undo 遇后续手改会拒绝覆盖。
+- **本地记录**：review/store/metrics/receipt 全部留在设备；损坏 proposal 可隔离、导出、清除，审计报告导出时只保留 source hash/锚点元数据，不带原文、API key 或完整 prompt。
+- **Review 收口**：本地 graph lint finding 由系统合并，模型不能省略；finding 直接显示并可定位来源；Logic / Ideas / Layout 可共同编译为一次事务；Apply 前复查 stale；持久化锚点不再重复保存正文，payload hash 或 index 写入失败会隔离/回滚。新增独立 held-out replay scorer（3 例 × 10 次）及双标签页 review/preview/commit-lock/Apply/Undo smoke。
+- **边界声明**：功能默认关闭，未通过真人产品验证、VoiceOver/200% 实机和真实 provider failure 演练，不属于 1.0.0 稳定承诺，也不授权 DSL v5。
+
+---
+
 ## 2026-07-20 · 1.0.0 · 首个稳定版
 
 将 `preview.2` 已验证的核心闭环正式冻结为 `v1.0.0`：版本源、README、STATE 与安装说明同步；新增 stable tag workflow，重新执行完整 Linux gate，分别生成 Windows x64 NSIS 与 macOS Apple Silicon DMG，验证 DMG/包内应用并发布平铺 `SHA256SUMS.txt`。

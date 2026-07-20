@@ -38,6 +38,13 @@ export interface AIRequest {
    * 字段则 no-op),非思考模型 no-op。不破坏现有兼容性。
    */
   structuredOutput?: boolean
+  /** Optional provider-native JSON Schema. Unsupported providers ignore it
+   * and callers must still perform strict local validation. */
+  responseSchema?: {
+    name: string
+    schema: Record<string, unknown>
+    strict?: boolean
+  }
   /**
    * 单次请求超时(ms)。不传则用 streamText 的 DEFAULT_TIMEOUT_MS(30s)。
    * 重型 DSL 产出任务(排版/cluster/对话 agent)产出长,传 60_000 防止中途
@@ -113,6 +120,7 @@ export interface AIProvider {
   readonly defaultBaseUrl: string
   readonly defaultModel: string
   readonly models: readonly string[]
+  readonly capabilities?: { jsonSchemaResponse: boolean }
   streamText(
     req: AIRequest,
     onDelta: (chunk: string) => void,
@@ -121,6 +129,24 @@ export interface AIProvider {
   testConnection(
     signal?: AbortSignal,
   ): Promise<{ ok: boolean; latencyMs?: number; error?: string }>
+}
+
+/** Preserves machine-readable HTTP retry metadata without exposing response
+ * bodies or credentials to the proposal layer. */
+export class AIProviderHttpError extends Error {
+  constructor(message: string, readonly status: number, readonly retryAfterMs?: number) {
+    super(message)
+    this.name = 'AIProviderHttpError'
+  }
+}
+
+export function parseRetryAfterMs(value: string | null | undefined, now = Date.now()): number | undefined {
+  if (!value) return undefined
+  const seconds = Number(value)
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1_000, 60_000)
+  const date = Date.parse(value)
+  if (!Number.isFinite(date)) return undefined
+  return Math.min(Math.max(0, date - now), 60_000)
 }
 
 /**

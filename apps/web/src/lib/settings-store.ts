@@ -74,6 +74,8 @@ export interface Settings {
     /** /ask tool-calling 实验室:AI 主动多轮检索卡片。
      *  不可预测 + 多轮外发:token 不可控。 */
     agentToolCallingLab?: boolean
+    /** 可审计 AI 共编：来源锚定、分层审查、事务 Apply/Undo。 */
+    proposalCoauthorLab?: boolean
   }
   /** AI 交互样本累积开关。仅 true=用户明确同意；undefined/false 均不写。
    *  独立字段(非 labs)，只在本机保留，最多 500 条。 */
@@ -149,7 +151,7 @@ function isValid(v: unknown): v is Settings {
   if ('labs' in o && o.labs !== undefined && o.labs !== null) {
     if (typeof o.labs !== 'object') return false
     const l = o.labs as Record<string, unknown>
-    for (const k of ['visionLab', 'autoCurateLab', 'autoCaptureLab', 'autoTagLab', 'agentToolCallingLab']) {
+    for (const k of ['visionLab', 'autoCurateLab', 'autoCaptureLab', 'autoTagLab', 'agentToolCallingLab', 'proposalCoauthorLab']) {
       if (k in l && typeof l[k] !== 'boolean') return false
     }
   }

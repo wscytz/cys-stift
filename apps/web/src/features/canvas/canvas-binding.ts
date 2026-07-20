@@ -127,6 +127,14 @@ export function bindCardWriteback(
   const pending = new Map<string, CanvasElement>()
   let timer: ReturnType<typeof setTimeout> | null = null
 
+  const cancelPending = () => {
+    pending.clear()
+    if (timer) {
+      clearTimeout(timer)
+      timer = null
+    }
+  }
+
   const flush = () => {
     timer = null
     for (const el of pending.values()) {
@@ -167,16 +175,22 @@ export function bindCardWriteback(
     if (pending.size > 0) scheduleFlush()
   })
 
-  const unsubHistory = host.onHistoryChange?.(() => reconcileCanvasHistory(host, service, canvasId)) ?? (() => {})
+  // Undo/redo restores the host through applyWithoutEcho, so neither the
+  // pending drag snapshot nor the ordinary user-change listener sees it.
+  // Cancel the stale debounce first, then reconcile the restored geometry.
+  const unsubHistory = host.onHistoryChange?.((change) => {
+    // A normal push happens before the corresponding host mutation. It must
+    // not cancel pending writes from an earlier, unrelated card edit.
+    if (change === 'push') return
+    cancelPending()
+    reconcileCanvasHistory(host, service, canvasId)
+  }) ?? (() => {})
 
   // Review fix (v0.37.0): flush synchronously before unsubscribing so a card
   // dragged then immediately followed by a canvas switch / route change / tab
   // close doesn't lose its last position.
   return () => {
-    if (timer) {
-      clearTimeout(timer)
-      flush()
-    }
+    if (timer) { clearTimeout(timer); flush() }
     unsubHistory()
     unsub()
   }
@@ -310,10 +324,10 @@ export function createCardOnCanvas(
  *
  * 与上面 moveToCanvas(host 有 DB 无)配对:undo = remove,redo = move 回,闭环幂等。
  * 归档/软删卡在两个方向都跳过(归档卡本就不在 host;软删卡 deletedAt 已设,
- * listOnCanvas 是否含取决于 repo,统一跳过)。正常编辑(pushUndo 也触发
- * onHistoryChange)只是一次廉价 no-op 扫描(DB 已在本画布则 continue)。
+ * listOnCanvas 是否含取决于 repo,统一跳过)。普通 history push 由
+ * onUserChange 的 debounce 负责,不调用本函数,避免清掉其他卡片的待写位置。
  *
- * 由 bindCardWriteback 订阅 onHistoryChange 时调用(pushUndo / undo / redo 都触发)。
+ * 由 bindCardWriteback 订阅 onHistoryChange,仅在 undo / redo 后调用。
  */
 export function reconcileCanvasHistory(
   host: CanvasHost,
@@ -337,7 +351,11 @@ export function reconcileCanvasHistory(
       // 归档的卡不应回到画布(用户主动归档,非 eraser)。
       if (card.archived) continue
       const pos = card.canvasPosition
-      if (pos?.canvasId === canvasId) continue // 已一致:幂等 no-op
+      const sameGeometry = pos?.canvasId === canvasId &&
+        pos.x === el.x && pos.y === el.y &&
+        pos.w === el.w && pos.h === el.h &&
+        (pos.rotation ?? 0) === (el.rotation ?? 0)
+      if (sameGeometry) continue // 已一致:幂等 no-op
       // DB 无 canvasPosition(被 Delete 清掉,undo 刚恢复 host 元素)或指向别画布
       // (跨画布 undo 边界,理论少见)→ 用 host 元素几何落回本画布。
       const z = pos?.z ?? 0

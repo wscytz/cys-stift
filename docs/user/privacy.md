@@ -11,15 +11,16 @@
 - **启用 AI** → 你选定的 provider 收到你**明确允许它看**的字段(见下表);其他东西(API key、未启用字段、媒体文件二进制)不会被发送
 - **未配置或关闭 AI** → AI 操作入口会保留为可解释的配置入口,不会发送请求;应用照常工作
 
-## 四种数据边界
+## 五种数据边界
 
-这些边界容易混在一起,但它们是四条不同的路径:
+这些边界容易混在一起,但它们是五条不同的路径:
 
 | 数据 | 默认位置 / 去向 | 什么时候会离开本机 |
 |---|---|---|
 | **prompt** | 只在启用 AI 的那次请求中,由客户端组装后发给你选的 provider | 发送请求时。包括当前问题、最近对话上下文(最多 20 条)、RAG 允许字段和目标画布几何快照;不是后台同步 |
 | **conversation** | `cys-stift.conversation.<canvasId>.v2` 的本地 localStorage; `/ask` 与 Canvas companion 共用,每画布隔离,最多保留 100 条 | 不会自动外发;只有后续 AI 请求会把最近上下文带给你选的 provider,或你主动导出 JSON |
 | **sample** | `cys-stift.ai-samples.v1` 的本地 localStorage;默认关闭,只有你在设置中明确开启后才累积,最近 500 条 | 不会自动外发;你在设置中导出样本或把完整 JSON 备份交给第三方时才离开本机 |
+| **proposal** | Proposal payload/review/receipt 存在本地 OPFS（不可用时 localStorage）；持久化来源锚点只保存 identity、revision、path/position 与 excerpt hash，不重复保存 `title/body` 原文；审计报告也不包含来源正文、API key 或完整 prompt | 只有生成时 allowlisted Working Set 会发给你选的 provider；本地 proposal 仅在你主动导出报告时离开设备 |
 | **export / archive** | Export 是你主动下载的开放 JSON; archive 是本地 OPFS(不可用时 localStorage) 的开发存档 | Export 文件由你决定是否分享; archive 本身不发给 AI。两者在最终边界清空 `apiKey`; archive 还剥离媒体 `dataUrl`,只留媒体元数据 |
 
 样本只保存 `question/context/aiOutput`、结果和 DSL 版号等脱敏字段,不保存原始 `Card[]`、settings、`deviceId` 或 API key。完整 JSON 备份可以包含卡片、媒体、草稿、设置、画布几何、对话和样本,所以分享前请把它当作包含你内容的文件处理。
@@ -39,6 +40,8 @@
 > **思考模式适配(2026-06-30)**:DeepSeek 等 OpenAI 兼容端点默认开「思考模式」,思考会吃掉大量 token 导致排版/分组/关系推荐这类**结构化输出**被截断(实测 1024~4096 token 全花在思考,DSL/JSON 输出 0 字 → 「未生效」)。结构化任务现在对 DeepSeek 端点发 `thinking: {type: disabled}` 关闭思考 —— 不截断、省约 75% token、快 2-3 倍、输出更完整。**只对 DeepSeek 端点发此字段**(靠 baseUrl 识别),真 OpenAI/Claude 端点不发(不破坏兼容)。总结/改写/翻译等需理解推理的任务**不关思考**(保留模型推理能力)。这不涉及隐私——思考内容留在模型侧,不发额外数据。
 
 > **vision 模型**:当前版本没有可用的 vision 运行时能力,因此设置中不显示 Vision 实验开关。图片二进制不会进入 AI prompt。只有实现完整 consumer、隐私确认和测试后,未来版本才会公开相应开关。
+
+> **可审计 AI 共编（Labs，默认关闭）**：必须先在设置中明确启用，再在画布选择范围并确认 manifest。发送内容只来自所选卡片的 `title/body` allowlist、范围内关系文字和必要几何；不会发送 scope 外卡片、设备 ID、媒体二进制、手绘点序列或 API key。模型只能返回无权限的 Proposal Payload；接受、Apply 与 Undo 都由本地系统记录控制。
 
 ### ✅ AI 可以看到的(默认)
 

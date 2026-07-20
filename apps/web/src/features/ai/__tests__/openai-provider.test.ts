@@ -67,6 +67,22 @@ describe('openai provider — structuredOutput 思考模式适配', () => {
     expect(calls[0]!.body.thinking).toBeUndefined()
   })
 
+  it('native OpenAI advertises and sends provider JSON Schema', async () => {
+    const calls = mockFetch('data: [DONE]\n\n')
+    const p = createOpenAIProvider({ apiKey: 'sk-test', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' })
+    await p.streamText({ system: 's', user: 'u', structuredOutput: true, responseSchema: { name: 'proposal', schema: { type: 'object' }, strict: false } }, () => {}, undefined)
+    expect(p.capabilities).toEqual({ jsonSchemaResponse: true })
+    expect(calls[0]!.body.response_format).toEqual({ type: 'json_schema', json_schema: { name: 'proposal', strict: false, schema: { type: 'object' } } })
+  })
+
+  it('compatible OpenAI endpoints keep local decode fallback and omit response_format', async () => {
+    const calls = mockFetch('data: [DONE]\n\n')
+    const p = createOpenAIProvider({ apiKey: 'sk-test', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat' })
+    await p.streamText({ system: 's', user: 'u', structuredOutput: true, responseSchema: { name: 'proposal', schema: { type: 'object' } } }, () => {}, undefined)
+    expect(p.capabilities).toEqual({ jsonSchemaResponse: false })
+    expect(calls[0]!.body.response_format).toBeUndefined()
+  })
+
   it('deepseek 子域也识别(如 api.deepseek.com 不带 /v1)', async () => {
     const calls = mockFetch('data: [DONE]\n\n')
     const p = createOpenAIProvider({ apiKey: 'sk-test', baseUrl: 'https://api.deepseek.com', model: 'm' })
@@ -177,10 +193,10 @@ describe('openai provider — 错误消息友好化', () => {
   })
 
   it('429 → 限额提示', async () => {
-    const fakeFetch = async () => ({ ok: false, status: 429, body: null, text: async () => '{"error":{"message":"rate limited"}}' })
+    const fakeFetch = async () => ({ ok: false, status: 429, body: null, headers: new Headers({ 'Retry-After': '2' }), text: async () => '{"error":{"message":"rate limited"}}' })
     vi.stubGlobal('fetch', vi.fn(fakeFetch as any))
     const p = createOpenAIProvider({ apiKey: 'sk', baseUrl: 'https://api.deepseek.com/v1', model: 'm' })
-    await expect(p.streamText({ system: 's', user: 'u' }, () => {}, undefined)).rejects.toThrow(/过频或额度/)
+    await expect(p.streamText({ system: 's', user: 'u' }, () => {}, undefined)).rejects.toMatchObject({ message: expect.stringMatching(/过频或额度/), status: 429, retryAfterMs: 2_000 })
   })
 
   it('testConnection 也返回友好错误', async () => {

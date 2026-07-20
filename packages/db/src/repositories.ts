@@ -4,7 +4,7 @@
  */
 
 import { eq, and, isNull, desc, asc } from 'drizzle-orm'
-import type { Card, CardId, CanvasId, Canvas as DomainCanvas, Workspace as DomainWorkspace, WorkspaceId } from '@cys-stift/domain'
+import type { Card, CardBatchChange, CardId, CanvasId, Canvas as DomainCanvas, Workspace as DomainWorkspace, WorkspaceId } from '@cys-stift/domain'
 import type { CardRepository } from '@cys-stift/domain'
 import type { CanvasRepository } from '@cys-stift/domain'
 import type { WorkspaceRepository } from '@cys-stift/domain'
@@ -77,6 +77,24 @@ export class SqliteCardRepository implements CardRepository {
     return rows
       .filter((r) => r.deletedAt == null)
       .map(cardFromRow)
+  }
+
+  applyBatch(changes: CardBatchChange[]): boolean {
+    const equal = (left: Card | null, right: Card | null) => {
+      if (!left || !right) return left === right
+      return JSON.stringify(cardToRow(left)) === JSON.stringify(cardToRow(right))
+    }
+    return this.handle.raw.transaction(() => {
+      for (const change of changes) {
+        if (!equal(this.getById(change.id), change.expected)) return false
+      }
+      for (const change of changes) {
+        if (change.next && change.expected) this.update(change.next)
+        else if (change.next) this.insert(change.next)
+        else this.delete(change.id)
+      }
+      return true
+    })()
   }
 }
 

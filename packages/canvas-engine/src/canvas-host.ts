@@ -144,6 +144,11 @@ export interface UserChange {
   removed: string[]
 }
 
+/** Why the undo history changed. Consumers must distinguish a new user edit
+ * from restore operations: restore paths need persistence reconciliation,
+ * while a normal push must not cancel unrelated debounced writes. */
+export type CanvasHistoryChange = 'push' | 'undo' | 'redo'
+
 export interface CanvasHost {
   /** 当前页可见元素(已排除引擎内部隐藏)。 */
   getElements(): CanvasElement[]
@@ -184,5 +189,5 @@ export interface CanvasHost {
    * 用户「Undo 找回卡」心智被打破)。监听 onHistoryChange 在 undo/redo 后
    * 把 DB canvasPosition 拉回与 host 一致,堵这个 desync。
    */
-  onHistoryChange?(cb: () => void): () => void
+  onHistoryChange?(cb: (change: CanvasHistoryChange) => void): () => void
 }

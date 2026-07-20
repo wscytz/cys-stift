@@ -13,7 +13,7 @@ import { useSettings } from '@/lib/settings-store'
 import type { MessageKey } from '@/lib/i18n/messages'
 
 /** 合法实验室 id(与 Settings.labs 字段一一对应)。 */
-export type LabId = 'visionLab'
+export type LabId = 'proposalCoauthorLab'
 
 /** 实验室元数据(从注册表读,<LabToggle> 渲染用)。 */
 export interface LabMeta {
@@ -34,11 +34,18 @@ export interface LabMeta {
  * 实验室注册表。新加 lab:① Settings.labs 加字段;② 这里加 meta;③ i18n 加 keys。
  * 顺序 = /settings 实验室区显示顺序。
  */
-export const LAB_REGISTRY: LabMeta[] = []
+export const LAB_REGISTRY: LabMeta[] = [{
+  id: 'proposalCoauthorLab',
+  labelKey: 'labs.proposal.label',
+  warnKey: 'labs.proposal.warn',
+  confirmTitleKey: 'labs.proposal.confirmTitle',
+  confirmBodyKey: 'labs.proposal.confirmBody',
+  confirmActionKey: 'labs.proposal.confirmAction',
+}]
 
 /**
  * 统一实验室守卫 hook。false 时该 lab 路径完全不可达(代码层守卫,非仅 UI 隐藏)。
- * 用法:`const enabled = useLabEnabled('visionLab'); if (!enabled) return null`
+ * 用法:`const enabled = useLabEnabled('proposalCoauthorLab'); if (!enabled) return null`
  * 替代每 lab 一个 hook,减少重复。保留 useVisionLabEnabled 作为语义别名(已广泛使用)。
  */
 export function useLabEnabled(lab: LabId): boolean {

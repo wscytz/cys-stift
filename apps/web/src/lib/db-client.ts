@@ -216,6 +216,25 @@ const cardRepo = {
   listAll() {
     return _cards
   },
+  replaceAll(cards: Card[]) {
+    const prev = _cards
+    _cards = [...cards]
+    if (!persist()) {
+      _cards = prev
+      notifyQuota()
+      throw new StorageQuotaError()
+    }
+  },
+  applyBatch(changes: Array<{ id: CardId; expected: Card | null; next: Card | null }>) {
+    const byId = new Map(_cards.map((card) => [String(card.id), card]))
+    const same = (a: Card | null, b: Card | null) => JSON.stringify(a) === JSON.stringify(b)
+    for (const change of changes) if (!same(byId.get(String(change.id)) ?? null, change.expected)) return false
+    const prev = _cards
+    for (const change of changes) change.next ? byId.set(String(change.id), change.next) : byId.delete(String(change.id))
+    _cards = [...byId.values()]
+    if (!persist()) { _cards = prev; notifyQuota(); throw new StorageQuotaError() }
+    return true
+  },
 }
 
 // ── React hooks ─────────────────────────────────────────────────────────────

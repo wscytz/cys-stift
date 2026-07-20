@@ -14,7 +14,9 @@
 import { createParser, type ParseEvent } from 'eventsource-parser'
 import { consumeStream } from './stream-reader'
 import {
+  AIProviderHttpError,
   normalizeAIFinishReason,
+  parseRetryAfterMs,
   type AIFinishReason,
   type AIProvider,
   type AIRequest,
@@ -34,6 +36,7 @@ export function createAnthropicProvider(cfg: AnthropicConfig): AIProvider {
     defaultBaseUrl: 'https://api.anthropic.com',
     defaultModel: 'claude-haiku-4-5',
     models: ['claude-haiku-4-5', 'claude-sonnet-4-6', 'claude-opus-4-8'],
+    capabilities: { jsonSchemaResponse: false },
     async streamText(req, onDelta, signal) {
       const res = await fetch(`${cfg.baseUrl}/v1/messages`, {
         method: 'POST',
@@ -58,7 +61,7 @@ export function createAnthropicProvider(cfg: AnthropicConfig): AIProvider {
       })
       if (!res.ok || !res.body) {
         const errText = await res.text().catch(() => '')
-        throw new Error(`Anthropic ${res.status}: ${errText}`)
+        throw new AIProviderHttpError(`Anthropic ${res.status}: ${errText}`, res.status, parseRetryAfterMs(res.headers?.get?.('Retry-After')))
       }
       const reader = res.body.getReader()
       const decoder = new TextDecoder()

@@ -194,6 +194,76 @@ describe('attachCanvasFreeformPersistence — save triggers', () => {
     expect(store.saveCalls.length).toBe(1)
     expect(store.saveCalls[0]!.map((e) => e.id)).toEqual(['t1'])
   })
+
+  it('persists an undo-restored freeform state instead of replaying the pre-undo snapshot', async () => {
+    const host = new InMemoryCanvasHost()
+    const store = makeFakeStore()
+    const unbind = await attachHydrated(host, store)
+    host.upsert(textEl('t1'))
+    await vi.advanceTimersByTimeAsync(DEBOUNCE + 10)
+    store.saveCalls.length = 0
+    host.undo()
+    await vi.advanceTimersByTimeAsync(DEBOUNCE + 10)
+    expect(store.saveCalls.at(-1)).toEqual([])
+    unbind()
+  })
+
+  it('tracks an element restored by undo so deleting it again is persisted', async () => {
+    const host = new InMemoryCanvasHost()
+    const store = makeFakeStore({ v: 1, app: 'cys-stift', elements: [textEl('t1')] })
+    const unbind = await attachHydrated(host, store)
+
+    host.remove('t1')
+    await vi.advanceTimersByTimeAsync(DEBOUNCE + 10)
+    host.undo()
+    await vi.advanceTimersByTimeAsync(DEBOUNCE + 10)
+    expect(host.getElement('t1')).toBeDefined()
+
+    store.saveCalls.length = 0
+    host.remove('t1')
+    await vi.advanceTimersByTimeAsync(DEBOUNCE + 10)
+    expect(store.saveCalls).toEqual([[]])
+    unbind()
+  })
+
+  it('serializes an in-flight save before the later undo snapshot', async () => {
+    const host = new InMemoryCanvasHost()
+    const saveCalls: CanvasElement[][] = []
+    const gates: Array<() => void> = []
+    let persisted: CanvasElement[] = []
+    const store = {
+      load: async () => null,
+      remove: async () => true,
+      save: async (_id: CanvasId, elements: CanvasElement[]) => {
+        const snapshot = elements.map((element) => ({ ...element }))
+        saveCalls.push(snapshot)
+        await new Promise<void>((resolve) => gates.push(resolve))
+        persisted = snapshot
+        return true
+      },
+    }
+    const unbind = attachCanvasFreeformPersistence(host, CANVAS, { debounceMs: DEBOUNCE, store })
+    await flush()
+
+    host.upsert(textEl('t1'))
+    await vi.advanceTimersByTimeAsync(DEBOUNCE + 10)
+    expect(saveCalls.map((elements) => elements.map((element) => element.id))).toEqual([['t1']])
+
+    host.undo()
+    await vi.advanceTimersByTimeAsync(DEBOUNCE + 10)
+    expect(saveCalls).toHaveLength(1)
+
+    gates.shift()?.()
+    await flush()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(saveCalls).toHaveLength(2)
+    expect(saveCalls[1]).toEqual([])
+    gates.shift()?.()
+    await flush()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(persisted).toEqual([])
+    unbind()
+  })
 })
 
 describe('attachCanvasFreeformPersistence — race safety', () => {

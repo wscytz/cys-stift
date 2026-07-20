@@ -13,6 +13,7 @@ import type {
   CanvasHost,
   CanvasView,
   UserChange,
+  CanvasHistoryChange,
 } from './canvas-host'
 import { sortByLayer, sanitizeView, ZOOM_MIN, ZOOM_MAX } from './canvas-host'
 import { renderElements, drawSelectionOutlines, drawMarquee, domTokenResolver, resolveCardLayout, type CardInfo, type TokenResolver, type CardDisplayMode } from './self-built-render'
@@ -49,7 +50,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   /** undo/redo 栈变化时触发(pushUndo/undo/redo)。供 UI 刷新 undo/redo 按钮 disabled 态。
    *  history 变化的三个点都广播:pushUndo(新变更→canUndo true/canRedo false)、
    *  undo、redo。restore() 不单独触发(由 undo/redo 末尾触发)。 */
-  private historyListeners = new Set<() => void>()
+  private historyListeners = new Set<(change: CanvasHistoryChange) => void>()
   protected echoing = true
   protected ctx: CanvasRenderingContext2D | null
   private getCardInfo: (id: string) => CardInfo | null
@@ -633,7 +634,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     this.undoStack.push(this.snapshot())
     if (this.undoStack.length > SelfBuiltAdapter.UNDO_LIMIT) this.undoStack.shift()
     this.redoStack = [] // 新 user-change 清 redo
-    this.emitHistory()
+    this.emitHistory('push')
   }
 
   private snapshot(): CanvasElement[] {
@@ -675,7 +676,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     if (!prev) return
     this.redoStack.push(this.snapshot())
     this.restore(prev)
-    this.emitHistory()
+    this.emitHistory('undo')
   }
 
   redo(): void {
@@ -683,16 +684,16 @@ export class SelfBuiltAdapter implements CanvasHost {
     if (!next) return
     this.undoStack.push(this.snapshot())
     this.restore(next)
-    this.emitHistory()
+    this.emitHistory('redo')
   }
 
   /** 广播 history 栈变化(供 undo/redo 按钮刷新 disabled 态)。 */
-  private emitHistory(): void {
-    for (const l of this.historyListeners) l()
+  private emitHistory(change: CanvasHistoryChange): void {
+    for (const l of this.historyListeners) l(change)
   }
 
   /** 订阅 undo/redo 栈变化(pushUndo/undo/redo 时触发)。返回取消订阅。 */
-  onHistoryChange(cb: () => void): () => void {
+  onHistoryChange(cb: (change: CanvasHistoryChange) => void): () => void {
     this.historyListeners.add(cb)
     return () => {
       this.historyListeners.delete(cb)

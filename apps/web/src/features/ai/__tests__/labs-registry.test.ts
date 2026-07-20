@@ -8,7 +8,7 @@ import { LAB_REGISTRY, type LabId } from '../labs-registry'
 describe('LAB_REGISTRY', () => {
   it('只公开有运行时 consumer 的实验室', () => {
     const ids = LAB_REGISTRY.map((m) => m.id)
-    expect(ids).toEqual([])
+    expect(ids).toEqual(['proposalCoauthorLab'])
   })
 
   it('每个 lab 有完整元数据(5 个 i18n key)', () => {
@@ -29,13 +29,14 @@ describe('LAB_REGISTRY', () => {
   it('LabId 类型与注册表一致(编译期 + 运行期对齐)', () => {
     // 运行期校验:每个 LabId 都在注册表里
     const registryIds = new Set(LAB_REGISTRY.map((m) => m.id))
-    const allLabIds: LabId[] = []
+    const allLabIds: LabId[] = ['proposalCoauthorLab']
     for (const id of allLabIds) {
       expect(registryIds.has(id)).toBe(true)
     }
   })
 
-  it('没有运行时 consumer 时不公开任何 toggle', () => {
-    expect(LAB_REGISTRY).toHaveLength(0)
+  it('不重新公开没有运行时 consumer 的旧 toggle', () => {
+    expect(LAB_REGISTRY).toHaveLength(1)
+    expect(LAB_REGISTRY.map((meta) => meta.id)).not.toContain('visionLab')
   })
 })

@@ -55,4 +55,8 @@ describe('anthropic provider — stream termination metadata', () => {
     expect(response.finishReason).toBe('refusal')
     expect(response.stopReason).toBe('refusal')
   })
+
+  it('declares prompt plus local decode fallback for JSON Schema', () => {
+    expect(provider().capabilities).toEqual({ jsonSchemaResponse: false })
+  })
 })

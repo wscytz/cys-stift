@@ -264,7 +264,7 @@ export function CompanionChat({
 
   return (
     <div className="cc-chat" style={chatStyle}>
-      <div className="cc-chat__thread" ref={scrollRef} style={threadStyle}>
+      <div className="cc-chat__thread" ref={scrollRef} role="log" aria-live="polite" aria-relevant="additions text" aria-label={t('canvas.companion.chat.threadLabel')}>
         {messages.length === 0 && (
           <p className="cc-chat__empty" style={emptyStyle}>{t('canvas.companion.chat.empty')}</p>
         )}

@@ -287,6 +287,16 @@ describe('/ask page — per-canvas conversation store (Task 3)', () => {
     unmount()
   })
 
+  it('exposes the conversation as a polite live log', () => {
+    const { host, unmount } = render(<AskPage />)
+    const thread = host.querySelector('.ask__thread')
+    expect(thread?.getAttribute('role')).toBe('log')
+    expect(thread?.getAttribute('aria-live')).toBe('polite')
+    expect(thread?.getAttribute('aria-relevant')).toBe('additions text')
+    expect(thread?.getAttribute('aria-label')).toBe('ask.threadLabel')
+    unmount()
+  })
+
   it('renders messages from the current targetCanvasId conversation on mount', () => {
     saveConversation(CV_A, [
       { role: 'user', content: 'hello-A' },

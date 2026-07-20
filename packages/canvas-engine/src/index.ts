@@ -17,6 +17,7 @@ export type {
   LegacyCanvasKind,
   CanvasView,
   UserChange,
+  CanvasHistoryChange,
 } from './canvas-host'
 export { ACTIVE_CANVAS_KINDS, KIND_LAYER, sortByLayer, sanitizeView, ZOOM_MIN, ZOOM_MAX } from './canvas-host'
 
