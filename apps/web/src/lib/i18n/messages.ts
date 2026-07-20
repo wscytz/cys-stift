@@ -794,6 +794,13 @@ export const messages = {
   'settings.importCheckpointRestoring': { zh: '恢复中…', en: 'Restoring…' },
   'settings.importCheckpointRestored': { zh: '已恢复导入前状态，恢复快照已清理。', en: 'Pre-import state restored and the recovery snapshot was cleared.' },
   'settings.importCheckpointClearFailed': { zh: '状态已恢复，但恢复快照未能清理；可稍后重试。', en: 'The state was restored, but the recovery snapshot could not be cleared. You can retry later.' },
+  'settings.clearWorkspace': { zh: '清空工作区', en: 'Clear workspace' },
+  'settings.clearWorkspaceLede': { zh: '清除卡片、画布、媒体、草稿和画布对话；保留应用设置、自建模板和研究样本。执行前会自动创建可恢复的本地快照。', en: 'Clear cards, canvases, media, drafts, and canvas chats. App settings, custom templates, and research samples stay. A recoverable local snapshot is created first.' },
+  'settings.clearWorkspaceConfirmTitle': { zh: '清空工作区？', en: 'Clear workspace?' },
+  'settings.clearWorkspaceConfirmBody': { zh: '这会清除当前工作区的卡片、画布、手绘、媒体、草稿和画布对话。应用设置、自建模板和研究样本会保留。执行前会保存完整本地恢复点，可在本页恢复。', en: 'This clears cards, canvases, freeform drawings, media, drafts, and canvas chats in the current workspace. App settings, custom templates, and research samples remain. A complete local recovery point is saved first and can be restored on this page.' },
+  'settings.clearWorkspaceClearing': { zh: '清空中…', en: 'Clearing…' },
+  'settings.clearWorkspaceOk': { zh: '工作区已清空；可在下方恢复清空前状态。', en: 'Workspace cleared. You can restore its previous state below.' },
+  'settings.clearWorkspaceFail': { zh: '清空工作区失败：{error}', en: 'Could not clear workspace: {error}' },
 
   /* ── AI (v0.29.0) ── */
   'settings.ai': { zh: 'AI', en: 'AI' },

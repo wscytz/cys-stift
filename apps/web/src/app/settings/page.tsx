@@ -15,6 +15,7 @@ import { LAB_REGISTRY } from '@/features/ai/labs-registry'
 import { CaptureShortcutSettings } from '@/features/capture/capture-shortcut-settings'
 import {
   buildExportPayload,
+  clearWorkspace,
   downloadExport,
   getImportCheckpointMeta,
   IMPORT_CHECKPOINT_STORAGE_KEY,
@@ -46,10 +47,12 @@ export default function SettingsPage() {
   } | null>(null)
   const [importMode, setImportMode] = useState<ImportMode>('replace')
   const [importing, setImporting] = useState(false)
-  const [resultAction, setResultAction] = useState<'import' | 'restore'>('import')
+  const [resultAction, setResultAction] = useState<'import' | 'restore' | 'clear'>('import')
   const [checkpointMeta, setCheckpointMeta] = useState<ImportCheckpointMeta | null>(null)
   const [restorePending, setRestorePending] = useState(false)
   const [restoring, setRestoring] = useState(false)
+  const [clearPending, setClearPending] = useState(false)
+  const [clearing, setClearing] = useState(false)
 
   const refreshCheckpointMeta = () => {
     setCheckpointMeta(getImportCheckpointMeta())
@@ -136,6 +139,20 @@ export default function SettingsPage() {
       }
     } finally {
       setRestoring(false)
+    }
+  }
+
+  const confirmClearWorkspace = async () => {
+    if (clearing) return
+    setClearing(true)
+    setResultAction('clear')
+    try {
+      const result = await clearWorkspace()
+      setImportResult(result)
+      refreshCheckpointMeta()
+      if (result.ok) setClearPending(false)
+    } finally {
+      setClearing(false)
     }
   }
 
@@ -233,13 +250,17 @@ export default function SettingsPage() {
                     ? importResult.checkpointCleared === false
                       ? t('settings.importCheckpointClearFailed')
                       : t('settings.importCheckpointRestored')
+                    : resultAction === 'clear'
+                      ? t('settings.clearWorkspaceOk')
                     : t('settings.importOk', {
                         cards: importResult.cards,
                         mediaAssets: importResult.mediaAssets,
                         canvases: importResult.canvases ?? 0,
                         freeform: importResult.freeformCanvases ?? 0,
                       })
-                  : t('settings.importFail', { error: importResult.error ?? '' })}
+                  : resultAction === 'clear'
+                    ? t('settings.clearWorkspaceFail', { error: importResult.error ?? '' })
+                    : t('settings.importFail', { error: importResult.error ?? '' })}
               </p>
             )}
             {checkpointMeta && (
@@ -262,6 +283,17 @@ export default function SettingsPage() {
                 </Button>
               </div>
             )}
+          </div>
+          <div className="set__clear-workspace">
+            <p className="mono mono--xs">{t('settings.clearWorkspaceLede')}</p>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => setClearPending(true)}
+              disabled={clearing || importing || restoring}
+            >
+              {t('settings.clearWorkspace')}
+            </Button>
           </div>
         </section>
 
@@ -415,6 +447,23 @@ export default function SettingsPage() {
         </div>
       </Modal>
 
+      <Modal
+        open={clearPending}
+        onClose={() => !clearing && setClearPending(false)}
+        title={t('settings.clearWorkspaceConfirmTitle')}
+        closeLabel={t('common.close')}
+      >
+        <p className="set__confirm-body">{t('settings.clearWorkspaceConfirmBody')}</p>
+        <div className="set__confirm-actions">
+          <Button variant="ghost" onClick={() => setClearPending(false)} disabled={clearing}>
+            {t('common.cancel')}
+          </Button>
+          <Button variant="danger" onClick={() => void confirmClearWorkspace()} disabled={clearing}>
+            {clearing ? t('settings.clearWorkspaceClearing') : t('settings.clearWorkspace')}
+          </Button>
+        </div>
+      </Modal>
+
       <style>{`
 .page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
 .set__select {
@@ -440,6 +489,8 @@ export default function SettingsPage() {
 .set__import-recovery { display: flex; flex-direction: column; gap: var(--space-1); border: var(--border-hairline); border-left-width: var(--space-quarter); border-left-color: var(--color-blue); background: var(--color-gray-soft); padding: var(--space-2); }
 .set__import-recovery p { margin: 0; line-height: 1.45; }
 .set__recovery-btn { align-self: flex-start; min-height: 40px; }
+.set__clear-workspace { margin-top: var(--space-3); padding-top: var(--space-3); border-top: var(--border-hairline); display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.set__clear-workspace p { flex: 1 1 28ch; margin: 0; line-height: 1.45; }
 .set__confirm-body { margin: 0 0 var(--space-3); font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black-soft); line-height: 1.5; }
 .set__confirm-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
 .set__import-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: var(--space-3) 0; }

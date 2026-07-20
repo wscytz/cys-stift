@@ -11,7 +11,8 @@ import { createRoot, type Root } from 'react-dom/client'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-const { importFromJsonMock, getImportCheckpointMetaMock, restoreImportCheckpointMock } = vi.hoisted(() => ({
+const { clearWorkspaceMock, importFromJsonMock, getImportCheckpointMetaMock, restoreImportCheckpointMock } = vi.hoisted(() => ({
+  clearWorkspaceMock: vi.fn(),
   importFromJsonMock: vi.fn(),
   getImportCheckpointMetaMock: vi.fn(),
   restoreImportCheckpointMock: vi.fn(),
@@ -19,6 +20,7 @@ const { importFromJsonMock, getImportCheckpointMetaMock, restoreImportCheckpoint
 
 vi.mock('@/lib/export-service', () => ({
   buildExportPayload: vi.fn(),
+  clearWorkspace: clearWorkspaceMock,
   downloadExport: vi.fn(),
   getImportCheckpointMeta: getImportCheckpointMetaMock,
   importFromJson: importFromJsonMock,
@@ -173,6 +175,7 @@ describe('SettingsPage import flow', () => {
     getImportCheckpointMetaMock.mockReset()
     getImportCheckpointMetaMock.mockReturnValue(null)
     restoreImportCheckpointMock.mockReset()
+    clearWorkspaceMock.mockReset()
   })
 
   afterEach(() => {
@@ -293,5 +296,42 @@ describe('SettingsPage import flow', () => {
     expect(container.querySelector('[aria-label="settings.importCheckpointConfirmTitle"]')).toBeNull()
     expect(container.querySelector('[role="status"]')?.textContent)
       .toContain('settings.importCheckpointRestored')
+  })
+
+  it('requires confirmation before clearing the workspace and then exposes recovery', async () => {
+    clearWorkspaceMock.mockResolvedValue({
+      ok: true,
+      cards: 0,
+      mediaAssets: 0,
+      checkpointCreated: true,
+    })
+    getImportCheckpointMetaMock
+      .mockReturnValueOnce(null)
+      .mockReturnValue({
+        version: 1,
+        createdAt: '2026-07-20T12:00:00.000Z',
+        mode: 'replace',
+        cards: 9,
+        mediaAssets: 1,
+        canvases: 2,
+      })
+    const container = renderPage()
+
+    const openClear = findButton(container, 'settings.clearWorkspace')
+    expect(openClear).toBeTruthy()
+    act(() => openClear!.click())
+    expect(clearWorkspaceMock).not.toHaveBeenCalled()
+
+    const dialog = container.querySelector('[aria-label="settings.clearWorkspaceConfirmTitle"]') as HTMLElement
+    expect(dialog).toBeTruthy()
+    expect(dialog.textContent).toContain('settings.clearWorkspaceConfirmBody')
+    const confirmClear = findButton(dialog, 'settings.clearWorkspace')
+    await act(async () => confirmClear!.click())
+
+    expect(clearWorkspaceMock).toHaveBeenCalledTimes(1)
+    expect(container.querySelector('[aria-label="settings.clearWorkspaceConfirmTitle"]')).toBeNull()
+    expect(container.querySelector('[data-testid="import-recovery"]')).toBeTruthy()
+    expect(container.querySelector('[role="status"]')?.textContent)
+      .toContain('settings.clearWorkspaceOk')
   })
 })

@@ -1508,6 +1508,60 @@ describe('full round-trip — settings + templates + samples + conversations', (
   })
 })
 
+describe('clearWorkspace', () => {
+  it('clears workspace content, keeps setup data, and creates a recoverable checkpoint', async () => {
+    const canvasId = 'canvas-reset' as unknown as CanvasId
+    const settings = {
+      theme: 'light',
+      locale: 'zh',
+      profiles: [{ id: 'p1', name: 'Local', provider: 'openai', apiKey: 'secret-local', baseUrl: 'https://api.example.test/v1', model: 'model', enabled: true }],
+      activeProfileId: 'p1',
+    }
+    const templates = [{ name: 'keep-template', dsl: '[frame #f1] @pos(0,0)' }]
+    const samples = [{ id: 'keep-sample', ts: 1, source: 'ask', kind: 'qa', outcome: 'answered', context: 'c', aiOutput: 'o' }]
+    const conversation = [{ role: 'user', content: 'clear this chat' }]
+    const rect: CanvasElement = {
+      id: 'rect-reset', kind: 'rect', x: 0, y: 0, w: 10, h: 10, rotation: 0, color: 'red',
+    }
+
+    seedStores({
+      cards: [makeCard({ title: 'remove-card' })],
+      mediaAssets: { 'media-reset': makeImageAsset('media-reset') },
+      drafts: { inbox: { title: 'remove-draft' } },
+      settings,
+    })
+    seedCanvases([makeCanvas({ id: canvasId })], String(canvasId))
+    seedCanvasView({ [canvasId]: { zoom: 2, pan: { x: 1, y: 2 }, gridMode: 'snap', gridSize: 8 } })
+    seedTemplates(templates)
+    seedSamples(samples)
+    seedConversation(String(canvasId), conversation)
+    const { canvasFreeformStore: store } = await import('../canvas-freeform-store')
+    expect(await store.save(canvasId, [rect])).toBe(true)
+
+    const result = await mod.clearWorkspace()
+
+    expect(result.ok).toBe(true)
+    expect(result.checkpointCreated).toBe(true)
+    expect(JSON.parse(window.localStorage.getItem(CARDS_KEY)!).cards).toEqual([])
+    expect(JSON.parse(window.localStorage.getItem(MEDIA_KEY)!).assets).toEqual({})
+    expect(JSON.parse(window.localStorage.getItem(DRAFTS_KEY)!).drafts).toEqual({})
+    expect(window.localStorage.getItem(CANVASES_KEY)).toBeNull()
+    expect(JSON.parse(window.localStorage.getItem(CANVAS_VIEW_KEY)!).views).toEqual({})
+    expect(window.localStorage.getItem(conversationStorageKey(String(canvasId)))).toBeNull()
+    expect(await store.load(canvasId)).toBeNull()
+    expect(JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!)).toEqual({ settings })
+    expect(JSON.parse(window.localStorage.getItem(TEMPLATES_KEY)!)).toEqual(templates)
+    expect(JSON.parse(window.localStorage.getItem(SAMPLES_KEY)!)).toEqual(samples)
+    expect(mod.getImportCheckpointMeta()?.cards).toBe(1)
+
+    const restored = await mod.restoreImportCheckpoint()
+    expect(restored.ok).toBe(true)
+    expect(JSON.parse(window.localStorage.getItem(CARDS_KEY)!).cards[0]?.title).toBe('remove-card')
+    expect(JSON.parse(window.localStorage.getItem(conversationStorageKey(String(canvasId)))!)).toEqual(conversation)
+    expect((await store.load(canvasId))?.elements).toEqual([rect])
+  })
+})
+
 // ── Important: v1 conversation 备份不漏(migrate-all 后全量进 v2) ──────────
 //
 // 问题:conversation-store 的 lazy migrate 只在 loadConversation(canvasId)

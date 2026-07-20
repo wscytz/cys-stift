@@ -210,6 +210,45 @@ export async function buildExportPayload(
 }
 
 /**
+ * Clear content that belongs to a workspace while retaining the user's app
+ * configuration and research setup. This deliberately reuses the import
+ * transaction so it gets the same complete recovery checkpoint and rollback
+ * guarantees as a replace import.
+ *
+ * Cleared: cards, media, drafts, canvases, freeform geometry, canvas views,
+ * and per-canvas conversations. Kept: settings (including local API keys),
+ * custom templates, and opt-in AI samples.
+ */
+export async function clearWorkspace(): Promise<ImportResult> {
+  if (typeof window === 'undefined') {
+    return { ok: false, cards: 0, mediaAssets: 0, error: 'not in browser' }
+  }
+
+  const current = await buildExportPayload()
+  const {
+    canvases: _canvases,
+    freeform: _freeform,
+    canvasView: _canvasView,
+    conversations: _conversations,
+    ...preserved
+  } = current
+
+  const emptyWorkspace: ExportPayload = {
+    ...preserved,
+    exportedAt: new Date().toISOString(),
+    cards: [],
+    mediaAssets: {},
+    drafts: {},
+    // An empty record makes replace remove each current conversation key.
+    conversations: {},
+    // Keep an explicit empty view map so no stale zoom or pan survives the reset.
+    canvasView: {},
+  }
+
+  return importFromJson(JSON.stringify(emptyWorkspace), { mode: 'replace' })
+}
+
+/**
  * Serialise the payload and trigger a download (cross-platform: Blob+a.click
  * on desktop, Tauri SAF save on Android). Returns the approximate byte size
  * so the caller can show a hint.
