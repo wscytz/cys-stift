@@ -46,7 +46,7 @@ export const LAB_REGISTRY: LabMeta[] = [{
 /**
  * 统一实验室守卫 hook。false 时该 lab 路径完全不可达(代码层守卫,非仅 UI 隐藏)。
  * 用法:`const enabled = useLabEnabled('proposalCoauthorLab'); if (!enabled) return null`
- * 替代每 lab 一个 hook,减少重复。保留 useVisionLabEnabled 作为语义别名(已广泛使用)。
+ * 替代每 lab 一个 hook,减少重复。
  */
 export function useLabEnabled(lab: LabId): boolean {
   const { settings } = useSettings()

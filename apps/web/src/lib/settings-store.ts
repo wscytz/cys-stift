@@ -37,6 +37,13 @@ export type ThemePreference = 'light' | 'dark' | 'system'
 // AIConfig/AIProfile 类型权威源在 features/ai/types.ts(多 profile 模型)。
 // 此处只 re-export AIProfile 供 store 消费者;AIConfig = Omit<AIProfile,'id'|'name'>。
 
+/** 当前仍有运行时入口的实验室设置。退役开关会在加载旧设置时迁移掉，
+ * 不能继续作为 Settings 的可写契约，避免它们在后续保存时被带回。 */
+export interface LabSettings {
+  /** 可审计 AI 共编：来源锚定、分层审查、事务 Apply/Undo。 */
+  proposalCoauthorLab?: boolean
+}
+
 export interface Settings {
   captureShortcut: CaptureShortcut
   theme: ThemePreference
@@ -57,26 +64,7 @@ export interface Settings {
    *  开启时:① /settings 弹不可撤销确认门;② 代码层 useLabEnabled(id) 守卫,
    *  路径才可达(非仅 UI 隐藏);③ R2 铁律永不放宽(deviceId/apiKey/软删卡)。
    *  向后兼容:旧 settings 无此字段 → 默认全关(labs = {})。 */
-  labs?: {
-    /** vision 大模型实验室:看图描述/OCR、画布视觉理解、图片转画布元素。
-     *  关闭时 vision 路径完全不可达(代码层守卫,非仅 UI 隐藏)。
-     *  隐私升级:开启后 media.dataUrl 可进 prompt(违反默认 R2)。 */
-    visionLab?: boolean
-    /** AI 自动整理实验室:跨画布自动归类/合并近重复卡。
-     *  破坏性:可能合并/软删卡。开启后需逐次确认 + 可撤销。 */
-    autoCurateLab?: boolean
-    /** AI 自动建卡实验室:从对话/剪贴板自动生成卡片。
-     *  自动副作用 + 不可预测:可能产生垃圾卡。 */
-    autoCaptureLab?: boolean
-    /** AI 自动打标签实验室:捕获/编辑后 AI 自动建议标签。
-     *  自动副作用(低破坏):自动改卡片 tags。 */
-    autoTagLab?: boolean
-    /** /ask tool-calling 实验室:AI 主动多轮检索卡片。
-     *  不可预测 + 多轮外发:token 不可控。 */
-    agentToolCallingLab?: boolean
-    /** 可审计 AI 共编：来源锚定、分层审查、事务 Apply/Undo。 */
-    proposalCoauthorLab?: boolean
-  }
+  labs?: LabSettings
   /** AI 交互样本累积开关。仅 true=用户明确同意；undefined/false 均不写。
    *  独立字段(非 labs)，只在本机保留，最多 500 条。 */
   aiSampleCapture?: boolean
@@ -95,6 +83,28 @@ export const DEFAULT_SETTINGS: Settings = {
   seenCaptureHint: false,
   export: { includeDeleted: true },
   labs: {},
+}
+
+/**
+ * Keep persisted Labs aligned with the runtime registry. Old preview builds
+ * wrote five experimental switches; none has a consumer now, so retaining
+ * them only makes a local profile look configured when it is not.
+ */
+function normalizeLabs(value: unknown): LabSettings {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  const proposalCoauthorLab = (value as Record<string, unknown>).proposalCoauthorLab
+  return typeof proposalCoauthorLab === 'boolean' ? { proposalCoauthorLab } : {}
+}
+
+function labsAreCanonical(value: unknown, normalized: LabSettings): boolean {
+  // A missing optional field is already canonical; do not write a no-op
+  // migration solely to add an empty object to an older valid profile.
+  if (value === undefined) return Object.keys(normalized).length === 0
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  const keys = Object.keys(record)
+  return keys.length === Object.keys(normalized).length &&
+    keys.every((key) => key === 'proposalCoauthorLab' && record[key] === normalized.proposalCoauthorLab)
 }
 
 /** Validate a parsed AI profile(多 profile 模型)。 */
@@ -147,13 +157,12 @@ function isValid(v: unknown): v is Settings {
   }
   if ('seenCaptureHint' in o && typeof o.seenCaptureHint !== 'boolean')
     return false
-  // labs 字段可选(向后兼容);存在时必须是对象,各 lab 可选 boolean。
+  // labs 字段可选(向后兼容)。先容忍旧字段使迁移能读取老 profile，
+  // 但当前可写字段必须为 boolean；loadSettings 会立即丢弃其余键。
   if ('labs' in o && o.labs !== undefined && o.labs !== null) {
-    if (typeof o.labs !== 'object') return false
+    if (typeof o.labs !== 'object' || Array.isArray(o.labs)) return false
     const l = o.labs as Record<string, unknown>
-    for (const k of ['visionLab', 'autoCurateLab', 'autoCaptureLab', 'autoTagLab', 'agentToolCallingLab', 'proposalCoauthorLab']) {
-      if (k in l && typeof l[k] !== 'boolean') return false
-    }
+    if ('proposalCoauthorLab' in l && typeof l.proposalCoauthorLab !== 'boolean') return false
   }
   if ('aiSampleCapture' in o && o.aiSampleCapture !== undefined && typeof o.aiSampleCapture !== 'boolean') return false
   if ('cardDisplayMode' in o && o.cardDisplayMode !== undefined && !['compact', 'auto', 'title', 'subtitle'].includes(o.cardDisplayMode as string)) return false
@@ -173,14 +182,24 @@ function loadSettings(): Settings {
         const parsed = JSON.parse(raw) as { settings?: unknown }
         if (isValid(parsed.settings)) {
           const loaded = parsed.settings as Settings
+          let migrated = false
           // B1 迁移:Space 注册必败(Carbon 限制 + 输入法冲突)→ 一次性迁移 KeyE。
           if (loaded.captureShortcut?.code === 'Space') {
             loaded.captureShortcut = { ...loaded.captureShortcut, code: 'KeyE' }
+            migrated = true
+          }
+          if (typeof loaded.seenCaptureHint !== 'boolean') {
+            loaded.seenCaptureHint = false
+            migrated = true
+          }
+          const labs = normalizeLabs(loaded.labs)
+          if (!labsAreCanonical(loaded.labs, labs)) {
+            loaded.labs = labs
+            migrated = true
+          }
+          if (migrated) {
             window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings: loaded }))
           }
-          if (typeof loaded.seenCaptureHint !== 'boolean') loaded.seenCaptureHint = false
-          if (!loaded.profiles) loaded.profiles = []
-          if (!loaded.labs || typeof loaded.labs !== 'object') loaded.labs = {}
           return loaded
         }
       } catch {
@@ -428,13 +447,13 @@ export const settingsStore = {
   },
   /**
    * 实验室功能开关更新。partial merge 到现有 labs 对象。
-   * visionLab 等「附加能力」开关,默认全关;用户显式开启 = 接受附加风险。
+   * 已注册附加能力的开关，默认全关；用户显式开启 = 接受附加风险。
    * 返回 true=持久化成功(与 upsertProfile 口径一致,便于 UI toast)。
    */
   updateLabs(patch: Partial<NonNullable<Settings['labs']>>): boolean {
     hydrateOnce()
     const prev = _settings
-    const merged = { ...(_settings.labs ?? {}), ...patch }
+    const merged = normalizeLabs({ ...(_settings.labs ?? {}), ...patch })
     _settings = { ..._settings, labs: merged }
     if (!saveSettings(_settings)) {
       _settings = prev

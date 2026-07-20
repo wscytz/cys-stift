@@ -58,12 +58,3 @@ export function useAIEnabled(): boolean {
   const active = settings.profiles.find((p) => p.id === settings.activeProfileId) ?? null
   return Boolean(active?.enabled)
 }
-
-/** 实验室 vision 开关(代码层守卫入口)。false 时 vision 路径完全不可达——
- *  所有 vision 能力(看图/画布视觉/图转 DSL)的 UI + 逻辑都用它做 if 守卫,
- *  不只是 UI 隐藏。默认关,用户在 /settings 实验室区显式开启才 true。
- *  开启 ≠ 自动发图:还需 provider 支持 vision + 用户触发具体 action。 */
-export function useVisionLabEnabled(): boolean {
-  const { settings } = useSettings()
-  return Boolean(settings.labs?.visionLab)
-}

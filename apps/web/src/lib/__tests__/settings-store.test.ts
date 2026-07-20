@@ -537,7 +537,14 @@ describe('captureShortcut Space→KeyE 迁移', () => {
           activeProfileId: 'p1',
           seenCaptureHint: true,
           export: { includeDeleted: false },
-          labs: { visionLab: true },
+          labs: {
+            visionLab: true,
+            autoCurateLab: false,
+            autoCaptureLab: true,
+            autoTagLab: false,
+            agentToolCallingLab: true,
+            proposalCoauthorLab: true,
+          },
         },
       }),
     )
@@ -546,7 +553,7 @@ describe('captureShortcut Space→KeyE 迁移', () => {
     const s = fresh.get()
     // code 迁移
     expect(s.captureShortcut.code).toBe('KeyE')
-    // 兄弟字段全保(theme/locale/profiles/active/seen/export/labs)
+    // 兄弟字段全保(theme/locale/profiles/active/seen/export/current labs)
     expect(s.theme).toBe('dark')
     expect(s.locale).toBe('en')
     expect(s.profiles).toHaveLength(1)
@@ -554,10 +561,44 @@ describe('captureShortcut Space→KeyE 迁移', () => {
     expect(s.activeProfileId).toBe('p1')
     expect(s.seenCaptureHint).toBe(true)
     expect(s.export?.includeDeleted).toBe(false)
-    expect(s.labs?.visionLab).toBe(true)
+    expect(s.labs).toEqual({ proposalCoauthorLab: true })
+    const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY)!) as {
+      settings: { labs?: Record<string, unknown> }
+    }
+    expect(stored.settings.labs).toEqual({ proposalCoauthorLab: true })
     // modKey/shift 不变(只改 code)
     expect(s.captureShortcut.modKey).toBe('meta')
     expect(s.captureShortcut.shift).toBe(true)
+  })
+
+  it('移除退役 Labs 键，同时保留当前共编开关', async () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        settings: {
+          captureShortcut: { modKey: 'meta', shift: true, code: 'KeyE' },
+          theme: 'system',
+          locale: 'zh',
+          profiles: [],
+          activeProfileId: null,
+          labs: {
+            visionLab: true,
+            autoCurateLab: false,
+            autoCaptureLab: true,
+            autoTagLab: false,
+            agentToolCallingLab: true,
+            proposalCoauthorLab: false,
+          },
+        },
+      }),
+    )
+    vi.resetModules()
+    const fresh = (await import('../settings-store')).settingsStore
+    expect(fresh.get().labs).toEqual({ proposalCoauthorLab: false })
+    const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY)!) as {
+      settings: { labs?: Record<string, unknown> }
+    }
+    expect(stored.settings.labs).toEqual({ proposalCoauthorLab: false })
   })
 
   it('Space 迁移幂等(第二次 load 不再迁移,KeyE 稳定)', async () => {
