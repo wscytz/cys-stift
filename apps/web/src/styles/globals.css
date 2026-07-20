@@ -218,6 +218,57 @@ a {
   border: 0;
 }
 
+/* ── Canvas accessible outline ─────────────────────────────────────────────
+ * Keep this in the compiled global sheet. Tauri's WebKit did not apply the
+ * component-injected <style> block, leaving its screen-reader outline visible
+ * across the bottom of the canvas. Opacity hides the full descendant tree
+ * while preserving keyboard and AT access; focus-within restores it on entry. */
+.canvas-a11y-outline {
+  position: absolute;
+  left: var(--space-1);
+  bottom: var(--space-1);
+  z-index: 35;
+  width: min(320px, calc(100% - var(--space-2)));
+  max-height: min(360px, calc(100% - var(--space-2)));
+  overflow: auto;
+  padding: var(--space-1);
+  background: var(--color-white);
+  border: 2px solid var(--color-black);
+  box-shadow: 4px 4px 0 0 var(--color-black);
+}
+.canvas-a11y-outline:not(:focus-within) {
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  opacity: 0;
+  white-space: nowrap;
+  border: 0;
+  box-shadow: none;
+}
+.canvas-a11y-outline [role='listbox'] {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.canvas-a11y-outline__option {
+  min-height: 44px;
+  padding: var(--space-1) var(--space-2);
+  text-align: left;
+  background: var(--color-white);
+  color: var(--color-black);
+  border: var(--border-hairline);
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+.canvas-a11y-outline__option[aria-selected='true'] { background: var(--color-yellow); }
+.canvas-a11y-outline__option:focus-visible { outline: 2px solid var(--color-red); outline-offset: -2px; }
+.canvas-a11y-outline__option > span { display: block; }
+.canvas-a11y-outline__meta { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black-soft); }
+
 /* ── h1 reset for breadcrumb "current page" crumb ───────────────────────────
  * Promoting the current-page crumb to <h1> (so SR users can navigate by
  * heading) must NOT alter the toolbar's visual layout. h1 has default
