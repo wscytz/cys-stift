@@ -18,6 +18,7 @@ import {
   DSL_COLOR_ALIASES,
   DSL_MAX_TEXT_LEN,
   DSL_MAX_CONTENT_LEN,
+  truncateDslText,
 } from './dsl-grammar'
 // Peggy 生成;类型垫片见 dsl-parser.gen.d.ts
 import { parse as parseLine } from './dsl-parser.gen.js'
@@ -186,13 +187,11 @@ function validEnum<T extends string>(raw: string, list: readonly T[]): T | undef
   return (list as readonly string[]).includes(raw) ? (raw as T) : undefined
 }
 
-/** 防超长 DoS(AI 输出不可信):静默截断到 max,不报错(parser robust)。 */
-function truncateTo(v: string, max: number): string {
-  return v.length > max ? v.slice(0, max) : v
-}
-/** 默认截断到 DSL_MAX_TEXT_LEN(@text/@label/@title,int 级)。@content 用 DSL_MAX_CONTENT_LEN(long 级)。 */
+/** 默认截断到 DSL_MAX_TEXT_LEN(@text/@label/@title,int 级)。@content 用
+ *  truncateDslText(…, DSL_MAX_CONTENT_LEN)(long 级)。截断实现共用 dsl-grammar 的
+ *  truncateDslText —— 代理对安全(不劈开 emoji),且 parser/sanitize 单一实现(G/H)。 */
 function truncate(v: string): string {
-  return truncateTo(v, DSL_MAX_TEXT_LEN)
+  return truncateDslText(v, DSL_MAX_TEXT_LEN)
 }
 
 /** quoted-string 解码,是 escapeQuoted 的逆。Peggy escChar = '\\' . —— 任何 \X 转义对;
@@ -248,7 +247,7 @@ function fold(ds: unknown[]): Folded {
       case 'label': if (a.label === undefined) a.label = truncate(unescapeQuoted(String(v1))); break
       case 'text': if (a.text === undefined) a.text = truncate(unescapeQuoted(String(v1))); break
       case 'title': if (a.title === undefined) a.title = truncate(unescapeQuoted(String(v1))); break
-      case 'content': if (a.content === undefined) a.content = truncateTo(unescapeQuoted(String(v1)), DSL_MAX_CONTENT_LEN); break
+      case 'content': if (a.content === undefined) a.content = truncateDslText(unescapeQuoted(String(v1)), DSL_MAX_CONTENT_LEN); break
       case 'dash': if (!a.dash) a.dash = validEnum(String(v1), ['solid', 'dashed', 'dotted']); break
       case 'arrowhead': if (!a.arrowhead) a.arrowhead = validEnum(String(v1), ['arrow', 'triangle', 'none']); break
       case 'route': if (!a.route) a.route = validEnum(String(v1), ['straight', 'curve', 'elbow']); break

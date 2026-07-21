@@ -17,7 +17,7 @@
  *              + case 3(free op 跨 kind 告警)。
  */
 import type { DslOp, DslCardOp, DslFreeOp, DslArrowOp } from './dsl-parser'
-import { DSL_MAX_TEXT_LEN, DSL_MAX_CONTENT_LEN } from './dsl-grammar'
+import { DSL_MAX_TEXT_LEN, DSL_MAX_CONTENT_LEN, truncateDslText } from './dsl-grammar'
 
 /** Sanitize 诊断:亮给用户/AI 看(让 AgentConfirmCard/dsl-dialog 把"引用了不存在的卡 #X"反馈出来)。 */
 export type SanitizeDiagnostic = {
@@ -52,10 +52,8 @@ function sanitizeSize(n: number | undefined): number | undefined {
   return Math.min(DSL_MAX_SIZE, n)
 }
 
-/** v5:@title/@content 长度截断(防 LLM 失控膨胀);parser 已截断,这是 apply 前第二道防线。 */
-function truncateTo(v: string, max: number): string {
-  return v.length > max ? v.slice(0, max) : v
-}
+/** v5:@title/@content 长度截断共用 dsl-grammar 的 truncateDslText(代理对安全;G/H)——
+ *  parser 已截断,sanitize 是 apply 前第二道防线(幂等,合规输入原样)。 */
 
 /** x/y 坐标 MAX 绝对值(防 LLM 生成 1e6 跑出可视区)。保负向 —— 负坐标合法(画布 pan 允许,
  *  commit fac88bb 契约),只钳极端有限值,不钳合理负值(如 -100)。 */
@@ -109,8 +107,8 @@ function sanitizeCard(
   const h = sanitizeSize(op.h)
   const x = clampCoord(op.x)
   const y = clampCoord(op.y)
-  const title = op.title !== undefined ? truncateTo(op.title, DSL_MAX_TEXT_LEN) : op.title
-  const content = op.content !== undefined ? truncateTo(op.content, DSL_MAX_CONTENT_LEN) : op.content
+  const title = op.title !== undefined ? truncateDslText(op.title, DSL_MAX_TEXT_LEN) : op.title
+  const content = op.content !== undefined ? truncateDslText(op.content, DSL_MAX_CONTENT_LEN) : op.content
   if (w === op.w && h === op.h && x === op.x && y === op.y && rel === op.rel && title === op.title && content === op.content) return op
   return { ...op, w, h, x, y, rel, title, content }
 }

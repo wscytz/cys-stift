@@ -38,11 +38,14 @@ export function serializeCanvas(
 }
 
 /**
- * 面向人的可读序列化(DSL 编辑器用):每元素一行,card 行带真实 @title/@content token
- * (v5;由 resolve 注入),让人在编辑器里直接看/改卡片内容。
+ * 面向人的可读序列化(DSL 编辑器用)。
  *
- * v4 历史:曾用 `  # title:` 注释行附标题(parser 跳过、只读)。v5 起 title/content 是
- * 可 round-trip 的真 token,注释退役 —— readable 与 strict(serializeCanvas)收敛同形态。
+ * v5 现状:与 strict {@link serializeCanvas} **逐字节收敛**(card 行带真实 @title/@content
+ * token,由 resolve 注入;旧的 `  # title:` 注释行已退役)。故本函数**委托** serializeCanvas,
+ * 不另留一份相同实现(消除漂移风险;F)。
+ *
+ * 保留独立命名的理由:它是编辑器的「人读视图」语义入口。将来若要加人读增强(如 @content
+ * 多行展开显示、注释),从**这里**分叉,strict 仍是机器往返形态。当前二者同形态。
  *
  * resolve: 可选,card id → {title, content}(消费者从 CardService 读)。不给 → 几何-only。
  */
@@ -50,11 +53,7 @@ export function serializeCanvasReadable(
   elements: CanvasElement[],
   resolve?: (id: string) => { title?: string; content?: string } | undefined,
 ): string {
-  return elements
-    .filter((e) => (DSL_KINDS as readonly string[]).includes(e.kind))
-    .map((e) => serializeElement(e, e.kind === 'card' ? resolve?.(e.id) : undefined))
-    .filter(Boolean)
-    .join('\n')
+  return serializeCanvas(elements, resolve)
 }
 
 export function serializeElement(

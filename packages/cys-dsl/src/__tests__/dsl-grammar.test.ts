@@ -5,6 +5,7 @@ import {
   DSL_COLORS,
   DSL_COLOR_ALIASES,
   DSL_GRAMMAR_REFERENCE,
+  truncateDslText,
 } from '../dsl-grammar'
 
 describe('dsl-grammar', () => {
@@ -43,5 +44,33 @@ describe('dsl-grammar', () => {
 
   it('DSL_GRAMMAR_REFERENCE does NOT advertise freedraw (AI should not emit hand-draw)', () => {
     expect(DSL_GRAMMAR_REFERENCE).not.toContain('[freedraw')
+  })
+})
+
+describe('truncateDslText (代理对安全截断;parser/sanitize 单一实现 — G/H)', () => {
+  it('不超长 → 原样返回', () => {
+    expect(truncateDslText('hello', 10)).toBe('hello')
+    expect(truncateDslText('', 10)).toBe('')
+  })
+
+  it('超长 → 截到 max', () => {
+    expect(truncateDslText('abcdef', 3)).toBe('abc')
+  })
+
+  it('切点落在 emoji 代理对中间 → 回退一位,不产孤立高代理位', () => {
+    const max = 10
+    const s = 'a'.repeat(max - 1) + '😀' // 9 个 a + 2 码元 emoji = 11 码元
+    const out = truncateDslText(s, max)
+    expect(out).toBe('a'.repeat(max - 1)) // 丢整个 emoji,而非切出半个
+    const last = out.charCodeAt(out.length - 1)
+    expect(last >= 0xd800 && last <= 0xdbff).toBe(false) // 末位非孤立高代理
+  })
+
+  it('emoji 完整落在 max 内 → 保留不丢', () => {
+    expect(truncateDslText('ab😀cd', 4)).toBe('ab😀')
+  })
+
+  it('max=0 → 空串(不越界)', () => {
+    expect(truncateDslText('abc', 0)).toBe('')
   })
 })

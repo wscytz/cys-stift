@@ -361,3 +361,21 @@ describe('serializeCanvasReadable — v5 card 行带 @title/@content 真 token',
     expect(ops.find((o) => o.type === 'card')).toMatchObject({ cardId: 'c1', title: 'title-c1' })
   })
 })
+
+describe('serializeCanvasReadable — v5 委托 serializeCanvas(F:消除重复实现)', () => {
+  it('与 serializeCanvas 逐字节一致(同 elements + 同 resolve,含 content)', () => {
+    const elements: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 100, y: 200, w: 240, h: 120, rotation: 0, color: 'blue' },
+      { id: 'r1', kind: 'rect', x: 10, y: 20, w: 300, h: 400, rotation: 0, color: 'red' },
+    ]
+    const resolve = (id: string) => (id === 'c1' ? { title: 'T', content: 'B\n2' } : undefined)
+    expect(serializeCanvasReadable(elements, resolve)).toBe(serializeCanvas(elements, resolve))
+  })
+
+  it('无 resolve 时也一致(几何-only)', () => {
+    const elements: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 },
+    ]
+    expect(serializeCanvasReadable(elements)).toBe(serializeCanvas(elements))
+  })
+})

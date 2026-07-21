@@ -36,6 +36,23 @@ export const DSL_MAX_TEXT_LEN = 200
  */
 export const DSL_MAX_CONTENT_LEN = 8000
 
+/**
+ * 文本截断到 max 个 UTF-16 码元,**不劈开代理对**(emoji / 增补平面字符占 2 码元)。
+ *
+ * 若切点正好落在高代理位(其配对的低代理位在 max 处、会被切掉),回退一位 —— 避免产生
+ * 孤立代理位(渲染成坏字符、JSON.stringify 出 `\udxxx` 孤值)。parser(dsl-parser.ts)与
+ * sanitize(dsl-sanitize.ts)共用这一处实现(消除两处重复 truncateTo;H 代理对安全)。
+ *
+ * max 为 0 / 空串安全:charCodeAt(-1)=NaN,不满足高代理位区间,slice(0,0)=''。
+ */
+export function truncateDslText(v: string, max: number): string {
+  if (v.length <= max) return v
+  let end = max
+  const code = v.charCodeAt(end - 1)
+  if (code >= 0xd800 && code <= 0xdbff) end -= 1 // 高代理位 → 回退,不劈开
+  return v.slice(0, end)
+}
+
 /** 指令种类(parser 识别 + serializer 序列化的集合;freedraw 是透传 no-op)。 */
 export const DSL_KINDS = ['card', 'rect', 'frame', 'text', 'arrow', 'freedraw'] as const
 export type DslKind = (typeof DSL_KINDS)[number]

@@ -426,3 +426,58 @@ describe('buildEmptyHost', () => {
     expect(host.getElements()).toEqual([])
   })
 })
+
+/**
+ * v5 内容(@title/@content)在 /ask persist 路径的**适配缺口**(锁定现状 — Corner A)。
+ *
+ * applyOpsAndPersist 的 onCardCreate 解构丢 title/content(硬编码空标题/空 body)、且未接
+ * onCardUpdate —— 故 DSL 携带的内容**不写回 CardService**。这不是 DSL 的问题(DSL 包能正确
+ * parse/携带内容),是 /ask 适配层尚未消费。留给 content-assist 单开项目接通;接通后这里的
+ * 断言需反转(red→green 锚点)。几何照常写(内容缺口不影响位置/颜色回写)。
+ */
+describe('applyOpsAndPersist — v5 内容适配缺口(锁定现状 A)', () => {
+  beforeEach(() => freeformStore.clear())
+
+  it('card-update 带 @title/@content → 卡片 title/body 不被改(几何照写)', async () => {
+    const svc = makeService([cardOnCanvas('c1', String(CANVAS), 100, 100)]) // title='c1', body=''
+    const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
+    const ops: DslOp[] = [
+      {
+        type: 'card',
+        cardId: 'c1' as never,
+        x: 300,
+        y: 200,
+        title: 'NEW TITLE',
+        content: 'NEW BODY',
+      },
+    ]
+    const res = await applyOpsAndPersist(host, before, ops, CANVAS, svc)
+    expect(res.ok).toBe(true)
+    // 几何落库:
+    expect(svc.get('c1' as never)!.canvasPosition?.x).toBe(300)
+    // 内容不落库(缺口):
+    expect(svc.get('c1' as never)!.title).toBe('c1') // 未被改成 'NEW TITLE'
+    expect(svc.get('c1' as never)!.body).toBe('') // 未被改成 'NEW BODY'
+  })
+
+  it('card-create 带 @title/@content → 落空标题卡(内容丢)', async () => {
+    const svc = makeService([])
+    const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
+    const ops: DslOp[] = [
+      {
+        type: 'card',
+        cardId: 'new1' as never,
+        x: 50,
+        y: 60,
+        create: true,
+        title: 'T',
+        content: 'B',
+      },
+    ]
+    const res = await applyOpsAndPersist(host, before, ops, CANVAS, svc)
+    expect(res.ok).toBe(true)
+    expect(res.cardsCreated).toBe(1)
+    expect(svc.get('new1' as never)!.title).toBe('') // onCardCreate 硬编码空标题
+    expect(svc.get('new1' as never)!.body).toBe('') // 丢 DSL content
+  })
+})
