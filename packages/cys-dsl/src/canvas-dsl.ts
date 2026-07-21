@@ -38,30 +38,23 @@ export function serializeCanvas(
 }
 
 /**
- * 面向人的可读序列化:每元素一行(同 serializeCanvas),但 card 行后附
- * `  # title: <title>` 注释行,让人在 DSL 编辑器里看到卡片内容。
- * 注释行不匹配 parseDsl 的 `[kind ` 前缀 → 被静默跳过,不影响 apply。
+ * 面向人的可读序列化(DSL 编辑器用):每元素一行,card 行带真实 @title/@content token
+ * (v5;由 resolve 注入),让人在编辑器里直接看/改卡片内容。
  *
- * getCardTitle: 可选,card id → title(从 CardService 读)。无则注释附 (untitled)。
- * 非 card 元素不附注释。title 中的换行被压成空格,避免破坏单行结构。
+ * v4 历史:曾用 `  # title:` 注释行附标题(parser 跳过、只读)。v5 起 title/content 是
+ * 可 round-trip 的真 token,注释退役 —— readable 与 strict(serializeCanvas)收敛同形态。
+ *
+ * resolve: 可选,card id → {title, content}(消费者从 CardService 读)。不给 → 几何-only。
  */
 export function serializeCanvasReadable(
   elements: CanvasElement[],
-  getCardTitle?: (id: string) => string | undefined,
+  resolve?: (id: string) => { title?: string; content?: string } | undefined,
 ): string {
-  const lines: string[] = []
-  for (const e of elements) {
-    const line = serializeElement(e)
-    if (!line) continue
-    lines.push(line)
-    if (e.kind === 'card') {
-      const rawTitle = getCardTitle?.(e.id) || '(untitled)'
-      // 防御:title 含换行会破坏单行注释结构,压平成空格。
-      const title = rawTitle.replace(/\n/g, ' ')
-      lines.push(`  # title: ${title}`)
-    }
-  }
-  return lines.join('\n')
+  return elements
+    .filter((e) => (DSL_KINDS as readonly string[]).includes(e.kind))
+    .map((e) => serializeElement(e, e.kind === 'card' ? resolve?.(e.id) : undefined))
+    .filter(Boolean)
+    .join('\n')
 }
 
 export function serializeElement(

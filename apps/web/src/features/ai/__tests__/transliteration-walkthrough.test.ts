@@ -35,16 +35,16 @@ describe('转义价值闭环 walkthrough:乱画布 → AI 重排 → 结构化',
     ]
     for (const e of messy) host.upsert(e)
 
-    // ── ② 序列化:画布变成 AI 能读的文字(serializeCanvasReadable,card 后附 title 注释)──
+    // ── ② 序列化:画布变成 AI 能读的文字(serializeCanvasReadable,card 带 @title 真 token)──
     //    AI 看到的就是下面这段(把它贴进 DSL 模态编辑器,你看到的一模一样)。
     const asText = serializeCanvasReadable(
       host.getElements(),
-      (id) => (messy.find((m) => m.id === id)?.meta as { title?: string } | undefined)?.title,
+      (id) => ({ title: (messy.find((m) => m.id === id)?.meta as { title?: string } | undefined)?.title }),
     )
     expect(asText).toContain('[card #c1]')
-    expect(asText).toContain('# title: 早睡')
+    expect(asText).toContain('@title("早睡")')
     expect(asText).toContain('[card #c4]')
-    expect(asText).toContain('# title: 冥想')
+    expect(asText).toContain('@title("冥想")')
 
     // ── ③ AI 输出重排 DSL:把"健康"(早睡+跑步)和"心智"(读书+冥想)分框,
     //    卡片归位上色,再连一条"相辅"关系箭头。这就是 AI 唯一要做的事——写文字。──
