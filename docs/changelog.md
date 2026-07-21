@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-07-21 · 1.0.0 · Tauri CSP 回退修复桌面端渲染
+
+7b7c4ee 引入的严格 CSP 在真实 Tauri 构建里使所有页面渲染静默失效：Tauri 对内联脚本注入 nonce 后浏览器忽略 `'unsafe-inline'`，Next.js 水合脚本被拦，React 不水合，运行时注入的 `<style>` 不插入；release 构建不把 webview console 转发到 stderr，故无任何报错。回退 `apps/desktop/src-tauri/tauri.conf.json` 的 `security.csp` 为 `null`（v1.0.0 发布版行为），渲染恢复。`v1.0.0` Release 资产本身为 `csp: null`，未受影响。
+
+- **根因**：`security.csp` 从 `null` 改为严格策略，随共编 commit（7b7c4ee）一并加入，未在真实 `tauri build` 验证。
+- **范围**：仅桌面端配置一行；web / DSL / 共编逻辑未动。
+- **后续**：共编处理不可信 AI 内容，仍宜加 CSP，但必须在真实 `tauri build`（非浏览器 / `tauri dev`）验证渲染后再上。
+
+---
+
 ## 2026-07-20 · 1.0.0 · 可审计 AI 共编实验链路
 
 在不修改 DSL v4 的前提下，新增默认关闭的 Labs 实验入口“可审计 AI 共编”：范围确认 → strict Proposal Bundle → 来源回链与三 lane 审查 → immutable preview → WAL 事务 Apply → CommitReceipt / guarded Undo / restart recovery。
