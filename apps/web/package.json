@@ -9,11 +9,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "tsc --noEmit",
-    "test": "vitest run",
-    "gen:dsl": "peggy src/features/ai/dsl.peggy -o src/features/ai/dsl-parser.gen.js --format es"
+    "test": "vitest run"
   },
   "dependencies": {
     "@cys-stift/canvas-engine": "workspace:*",
+    "@cys-stift/dsl": "workspace:*",
     "@cys-stift/domain": "workspace:*",
     "@cys-stift/ui": "workspace:*",
     "@tauri-apps/plugin-dialog": "2",

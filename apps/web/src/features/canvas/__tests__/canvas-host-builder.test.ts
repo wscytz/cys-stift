@@ -24,7 +24,7 @@ import {
   applyOpsAndPersist,
   buildEmptyHost,
 } from '../canvas-host-builder'
-import type { DslOp } from '@/features/ai/dsl-parser'
+import type { DslOp } from '@cys-stift/dsl'
 import { canvasFreeformStore } from '@/lib/canvas-freeform-store'
 
 /** 造一张在 canvasId 上的卡(带 canvasPosition)。 */

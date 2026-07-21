@@ -25,8 +25,8 @@ import type { CanvasId, CardId, CardService, Card, ColorToken } from '@cys-stift
 import { canvasFreeformStore } from '@/lib/canvas-freeform-store'
 import { loadCardsIntoEditor, cardToElement, elementToCardPosition } from './canvas-binding'
 import { applyLayout, type ApplyOpResult } from './apply-layout'
-import type { SanitizeDiagnostic } from '@/features/ai/dsl-sanitize'
-import type { DslOp } from '@/features/ai/dsl-parser'
+import type { SanitizeDiagnostic } from '@cys-stift/dsl'
+import type { DslOp } from '@cys-stift/dsl'
 import { freeformElementsOf } from './canvas-freeform-binding'
 
 /**

@@ -23,7 +23,7 @@
 import type { Card } from '@cys-stift/domain'
 import { searchCards } from '@cys-stift/domain'
 import { serializeCardsForAI } from './ai-context'
-import { DSL_GRAMMAR_REFERENCE } from './dsl-grammar'
+import { DSL_GRAMMAR_REFERENCE } from '@cys-stift/dsl'
 
 /** RAG 预注入的卡片数(平衡 token 预算与召回)。 */
 export const RAG_TOP_N = 8

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { serializeCanvas, serializeCanvasReadable } from '../canvas-dsl'
-import { parseDslWithDiagnostics } from '../dsl-parser'
+import { serializeCanvas, serializeCanvasReadable } from '@cys-stift/dsl'
+import { parseDslWithDiagnostics } from '@cys-stift/dsl'
 import { applyLayout } from '../../canvas/apply-layout'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
 import type { CanvasElement } from '@cys-stift/canvas-engine'

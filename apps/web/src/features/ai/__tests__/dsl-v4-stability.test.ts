@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
-import { serializeCanvas } from '../canvas-dsl'
-import { DSL_VERSION } from '../dsl-grammar'
-import { parseDsl } from '../dsl-parser'
-import { sanitizeDslOps } from '../dsl-sanitize'
+import { serializeCanvas } from '@cys-stift/dsl'
+import { DSL_VERSION } from '@cys-stift/dsl'
+import { parseDsl } from '@cys-stift/dsl'
+import { sanitizeDslOps } from '@cys-stift/dsl'
 import { solveRelational } from '../relational-solver'
 import { applyLayout, buildApplyPlan } from '../../canvas/apply-layout'
 

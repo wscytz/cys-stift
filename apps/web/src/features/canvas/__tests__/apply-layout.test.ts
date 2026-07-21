@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { applyLayout } from '../apply-layout'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
-import type { DslOp } from '../../ai/dsl-parser'
-import { parseDsl } from '../../ai/dsl-parser'
+import type { DslOp } from '@cys-stift/dsl'
+import { parseDsl } from '@cys-stift/dsl'
 import type { CardId } from '@cys-stift/domain'
 
 /** Pre-seed a card element so a `card` op has something to reposition. */
@@ -704,7 +704,7 @@ describe('applyLayout', () => {
   })
 })
 
-import type { DslCardOp } from '../../ai/dsl-parser'
+import type { DslCardOp } from '@cys-stift/dsl'
 
 describe('applyLayout — card create + onCardCreate', () => {
   it('invokes onCardCreate with DSL id + geometry when create flag set', () => {

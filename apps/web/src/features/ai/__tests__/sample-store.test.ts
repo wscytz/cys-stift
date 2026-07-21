@@ -10,7 +10,7 @@ import {
   type DslSample,
   type QaSample,
 } from '../sample-store'
-import { DSL_VERSION } from '../dsl-grammar'
+import { DSL_VERSION } from '@cys-stift/dsl'
 
 beforeEach(() => {
   window.localStorage.clear()

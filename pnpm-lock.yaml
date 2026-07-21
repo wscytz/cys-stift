@@ -42,6 +42,9 @@ importers:
       '@cys-stift/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@cys-stift/dsl':
+        specifier: workspace:*
+        version: link:../../packages/cys-dsl
       '@cys-stift/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -139,6 +142,25 @@ importers:
       jsdom:
         specifier: ^29.1.1
         version: 29.1.1
+      typescript:
+        specifier: 5.6.3
+        version: 5.6.3
+      vitest:
+        specifier: 2.1.5
+        version: 2.1.5(@types/node@22.9.0)(@vitest/ui@2.1.5)(jsdom@29.1.1)
+
+  packages/cys-dsl:
+    dependencies:
+      '@cys-stift/canvas-engine':
+        specifier: workspace:*
+        version: link:../canvas-engine
+      '@cys-stift/domain':
+        specifier: workspace:*
+        version: link:../domain
+    devDependencies:
+      peggy:
+        specifier: ^5.1.0
+        version: 5.1.0
       typescript:
         specifier: 5.6.3
         version: 5.6.3

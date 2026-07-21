@@ -1,9 +1,9 @@
 'use client'
 
 import type { CanvasElement, CanvasHost } from '@cys-stift/canvas-engine'
-import type { DslArrowOp, DslCardOp, DslFreeOp, DslOp } from '../ai/dsl-parser'
-import { sanitizeDslOps } from '../ai/dsl-sanitize'
-import type { SanitizeCtx, SanitizeDiagnostic } from '../ai/dsl-sanitize'
+import type { DslArrowOp, DslCardOp, DslFreeOp, DslOp } from '@cys-stift/dsl'
+import { sanitizeDslOps } from '@cys-stift/dsl'
+import type { SanitizeCtx, SanitizeDiagnostic } from '@cys-stift/dsl'
 import { solveRelational } from '../ai/relational-solver'
 import type { ExistingGeom } from '../ai/relational-solver'
 

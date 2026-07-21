@@ -10,7 +10,7 @@
  *
  * 纯函数不调 Date.now() —— ts 由调用方传(可测)。genSampleId 用 crypto.randomUUID 兜底。
  */
-import { DSL_VERSION } from './dsl-grammar'
+import { DSL_VERSION } from '@cys-stift/dsl'
 
 export interface BaseSample {
   id: string

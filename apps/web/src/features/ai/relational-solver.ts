@@ -15,9 +15,9 @@
  * 与 sanitize 协作:applyLayout 入口先 sanitize(修正 size/coord/id)再 solve(rel → 绝对)。
  * diagnostic 复用 SanitizeDiagnostic 形态,apply-layout 合并透出。
  */
-import type { DslOp, DslCardOp } from './dsl-parser'
-import type { SanitizeDiagnostic } from './dsl-sanitize'
-import { DSL_MAX_COORD } from './dsl-sanitize'
+import type { DslOp, DslCardOp } from '@cys-stift/dsl'
+import type { SanitizeDiagnostic } from '@cys-stift/dsl'
+import { DSL_MAX_COORD } from '@cys-stift/dsl'
 
 /** 已知几何(anchor 查找用)。来自画布现有 card 或同批更早 op。 */
 export interface ExistingGeom {

@@ -33,7 +33,7 @@ import { AiSetupCard } from '@/features/ai/ai-setup-card'
 import { isAIReady } from '@/features/ai/ai-settings-provider'
 import { streamText } from '@/features/ai/stream-text'
 import { retryFailureMessageKey, retryUntilValid, buildDslCorrection } from '@/features/ai/retry-until-valid'
-import { parseDslStrictWithDiagnostics } from '@/features/ai/dsl-parser'
+import { parseDslStrictWithDiagnostics } from '@cys-stift/dsl'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import {
   AGENT_SYSTEM_PROMPT,
