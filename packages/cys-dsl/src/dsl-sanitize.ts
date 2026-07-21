@@ -1,5 +1,3 @@
-'use client'
-
 /**
  * DSL Sanitize 层 —— 解析后、apply 前,纯函数修正 LLM 常见错误 + 产 diagnostic。
  *

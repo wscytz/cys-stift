@@ -1,5 +1,3 @@
-'use client'
-
 /**
  * DSL Parser — parses AI output (or pasted/edited DSL) for canvas layout.
  *

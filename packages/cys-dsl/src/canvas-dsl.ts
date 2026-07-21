@@ -1,5 +1,3 @@
-'use client'
-
 /**
  * Canvas DSL — the unified bidirectional text format for the canvas (Phase 0 / T3).
  *
@@ -26,10 +24,15 @@ import { DSL_KINDS } from './dsl-grammar'
  * Serialize the canvas's active elements to a text block the AI can read.
  * Pure function of the element list — no side-effects, no engine access.
  */
-export function serializeCanvas(elements: CanvasElement[]): string {
+export function serializeCanvas(
+  elements: CanvasElement[],
+  /** v5:可选,card id → {title, content}(消费者注入,如 CardService 的 title/body)。
+   *  不传 → 几何-only(向后兼容,所有现有调用点零改动)。传了 → card 行附 @title/@content。 */
+  resolve?: (id: string) => { title?: string; content?: string } | undefined,
+): string {
   return elements
     .filter((e) => (DSL_KINDS as readonly string[]).includes(e.kind))
-    .map(serializeElement)
+    .map((e) => serializeElement(e, e.kind === 'card' ? resolve?.(e.id) : undefined))
     .filter(Boolean)
     .join('\n')
 }
@@ -61,12 +64,20 @@ export function serializeCanvasReadable(
   return lines.join('\n')
 }
 
-export function serializeElement(e: CanvasElement): string {
+export function serializeElement(
+  e: CanvasElement,
+  /** v5:card 的 title/content(可选,由 serializeCanvas 的 resolve 注入)。非 card 元素忽略。 */
+  content?: { title?: string; content?: string },
+): string {
   const pos = `@pos(${e.x.toFixed(1)},${e.y.toFixed(1)})`
   const color = e.color ? ` @color(${e.color})` : ''
   switch (e.kind) {
-    case 'card':
-      return `[card #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}`
+    case 'card': {
+      // v5:可选 @title/@content(消费者注入)。缺省几何-only(round-trip 与 v4 等价)。
+      const titleAttr = content?.title ? ` @title("${escapeQuoted(content.title)}")` : ''
+      const contentAttr = content?.content ? ` @content("${escapeQuoted(content.content)}")` : ''
+      return `[card #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}${titleAttr}${contentAttr}`
+    }
     case 'rect':
       return `[rect #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}`
     case 'frame':
@@ -116,7 +127,8 @@ export function serializeElement(e: CanvasElement): string {
   }
 }
 
-/** Escape double-quotes/backslashes inside a quoted DSL string value. */
+/** Escape a string for a quoted DSL value:\\ = backslash, \" = quote, \n = newline(v5,@content 多行)。
+ *  顺序:先 \ (防后续插入的 \ 被二次转义),再 ",再换行。是 dsl-parser unescapeQuoted 的逆。 */
 function escapeQuoted(s: string): string {
-  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')
 }

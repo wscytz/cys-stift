@@ -4,11 +4,11 @@ cys-dsl — cy's Stift 画布的**双向文字表示(转义)**。整张画布能
 
 ## 是什么
 
-cys-dsl **v4** 文法:6 种元素(`card`/`rect`/`frame`/`text`/`arrow`/`freedraw`)、6 Bauhaus 色、关系式放置(`right-of`/`below` + `@gap`)、箭头签名(label/color/dash/arrowhead/route/wikilink)。几何为主;`freedraw` 仅位置(点序列 R2 隐私,不外发)。
+cys-dsl **v5** 文法:6 种元素(`card`/`rect`/`frame`/`text`/`arrow`/`freedraw`)、6 Bauhaus 色、关系式放置(`right-of`/`below` + `@gap`)、箭头签名(label/color/dash/arrowhead/route/wikilink)、**v5 卡片内容 `@title`(短)/`@content`(长 markdown,`\n` 转义多行)**。几何 + 内容;`freedraw` 仅位置(点序列 R2 隐私,不外发)。
 
 ## public API
 
-- **grammar**:`DSL_VERSION`、`DSL_KINDS`、`DSL_COLORS`、`DSL_COLOR_ALIASES`、`DSL_GRAMMAR_REFERENCE`、`DSL_MAX_TEXT_LEN`
+- **grammar**:`DSL_VERSION`、`DSL_KINDS`、`DSL_COLORS`、`DSL_COLOR_ALIASES`、`DSL_GRAMMAR_REFERENCE`、`DSL_MAX_TEXT_LEN`、`DSL_MAX_CONTENT_LEN`
 - **serialize**:`serializeCanvas`、`serializeCanvasReadable`、`serializeElement`
 - **parse**:`parseDsl`、`parseDslWithDiagnostics`、`parseDslStrictWithDiagnostics`(Peggy 语法驱动)
 - **sanitize**:`sanitizeDslOps`(opt-in 修正层,防 LLM 产非法值不崩)

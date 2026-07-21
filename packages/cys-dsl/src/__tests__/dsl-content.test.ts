@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import type { CanvasElement } from '@cys-stift/canvas-engine'
 import { parseDsl } from '../dsl-parser'
+import { serializeCanvas } from '../canvas-dsl'
 import { sanitizeDslOps } from '../dsl-sanitize'
 import { DSL_MAX_CONTENT_LEN, DSL_MAX_TEXT_LEN } from '../dsl-grammar'
 
@@ -53,5 +55,34 @@ describe('cys-dsl v5 @title/@content', () => {
     const b = parseDsl('[card #c2] @pos(0,0) @size(10,10) @content("only body")')
     expect((b[0] as { title?: string }).title).toBeUndefined()
     expect((b[0] as { content?: string }).content).toBe('only body')
+  })
+})
+
+describe('cys-dsl v5 serialize @title/@content (Slice B)', () => {
+  const card = (id: string): CanvasElement => ({ id, kind: 'card', x: 10, y: 20, w: 100, h: 80, rotation: 0 })
+
+  it('serializeCanvas emits @title/@content when resolve is provided', () => {
+    const text = serializeCanvas([card('c1')], () => ({ title: 'Hi', content: 'body' }))
+    expect(text).toContain('@title("Hi")')
+    expect(text).toContain('@content("body")')
+  })
+
+  it('serializeCanvas is geometry-only when resolve is omitted (backward compat)', () => {
+    const text = serializeCanvas([card('c1')])
+    expect(text).not.toContain('@title')
+    expect(text).not.toContain('@content')
+  })
+
+  it('round-trips content: serialize → parse preserves title/content (incl. \\n)', () => {
+    const text = serializeCanvas([card('c1')], () => ({ title: '标题', content: '第一行\n第二行' }))
+    const ops = parseDsl(text)
+    expect(ops[0]).toMatchObject({ type: 'card', cardId: 'c1', title: '标题', content: '第一行\n第二行' })
+  })
+
+  it('escapes quotes/backslashes/newlines so content stays on one DSL line', () => {
+    const text = serializeCanvas([card('c1')], () => ({ content: 'a "q" and \\b\nnl' }))
+    expect(text.split('\n').filter((l) => l.includes('[card'))).toHaveLength(1)
+    const ops = parseDsl(text)
+    expect((ops[0] as { content?: string }).content).toBe('a "q" and \\b\nnl')
   })
 })
