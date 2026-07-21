@@ -11,10 +11,10 @@
  * bump 规则:增删指令种类 / 增删属性 / 改颜色枚举 → bump DSL_VERSION。
  * 纯改 prompt 措辞、改 parser 正则细节(不动语法)→ 不 bump。
  */
-export const DSL_VERSION = 4
+export const DSL_VERSION = 5
 
 /**
- * `@text("...")` / `@label("...")` 值的最大字符数。
+ * `@text("...")` / `@label("...")` / `@title("...")` 值的最大字符数(int 级)。
  *
  * 防护:AI 输出不可信,可能产超长文本(幻觉 / 错误重复 / token 失控)→ 渲染溢出 / 存储
  * 膨胀 / 应用卡顿(DoS)。parser 在解析时把超长值**静默截断**到上限(不报错不 warn ——
@@ -22,9 +22,19 @@ export const DSL_VERSION = 4
  *
  * 不 bump DSL_VERSION:这是 parser 防护,不改语法形态(语法层面 @text 仍接任意字符串,
  * 只是 parser 不接受超长)。200 覆盖正常画布标签/文本需求(标签通常 <20 字,文本标题 <50)。
- * STATE 缺口⑩。
  */
 export const DSL_MAX_TEXT_LEN = 200
+
+/**
+ * `@content("...")` 值的最大字符数(v5:卡片正文 markdown,long 级)。
+ *
+ * 与 @title/@text 的 DSL_MAX_TEXT_LEN(int 级 200)区分:@content 是 long 级 —— 卡片正文是
+ * markdown body,远长于标签/标题。8000 覆盖正常长笔记(~1000 词),同时防 LLM 失控膨胀(DoS)。
+ * parser + sanitize 都按此截断(静默,不报错)。
+ *
+ * 不 bump DSL_VERSION:parser 防护,不改语法形态。
+ */
+export const DSL_MAX_CONTENT_LEN = 8000
 
 /** 指令种类(parser 识别 + serializer 序列化的集合;freedraw 是透传 no-op)。 */
 export const DSL_KINDS = ['card', 'rect', 'frame', 'text', 'arrow', 'freedraw'] as const
@@ -43,8 +53,10 @@ export const DSL_COLOR_ALIASES: Record<string, DslColor> = { grey: 'gray' }
  * 故意不含 [freedraw #id]——AI 不该产手绘(freedraw 仍在 DSL_KINDS 给 parser/serializer 用)。
  */
 export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one element per line):
-  [card #id] @pos(x, y) @size(w, h) @color(red|yellow|blue|black|white|gray|grey)
-  [card #id create] @pos(x, y) @size(w, h) @color(c)   # create an empty card; id must not exist
+  [card #id] @pos(x, y) @size(w, h) @color(red|yellow|blue|black|white|gray|grey) [@title("…")] [@content("…")]
+  [card #id create] @pos(x, y) @size(w, h) @color(c) [@title("…")] [@content("…")]   # create an empty card; id must not exist
+  #   @title: short card title (≤200 chars, int-tier). @content: long markdown body (≤8000 chars, long-tier).
+  #   Quoted-string escapes: \\" = quote, \\\\ = backslash, \\n = newline (so @content carries multi-line markdown on one DSL line).
   # relational placement — PREFER for structured layouts (trees, lists, grids, hierarchies;
   #   anything row/column-shaped). The engine computes coords AND avoids overlaps, so you skip
   #   error-prone coordinate math. Reserve @pos for free/scattered positioning only:
@@ -64,5 +76,6 @@ export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one eleme
   #   (meta.wikilink===true); distinguishes auto-built wikilink arrows from
   #   manual references arrows so the marker survives DSL round-trip.
 Rules: card updates are the default; explicit create makes an empty card only after persistence succeeds.
+  @title/@content (v5) update an existing card's title/body; omit them to leave content unchanged.
   IDs use letters, digits, underscore, hyphen, and colon. Lines starting with # are comments and ignored;
   colors are the ${DSL_COLORS.length} Bauhaus tokens only.`

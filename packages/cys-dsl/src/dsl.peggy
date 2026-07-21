@@ -21,7 +21,7 @@ cardLine
   = '[' 'card' sp ds:cardDir* .* { return { kind: 'card', ds: ds } }
 
 cardDir
-  = ws d:(idDir / posDir / sizeDir / colorDir / relationDir / gapDir / createDir / skipChunk) { return d }
+  = ws d:(idDir / posDir / sizeDir / colorDir / relationDir / gapDir / createDir / titleDir / contentDir / skipChunk) { return d }
 
 // ── arrow:`[arrow ` 或 `[arrow]` 提交;#id 可省([arrow]);relation(from/to) vs free(pos/size) ──
 arrowLine
@@ -92,6 +92,13 @@ labelDir
 
 textDir
   = '@text(' v:quotedString ')' { return ['text', v] }
+
+// v5: 卡片内容(@title 短 / @content 长 markdown)。quotedString 的 escChar 已支持 \n 转义。
+titleDir
+  = '@title(' v:quotedString ')' { return ['title', v] }
+
+contentDir
+  = '@content(' v:quotedString ')' { return ['content', v] }
 
 dashDir
   = '@dash(' c:$([^)]+) ')' { return ['dash', c] }
