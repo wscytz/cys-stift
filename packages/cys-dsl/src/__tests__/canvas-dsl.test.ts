@@ -380,3 +380,57 @@ describe('serializeCanvasReadable — v5 委托 serializeCanvas(F:消除重复�
     expect(serializeCanvasReadable(elements)).toBe(serializeCanvas(elements))
   })
 })
+
+describe('serializeCanvas — v7 meta directives (@group / @href / @compute)', () => {
+  it('card meta.group → @group("名")(转义)', () => {
+    const out = serializeCanvas([
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0, meta: { group: 'Q3 规划' } },
+    ])
+    expect(out).toContain('@group("Q3 规划")')
+  })
+
+  it('card meta.href → @href(#a;#b)(补 #,; 分隔)', () => {
+    const out = serializeCanvas([
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0, meta: { href: ['a', 'b'] } },
+    ])
+    expect(out).toContain('@href(#a;#b)')
+  })
+
+  it('card meta.href 空数组 / meta.group 空串 → 不 emit', () => {
+    const out = serializeCanvas([
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0, meta: { href: [], group: '' } },
+    ])
+    expect(out).not.toContain('@href')
+    expect(out).not.toContain('@group')
+  })
+
+  it('text meta.compute → @compute + @text(求值结果)同时 emit', () => {
+    const out = serializeCanvas([
+      { id: 't1', kind: 'text', x: 0, y: 0, w: 0, h: 0, rotation: 0, text: '40', meta: { compute: '#a.w + #b.w' } },
+    ])
+    expect(out).toContain('@text("40")')
+    expect(out).toContain('@compute("#a.w + #b.w")')
+  })
+
+  it('rect meta.group → @group(free shape 也可分组)', () => {
+    const out = serializeCanvas([
+      { id: 'r1', kind: 'rect', x: 0, y: 0, w: 5, h: 5, rotation: 0, color: 'red', meta: { group: 'g' } },
+    ])
+    expect(out).toContain('@group("g")')
+  })
+
+  it('v7 meta 往返对称:serialize → parse 还原 group/href/compute', () => {
+    const elements: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0, meta: { group: 'g', href: ['x', 'y'] } },
+      { id: 't1', kind: 'text', x: 0, y: 0, w: 0, h: 0, rotation: 0, text: '40', meta: { compute: '#c1.w' } },
+    ]
+    const ops = parseDsl(serializeCanvas(elements))
+    const card = ops.find((o) => o.type === 'card')
+    const text = ops.find((o) => o.type === 'free' && o.shape === 'text')
+    if (card?.type === 'card') {
+      expect(card.group).toBe('g')
+      expect(card.href).toEqual(['x', 'y'])
+    }
+    if (text?.type === 'free' && text.shape === 'text') expect(text.compute).toBe('#c1.w')
+  })
+})

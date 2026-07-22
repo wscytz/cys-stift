@@ -17,7 +17,7 @@
  *              + case 3(free op 跨 kind 告警)。
  */
 import type { DslOp, DslCardOp, DslFreeOp, DslArrowOp } from './dsl-parser'
-import { DSL_MAX_TEXT_LEN, DSL_MAX_CONTENT_LEN, truncateDslText } from './dsl-grammar'
+import { DSL_MAX_TEXT_LEN, DSL_MAX_CONTENT_LEN, DSL_MAX_HREF_TARGETS, truncateDslText } from './dsl-grammar'
 
 /** Sanitize 诊断:亮给用户/AI 看(让 AgentConfirmCard/dsl-dialog 把"引用了不存在的卡 #X"反馈出来)。 */
 export type SanitizeDiagnostic = {
@@ -109,8 +109,15 @@ function sanitizeCard(
   const y = clampCoord(op.y)
   const title = op.title !== undefined ? truncateDslText(op.title, DSL_MAX_TEXT_LEN) : op.title
   const content = op.content !== undefined ? truncateDslText(op.content, DSL_MAX_CONTENT_LEN) : op.content
-  if (w === op.w && h === op.h && x === op.x && y === op.y && rel === op.rel && title === op.title && content === op.content) return op
-  return { ...op, w, h, x, y, rel, title, content }
+  // v7:group 二次截断 + href 二次截断到上限(幂等 —— parser 已截,这里防程序构造 op 绕过)。
+  //     href.slice 仅在超长时发生,否则保引用(不破坏合规输入引用稳定 / round-trip byte-equal)。
+  const group = op.group !== undefined ? truncateDslText(op.group, DSL_MAX_TEXT_LEN) : op.group
+  const href =
+    op.href !== undefined && op.href.length > DSL_MAX_HREF_TARGETS
+      ? op.href.slice(0, DSL_MAX_HREF_TARGETS)
+      : op.href
+  if (w === op.w && h === op.h && x === op.x && y === op.y && rel === op.rel && title === op.title && content === op.content && group === op.group && href === op.href) return op
+  return { ...op, w, h, x, y, rel, title, content, group, href }
 }
 
 /** free shape(rect/text/frame)op:case 6(size)+ case 3(跨 kind 告警)。
@@ -138,8 +145,10 @@ function sanitizeFree(
   const h = sanitizeSize(op.h)
   const x = clampCoord(op.x)
   const y = clampCoord(op.y)
-  if (w === op.w && h === op.h && x === op.x && y === op.y) return op
-  return { ...op, w, h, x, y }
+  // v7:group 二次截断(幂等;compute 仅 text,parser 已截断,这里不重复以避联合类型分支)。
+  const group = op.group !== undefined ? truncateDslText(op.group, DSL_MAX_TEXT_LEN) : op.group
+  if (w === op.w && h === op.h && x === op.x && y === op.y && group === op.group) return op
+  return { ...op, w, h, x, y, group }
 }
 
 /** arrow op:case 7(端点不存在 diagnostic)。free arrow 不检查(无端点)。

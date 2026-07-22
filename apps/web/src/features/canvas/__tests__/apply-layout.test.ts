@@ -869,3 +869,70 @@ describe('applyLayout — relational card (right-of / below)', () => {
     }
   })
 })
+
+describe('applyLayout — v7 directives (@group / @href / @compute)', () => {
+  it('@group on create card → element.meta.group', () => {
+    const host = new InMemoryCanvasHost()
+    applyLayout(host, parseDsl('[card #g1 create] @pos(0,0) @group("idea")'))
+    expect(host.getElement('g1')?.meta?.group).toBe('idea')
+  })
+
+  it('@group on existing card (无 @pos,keepExistingPos) → 加 group 不动几何', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'a1', 300, 400)
+    applyLayout(host, parseDsl('[card #a1] @group("Q3 规划")'))
+    const el = host.getElement('a1')!
+    expect(el.meta?.group).toBe('Q3 规划')
+    expect(el).toMatchObject({ x: 300, y: 400, w: 240, h: 120 })
+  })
+
+  it('@group("") 清键(取消分组)', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'a1')
+    host.upsert({ ...host.getElement('a1')!, meta: { group: 'old' } })
+    applyLayout(host, parseDsl('[card #a1] @group("")'))
+    expect(host.getElement('a1')?.meta?.group).toBeUndefined()
+  })
+
+  it('@href(#a;#b) → element.meta.href 裸 id 列表', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'c1')
+    applyLayout(host, parseDsl('[card #c1] @href(#a;#b)'))
+    expect(host.getElement('c1')?.meta?.href).toEqual(['a', 'b'])
+  })
+
+  it('@compute on text → 对 seed 几何求值写 text + 存 meta.compute', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'a1') // w=240, h=120
+    applyLayout(host, parseDsl('[text #t1] @pos(0,0) @compute("#a1.w + 10")'))
+    const t = host.getElement('t1')!
+    expect(t.text).toBe('250')
+    expect(t.meta?.compute).toBe('#a1.w + 10')
+  })
+
+  it('@compute 引用同批 create 的卡(shadow 几何)', () => {
+    const host = new InMemoryCanvasHost()
+    applyLayout(
+      host,
+      parseDsl('[card #c1 create] @pos(0,0) @size(100,50)\n[text #t] @pos(0,0) @compute("#c1.w * 2")'),
+    )
+    expect(host.getElement('t')?.text).toBe('200')
+  })
+
+  it('@compute 引用不存在 → 求值失败保留 op.text,仍存 meta.compute', () => {
+    const host = new InMemoryCanvasHost()
+    applyLayout(host, parseDsl('[text #t] @pos(0,0) @text("orig") @compute("#ghost.w")'))
+    const t = host.getElement('t')!
+    expect(t.text).toBe('orig')
+    expect(t.meta?.compute).toBe('#ghost.w')
+  })
+
+  it('@group/@href 经 apply 后存活于 element.meta(serialize 可往返)', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'a1')
+    applyLayout(host, parseDsl('[card #a1] @group("g") @href(#x)'))
+    const el = host.getElement('a1')!
+    expect(el.meta?.group).toBe('g')
+    expect(el.meta?.href).toEqual(['x'])
+  })
+})

@@ -67,19 +67,20 @@ export function serializeElement(
       // v5:可选 @title/@content(消费者注入)。缺省几何-only(round-trip 与 v4 等价)。
       const titleAttr = content?.title ? ` @title("${escapeQuoted(content.title)}")` : ''
       const contentAttr = content?.content ? ` @content("${escapeQuoted(content.content)}")` : ''
-      return `[card #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}${titleAttr}${contentAttr}`
+      return `[card #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}${titleAttr}${contentAttr}${metaGroup(e)}${metaHref(e)}`
     }
     case 'rect':
-      return `[rect #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}`
+      return `[rect #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}${metaGroup(e)}`
     case 'frame':
       return (
         `[frame #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})` +
         ` @text("${escapeQuoted(e.text ?? '')}")` +
-        color
+        color +
+        metaGroup(e)
       )
     case 'text':
       return (
-        `[text #${e.id}] ${pos} @text("${escapeQuoted(e.text ?? '')}")` + color
+        `[text #${e.id}] ${pos} @text("${escapeQuoted(e.text ?? '')}")` + color + metaGroup(e) + metaCompute(e)
       )
     case 'arrow': {
       // Shared relation signature (label/color/dash/arrowhead/route).
@@ -124,4 +125,26 @@ export function serializeElement(
  *  顺序:先 \ (防后续插入的 \ 被二次转义),再 ",再换行。是 dsl-parser unescapeQuoted 的逆。 */
 function escapeQuoted(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')
+}
+
+/** v7:读 element.meta.group(语义分组名)。非字符串 / 空 → 不 emit。 */
+function metaGroup(e: CanvasElement): string {
+  const g = e.meta?.group
+  return typeof g === 'string' && g !== '' ? ` @group("${escapeQuoted(g)}")` : ''
+}
+
+/** v7:读 element.meta.href(卡片显式语义引用目标 id 列表)。非数组 / 空 → 不 emit。
+ *  emit 形如 ` @href(#a;#b)`(每个 id 补 `#`,`;` 分隔),是 parseHref 的逆。 */
+function metaHref(e: CanvasElement): string {
+  const h = e.meta?.href
+  if (!Array.isArray(h)) return ''
+  const ids = h.filter((x): x is string => typeof x === 'string' && x !== '')
+  if (ids.length === 0) return ''
+  return ` @href(${ids.map((id) => '#' + id).join(';')})`
+}
+
+/** v7:读 element.meta.compute(text 元素安全公式原文)。非字符串 / 空 → 不 emit。 */
+function metaCompute(e: CanvasElement): string {
+  const c = e.meta?.compute
+  return typeof c === 'string' && c !== '' ? ` @compute("${escapeQuoted(c)}")` : ''
 }

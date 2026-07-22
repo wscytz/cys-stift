@@ -7,9 +7,9 @@ import { sanitizeDslOps } from '@cys-stift/dsl'
 import { solveRelational } from '../relational-solver'
 import { applyLayout, buildApplyPlan } from '../../canvas/apply-layout'
 
-describe('cys-dsl v6 stability contract', () => {
+describe('cys-dsl v7 stability contract', () => {
   it('round-trips quote, backslash, Unicode, and colon ids canonically', () => {
-    expect(DSL_VERSION).toBe(6)
+    expect(DSL_VERSION).toBe(7)
 
     const source = new InMemoryCanvasHost()
     source.upsert({ id: 'card:from', kind: 'card', x: 0, y: 0, w: 100, h: 80, rotation: 0 })

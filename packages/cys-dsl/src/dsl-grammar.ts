@@ -11,7 +11,7 @@
  * bump 规则:增删指令种类 / 增删属性 / 改颜色枚举 → bump DSL_VERSION。
  * 纯改 prompt 措辞、改 parser 正则细节(不动语法)→ 不 bump。
  */
-export const DSL_VERSION = 6
+export const DSL_VERSION = 7
 
 /**
  * `@text("...")` / `@label("...")` / `@title("...")` 值的最大字符数(int 级)。
@@ -35,6 +35,17 @@ export const DSL_MAX_TEXT_LEN = 200
  * 不 bump DSL_VERSION:parser 防护,不改语法形态。
  */
 export const DSL_MAX_CONTENT_LEN = 8000
+
+/**
+ * `@href(#a;#b;…)` 目标 id 的最大个数(v7:卡片显式语义引用列表)。
+ *
+ * 防护:AI 输出不可信,可能产超长引用列表(幻觉 / token 失控)→ 存储膨胀 / 应用卡顿(DoS)。
+ * parser 解析 @href 时把目标数**静默截断**到上限(保前 N 个,不报错)。20 远超正常一张卡的
+ * 出链需求(典型 <5)。
+ *
+ * 不 bump DSL_VERSION:parser 防护,不改语法形态(语法层面 @href 仍接任意长 `;` 列表)。
+ */
+export const DSL_MAX_HREF_TARGETS = 20
 
 /**
  * 文本截断到 max 个 UTF-16 码元,**不劈开代理对**(emoji / 增补平面字符占 2 码元)。
@@ -71,19 +82,28 @@ export const DSL_COLOR_ALIASES: Record<string, DslColor> = { grey: 'gray' }
  * 故意不含 [freedraw #id]——freedraw 不在 DSL(程序自管:R2 + 渲染;点序列重/意义低/隐私),AI 不该也不产。
  */
 export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one element per line):
-  [card #id] @pos(x, y) @size(w, h) @color(red|yellow|blue|black|white|gray|grey) [@title("…")] [@content("…")]
+  [card #id] @pos(x, y) @size(w, h) @color(red|yellow|blue|black|white|gray|grey) [@title("…")] [@content("…")] [@group("…")] [@href(#a;#b)]
   [card #id create] @pos(x, y) @size(w, h) @color(c) [@title("…")] [@content("…")]   # create a card; id must not exist
   #   @title: short card title (≤200 chars, int-tier). @content: long markdown body (≤8000 chars, long-tier).
   #   Quoted-string escapes: \\" = quote, \\\\ = backslash, \\n = newline (so @content carries multi-line markdown on one DSL line).
+  #   @group("name") (v7): tag the card with a semantic group name (grouping/styling is a view concern, not DSL state).
+  #     Assign a group to an EXISTING card without moving it: [card #id] @group("name") (no @pos needed).
+  #   @href(#a;#b) (v7): declare explicit semantic links from this card to other card ids — a knowledge-graph edge
+  #     with NO arrow drawn (distinct from body [[wikilinks]] which auto-build reference arrows). Semicolon-separated,
+  #     leading # optional, deduped, ≤20 targets.
   # relational placement — PREFER for structured layouts (trees, lists, grids, hierarchies;
   #   anything row/column-shaped). The engine computes coords AND avoids overlaps, so you skip
   #   error-prone coordinate math. Reserve @pos for free/scattered positioning only:
   #   [card #id] right-of #anchor @gap(20)   # right of anchor, same row (x=anchor.x+w+gap; y=anchor.y)
   #   [card #id] below #anchor @gap(20)      # below anchor, same column (y=anchor.y+h+gap; x=anchor.x)
   #   (@gap defaults to 20 and is limited to 0..2000; anchor must be placed earlier or already exist)
-  [rect #id] @pos(x, y) @size(w, h) @color(c)
-  [text #id] @pos(x, y) @text("...") @color(c)
-  [frame #id] @pos(x, y) @size(w, h) @text("title") @color(c)   # themed group/section container
+  [rect #id] @pos(x, y) @size(w, h) @color(c) [@group("…")]
+  [text #id] @pos(x, y) @text("...") @color(c) [@group("…")] [@compute("…")]
+  #   @compute("expr") (v7, text only): a SAFE formula evaluated into the text's displayed value.
+  #     Language: numbers, + - * / , parentheses, min/max/abs/round, and geometry refs #id.x|y|w|h.
+  #     Example: [text #total] @pos(x,y) @compute("#a.w + #b.w"). NO code/eval; only element geometry
+  #     (never card content). Recomputed on each apply (not live-reactive). On a failed formula the last text is kept.
+  [frame #id] @pos(x, y) @size(w, h) @text("title") @color(c) [@group("…")]   # themed group/section container
   [arrow #id] from #a to #b @label("...") @color(c) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none) [@wikilink]
   [arrow #id] @pos(x, y) @size(w, h) @color(c)   # free arrow (no from/to)
   # arrow route (optional, to bend or elbow around obstacles):

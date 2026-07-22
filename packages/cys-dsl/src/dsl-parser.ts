@@ -18,6 +18,7 @@ import {
   DSL_COLOR_ALIASES,
   DSL_MAX_TEXT_LEN,
   DSL_MAX_CONTENT_LEN,
+  DSL_MAX_HREF_TARGETS,
   truncateDslText,
 } from './dsl-grammar'
 // Peggy 生成;类型垫片见 dsl-parser.gen.d.ts
@@ -47,6 +48,11 @@ export type DslCardOp = {
    *  title/content/color/size 之一时置真 —— apply 时(planCard)沿用现有卡几何,只更那些字段;
    *  x/y 为占位(0,0),apply 期忽略。serializeCanvas 永不 emit(始终绝对坐标)→ 输入专用。 */
   keepExistingPos?: boolean
+  /** v7:语义分组名(directive,非新 kind)。落 element.meta.group;组样式/折叠是视图层,不进 DSL。 */
+  group?: string
+  /** v7:卡片显式语义引用目标 id 列表(KG 边,不画线)。落 element.meta.href。
+   *  区别于正文 [[...]]→自动 references 箭头:这是 DSL 里直接声明的语义边。 */
+  href?: string[]
 }
 
 export type DslFreeOp =
@@ -60,6 +66,8 @@ export type DslFreeOp =
       w?: number
       h?: number
       color?: string
+      /** v7:语义分组名。落 element.meta.group。 */
+      group?: string
     }
   | {
       type: 'free'
@@ -72,6 +80,11 @@ export type DslFreeOp =
       h?: number
       text?: string
       color?: string
+      /** v7:语义分组名。落 element.meta.group。 */
+      group?: string
+      /** v7:安全公式原文(仅 text 元素)。apply 时用受限递归下降求值器算(禁裸 eval),
+       *  只引用元素几何 #id.x/y/w/h,结果写 element.text,原式存 element.meta.compute。 */
+      compute?: string
     }
   | {
       type: 'free'
@@ -84,6 +97,8 @@ export type DslFreeOp =
       h?: number
       text?: string
       color?: string
+      /** v7:语义分组名。落 element.meta.group。 */
+      group?: string
     }
 
 export type DslArrowOp = {
@@ -155,6 +170,9 @@ type DirectiveTuple =
   | ['from', string]
   | ['to', string]
   | ['wikilink', true]
+  | ['group', string]
+  | ['href', string]
+  | ['compute', string]
 
 /** directive* 收集的元组列表(null = skipChunk 消费的未知残余,过滤掉)。 */
 type LineResult =
@@ -213,6 +231,23 @@ function parseElbow(raw: string): { x: number; y: number }[] | undefined {
   return pts.length >= 1 ? pts.slice(0, 2) : undefined
 }
 
+/** @href(#a;#b) 拆分(v7):`;` 分隔目标 id,每个可有可无 `#` 前缀(归一去掉)。
+ *  校验每个目标匹配 idChars(字母/数字/_/:-);过滤坏目标保好的,去重(保序),
+ *  截断到 DSL_MAX_HREF_TARGETS(防 LLM 失控膨胀)。无有效目标 → undefined。 */
+function parseHref(raw: string): string[] | undefined {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const part of raw.split(';')) {
+    const id = part.trim().replace(/^#/, '')
+    if (!/^[a-zA-Z0-9_:-]+$/.test(id)) continue // 空 / 含非法字符 → 丢
+    if (seen.has(id)) continue // 去重保序
+    seen.add(id)
+    out.push(id)
+    if (out.length >= DSL_MAX_HREF_TARGETS) break // 截断到上限
+  }
+  return out.length >= 1 ? out : undefined
+}
+
 // ── fold:directive 元组列表 → 结构化字段(首遇优先,复刻旧正则"首个 match"语义)────────
 
 interface Folded {
@@ -235,6 +270,9 @@ interface Folded {
   from?: string
   to?: string
   wikilink?: boolean
+  group?: string
+  href?: string[]
+  compute?: string
 }
 
 function fold(ds: unknown[]): Folded {
@@ -262,6 +300,9 @@ function fold(ds: unknown[]): Folded {
       case 'from': if (!a.from) a.from = String(v1); break
       case 'to': if (!a.to) a.to = String(v1); break
       case 'wikilink': if (!a.wikilink) a.wikilink = true; break
+      case 'group': if (a.group === undefined) a.group = truncate(unescapeQuoted(String(v1))); break
+      case 'href': if (!a.href) a.href = parseHref(String(v1)); break
+      case 'compute': if (a.compute === undefined) a.compute = truncate(unescapeQuoted(String(v1))); break
     }
   }
   return a
@@ -292,6 +333,8 @@ function buildCard(ds: unknown[]): BuildResult {
     if (d.create) op.create = true
     if (d.title !== undefined) op.title = d.title
     if (d.content !== undefined) op.content = d.content
+    if (d.group !== undefined) op.group = d.group
+    if (d.href !== undefined) op.href = d.href
     return { op }
   }
   if (d.pos) {
@@ -307,11 +350,14 @@ function buildCard(ds: unknown[]): BuildResult {
     if (d.create) op.create = true
     if (d.title !== undefined) op.title = d.title
     if (d.content !== undefined) op.content = d.content
+    if (d.group !== undefined) op.group = d.group
+    if (d.href !== undefined) op.href = d.href
     return { op }
   }
   // v5(E):无 @pos 的非 create 卡片行,若携带 title/content/color/size 之一 = "纯属性/内容编辑"
   // (几何沿用现有卡,由 planCard 处理)。x/y 占位(0,0);裸行(无任何字段)与 create 仍 missing @pos。
-  if (!d.create && (d.title !== undefined || d.content !== undefined || d.color !== undefined || d.size !== undefined)) {
+  // v7:group/href 同为"无几何属性编辑"——给现有卡分组/加出链不该要求 @pos。
+  if (!d.create && (d.title !== undefined || d.content !== undefined || d.color !== undefined || d.size !== undefined || d.group !== undefined || d.href !== undefined)) {
     const op: DslCardOp = {
       type: 'card',
       cardId: d.id as CardId,
@@ -322,6 +368,8 @@ function buildCard(ds: unknown[]): BuildResult {
       ...(d.size ? { w: d.size.w, h: d.size.h } : {}),
       ...(d.title !== undefined ? { title: d.title } : {}),
       ...(d.content !== undefined ? { content: d.content } : {}),
+      ...(d.group !== undefined ? { group: d.group } : {}),
+      ...(d.href !== undefined ? { href: d.href } : {}),
     }
     return { op }
   }
@@ -375,6 +423,7 @@ function buildFree(kind: 'rect' | 'text' | 'frame', ds: unknown[]): BuildResult 
     const op: DslFreeOp = {
       type: 'free', shape: 'rect', id: d.id,
       x: d.pos[0], y: d.pos[1], w: d.size?.w, h: d.size?.h, color: d.color,
+      ...(d.group !== undefined ? { group: d.group } : {}),
     }
     return { op }
   }
@@ -382,12 +431,15 @@ function buildFree(kind: 'rect' | 'text' | 'frame', ds: unknown[]): BuildResult 
     const op: DslFreeOp = {
       type: 'free', shape: 'text', id: d.id,
       x: d.pos[0], y: d.pos[1], text: d.text, color: d.color,
+      ...(d.group !== undefined ? { group: d.group } : {}),
+      ...(d.compute !== undefined ? { compute: d.compute } : {}),
     }
     return { op }
   }
   const op: DslFreeOp = {
     type: 'free', shape: 'frame', id: d.id,
     x: d.pos[0], y: d.pos[1], w: d.size?.w, h: d.size?.h, text: d.text, color: d.color,
+    ...(d.group !== undefined ? { group: d.group } : {}),
   }
   return { op }
 }

@@ -2,8 +2,8 @@
 
 import type { CanvasElement, CanvasHost } from '@cys-stift/canvas-engine'
 import type { DslArrowOp, DslCardOp, DslFreeOp, DslOp } from '@cys-stift/dsl'
-import { sanitizeDslOps } from '@cys-stift/dsl'
-import type { SanitizeCtx, SanitizeDiagnostic } from '@cys-stift/dsl'
+import { sanitizeDslOps, evalCompute, formatComputeNumber } from '@cys-stift/dsl'
+import type { SanitizeCtx, SanitizeDiagnostic, ComputeResolver } from '@cys-stift/dsl'
 import { solveRelational } from '../ai/relational-solver'
 import type { ExistingGeom } from '../ai/relational-solver'
 
@@ -342,6 +342,56 @@ function planOp(
   }
 }
 
+/** v7: 给 card 套 group/href meta(幂等合并;空串/空数组清键)。无 group/href → 原 meta(含 undefined)。 */
+function applyCardMeta(
+  existing: CanvasElement | undefined,
+  op: DslCardOp,
+): Record<string, unknown> | undefined {
+  if (op.group === undefined && op.href === undefined) return existing?.meta
+  const meta: Record<string, unknown> = { ...(existing?.meta ?? {}) }
+  if (op.group !== undefined) {
+    if (op.group === '') delete meta.group
+    else meta.group = op.group
+  }
+  if (op.href !== undefined) {
+    if (op.href.length === 0) delete meta.href
+    else meta.href = op.href
+  }
+  return meta
+}
+
+/** v7: 给 free 元素套 group/compute meta(幂等合并;空串清键)。compute 仅 text。 */
+function applyFreeMeta(
+  existing: CanvasElement | undefined,
+  op: DslFreeOp,
+): Record<string, unknown> | undefined {
+  const compute = op.shape === 'text' ? op.compute : undefined
+  if (op.group === undefined && compute === undefined) return existing?.meta
+  const meta: Record<string, unknown> = { ...(existing?.meta ?? {}) }
+  if (op.group !== undefined) {
+    if (op.group === '') delete meta.group
+    else meta.group = op.group
+  }
+  if (compute !== undefined) {
+    if (compute === '') delete meta.compute
+    else meta.compute = compute
+  }
+  return meta
+}
+
+/** v7: text 元素带 @compute → 用受限求值器(禁裸 eval)算出显示值写 text。
+ *  求值失败(语法/引用未解析)→ 保留已知 text(op.text 优先,其次 existing),不清空。 */
+function resolveComputedText(
+  op: DslFreeOp,
+  existing: CanvasElement | undefined,
+  resolver: ComputeResolver,
+): { text: string } | Record<string, never> {
+  if (op.shape !== 'text' || op.compute === undefined) return {}
+  const val = evalCompute(op.compute, resolver)
+  if (val === undefined) return { text: op.text ?? existing?.text ?? '' }
+  return { text: formatComputeNumber(val) }
+}
+
 function planCard(
   shadow: Map<string, CanvasElement>,
   op: DslCardOp,
@@ -356,6 +406,7 @@ function planCard(
     const y = finiteRound(op.y, 0)
     const w = op.w ?? 240
     const h = op.h ?? 120
+    const createMeta = applyCardMeta(undefined, op)
     const element: CanvasElement = {
       id,
       kind: 'card',
@@ -365,6 +416,7 @@ function planCard(
       h,
       rotation: 0,
       color: op.color ?? 'white',
+      ...(createMeta ? { meta: createMeta } : {}),
     }
     return readyItem(
       opIndex,
@@ -392,6 +444,7 @@ function planCard(
     return skippedItem(opIndex, op, hash, `card #${id} id conflict with existing card`)
   }
   const keepPos = op.keepExistingPos === true
+  const updateMeta = applyCardMeta(existing, op)
   const updateItem = readyItem(
     opIndex,
     op,
@@ -404,6 +457,7 @@ function planCard(
       ...(op.w !== undefined ? { w: op.w } : {}),
       ...(op.h !== undefined ? { h: op.h } : {}),
       ...(op.color ? { color: op.color } : {}),
+      ...(updateMeta !== undefined ? { meta: updateMeta } : {}),
     },
     'card-update',
   )
@@ -426,9 +480,15 @@ function planFree(
 ): ApplyPlanItem {
   const x = finiteRound(op.x, 0)
   const y = finiteRound(op.y, 0)
+  // v7 @compute 求值器:把 `#id.field` 解析成 shadow 里元素的几何(含本批已规划的)。
+  const resolver: ComputeResolver = (refId) => {
+    const el = shadow.get(refId)
+    return el ? { x: el.x, y: el.y, w: el.w, h: el.h } : undefined
+  }
   if (op.id) {
     const existing = shadow.get(op.id)
     if (existing?.kind === op.shape) {
+      const meta = applyFreeMeta(existing, op)
       return readyItem(
         opIndex,
         op,
@@ -441,6 +501,8 @@ function planFree(
           ...(op.h !== undefined ? { h: op.h } : {}),
           ...(op.color ? { color: op.color } : {}),
           ...('text' in op && op.text !== undefined ? { text: op.text } : {}),
+          ...resolveComputedText(op, existing, resolver),
+          ...(meta !== undefined ? { meta } : {}),
         },
         'freeform',
       )
@@ -449,6 +511,7 @@ function planFree(
 
   // Preserve the previous compatibility rule for cross-kind free-shape ids.
   const id = op.id && !shadow.has(op.id) ? op.id : uid('free')
+  const createMeta = applyFreeMeta(undefined, op)
   let element: CanvasElement
   switch (op.shape) {
     case 'rect':
@@ -461,9 +524,11 @@ function planFree(
         h: op.h ?? 150,
         rotation: 0,
         color: op.color ?? 'black',
+        ...(createMeta ? { meta: createMeta } : {}),
       }
       break
-    case 'text':
+    case 'text': {
+      const computedText = resolveComputedText(op, undefined, resolver)
       element = {
         id,
         kind: 'text',
@@ -472,10 +537,12 @@ function planFree(
         w: op.w ?? 100,
         h: op.h ?? 40,
         rotation: 0,
-        text: op.text ?? '',
+        text: 'text' in computedText ? computedText.text : (op.text ?? ''),
         ...(op.color ? { color: op.color } : {}),
+        ...(createMeta ? { meta: createMeta } : {}),
       }
       break
+    }
     case 'frame':
       element = {
         id,
@@ -487,6 +554,7 @@ function planFree(
         rotation: 0,
         text: op.text ?? '',
         color: op.color ?? 'blue',
+        ...(createMeta ? { meta: createMeta } : {}),
       }
       break
   }

@@ -613,3 +613,82 @@ describe('parseDsl — relational card (right-of / below + @gap)', () => {
     expect((ops[0] as { to: string }).to).toBe('c1')
   })
 })
+
+describe('parseDsl — v7 directives (@group / @href / @compute)', () => {
+  it('@group("名") on card → op.group(带空格组名,quoted)', () => {
+    const ops = parseDsl('[card #a] @pos(0,0) @group("Q3 规划")')
+    const op = ops[0]!
+    expect(op.type).toBe('card')
+    if (op.type === 'card') expect(op.group).toBe('Q3 规划')
+  })
+
+  it('@group 无 @pos(给现有卡分组)→ keepExistingPos + group(不报 missing @pos)', () => {
+    const { ops, errors } = parseDslWithDiagnostics('[card #a] @group("idea")')
+    expect(errors).toEqual([])
+    expect(ops).toHaveLength(1)
+    const op = ops[0]!
+    if (op.type === 'card') {
+      expect(op.keepExistingPos).toBe(true)
+      expect(op.group).toBe('idea')
+    }
+  })
+
+  it('@group on rect/text/frame(freeDir 共享)→ 各自携带 group', () => {
+    const rect = parseDsl('[rect #r] @pos(0,0) @group("g1")')[0]!
+    const text = parseDsl('[text #t] @pos(0,0) @text("x") @group("g1")')[0]!
+    if (rect.type === 'free') expect(rect.group).toBe('g1')
+    if (text.type === 'free') expect(text.group).toBe('g1')
+  })
+
+  it('@href(#a;#b) → op.href 裸 id 列表(去 #)', () => {
+    const ops = parseDsl('[card #c] @pos(0,0) @href(#a;#b)')
+    const op = ops[0]!
+    if (op.type === 'card') expect(op.href).toEqual(['a', 'b'])
+  })
+
+  it('@href 容错:去重 + 丢非法 + 接受可无 # 前缀', () => {
+    const ops = parseDsl('[card #c] @pos(0,0) @href(#a;a;#b;bad id;#a)')
+    const op = ops[0]!
+    // a 去重(首留),bad id 含空格丢,顺序 a,b
+    if (op.type === 'card') expect(op.href).toEqual(['a', 'b'])
+  })
+
+  it('@href 无有效目标 → href undefined', () => {
+    const ops = parseDsl('[card #c] @pos(0,0) @href(;;)')
+    const op = ops[0]!
+    if (op.type === 'card') expect(op.href).toBeUndefined()
+  })
+
+  it('@href 超过上限截断到 DSL_MAX_HREF_TARGETS', () => {
+    const ids = Array.from({ length: 30 }, (_, i) => `#n${i}`).join(';')
+    const ops = parseDsl(`[card #c] @pos(0,0) @href(${ids})`)
+    const op = ops[0]!
+    if (op.type === 'card') {
+      expect(op.href).toHaveLength(20)
+      expect(op.href![0]).toBe('n0')
+      expect(op.href![19]).toBe('n19')
+    }
+  })
+
+  it('@compute on text → op.compute 原文(quoted)', () => {
+    const ops = parseDsl('[text #t] @pos(0,0) @compute("#a.w + #b.w")')
+    const op = ops[0]!
+    if (op.type === 'free' && op.shape === 'text') expect(op.compute).toBe('#a.w + #b.w')
+  })
+
+  it('@compute on rect → 忽略(仅 text 携带 compute)', () => {
+    const ops = parseDsl('[rect #r] @pos(0,0) @compute("1+1")')
+    const op = ops[0]!
+    if (op.type === 'free' && op.shape === 'rect') {
+      expect((op as { compute?: string }).compute).toBeUndefined()
+    }
+  })
+
+  it('strict 模式接受 v7 directive(非 unknown residual)', () => {
+    const { ops, errors } = parseDslStrictWithDiagnostics(
+      '[card #a] @pos(0,0) @group("g") @href(#b)\n[text #t] @pos(0,0) @text("x") @compute("#a.w")',
+    )
+    expect(errors).toEqual([])
+    expect(ops).toHaveLength(2)
+  })
+})

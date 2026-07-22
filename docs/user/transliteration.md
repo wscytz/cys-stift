@@ -42,7 +42,7 @@
 
 ## 三、DSL 语法速查
 
-每行一个元素。`#id` 是元素标识(往返用),`@pos/@size/@color` 是几何与样式。当前语法是 **cys-dsl v6**(v5 加卡片内容;v6 将 freedraw 移出 DSL)。
+每行一个元素。`#id` 是元素标识(往返用),`@pos/@size/@color` 是几何与样式。当前语法是 **cys-dsl v7**(v5 加卡片内容;v6 将 freedraw 移出 DSL;v7 加语义分组 `@group` / 卡片显式引用 `@href` / 安全公式 `@compute`)。
 
 ```
 # 卡片:默认更新既有卡;可改几何/颜色/title/content
@@ -58,13 +58,22 @@
 # 空串显式清空;省略 token = 保持内容不变
 [card #<id>] @title("") @content("")
 
-# 矩形等自由形状
+# v7 语义分组:给卡打组名(无 @pos 可给现有卡分组);组的样式/折叠是视图层,不进 DSL
+[card #<id>] @group("Q3 规划")
+
+# v7 卡片显式引用(KG 边,不画线;区别于正文 [[wikilink]]→自动箭头);;分隔,≤20 个
+[card #<id>] @href(#<目标1>;#<目标2>)
+
+# 矩形等自由形状(v7 可加 @group)
 [rect #<id>] @pos(<x>,<y>) @size(<w>,<h>) @color(<c>)
 
-# 文本
+# 文本(v7 可加 @group / @compute)
 [text #<id>] @pos(<x>,<y>) @text("<内容>") @color(<c>)
 
-# 主题分区
+# v7 安全公式(仅 text):只引用元素几何 #id.x|y|w|h,算出显示值(禁裸 eval,不碰卡片内容)
+[text #<id>] @pos(<x>,<y>) @compute("#a.w + #b.w")
+
+# 主题分区(v7 可加 @group)
 [frame #<id>] @pos(<x>,<y>) @size(<w>,<h>) @text("<标题>") @color(<c>)
 
 # 关系箭头(三维语义签名:线型 + 箭头头 + 颜色)
@@ -141,7 +150,7 @@
 - **颜色固定 6+1**:越界色回退默认,不静默变黑。
 - **vision 当前未接入**:默认只保留 `kind`(image/pdf)元数据,二进制永不外发。Settings 的 Labs 区会明确显示没有可开启的 Vision consumer;详见 [`privacy.md`](privacy.md)。
 
-### DSL coverage（当前 v6）
+### DSL coverage（当前 v7）
 
 | 字段 | DSL 状态 |
 |---|---|
@@ -149,7 +158,10 @@
 | card `@title` / `@content` | 可序列化、可解析、可回写;空串清空;无 `@pos` 可纯内容编辑 |
 | relation/free arrow 的端点、标签、颜色、线型、箭头头、curve/elbow route、wikilink 标记 | 可序列化、可解析、可回写 |
 | `create` 卡 | 显式 `create`;可带 title/content;持久化失败标 failed,不留 ghost |
-| links、code、quotes、media 二进制 | 不属于 DSL;仍由程序/CardService/导出数据管理 |
+| v7 `@group`(语义分组) | card/rect/text/frame 均可;落 `element.meta.group`;空串清空;组的样式/折叠是视图层 |
+| v7 `@href(#a;#b)`(卡片显式引用) | 落 `element.meta.href`(裸 id 列表);去重 ≤20;不画线,区别于正文 wikilink→箭头 |
+| v7 `@compute("公式")`(安全公式) | 仅 text;只引用几何 `#id.x\|y\|w\|h`,apply 时求值写 text;禁裸 eval、不碰卡片内容;每次 apply 重算(非 live) |
+| 正文内 links/wikilink、code、quotes、media 二进制 | 不属于 DSL;仍由程序/CardService/导出数据管理(卡片间的**显式**引用可走 `@href`) |
 | freedraw | **不属于 DSL**;位置/点序列均不进文本,由程序 R2 + 渲染管理 |
 
 ---
@@ -158,8 +170,8 @@
 
 告诉 AI:
 
-> 这是一张 cys-dsl v6 画布描述。每行一个元素;使用 grammar 给出的 `[kind #id]` 与 `@directive(...)` 形式。
-> 卡片默认更新既有 id;可按任务改几何/颜色/`@title`/`@content`;纯内容编辑可省 `@pos`,确实新建时才使用 `[card #new-id create] @pos(...)`,且 ID 必须不存在。freedraw 不属于 DSL。
+> 这是一张 cys-dsl v7 画布描述。每行一个元素;使用 grammar 给出的 `[kind #id]` 与 `@directive(...)` 形式。
+> 卡片默认更新既有 id;可按任务改几何/颜色/`@title`/`@content`;纯内容编辑可省 `@pos`,确实新建时才使用 `[card #new-id create] @pos(...)`,且 ID 必须不存在。语义分组用 `@group("名")`,卡片间显式引用用 `@href(#a;#b)`,文本公式用 `@compute("#id.w + …")`(只读几何)。freedraw 不属于 DSL。
 > 输出一段 DSL 重排或编辑这张画布。应用前会预演、校验并显示确认门;坏行会被诊断并跳过,不会静默成功。
 
 DSL 模态编辑器里还内嵌了一份语法速查(可折叠 details),双语。

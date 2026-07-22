@@ -23,7 +23,7 @@
 | **proposal** | Proposal payload/review/receipt 存在本地 OPFS（不可用时 localStorage）；持久化来源锚点只保存 identity、revision、path/position 与 excerpt hash，不重复保存 `title/body` 原文；审计报告也不包含来源正文、API key 或完整 prompt | 只有生成时 allowlisted Working Set 会发给你选的 provider；本地 proposal 仅在你主动导出报告时离开设备 |
 | **export / archive** | Export 是你主动下载的开放 JSON; archive 是本地 OPFS(不可用时 localStorage) 的开发存档 | Export 文件由你决定是否分享; archive 本身不发给 AI。两者在最终边界清空 `apiKey`; archive 还剥离媒体 `dataUrl`,只留媒体元数据 |
 
-样本只保存 `question/context/aiOutput`、结果和 DSL 版号等脱敏字段,不保存原始 `Card[]`、settings、`deviceId` 或 API key。完整 JSON 备份可以包含卡片、媒体、草稿、设置、画布几何、对话和样本,所以分享前请把它当作包含你内容的文件处理。**画布 DSL v6**支持卡片 `@title`/`@content`(内容能力自 v5 引入;v6 将 freedraw 移出 DSL):DSL 模态编辑器的人读全量视图会携带内容;"复制所选为 DSL"与自建模板不注入内容,仍是纯几何(outbound 默认隐私安全)。AI 不直接读取模态编辑器 DSL 文本,而由程序通过独立的 `snapshotCanvas` / RAG 视图按任务构造上下文(snapshot 默认卡片 title;RAG 仅发送 allowlist 字段;freedraw 仅 shape 描述符)。分享**你在模态编辑器里复制的全量 DSL 文本**时仍应当作包含卡片内容处理。DSL 永远不含 `apiKey`、媒体二进制或手绘点序列;freedraw 由程序自管 R2 + 渲染。
+样本只保存 `question/context/aiOutput`、结果和 DSL 版号等脱敏字段,不保存原始 `Card[]`、settings、`deviceId` 或 API key。完整 JSON 备份可以包含卡片、媒体、草稿、设置、画布几何、对话和样本,所以分享前请把它当作包含你内容的文件处理。**画布 DSL v7**支持卡片 `@title`/`@content`(内容能力自 v5 引入;v6 将 freedraw 移出 DSL;v7 加 `@group` 语义分组 / `@href` 卡片显式引用 / `@compute` 安全公式——其中 `@compute` 只引用元素几何 `#id.x|y|w|h`、**不碰卡片内容**,`@href` 是卡 id,均不新增内容外发):DSL 模态编辑器的人读全量视图会携带内容;"复制所选为 DSL"与自建模板不注入内容,仍是纯几何(outbound 默认隐私安全)。AI 不直接读取模态编辑器 DSL 文本,而由程序通过独立的 `snapshotCanvas` / RAG 视图按任务构造上下文(snapshot 默认卡片 title;RAG 仅发送 allowlist 字段;freedraw 仅 shape 描述符)。分享**你在模态编辑器里复制的全量 DSL 文本**时仍应当作包含卡片内容处理。DSL 永远不含 `apiKey`、媒体二进制或手绘点序列;freedraw 由程序自管 R2 + 渲染。
 
 ---
 

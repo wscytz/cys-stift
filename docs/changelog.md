@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-07-23 · 1.0.0 · cys-dsl v7(@group / @href / @compute)
+
+DSL 语法单一源升 v6→v7,加三条 directive。全链路(grammar/peggy/parser/sanitize/serialize/apply)+ AI prompt(单一源 REFERENCE 自动联动)+ 用户文档 + 版本锁测试同步。**铁律守住:DSL=状态≠行为、双向往返对称、`@compute` 禁裸 eval。**
+
+- **`@group("名")`(语义分组)**:card/rect/text/frame 均可,落 `element.meta.group`;空串清键。无 `@pos` 可给现有卡分组(沿用 `keepExistingPos`)。**组的样式/折叠是视图层关注,不进 DSL**(同 halo 判定:DSL 只存成员关系这一状态)。
+- **`@href(#a;#b)`(卡片显式引用)**:落 `element.meta.href`(裸 id 列表,`;` 分隔、去重、≤20 上限)。**不画线**,是 DSL 里直接声明的 KG 边,区别于正文 `[[wikilink]]`→自动 references 箭头(那是生产侧,这是显式声明侧)。消费(backlink 面板/跳转)是后续视图特性。
+- **`@compute("公式")`(安全公式,仅 text)**:新增 `dsl-compute.ts` —— 手写 tokenizer + 递归下降求值器,**绝不 eval/new Function**;只认数字 / `+ - * /` / 括号 / `min,max,abs,round` / 几何引用 `#id.x|y|w|h`。**只读元素几何,不碰卡片内容(无隐私泄漏)**。除零→0、非有限→0、递归深度上限防栈炸。apply 时用 shadow 几何(含同批 create)求值写 `element.text`,原式存 `meta.compute` 往返对称;求值失败保留已知 text。**每次 apply 重算,live 响应是文档化的后续增强。**
+- **版本治理**:`DSL_VERSION` 6→7;`DSL_GRAMMAR_REFERENCE` 加三条指令(AI prompt / DSL 模态语法速查 / canvas-prompt / 样本版号单一源自动跟随);4 处版本锁测试升 7(cys-dsl ×2 + web agent-prompt/dsl-stability ×2);`docs/user/transliteration.md` 语法速查 + coverage 表 + AI 提示模板、`docs/user/privacy.md`、`docs/STATE.md` 对齐。
+- **测试**:cys-dsl +30(parser 10 / compute 14 / serialize 6)+ web apply-layout +8(@compute 对 seed/同批几何求值、@group 清键、@href、meta 存活)。
+
+---
+
 ## 2026-07-22 · 1.0.0 · AI 输出健壮性 + 工作台 UX(测试反馈一批)
 
 真机测试发现的体验问题一批,集中在"AI 输出 DSL 的可靠性"与"工作台保存/输入交互"。

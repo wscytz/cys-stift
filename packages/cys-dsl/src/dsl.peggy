@@ -21,7 +21,7 @@ cardLine
   = '[' 'card' sp ds:cardDir* .* { return { kind: 'card', ds: ds } }
 
 cardDir
-  = ws d:(idDir / posDir / sizeDir / colorDir / relationDir / gapDir / createDir / titleDir / contentDir / skipChunk) { return d }
+  = ws d:(idDir / posDir / sizeDir / colorDir / relationDir / gapDir / createDir / titleDir / contentDir / groupDir / hrefDir / skipChunk) { return d }
 
 // ── arrow:`[arrow ` 或 `[arrow]` 提交;#id 可省([arrow]);relation(from/to) vs free(pos/size) ──
 arrowLine
@@ -41,7 +41,7 @@ frameLine
   = '[' 'frame' sp ds:freeDir* .* { return { kind: 'frame', ds: ds } }
 
 freeDir
-  = ws d:(idDir / posDir / sizeDir / colorDir / textDir / skipChunk) { return d }
+  = ws d:(idDir / posDir / sizeDir / colorDir / textDir / groupDir / computeDir / skipChunk) { return d }
 
 // ── [ 开头但非已知 kind(或已知 kind 缺空格如 [card])→ unrecognized diagnostic ──
 // 注:freedraw 已移出 DSL([freedraw] 落到这里 → unrecognized);程序自管(R2 + 渲染)。
@@ -116,6 +116,23 @@ elbowDir
 wikilinkDir
   // 词边界(复刻旧 @wikilink\b):@wikilinkXYZ 不命中
   = '@wikilink' !idChar { return ['wikilink', true] }
+
+// v7: 语义分组(directive,非新 kind)。quotedString 允许带空格组名(如 "Q3 规划")。
+//     成员关系落 element.meta.group;组的样式/折叠是视图层关注点,不进 DSL(DSL=状态≠行为)。
+groupDir
+  = '@group(' v:quotedString ')' { return ['group', v] }
+
+// v7: 卡片显式语义引用(KG 边)。`;` 分隔的 #id 列表(镜像 @elbow 的列表约定)。
+//     捕获原始串,TS 层 parseHref 拆分 + 校验 + 去重 + 上限。区别于正文 [[...]]→自动箭头:
+//     这是 DSL 里直接声明的、不画线的语义边,落 element.meta.href。
+hrefDir
+  = '@href(' v:$([^)]+) ')' { return ['href', v] }
+
+// v7: 安全公式(仅 text 元素)。quotedString 承载表达式;apply 层用受限递归下降
+//     求值器算(禁裸 eval),只引用元素几何 #id.x/y/w/h(不碰卡片内容 → 无隐私泄漏),
+//     结果写 element.text,原式存 element.meta.compute(往返对称 + 每次 apply 重算)。
+computeDir
+  = '@compute(' v:quotedString ')' { return ['compute', v] }
 
 // ─── lexemes ───
 num
