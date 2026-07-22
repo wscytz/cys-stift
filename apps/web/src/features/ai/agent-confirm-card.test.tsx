@@ -360,6 +360,59 @@ describe('AgentConfirmCard — live 模式(liveHost 提供)', () => {
     expect(hostCalls.upserts.filter((e) => e.id === 'r1')).toHaveLength(0)
     unmount()
   })
+
+  it('live 路径 content 写入可经 toast undo 回滚正文(BUG2:几何走 Ctrl+Z,正文走 undo)', async () => {
+    pushToastSpy.mockClear()
+    // 带状态的 service:c1 已存在,跟踪 get/update。
+    const store = new Map([
+      ['c1', { id: 'c1', title: '旧标题', body: '旧正文' }],
+    ])
+    const service = {
+      get: (id: string) => store.get(String(id)) ?? undefined,
+      update: (id: string, patch: { title?: string; body?: string }) => {
+        const c = store.get(String(id))
+        if (!c) return null
+        store.set(String(id), { ...c, ...patch })
+        return store.get(String(id))
+      },
+      createWithId: () => {},
+    } as unknown as CardService
+    const { host: mockHost } = makeMockHost({
+      elements: [
+        { id: 'c1', kind: 'card', x: 10, y: 10, w: 240, h: 120, rotation: 0 } as CanvasElement,
+      ],
+    })
+
+    const { host: domHost, unmount } = mount(
+      <AgentConfirmCard
+        dsl={'[card #c1] @pos(20,20) @title("新标题")'}
+        targetCanvasId={'canvas-live' as never}
+        service={service}
+        liveHost={mockHost}
+        onApplied={() => {}}
+        onRejected={() => {}}
+      />,
+    )
+    await act(async () => { await flushMicro() })
+    await act(async () => { byText(domHost, /^应用$|^Apply$/)!.click() })
+    await act(async () => { await flushMicro() })
+
+    // apply 经 makeOnCardUpdate 写了新标题。
+    expect(store.get('c1')!.title).toBe('新标题')
+    // toast 提供 undo action(BUG2 修前 live 路径无 undo)。
+    const success = pushToastSpy.mock.calls
+      .map(([toast]) => toast as { kind?: string; actions?: { label: string; onClick: () => void }[] })
+      .find((toast) => toast.kind === 'success')
+    expect(success?.actions?.[0]?.label).toMatch(/撤销/)
+    await act(async () => {
+      success!.actions![0]!.onClick()
+      await flushMicro()
+    })
+    // undo 回滚正文到旧标题(BUG2 修前:永久驻留「新标题」)。
+    expect(store.get('c1')!.title).toBe('旧标题')
+    expect(store.get('c1')!.body).toBe('旧正文')
+    unmount()
+  })
 })
 
 // ───────────────────────────────────────────────────────────────────

@@ -274,8 +274,40 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
         // binding 持久化几何;v5 内容(@title/@content)经 onCardUpdate 直接 service.update
         // (bindCardWriteback 不写内容)。不调 applyOpsAndPersist(会双写)。
         const creator = makeOnCardCreate(targetCanvasId, service)
+        // 修 BUG2:makeOnCardUpdate 的 service.update 在 host.batch 之外,host undo 栈
+        // 只记几何 → Ctrl+Z 只回几何、正文永久驻留。捕获 content 目标卡的 before
+        // title/body,apply 后暴露一次性 undo 回滚正文(几何仍走 host 的 Ctrl+Z)。
+        const contentBefore = new Map<CardId, { title: string; body: string }>()
+        for (const op of preview.ops) {
+          if (op.type === 'card' && !op.create && (op.title !== undefined || op.content !== undefined)) {
+            const cur = service.get(op.cardId as CardId)
+            if (cur) contentBefore.set(op.cardId as CardId, { title: cur.title, body: cur.body })
+          }
+        }
         const r = applyLayout(liveHost, preview.ops, undefined, creator.onCardCreate, makeOnCardUpdate(service))
-        res = { ok: true, committed: true, applied: r.applied, failed: r.failed, cardsUpdated: r.cardsUpdated, cardsCreated: r.cardsCreated, cardsFailed: creator.getFailed(), ...(r.sanitizeDiagnostics ? { sanitizeDiagnostics: r.sanitizeDiagnostics } : {}) }
+        const contentUndo =
+          contentBefore.size > 0
+            ? async (): Promise<boolean> => {
+                for (const [id, before] of contentBefore) {
+                  const cur = service.get(id)
+                  if (cur && (cur.title !== before.title || cur.body !== before.body)) {
+                    service.update(id, { title: before.title, body: before.body })
+                  }
+                }
+                return true
+              }
+            : undefined
+        res = {
+          ok: true,
+          committed: true,
+          applied: r.applied,
+          failed: r.failed,
+          cardsUpdated: r.cardsUpdated,
+          cardsCreated: r.cardsCreated,
+          cardsFailed: creator.getFailed(),
+          ...(contentUndo ? { undo: contentUndo } : {}),
+          ...(r.sanitizeDiagnostics ? { sanitizeDiagnostics: r.sanitizeDiagnostics } : {}),
+        }
       } else {
         // /ask temp 路径:复用刚通过 revision 检查的 host，避免检查后再异步
         // rebuild 留出新的竞态窗口；applyOpsAndPersist 在该 host 上应用并落库。
