@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-07-22 · 1.0.0 · AI 内容编辑闭环(确认门 content diff + 纯内容编辑可 apply)
+
+承接同日 content-on-demand 开关与 v6 两处修复,补齐"AI 改得来内容"的最后一环:确认门原本只看几何 diff,纯内容编辑(@title/@content 无 @pos —— 正是 prompt 教 AI 发的形式)几何零变化 → Apply 按钮被禁用,AI 的内容改动永远落不了地。
+
+- **fix(ai): 纯内容编辑可 apply**:`AgentConfirmCard` 的 Apply gating 原为 `totalChanges===0`(纯几何 diff)。新增 `computeContentDiff` 从 ops + CardService 算出 @title/@content 变更,gating 改为「几何或内容有变化」即可启用。
+- **feat(ai): 专门的对话内容修改预览**:新增 `AgentContentDiff` 子组件,逐卡展示标题/正文的 before(划掉)→ after,区别于几何缩略图。纯内容编辑时几何缩略图那栏隐藏(以前显示两张一模一样的图),内容 diff 成为主体视图。建卡带内容时只展 after。
+- **为什么之前漏**:两条 apply 路径(live `makeOnCardUpdate` + /ask temp `applyOpsAndPersist` 的 `contentByCardId`)内容写回逻辑都正确,断点只在确认门的几何 diff 与按钮 gating —— 几何 diff 看不到内容(`CanvasElement` 无 title/body 字段)。
+- **验证**:web 1713 passed(+6:5 `computeContentDiff` 纯函数 + 1 组件路径);lint 0。
+
+---
+
 ## 2026-07-22 · 1.0.0 · AI content-on-demand 开关 + v6 两处正确性修复
 
 修"AI 看不到卡片正文"诉求 + code review 发现的两处 v6 正确性 bug,均在 main 上(承接已合并的 cys-dsl v6)。

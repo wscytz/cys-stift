@@ -23,14 +23,14 @@ import { Button } from '@cys-stift/ui'
 import type { CanvasId, CardId, CardService, ColorToken } from '@cys-stift/domain'
 import { InMemoryCanvasHost, type CanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
 import { parseDslStrictWithDiagnostics } from '@cys-stift/dsl'
-import type { SanitizeDiagnostic } from '@cys-stift/dsl'
+import type { DslOp, SanitizeDiagnostic } from '@cys-stift/dsl'
 import { applyLayout, type CardCreateHandler, type CardUpdateHandler } from '@/features/canvas/apply-layout'
 import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
 import { buildCanvasHostForCanvas, applyOpsAndPersist, type PersistResult } from '@/features/canvas/canvas-host-builder'
 import { useI18n } from '@/lib/i18n'
 import { pushToast } from '@/lib/toast-store'
 import { addSample, genSampleId } from './sample-store'
-import { Thumb, DiffGroup, summarizeEl, confirmStyles } from './canvas-thumb'
+import { Thumb, DiffGroup, summarizeEl, confirmStyles, AgentContentDiff, type ContentChange } from './canvas-thumb'
 import { settingsStore } from '@/lib/settings-store'
 import { archiveStore, type ArchivePayload, type ArchiveStateSnapshot } from '@/lib/archive-store'
 import { buildArchivePayload } from '@/lib/build-archive-payload'
@@ -156,6 +156,40 @@ export function makeOnCardUpdate(service: CardService): CardUpdateHandler {
   }
 }
 
+/**
+ * 从 DSL ops + 当前 CardService 算出内容变更(@title/@content)。几何 diff 看不到内容
+ * (CanvasElement 无 title/body),这条独立 diff 让确认门展示"内容将怎么改",并让纯内容
+ * 编辑(无 @pos)也能 apply —— 否则 totalChanges(几何)===0 会把 Apply 按钮误禁用,
+ * AI 的内容改动永远落不了地(这就是"改不来内容"的根因)。建卡(create)带内容时只展
+ * 示将写入的 after,无 before。
+ */
+export function computeContentDiff(
+  ops: readonly DslOp[],
+  service: CardService,
+): ContentChange[] {
+  const out: ContentChange[] = []
+  for (const op of ops) {
+    if (op.type !== 'card') continue
+    if (op.title === undefined && op.content === undefined) continue
+    const created = !!op.create
+    const current = created ? undefined : (service.get(op.cardId as CardId) ?? undefined)
+    const title: ContentChange['title'] =
+      op.title === undefined
+        ? undefined
+        : created
+          ? { after: op.title }
+          : { before: current?.title, after: op.title }
+    const body: ContentChange['body'] =
+      op.content === undefined
+        ? undefined
+        : created
+          ? { after: op.content }
+          : { before: current?.body, after: op.content }
+    out.push({ cardId: String(op.cardId), created, title, body })
+  }
+  return out
+}
+
 export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApplied, onRejected, sampleContext }: Props) {
   const { t } = useI18n()
   const [phase, setPhase] = useState<Phase>('confirming')
@@ -206,6 +240,13 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
     if (!beforeState || !afterState) return null
     return diffCanvasSnapshots(beforeState, afterState)
   }, [beforeState, afterState])
+
+  // 内容 diff(@title/@content):几何 diff 看不到内容,这条独立计算。不依赖异步 before/
+  // after 加载,纯内容编辑时立即展示;并让 Apply 在纯内容改动时也能启用。
+  const contentChanges = useMemo(() => {
+    if (preview.kind !== 'ok') return [] as ContentChange[]
+    return computeContentDiff(preview.ops, service)
+  }, [preview, service])
 
   const recordReject = () => {
     // 拒绝路径捕获(parseError 态 + confirming 态共用)。开关关时 addSample 内部 no-op。
@@ -442,6 +483,9 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
   }
 
   const totalChanges = diff ? diff.added.length + diff.removed.length + diff.changed.length : 0
+  const hasGeometryChange = totalChanges > 0
+  const hasContentChange = contentChanges.length > 0
+  const hasAnyChange = hasGeometryChange || hasContentChange
 
   return (
     <div className="ac">
@@ -451,9 +495,13 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
           : t('agent.proposeTitle', { canvas: canvasName(targetCanvasId) })}
       </p>
 
-      {diff && (
+      {diff && !hasAnyChange && (
         <div className="ac__diff">
-          {totalChanges === 0 && <p className="ac__nochange">{t('agent.noChange')}</p>}
+          <p className="ac__nochange">{t('agent.noChange')}</p>
+        </div>
+      )}
+      {diff && hasGeometryChange && (
+        <div className="ac__diff">
           {diff.added.length > 0 && (
             <DiffGroup color="blue" label={t('agent.added', { n: String(diff.added.length) })}
               items={diff.added.map((e) => summarizeEl(e))} />
@@ -469,7 +517,20 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
         </div>
       )}
 
-      {beforeState && afterState && (
+      {hasContentChange && (
+        <AgentContentDiff
+          changes={contentChanges}
+          labels={{
+            section: t('agent.contentChanges', { n: String(contentChanges.length) }),
+            newCard: t('agent.contentNewCard'),
+            titleField: t('agent.contentFieldTitle'),
+            bodyField: t('agent.contentFieldBody'),
+            emptyMark: '(空)',
+          }}
+        />
+      )}
+
+      {hasGeometryChange && beforeState && afterState && (
         <div className="ac__thumbs">
           <Thumb elements={beforeState} label={t('agent.before')} />
           <span className="ac__arrow">→</span>
@@ -488,7 +549,7 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
 
       {phase !== 'applied' && (
         <div className="ac__actions">
-          <Button variant="primary" onClick={() => void handleApply()} disabled={phase === 'applying' || !afterState || totalChanges === 0}>
+          <Button variant="primary" onClick={() => void handleApply()} disabled={phase === 'applying' || !afterState || !hasAnyChange}>
             {phase === 'applying' ? t('agent.applying') : t('agent.apply')}
           </Button>
           <Button variant="ghost" onClick={() => setEditing((v) => !v)}>{t('agent.edit')}</Button>

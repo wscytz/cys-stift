@@ -92,7 +92,9 @@ import {
   AgentConfirmCard,
   makeOnCardCreate,
   makeOnCardUpdate,
+  computeContentDiff,
 } from '@/features/ai/agent-confirm-card'
+import { parseDsl } from '@cys-stift/dsl'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true
@@ -283,6 +285,56 @@ describe('makeOnCardUpdate — v5 内容写回(@title/@content,live 路径)', ()
 })
 
 // ───────────────────────────────────────────────────────────────────
+describe('computeContentDiff — 内容 diff 纯函数(几何 diff 看不到 @title/@content)', () => {
+  it('update op 带 @title/@content → before 取自 service,after 取自 op', () => {
+    const service = {
+      get: (id: string) =>
+        id === 'c1' ? { id, title: '旧标题', body: '旧正文' } : null,
+    } as unknown as CardService
+    const ops = parseDsl('[card #c1] @title("新标题") @content("新正文")')
+    const diff = computeContentDiff(ops, service)
+    expect(diff).toHaveLength(1)
+    expect(diff[0]).toMatchObject({ cardId: 'c1', created: false })
+    expect(diff[0]!.title).toMatchObject({ before: '旧标题', after: '新标题' })
+    expect(diff[0]!.body).toMatchObject({ before: '旧正文', after: '新正文' })
+  })
+
+  it('create op 带内容 → created=true,只展 after(无 before)', () => {
+    const service = { get: () => null } as unknown as CardService
+    const ops = parseDsl('[card #new create] @pos(0,0) @title("T") @content("B")')
+    const diff = computeContentDiff(ops, service)
+    expect(diff).toHaveLength(1)
+    expect(diff[0]).toMatchObject({ cardId: 'new', created: true })
+    expect(diff[0]!.title).toMatchObject({ after: 'T' })
+    expect(diff[0]!.title!.before).toBeUndefined()
+    expect(diff[0]!.body).toMatchObject({ after: 'B' })
+  })
+
+  it('纯几何 op(无 @title/@content)→ 空数组', () => {
+    const service = { get: () => null } as unknown as CardService
+    const ops = parseDsl('[card #c1] @pos(10,10) @color(red)')
+    expect(computeContentDiff(ops, service)).toHaveLength(0)
+  })
+
+  it('仅 @title(无 @content)→ 只 title 字段,body undefined', () => {
+    const service = {
+      get: () => ({ id: 'c1', title: '旧', body: 'b' }),
+    } as unknown as CardService
+    const ops = parseDsl('[card #c1] @title("新")')
+    const diff = computeContentDiff(ops, service)
+    expect(diff).toHaveLength(1)
+    expect(diff[0]!.body).toBeUndefined()
+    expect(diff[0]!.title).toMatchObject({ before: '旧', after: '新' })
+  })
+
+  it('非 card op(arrow/rect)→ 忽略', () => {
+    const service = { get: () => null } as unknown as CardService
+    const ops = parseDsl('[rect #r1] @pos(0,0) @size(10,10)\n[arrow #c1→#c2]')
+    expect(computeContentDiff(ops, service)).toHaveLength(0)
+  })
+})
+
+// ───────────────────────────────────────────────────────────────────
 describe('AgentConfirmCard — live 模式(liveHost 提供)', () => {
   it('点 Apply → mockHost.batch 被调 + upsert 收到 rect;不调 applyOpsAndPersist', async () => {
     const { host: mockHost, calls: hostCalls } = makeMockHost({
@@ -411,6 +463,59 @@ describe('AgentConfirmCard — live 模式(liveHost 提供)', () => {
     // undo 回滚正文到旧标题(BUG2 修前:永久驻留「新标题」)。
     expect(store.get('c1')!.title).toBe('旧标题')
     expect(store.get('c1')!.body).toBe('旧正文')
+    unmount()
+  })
+
+  it('纯内容编辑(无 @pos)→ Apply 启用 + 内容 diff 显示 + 几何缩略图隐藏 + 落地(BUG: 改不来内容)', async () => {
+    pushToastSpy.mockClear()
+    const store = new Map([
+      ['c1', { id: 'c1', title: '旧标题', body: '旧正文' }],
+    ])
+    const service = {
+      get: (id: string) => store.get(String(id)) ?? undefined,
+      update: (id: string, patch: { title?: string; body?: string }) => {
+        const c = store.get(String(id))
+        if (!c) return null
+        store.set(String(id), { ...c, ...patch })
+        return store.get(String(id))
+      },
+      createWithId: () => {},
+    } as unknown as CardService
+    const { host: mockHost } = makeMockHost({
+      elements: [
+        { id: 'c1', kind: 'card', x: 10, y: 10, w: 240, h: 120, rotation: 0 } as CanvasElement,
+      ],
+    })
+
+    const { host: domHost, unmount } = mount(
+      <AgentConfirmCard
+        dsl={'[card #c1] @title("新标题") @content("新正文")'}
+        targetCanvasId={'canvas-live' as never}
+        service={service}
+        liveHost={mockHost}
+        onApplied={() => {}}
+        onRejected={() => {}}
+      />,
+    )
+    await act(async () => { await flushMicro() })
+
+    // 修前:纯内容编辑 totalChanges(几何)===0 → Apply 禁用 → AI 内容改动永远落不了地。
+    const applyBtn = byText(domHost, /^应用$|^Apply$/)!
+    expect(applyBtn.disabled).toBe(false)
+
+    // 专门的对话内容修改预览:展示将写入的新标题/新正文。
+    expect(domHost.querySelector('.ac__content')).toBeTruthy()
+    expect(domHost.textContent).toMatch(/新标题/)
+    expect(domHost.textContent).toMatch(/新正文/)
+    // 纯内容编辑无几何变化 → 缩略图那栏隐藏(以前会显示两张一模一样的图)。
+    expect(domHost.querySelector('.ac__thumbs')).toBeNull()
+
+    // 点 Apply → makeOnCardUpdate 写入新内容(改得来内容)。
+    await act(async () => { applyBtn.click() })
+    await act(async () => { await flushMicro() })
+    expect(store.get('c1')!.title).toBe('新标题')
+    expect(store.get('c1')!.body).toBe('新正文')
+
     unmount()
   })
 })

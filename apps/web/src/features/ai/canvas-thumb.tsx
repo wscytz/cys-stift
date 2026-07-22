@@ -18,6 +18,108 @@ export function summarizeEl(el: CanvasElement): string {
   return `${el.kind} #${el.id}`
 }
 
+/** 一张卡单个内容字段(标题/正文)的前后变化。新卡无 before。 */
+export interface ContentFieldChange {
+  before?: string
+  after?: string
+}
+
+/**
+ * 卡片内容变更项。DSL `@title`/`@content` 改动几何 diff 看不见(CanvasElement 无内容字段),
+ * 用这条独立的 content diff 让用户在确认门看到"正文/标题将怎么改"。`created` 标记建卡
+ * (无 before,只展示将写入的内容)。
+ */
+export interface ContentChange {
+  cardId: string
+  created: boolean
+  title?: ContentFieldChange
+  body?: ContentFieldChange
+}
+
+export interface AgentContentDiffLabels {
+  section: string
+  newCard: string
+  titleField: string
+  bodyField: string
+  emptyMark: string
+}
+
+/**
+ * 专门的对话内容修改预览 —— 区别于几何缩略图。逐卡展示标题/正文的 before(划掉)→ after。
+ * 纯内容编辑(@title/@content 无 @pos)时这是确认门的主体视图(几何缩略图那栏会隐藏)。
+ */
+export function AgentContentDiff({
+  changes,
+  labels,
+}: {
+  changes: ContentChange[]
+  labels: AgentContentDiffLabels
+}) {
+  return (
+    <section className="ac__content">
+      <p className="ac__group-label">{labels.section}</p>
+      {changes.map((c) => {
+        const showTitle = !!c.title && (c.title.before !== undefined || c.title.after !== undefined)
+        const showBody = !!c.body && (c.body.before !== undefined || c.body.after !== undefined)
+        if (!showTitle && !showBody) return null
+        return (
+          <div className="ac__content-card" key={c.cardId}>
+            <p className="ac__content-id">
+              #{c.cardId}
+              {c.created ? ` · ${labels.newCard}` : ''}
+            </p>
+            {showTitle && (
+              <ContentRow
+                field={labels.titleField}
+                before={c.title!.before}
+                after={c.title!.after}
+                created={c.created}
+                emptyMark={labels.emptyMark}
+              />
+            )}
+            {showBody && (
+              <ContentRow
+                field={labels.bodyField}
+                before={c.body!.before}
+                after={c.body!.after}
+                created={c.created}
+                emptyMark={labels.emptyMark}
+              />
+            )}
+          </div>
+        )
+      })}
+    </section>
+  )
+}
+
+function ContentRow({
+  field,
+  before,
+  after,
+  created,
+  emptyMark,
+}: {
+  field: string
+  before?: string
+  after?: string
+  created: boolean
+  emptyMark: string
+}) {
+  const afterText = after ?? ''
+  return (
+    <div className="ac__content-row">
+      <span className="ac__content-field">{field}</span>
+      <div className="ac__content-text">
+        {!created && before !== undefined && (
+          <p className="ac__content-before">{before === '' ? emptyMark : before}</p>
+        )}
+        <p className="ac__content-after">{afterText === '' ? emptyMark : afterText}</p>
+      </div>
+    </div>
+  )
+}
+
 export function DiffGroup({ color, label, items }: { color: 'blue' | 'red' | 'yellow'; label: string; items: string[] }) {
   return (
     <section className={`ac__group ac__group--${color}`}>
@@ -109,4 +211,13 @@ export const confirmStyles = `
 .ac__edit { width: 100%; font-family: var(--font-mono); font-size: var(--font-size-xs); border: var(--border-hairline); padding: var(--space-1); border-radius: var(--radius-sm); resize: vertical; margin-bottom: var(--space-2); }
 .ac__actions { display: flex; gap: var(--space-1); flex-wrap: wrap; }
 .ac__errors { margin: 0 0 var(--space-2); padding-left: var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-red); }
+.ac__content { display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-2); }
+.ac__content-card { padding: var(--space-1) 0; border-top: var(--border-hairline); }
+.ac__content-card:first-of-type { border-top: none; padding-top: 0; }
+.ac__content-id { margin: 0 0 var(--space-1); font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black-soft); text-transform: lowercase; }
+.ac__content-row { display: flex; gap: var(--space-2); align-items: flex-start; }
+.ac__content-field { flex-shrink: 0; width: 3rem; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); text-transform: uppercase; letter-spacing: 0.08em; padding-top: 1px; }
+.ac__content-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ac__content-before { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); text-decoration: line-through; word-break: break-word; white-space: pre-wrap; }
+.ac__content-after { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black-soft); word-break: break-word; white-space: pre-wrap; }
 `
