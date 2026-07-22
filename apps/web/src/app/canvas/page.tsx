@@ -48,8 +48,8 @@ import { CanvasContextMenu } from '@/features/canvas/canvas-context-menu'
 import { CanvasEmptyMotif } from '@/features/canvas/canvas-empty-motif'
 import { syncAllWikiLinks } from '@/features/canvas/wiki-links'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
-import { serializeCanvas } from '@/features/ai/canvas-dsl'
-import { parseDsl, parseDslWithDiagnostics } from '@/features/ai/dsl-parser'
+import { serializeCanvas } from '@cys-stift/dsl'
+import { parseDsl, parseDslWithDiagnostics } from '@cys-stift/dsl'
 import { retryFailureMessageKey, retryUntilValid, buildIntentCorrection } from '@/features/ai/retry-until-valid'
 import { INTENT_IR_SCHEMA } from '@/features/ai/intent-schema'
 import { decodeIntentJson } from '@/features/ai/intent-validation'
@@ -720,11 +720,11 @@ ${formatted}`
   }, [zoomBy, toggleSnap, t, focusMode])
 
   // create 类 op 先落 CardService,applyLayout 收到成功结果后才写 host。
-  const onCardCreate = useCallback((p: { cardId: string; x: number; y: number; w: number; h: number; color?: string }) => {
+  const onCardCreate = useCallback((p: { cardId: string; x: number; y: number; w: number; h: number; color?: string; title?: string; content?: string }) => {
     try {
       service.createWithId(p.cardId as CardId, {
-        title: '',
-        body: '',
+        title: p.title ?? '',
+        body: p.content ?? '',
         type: 'note',
         canvasPosition: {
           canvasId: activeCanvasId,
@@ -745,6 +745,18 @@ ${formatted}`
       } as const
     }
   }, [service, activeCanvasId])
+
+  // v5:card-update 带 @title/@content → 写回 CardService(Card.title/body)。只写 DSL 提供的字段。
+  const onCardUpdate = useCallback((p: { cardId: string; title?: string; content?: string }) => {
+    try {
+      service.update(p.cardId as CardId, {
+        ...(p.title !== undefined ? { title: p.title } : {}),
+        ...(p.content !== undefined ? { body: p.content } : {}),
+      })
+    } catch {
+      // 静默:内容写入失败不视为致命(几何已应用;内容下次同步)。与 onCardCreate 的硬失败语义区分。
+    }
+  }, [service])
 
   // BUG-B + BUG-A:把"疑似 DSL 文本 → 审核"抽成组件级回调,paste 监听和右键菜单(T6)共用。
   // 放宽检测:任何含 `[` 开头的行都算疑似 DSL(不再只认 5 种 kind)。
@@ -1088,7 +1100,7 @@ ${formatted}`
     if (!template) return
     const ops = parseDsl(template.dsl)
     if (ops.length === 0) return
-    const report = applyLayout(adapterLocal, ops, undefined, onCardCreate)
+    const report = applyLayout(adapterLocal, ops, undefined, onCardCreate, onCardUpdate)
     if (report.applied > 0) {
       pushToast({ kind: 'success', message: t('canvas.template.applied', { name: tplName === 'blank' ? '' : tplName }) })
     } else {
@@ -1532,6 +1544,7 @@ ${formatted}`
         service={service}
         canvasName={activeCanvas?.name ?? ''}
         onCardCreate={onCardCreate}
+        onCardUpdate={onCardUpdate}
         initialText={dslSeedText ?? undefined}
       />
 

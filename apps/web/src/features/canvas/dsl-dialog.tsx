@@ -4,7 +4,7 @@
  * DslDialog — 画布转义(DSL 双向)模态编辑器(转义产品化 Step 2)。
  *
  * 把"画布的文字形态"直接暴露给用户:工具栏 DSL 按钮 → 弹模态,textarea
- * 显示当前画布文本(serializeCanvasReadable,card 行后附 `# title:` 注释),
+ * 显示当前画布文本(serializeCanvasReadable;v6 card 行含真实 @title/@content token),
  * 可编辑/粘贴,"应用/复制/下载"。应用走 parseDslWithDiagnostics +
  * applyLayout(单 undo 步);parse 失败的行不再被静默吞掉,而是在
  * textarea 下方逐行展示诊断(line + 原因)。
@@ -19,11 +19,11 @@ import { InMemoryCanvasHost, type CanvasElement, type CanvasHost } from '@cys-st
 import { useI18n } from '@/lib/i18n'
 import { downloadFile } from '@/lib/download'
 import { pushToast } from '@/lib/toast-store'
-import { serializeCanvasReadable, serializeCanvas } from '../ai/canvas-dsl'
-import { parseDslWithDiagnostics } from '../ai/dsl-parser'
+import { serializeCanvasReadable, serializeCanvas } from '@cys-stift/dsl'
+import { parseDslWithDiagnostics } from '@cys-stift/dsl'
 import { buildCanvasPrompt } from '../ai/canvas-prompt'
-import { DSL_GRAMMAR_REFERENCE } from '../ai/dsl-grammar'
-import { applyLayout, type CardCreateHandler } from './apply-layout'
+import { DSL_GRAMMAR_REFERENCE } from '@cys-stift/dsl'
+import { applyLayout, type CardCreateHandler, type CardUpdateHandler } from './apply-layout'
 import { diffCanvasSnapshots } from './canvas-diff'
 import { archiveStore } from '@/lib/archive-store'
 import { buildArchivePayload } from '@/lib/build-archive-payload'
@@ -88,6 +88,7 @@ export function DslDialog({
   service,
   canvasName,
   onCardCreate,
+  onCardUpdate,
   initialText,
 }: {
   open: boolean
@@ -96,6 +97,8 @@ export function DslDialog({
   service: CardService
   canvasName: string
   onCardCreate?: CardCreateHandler
+  /** v5:card-update 带 @title/@content 时写回 CardService。 */
+  onCardUpdate?: CardUpdateHandler
   /** Text supplied by the paste bridge; it is reviewed before being applied. */
   initialText?: string
 }) {
@@ -157,14 +160,14 @@ export function DslDialog({
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  // 打开时填充当前画布文本(serializeCanvasReadable,card 附 title 注释)。
+  // 打开时填充当前画布文本(v6:serializeCanvasReadable + CardService resolve,card 含 @title/@content)。
   // 同时清空诊断列表:刚序列化的文本恒为合法,无 parse 错误。
   // 也清空增量应用缓存:每次打开模态都是全新编辑会话。
   useEffect(() => {
     if (!open || !host) return
     const els = cloneElements(host.getElements())
     setBase({ elements: els, revision: revisionOf(els) })
-    setText(initialText ?? serializeCanvasReadable(els, (id) => service.get(id as CardId)?.title))
+    setText(initialText ?? serializeCanvasReadable(els, (id) => { const c = service.get(id as CardId); return c ? { title: c.title, content: c.body } : undefined }))
     setAppliedHashes(new Set())
     setStale(false)
   }, [open, host, service, initialText])
@@ -191,7 +194,7 @@ export function DslDialog({
     if (!host) return
     const elements = cloneElements(host.getElements())
     setBase({ elements, revision: revisionOf(elements) })
-    setText(serializeCanvasReadable(elements, (id) => service.get(id as CardId)?.title))
+    setText(serializeCanvasReadable(elements, (id) => { const c = service.get(id as CardId); return c ? { title: c.title, content: c.body } : undefined }))
     setAppliedHashes(new Set())
     setStale(false)
   }
@@ -222,7 +225,7 @@ export function DslDialog({
       return
     }
 
-    const { applied, skipped, failed } = applyLayout(host, ops, appliedHashes, onCardCreate)
+    const { applied, skipped, failed } = applyLayout(host, ops, appliedHashes, onCardCreate, onCardUpdate)
     // 合并新应用的 hash 到现有集合触发状态更新
     if (applied > 0) {
       const nextBase = cloneElements(host.getElements())
@@ -238,7 +241,7 @@ export function DslDialog({
     // 重序列化:apply 后画布变了,文本同步,防重复 Apply 造副本(create 类 op 幂等失效)。
     // host 是同引用 + host.batch 原地变更,上面填充 text 的 useEffect([open,host,service])
     // 不会重跑,必须手动 setText。
-    setText(serializeCanvasReadable(host.getElements(), (id) => service.get(id as CardId)?.title))
+    setText(serializeCanvasReadable(host.getElements(), (id) => { const c = service.get(id as CardId); return c ? { title: c.title, content: c.body } : undefined }))
     if (parseErrors.length > 0 || skipped > 0 || failed > 0) {
       // 有 parse 错误或 apply 跳过 → 用带 skipped 的诚实反馈(parse 错误数也在列表里展示)。
       pushToast({

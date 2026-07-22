@@ -5,6 +5,56 @@
 
 ---
 
+## 2026-07-22 · 1.0.0 · cys-dsl v6 + app 全路径适配
+
+承接 v5 内容能力和 freedraw 出 DSL,完成协议版本治理与 cy's Stift 软件侧替换:因 freedraw 从 DSL kind 集移除属于格式变更,`DSL_VERSION` **5→6**;app 的 grammar/help/sample/prompt/apply/用户文档与开发文档全部对齐当前协议。
+
+- **版本治理**:`DSL_VERSION=6`;AI 样本继续从单一源自动盖 `dslVersion`;v6 stability/invariants 锁版本与 5 kind。
+- **`/ask` 真启用内容 DSL**:移除旧的"NEVER put card titles / empty content / geometry-only"约束;prompt 现在明确按用户任务使用 `@title/@content`,空串清空,纯内容/颜色/尺寸编辑可省 `@pos`,create 可携带内容。继续走 strict parser → 预演/确认门 → 事务写回。
+- **消费者策略不混淆**:DSL modal 传 CardService resolver,显示全量 `@title/@content`;copy-selected 与 custom template 不传 resolver,保持纯几何(outbound 默认隐私安全)。这是 app 策略,不是 DSL 能力限制。
+- **文档**:转义手册 v4→v6 全面重写;STATE 区分 v1.0.0 发布时 v4 与当前 post-release 分支 v6;用户 privacy + 私有 privacy-design 对齐格式完整/视图层隐私/freedraw 出 DSL;源码注释清旧 `# title:`/几何-only 叙事。
+- **验证**:见本提交的实际 gate 结果。
+
+---
+
+## 2026-07-22 · 1.0.0 · freedraw 出 DSL(程序自管,不文字化)
+
+freedraw 此前在 DSL 里只存位置(点序列已不入),但仍占一个 kind。本轮按"freedraw 非核心/存储重/意义低/隐私"将其**整出 DSL 契约**,完全归程序(R2 + 渲染)。DSL 从 6 kind 收敛到 5 kind;该格式变更最终在上方 app 全路径适配条目中治理为 `DSL_VERSION` 5→6。
+
+- **grammar**:`DSL_KINDS` 去 `freedraw`(6→5);`DSL_GRAMMAR_REFERENCE` 注释更新(freedraw 出 DSL)。
+- **peggy**:删 `freedrawLine` 规则 + `Line` 引用;`[freedraw]` 落 `bracketUnknown` → `unrecognized`。重生成 parser(`pnpm gen`)。
+- **parser**:删 `LineResult` 的 `freedraw` kind + `buildOp`/strict 的 freedraw 检查;`[freedraw]` 行现报 unrecognized(graceful `parseDsl` 丢弃,strict 报错)。
+- **serialize**:`serializeCanvas` 按 `DSL_KINDS` 过滤 → freedraw 整元素被丢,不进 DSL 文本(位置都不发)。`serializeElement`(底层,被 AI snapshot 直接用)**保留** freedraw case——snapshot 是单向 AI 上下文格式(非往返 DSL),照发 freedraw 行给 AI 看 shape;parseDsl 不接受它。
+- **程序渲染不受影响**:canvas-engine 的 freedraw(渲染/SVG/adapter)走 element + meta.points,与 DSL 无关;freedraw 仍正常画。
+- **测试**:翻转 9 个文件的 freedraw 断言(从"freedraw 在 DSL"翻成"出 DSL:serialize 丢/parse unrecognized/kind 5 个");e2e-roundtrip 的 freedraw guard 更新。dsl 338 / web 1702 passed;lint/build 全绿。
+- **未 push**(等用户手测)。
+
+---
+
+## 2026-07-22 · 1.0.0 · v5 内容的 D/E 局限闭合(纯内容编辑 + 清空)
+
+承接同日「/ask 路径消费 v5 内容」,把 v5 内容区剩余两处文法层局限(D/E)一并闭合。序列化格式未变(serialize 始终发绝对 `@pos`)→ 未 bump `DSL_VERSION`。
+
+- **E(纯内容/属性编辑)**:`DslCardOp` 加 `keepExistingPos` 标志;parser 对"非 create、无 `@pos`、携带 `@title`/`@content`/`@color`/`@size` 之一"的卡片行放行(产 keepExistingPos op,`x/y` 占位 0,0);`planCard` 对 keepExistingPos 的现有卡**沿用现有几何**,只更那些字段。`@pos` 仅在移动/建卡时必需;裸行与 `create` 无 `@pos` 仍报 `missing @pos`。解掉"改内容必须重抄坐标"的耦合。
+- **D(清空内容)**:`@title("")`/`@content("")` parse 成空串 → apply 真写空串清空(A 的写回逻辑已支持)。serialize 对空串不发 token(空=默认,by-design),`keepExistingPos` 输入专用(serialize 永不发)→ round-trip 不变。
+- **契约**:`DSL_GRAMMAR_REFERENCE` 文档化"" 清空 + 无 `@pos` 编辑现有卡。
+- **测试**:翻转 dsl-content/glm-5.2-content 的 D/E 锁定断言 + 更新 dsl-parser/glm-5.2-robustness 里锁旧"no-pos=错"的用例;新增 apply-content(keepExistingPos/不存在卡/纯 color/清空)+ canvas-host-builder(纯内容编辑持久化 + 清空)覆盖。
+- **验证**:dsl 339 / web 1702 passed;lint/build 全绿。
+
+---
+
+## 2026-07-22 · 1.0.0 · /ask 路径消费 v5 卡片内容(@title/@content)
+
+v5 DSL 已在格式层公示并解析 `@title`/`@content`,但 `/ask` agent 的落库路径此前的适配缝未接:create 指令落空标题卡、update 指令的内容不写回、回滚/undo 不覆盖内容。本轮闭合该缝(DSL 文法未动)。
+
+- **temp 路径(`/ask` 全屏)**:`applyOpsAndPersist` 的 create handler 写入 `@title`/`@content`(不再硬编码空标题/空 body);update 指令经既有 post-hoc 回写循环写回 `Card.title/body`(与几何/颜色同阶段);回滚 `restoreNow` 与一次性 undo 的 `matchesCommittedState` 均覆盖 title/body;纯内容更新(无几何/颜色变化)计入 `cardsUpdated`;内容写失败 → 整体回滚。
+- **live 路径(companion,画布页已开)**:`makeOnCardCreate` 写入内容;新增 `makeOnCardUpdate` 直接 `service.update`(bindCardWriteback 只写几何,内容无对应回写),写失败抛错计入 `r.failed`。两条路径对内容行为一致。
+- **测试**:翻转 `canvas-host-builder.test.ts` 原 Corner A 锁定断言(red→green)+ 新增内容回滚/undo/失败回滚/计数用例;新增 `makeOnCardCreate`/`makeOnCardUpdate` 单测。
+- **边界**:仅适配层;不碰 DSL 文法/parser/serializer/sanitize;不碰 DSL 模态编辑器路径(早已接通)。内容辅助 AI 大车道(proposal `card.update` 动作 / 新 UX / inline 编辑 / 新审计 lane)仍按既有意向档搁置,本轮未启。
+- **验证**:`pnpm --filter web test` 全绿;lint/build 见 commit。
+
+---
+
 ## 2026-07-21 · 1.0.0 · Tauri CSP 回退修复桌面端渲染
 
 7b7c4ee 引入的严格 CSP 在真实 Tauri 构建里使所有页面渲染静默失效：Tauri 对内联脚本注入 nonce 后浏览器忽略 `'unsafe-inline'`，Next.js 水合脚本被拦，React 不水合，运行时注入的 `<style>` 不插入；release 构建不把 webview console 转发到 stderr，故无任何报错。回退 `apps/desktop/src-tauri/tauri.conf.json` 的 `security.csp` 为 `null`（v1.0.0 发布版行为），渲染恢复。`v1.0.0` Release 资产本身为 `csp: null`，未受影响。

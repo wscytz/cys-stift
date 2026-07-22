@@ -9,7 +9,7 @@
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import type { CanvasId, CardService } from '@cys-stift/domain'
 import { snapshotCanvas, formatCanvasSnapshot } from './canvas-snapshot'
-import { DSL_GRAMMAR_REFERENCE as GRAMMAR } from './dsl-grammar'
+import { DSL_GRAMMAR_REFERENCE as GRAMMAR } from '@cys-stift/dsl'
 
 export function buildCanvasPrompt(
   host: CanvasHost,

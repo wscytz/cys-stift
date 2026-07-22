@@ -8,15 +8,16 @@
  * canvas can apply them — `create` makes applyCardOp persist a real Card row
  * via onCardCreate before upserting geometry under the same #id.
  *
- * Custom templates serialize the current canvas via serializeCanvasReadable
- * (freeform-only round-trip; card lines are update-only and re-apply to
- * existing cards by id on a populated canvas).
+ * Custom templates serialize via serializeCanvasReadable WITHOUT a CardService
+ * resolver:template DSL intentionally stays geometry-only. Card lines are update-only
+ * and re-apply to existing cards by id on a populated canvas;this is a consumer policy,
+ * not a limitation of cys-dsl v6(which supports @title/@content).
  *
  * Storage: localStorage `cys-stift.canvas-templates.v1` (JSON array). SSR-safe
  * (window guard). No quota/rollback dance here — a failed save just doesn't
  * persist; templates are convenience, not source-of-truth data.
  */
-import { serializeCanvasReadable } from '@/features/ai/canvas-dsl'
+import { serializeCanvasReadable } from '@cys-stift/dsl'
 import type { CanvasElement } from '@cys-stift/canvas-engine'
 
 const KEY = 'cys-stift.canvas-templates.v1'
@@ -97,8 +98,10 @@ export function listCustomTemplates(): CanvasTemplate[] {
  * 把当前画布的元素序列化成 DSL 存为自建模板。返回 true=写入成功,
  * false=配额满/异常(不抛,调用方 toast)。
  *
- * 注意:serializeCanvasReadable 对 card 是 update-only 行(只记 @pos/@size/@color,
- * 不记内容),所以自建模板重新应用到「有这些 id 的卡」的画布才还原卡位置;
+ * 注意:本调用不传 CardService resolver,故 card 行是 update-only 的纯几何
+ * (@pos/@size/@color,不记内容)。这是模板消费者策略,不是 cys-dsl v6 的能力限制;
+ * v6 在传 resolver 时支持 @title/@content。所以自建模板重新应用到「有这些 id 的卡」
+ * 的画布才还原卡位置;
  * 应用到空画布会因 card 无 create flag 而跳过 card 行(只落 freeform)。
  * 这是设计取舍:自建模板是「布局骨架」,不是「卡片克隆」。
  */

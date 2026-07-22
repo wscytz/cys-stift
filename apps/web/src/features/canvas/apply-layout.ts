@@ -1,9 +1,9 @@
 'use client'
 
 import type { CanvasElement, CanvasHost } from '@cys-stift/canvas-engine'
-import type { DslArrowOp, DslCardOp, DslFreeOp, DslOp } from '../ai/dsl-parser'
-import { sanitizeDslOps } from '../ai/dsl-sanitize'
-import type { SanitizeCtx, SanitizeDiagnostic } from '../ai/dsl-sanitize'
+import type { DslArrowOp, DslCardOp, DslFreeOp, DslOp } from '@cys-stift/dsl'
+import { sanitizeDslOps } from '@cys-stift/dsl'
+import type { SanitizeCtx, SanitizeDiagnostic } from '@cys-stift/dsl'
 import { solveRelational } from '../ai/relational-solver'
 import type { ExistingGeom } from '../ai/relational-solver'
 
@@ -22,7 +22,20 @@ export interface CardCreateParams {
   w: number
   h: number
   color?: string
+  /** v5:卡片标题(DSL @title)。建卡时写入 Card.title。 */
+  title?: string
+  /** v5:卡片正文(DSL @content)。建卡时写入 Card.body。 */
+  content?: string
 }
+
+/** v5:更新现有卡片内容(DSL @title/@content on an existing card)。apply 时写回 Card.title/body。 */
+export interface CardUpdateContent {
+  cardId: string
+  title?: string
+  content?: string
+}
+
+export type CardUpdateHandler = (params: CardUpdateContent) => void
 
 export type CardCreateResult =
   | { ok: true }
@@ -52,6 +65,8 @@ export interface ApplyPlanItem {
   element?: CanvasElement
   mutation?: PlannedMutation
   cardCreate?: CardCreateParams
+  /** v5:card-update 带 @title/@content 时携带;commit 时经 onCardUpdate 写回 CardService。 */
+  cardUpdateContent?: CardUpdateContent
   dependencies: string[]
 }
 
@@ -137,6 +152,7 @@ export function commitApplyPlan(
   plan: ApplyPlan,
   appliedHashes?: Set<string>,
   onCardCreate?: CardCreateHandler,
+  onCardUpdate?: CardUpdateHandler,
 ): ApplyResult {
   const report = emptyReport(plan.items.length)
   const failedElementIds = new Set<string>()
@@ -173,6 +189,18 @@ export function commitApplyPlan(
             report.opResults.push(opResult(item, 'failed', persisted.reason))
             continue
           }
+        } catch (error) {
+          failedElementIds.add(item.element.id)
+          report.failed++
+          report.opResults.push(opResult(item, 'failed', errorReason(error)))
+          continue
+        }
+      }
+
+      // v5:card-update 带 @title/@content → 写回 CardService(Card.title/body)。
+      if (item.cardUpdateContent && onCardUpdate) {
+        try {
+          onCardUpdate(item.cardUpdateContent)
         } catch (error) {
           failedElementIds.add(item.element.id)
           report.failed++
@@ -218,9 +246,10 @@ export function applyLayout(
   ops: DslOp[],
   appliedHashes?: Set<string>,
   onCardCreate?: CardCreateHandler,
+  onCardUpdate?: CardUpdateHandler,
 ): ApplyResult {
   const plan = buildApplyPlan(host, ops, appliedHashes)
-  return commitApplyPlan(host, plan, appliedHashes, onCardCreate)
+  return commitApplyPlan(host, plan, appliedHashes, onCardCreate, onCardUpdate)
 }
 
 function emptyReport(total: number): ApplyResult {
@@ -344,7 +373,16 @@ function planCard(
       element,
       'card-create',
       [],
-      { cardId: id, x, y, w, h, color: op.color },
+      {
+        cardId: id,
+        x,
+        y,
+        w,
+        h,
+        color: op.color,
+        ...(op.title !== undefined ? { title: op.title } : {}),
+        ...(op.content !== undefined ? { content: op.content } : {}),
+      },
     )
   }
   if (existing.kind !== 'card') {
@@ -353,20 +391,31 @@ function planCard(
   if (op.create) {
     return skippedItem(opIndex, op, hash, `card #${id} id conflict with existing card`)
   }
-  return readyItem(
+  const keepPos = op.keepExistingPos === true
+  const updateItem = readyItem(
     opIndex,
     op,
     hash,
     {
       ...existing,
-      x: finiteRound(op.x, existing.x),
-      y: finiteRound(op.y, existing.y),
+      ...(keepPos
+        ? {} // v5(E):无 @pos 的纯属性/内容编辑 → 几何完全沿用现有卡
+        : { x: finiteRound(op.x, existing.x), y: finiteRound(op.y, existing.y) }),
       ...(op.w !== undefined ? { w: op.w } : {}),
       ...(op.h !== undefined ? { h: op.h } : {}),
       ...(op.color ? { color: op.color } : {}),
     },
     'card-update',
   )
+  // v5:card-update 带 @title/@content → 携带,commit 时写回 CardService。
+  if (op.title !== undefined || op.content !== undefined) {
+    updateItem.cardUpdateContent = {
+      cardId: id,
+      ...(op.title !== undefined ? { title: op.title } : {}),
+      ...(op.content !== undefined ? { content: op.content } : {}),
+    }
+  }
+  return updateItem
 }
 
 function planFree(

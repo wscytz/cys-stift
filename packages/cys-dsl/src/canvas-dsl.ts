@@ -1,5 +1,3 @@
-'use client'
-
 /**
  * Canvas DSL — the unified bidirectional text format for the canvas (Phase 0 / T3).
  *
@@ -12,11 +10,10 @@
  *   [rect #<id>] @pos(<x>,<y>) @size(<w>,<h>) @color(<c>)
  *   [text #<id>] @pos(<x>,<y>) @text("<t>") @color(<c>)
  *   [arrow #<id>] from #<a> to #<b> @label("<l>") @color(<c>) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none)
- *   [freedraw #<id>] @pos(<x>,<y>)            ← metadata only, NO point sequence
  *
- * Legacy kinds (ellipse/line/note/image) are NOT serialized — they're not in
- * the active set. freedraw emits position only; its point sequence stays in the
- * engine store (R2: hand-draw is vector; also keeps point data out of AI view).
+ * Legacy kinds (ellipse/line/note/image) and freedraw are NOT serialized — they're
+ * not in DSL_KINDS. freedraw is program-managed (R2 store + renderer): point sequence
+ * is heavy / low-value / privacy-sensitive, so it stays out of the text format entirely.
  * Canonical single source: ./dsl-grammar.ts (DSL_KINDS / DSL_COLORS / DSL_GRAMMAR_REFERENCE).
  */
 import type { CanvasElement } from '@cys-stift/canvas-engine'
@@ -26,47 +23,52 @@ import { DSL_KINDS } from './dsl-grammar'
  * Serialize the canvas's active elements to a text block the AI can read.
  * Pure function of the element list — no side-effects, no engine access.
  */
-export function serializeCanvas(elements: CanvasElement[]): string {
+export function serializeCanvas(
+  elements: CanvasElement[],
+  /** v5:可选,card id → {title, content}(消费者注入,如 CardService 的 title/body)。
+   *  不传 → 几何-only(向后兼容,所有现有调用点零改动)。传了 → card 行附 @title/@content。 */
+  resolve?: (id: string) => { title?: string; content?: string } | undefined,
+): string {
   return elements
     .filter((e) => (DSL_KINDS as readonly string[]).includes(e.kind))
-    .map(serializeElement)
+    .map((e) => serializeElement(e, e.kind === 'card' ? resolve?.(e.id) : undefined))
     .filter(Boolean)
     .join('\n')
 }
 
 /**
- * 面向人的可读序列化:每元素一行(同 serializeCanvas),但 card 行后附
- * `  # title: <title>` 注释行,让人在 DSL 编辑器里看到卡片内容。
- * 注释行不匹配 parseDsl 的 `[kind ` 前缀 → 被静默跳过,不影响 apply。
+ * 面向人的可读序列化(DSL 编辑器用)。
  *
- * getCardTitle: 可选,card id → title(从 CardService 读)。无则注释附 (untitled)。
- * 非 card 元素不附注释。title 中的换行被压成空格,避免破坏单行结构。
+ * v5 现状:与 strict {@link serializeCanvas} **逐字节收敛**(card 行带真实 @title/@content
+ * token,由 resolve 注入;旧的 `  # title:` 注释行已退役)。故本函数**委托** serializeCanvas,
+ * 不另留一份相同实现(消除漂移风险;F)。
+ *
+ * 保留独立命名的理由:它是编辑器的「人读视图」语义入口。将来若要加人读增强(如 @content
+ * 多行展开显示、注释),从**这里**分叉,strict 仍是机器往返形态。当前二者同形态。
+ *
+ * resolve: 可选,card id → {title, content}(消费者从 CardService 读)。不给 → 几何-only。
  */
 export function serializeCanvasReadable(
   elements: CanvasElement[],
-  getCardTitle?: (id: string) => string | undefined,
+  resolve?: (id: string) => { title?: string; content?: string } | undefined,
 ): string {
-  const lines: string[] = []
-  for (const e of elements) {
-    const line = serializeElement(e)
-    if (!line) continue
-    lines.push(line)
-    if (e.kind === 'card') {
-      const rawTitle = getCardTitle?.(e.id) || '(untitled)'
-      // 防御:title 含换行会破坏单行注释结构,压平成空格。
-      const title = rawTitle.replace(/\n/g, ' ')
-      lines.push(`  # title: ${title}`)
-    }
-  }
-  return lines.join('\n')
+  return serializeCanvas(elements, resolve)
 }
 
-export function serializeElement(e: CanvasElement): string {
+export function serializeElement(
+  e: CanvasElement,
+  /** v5:card 的 title/content(可选,由 serializeCanvas 的 resolve 注入)。非 card 元素忽略。 */
+  content?: { title?: string; content?: string },
+): string {
   const pos = `@pos(${e.x.toFixed(1)},${e.y.toFixed(1)})`
   const color = e.color ? ` @color(${e.color})` : ''
   switch (e.kind) {
-    case 'card':
-      return `[card #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}`
+    case 'card': {
+      // v5:可选 @title/@content(消费者注入)。缺省几何-only(round-trip 与 v4 等价)。
+      const titleAttr = content?.title ? ` @title("${escapeQuoted(content.title)}")` : ''
+      const contentAttr = content?.content ? ` @content("${escapeQuoted(content.content)}")` : ''
+      return `[card #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}${titleAttr}${contentAttr}`
+    }
     case 'rect':
       return `[rect #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}`
     case 'frame':
@@ -108,15 +110,18 @@ export function serializeElement(e: CanvasElement): string {
       return `[arrow #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${sig}`
     }
     case 'freedraw':
-      // Position only — never the point sequence (R2 + privacy).
+      // Position only — never the point sequence (R2 + privacy)。注意:freedraw 已出 DSL 契约
+      // (serializeCanvas 按 DSL_KINDS 过滤,不 emit)。本 case 仅供**直接调用方**(如 AI snapshot,
+      // 它是单向上下文格式、非往返 DSL)用;parseDsl 不接受 `[freedraw]`(→ unrecognized)。
       return `[freedraw #${e.id}] ${pos}`
     default:
-      // ellipse/line/note/image (legacy) — not in the DSL.
+      // ellipse / line / note / image (legacy) — not in the DSL。
       return ''
   }
 }
 
-/** Escape double-quotes/backslashes inside a quoted DSL string value. */
+/** Escape a string for a quoted DSL value:\\ = backslash, \" = quote, \n = newline(v5,@content 多行)。
+ *  顺序:先 \ (防后续插入的 \ 被二次转义),再 ",再换行。是 dsl-parser unescapeQuoted 的逆。 */
 function escapeQuoted(s: string): string {
-  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { serializeCanvas } from '../canvas-dsl'
-import { parseDsl } from '../dsl-parser'
+import { serializeCanvas } from '@cys-stift/dsl'
+import { parseDsl } from '@cys-stift/dsl'
 import { applyLayout } from '../../canvas/apply-layout'
 import { snapshotCanvas, formatCanvasSnapshot } from '../canvas-snapshot'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
@@ -17,8 +17,9 @@ import type { CardService, CardId, CanvasId } from '@cys-stift/domain'
  *
  * Flow per case: pre-seed elements → serialize → parse → apply (same host,
  * update) → re-serialize → assert equal to the original. Lossless on all 5
- * active kinds; freedraw is the deliberate asymmetry (parser has no freedraw
- * branch — its point sequence stays in the engine store, never reaching AI).
+ * active kinds; freedraw is out of DSL entirely (program-managed: R2 + renderer —
+ * serialize drops it, so it never reaches the text/AI). The host retains freedraw
+ * elements for the program; the DSL text just doesn't carry them.
  */
 function roundTrip(host: InMemoryCanvasHost, elements: CanvasElement[]) {
   for (const e of elements) host.upsert(e)
@@ -166,7 +167,7 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
     expect(roundtripped).toBe(original)
   })
 
-  it('freedraw is NOT round-tripped by parse/apply (guard — host retains it untouched)', () => {
+  it('freedraw 出 DSL:serialize 整元素丢(host 保留元素给程序,DSL 文本永不带 freedraw)', () => {
     const host = new InMemoryCanvasHost()
     const { original, roundtripped, ops } = roundTrip(host, [
       {
@@ -174,15 +175,14 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
         meta: { segments: [{ points: [{ x: 1, y: 2 }, { x: 3, y: 4 }] }] },
       },
     ])
-    // serialize emits position only (point sequence stays in the engine store).
-    expect(original).toBe('[freedraw #f1] @pos(7.0,8.0)')
-    // parser has no freedraw branch → zero ops produced from a freedraw-only canvas.
+    // serialize 按 DSL_KINDS 过滤 → freedraw 整元素被丢,DSL 文本为空。
+    expect(original).toBe('')
+    expect(roundtripped).toBe('')
+    // 无 DSL 行 → parse 0 ops。
     expect(ops).toHaveLength(0)
     expect(ops.filter((o) => o.type === 'free' && (o as { shape?: string }).shape === 'freedraw')).toHaveLength(0)
-    // apply ran with no ops → the host's freedraw is untouched; re-serialize still emits it.
-    // The guard proves "parse doesn't reproduce freedraw", NOT "freedraw disappears".
-    expect(roundtripped).toBe('[freedraw #f1] @pos(7.0,8.0)')
-    expect(roundtripped).toBe(original)
+    // host 的 freedraw 元素仍在(程序自管 R2 + 渲染),只是不进 DSL 文本。
+    expect(host.getElements().some((e) => e.kind === 'freedraw')).toBe(true)
   })
 
   it('full canvas e2e round-trip (all active kinds together + freedraw)', () => {
@@ -199,12 +199,12 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
       { id: 'fa1', kind: 'arrow', x: 10, y: 20, w: 100, h: 50, rotation: 0, dash: 'solid', arrowhead: 'arrow' },
       { id: 'f1', kind: 'freedraw', x: 7, y: 8, w: 0, h: 0, rotation: 0 },
     ])
-    // 7 DSL lines (rect, freedraw, 2×card, 2×arrow, text) — byte-equal after the full loop.
-    expect(roundtripped.split('\n')).toHaveLength(7)
+    // 6 DSL lines(rect, 2×card, 2×arrow, text)— freedraw 出 DSL 被 serialize 丢;byte-equal 往返。
+    expect(roundtripped.split('\n')).toHaveLength(6)
     expect(roundtripped).toBe(original)
-    // every active kind survives (freedraw too — it stays in the host, untouched).
+    // 每种 active kind 都存活;freedraw 不在 DSL(但 host 元素仍在,程序自管)。
     expect(roundtripped).toContain('[rect #r1] @pos(10.0,20.0) @size(300.0,400.0) @color(red)')
-    expect(roundtripped).toContain('[freedraw #f1] @pos(7.0,8.0)')
+    expect(roundtripped).not.toContain('[freedraw') // freedraw 出 DSL
     expect(roundtripped).toContain('[card #c1] @pos(100.0,200.0) @size(240.0,120.0) @color(blue)')
     expect(roundtripped).toContain('[card #c2] @pos(300.0,200.0) @size(240.0,120.0)')
     expect(roundtripped).toContain('[arrow #a1] from #c1 to #c2 @label("references") @color(red) @dash(dashed) @arrowhead(triangle)')

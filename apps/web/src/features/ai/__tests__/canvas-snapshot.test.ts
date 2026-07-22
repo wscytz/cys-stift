@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { snapshotCanvas, formatCanvasSnapshot } from '../canvas-snapshot'
-import { parseDsl } from '../dsl-parser'
+import { parseDsl } from '@cys-stift/dsl'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
 import type { CardService, CardId, CanvasId } from '@cys-stift/domain'
 

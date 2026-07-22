@@ -140,7 +140,7 @@ describe('serializeCanvas — exclusions (R2 + privacy)', () => {
     expect(out).toBe('')
   })
 
-  it('freedraw emits position only — never the point sequence', () => {
+  it('freedraw 出 DSL:serialize 整元素被丢(程序自管 R2),位置/点序列都不进 text', () => {
     const out = serializeCanvas([
       {
         id: 'f1',
@@ -153,7 +153,8 @@ describe('serializeCanvas — exclusions (R2 + privacy)', () => {
         meta: { segments: [{ points: [{ x: 9, y: 9 }, { x: 10, y: 10 }] }] },
       },
     ])
-    expect(out).toContain('[freedraw #f1] @pos(5.0,6.0)')
+    expect(out).toBe('') // DSL_KINDS 过滤掉 freedraw,整元素不进 text
+    expect(out).not.toContain('[freedraw')
     expect(out).not.toContain('points')
     expect(out).not.toContain('(9,9)')
   })
@@ -294,68 +295,88 @@ describe('canvas DSL round-trip — arrow route', () => {
   })
 })
 
-describe('serializeCanvasReadable — card 行后附 title 注释', () => {
-  it('card 行后附 # title 注释', () => {
+describe('serializeCanvasReadable — v5 card 行带 @title/@content 真 token', () => {
+  it('card 行带 @title/@content token(resolve 注入)', () => {
     const elements: CanvasElement[] = [
       { id: 'c1', kind: 'card', x: 100, y: 200, w: 240, h: 120, rotation: 0, color: 'blue' },
     ]
-    const out = serializeCanvasReadable(elements, (id) => (id === 'c1' ? 'My Card' : undefined))
-    const lines = out.split('\n')
-    expect(lines[0]).toBe('[card #c1] @pos(100.0,200.0) @size(240.0,120.0) @color(blue)')
-    expect(lines[1]).toBe('  # title: My Card')
+    const out = serializeCanvasReadable(elements, () => ({ title: 'My Card', content: 'body' }))
+    expect(out).toBe(
+      '[card #c1] @pos(100.0,200.0) @size(240.0,120.0) @color(blue) @title("My Card") @content("body")',
+    )
   })
 
-  it('无 getCardTitle 时附 (untitled)', () => {
+  it('无 resolve 时几何-only(不附任何 title/content token)', () => {
     const elements: CanvasElement[] = [
       { id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 },
     ]
     const out = serializeCanvasReadable(elements)
-    expect(out).toContain('  # title: (untitled)')
+    expect(out).not.toContain('@title')
+    expect(out).not.toContain('@content')
   })
 
-  it('非 card 元素不附注释', () => {
+  it('非 card 元素不带 title/content', () => {
     const elements: CanvasElement[] = [
       { id: 'r1', kind: 'rect', x: 10, y: 20, w: 300, h: 400, rotation: 0, color: 'red' },
       { id: 't1', kind: 'text', x: 5, y: 6, w: 0, h: 0, rotation: 0, text: 'hello' },
       { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'r1', text: 'ref' },
       { id: 'f1', kind: 'freedraw', x: 5, y: 6, w: 0, h: 0, rotation: 0 },
     ]
-    const out = serializeCanvasReadable(elements, () => 'should-not-appear')
-    expect(out).not.toContain('# title:')
+    const out = serializeCanvasReadable(elements, () => ({ title: 'should-not-appear' }))
+    expect(out).not.toContain('@title')
   })
 
-  it('多 card 各附自己的 title', () => {
+  it('多 card 各带自己的 title', () => {
     const elements: CanvasElement[] = [
       { id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 },
       { id: 'c2', kind: 'card', x: 20, y: 20, w: 10, h: 10, rotation: 0 },
     ]
-    const out = serializeCanvasReadable(elements, (id) => (id === 'c1' ? 'First' : 'Second'))
-    expect(out).toContain('  # title: First')
-    expect(out).toContain('  # title: Second')
+    const out = serializeCanvasReadable(elements, (id) =>
+      id === 'c1' ? { title: 'First' } : { title: 'Second' },
+    )
+    expect(out).toContain('@title("First")')
+    expect(out).toContain('@title("Second")')
   })
 
-  it('title 含换行被压平', () => {
+  it('content 含换行经 \\n 转义,保持单行', () => {
     const elements: CanvasElement[] = [
       { id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 },
     ]
-    const out = serializeCanvasReadable(elements, () => 'a\nb')
-    expect(out).toContain('  # title: a b')
-    // 换行被压平 → 注释仍是单行,只产生一行 title 注释。
-    expect(out.split('\n').filter((l) => l.includes('# title:'))).toHaveLength(1)
+    const out = serializeCanvasReadable(elements, () => ({ content: 'a\nb' }))
+    expect(out).toContain('@content("a\\nb")')
+    expect(out.split('\n')).toHaveLength(1)
   })
 
-  it('注释行被 parseDsl 跳过(往返不崩)', () => {
+  it('readable 输出可被 parseDsl 完整 round-trip(含 title)', () => {
     const elements: CanvasElement[] = [
       { id: 'c1', kind: 'card', x: 100, y: 200, w: 240, h: 120, rotation: 0, color: 'blue' },
       { id: 'r1', kind: 'rect', x: 10, y: 20, w: 300, h: 400, rotation: 0, color: 'red' },
       { id: 't1', kind: 'text', x: 5, y: 6, w: 0, h: 0, rotation: 0, text: 'hello' },
       { id: 'a1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'r1', text: 'ref' },
-      { id: 'f1', kind: 'freedraw', x: 5, y: 6, w: 0, h: 0, rotation: 0 },
     ]
-    const out = serializeCanvasReadable(elements, (id) => `title-${id}`)
+    const out = serializeCanvasReadable(elements, (id) => ({ title: `title-${id}` }))
     expect(() => parseDsl(out)).not.toThrow()
     const ops = parseDsl(out)
-    // card + rect + text + arrow = 4(freedraw 不被 parse,注释行被跳过)。
+    // card + rect + text + arrow = 4(freedraw 不被 parse)。
     expect(ops).toHaveLength(4)
+    expect(ops.find((o) => o.type === 'card')).toMatchObject({ cardId: 'c1', title: 'title-c1' })
+  })
+})
+
+describe('serializeCanvasReadable — v5 委托 serializeCanvas(F:消除重复实现)', () => {
+  it('与 serializeCanvas 逐字节一致(同 elements + 同 resolve,含 content)', () => {
+    const elements: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 100, y: 200, w: 240, h: 120, rotation: 0, color: 'blue' },
+      { id: 'r1', kind: 'rect', x: 10, y: 20, w: 300, h: 400, rotation: 0, color: 'red' },
+    ]
+    const resolve = (id: string) => (id === 'c1' ? { title: 'T', content: 'B\n2' } : undefined)
+    expect(serializeCanvasReadable(elements, resolve)).toBe(serializeCanvas(elements, resolve))
+  })
+
+  it('无 resolve 时也一致(几何-only)', () => {
+    const elements: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 },
+    ]
+    expect(serializeCanvasReadable(elements)).toBe(serializeCanvas(elements))
   })
 })

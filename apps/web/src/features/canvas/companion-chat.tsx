@@ -24,7 +24,7 @@ import { pushToast } from '@/lib/toast-store'
 import { isAIReady, getCurrentAI } from '@/features/ai/ai-settings-provider'
 import { streamText } from '@/features/ai/stream-text'
 import { retryFailureMessageKey, retryUntilValid, buildDslCorrection } from '@/features/ai/retry-until-valid'
-import { parseDslStrictWithDiagnostics } from '@/features/ai/dsl-parser'
+import { parseDslStrictWithDiagnostics } from '@cys-stift/dsl'
 import { AiSetupCard } from '@/features/ai/ai-setup-card'
 import {
   AGENT_SYSTEM_PROMPT,

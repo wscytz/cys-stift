@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { DslOp } from '../dsl-parser'
-import { parseDsl } from '../dsl-parser'
+import type { DslOp } from '@cys-stift/dsl'
+import { parseDsl } from '@cys-stift/dsl'
 import { solveRelational } from '../relational-solver'
 
 /**

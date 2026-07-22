@@ -29,11 +29,15 @@ function card(id: string, title: string, body = ''): Card {
 }
 
 describe('AGENT_SYSTEM_PROMPT', () => {
-  it('含 cys-dsl 输出契约 + 引用格式 + 能力分诊', () => {
-    expect(AGENT_SYSTEM_PROMPT).toContain('cys-dsl')
+  it('含 cys-dsl v6 输出契约 + 内容能力 + 引用格式 + 能力分诊', () => {
+    expect(AGENT_SYSTEM_PROMPT).toContain('cys-dsl grammar v6')
     expect(AGENT_SYSTEM_PROMPT).toContain('[card #id]')
     expect(AGENT_SYSTEM_PROMPT).toContain('UPDATE')
     expect(AGENT_SYSTEM_PROMPT).toContain('create')
+    expect(AGENT_SYSTEM_PROMPT).toContain('@title')
+    expect(AGENT_SYSTEM_PROMPT).toContain('@content')
+    expect(AGENT_SYSTEM_PROMPT).not.toContain('[freedraw #id]')
+    expect(AGENT_SYSTEM_PROMPT).not.toContain('NEVER put card titles')
   })
 })
 

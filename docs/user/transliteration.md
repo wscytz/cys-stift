@@ -42,34 +42,42 @@
 
 ## 三、DSL 语法速查
 
-每行一个元素。`#id` 是元素标识(往返用),`@pos/@size/@color` 是几何与样式。当前语法是 **cys-dsl v4**。
+每行一个元素。`#id` 是元素标识(往返用),`@pos/@size/@color` 是几何与样式。当前语法是 **cys-dsl v6**(v5 加卡片内容;v6 将 freedraw 移出 DSL)。
 
 ```
-# 卡片(内容来自卡片库,DSL 只改几何/颜色——见 §六"update-only")
-[card #<id>] @pos(<x>,<y>) @size(<w>,<h>) @color(red|yellow|blue|black|white|gray)
+# 卡片:默认更新既有卡;可改几何/颜色/title/content
+[card #<id>] @pos(<x>,<y>) @size(<w>,<h>) @color(red|yellow|blue|black|white|gray) @title("<标题>") @content("<Markdown 正文>")
+
+# 纯内容/属性编辑可省 @pos:沿用现有几何
+[card #<id>] @title("新标题") @content("新正文")
+[card #<id>] @color(red)
+
+# 明确 create:先持久化新卡再写入画布(不能与已有 id 冲突;内容可选)
+[card #<new-id> create] @pos(<x>,<y>) @size(<w>,<h>) @color(<c>) @title("标题") @content("正文")
+
+# 空串显式清空;省略 token = 保持内容不变
+[card #<id>] @title("") @content("")
 
 # 矩形等自由形状
 [rect #<id>] @pos(<x>,<y>) @size(<w>,<h>) @color(<c>)
 
-# 明确 create:持久化成功后新建一张空卡(不能与已有 id 冲突)
-[card #<new-id> create] @pos(<x>,<y>) @size(<w>,<h>) @color(<c>)
-
 # 文本
 [text #<id>] @pos(<x>,<y>) @text("<内容>") @color(<c>)
 
-# 主题分区(框住一组卡,2026-06-26 新增)
+# 主题分区
 [frame #<id>] @pos(<x>,<y>) @size(<w>,<h>) @text("<标题>") @color(<c>)
 
 # 关系箭头(三维语义签名:线型 + 箭头头 + 颜色)
 [arrow #<id>] from #<a> to #<b> @label("<标签>") @color(<c>) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none)
-
-# 手绘(只发位置元数据,不发点序列——见 §五隐私)
-[freedraw #<id>] @pos(<x>,<y>)
 ```
+
+**freedraw 不在 DSL**:手绘由程序的 R2 存储 + canvas-engine 渲染负责;`serializeCanvas` 不输出 freedraw,`[freedraw #id]` 输入会报 `unrecognized directive`。AI 的单向画布快照仍可看到本地计算的 shape 描述符,但不是 DSL 往返的一部分。
+
+**内容转义**:`@title/@content/@text/@label` 使用引号字符串;`\"` 表示引号、`\\` 表示反斜杠、`\n` 表示正文换行。`@title` 最长 200 字符,`@content` 最长 8000 字符。
 
 **颜色**:固定 Bauhaus 6 原色 + grey(`red`/`yellow`/`blue`/`black`/`white`/`gray`/`grey`)。越界色(如 green)不匹配 → 回退默认色(而非静默变黑)。
 
-**注释**:`#` 开头的行被跳过(`serializeCanvasReadable` 给每张卡附 `# title: …` 注释,方便人读,不影响解析)。
+**注释**:`#` 开头的行在 graceful/strict 两种 parser 中都被跳过;非注释散文在 strict AI 模式中会报错。
 
 **容错**:不认识的行 / 坏指令 → 记一条诊断(行号 + 原因),跳过它,继续处理其余。AI 写 10 行 7 对 3 错 → 应用 7 条 + 告诉你哪 3 行错了。**不静默丢、不崩溃。**
 
@@ -79,17 +87,13 @@
 
 **场景**:一张乱画布,4 张散落的灵感卡(早睡 / 跑步 / 读书 / 冥想),没框没箭头。
 
-**① 画布 → 文字**(AI 看到的,也是你在 DSL 模态编辑器里看到的):
+**① 画布 → 文字**(DSL 模态编辑器的人读全量视图;AI 使用程序按任务构造的独立快照/上下文):
 
 ```
-[card #c1] @pos(50,50) @size(120,80)
-  # title: 早睡
-[card #c2] @pos(820,30) @size(120,80)
-  # title: 跑步
-[card #c3] @pos(180,640) @size(120,80)
-  # title: 读书
-[card #c4] @pos(900,720) @size(120,80)
-  # title: 冥想
+[card #c1] @pos(50,50) @size(120,80) @title("早睡") @content("尽量在 23:00 前睡")
+[card #c2] @pos(820,30) @size(120,80) @title("跑步")
+[card #c3] @pos(180,640) @size(120,80) @title("读书")
+[card #c4] @pos(900,720) @size(120,80) @title("冥想")
 ```
 
 **② AI 输出重排**(AI 写一段文字,按主题分框、归位上色、连关系):
@@ -116,7 +120,7 @@
 ## 五、怎么用(三种方式)
 
 1. **画布工具栏 →「DSL」按钮**(模态编辑器,所有用户可用,**不门控 AI**):
-   - 打开即显示当前画布的文字形态(`serializeCanvasReadable`,带 title 注释)
+   - 打开即显示当前画布的文字形态(`serializeCanvasReadable`,card 带真实 `@title/@content` token)
    - 先在画布按顺序选中两张卡(第一张是参照,第二张会移动),打开后直接点「放到右侧」或「放到下方」；编辑器会改写目标卡那一行并立即显示真实 diff
    - 直接编辑 textarea / 粘贴一段 DSL →「应用」→ 画布变
    - 诊断列表在输入时就告诉你哪行错了(行号 + 原因);ApplyReport 反馈 applied / skipped / failed 的逐条结果与汇总
@@ -131,21 +135,22 @@
 
 ## 六、边界与隐私(诚实说明)
 
-- **卡片默认 update-only**:普通 `[card #id]` 只能改已存在卡片的**几何和颜色**,内容(title/body/媒体)仍来自卡片库(单一可信源)。显式 `[card #id create]` 是例外:它只创建空标题/空正文卡,先持久化成功再写入画布;ID 冲突或持久化失败会报告失败,不会留下 ghost card。
+- **卡片默认更新既有 id**:普通 `[card #id]` 可改几何/颜色和 `@title/@content`;纯内容/属性编辑可省 `@pos` 并保持原几何。`@title("")`/`@content("")` 显式清空,省略 token 则保持不变。显式 `[card #id create]` 可创建带内容的新卡;先持久化成功再写入 host,ID 冲突/配额失败会报告且不留 ghost card。
 - **关系箭头端点必须存在**:`from`/`to` 指向不存在的卡 → 那条 op 跳过(不崩,诊断会报)。
-- **手绘(freedraw)单向**:DSL 只输出 `[freedraw #id] @pos(...)` 位置元数据,**绝不输出点序列**。画布 AI 快照可额外附上本地计算的离散形状标签/标量特征,但不带笔迹点；这是 **R2 隐私硬边界**，AI 不能通过 DSL 改写笔迹。
+- **freedraw 已出 DSL**:手绘由程序(R2 + canvas-engine)存储/渲染;DSL 不输出位置或点序列,也不创建/修改手绘。AI 单向 snapshot 可附本地计算的 shape 标签/标量特征,但永不带笔迹点。
 - **颜色固定 6+1**:越界色回退默认,不静默变黑。
 - **vision 当前未接入**:默认只保留 `kind`(image/pdf)元数据,二进制永不外发。Settings 的 Labs 区会明确显示没有可开启的 Vision consumer;详见 [`privacy.md`](privacy.md)。
 
-### DSL coverage（当前 v4）
+### DSL coverage（当前 v6）
 
 | 字段 | DSL 状态 |
 |---|---|
 | card/rect/frame/text 的 id、位置、尺寸、颜色 | 可序列化、可解析、可回写 |
+| card `@title` / `@content` | 可序列化、可解析、可回写;空串清空;无 `@pos` 可纯内容编辑 |
 | relation/free arrow 的端点、标签、颜色、线型、箭头头、curve/elbow route、wikilink 标记 | 可序列化、可解析、可回写 |
-| `create` 卡 | 仅显式 `create`；持久化失败会标为 failed,不会留下 ghost |
-| card title/body、links、code、quotes、media 二进制 | 不属于 DSL；从 CardService/导出数据读取 |
-| freedraw 点序列 | 不属于 DSL；位置元数据可见,笔迹只留本地 |
+| `create` 卡 | 显式 `create`;可带 title/content;持久化失败标 failed,不留 ghost |
+| links、code、quotes、media 二进制 | 不属于 DSL;仍由程序/CardService/导出数据管理 |
+| freedraw | **不属于 DSL**;位置/点序列均不进文本,由程序 R2 + 渲染管理 |
 
 ---
 
@@ -153,9 +158,9 @@
 
 告诉 AI:
 
-> 这是一张 cys-dsl v4 画布描述。每行一个元素:`[kind #id] @pos(x,y) @size(w,h) @color(c)`。
-> 卡片默认更新已存在的(改 pos/size/color);确实需要空卡时才使用 `[card #new-id create]`,且 ID 必须不存在。关系箭头是 `[arrow #id] from #a to #b @label("…")`。
-> 输出一段 DSL 重排这张画布。应用前会预演、校验并显示确认门;坏行会被诊断并跳过,不会静默成功。
+> 这是一张 cys-dsl v6 画布描述。每行一个元素;使用 grammar 给出的 `[kind #id]` 与 `@directive(...)` 形式。
+> 卡片默认更新既有 id;可按任务改几何/颜色/`@title`/`@content`;纯内容编辑可省 `@pos`,确实新建时才使用 `[card #new-id create] @pos(...)`,且 ID 必须不存在。freedraw 不属于 DSL。
+> 输出一段 DSL 重排或编辑这张画布。应用前会预演、校验并显示确认门;坏行会被诊断并跳过,不会静默成功。
 
 DSL 模态编辑器里还内嵌了一份语法速查(可折叠 details),双语。
 

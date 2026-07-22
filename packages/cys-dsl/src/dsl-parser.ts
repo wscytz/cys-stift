@@ -1,5 +1,3 @@
-'use client'
-
 /**
  * DSL Parser — parses AI output (or pasted/edited DSL) for canvas layout.
  *
@@ -19,6 +17,8 @@ import {
   DSL_COLORS,
   DSL_COLOR_ALIASES,
   DSL_MAX_TEXT_LEN,
+  DSL_MAX_CONTENT_LEN,
+  truncateDslText,
 } from './dsl-grammar'
 // Peggy 生成;类型垫片见 dsl-parser.gen.d.ts
 import { parse as parseLine } from './dsl-parser.gen.js'
@@ -34,11 +34,19 @@ export type DslCardOp = {
   h?: number
   color?: string
   create?: boolean
+  /** v5:卡片标题(短,≤DSL_MAX_TEXT_LEN)。serialize 由消费者注入;DSL apply 写回 Card.title。 */
+  title?: string
+  /** v5:卡片正文 markdown(长,≤DSL_MAX_CONTENT_LEN)。serialize 由消费者注入;DSL apply 写回 Card.body。 */
+  content?: string
   /** B工程 pilot:关系式坐标。有 rel 时 x/y 是占位(0,0),求解器 solveRelational 填真值。
    *  right-of #anchor:x = anchor.x + anchor.w + gap;y = anchor.y
    *  below    #anchor:y = anchor.y + anchor.h + gap;x = anchor.x
    *  仅 AI 输入路径;serializeCanvas 永不 emit rel(rel 解决后画布存绝对坐标)。 */
   rel?: { dir: 'right-of' | 'below'; anchor: string; gap: number }
+  /** v5(E):无 @pos 的"纯属性/内容编辑"标志。无 @pos(且非 create、非 rel)但携带
+   *  title/content/color/size 之一时置真 —— apply 时(planCard)沿用现有卡几何,只更那些字段;
+   *  x/y 为占位(0,0),apply 期忽略。serializeCanvas 永不 emit(始终绝对坐标)→ 输入专用。 */
+  keepExistingPos?: boolean
 }
 
 export type DslFreeOp =
@@ -134,6 +142,8 @@ type DirectiveTuple =
   | ['color', string]
   | ['label', string]
   | ['text', string]
+  | ['title', string]
+  | ['content', string]
   | ['dash', string]
   | ['arrowhead', string]
   | ['route', string]
@@ -149,8 +159,7 @@ type DirectiveTuple =
 /** directive* 收集的元组列表(null = skipChunk 消费的未知残余,过滤掉)。 */
 type LineResult =
   | null // prose / 注释 / 围栏 / 空(静默 skip)
-  | { kind: 'freedraw' } // 透传 no-op(skip,不报错)
-  | { kind: 'unknown' } // [ 开头但非已知 kind → unrecognized
+  | { kind: 'unknown' } // [ 开头但非已知 kind → unrecognized([freedraw] 也落此:freedraw 已出 DSL)
   | { kind: 'card'; ds: unknown[] }
   | { kind: 'arrow'; ds: unknown[] }
   | { kind: 'rect'; ds: unknown[] }
@@ -181,14 +190,17 @@ function validEnum<T extends string>(raw: string, list: readonly T[]): T | undef
   return (list as readonly string[]).includes(raw) ? (raw as T) : undefined
 }
 
-/** 防超长 DoS(AI 输出不可信):静默截断到 DSL_MAX_TEXT_LEN,不报错(parser robust)。 */
+/** 默认截断到 DSL_MAX_TEXT_LEN(@text/@label/@title,int 级)。@content 用
+ *  truncateDslText(…, DSL_MAX_CONTENT_LEN)(long 级)。截断实现共用 dsl-grammar 的
+ *  truncateDslText —— 代理对安全(不劈开 emoji),且 parser/sanitize 单一实现(G/H)。 */
 function truncate(v: string): string {
-  return v.length > DSL_MAX_TEXT_LEN ? v.slice(0, DSL_MAX_TEXT_LEN) : v
+  return truncateDslText(v, DSL_MAX_TEXT_LEN)
 }
 
-/** @text/@label 共用的 canonical quoted-string 解码,是 escapeQuoted 的逆。 */
+/** quoted-string 解码,是 escapeQuoted 的逆。Peggy escChar = '\\' . —— 任何 \X 转义对;
+ *  \n→换行(v5,@content 多行 markdown),其余 \X→X(\"→", \\→\)。 */
 function unescapeQuoted(v: string): string {
-  return v.replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+  return v.replace(/\\(.)/g, (_, c: string) => (c === 'n' ? '\n' : c))
 }
 
 /** @elbow(x,y;x,y) 拆分:分号分隔,每个折点 x,y(支持负);过滤坏点,保好点(复刻 extractElbow)。 */
@@ -210,6 +222,8 @@ interface Folded {
   color?: string
   label?: string
   text?: string
+  title?: string
+  content?: string
   dash?: string
   arrowhead?: string
   route?: string
@@ -235,6 +249,8 @@ function fold(ds: unknown[]): Folded {
       case 'color': if (a.color === undefined) a.color = validColor(String(v1)); break
       case 'label': if (a.label === undefined) a.label = truncate(unescapeQuoted(String(v1))); break
       case 'text': if (a.text === undefined) a.text = truncate(unescapeQuoted(String(v1))); break
+      case 'title': if (a.title === undefined) a.title = truncate(unescapeQuoted(String(v1))); break
+      case 'content': if (a.content === undefined) a.content = truncateDslText(unescapeQuoted(String(v1)), DSL_MAX_CONTENT_LEN); break
       case 'dash': if (!a.dash) a.dash = validEnum(String(v1), ['solid', 'dashed', 'dotted']); break
       case 'arrowhead': if (!a.arrowhead) a.arrowhead = validEnum(String(v1), ['arrow', 'triangle', 'none']); break
       case 'route': if (!a.route) a.route = validEnum(String(v1), ['straight', 'curve', 'elbow']); break
@@ -274,6 +290,8 @@ function buildCard(ds: unknown[]): BuildResult {
       },
     }
     if (d.create) op.create = true
+    if (d.title !== undefined) op.title = d.title
+    if (d.content !== undefined) op.content = d.content
     return { op }
   }
   if (d.pos) {
@@ -287,6 +305,24 @@ function buildCard(ds: unknown[]): BuildResult {
       color: d.color,
     }
     if (d.create) op.create = true
+    if (d.title !== undefined) op.title = d.title
+    if (d.content !== undefined) op.content = d.content
+    return { op }
+  }
+  // v5(E):无 @pos 的非 create 卡片行,若携带 title/content/color/size 之一 = "纯属性/内容编辑"
+  // (几何沿用现有卡,由 planCard 处理)。x/y 占位(0,0);裸行(无任何字段)与 create 仍 missing @pos。
+  if (!d.create && (d.title !== undefined || d.content !== undefined || d.color !== undefined || d.size !== undefined)) {
+    const op: DslCardOp = {
+      type: 'card',
+      cardId: d.id as CardId,
+      x: 0,
+      y: 0,
+      keepExistingPos: true,
+      ...(d.color !== undefined ? { color: d.color } : {}),
+      ...(d.size ? { w: d.size.w, h: d.size.h } : {}),
+      ...(d.title !== undefined ? { title: d.title } : {}),
+      ...(d.content !== undefined ? { content: d.content } : {}),
+    }
     return { op }
   }
   return { diag: 'missing @pos' }
@@ -357,7 +393,7 @@ function buildFree(kind: 'rect' | 'text' | 'frame', ds: unknown[]): BuildResult 
 }
 
 function buildOp(r: LineResult): BuildResult {
-  if (r === null || r.kind === 'freedraw') return null // 静默 skip
+  if (r === null) return null // 静默 skip
   if (r.kind === 'unknown') return { diag: 'unrecognized element kind' }
   if (r.kind === 'card') return buildCard(r.ds)
   if (r.kind === 'arrow') return buildArrow(r.ds)
@@ -399,7 +435,7 @@ export function parseDslWithDiagnostics(dslText: string): {
     }
 
     const built = buildOp(result)
-    if (built === null) continue // prose / freedraw skip
+    if (built === null) continue // prose skip
     if ('op' in built) {
       ops.push(built.op)
     } else {
@@ -427,6 +463,9 @@ export function parseDslStrictWithDiagnostics(dslText: string): {
     const line = rawLines[index]!.trim()
     const lineNo = index + 1
     if (!line) continue
+    // grammar 承诺"Lines starting with # are comments and ignored";strict 比 graceful 严在
+    // 拒散文,但**注释行照放行**(与 grammar 一致,也让 AI 输出里夹带的 # 注释不报错)。
+    if (line.startsWith('#')) continue
     if (!line.startsWith('[')) {
       errors.push({ line: lineNo, text: line, message: 'unexpected prose or markdown' })
       continue
@@ -438,8 +477,8 @@ export function parseDslStrictWithDiagnostics(dslText: string): {
       errors.push({ line: lineNo, text: line, message: 'malformed directive' })
       continue
     }
-    if (result === null || result.kind === 'unknown' || result.kind === 'freedraw') {
-      errors.push({ line: lineNo, text: line, message: result?.kind === 'freedraw' ? 'freedraw is not mutable through AI DSL' : 'unrecognized directive' })
+    if (result === null || result.kind === 'unknown') {
+      errors.push({ line: lineNo, text: line, message: 'unrecognized directive' })
       continue
     }
     const tuples = result.ds.filter(Array.isArray) as DirectiveTuple[]

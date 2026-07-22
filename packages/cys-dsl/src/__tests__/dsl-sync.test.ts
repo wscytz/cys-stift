@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { DSL_KINDS, DSL_COLORS, DSL_COLOR_ALIASES } from '../dsl-grammar'
 import { parseDslWithDiagnostics } from '../dsl-parser'
 
-/** parser 对每个 DSL_KINDS 都「认识」:AI 可产的种类产 op;freedraw 是善意 no-op(不报错)。 */
+/** parser 对每个 DSL_KINDS 都「认识」并产 1 op(freedraw 已出 DSL,不在此;[freedraw] 现 unrecognized,见 dsl-parser 测试)。 */
 describe('parser recognizes every DSL_KINDS', () => {
   const SAMPLES: Record<string, string> = {
     card: '[card #c1] @pos(10,20) @size(100,50) @color(blue)',
@@ -10,17 +10,14 @@ describe('parser recognizes every DSL_KINDS', () => {
     text: '[text #t1] @pos(10,20) @text("hi")',
     frame: '[frame #f1] @pos(10,20) @size(100,50) @text("t")',
     arrow: '[arrow #a1] from #x to #y',
-    freedraw: '[freedraw #d1] @pos(10,20)',
   }
   for (const kind of DSL_KINDS) {
     it(`parser handles [${kind} …] without "unrecognized" error`, () => {
       const line = SAMPLES[kind]
       if (!line) throw new Error(`no sample for kind ${kind} — add it`)
       const { ops, errors } = parseDslWithDiagnostics(line)
-      expect(errors).toEqual([]) // 全部种类都被认(freedraw 是 no-op,也不报错)
-      if (kind !== 'freedraw') {
-        expect(ops.length).toBe(1) // freedraw 不产 op(透传),其余产 1 个
-      }
+      expect(errors).toEqual([]) // 全部 DSL_KINDS 都被认、产 1 op
+      expect(ops.length).toBe(1)
     })
   }
 
