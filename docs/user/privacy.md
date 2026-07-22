@@ -35,7 +35,9 @@
 
 > **AI 关系候选推荐(2026-06-30)**:在图谱详情页点「AI 再找找」时,把**当前卡的允许字段**(同下表,走 allowlist)+ **候选卡的 id 和标题**(只标题,不发正文/媒体/deviceId)发给 AI,让它挑出语义相关但字面无重合的卡作为**候选**(不自动建关系,用户一键才建)。同样守 R2:`deviceId` / `media.dataUrl` / 软删除卡永不发;输出经白名单 id 校验。**未配 AI 时不显示该按钮**,本地启发式推荐照常工作(零 AI)。
 
-> **AI 对话 agent /ask(2026-06-30)**:在 `/ask` 页对话时,把你的问题 + **RAG 检索到的 top-8 相关卡**(走 allowlist,同下表)+ **目标画布的元素几何快照**(只 id+位置+颜色+关系签名,不含卡片正文)发给 AI。AI 回答时引用 `[card #id]`(UI 渲染可点开);要改画布时输出 `cys-dsl` 块,**经你确认才应用**(确认门显示 before/after 缩略图 + 变更摘要)。画布侧的“AI 排版”则使用受限 Intent IR v1,只允许 layout/place/align/distribute/pin,同样先预览 immutable plan 再提交。同样守 R2:`deviceId` / `media.dataUrl` / `apiKey` / 软删除卡永不发。
+> **AI 对话 agent /ask(2026-06-30)**:在 `/ask` 页对话时,把你的问题 + **RAG 检索到的 top-8 相关卡**(走 allowlist,同下表)+ **目标画布的元素快照**(id+位置+颜色+关系签名+卡片标题)发给 AI。AI 回答时引用 `[card #id]`(UI 渲染可点开);要改画布时输出 `cys-dsl` 块,**经你确认才应用**(确认门显示 before/after 缩略图 + 变更摘要)。画布侧的“AI 排版”则使用受限 Intent IR v1,只允许 layout/place/align/distribute/pin,同样先预览 immutable plan 再提交。同样守 R2:`deviceId` / `media.dataUrl` / `apiKey` / 软删除卡永不发。
+>
+> **画布快照 content-on-demand 开关(2026-07-22)**:`/ask`、companion、AI 排版/聚类的画布快照默认**还会带卡片正文**(`  content: …` 行),让 AI 在画布类任务里也能理解卡片内容(以前只发标题,AI 常反映"看不到正文")。正文本就在 AI allowlist(RAG 一直发 body),这是同源数据的另一通道,不是新隐私面。想省 token / 更保守,在 **设置 → AI 上下文** 关掉「允许 AI 读取卡片正文」,快照就只发标题。对外「复制为提示词」仍纯几何。
 
 > **思考模式适配(2026-06-30)**:DeepSeek 等 OpenAI 兼容端点默认开「思考模式」,思考会吃掉大量 token 导致排版/分组/关系推荐这类**结构化输出**被截断(实测 1024~4096 token 全花在思考,DSL/JSON 输出 0 字 → 「未生效」)。结构化任务现在对 DeepSeek 端点发 `thinking: {type: disabled}` 关闭思考 —— 不截断、省约 75% token、快 2-3 倍、输出更完整。**只对 DeepSeek 端点发此字段**(靠 baseUrl 识别),真 OpenAI/Claude 端点不发(不破坏兼容)。总结/改写/翻译等需理解推理的任务**不关思考**(保留模型推理能力)。这不涉及隐私——思考内容留在模型侧,不发额外数据。
 

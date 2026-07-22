@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-07-22 · 1.0.0 · AI content-on-demand 开关 + v6 两处正确性修复
+
+修"AI 看不到卡片正文"诉求 + code review 发现的两处 v6 正确性 bug,均在 main 上(承接已合并的 cys-dsl v6)。
+
+- **feat(ai): 画布快照 content-on-demand 开关**:`snapshotCanvas` 采集卡片 body;`formatCanvasSnapshot` 加 `includeContent` 选项,为 true 时每张卡追加 `  content: …` 注释行(parser 静默跳过,round-trip 安全)。新增 `settings.aiIncludeCardContent`(默认 true);接 `/ask`、companion、canvas 排版/cluster 四条 AI 路径;设置页加开关 UI。修"画布类任务 AI 只看到标题"(快照原本只发 title)。body 已在 AI allowlist(RAG 一直发),非新隐私面;对外 copy-prompt 保持纯几何。详见 `docs/user/privacy.md`。
+- **fix(dsl): keepExistingPos 不污染 relational solver geom seed**:`[card #a1] @title(...)` 这类 v5(E) 纯内容编辑 op 的 x/y 是 parser 占位 (0,0),solver 绝对 card 分支盲目用它覆盖 seed → 下游 `right-of/below #a1` 锚到 (0,0) 飞画布左上角。改为 keepExistingPos 时沿用 existing 真实坐标。
+- **fix(ai): live 路径内容写入可撤销**:companion/live 路径 `@title/@content` 经 `makeOnCardUpdate` 直接 `service.update`,发生在 `host.batch` 之外 → host undo 栈只记几何,Ctrl+Z 只回几何、正文永久驻留。现 apply 前捕获 content 目标卡的 before title/body,apply 后暴露一次性 toast undo 回滚正文(几何仍走 host 的 Ctrl+Z)。
+- **验证**:web 1707 passed / cys-dsl 338 / canvas-engine 570 / db 8 / domain 86;lint 0;web build 0;docs:links 0。
+
+---
+
 ## 2026-07-22 · 1.0.0 · cys-dsl v6 + app 全路径适配
 
 承接 v5 内容能力和 freedraw 出 DSL,完成协议版本治理与 cy's Stift 软件侧替换:因 freedraw 从 DSL kind 集移除属于格式变更,`DSL_VERSION` **5→6**;app 的 grammar/help/sample/prompt/apply/用户文档与开发文档全部对齐当前协议。
