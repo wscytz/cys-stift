@@ -8,20 +8,16 @@ import { DSL_GRAMMAR_REFERENCE } from '../dsl-grammar'
  * 真调 LLM,让它**只凭** DSL_GRAMMAR_REFERENCE + 一句排版指令产出一段 cys-dsl,
  * 再验证 parser **零诊断**接受 —— 这就是"任何 AI 读写一段文字就能驱动画布"的实弹验证。
  *
- * 模型(按可用性):
- *   - DeepSeek 两款:`deepseek-v4-flash`(快)+ `deepseek-v4-pro`(强)—— 需 DEEPSEEK_API_KEY。
- *   - GLM 兜底演示:`glm-5.2`(Anthropic 兼容端点)—— 需 GLM_API_KEY。
+ * 模型:DeepSeek 两款 `deepseek-v4-flash`(快)/ `deepseek-v4-pro`(强,需 `thinking:disabled`)。
  *
  * 默认**跳过**(不进 pnpm test / CI,避免网络依赖与抖动)。启用:
  *   CYS_DSL_LIVE_LLM=1 DEEPSEEK_API_KEY=… pnpm --filter @cys-stift/dsl test qwen-max-7-21-live-llm
- *   (或 GLM_API_KEY=… 用 GLM 演示;两者可同时给)
  *
  * 隐私:prompt 只含**合成**画布(3 张假卡)+ 语法参考,不含任何真实用户内容;
  * key 只进 auth header,绝不入日志 / 断言 / 提交。
  */
 const RUN = process.env.CYS_DSL_LIVE_LLM === '1'
 const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY ?? ''
-const GLM_KEY = process.env.GLM_API_KEY ?? ''
 
 const SYSTEM = [
   'You drive a canvas by emitting cys-dsl text ONLY. No prose, no code fences, no explanations.',
@@ -80,26 +76,6 @@ async function askDeepSeek(model: string): Promise<string> {
   return json.choices?.[0]?.message?.content ?? ''
 }
 
-async function askGLM(): Promise<string> {
-  const res = await postWithRetry('https://open.bigmodel.cn/api/anthropic/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': GLM_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'glm-5.2',
-      max_tokens: 1024,
-      system: SYSTEM,
-      messages: [{ role: 'user', content: TASK }],
-    }),
-  })
-  if (!res.ok) throw new Error(`glm http ${res.status}`)
-  const json = (await res.json()) as { content?: { text?: string }[] }
-  return (json.content ?? []).map((b) => b.text ?? '').join('')
-}
-
 /** 能力断言:LLM 只凭语法参考就产出 parser 零诊断接受、且真驱动了画布的合法 DSL。
  *  门槛是"合法 DSL"(0 解析错 + ≥2 op),不是"完整执行 3 卡指令"——好模型可能只 emit 改动
  *  (如 c1 已在位就不重发),指令完整度是模型质量轴,非格式能力轴。 */
@@ -110,7 +86,7 @@ function assertDrivesCanvas(raw: string) {
   expect(ops.some((o) => o.type === 'card'), `LLM 没产出任何 card op:\n${raw}`).toBe(true)
 }
 
-describe.runIf(RUN && (DEEPSEEK_KEY || GLM_KEY))('qwen-max-7-21-live-llm · LLM 实测驱动画布', () => {
+describe.runIf(RUN && DEEPSEEK_KEY)('qwen-max-7-21-live-llm · LLM 实测驱动画布', () => {
   it.runIf(!!DEEPSEEK_KEY)(
     'deepseek-v4-flash 只凭语法参考即可产出合法 DSL',
     async () => assertDrivesCanvas(await askDeepSeek('deepseek-v4-flash')),
@@ -122,17 +98,11 @@ describe.runIf(RUN && (DEEPSEEK_KEY || GLM_KEY))('qwen-max-7-21-live-llm · LLM 
     async () => assertDrivesCanvas(await askDeepSeek('deepseek-v4-pro')),
     150_000,
   )
-
-  it.runIf(!!GLM_KEY)(
-    'glm-5.2(兜底演示)只凭语法参考即可产出合法 DSL',
-    async () => assertDrivesCanvas(await askGLM()),
-    90_000,
-  )
 })
 
 // 未启用时给个显式占位:普通 test 运行里可见地"跳过",而非文件凭空消失。
-describe.skipIf(RUN && (DEEPSEEK_KEY || GLM_KEY))('qwen-max-7-21-live-llm · 跳过(未启用)', () => {
-  it('设置 CYS_DSL_LIVE_LLM=1 + DEEPSEEK_API_KEY / GLM_API_KEY 以启用实测', () => {
+describe.skipIf(RUN && DEEPSEEK_KEY)('qwen-max-7-21-live-llm · 跳过(未启用)', () => {
+  it('设置 CYS_DSL_LIVE_LLM=1 + DEEPSEEK_API_KEY 以启用实测', () => {
     expect(true).toBe(true)
   })
 })

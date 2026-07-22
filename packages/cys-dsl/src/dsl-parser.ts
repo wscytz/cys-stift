@@ -444,6 +444,9 @@ export function parseDslStrictWithDiagnostics(dslText: string): {
     const line = rawLines[index]!.trim()
     const lineNo = index + 1
     if (!line) continue
+    // grammar 承诺"Lines starting with # are comments and ignored";strict 比 graceful 严在
+    // 拒散文,但**注释行照放行**(与 grammar 一致,也让 AI 输出里夹带的 # 注释不报错)。
+    if (line.startsWith('#')) continue
     if (!line.startsWith('[')) {
       errors.push({ line: lineNo, text: line, message: 'unexpected prose or markdown' })
       continue
