@@ -976,6 +976,12 @@ export const messages = {
   'ai.menu.rewrite': { zh: 'AI 改写', en: 'AI rewrite' },
   'ai.menu.translateEn': { zh: 'AI 翻译 → 英文', en: 'AI translate → English' },
   'ai.menu.translateZh': { zh: 'AI 翻译 → 中文', en: 'AI translate → Chinese' },
+  'ai.menu.editInstruction': { zh: 'AI 自定义编辑…', en: 'AI custom edit…' },
+  'ai.menu.instructionPlaceholder': {
+    zh: '用一句话描述怎么改这张卡(如:改成要点列表 / 标题更简洁 / 补一段总结)',
+    en: 'Describe the edit in one line (e.g. turn into bullets / shorten the title / add a summary)',
+  },
+  'ai.menu.instructionApply': { zh: '应用', en: 'Apply' },
   /* ── Tags (P4) ── */
   'tag.add': { zh: '添加标签', en: 'Add tag' },
   'tag.placeholder': { zh: '输入标签名...', en: 'Type tag name...' },

@@ -57,14 +57,14 @@ describe('PROMPTS (privacy lock)', () => {
   })
 
   // ── Privacy reverse assertions (must NOT leak sensitive fields) ──
-  it.each<AIAction>(['summarize', 'improveWriting', 'translate'])(
+  it.each<AIAction>(['summarize', 'improveWriting', 'translate', 'editWithInstruction'])(
     '%s prompt does NOT contain source.deviceId',
     (action) => {
       const u = PROMPTS[action].buildUser(fakeCard() as never, 'en')
       expect(u).not.toContain('secret-device-id')
     },
   )
-  it.each<AIAction>(['summarize', 'improveWriting', 'translate'])(
+  it.each<AIAction>(['summarize', 'improveWriting', 'translate', 'editWithInstruction'])(
     '%s prompt does NOT contain "apiKey" (the AI config)',
     (action) => {
       const u = PROMPTS[action].buildUser(fakeCard() as never, 'en')
@@ -76,7 +76,7 @@ describe('PROMPTS (privacy lock)', () => {
   // ── Privacy rule #3: soft-deleted cards never reach the AI ──
   // serializeCardForAI returns '' for deleted cards; the blank-card
   // fallback must NOT then hand-concat the raw title/body. v0.37.0 fix.
-  it.each<AIAction>(['summarize', 'improveWriting', 'translate'])(
+  it.each<AIAction>(['summarize', 'improveWriting', 'translate', 'editWithInstruction'])(
     '%s prompt is empty for a soft-deleted card (rule #3)',
     (action) => {
       const deleted = fakeCard({ title: 'Leaked Title', body: 'Leaked body' })
@@ -105,5 +105,23 @@ describe('PROMPTS (privacy lock)', () => {
     // The tuned prompts actively forbid preamble boilerplate.
     expect(PROMPTS.summarize.system.toLowerCase()).not.toContain('here is')
     expect(PROMPTS.improveWriting.system.toLowerCase()).not.toContain('here is')
+  })
+
+  // ── editWithInstruction (v7:单卡自定义指令编辑)──
+  const ewi = buildsFor('editWithInstruction', fakeCard())
+  it('editWithInstruction system is non-empty + 要求只应用指令/输出全量正文', () => {
+    expect(ewi.system.length).toBeGreaterThan(10)
+    expect(ewi.system.toLowerCase()).toContain('instruction')
+  })
+  it('editWithInstruction user 携带 {{INSTRUCTION}} 占位(ai-actions 运行期替换)', () => {
+    expect(ewi.user).toContain('{{INSTRUCTION}}')
+  })
+  it('editWithInstruction user 携带卡 title + body(经 serializeCardForAI allowlist)', () => {
+    expect(ewi.user).toContain('Test Title')
+    expect(ewi.user).toContain('Test body')
+  })
+  it('editWithInstruction 遵循 locale 输出语言', () => {
+    const u = PROMPTS.editWithInstruction.buildUser(fakeCard() as never, 'zh')
+    expect(u.toLowerCase()).toContain('中文')
   })
 })

@@ -26,6 +26,8 @@ interface Props {
   card: Card
   action: AIAction
   targetLang?: 'zh' | 'en'
+  /** Free-form editing instruction (editWithInstruction only). */
+  instruction?: string
   onClose: () => void
   onReplace: (newBody: string) => void
   onAppendNew: (newCard: { title: string; body: string }) => void
@@ -35,6 +37,7 @@ export function AIPopover({
   card,
   action,
   targetLang,
+  instruction,
   onClose,
   onReplace,
   onAppendNew,
@@ -58,6 +61,7 @@ export function AIPopover({
     runAIAction(ai, action, card, {
       targetLang,
       locale: locale,
+      instruction,
       signal: ctrl.signal,
       onDelta: (chunk) => setStreamed((s) => s + chunk),
     })
@@ -71,8 +75,8 @@ export function AIPopover({
       ctrl.abort()
     }
     // card.id is the stable identity for the underlying record; we
-    // intentionally re-stream when the action/lang changes.
-  }, [card.id, action, targetLang, t])
+    // intentionally re-stream when the action/lang/instruction changes.
+  }, [card.id, action, targetLang, instruction, t])
 
   return (
     <div className="ai-popover" id="ai-popover" role="dialog" aria-label={t('ai.suggestion')}>

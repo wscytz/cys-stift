@@ -124,4 +124,59 @@ describe('AiActionMenu', () => {
     expect(spy).toHaveBeenCalledWith('translate', 'zh')
     unmount()
   })
+
+  // ── v7: 自定义编辑指令(editWithInstruction)──
+  it('edit-instruction entry 默认在,但输入框默认收起', () => {
+    const { host, unmount } = mount(<AiActionMenu onPick={() => {}} />)
+    expect(byTestId(host, 'ai-menu-edit-instruction')).toBeTruthy()
+    expect(byTestId(host, 'ai-menu-instruction-box')).toBeNull()
+    unmount()
+  })
+
+  it('点击 edit-instruction 展开输入框', () => {
+    const { host, unmount } = mount(<AiActionMenu onPick={() => {}} />)
+    act(() => {
+      ;(byTestId(host, 'ai-menu-edit-instruction') as HTMLButtonElement).click()
+    })
+    expect(byTestId(host, 'ai-menu-instruction-box')).toBeTruthy()
+    expect(byTestId(host, 'ai-menu-instruction-input')).toBeTruthy()
+    unmount()
+  })
+
+  it('输入指令 + 应用 → onPick("editWithInstruction", undefined, instruction)', () => {
+    const spy = vi.fn()
+    const { host, unmount } = mount(<AiActionMenu onPick={spy} />)
+    act(() => {
+      ;(byTestId(host, 'ai-menu-edit-instruction') as HTMLButtonElement).click()
+    })
+    const input = byTestId(host, 'ai-menu-instruction-input') as HTMLTextAreaElement
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLTextAreaElement.prototype,
+      'value',
+    )!.set!
+    act(() => {
+      setter.call(input, '改成要点列表')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    act(() => {
+      ;(byTestId(host, 'ai-menu-instruction-apply') as HTMLButtonElement).click()
+    })
+    expect(spy).toHaveBeenCalledWith('editWithInstruction', undefined, '改成要点列表')
+    unmount()
+  })
+
+  it('空指令 → 应用钮 disabled,不触发 onPick', () => {
+    const spy = vi.fn()
+    const { host, unmount } = mount(<AiActionMenu onPick={spy} />)
+    act(() => {
+      ;(byTestId(host, 'ai-menu-edit-instruction') as HTMLButtonElement).click()
+    })
+    const apply = byTestId(host, 'ai-menu-instruction-apply') as HTMLButtonElement
+    expect(apply.disabled).toBe(true)
+    act(() => {
+      apply.click()
+    })
+    expect(spy).not.toHaveBeenCalled()
+    unmount()
+  })
 })

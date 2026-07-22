@@ -19,7 +19,7 @@
 import type { Card } from '@cys-stift/domain'
 import { serializeCardForAI } from './ai-context'
 
-export type AIAction = 'summarize' | 'improveWriting' | 'translate'
+export type AIAction = 'summarize' | 'improveWriting' | 'translate' | 'editWithInstruction'
 
 export interface PromptTemplate {
   system: string
@@ -74,6 +74,18 @@ export const PROMPTS: Record<AIAction, PromptTemplate> = {
       const ctx = serializeCardForAI(card)
       const body = ctx || `${card.body || '(empty)'}`
       return `Target: {{LANG}}\n\n---\n\n${body}`
+    },
+  },
+  editWithInstruction: {
+    system:
+      'You are a precise editing assistant for a personal-notes app. The user gives a free-form instruction describing how to modify the note body. Apply ONLY that instruction; preserve everything else (meaning, facts, structure, markdown formatting, code blocks, proper nouns) unless the instruction explicitly changes it. Output the full edited body only — no preamble, no explanations, no restating the instruction, no lead-in.',
+    // The {{INSTRUCTION}} placeholder is replaced at runtime by ai-actions.ts
+    // (mirrors translate's {{LANG}} injection).
+    buildUser: (card, locale) => {
+      if (hiddenFromAI(card)) return ''
+      const ctx = serializeCardForAI(card)
+      const body = ctx || `Title: ${card.title}\n\nBody: ${card.body || '(empty)'}`
+      return `${outputLangLine(locale)}\n\nInstruction: {{INSTRUCTION}}\n\nApply the instruction to the body of this note and output the full result.\n\n${body}`
     },
   },
 }

@@ -19,6 +19,8 @@ export interface RunAIOptions {
   targetLang?: 'zh' | 'en'
   /** Output locale for summarize/improveWriting (defaults to 'en'). */
   locale?: 'zh' | 'en'
+  /** Free-form editing instruction for editWithInstruction. */
+  instruction?: string
   onDelta?: (chunk: string) => void
   signal?: AbortSignal
 }
@@ -29,6 +31,7 @@ const ACTION_DEFAULTS: Record<AIAction, { temperature: number; maxTokens: number
   summarize: { temperature: 0.3, maxTokens: 1024 },
   improveWriting: { temperature: 0.7, maxTokens: 1024 },
   translate: { temperature: 0.3, maxTokens: 1024 },
+  editWithInstruction: { temperature: 0.5, maxTokens: 2048 },
 }
 
 export async function runAIAction(
@@ -43,6 +46,9 @@ export async function runAIAction(
   if (action === 'translate') {
     const lang = opts.targetLang ?? 'en'
     user = user.replace('{{LANG}}', lang === 'zh' ? '中文' : 'English')
+  }
+  if (action === 'editWithInstruction') {
+    user = user.replace('{{INSTRUCTION}}', opts.instruction ?? '')
   }
   const def = ACTION_DEFAULTS[action]
   return streamText(

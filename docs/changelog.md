@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-07-23 · 1.0.0 · 单卡自定义指令编辑(editWithInstruction)
+
+卡片 ✨ AI 菜单新增「自定义编辑」:用户填一句自由指令(如"改成要点列表"/"标题更简洁"/"补一段总结"),AI 只应用该指令、保留其余内容,输出全量改后正文走既有 AIPopover(替换/另存)。
+
+- **ai(prompts/ai-actions)**:新增 `editWithInstruction` action —— system 约束"只应用指令、保留其余、输出全量正文",buildUser 带 `{{INSTRUCTION}}` 占位(ai-actions 运行期替换,镜像 translate 的 `{{LANG}}`)。走 `serializeCardForAI` allowlist,**软删卡守卫沿用**(rule #3),不新增卡片字段外发(隐私面不变)。
+- **ai(ui)**:`AiActionMenu` 加「自定义编辑…」项 → 展开内联 textarea + 应用钮;回车发送(Shift+Enter 换行,**IME `keyCode !== 229` 守卫**防中文选词误发);空指令禁用。`AIPopover` 透传 `instruction`,指令变化重跑流。`card-detail` aiView 加 `'edit'` 态承接。
+- **i18n**:`ai.menu.editInstruction/instructionPlaceholder/instructionApply`(中英)。
+- **测试**:prompts +8(editWithInstruction 占位/内容/locale + 3 组隐私锁 it.each 纳入新 action);ai-action-menu +4(收起/展开/输入应用/空禁用)。web 1732 passed / lint 0 / build 0。
+
+---
+
 ## 2026-07-23 · 1.0.0 · cys-dsl v7(@group / @href / @compute)
 
 DSL 语法单一源升 v6→v7,加三条 directive。全链路(grammar/peggy/parser/sanitize/serialize/apply)+ AI prompt(单一源 REFERENCE 自动联动)+ 用户文档 + 版本锁测试同步。**铁律守住:DSL=状态≠行为、双向往返对称、`@compute` 禁裸 eval。**

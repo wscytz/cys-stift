@@ -324,11 +324,13 @@ export function CardDetailModal({
   //   null           → entry closed
   //   'setup'        → AI not ready, show AiSetupCard
   //   'menu'         → AI ready, show AiActionMenu
-  //   'summarize' | 'rewrite' | 'translate' → action chosen, AIPopover open
+  //   'summarize' | 'rewrite' | 'translate' | 'edit' → action chosen, AIPopover open
+  //   ('edit' = editWithInstruction,带用户自由指令)
   const [aiView, setAiView] = useState<
-    null | 'setup' | 'menu' | 'summarize' | 'rewrite' | 'translate'
+    null | 'setup' | 'menu' | 'summarize' | 'rewrite' | 'translate' | 'edit'
   >(null)
   const [translateTo, setTranslateTo] = useState<'zh' | 'en'>('en')
+  const [editInstruction, setEditInstruction] = useState('')
   const aiEnabled = useAIEnabled()
   void aiEnabled // kept for future "configured but disabled" affordances; the
   // ✨ AI entry is ALWAYS visible per spec §3.2 (the barrier fix).
@@ -942,8 +944,14 @@ export function CardDetailModal({
           {aiView === 'menu' && (
             <div id="ai-entry-panel">
               <AiActionMenu
-                onPick={(action, targetLang) => {
+                onPick={(action, targetLang, instruction) => {
                   if (action === 'translate' && targetLang) setTranslateTo(targetLang)
+                  // editWithInstruction:存用户指令 → 进 'edit' 视图(AIPopover 带指令重跑)。
+                  if (action === 'editWithInstruction') {
+                    setEditInstruction(instruction ?? '')
+                    setAiView('edit')
+                    return
+                  }
                   // AiActionMenu emits the canonical AIAction ('improveWriting'),
                   // but aiView tracks the local 'rewrite' alias (kept for
                   // parity with the original card-detail action names). Map
@@ -954,11 +962,12 @@ export function CardDetailModal({
               <Button variant="ghost" onClick={() => setAiView(null)}>{t('card.detail.cancel')}</Button>
             </div>
           )}
-          {(aiView === 'summarize' || aiView === 'rewrite' || aiView === 'translate') && (
+          {(aiView === 'summarize' || aiView === 'rewrite' || aiView === 'translate' || aiView === 'edit') && (
             <AIPopover
               card={card}
-              action={aiView === 'rewrite' ? 'improveWriting' : aiView}
+              action={aiView === 'rewrite' ? 'improveWriting' : aiView === 'edit' ? 'editWithInstruction' : aiView}
               targetLang={aiView === 'translate' ? translateTo : undefined}
+              instruction={aiView === 'edit' ? editInstruction : undefined}
               onClose={() => setAiView(null)}
               onReplace={(body) => {
                 // Bug A fix (preserved): AI replaces only the BODY. Every
