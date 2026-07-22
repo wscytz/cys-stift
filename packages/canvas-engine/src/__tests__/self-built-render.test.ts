@@ -196,6 +196,12 @@ describe('renderElements', () => {
     expect(ctx._calls).toContain('lineTo(200,50)')
     // label 画在中点 (150,50)
     expect(ctx._calls.some((c) => c.startsWith('fillText(rel@150,50)'))).toBe(true)
+    // halo 半透明底条先于 label 文字(measure 'rel'@7px=21 → fillRect(150-6,50-3,21+12,12+6))
+    expect(ctx._calls).toContain('fillStyle=#ffffff')
+    expect(ctx._calls).toContain('fillRect(144,47,33,18)')
+    const haloIdx = ctx._calls.indexOf('fillRect(144,47,33,18)')
+    const labelIdx = ctx._calls.findIndex((c) => c.startsWith('fillText(rel@150,50)'))
+    expect(labelIdx).toBeGreaterThan(haloIdx) // 底条先于文字
   })
 
   it('renders an arrow with dashed line + triangle head (语义签名)', () => {
@@ -272,6 +278,20 @@ describe('renderElements', () => {
     // 行 1 @ y=20,行 2 @ y=20+18=38
     expect(ctx._calls).toContain('fillText(hello@10,20)')
     expect(ctx._calls).toContain('fillText(world@10,38)')
+    // halo:2 行底条(measure 'hello'/'world'@7px=35 → fillRect(10-6,20-3,35+12,2*18+6))
+    expect(ctx._calls).toContain('fillRect(4,17,47,42)')
+    const haloIdx = ctx._calls.indexOf('fillRect(4,17,47,42)')
+    expect(ctx._calls.findIndex((c) => c.startsWith('fillText(hello@10,20)'))).toBeGreaterThan(haloIdx)
+  })
+
+  it('text halo 高度随行数缩放(3 行 → height = 3*18+6)', () => {
+    const ctx = mockCtx()
+    const els = [
+      { id: 't1', kind: 'text', x: 0, y: 0, w: 100, h: 60, rotation: 0, text: 'a\nb\nc' },
+    ] as unknown as CanvasElement[]
+    renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => null, '#ffffff')
+    // measure 'a'/'b'/'c'@7px=7 → width=7+12=19;height=3*18+6=60
+    expect(ctx._calls).toContain('fillRect(-6,-3,19,60)')
   })
 
   it('text with empty string draws nothing (no throw)', () => {

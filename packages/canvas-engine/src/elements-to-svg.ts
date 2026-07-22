@@ -36,6 +36,21 @@ function estimateSoftWrap(text: string, maxW: number, maxLines: number): string[
   return out.slice(0, maxLines)
 }
 
+/** SVG 无 ctx.measureText:估文本块最大行宽(像素),给 halo rect 量宽用。
+ *  与 estimateSoftWrap 同源 cw 逻辑(CJK/全角≈字号,latin≈0.58 字号),宁可略宽勿窄。*/
+function estimateTextWidth(text: string, fontSize: number): number {
+  let max = 0
+  for (const line of text.split('\n')) {
+    let w = 0
+    for (const ch of line) {
+      const code = ch.codePointAt(0) ?? 0
+      w += code >= 0x1100 ? fontSize : Math.round(fontSize * 0.58)
+    }
+    if (w > max) max = w
+  }
+  return max
+}
+
 export interface ElementsToSvgOptions {
   background: boolean
   border: number
@@ -167,7 +182,11 @@ function elementToSvg(
       const lines = (el.text ?? '').split('\n')
       // render line 171 早退:纯空文本(lines==[''])不画。
       if (lines.length === 0 || (lines.length === 1 && lines[0] === '')) return ''
-      return lines.map((ln, i) =>
+      // 半透明 halo 底条(与实时渲染 drawTextWithHalo 同源):标签压线/压笔画时可读。
+      // SVG <text> y 是 baseline(首行 y+14),rect 从 y-3 起 height n*18+6 覆盖整块。
+      const maxW = estimateTextWidth(el.text ?? '', 14)
+      const halo = `<rect x="${x - 6}" y="${y - 3}" width="${maxW + 12}" height="${lines.length * 18 + 6}" fill="${tokenResolver('--color-white', '#ffffff')}" fill-opacity="0.85"/>`
+      return halo + lines.map((ln, i) =>
         `<text x="${x}" y="${y + 14 + i * 18}" fill="${colorOf(el.color, tokenResolver)}" font-family="${c.fontBody}" font-size="14">${esc(ln)}</text>`,
       ).join('')
     }
@@ -242,6 +261,10 @@ function elementToSvg(
         } else {
           mx = (fx + tx) / 2; my = (fy + ty) / 2
         }
+        // 半透明 halo 底条(与实时渲染 drawTextWithHalo 同源):标签压在箭头线上时可读。
+        // SVG <text> y 是 baseline(my),12px 字上升约 12 → rect 从 my-15 起 height 18 覆盖。
+        const labelW = estimateTextWidth(el.text, 12)
+        segs.push(`<rect x="${mx - 6}" y="${my - 15}" width="${labelW + 12}" height="18" fill="${tokenResolver('--color-white', '#ffffff')}" fill-opacity="0.85"/>`)
         segs.push(`<text x="${mx}" y="${my}" fill="${stroke}" font-family="${c.fontBody}" font-size="12">${esc(el.text)}</text>`)
       }
       return segs.join('')

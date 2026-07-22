@@ -285,6 +285,35 @@ describe('elementsToSvg — text 多行 + rect 负 bbox(M1+M3:导出对齐实时
   })
 })
 
+describe('elementsToSvg — label halo(箭头标签 + text 元素半透明底条)', () => {
+  const view = { panX: 0, panY: 0, zoom: 1, gridMode: 'free' as const }
+
+  it('text 元素 + arrow label 各出一个 fill-opacity=0.85 的 halo rect', () => {
+    // 与实时渲染 drawTextWithHalo 同源:标签压线/压笔画时可读的半透明底条。
+    const els: CanvasElement[] = [
+      { id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'b', kind: 'card', x: 300, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b', text: 'rel' },
+      { id: 't1', kind: 'text', x: 10, y: 10, w: 0, h: 0, rotation: 0, text: 'hi' },
+    ]
+    const r = elementsToSvg(els, view, () => null, { background: false, border: 0 }, domTokenResolver)
+    // 两个 halo(text 元素 + arrow label);frame 不在此例,card 无 halo。
+    expect((r.svg.match(/fill-opacity="0\.85"/g) ?? []).length).toBe(2)
+    // halo 走 token(--color-white),jsdom 无 CSS 变量 → 回退 #ffffff(不写裸 'white' 字面量)
+    expect(r.svg).toContain('fill="#ffffff"')
+  })
+
+  it('arrow 无 label(text 缺省)→ 无 halo rect(只有 card 的 <rect>)', () => {
+    const els: CanvasElement[] = [
+      { id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'b', kind: 'card', x: 300, y: 0, w: 100, h: 100, rotation: 0 },
+      { id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b' },
+    ]
+    const r = elementsToSvg(els, view, () => null, { background: false, border: 0 }, domTokenResolver)
+    expect(r.svg).not.toContain('fill-opacity="0.85"')
+  })
+})
+
 describe('elementsToSvg — freedraw 单点画 <circle>(L1:导出与渲染一致)', () => {
   const view = { panX: 0, panY: 0, zoom: 1, gridMode: 'free' as const }
 

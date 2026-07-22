@@ -301,26 +301,77 @@ function drawElement(
           mx = (from.x + to.x) / 2
           my = (from.y + to.y) / 2
         }
-        ctx.fillStyle = stroke
-        ctx.font = `12px ${tokenResolver('--font-body', 'Inter, sans-serif')}`
-        ctx.fillText(el.text, mx, my)
+        // 半透明底条 halo:标签压在箭头线/笔画上时可读。textBaseline 显式 'top'
+        // (本分支原本不设,继承上一处绘制 → 位置非确定;helper 内部统一)。
+        drawTextWithHalo(
+          ctx,
+          [el.text],
+          mx,
+          my,
+          `12px ${tokenResolver('--font-body', 'Inter, sans-serif')}`,
+          12,
+          stroke,
+          tokenResolver,
+        )
       }
       break
     }
     case 'text': {
       const lines = (el.text ?? '').split('\n')
       if (lines.length === 0 || (lines.length === 1 && lines[0] === '')) break
-      ctx.fillStyle = colorOf(el.color, tokenResolver)
-      ctx.font = `14px ${tokenResolver('--font-body', 'Inter, sans-serif')}`
-      ctx.textBaseline = 'top'
-      for (let i = 0; i < lines.length; i++) {
-        ctx.fillText(lines[i]!, el.x, el.y + i * 18)
-      }
+      drawTextWithHalo(
+        ctx,
+        lines,
+        el.x,
+        el.y,
+        `14px ${tokenResolver('--font-body', 'Inter, sans-serif')}`,
+        18,
+        colorOf(el.color, tokenResolver),
+        tokenResolver,
+      )
       break
     }
     default:
       // legacy — 后续 Task。
       break
+  }
+}
+
+/**
+ * 半透明底条(halo)+ 多行文本。镜像 frame title halo 模式(可读性底条),泛化到 N 行:
+ * 设 textBaseline='top' → anchor (x,y) = 首行左上角;逐行 measureText 取最大宽;画
+ * 画布色半透明 fillRect 底条;复位 alpha 后逐行 fillText。全空文本早退(不画底不画字)。
+ * 供 arrow label + 独立 text 元素用;card 文字自带卡 fill 背景、frame title 自有 halo,
+ * 均不走本函数。颜色/字体全走 tokenResolver,不写裸 hex。
+ */
+function drawTextWithHalo(
+  ctx: CanvasRenderingContext2D,
+  lines: string[],
+  x: number,
+  y: number,
+  font: string,
+  lineHeight: number,
+  color: string,
+  tokenResolver: TokenResolver,
+  padX = 6,
+  padY = 3,
+  alpha = 0.85,
+): void {
+  if (lines.every((ln) => ln.length === 0)) return
+  ctx.font = font
+  ctx.textBaseline = 'top'
+  let maxW = 0
+  for (const ln of lines) {
+    const w = ctx.measureText(ln.length ? ln : ' ').width
+    if (w > maxW) maxW = w
+  }
+  ctx.fillStyle = tokenResolver('--color-white', '#ffffff')
+  ctx.globalAlpha = alpha
+  ctx.fillRect(x - padX, y - padY, Math.ceil(maxW) + padX * 2, lines.length * lineHeight + padY * 2)
+  ctx.globalAlpha = 1
+  ctx.fillStyle = color
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i]!, x, y + i * lineHeight)
   }
 }
 
