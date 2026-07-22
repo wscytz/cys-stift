@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:2026-07-22。2026-07-21 回退桌面端 `security.csp`(→ `null`)修复 Tauri 构建渲染静默失效;`v1.0.0` 发布资产本身为 `csp: null`,未受影响(详见 changelog)。当前源码版本为 **1.0.0**（根 `package.json` 单一来源）；`v1.0.0` 是 GitHub stable release，tag workflow 重新运行 Linux gate、生成 Windows x64 NSIS、生成并验证 macOS Apple Silicon ad-hoc DMG，并发布平铺可校验的 `SHA256SUMS.txt`。该正式发布当时冻结核心工作流、数据格式与 cys-dsl v4；**post-release `feat/cys-dsl-extract` 当前源码已升级到 cys-dsl v7**(独立包 + card `@title/@content` + 纯内容编辑/清空 + freedraw 出 DSL + v7 `@group/@href/@compute` + app 全路径适配),尚未合并/tag,不改写 v1.0.0 发布事实。macOS 无 Apple Developer ID/Team ID 和 notarization，Windows 无 Authenticode 签名；Android 不在 1.0.0 支持范围。VoiceOver、真实系统 200% 缩放、代表性设备安装升级、真实 provider quota/refusal 和外部用户研究仍是发布后加固项。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:2026-07-22。2026-07-21 回退桌面端 `security.csp`(→ `null`)修复 Tauri 构建渲染静默失效;`v1.0.0` 发布资产本身为 `csp: null`,未受影响(详见 changelog)。当前源码版本为 **1.1.0**（根 `package.json` 单一来源）；`v1.0.0` 是 GitHub stable release，tag workflow 重新运行 Linux gate、生成 Windows x64 NSIS、生成并验证 macOS Apple Silicon ad-hoc DMG，并发布平铺可校验的 `SHA256SUMS.txt`。该正式发布当时冻结核心工作流、数据格式与 cys-dsl v4；**post-release `feat/cys-dsl-extract` 当前源码已升级到 cys-dsl v7**(独立包 + card `@title/@content` + 纯内容编辑/清空 + freedraw 出 DSL + v7 `@group/@href/@compute` + app 全路径适配),已合并 main、版本 bump 1.1.0(尚未 tag);v1.0.0 发布事实不变。macOS 无 Apple Developer ID/Team ID 和 notarization，Windows 无 Authenticode 签名；Android 不在 1.0.0 支持范围。VoiceOver、真实系统 200% 缩放、代表性设备安装升级、真实 provider quota/refusal 和外部用户研究仍是发布后加固项。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 

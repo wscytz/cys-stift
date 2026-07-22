@@ -5,6 +5,10 @@
 
 ---
 
+## 2026-07-23 · 1.1.0 · post-release 汇总(cys-dsl v7 + editWithInstruction,已合并 main)
+
+承接 v1.0.0 发布(cys-dsl v4 冻结),post-release `feat/cys-dsl-extract` 工作已合并到 main:DSL 抽包 + 升级到 cys-dsl v7(`@group`/`@href`/`@compute`)+ 单卡自定义指令编辑(editWithInstruction)+ 全路径适配。版本号 1.0.0 → 1.1.0 反映 post-release 实质内容;**尚未 tag**(tag = 手测绿的发版门)。下面 1.0.0 条目为开发期记录(归在当时版本号下)。
+
 ## 2026-07-23 · 1.0.0 · 单卡自定义指令编辑(editWithInstruction)
 
 卡片 ✨ AI 菜单新增「自定义编辑」:用户填一句自由指令(如"改成要点列表"/"标题更简洁"/"补一段总结"),AI 只应用该指令、保留其余内容,输出全量改后正文走既有 AIPopover(替换/另存)。
