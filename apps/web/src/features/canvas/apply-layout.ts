@@ -391,14 +391,16 @@ function planCard(
   if (op.create) {
     return skippedItem(opIndex, op, hash, `card #${id} id conflict with existing card`)
   }
+  const keepPos = op.keepExistingPos === true
   const updateItem = readyItem(
     opIndex,
     op,
     hash,
     {
       ...existing,
-      x: finiteRound(op.x, existing.x),
-      y: finiteRound(op.y, existing.y),
+      ...(keepPos
+        ? {} // v5(E):无 @pos 的纯属性/内容编辑 → 几何完全沿用现有卡
+        : { x: finiteRound(op.x, existing.x), y: finiteRound(op.y, existing.y) }),
       ...(op.w !== undefined ? { w: op.w } : {}),
       ...(op.h !== undefined ? { h: op.h } : {}),
       ...(op.color ? { color: op.color } : {}),

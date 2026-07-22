@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-07-22 · 1.0.0 · v5 内容的 D/E 局限闭合(纯内容编辑 + 清空)
+
+承接同日「/ask 路径消费 v5 内容」,把 v5 内容区剩余两处文法层局限(D/E)一并闭合。序列化格式未变(serialize 始终发绝对 `@pos`)→ 未 bump `DSL_VERSION`。
+
+- **E(纯内容/属性编辑)**:`DslCardOp` 加 `keepExistingPos` 标志;parser 对"非 create、无 `@pos`、携带 `@title`/`@content`/`@color`/`@size` 之一"的卡片行放行(产 keepExistingPos op,`x/y` 占位 0,0);`planCard` 对 keepExistingPos 的现有卡**沿用现有几何**,只更那些字段。`@pos` 仅在移动/建卡时必需;裸行与 `create` 无 `@pos` 仍报 `missing @pos`。解掉"改内容必须重抄坐标"的耦合。
+- **D(清空内容)**:`@title("")`/`@content("")` parse 成空串 → apply 真写空串清空(A 的写回逻辑已支持)。serialize 对空串不发 token(空=默认,by-design),`keepExistingPos` 输入专用(serialize 永不发)→ round-trip 不变。
+- **契约**:`DSL_GRAMMAR_REFERENCE` 文档化"" 清空 + 无 `@pos` 编辑现有卡。
+- **测试**:翻转 dsl-content/glm-5.2-content 的 D/E 锁定断言 + 更新 dsl-parser/glm-5.2-robustness 里锁旧"no-pos=错"的用例;新增 apply-content(keepExistingPos/不存在卡/纯 color/清空)+ canvas-host-builder(纯内容编辑持久化 + 清空)覆盖。
+- **验证**:dsl 339 / web 1702 passed;lint/build 全绿。
+
+---
+
 ## 2026-07-22 · 1.0.0 · /ask 路径消费 v5 卡片内容(@title/@content)
 
 v5 DSL 已在格式层公示并解析 `@title`/`@content`,但 `/ask` agent 的落库路径此前的适配缝未接:create 指令落空标题卡、update 指令的内容不写回、回滚/undo 不覆盖内容。本轮闭合该缝(DSL 文法未动)。

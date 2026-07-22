@@ -575,4 +575,39 @@ describe('applyOpsAndPersist — v5 内容写回(@title/@content)', () => {
     expect(undone).toBe(true)
     expect(svc.get('new1' as never)).toBeNull() // hardDelete
   })
+
+  it('v5(E): 无 @pos 的纯内容编辑(keepExistingPos)→ 写回内容,几何不动', async () => {
+    const svc = makeService([cardOnCanvas('c1', String(CANVAS), 100, 100)]) // title='c1', pos(100,100)
+    const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
+    const ops: DslOp[] = [
+      {
+        type: 'card',
+        cardId: 'c1' as never,
+        x: 0, // 占位;keepExistingPos 时 planCard 沿用现有卡几何
+        y: 0,
+        keepExistingPos: true,
+        title: '纯内容标题',
+        content: '纯内容正文',
+      },
+    ]
+    const res = await applyOpsAndPersist(host, before, ops, CANVAS, svc)
+    expect(res.ok).toBe(true)
+    expect(res.cardsUpdated).toBeGreaterThanOrEqual(1)
+    expect(svc.get('c1' as never)!.title).toBe('纯内容标题')
+    expect(svc.get('c1' as never)!.body).toBe('纯内容正文')
+    // 几何不动(keepExistingPos):
+    expect(svc.get('c1' as never)!.canvasPosition?.x).toBe(100)
+    expect(svc.get('c1' as never)!.canvasPosition?.y).toBe(100)
+  })
+
+  it('v5(D): @title("") 清空标题 → apply 真写空串', async () => {
+    const svc = makeService([cardOnCanvas('c1', String(CANVAS), 100, 100)]) // title='c1'
+    const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
+    const ops: DslOp[] = [
+      { type: 'card', cardId: 'c1' as never, x: 100, y: 100, title: '' },
+    ]
+    const res = await applyOpsAndPersist(host, before, ops, CANVAS, svc)
+    expect(res.ok).toBe(true)
+    expect(svc.get('c1' as never)!.title).toBe('') // 清空(非保持 'c1')
+  })
 })

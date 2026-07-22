@@ -87,7 +87,7 @@ describe('cys-dsl v5 serialize @title/@content (Slice B)', () => {
   })
 })
 
-describe('cys-dsl v5 边界与已知局限(锁定现状)', () => {
+describe('cys-dsl v5 边界(截断/转义/清空/纯内容编辑)', () => {
   const card = (id: string): CanvasElement => ({ id, kind: 'card', x: 10, y: 20, w: 100, h: 80, rotation: 0 })
 
   it('字面反斜杠+n(两字符,非换行)round-trip 不被误解码成换行', () => {
@@ -107,19 +107,38 @@ describe('cys-dsl v5 边界与已知局限(锁定现状)', () => {
     expect(last >= 0xd800 && last <= 0xdbff).toBe(false)
   })
 
-  it('KNOWN LIMITATION (D): 空 title/content 不被序列化 → DSL 无法表达"清空内容"', () => {
-    // serialize 用真值判断,空串被跳过;parse/apply 也无"设为空"语义。
-    // 内容只能加/改,不能经 DSL 清空。挂到 content-assist 项目(见 README 已知局限)。
+  it('by-design (D): serialize 不发空 title/content token(空=默认);@title("") 可表达"清空"', () => {
+    // serialize 对空串不发 token(空是默认态,无需冗余 token);但 @title("") 能 parse 成 title=''
+    // → apply 侧(见 canvas-host-builder)真写空串清空。故"清空内容"经 DSL 可表达(apply 侧)。
     const text = serializeCanvas([card('c1')], () => ({ title: '', content: '' }))
     expect(text).not.toContain('@title')
     expect(text).not.toContain('@content')
+    // @title("") / @content("") parse 成空串(清空意图可表达):
+    const clear = parseDslWithDiagnostics('[card #c1] @pos(0,0) @title("") @content("")')
+    expect(clear.errors).toHaveLength(0)
+    expect((clear.ops[0] as { title?: string }).title).toBe('')
+    expect((clear.ops[0] as { content?: string }).content).toBe('')
   })
 
-  it('KNOWN LIMITATION (E): card 行缺 @pos 被丢 → 无"纯内容编辑"', () => {
-    // buildCard 要求 @pos;只给 @title 的行产 diagnostic、0 ops。改内容必须重抄坐标(耦合几何)。
-    // 挂到 content-assist 项目(见 README 已知局限)。
+  it('v5(E): card 行缺 @pos 但带 @title/@content → keepExistingPos(纯内容编辑,解耦几何)', () => {
+    // 无 @pos 的非 create 卡片行,携带 title/content/color/size 之一 → 沿用现有卡几何的纯编辑。
+    // 裸行(无任何字段)仍 missing @pos;create 无 @pos 仍 missing @pos(建卡必须有位置)。
     const { ops, errors } = parseDslWithDiagnostics('[card #c1] @title("only")')
-    expect(ops).toHaveLength(0)
-    expect(errors[0]?.message).toContain('@pos')
+    expect(ops).toHaveLength(1)
+    expect(errors).toHaveLength(0)
+    expect((ops[0] as { keepExistingPos?: boolean }).keepExistingPos).toBe(true)
+    expect((ops[0] as { title?: string }).title).toBe('only')
+    // color/size 同样适用(无 @pos 的属性编辑):
+    const recolor = parseDsl('[card #c1] @color(red)')
+    expect((recolor[0] as { keepExistingPos?: boolean }).keepExistingPos).toBe(true)
+    expect((recolor[0] as { color?: string }).color).toBe('red')
+    // 裸行仍报错:
+    const bare = parseDslWithDiagnostics('[card #c1]')
+    expect(bare.ops).toHaveLength(0)
+    expect(bare.errors[0]?.message).toContain('@pos')
+    // create 无 @pos 仍报错(建卡必须有位置):
+    const createNoPos = parseDslWithDiagnostics('[card #c1 create] @title("x")')
+    expect(createNoPos.ops).toHaveLength(0)
+    expect(createNoPos.errors[0]?.message).toContain('@pos')
   })
 })

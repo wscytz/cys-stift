@@ -78,7 +78,7 @@ describe('glm-5.2 健壮性 —— 脏输入永不崩 + 截断精确 + v4 兼容
         '[card #c1] @pos(0,0) @size(10,10)',
         'garbage line one',
         '[rect #r1] @pos(1,1) @size(2,2) @color(red)',
-        '[card #c2] @title("missing pos")',
+        '[card #c2]', // 裸卡(无 pos 又无可更新字段)→ 坏 [ 行
         '[arrow #a] @pos(5,5) @size(1,1) @color(black)',
       ].join('\n')
       const { ops, errors } = parseDslWithDiagnostics(dsl)

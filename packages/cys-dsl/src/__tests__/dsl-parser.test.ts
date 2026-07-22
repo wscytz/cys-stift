@@ -90,9 +90,10 @@ describe('parseDsl', () => {
     expect(result[0]?.type).toBe('card')
   })
 
-  it('gracefully skips card lines without position', () => {
+  it('gracefully accepts attribute-only card lines without @pos (v5 E: keepExistingPos)', () => {
     const result = parseDsl('[card #a1] @color(red)')
-    expect(result).toHaveLength(0)
+    expect(result).toHaveLength(1)
+    expect((result[0] as { keepExistingPos?: boolean }).keepExistingPos).toBe(true)
   })
 
   it('returns empty array for empty input', () => {
@@ -332,7 +333,7 @@ describe('parseDslWithDiagnostics', () => {
   })
 
   it('reports a card line missing @pos', () => {
-    const { ops, errors } = parseDslWithDiagnostics('[card #a1] @color(red)')
+    const { ops, errors } = parseDslWithDiagnostics('[card #a1]')
     expect(ops).toHaveLength(0)
     expect(errors).toHaveLength(1)
     expect(errors[0]!.message).toMatch(/pos/i)
@@ -355,7 +356,7 @@ describe('parseDslWithDiagnostics', () => {
   it('reports correct line numbers in a mixed block', () => {
     const dsl = [
       '[card #a1] @pos(1,2)', // line 1 valid
-      '[card #a2] @color(red)', // line 2 malformed (no pos)
+      '[card #a2]', // line 2 malformed (bare card, no pos)
       '[arrow #arr1] from #a1 to #a2', // line 3 valid
       '[bad #x] @pos(1,2)', // line 4 unrecognized
     ].join('\n')
@@ -435,7 +436,7 @@ describe('parseDslWithDiagnostics', () => {
   it('混合:部分合法 + 部分格式错 → ops 非空 + errors 非空(应用合法的,报错的跳过)', () => {
     const dsl = [
       '[card #a1] @pos(1,2)', // 合法
-      '[card #b2] @color(blue)', // 格式错(缺 pos)
+      '[card #b2]', // 格式错(裸行,缺 pos)
       '[rect #r1] @pos(3,4) @size(10,10)', // 合法
     ].join('\n')
     const { ops, errors } = parseDslWithDiagnostics(dsl)
@@ -591,8 +592,8 @@ describe('parseDsl — relational card (right-of / below + @gap)', () => {
     expect((op as { y: number }).y).toBe(200)
   })
 
-  it('无 @pos 且无 rel → 仍报 missing @pos(既有契约不破)', () => {
-    const { ops, errors } = parseDslWithDiagnostics('[card #a] @color(blue)')
+  it('无 @pos 且无 rel 且无可更新字段 → 仍报 missing @pos(既有契约不破)', () => {
+    const { ops, errors } = parseDslWithDiagnostics('[card #a]')
     expect(ops).toHaveLength(0)
     expect(errors[0]?.message).toBe('missing @pos')
   })

@@ -69,20 +69,22 @@ describe('glm-5.2 v5 内容 —— @title/@content 富文本与边界', () => {
     })
   })
 
-  describe('已知局限锁定(防止"修复"后破坏叙事一致性)', () => {
-    it('LIMIT:空 title/content 不被序列化 → DSL 无法表达"清空内容"', () => {
+  describe('v5 内容边界锁定(serialize 行为 + E 已解)', () => {
+    it('serialize 不发空 title/content token(空=默认;apply 侧 @title("") 可清空,见 dsl-content)', () => {
       const text = serializeCanvas([card('c1')], () => ({ title: '', content: '' }))
       expect(text).not.toContain('@title')
       expect(text).not.toContain('@content')
     })
 
-    it('LIMIT:card 行缺 @pos 被丢 → 无"纯内容编辑"(内容编辑耦合几何)', () => {
+    it('v5(E):card 行缺 @pos 但带 @title/@content → keepExistingPos op(内容编辑解耦几何)', () => {
       const { ops, errors } = parseDslWithDiagnostics('[card #c1] @title("only content")')
-      expect(ops).toHaveLength(0)
-      expect(errors[0]?.message).toMatch(/@pos/)
+      expect(ops).toHaveLength(1)
+      expect(errors).toHaveLength(0)
+      expect((ops[0] as { keepExistingPos?: boolean }).keepExistingPos).toBe(true)
+      expect((ops[0] as { title?: string }).title).toBe('only content')
     })
 
-    it('LIMIT:resolve 返回 undefined 时不 emit 内容 token(几何-only)', () => {
+    it('serialize:resolve 返回 undefined 时不 emit 内容 token(几何-only)', () => {
       const text = serializeCanvas([card('c1')], () => undefined)
       expect(text).not.toContain('@title')
       expect(text).not.toContain('@content')

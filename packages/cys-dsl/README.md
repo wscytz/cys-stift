@@ -44,15 +44,16 @@ const clean = sanitizeDslOps(ops, ctx)      // 修正非法值(永不抛错)
 - **Bauhaus 6 色**:不新增色。
 - **截断代理对安全**:`truncateDslText` 不劈开 emoji/增补平面字符(不产孤立代理位)。
 
-## 已知局限(v5)
+## 内容能力与边界(v5)
 
-格式 / 适配层的已知边界,**不是 bug**;多数挂到后续「内容辅助 AI」项目(单开)解决。每项都有测试锁现状(red→green 锚点,接通后断言反转)。
+v5 的卡片内容(`@title`/`@content`)在格式层、apply 层、`/ask` 落库层均已接通(无遗留适配缝)。A/D/E 三处此前的缺口/局限于 2026-07-22 全部闭合:
 
-- **DSL 无法"清空"卡片内容(D)**:serialize 对空 `title`/`content` 不产 token,parse/apply 也无"设为空"语义——内容只能**加/改**,不能经 DSL 清空。锁于 `dsl-content.test.ts`。
-- **card 行必须有 `@pos`(E)**:无"纯内容编辑"——改 `@title`/`@content` 要重抄坐标,否则该行按 `missing @pos` 丢弃(内容耦合几何)。锁于 `dsl-content.test.ts`。
-- **`/ask` agent 落库路径现已消费内容(A,2026-07-22 解)**:`applyOpsAndPersist` 建/改卡均写回 `@title`/`@content`(create 不再落空标题卡;update 经 post-hoc 回写写回 `Card.title/body`;回滚 + 一次性 undo 覆盖内容);companion 的 live 路径(`makeOnCardCreate`/`makeOnCardUpdate`)同接。此前缺口锁于 `apps/web` 的 `canvas-host-builder.test.ts`(已 red→green 翻转)。
-- **DSL 无法"清空"卡片内容(D)** 与 **card 行必须有 `@pos`(E)** 仍是文法层局限(见上),不在本路径解决范围。
-- DSL 模态编辑器(人读)路径早已接 `onCardCreate`/`onCardUpdate`;现在 `/ask` agent 路径同样消费 `@title`/`@content`——人读与 AI 写两条路径一致。
+- **A(`/ask` 落库)**:`applyOpsAndPersist` 建/改卡写回 `@title`/`@content`(create 不再落空标题卡;update 经 post-hoc 回写写回 `Card.title/body`;回滚 + 一次性 undo 覆盖内容);companion live 路径(`makeOnCardCreate`/`makeOnCardUpdate`)同接。锁于 `apps/web` 的 `canvas-host-builder.test.ts`。
+- **D(清空内容)**:`@title("")`/`@content("")` parse 成空串 → apply 真写空串清空(锁于 `dsl-content.test.ts`)。serialize 对空串**不发** token(空=默认态,by-design)。
+- **E(纯内容/属性编辑)**:现有卡的 `@title`/`@content`/`@color`/`@size` 编辑**可省 `@pos`**(`keepExistingPos` 标志,apply 时几何沿用现有卡);`@pos` 仅在**移动**卡或**建卡**时必需。裸行(无任何字段)/ `create` 无 `@pos` 仍报 `missing @pos`。锁于 `dsl-content.test.ts` + `apply-content.test.ts`。
+- DSL 模态编辑器(人读)与 `/ask` agent(AI 写)两条路径对 `@title`/`@content` 行为一致。
+
+**边界(by-design,非局限)**:serialize 不发空 token(空是默认态,无需冗余);`keepExistingPos` 是**输入专用**——serialize 始终发绝对 `@pos`,故 round-trip 序列化格式不变(未 bump `DSL_VERSION`)。
 
 ## 预期能力测试(qwen-max-7-21)
 

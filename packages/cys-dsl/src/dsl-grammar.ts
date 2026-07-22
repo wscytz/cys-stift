@@ -93,6 +93,10 @@ export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one eleme
   #   (meta.wikilink===true); distinguishes auto-built wikilink arrows from
   #   manual references arrows so the marker survives DSL round-trip.
 Rules: card updates are the default; explicit create makes an empty card only after persistence succeeds.
-  @title/@content (v5) update an existing card's title/body; omit them to leave content unchanged.
+  @title/@content (v5) update an existing card's title/body; "" clears it, omit to leave unchanged.
+  To edit an EXISTING card's content/color/size WITHOUT moving it, omit @pos (geometry is kept):
+  [card #id] @title("…") @content("…")   # content-only edit, position preserved
+  [card #id] @color(c)                   # recolor in place
+  (@pos is still required to MOVE a card or to CREATE one.)
   IDs use letters, digits, underscore, hyphen, and colon. Lines starting with # are comments and ignored;
   colors are the ${DSL_COLORS.length} Bauhaus tokens only.`

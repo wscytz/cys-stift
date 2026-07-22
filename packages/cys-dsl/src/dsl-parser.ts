@@ -43,6 +43,10 @@ export type DslCardOp = {
    *  below    #anchor:y = anchor.y + anchor.h + gap;x = anchor.x
    *  仅 AI 输入路径;serializeCanvas 永不 emit rel(rel 解决后画布存绝对坐标)。 */
   rel?: { dir: 'right-of' | 'below'; anchor: string; gap: number }
+  /** v5(E):无 @pos 的"纯属性/内容编辑"标志。无 @pos(且非 create、非 rel)但携带
+   *  title/content/color/size 之一时置真 —— apply 时(planCard)沿用现有卡几何,只更那些字段;
+   *  x/y 为占位(0,0),apply 期忽略。serializeCanvas 永不 emit(始终绝对坐标)→ 输入专用。 */
+  keepExistingPos?: boolean
 }
 
 export type DslFreeOp =
@@ -304,6 +308,22 @@ function buildCard(ds: unknown[]): BuildResult {
     if (d.create) op.create = true
     if (d.title !== undefined) op.title = d.title
     if (d.content !== undefined) op.content = d.content
+    return { op }
+  }
+  // v5(E):无 @pos 的非 create 卡片行,若携带 title/content/color/size 之一 = "纯属性/内容编辑"
+  // (几何沿用现有卡,由 planCard 处理)。x/y 占位(0,0);裸行(无任何字段)与 create 仍 missing @pos。
+  if (!d.create && (d.title !== undefined || d.content !== undefined || d.color !== undefined || d.size !== undefined)) {
+    const op: DslCardOp = {
+      type: 'card',
+      cardId: d.id as CardId,
+      x: 0,
+      y: 0,
+      keepExistingPos: true,
+      ...(d.color !== undefined ? { color: d.color } : {}),
+      ...(d.size ? { w: d.size.w, h: d.size.h } : {}),
+      ...(d.title !== undefined ? { title: d.title } : {}),
+      ...(d.content !== undefined ? { content: d.content } : {}),
+    }
     return { op }
   }
   return { diag: 'missing @pos' }
