@@ -94,11 +94,11 @@ export function CompanionChat({
 
   const aiReady = isAIReady(getCurrentAI())
 
-  const send = async () => {
-    const question = input.trim()
+  const send = async (override?: string) => {
+    const question = (override ?? input).trim()
     if (!question || busy || !aiReady) return
     const cfg = getCurrentAI()!
-    setInput('')
+    if (override === undefined) setInput('')
     setBusy(true)
 
     // 截断老消息(超 MAX_HISTORY 丢最早);history 发给 AI 让它有上下文。
@@ -256,6 +256,13 @@ export function CompanionChat({
     })
   }
 
+  // DSL 解析失败时的定点修复:自动发起一轮"只重生 DSL 块"(带转义提醒)。
+  const onRegenerateDsl = (msgIdx: number) => {
+    void msgIdx
+    if (busy || !aiReady) return
+    void send(t('agent.fixDslPrompt'))
+  }
+
   const liveDetail = detailCard ? (service.get(detailCard.id) ?? null) : null
   const effectiveDetail = liveDetail && !liveDetail.deletedAt ? liveDetail : null
 
@@ -288,6 +295,7 @@ export function CompanionChat({
               }}
               onApplied={() => { /* useDb 订阅自动 re-render;确认门内部已切 applied 态 */ }}
               onRejected={() => { void onRejected(i) }}
+              onRegenerateDsl={() => { onRegenerateDsl(i) }}
               sampleContext={m.sampleContext ? { source: 'companion', question: m.sampleContext.question, context: m.sampleContext.context, targetCanvasId: m.targetCanvasId ?? String(canvasId) } : undefined}
             />
           </div>
@@ -300,7 +308,7 @@ export function CompanionChat({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey && e.keyCode !== 229) {
               e.preventDefault()
               void send()
             }
@@ -365,6 +373,7 @@ function MessageContent({
   onCardRefClick,
   onApplied,
   onRejected,
+  onRegenerateDsl,
   sampleContext,
 }: {
   content: string
@@ -378,6 +387,7 @@ function MessageContent({
   onCardRefClick: (id: string) => void
   onApplied: () => void
   onRejected: () => void
+  onRegenerateDsl?: () => void
   sampleContext?: { source: 'ask' | 'companion'; question?: string; context: string; targetCanvasId?: string }
 }) {
   const { t } = useI18n()
@@ -429,6 +439,7 @@ function MessageContent({
           liveHost={host}
           onApplied={() => onApplied()}
           onRejected={() => onRejected()}
+          onRegenerateDsl={onRegenerateDsl}
           sampleContext={sampleContext ? { source: 'companion', question: sampleContext.question, context: sampleContext.context, targetCanvasId: canvasId } : undefined}
         />
       ))}

@@ -484,6 +484,8 @@ export const messages = {
   'agent.sanitizeDiagnostics': { zh: '{n} 处引用不存在(卡/端点)', en: '{n} reference(s) not found (card/endpoint)' },
   'agent.reject': { zh: '拒绝', en: 'Reject' },
   'agent.retry': { zh: '让 AI 重试', en: 'Ask AI to retry' },
+  'agent.fixDsl': { zh: '让 AI 修复 DSL', en: 'Ask AI to fix DSL' },
+  'agent.fixDslPrompt': { zh: '上面的 cys-dsl 块无法解析。请只重新输出一个修正后的 cys-dsl 块,不要改其他内容。注意:@title/@content 是字符串字面量,内部不要嵌 ``` 围栏,双引号转义为 \\",反斜杠转义为 \\\\。', en: 'The cys-dsl block above failed to parse. Re-emit ONLY a corrected cys-dsl block, nothing else. Note: @title/@content are string literals — never embed ``` inside, escape " as \\" and \\ as \\\\.' },
   'agent.edit': { zh: '编辑 DSL', en: 'Edit DSL' },
   'agent.parseError': { zh: 'AI 的提议格式有误', en: 'AI proposal has format errors' },
   'agent.noChange': { zh: '无变更', en: 'No changes' },

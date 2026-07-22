@@ -27,6 +27,13 @@ export interface WorkbenchPanelProps {
   onDirtyChange?: (dirty: boolean) => void
 }
 
+/**
+ * 自动保存防抖。拉到 2.5s(原 500ms 太勤 → 「完成」钮失去"立即存"意义)。安全网仍在:
+ * 完成(flush+close)与切卡 cleanup flush 都会落盘,所以拉长只影响"静默自动存"的频率,
+ * 不丢编辑(除非半秒内关浏览器 tab,可接受)。
+ */
+const AUTOSAVE_DEBOUNCE_MS = 2500
+
 export function WorkbenchPanel({
   card,
   onSave,
@@ -97,9 +104,9 @@ export function WorkbenchPanel({
 
   useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
 
-  // 防抖自动存(500ms)。脏才存。
+  // 防抖自动存。脏才存。
   useEffect(() => {
-    const id = setTimeout(() => flushRef.current(), 500)
+    const id = setTimeout(() => flushRef.current(), AUTOSAVE_DEBOUNCE_MS)
     return () => clearTimeout(id)
   }, [title, body, tags, card.title, card.body, card.tags])
 

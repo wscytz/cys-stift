@@ -5,6 +5,31 @@
 
 ---
 
+## 2026-07-22 · 1.0.0 · AI 输出健壮性 + 工作台 UX(测试反馈一批)
+
+真机测试发现的体验问题一批,集中在"AI 输出 DSL 的可靠性"与"工作台保存/输入交互"。
+
+- **fix(ai): @content 转义防护**:system prompt 明令 `@title/@content` 是字符串字面量——禁嵌 ` ``` ` 围栏(会截断外层 cys-dsl fence 致整条回复丢)、双引号转义 `\"`、反斜杠转义 `\\`;`buildDslCorrection` 重试消息补同款提醒。修"AI 把 markdown 代码块塞进 @content → 解析炸 → 回复看不见"。
+- **feat(ai): DSL 解析失败定点重生**:`AgentConfirmCard` 解析失败时按钮变「让 AI 修复 DSL」(`onRegenerateDsl`),自动发起一轮带转义提醒的定点修复(只重生 DSL 块),不再静默或靠手动续聊。`send` 加 `override` 参数支撑;`/ask` + companion 两路接通。
+- **fix(ai): IME 回车误发送**:`/ask` + companion 输入框 keydown 漏查合成态,中文输入法选词回车直接发送。加 `keyCode !== 229` 守卫(需两次回车:一次确认候选、一次发送)。
+- **fix(workbench): 缩略图收起挡「完成」钮**:工作台 MinimapPreview 收起态默认贴右上角,正好压住 panel head 的「完成」钮(zIndex:30)。收起默认挪到右下角,展开态(原 top:184px)不变。
+- **tune(workbench): 自动保存降频**:autosave 防抖 500ms → 2500ms(常量 `AUTOSAVE_DEBOUNCE_MS` 可调),「完成」钮重新具备"立即存+关"意义。安全网仍在(完成 flush + 切卡 cleanup flush),不丢编辑。
+- **搁置**:markdown 预览差异(AI 能渲/用户不能)待用户重现定位——`MarkdownBody` 全功能,疑视图/路径问题,非渲染器缺陷。
+- **验证**:web 1713 passed;lint 0;build 0。
+
+---
+
+## 2026-07-22 · 1.0.0 · 标签 halo(箭头标签 + text 元素半透明底条)
+
+渲染层自动避障 Phase 1(字体优先):箭头标签 / 独立 text 元素压在笔画上时可读。架构判定 halo 是视图层关注,**不进 DSL**(DSL 继续只存文字,放哪由渲染决定)。
+
+- **canvas**:`self-built-render.ts` 新增 `drawTextWithHalo`(镜像 frame title 底条模式,泛化多行),接 arrow label + text 元素;顺带修 arrow 分支从不设 `textBaseline` 的 latent bug。
+- **SVG 导出**:`elements-to-svg.ts` 同源加半透明 `<rect>`(走 `--color-white` token,不用字面量);新增 `estimateTextWidth`(CJK/latin 同源 cw)。视图一致性——导出与屏上不分裂。
+- **测试**:+3(arrow halo 顺序锁定 / 3 行 text halo 高度 / SVG halo 计数);canvas-engine 573 passed;web build 0。
+- **Phase 2 留待**:label↔label 候选位贪心避障(render or nudge)。
+
+---
+
 ## 2026-07-22 · 1.0.0 · AI 内容编辑闭环(确认门 content diff + 纯内容编辑可 apply)
 
 承接同日 content-on-demand 开关与 v6 两处修复,补齐"AI 改得来内容"的最后一环:确认门原本只看几何 diff,纯内容编辑(@title/@content 无 @pos —— 正是 prompt 教 AI 发的形式)几何零变化 → Apply 按钮被禁用,AI 的内容改动永远落不了地。

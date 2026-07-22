@@ -45,6 +45,8 @@ interface Props {
   liveHost?: CanvasHost
   onApplied: (result: { applied: number; cardsUpdated: number; cardsCreated: number }) => void
   onRejected: () => void
+  /** 解析失败时可选拔回调:自动发起一轮定点修复(只重生 DSL 块),优于 onRejected 的手动续聊。 */
+  onRegenerateDsl?: () => void
   /** 捕获样本用上下文(透传自调用方 /ask + companion)。有则在 apply/reject 时记样本。 */
   sampleContext?: { source: 'ask' | 'companion'; question?: string; context: string; targetCanvasId?: string }
 }
@@ -190,7 +192,7 @@ export function computeContentDiff(
   return out
 }
 
-export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApplied, onRejected, sampleContext }: Props) {
+export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApplied, onRejected, onRegenerateDsl, sampleContext }: Props) {
   const { t } = useI18n()
   const [phase, setPhase] = useState<Phase>('confirming')
   const [editing, setEditing] = useState(false)
@@ -476,7 +478,7 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
             <li key={e.line}>L{e.line}: {e.text}</li>
           ))}
         </ul>
-        <Button variant="ghost" onClick={() => { recordReject(); onRejected() }}>{t('agent.retry')}</Button>
+        <Button variant="ghost" onClick={() => { recordReject(); onRegenerateDsl ? onRegenerateDsl() : onRejected() }}>{onRegenerateDsl ? t('agent.fixDsl') : t('agent.retry')}</Button>
         <style>{confirmStyles}</style>
       </div>
     )

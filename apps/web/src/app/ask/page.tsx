@@ -198,8 +198,8 @@ export default function AskPage() {
     }
   }, [targetCanvasId])
 
-  const send = async () => {
-    const question = input.trim()
+  const send = async (override?: string) => {
+    const question = (override ?? input).trim()
     if (!question || busy || !aiReady) return
     const cfg = currentAI!
     const requestCanvasId = targetCanvasId
@@ -209,7 +209,7 @@ export default function AskPage() {
       requestSeqRef.current === requestId &&
       targetCanvasIdRef.current === requestCanvasId &&
       aiProfileSignature(activeAIProfile(settingsStore.get())) === requestProfileSignature
-    setInput('')
+    if (override === undefined) setInput('')
     setBusy(true)
 
     // 截断老消息(超 MAX_HISTORY 丢最早,保 system 逻辑在 streamText 外拼)。
@@ -415,6 +415,14 @@ export default function AskPage() {
     })
   }
 
+  // DSL 解析失败时的定点修复:自动发起一轮"只重生 DSL 块"(带转义提醒),
+  // 而不是让用户手动续聊。retryUntilValid 已在单轮内重试过,这是兜底入口。
+  const onRegenerateDsl = async (msgIdx: number) => {
+    void msgIdx
+    if (busy || !aiReady) return
+    await send(t('agent.fixDslPrompt'))
+  }
+
   const handleClear = () => {
     const n = messages.length
     setMessages([])
@@ -531,6 +539,7 @@ export default function AskPage() {
                     }}
                     onApplied={() => onApplied(i)}
                     onRejected={() => { void onRejected(i) }}
+                    onRegenerateDsl={() => { void onRegenerateDsl(i) }}
                     sampleContext={m.sampleContext ? { source: 'ask', question: m.sampleContext.question, context: m.sampleContext.context, targetCanvasId: m.targetCanvasId ?? String(targetCanvasId) } : undefined}
                   />
                 </div>
@@ -543,7 +552,7 @@ export default function AskPage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
+                  if (e.key === 'Enter' && !e.shiftKey && e.keyCode !== 229) {
                     e.preventDefault()
                     void send()
                   }
@@ -612,6 +621,7 @@ function MessageContent({
   onCardRefClick,
   onApplied,
   onRejected,
+  onRegenerateDsl,
   sampleContext,
 }: {
   content: string
@@ -624,6 +634,7 @@ function MessageContent({
   onCardRefClick: (id: string) => void
   onApplied: () => void
   onRejected: () => void
+  onRegenerateDsl?: () => void
   sampleContext?: { source: 'ask' | 'companion'; question?: string; context: string; targetCanvasId?: string }
 }) {
   const { t } = useI18n()
@@ -674,6 +685,7 @@ function MessageContent({
           service={service}
           onApplied={() => onApplied()}
           onRejected={() => onRejected()}
+          onRegenerateDsl={onRegenerateDsl}
           sampleContext={sampleContext ? { source: 'ask', question: sampleContext.question, context: sampleContext.context, targetCanvasId: sampleContext.targetCanvasId ?? String(targetCanvasId) } : undefined}
         />
       ))}

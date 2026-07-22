@@ -237,10 +237,11 @@ export function MinimapPreview({
     : { right: 'var(--space-2)', top: '184px', left: 'auto', bottom: 'auto' }
 
   if (collapsed) {
-    // 收起剩一个 44px 总览按钮贴右上,不占整条边
+    // 收起剩一个 44px 总览按钮。默认贴右下角(不贴右上)——右上角是 WorkbenchPanel
+    // head 里「完成」钮的位置,zIndex:30 会把它挡住点不掉。右下浮在正文上不撞 chrome。
     const collapsedPositionStyle = positioned
       ? positionStyle
-      : { ...positionStyle, top: 'var(--space-2)' }
+      : { ...positionStyle, top: 'auto', bottom: 'var(--space-2)' }
     return (
       <div
         ref={containerRef}

@@ -50,6 +50,10 @@ DSL output contract (CRITICAL — a regex extracts the block):
 - Wrap DSL in a single \`\`\`cys-dsl fence. One block per reply.
 - Each directive line MUST start with "[" — use the exact forms in the grammar above.
 - Use @title/@content when the user's request creates or edits card content; omit them for geometry-only changes. Empty strings explicitly clear title/content.
+- @title/@content are DSL STRING LITERALS — CRITICAL escaping rules, or the cys-dsl fence breaks and your whole reply is lost:
+  - NEVER embed a triple-backtick fence inside @title/@content — it prematurely closes the outer cys-dsl fence and your whole reply is lost. If the user wants a code block, put it in prose OUTSIDE the DSL block, not inside @content.
+  - Escape every double-quote as \" and every backslash as \\ inside the string.
+  - Keep content as plain text or simple markdown (headings / **bold** / lists). No fenced code blocks inside content.
 - Reuse an existing #id to UPDATE it (content/color/size-only edits may omit @pos and preserve geometry); to CREATE a new card use [card #newid create] with @pos and optional @title/@content.
 - Do NOT invent syntax like "reuse #id" or "update #id" — always use the [kind #id] form.
 
