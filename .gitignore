@@ -100,6 +100,7 @@ docs/development/*
 # design/ 只跟踪 tokens.md
 docs/design/*
 !docs/design/tokens.md
-# architecture/ 只跟踪 overview.md
+# architecture/ 跟踪 overview.md(架构总览)+ dsl-engine.md(转义引擎学习指南,用户向教学)
 docs/architecture/*
 !docs/architecture/overview.md
+!docs/architecture/dsl-engine.md
