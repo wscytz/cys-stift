@@ -24,7 +24,7 @@ import type { CanvasId, CardId, CardService, ColorToken } from '@cys-stift/domai
 import { InMemoryCanvasHost, type CanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
 import { parseDslStrictWithDiagnostics } from '@cys-stift/dsl'
 import type { SanitizeDiagnostic } from '@cys-stift/dsl'
-import { applyLayout, type CardCreateHandler } from '@/features/canvas/apply-layout'
+import { applyLayout, type CardCreateHandler, type CardUpdateHandler } from '@/features/canvas/apply-layout'
 import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
 import { buildCanvasHostForCanvas, applyOpsAndPersist, type PersistResult } from '@/features/canvas/canvas-host-builder'
 import { useI18n } from '@/lib/i18n'
@@ -101,20 +101,21 @@ function cloneCanvasElements(elements: readonly CanvasElement[]): CanvasElement[
 }
 
 /**
- * DSL create op 建新卡(空卡 + 几何)—— live 与 temp 路径共用。
- * mirror canvas-host-builder.ts:88-99 的 onCardCreate(ask-agent 建卡模板):
- * 同样的 createWithId 字段(title/body/type/canvasPosition{z,rotation}/color?/source)。
+ * DSL create op 建新卡(几何 + v5 内容)—— live 与 temp 路径共用。
+ * mirror canvas-host-builder.ts 的 onCardCreate(ask-agent 建卡模板):同样的
+ * createWithId 字段(title/body/type/canvasPosition{z,rotation}/color?/source)。
+ * v5:带 @title/@content 时写入(不再落空标题卡)。
  */
 export function makeOnCardCreate(canvasId: CanvasId, service: CardService): {
   onCardCreate: CardCreateHandler
   getFailed: () => number
 } {
   let failed = 0
-  const onCardCreate = (p: { cardId: string; x: number; y: number; w: number; h: number; color?: string }) => {
+  const onCardCreate: CardCreateHandler = (p) => {
     try {
       service.createWithId(p.cardId as CardId, {
-        title: '',
-        body: '',
+        title: p.title ?? '',
+        body: p.content ?? '',
         type: 'note',
         canvasPosition: { canvasId, x: p.x, y: p.y, w: p.w, h: p.h, z: Date.now(), rotation: 0 },
         ...(p.color ? { color: p.color as ColorToken } : {}),
@@ -132,6 +133,27 @@ export function makeOnCardCreate(canvasId: CanvasId, service: CardService): {
     }
   }
   return { onCardCreate, getFailed: () => failed }
+}
+
+/**
+ * DSL update op 写现有卡内容(@title/@content)—— live 路径专用。
+ * live host 的几何走画布页 bindCardWriteback,但内容无对应回写,故由本 handler 直接
+ * service.update(title/body)。写失败抛错 → applyLayout 计入 r.failed(live 路径 res.failed
+ * 反映);title/body 与当前一致时跳过(无谓写入)。
+ */
+export function makeOnCardUpdate(service: CardService): CardUpdateHandler {
+  return ({ cardId, title, content }) => {
+    const current = service.get(cardId as CardId)
+    if (!current) throw new Error(`card not found: ${cardId}`)
+    const patch: { title?: string; body?: string } = {}
+    if (title !== undefined && title !== current.title) patch.title = title
+    if (content !== undefined && content !== current.body) patch.body = content
+    if (patch.title === undefined && patch.body === undefined) return
+    const updated = service.update(cardId as CardId, patch) as unknown
+    if (updated === null || updated === false || updated === undefined) {
+      throw new Error(`card content update failed: ${cardId}`)
+    }
+  }
 }
 
 export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApplied, onRejected, sampleContext }: Props) {
@@ -249,9 +271,10 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
       let res: ApplyOutcome
       if (liveHost) {
         // live:host.batch 单 undo;onCardCreate 建卡;画布页 bindCardWriteback + freeform
-        // binding 持久化。不调 applyOpsAndPersist(会双写)。
+        // binding 持久化几何;v5 内容(@title/@content)经 onCardUpdate 直接 service.update
+        // (bindCardWriteback 不写内容)。不调 applyOpsAndPersist(会双写)。
         const creator = makeOnCardCreate(targetCanvasId, service)
-        const r = applyLayout(liveHost, preview.ops, undefined, creator.onCardCreate)
+        const r = applyLayout(liveHost, preview.ops, undefined, creator.onCardCreate, makeOnCardUpdate(service))
         res = { ok: true, committed: true, applied: r.applied, failed: r.failed, cardsUpdated: r.cardsUpdated, cardsCreated: r.cardsCreated, cardsFailed: creator.getFailed(), ...(r.sanitizeDiagnostics ? { sanitizeDiagnostics: r.sanitizeDiagnostics } : {}) }
       } else {
         // /ask temp 路径:复用刚通过 revision 检查的 host，避免检查后再异步

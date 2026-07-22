@@ -20,6 +20,7 @@ import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
+import type { CardService } from '@cys-stift/domain'
 
 // ── mock @/lib/i18n: 真翻译绑定 messages 表(避免全套 I18nProvider)──
 const _locale: 'zh' | 'en' = 'zh'
@@ -90,6 +91,7 @@ import { VERSION } from '@/lib/version'
 import {
   AgentConfirmCard,
   makeOnCardCreate,
+  makeOnCardUpdate,
 } from '@/features/ai/agent-confirm-card'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -216,6 +218,14 @@ describe('makeOnCardCreate', () => {
     expect((created[0]!.input as { color?: string }).color).toBeUndefined()
   })
 
+  it('带 title/content 时写入(v5,不再落空标题卡)', () => {
+    const { service, created } = makeMockService()
+    makeOnCardCreate('c' as never, service).onCardCreate({
+      cardId: 'c4', x: 0, y: 0, w: 1, h: 1, title: 'T', content: 'B',
+    })
+    expect(created[0]!.input).toMatchObject({ title: 'T', body: 'B' })
+  })
+
   it('createWithId 抛错时计入 failed(不向上传播,case 2a 不再静默)', () => {
     const boom = {
       createWithId: () => {
@@ -225,6 +235,50 @@ describe('makeOnCardCreate', () => {
     const { onCardCreate: fn, getFailed } = makeOnCardCreate('c' as never, boom)
     expect(() => fn({ cardId: 'x', x: 0, y: 0, w: 1, h: 1 })).not.toThrow()
     expect(getFailed()).toBe(1)
+  })
+})
+
+// ───────────────────────────────────────────────────────────────────
+describe('makeOnCardUpdate — v5 内容写回(@title/@content,live 路径)', () => {
+  it('带 title/content → service.update 写回(title→title, content→body)', () => {
+    const updated: { id: string; patch: Record<string, unknown> }[] = []
+    const cards = new Map<string, { id: string; title: string; body: string }>([
+      ['c1', { id: 'c1', title: '旧', body: '旧正文' }],
+    ])
+    const service = {
+      get: (id: string) => cards.get(id) ?? null,
+      update: (id: string, patch: Record<string, unknown>) => {
+        updated.push({ id, patch })
+        const c = cards.get(id)
+        if (c) cards.set(id, { ...c, ...patch } as { id: string; title: string; body: string })
+        return cards.get(id) ?? null
+      },
+    } as unknown as CardService
+    makeOnCardUpdate(service)({ cardId: 'c1', title: '新标题', content: '新正文' })
+    expect(updated[0]).toMatchObject({ id: 'c1', patch: { title: '新标题', body: '新正文' } })
+  })
+
+  it('card 不存在 → 抛错(applyLayout 计 failed)', () => {
+    const service = { get: () => null, update: () => null } as unknown as CardService
+    expect(() => makeOnCardUpdate(service)({ cardId: 'nope', title: 'x' })).toThrow()
+  })
+
+  it('title/body 与当前一致 → 不调 update(无谓写入)', () => {
+    const updated: unknown[] = []
+    const service = {
+      get: () => ({ id: 'c1', title: 'same', body: 'samebody' }),
+      update: () => { updated.push(true); return { id: 'c1' } },
+    } as unknown as CardService
+    makeOnCardUpdate(service)({ cardId: 'c1', title: 'same', content: 'samebody' })
+    expect(updated).toHaveLength(0)
+  })
+
+  it('service.update 返回 null → 抛错(applyLayout 计 failed)', () => {
+    const service = {
+      get: () => ({ id: 'c1', title: '旧', body: '' }),
+      update: () => null,
+    } as unknown as CardService
+    expect(() => makeOnCardUpdate(service)({ cardId: 'c1', title: '新' })).toThrow()
   })
 })
 

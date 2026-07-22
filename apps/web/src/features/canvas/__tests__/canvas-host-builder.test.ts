@@ -428,17 +428,17 @@ describe('buildEmptyHost', () => {
 })
 
 /**
- * v5 内容(@title/@content)在 /ask persist 路径的**适配缺口**(锁定现状 — Corner A)。
+ * v5 内容(@title/@content)在 /ask persist 路径的**写回**(原 Corner A,已接通)。
  *
- * applyOpsAndPersist 的 onCardCreate 解构丢 title/content(硬编码空标题/空 body)、且未接
- * onCardUpdate —— 故 DSL 携带的内容**不写回 CardService**。这不是 DSL 的问题(DSL 包能正确
- * parse/携带内容),是 /ask 适配层尚未消费。留给 content-assist 单开项目接通;接通后这里的
- * 断言需反转(red→green 锚点)。几何照常写(内容缺口不影响位置/颜色回写)。
+ * applyOpsAndPersist:create 指令把 @title/@content 写进 createWithId;update 指令经
+ * post-hoc 回写循环写回 Card.title/body(与几何/颜色同阶段);回滚 / 一次性 undo 均覆盖
+ * title/body(无新增数据丢失面)。几何照常写。注:「清空内容」(空串语义)/「无 @pos 纯内容
+ * 编辑」仍是 DSL 文法层局限(见 dsl 包 README 已知局限 D/E),与本路径无关。
  */
-describe('applyOpsAndPersist — v5 内容适配缺口(锁定现状 A)', () => {
+describe('applyOpsAndPersist — v5 内容写回(@title/@content)', () => {
   beforeEach(() => freeformStore.clear())
 
-  it('card-update 带 @title/@content → 卡片 title/body 不被改(几何照写)', async () => {
+  it('card-update 带 @title/@content → title/body 落库(几何照写)', async () => {
     const svc = makeService([cardOnCanvas('c1', String(CANVAS), 100, 100)]) // title='c1', body=''
     const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
     const ops: DslOp[] = [
@@ -455,12 +455,12 @@ describe('applyOpsAndPersist — v5 内容适配缺口(锁定现状 A)', () => {
     expect(res.ok).toBe(true)
     // 几何落库:
     expect(svc.get('c1' as never)!.canvasPosition?.x).toBe(300)
-    // 内容不落库(缺口):
-    expect(svc.get('c1' as never)!.title).toBe('c1') // 未被改成 'NEW TITLE'
-    expect(svc.get('c1' as never)!.body).toBe('') // 未被改成 'NEW BODY'
+    // 内容落库(原 Corner A 缺口,已接通):
+    expect(svc.get('c1' as never)!.title).toBe('NEW TITLE')
+    expect(svc.get('c1' as never)!.body).toBe('NEW BODY')
   })
 
-  it('card-create 带 @title/@content → 落空标题卡(内容丢)', async () => {
+  it('card-create 带 @title/@content → 建卡即带内容(不再落空标题卡)', async () => {
     const svc = makeService([])
     const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
     const ops: DslOp[] = [
@@ -477,7 +477,102 @@ describe('applyOpsAndPersist — v5 内容适配缺口(锁定现状 A)', () => {
     const res = await applyOpsAndPersist(host, before, ops, CANVAS, svc)
     expect(res.ok).toBe(true)
     expect(res.cardsCreated).toBe(1)
-    expect(svc.get('new1' as never)!.title).toBe('') // onCardCreate 硬编码空标题
-    expect(svc.get('new1' as never)!.body).toBe('') // 丢 DSL content
+    expect(svc.get('new1' as never)!.title).toBe('T')
+    expect(svc.get('new1' as never)!.body).toBe('B')
+  })
+
+  it('纯内容更新(无几何/颜色变化)→ 计 cardsUpdated 且 title/body 落库', async () => {
+    const svc = makeService([cardOnCanvas('c1', String(CANVAS), 100, 100)]) // title='c1', body=''
+    const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
+    const ops: DslOp[] = [
+      {
+        type: 'card',
+        cardId: 'c1' as never,
+        x: 100, // 同原位,无几何漂移
+        y: 100,
+        title: '只改标题',
+        content: '只改正文',
+      },
+    ]
+    const res = await applyOpsAndPersist(host, before, ops, CANVAS, svc)
+    expect(res.ok).toBe(true)
+    expect(res.cardsUpdated).toBeGreaterThanOrEqual(1)
+    expect(svc.get('c1' as never)!.title).toBe('只改标题')
+    expect(svc.get('c1' as never)!.body).toBe('只改正文')
+  })
+
+  it('内容更新后 undo → title/body 恢复到 before', async () => {
+    const svc = makeService([cardOnCanvas('c1', String(CANVAS), 100, 100)])
+    const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
+    const ops: DslOp[] = [
+      {
+        type: 'card',
+        cardId: 'c1' as never,
+        x: 100,
+        y: 100,
+        title: '临时标题',
+        content: '临时正文',
+      },
+    ]
+    const res = await applyOpsAndPersist(host, before, ops, CANVAS, svc)
+    expect(res.ok).toBe(true)
+    // 提交后内容已写(无 impl 时此处即红):
+    expect(svc.get('c1' as never)!.title).toBe('临时标题')
+    expect(svc.get('c1' as never)!.body).toBe('临时正文')
+    expect(res.undo).toBeDefined()
+    const undone = await res.undo!()
+    expect(undone).toBe(true)
+    // undo 后内容恢复到 before(title='c1', body=''):
+    expect(svc.get('c1' as never)!.title).toBe('c1')
+    expect(svc.get('c1' as never)!.body).toBe('')
+  })
+
+  it('service.update 返回 null(内容写失败)→ 整体失败并回滚(title/body/几何维持原值)', async () => {
+    const svc = makeService([cardOnCanvas('c1', String(CANVAS), 100, 100)])
+    // 让 update 在写 title/body 时返回 null(模拟持久层失败);几何走 moveToCanvas,不受影响。
+    const realUpdate = svc.update
+    ;(svc as any).update = (id: string, patch: any) => {
+      if (patch && (patch.title !== undefined || patch.body !== undefined)) return null
+      return (realUpdate as any)(id, patch)
+    }
+    const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
+    const ops: DslOp[] = [
+      {
+        type: 'card',
+        cardId: 'c1' as never,
+        x: 300,
+        y: 200,
+        title: '应被回滚',
+        content: '应被回滚正文',
+      },
+    ]
+    const res = await applyOpsAndPersist(host, before, ops, CANVAS, svc)
+    expect(res.ok).toBe(false)
+    // 回滚后几何 + 内容均维持原值(无数据丢失):
+    expect(svc.get('c1' as never)!.canvasPosition?.x).toBe(100)
+    expect(svc.get('c1' as never)!.title).toBe('c1')
+    expect(svc.get('c1' as never)!.body).toBe('')
+  })
+
+  it('create 带 content 后 undo → 新建卡被 hardDelete(内容随之消失)', async () => {
+    const svc = makeService([])
+    const { host, before } = await buildCanvasHostForCanvas(CANVAS, svc)
+    const ops: DslOp[] = [
+      {
+        type: 'card',
+        cardId: 'new1' as never,
+        x: 50,
+        y: 60,
+        create: true,
+        title: '会撤销',
+        content: '会撤销正文',
+      },
+    ]
+    const res = await applyOpsAndPersist(host, before, ops, CANVAS, svc)
+    expect(res.ok).toBe(true)
+    expect(svc.get('new1' as never)!.title).toBe('会撤销')
+    const undone = await res.undo!()
+    expect(undone).toBe(true)
+    expect(svc.get('new1' as never)).toBeNull() // hardDelete
   })
 })

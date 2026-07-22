@@ -115,14 +115,14 @@ export async function applyOpsAndPersist(
   // createWithId 成功后即记录 id。即使随后 host.upsert 或 freeform 写失败，
   // 也必须把这张尚未可见的 ghost card 一并清掉。
   const createdCardIds: CardId[] = []
-  // onCardCreate:create 指令落 service.createWithId(空标题卡,几何 + 颜色来自 DSL)。
-  // 后续 applyLayout 会在 host 里 upsert 该 card 元素,统一进 after 回写。
-  const result = applyLayout(host, ops, undefined, ({ cardId, x, y, w, h, color }) => {
-    // createWithId:DSL 指定 id 建卡。空标题 + 空 body,用户后续编辑。
+  // onCardCreate:create 指令落 service.createWithId。v5:带 @title/@content 时即写入
+  // (不再落空标题卡);几何 + 颜色来自 DSL。后续 applyLayout 会在 host 里 upsert 该 card
+  // 元素,统一进 after 回写。
+  const result = applyLayout(host, ops, undefined, ({ cardId, x, y, w, h, color, title, content }) => {
     try {
       service.createWithId(cardId as CardId, {
-        title: '',
-        body: '',
+        title: title ?? '',
+        body: content ?? '',
         type: 'note',
         canvasPosition: { canvasId, x, y, w, h, z: Date.now(), rotation: 0 },
         ...(color ? { color: color as ColorToken } : {}),
@@ -152,6 +152,17 @@ export async function applyOpsAndPersist(
       )
       .map((entry) => (entry.op as Extract<DslOp, { type: 'card' }>).cardId as CardId),
   )
+  // v5:从 opResults 收集 update 指令携带的 @title/@content(card op、非 create)。post-hoc
+  // 回写循环据此把内容写回 Card.title/body(与几何/颜色同阶段,保持 /ask 事务模型单一)。
+  const contentByCardId = new Map<CardId, { title?: string; body?: string }>()
+  for (const entry of result.opResults) {
+    if (entry.op.type !== 'card' || entry.op.create) continue
+    if (entry.op.title === undefined && entry.op.content === undefined) continue
+    contentByCardId.set(entry.op.cardId as CardId, {
+      ...(entry.op.title !== undefined ? { title: entry.op.title } : {}),
+      ...(entry.op.content !== undefined ? { body: entry.op.content } : {}),
+    })
+  }
 
   const after = host.getElements()
 
@@ -183,8 +194,8 @@ export async function applyOpsAndPersist(
       }
     }
 
-    // 恢复已有卡的几何与颜色。applyOpsAndPersist 只会写这两个字段，因此不
-    // 触碰正文、媒体、标签等用户数据；每个明确 false/null 都计为恢复失败。
+    // 恢复已有卡的几何、颜色与内容(v5:含 title/body)。applyOpsAndPersist 只会写这几个
+    // 字段,因此不触碰媒体、标签等用户数据;每个明确 false/null 都计为恢复失败。
     for (const id of touchedExistingCardIds) {
       const previous = beforeCards.get(id)
       if (!previous) {
@@ -221,6 +232,18 @@ export async function applyOpsAndPersist(
         } catch (error) {
           ok = false
           console.warn('[canvas-host-builder] card color rollback failed', id, error)
+        }
+      }
+      // v5:恢复标题/正文(content writeback 回滚)。beforeCards 是全卡快照;重新取 current
+      // (几何/颜色写回后旧引用已陈旧)。
+      const now = service.get(id)
+      if (now && (previous.title !== now.title || previous.body !== now.body)) {
+        try {
+          const restored = service.update(id, { title: previous.title, body: previous.body }) as unknown
+          if (restored === null || restored === false || restored === undefined) ok = false
+        } catch (error) {
+          ok = false
+          console.warn('[canvas-host-builder] card content rollback failed', id, error)
         }
       }
     }
@@ -300,7 +323,7 @@ export async function applyOpsAndPersist(
   const freeformRemoved = freeformBefore.filter((b) => !afterIds.has(b.id)).length
   const freeformChanged = freeformAdded + freeformUpdated + freeformRemoved
 
-  // ── card 回写:after 的 card 元素,位置/颜色变了就 service.update。
+  // ── card 回写:after 的 card 元素,位置/颜色/内容变了就 service 写回。
   let cardsUpdated = 0
   let cardUpdatesFailed = 0
   const afterCards = after.filter((el) => el.kind === 'card')
@@ -323,6 +346,7 @@ export async function applyOpsAndPersist(
       card.canvasPosition?.h !== newPos.h ||
       card.canvasPosition?.rotation !== newPos.rotation
     const colorChanged = el.color && el.color !== card.color
+    let opCounted = false
     if (drifted) {
       // 位置/尺寸变更走 moveToCanvas(canvasPosition 的正规入口)。
       let moved = false
@@ -347,7 +371,7 @@ export async function applyOpsAndPersist(
           continue
         }
       }
-      cardsUpdated++
+      opCounted = true
     } else if (colorChanged) {
       let updated: unknown = null
       try {
@@ -359,8 +383,34 @@ export async function applyOpsAndPersist(
         cardUpdatesFailed++
         continue
       }
-      cardsUpdated++
+      opCounted = true
     }
+    // v5:内容写回(@title/@content)。与几何/颜色同阶段;只传发生变化的字段;失败 →
+    // cardUpdatesFailed(触发整体回滚,见 makeFailure)。
+    const contentPatch = contentByCardId.get(cardId)
+    if (contentPatch) {
+      const patch: { title?: string; body?: string } = {}
+      if (contentPatch.title !== undefined && contentPatch.title !== card.title) {
+        patch.title = contentPatch.title
+      }
+      if (contentPatch.body !== undefined && contentPatch.body !== card.body) {
+        patch.body = contentPatch.body
+      }
+      if (patch.title !== undefined || patch.body !== undefined) {
+        let updated: unknown = null
+        try {
+          updated = service.update(card.id, patch) as unknown
+        } catch (error) {
+          console.error('[canvas-host-builder] card content update failed', card.id, error)
+        }
+        if (updated === null || updated === false || updated === undefined) {
+          cardUpdatesFailed++
+          continue
+        }
+        opCounted = true
+      }
+    }
+    if (opCounted) cardsUpdated++
   }
 
   if (cardUpdatesFailed > 0) {
@@ -390,7 +440,9 @@ export async function applyOpsAndPersist(
         !current ||
         !committed ||
         !sameCanvasPosition(current.canvasPosition, committed.canvasPosition) ||
-        (current.color ?? null) !== (committed.color ?? null)
+        (current.color ?? null) !== (committed.color ?? null) ||
+        current.title !== committed.title ||
+        current.body !== committed.body
       ) return false
     }
     // A user may start editing a newly created card immediately. Never hard

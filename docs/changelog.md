@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-07-22 · 1.0.0 · /ask 路径消费 v5 卡片内容(@title/@content)
+
+v5 DSL 已在格式层公示并解析 `@title`/`@content`,但 `/ask` agent 的落库路径此前的适配缝未接:create 指令落空标题卡、update 指令的内容不写回、回滚/undo 不覆盖内容。本轮闭合该缝(DSL 文法未动)。
+
+- **temp 路径(`/ask` 全屏)**:`applyOpsAndPersist` 的 create handler 写入 `@title`/`@content`(不再硬编码空标题/空 body);update 指令经既有 post-hoc 回写循环写回 `Card.title/body`(与几何/颜色同阶段);回滚 `restoreNow` 与一次性 undo 的 `matchesCommittedState` 均覆盖 title/body;纯内容更新(无几何/颜色变化)计入 `cardsUpdated`;内容写失败 → 整体回滚。
+- **live 路径(companion,画布页已开)**:`makeOnCardCreate` 写入内容;新增 `makeOnCardUpdate` 直接 `service.update`(bindCardWriteback 只写几何,内容无对应回写),写失败抛错计入 `r.failed`。两条路径对内容行为一致。
+- **测试**:翻转 `canvas-host-builder.test.ts` 原 Corner A 锁定断言(red→green)+ 新增内容回滚/undo/失败回滚/计数用例;新增 `makeOnCardCreate`/`makeOnCardUpdate` 单测。
+- **边界**:仅适配层;不碰 DSL 文法/parser/serializer/sanitize;不碰 DSL 模态编辑器路径(早已接通)。内容辅助 AI 大车道(proposal `card.update` 动作 / 新 UX / inline 编辑 / 新审计 lane)仍按既有意向档搁置,本轮未启。
+- **验证**:`pnpm --filter web test` 全绿;lint/build 见 commit。
+
+---
+
 ## 2026-07-21 · 1.0.0 · Tauri CSP 回退修复桌面端渲染
 
 7b7c4ee 引入的严格 CSP 在真实 Tauri 构建里使所有页面渲染静默失效：Tauri 对内联脚本注入 nonce 后浏览器忽略 `'unsafe-inline'`，Next.js 水合脚本被拦，React 不水合，运行时注入的 `<style>` 不插入；release 构建不把 webview console 转发到 stderr，故无任何报错。回退 `apps/desktop/src-tauri/tauri.conf.json` 的 `security.csp` 为 `null`（v1.0.0 发布版行为），渲染恢复。`v1.0.0` Release 资产本身为 `csp: null`，未受影响。
