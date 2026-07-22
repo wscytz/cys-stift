@@ -85,6 +85,19 @@ describe('solveRelational — relational → 绝对坐标', () => {
     expect(out[1]).toMatchObject({ x: 330, y: 10 })
   })
 
+  it('keepExistingPos(纯内容编辑)保留 existing 真实坐标 → 下游 rel anchor 正确,不飞到 (0,0)', () => {
+    // v5(E):[card #a1] @title(...) 无 @pos = keepExistingPos,op.x/y 是占位 (0,0)。
+    // solver 必须沿用 existing 真实坐标,否则下游 right-of #a1 锚到占位 (0,0) 飞左上角。
+    const ops = parseDsl(
+      '[card #a1] @title("改名")\n[card #a2 create] right-of #a1 @gap(20) @size(240,120)',
+    )
+    const existing = new Map([['a1', { x: 500, y: 300, w: 240, h: 120 }]])
+    const { ops: out, diagnostics } = solveRelational(ops, existing)
+    expect(diagnostics).toEqual([])
+    // a2 锚到 a1 真实位置:500+240+20=760, y=300(而非占位 0,0 → 260,0)
+    expect(out[1]).toMatchObject({ cardId: 'a2', x: 760, y: 300 })
+  })
+
   it('绝对 card op 引用稳定(原样返回,=== 同对象)', () => {
     const ops = parseDsl('[card #c0 create] @pos(100,100) @size(240,120)')
     const { ops: out } = solveRelational(ops)

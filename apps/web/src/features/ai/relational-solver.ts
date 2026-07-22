@@ -116,7 +116,13 @@ export function solveRelational(
     }
 
     // 绝对 card:记录几何(供后续 rel anchor),op 原样返回(引用稳定)
-    geom.set(cardId, { x: op.x, y: op.y, w, h })
+    // v5(E) keepExistingPos:op.x/y 是 parser 占位 (0,0),必须沿用 existing 真实坐标,
+    // 否则下游 rel anchor 到本卡会锚到 (0,0) 飞画布左上角。
+    if (op.keepExistingPos === true && exist) {
+      geom.set(cardId, { x: exist.x, y: exist.y, w, h })
+    } else {
+      geom.set(cardId, { x: op.x, y: op.y, w, h })
+    }
     out.push(op)
   }
 
