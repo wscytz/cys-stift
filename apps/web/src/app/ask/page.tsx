@@ -234,7 +234,8 @@ export default function AskPage() {
       // RAG + 目标画布快照(改画布时让 AI 看到当前布局)。
       const { host } = await buildCanvasHostForCanvas(requestCanvasId, service)
       if (!isRequestCurrent()) return
-      const canvasSnapshot = formatCanvasSnapshot(snapshotCanvas(host, service, requestCanvasId))
+      const includeContent = settingsStore.get().aiIncludeCardContent !== false
+      const canvasSnapshot = formatCanvasSnapshot(snapshotCanvas(host, service, requestCanvasId), { includeContent })
       const userPrompt = buildAgentUserPrompt(question, allCards, canvasSnapshot)
 
       let acc = ''

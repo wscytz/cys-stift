@@ -711,6 +711,12 @@ export const messages = {
   'settings.cardDisplayAuto': { zh: '自适应(全文,卡高随内容)', en: 'Auto (full, height fits content)' },
   'settings.cardDisplayTitle': { zh: '仅标题', en: 'Title only' },
   'settings.cardDisplaySubtitle': { zh: '标题+副标题', en: 'Title + subtitle' },
+  'settings.aiContext': { zh: 'AI 上下文', en: 'AI context' },
+  'settings.aiContextLede': {
+    zh: '控制 AI 在 /ask、排版、聚类时能看到多少卡片内容。开启 = AI 可读卡片正文(理解更准、更耗 token);关闭 = 只发标题(省 token、更保守)。',
+    en: 'Control how much card content AI sees in /ask, layout, and cluster. On = AI may read card body (better understanding, more tokens); Off = titles only (saves tokens, more conservative).',
+  },
+  'settings.aiIncludeCardContent': { zh: '允许 AI 读取卡片正文', en: 'Allow AI to read card content' },
   'settings.language': { zh: '语言', en: 'Language' },
   'settings.languageLede': { zh: '选择界面语言。', en: 'Choose the interface language.' },
   'settings.languageZh': { zh: '中文', en: 'Chinese' },

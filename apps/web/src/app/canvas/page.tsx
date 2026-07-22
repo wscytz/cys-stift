@@ -379,7 +379,9 @@ export default function CanvasPage() {
       if (!adapter) return
 
       const snap = snapshotCanvas(adapter, service, activeCanvasId)
-      const formatted = formatCanvasSnapshot(snap)
+      const formatted = formatCanvasSnapshot(snap, {
+        includeContent: settingsStore.get().aiIncludeCardContent !== false,
+      })
       const intentSnapshot = intentSnapshotFromHost(adapter)
 
       const systemPrompt = `You are an active canvas layout organizer. Return exactly one CYS Intent IR v1 JSON object that conforms to this schema. No prose, comments, or markdown fences.
@@ -468,7 +470,9 @@ ${formatted}`
       const knownIds = new Set(cards.map((c) => String(c.id)))
       // A 方向闭环:把画布快照(含 freedraw shape 行)喂给 cluster,让 AI 看到手绘
       // 形状作为空间分组提示。snapshotCanvas 守 R2(freedraw 只发 shape 标签不发点坐标)。
-      const canvasSnapshot = formatCanvasSnapshot(snapshotCanvas(adapter, service, activeCanvasId))
+      const canvasSnapshot = formatCanvasSnapshot(snapshotCanvas(adapter, service, activeCanvasId), {
+        includeContent: settingsStore.get().aiIncludeCardContent !== false,
+      })
       const userPrompt = buildClusterUserPrompt(cards, canvasSnapshot)
       if (!userPrompt) {
         pushToast({ kind: 'info', message: t('canvas.aiClusterTooFew') })

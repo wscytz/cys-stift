@@ -72,6 +72,11 @@ export interface Settings {
    *  title(仅标题)/ subtitle(标题+副标题)。模式管卡高(mode A);视图设置,不进 DSL。
    *  向后兼容:旧 settings 无此字段 -> 默认 compact(旧行为)。 */
   cardDisplayMode?: 'compact' | 'auto' | 'title' | 'subtitle'
+  /** AI 上下文是否包含卡片正文(content-on-demand)。默认 true(/ask 等用户主动发起的
+   *  AI 任务需要 AI 理解卡片内容);关掉则画布快照只发 title(省 token + 保守)。body
+   *  已在 AI_CARD_FIELDS allowlist(RAG 本就发),此开关只额外控画布快照通道。
+   *  向后兼容:旧 settings 无此字段 → 默认 true。 */
+  aiIncludeCardContent?: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {

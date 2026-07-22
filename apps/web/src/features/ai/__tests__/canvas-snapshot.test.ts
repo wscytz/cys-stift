@@ -14,6 +14,16 @@ function stubService(titles: Record<string, string>): CardService {
   } as unknown as CardService
 }
 
+/** CardService stub 带正文 — snapshotCanvas 读 service.get(id).title/.body。 */
+function stubServiceWithBody(cards: Record<string, { title?: string; body?: string }>): CardService {
+  return {
+    get: (id: CardId) => {
+      const c = cards[String(id)]
+      return c ? ({ id, title: c.title ?? '', body: c.body } as never) : undefined
+    },
+  } as unknown as CardService
+}
+
 const CV = 'cv' as unknown as CanvasId
 
 describe('snapshotCanvas → formatCanvasSnapshot', () => {
@@ -22,6 +32,39 @@ describe('snapshotCanvas → formatCanvasSnapshot', () => {
     host.upsert({ id: 'c1', kind: 'card', x: 10, y: 20, w: 240, h: 120, rotation: 0 })
     const text = formatCanvasSnapshot(snapshotCanvas(host, stubService({ c1: 'Growth ideas' }), CV))
     expect(text).toContain('Growth ideas')
+  })
+
+  it('includeContent=true:卡片正文作为 `  content: ` 行输出(AI 看得到 body)', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'c1', kind: 'card', x: 10, y: 20, w: 240, h: 120, rotation: 0 })
+    const text = formatCanvasSnapshot(
+      snapshotCanvas(host, stubServiceWithBody({ c1: { title: '想法', body: '详细正文内容' } }), CV),
+      { includeContent: true },
+    )
+    expect(text).toContain('title: 想法')
+    expect(text).toContain('content: 详细正文内容')
+  })
+
+  it('includeContent 默认 false:不输出 body(省 token + 保守;反向断言)', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'c1', kind: 'card', x: 10, y: 20, w: 240, h: 120, rotation: 0 })
+    const text = formatCanvasSnapshot(
+      snapshotCanvas(host, stubServiceWithBody({ c1: { title: '想法', body: '秘密正文' } }), CV),
+    )
+    expect(text).toContain('title: 想法')
+    expect(text).not.toContain('秘密正文')
+    expect(text).not.toContain('content:')
+  })
+
+  it('includeContent 行 round-trip 安全:parser 静默跳过 content 注释行', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'c1', kind: 'card', x: 10, y: 20, w: 240, h: 120, rotation: 0 })
+    const text = formatCanvasSnapshot(
+      snapshotCanvas(host, stubServiceWithBody({ c1: { title: 'A', body: '正文行不破坏 parse' } }), CV),
+      { includeContent: true },
+    )
+    const ops = parseDsl(text)
+    expect(ops.length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders arrows + rect + text with the unified grammar', () => {

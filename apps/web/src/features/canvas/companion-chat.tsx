@@ -121,7 +121,8 @@ export function CompanionChat({
     abortRef.current = ac
     try {
       // RAG + 当前画布 live snapshot(改画布时让 AI 看到当前布局,含未存改动)。
-      const canvasSnapshot = formatCanvasSnapshot(snapshotCanvas(host, service, canvasId))
+      const includeContent = settingsStore.get().aiIncludeCardContent !== false
+      const canvasSnapshot = formatCanvasSnapshot(snapshotCanvas(host, service, canvasId), { includeContent })
       const userPrompt = buildAgentUserPrompt(question, allCards, canvasSnapshot)
 
       let acc = ''

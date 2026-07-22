@@ -351,6 +351,22 @@ export default function SettingsPage() {
         </section>
 
         <div id="settings-ai">
+        <section className="section" aria-labelledby="settings-ai-context-heading">
+          <h3 className="set__subhead" id="settings-ai-context-heading">{t('settings.aiContext')}</h3>
+          <p className="section__lede">{t('settings.aiContextLede')}</p>
+          <div className="field-row">
+            <label className="mono-label" htmlFor="set-ai-include-content">
+              <input
+                id="set-ai-include-content"
+                type="checkbox"
+                className="set__checkbox"
+                checked={settings.aiIncludeCardContent !== false}
+                onChange={(e) => settingsStore.update({ aiIncludeCardContent: e.target.checked })}
+              />
+              <span>{t('settings.aiIncludeCardContent')}</span>
+            </label>
+          </div>
+        </section>
         <AISettingsPanel />
         </div>
 

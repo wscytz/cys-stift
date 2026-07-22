@@ -33,6 +33,8 @@ export interface SnapshotCard {
   h: number
   color?: string
   title: string
+  /** 卡片正文(总是采集;是否输出给 AI 由 formatCanvasSnapshot 的 includeContent 决定)。 */
+  body?: string
 }
 
 export interface SnapshotArrow {
@@ -100,7 +102,7 @@ export function snapshotCanvas(
     const y = Math.round(el.y)
     switch (el.kind) {
       case 'card': {
-        // Title from CardService (content source of truth), not the element.
+        // Title/body from CardService (content source of truth), not the element.
         const card = service.get(el.id as CardId)
         cards.push({
           id: el.id,
@@ -110,6 +112,7 @@ export function snapshotCanvas(
           h: Math.round(el.h),
           color: el.color,
           title: card?.title ?? '',
+          body: card?.body,
         })
         break
       }
@@ -174,8 +177,17 @@ export function snapshotCanvas(
  * Format the snapshot as a human+AI readable text block (for prompts).
  * Grammar stays close to the round-trip DSL (serializeCanvas) so the model
  * sees a consistent shape; card titles are annotated on a second line.
+ *
+ * `includeContent`(默认 false):为 true 时每张卡追加 `  content: …` 行(卡片正文)。
+ * content 行不以 `[kind ` 开头,parser 逐行静默跳过,round-trip 安全。隐私上 body
+ * 已在 AI_CARD_FIELDS allowlist(RAG 本就发 body),这里只是同源数据的另一通道;
+ * 默认关 = 省 token + 保守;用户在设置开「AI 包含卡片正文」后 /ask/排版/cluster 才带。
  */
-export function formatCanvasSnapshot(snapshot: CanvasSnapshotOutput): string {
+export function formatCanvasSnapshot(
+  snapshot: CanvasSnapshotOutput,
+  opts?: { includeContent?: boolean },
+): string {
+  const includeContent = opts?.includeContent === true
   const parts: string[] = []
 
   parts.push(
@@ -184,12 +196,15 @@ export function formatCanvasSnapshot(snapshot: CanvasSnapshotOutput): string {
 
   for (const c of snapshot.cards) {
     // 重建 CanvasElement 调 serializeElement(唯一文法源:AI 看到的 = parser 能读回的)。
-    // header 行 + card `  title: ...` 行被 parser 逐行静默跳过,不影响 round-trip。
+    // header 行 + card `  title: ...` / `  content: ...` 行被 parser 逐行静默跳过,不影响 round-trip。
     const el: CanvasElement = {
       id: c.id, kind: 'card', x: c.x, y: c.y, w: c.w, h: c.h, rotation: 0, color: c.color,
     }
     parts.push(serializeElement(el))
     parts.push(`  title: ${c.title || '(untitled)'}`)
+    if (includeContent && c.body) {
+      parts.push(`  content: ${c.body}`)
+    }
   }
 
   for (const a of snapshot.arrows) {
