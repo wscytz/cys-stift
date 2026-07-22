@@ -311,7 +311,7 @@ describe('parseDsl', () => {
     expect(result).toHaveLength(0)
   })
 
-  // ── # 注释行被静默跳过(serializeCanvasReadable 的 title 注释)──
+  // ── # 注释行被静默跳过(grammar 契约;strict/graceful 对注释一致)──
 
   it('parseDsl 跳过 # 注释行', () => {
     const result = parseDsl(

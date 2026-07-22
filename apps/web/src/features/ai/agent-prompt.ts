@@ -18,7 +18,8 @@
  * 【引用提取】[card #id] 模式提取,UI 渲染成可点链接(开 CardDetailModal)。
  *
  * 【R2 安全】RAG 走 serializeCardsForAI(allowlist:无 deviceId/media.dataUrl/apiKey;
- * 软删卡过滤)。DSL 只含几何/关系不含卡片正文。不手拼卡片字符串。
+ * 软删卡过滤)。DSL v6 可携带 @title/@content,但不含 apiKey/媒体二进制/freedraw;
+ * 卡片内容写入仍经过严格 parser → 预演/确认门 → 事务回写。不手拼卡片字符串。
  */
 import type { Card } from '@cys-stift/domain'
 import { searchCards } from '@cys-stift/domain'
@@ -33,7 +34,7 @@ export const RAG_TOP_N = 8
  *
  * 关键约束:
  *  - 改画布时输出 ```cys-dsl 块(可被正则提取),块外用自然语言解释
- *  - DSL 复用现有 #id UPDATE;cards 只能 update(内容来自 inbox)除非 create
+ *  - DSL 复用现有 #id UPDATE;按任务可改几何/颜色/title/content;新卡须显式 create
  *  - 引用卡片用 [card #id] 格式(UI 渲染可点链接)
  *  - 不解释 DSL 语法本身,只说人话意图
  */
@@ -43,13 +44,13 @@ You are cy's Stift's canvas agent — like a coding agent for the user's inspira
 
 1. ANSWER from knowledge: When the user asks about their notes/ideas, answer using the provided cards. Cite sources as [card #id] inline.
 2. EDIT the canvas: When the user wants to reorganize/align/connect/restyle cards, output a \`\`\`cys-dsl code block with the changes, plus a short natural-language explanation before it.
-3. CREATE cards: When the user wants to jot a new idea onto the canvas, output a \`\`\`cys-dsl block with \`[card #id create]\` directives. For structured layouts (lists/trees/grids) PREFER relational placement (right-of/below #anchor) over computing @pos yourself — the engine resolves coords and avoids overlaps.
+3. CREATE cards: When the user wants to jot a new idea onto the canvas, output a \`\`\`cys-dsl block with \`[card #id create]\` directives and include @title/@content when the request provides content. For structured layouts (lists/trees/grids) PREFER relational placement (right-of/below #anchor) over computing @pos yourself — the engine resolves coords and avoids overlaps.
 
 DSL output contract (CRITICAL — a regex extracts the block):
 - Wrap DSL in a single \`\`\`cys-dsl fence. One block per reply.
 - Each directive line MUST start with "[" — use the exact forms in the grammar above.
-- NEVER put card titles or text inside the DSL. A card line is geometry only. Card content lives in the inbox.
-- Reuse an existing #id to UPDATE it; to CREATE a new card use [card #newid create] @pos @size @color (empty content).
+- Use @title/@content when the user's request creates or edits card content; omit them for geometry-only changes. Empty strings explicitly clear title/content.
+- Reuse an existing #id to UPDATE it (content/color/size-only edits may omit @pos and preserve geometry); to CREATE a new card use [card #newid create] with @pos and optional @title/@content.
 - Do NOT invent syntax like "reuse #id" or "update #id" — always use the [kind #id] form.
 
 Cite existing cards as [card #id] when answering knowledge questions so the user can open them.
@@ -80,10 +81,11 @@ export function buildAgentUserPrompt(
     parts.push(ragBlock || '(no matching cards found)')
   }
 
-  // 目标画布快照(改画布时让 AI 看到当前布局:id + 几何 + 关系签名,不含卡片正文)。
+  // 目标画布快照(改画布时让 AI 看到当前布局:id + 几何 + 关系签名 + card title;
+  // 不直接带 card body;内容检索仍由上方 RAG allowlist 提供)。
   if (canvasSnapshot?.trim()) {
     parts.push(
-      `\n[Target canvas current state — reuse #id to UPDATE; cards are update-only]\n${canvasSnapshot.trim()}`,
+      `\n[Target canvas current state — reuse #id to UPDATE; use cys-dsl v6 rules]\n${canvasSnapshot.trim()}`,
     )
   }
 

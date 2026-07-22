@@ -4,7 +4,7 @@
  * DslDialog — 画布转义(DSL 双向)模态编辑器(转义产品化 Step 2)。
  *
  * 把"画布的文字形态"直接暴露给用户:工具栏 DSL 按钮 → 弹模态,textarea
- * 显示当前画布文本(serializeCanvasReadable,card 行后附 `# title:` 注释),
+ * 显示当前画布文本(serializeCanvasReadable;v6 card 行含真实 @title/@content token),
  * 可编辑/粘贴,"应用/复制/下载"。应用走 parseDslWithDiagnostics +
  * applyLayout(单 undo 步);parse 失败的行不再被静默吞掉,而是在
  * textarea 下方逐行展示诊断(line + 原因)。
@@ -160,7 +160,7 @@ export function DslDialog({
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  // 打开时填充当前画布文本(serializeCanvasReadable,card 附 title 注释)。
+  // 打开时填充当前画布文本(v6:serializeCanvasReadable + CardService resolve,card 含 @title/@content)。
   // 同时清空诊断列表:刚序列化的文本恒为合法,无 parse 错误。
   // 也清空增量应用缓存:每次打开模态都是全新编辑会话。
   useEffect(() => {

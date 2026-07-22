@@ -5,9 +5,21 @@
 
 ---
 
+## 2026-07-22 · 1.0.0 · cys-dsl v6 + app 全路径适配
+
+承接 v5 内容能力和 freedraw 出 DSL,完成协议版本治理与 cy's Stift 软件侧替换:因 freedraw 从 DSL kind 集移除属于格式变更,`DSL_VERSION` **5→6**;app 的 grammar/help/sample/prompt/apply/用户文档与开发文档全部对齐当前协议。
+
+- **版本治理**:`DSL_VERSION=6`;AI 样本继续从单一源自动盖 `dslVersion`;v6 stability/invariants 锁版本与 5 kind。
+- **`/ask` 真启用内容 DSL**:移除旧的"NEVER put card titles / empty content / geometry-only"约束;prompt 现在明确按用户任务使用 `@title/@content`,空串清空,纯内容/颜色/尺寸编辑可省 `@pos`,create 可携带内容。继续走 strict parser → 预演/确认门 → 事务写回。
+- **消费者策略不混淆**:DSL modal 传 CardService resolver,显示全量 `@title/@content`;copy-selected 与 custom template 不传 resolver,保持纯几何(outbound 默认隐私安全)。这是 app 策略,不是 DSL 能力限制。
+- **文档**:转义手册 v4→v6 全面重写;STATE 区分 v1.0.0 发布时 v4 与当前 post-release 分支 v6;用户 privacy + 私有 privacy-design 对齐格式完整/视图层隐私/freedraw 出 DSL;源码注释清旧 `# title:`/几何-only 叙事。
+- **验证**:见本提交的实际 gate 结果。
+
+---
+
 ## 2026-07-22 · 1.0.0 · freedraw 出 DSL(程序自管,不文字化)
 
-freedraw 此前在 DSL 里只存位置(点序列已不入),但仍占一个 kind。本轮按"freedraw 非核心/存储重/意义低/隐私"将其**整出 DSL 契约**,完全归程序(R2 + 渲染)。DSL 从 6 kind 收敛到 5 kind;序列化格式变了(少一个 kind)但未 bump `DSL_VERSION`(freedraw 本就非 AI 可产、非 round-trip 核心,grammar reference 早已不含)。
+freedraw 此前在 DSL 里只存位置(点序列已不入),但仍占一个 kind。本轮按"freedraw 非核心/存储重/意义低/隐私"将其**整出 DSL 契约**,完全归程序(R2 + 渲染)。DSL 从 6 kind 收敛到 5 kind;该格式变更最终在上方 app 全路径适配条目中治理为 `DSL_VERSION` 5→6。
 
 - **grammar**:`DSL_KINDS` 去 `freedraw`(6→5);`DSL_GRAMMAR_REFERENCE` 注释更新(freedraw 出 DSL)。
 - **peggy**:删 `freedrawLine` 规则 + `Line` 引用;`[freedraw]` 落 `bracketUnknown` → `unrecognized`。重生成 parser(`pnpm gen`)。

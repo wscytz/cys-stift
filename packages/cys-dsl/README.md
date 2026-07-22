@@ -4,7 +4,7 @@ cys-dsl — cy's Stift 画布的**双向文字表示(转义)**。整张画布能
 
 ## 是什么
 
-cys-dsl **v5** 文法:**5 种元素**(`card`/`rect`/`frame`/`text`/`arrow`)、6 Bauhaus 色、关系式放置(`right-of`/`below` + `@gap`)、箭头签名(label/color/dash/arrowhead/route/wikilink)、**v5 卡片内容 `@title`(短)/`@content`(长 markdown,`\n` 转义多行)**。几何 + 内容;`freedraw` **已出 DSL**(程序自管 R2 + 渲染:存储重/意义低/隐私,不文字化)。
+cys-dsl **v6** 文法:**5 种元素**(`card`/`rect`/`frame`/`text`/`arrow`)、6 Bauhaus 色、关系式放置(`right-of`/`below` + `@gap`)、箭头签名(label/color/dash/arrowhead/route/wikilink)、**卡片内容 `@title`(短)/`@content`(长 markdown,`\n` 转义多行)**。v5 引入内容;v6 将 `freedraw` 移出 DSL(程序自管 R2 + 渲染:存储重/意义低/隐私,不文字化)。
 
 ## public API
 
@@ -44,7 +44,7 @@ const clean = sanitizeDslOps(ops, ctx)      // 修正非法值(永不抛错)
 - **Bauhaus 6 色**:不新增色。
 - **截断代理对安全**:`truncateDslText` 不劈开 emoji/增补平面字符(不产孤立代理位)。
 
-## 内容能力与边界(v5)
+## 内容能力与边界(v6;内容自 v5 引入)
 
 v5 的卡片内容(`@title`/`@content`)在格式层、apply 层、`/ask` 落库层均已接通(无遗留适配缝)。A/D/E 三处此前的缺口/局限于 2026-07-22 全部闭合:
 

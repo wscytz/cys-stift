@@ -2,7 +2,7 @@
 
 > **这份文件是唯一的"当前状态"档。** 其它文档(CLAUDE.md / changelog / decisions)只引用它,不复制状态。
 > 新会话 / `/clear` 后 / 新模型 — 先读本档。
-> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:2026-07-21。2026-07-21 回退桌面端 `security.csp`(→ `null`)修复 Tauri 构建渲染静默失效;`v1.0.0` 发布资产本身为 `csp: null`,未受影响(详见 changelog)。当前源码版本为 **1.0.0**（根 `package.json` 单一来源）；`v1.0.0` 是 GitHub stable release，tag workflow 重新运行 Linux gate、生成 Windows x64 NSIS、生成并验证 macOS Apple Silicon ad-hoc DMG，并发布平铺可校验的 `SHA256SUMS.txt`。本次正式发布冻结核心工作流、数据格式与 cys-dsl v4；它不冒充平台认证或外部研究证据。macOS 无 Apple Developer ID/Team ID 和 notarization，Windows 无 Authenticode 签名；Android 不在 1.0.0 支持范围。VoiceOver、真实系统 200% 缩放、代表性设备安装升级、真实 provider quota/refusal 和外部用户研究仍是发布后加固项。
+> 版本表由 `scripts/gen-state.mjs` 从 `git tag` 生成,不会漂移。最后更新:2026-07-22。2026-07-21 回退桌面端 `security.csp`(→ `null`)修复 Tauri 构建渲染静默失效;`v1.0.0` 发布资产本身为 `csp: null`,未受影响(详见 changelog)。当前源码版本为 **1.0.0**（根 `package.json` 单一来源）；`v1.0.0` 是 GitHub stable release，tag workflow 重新运行 Linux gate、生成 Windows x64 NSIS、生成并验证 macOS Apple Silicon ad-hoc DMG，并发布平铺可校验的 `SHA256SUMS.txt`。该正式发布当时冻结核心工作流、数据格式与 cys-dsl v4；**post-release `feat/cys-dsl-extract` 当前源码已升级到 cys-dsl v6**(独立包 + card `@title/@content` + 纯内容编辑/清空 + freedraw 出 DSL + app 全路径适配),尚未合并/tag,不改写 v1.0.0 发布事实。macOS 无 Apple Developer ID/Team ID 和 notarization，Windows 无 Authenticode 签名；Android 不在 1.0.0 支持范围。VoiceOver、真实系统 200% 缩放、代表性设备安装升级、真实 provider quota/refusal 和外部用户研究仍是发布后加固项。
 
 > **方向迷茫时**:先读 [`docs/product-and-engine.md`](product-and-engine.md) —— 产品与引擎的定位锚点 + 优先级框架。判断"这一步是否推进核心承诺",而非"还有没有缝可修"。
 
@@ -11,7 +11,7 @@
 **cy's Stift** — 本地优先的灵感画布,包豪斯风格 UI。你的灵感,在画布上生长。
 (Next.js 15 静态导出 + 自研 Canvas 2D + React 19 + TS strict;桌面壳 Tauri v2;数据 localStorage + OPFS,离线可用。)
 
-## 当前执行快照（2026-07-20）
+## 当前执行快照（2026-07-22）
 
 本轮重构围绕一条可恢复主线：捕获 → 待整理 → 画布组织 → 搜索定位 → 工作台继续编辑 → 导出/导入恢复。当前工作树已落地：
 
@@ -19,11 +19,11 @@
 - Inbox 批量投放先选择明确目标画布，按避让已有元素的网格分配位置，逐项报告失败并提供一次性撤销；失败卡仍留在 Inbox。
 - 画布内标题/正文搜索、命中后居中选中、视口持久化、工作台来源/捕获时间/画布坐标 provenance。
 - Workbench 预览默认收起；用户展开后选择会持久化，卡片/freeform 版本变化会触发预览重建，避免陈旧截图。
-- DSL v4 的 parse → sanitize → relational solve → plan → confirm/apply 报告；手动编辑器显示实际新增/删除/修改元素，记录打开时 base revision，画布变化会阻止旧文本覆盖并可在模态内载入最新状态；按顺序选中两张卡可直接生成“右侧/下方”关系式，行级错误实时显示；画布粘贴 DSL 进入同一确认门。
+- **cys-dsl v6(post-release 分支)**:DSL 已抽到 `packages/cys-dsl`(纯逻辑包);v5 加 card `@title/@content`,v6 将 freedraw 移出 DSL(程序自管 R2 + 渲染,DSL 5 kind)。parse → sanitize → relational solve → plan → confirm/apply 全链适配内容:create/update 写回 CardService、回滚/一次性 undo 覆盖 title/body、空串清空、无 `@pos` 的纯内容/属性编辑沿用现有几何;strict 放行 `#` 注释但拒散文。手动 DSL 编辑器显示全量内容 token;copy-DSL/模板不注入 content(消费者策略,纯几何);`/ask` prompt 已使用 v6 grammar 并可按任务生成/修改内容;freedraw 不进 DSL 但 AI snapshot 仍可看本地 shape 描述符。
 - Canvas、Companion、`/ask` 的 AI 提案遵循 stale revision guard；`/ask` 直接订阅当前 settings profile，不再因模块缓存晚于页面首屏而误报未启用；临时 host 的 freeform/card 落库是事务式的，失败会回滚，成功后提供一次性撤销并记录 before/after。
 - 导入 replace/merge 预检、事务回滚、全 store rehydrate；真实导入前保存设备内完整恢复快照（包括本机 settings 凭据），恢复成功后才清理。对外 JSON/archive 导出仍剥离 API key 和媒体二进制，恢复快照不随导出文件外带。
 - Markdown 阅读预览隐藏标题/列表语法并保留正文单换行；工作台提供 source/split/preview 三态编辑。
-- **可审计 AI 共编（Labs，默认关闭）**：用户选择至少两张卡后先确认本次读取范围，配置的 provider 输出经 strict Proposal Bundle decoder 后进入 Logic / Ideas / Layout 分层审查；系统本地 graph lint 的确定性 finding 不能被模型省略，finding 与来源可直接查看、回链并居中。接受不等于应用，三个 lane 的 accepted subset 统一编译为一份固定 plan hash 和 ghost preview，Apply 再做 stale/expected-value preflight，之后经 PREPARED/COMMITTED journal、Card/SQLite batch 与 freeform WAL 应用；成功生成 CommitReceipt，可一次性撤销，后续手改会阻止撤销覆盖。刷新可恢复 reviewing proposal，启动会收敛残留 journal；持久化 source anchor 不重复保存正文，payload hash 不一致会隔离；Idea 卡保留 `ai-proposal` provenance，报告可导出为去原文锚点的 JSON/Markdown。DSL v4 未改。
+- **可审计 AI 共编（Labs，默认关闭）**：用户选择至少两张卡后先确认本次读取范围，配置的 provider 输出经 strict Proposal Bundle decoder 后进入 Logic / Ideas / Layout 分层审查；系统本地 graph lint 的确定性 finding 不能被模型省略，finding 与来源可直接查看、回链并居中。接受不等于应用，三个 lane 的 accepted subset 统一编译为一份固定 plan hash 和 ghost preview，Apply 再做 stale/expected-value preflight，之后经 PREPARED/COMMITTED journal、Card/SQLite batch 与 freeform WAL 应用；成功生成 CommitReceipt，可一次性撤销，后续手改会阻止撤销覆盖。刷新可恢复 reviewing proposal，启动会收敛残留 journal；持久化 source anchor 不重复保存正文，payload hash 不一致会隔离；Idea 卡保留 `ai-proposal` provenance，报告可导出为去原文锚点的 JSON/Markdown。**该 2026-07-20 里程碑当时未改 DSL(v4);当前 post-release DSL 状态见上方 v6 条目。**
 
 自动化证据（2026-07-20 post-1.0 工程 checkpoint）：`web=166-files/1852-tests`，Web TypeScript 通过；Proposal 专项覆盖 strict decode、不可省略 local lint、来源/隐私、dependency、lane stale、三 lane 单事务编译、OPFS/localStorage 回滚、payload hash quarantine、plan hash、SQLite atomic batch、事务/fault/restart/undo、Logic/Layout/Idea 与 provenance；1k/5k Working Set benchmark、paste/预算/100 次 deterministic Working Set replay、独立 held-out scorer（3 例各 10 次 deterministic replay）及 `smoke:proposal`（desktop + 390px，范围确认、三 lane、stale 拦截、双 tab 锁竞争、Apply/Receipt/Undo、无 page error）通过。domain 86 项、SQLite repository 8 项、canvas-engine 全套、monorepo lint、Web build（23/23 静态路由）和 docs guards 均通过。本 checkpoint 只证明受控 Labs 工程闭环，不把冻结 replay 写成真实 provider 或外部产品验证。真人/实机、VoiceOver、真实系统 200%、Windows 安装升级和真实 provider quota/refusal 演练按用户要求延期；安装矩阵和更广浏览器视觉回放仍是 M10 工程债。
 

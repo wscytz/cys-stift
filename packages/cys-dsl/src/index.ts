@@ -7,7 +7,7 @@
  * sanitize(sanitizeDslOps,防 LLM 产非法值不崩的 opt-in 修正层)。
  *
  * 依赖:canvas-engine(CanvasElement 类型)+ domain(CardId 类型)。纯逻辑,框架无关。
- * freedraw 仅位置(点序列 R2 隐私,不外发)。详细见仓库 README。
+ * freedraw 不在 DSL(程序自管 R2 + 渲染);DSL v6 含 5 kind + card title/content。详细见仓库 README。
  */
 export * from './dsl-grammar'
 export * from './canvas-dsl'

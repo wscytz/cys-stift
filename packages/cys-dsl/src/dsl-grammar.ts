@@ -11,7 +11,7 @@
  * bump 规则:增删指令种类 / 增删属性 / 改颜色枚举 → bump DSL_VERSION。
  * 纯改 prompt 措辞、改 parser 正则细节(不动语法)→ 不 bump。
  */
-export const DSL_VERSION = 5
+export const DSL_VERSION = 6
 
 /**
  * `@text("...")` / `@label("...")` / `@title("...")` 值的最大字符数(int 级)。
@@ -72,7 +72,7 @@ export const DSL_COLOR_ALIASES: Record<string, DslColor> = { grey: 'gray' }
  */
 export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one element per line):
   [card #id] @pos(x, y) @size(w, h) @color(red|yellow|blue|black|white|gray|grey) [@title("…")] [@content("…")]
-  [card #id create] @pos(x, y) @size(w, h) @color(c) [@title("…")] [@content("…")]   # create an empty card; id must not exist
+  [card #id create] @pos(x, y) @size(w, h) @color(c) [@title("…")] [@content("…")]   # create a card; id must not exist
   #   @title: short card title (≤200 chars, int-tier). @content: long markdown body (≤8000 chars, long-tier).
   #   Quoted-string escapes: \\" = quote, \\\\ = backslash, \\n = newline (so @content carries multi-line markdown on one DSL line).
   # relational placement — PREFER for structured layouts (trees, lists, grids, hierarchies;
@@ -93,7 +93,7 @@ export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one eleme
   # @wikilink (optional, relation/free arrow): only on wikilink-auto arrows
   #   (meta.wikilink===true); distinguishes auto-built wikilink arrows from
   #   manual references arrows so the marker survives DSL round-trip.
-Rules: card updates are the default; explicit create makes an empty card only after persistence succeeds.
+Rules: card updates are the default; explicit create persists a new card before its host element (title/content optional).
   @title/@content (v5) update an existing card's title/body; "" clears it, omit to leave unchanged.
   To edit an EXISTING card's content/color/size WITHOUT moving it, omit @pos (geometry is kept):
   [card #id] @title("…") @content("…")   # content-only edit, position preserved
