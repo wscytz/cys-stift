@@ -10,11 +10,10 @@
  *   [rect #<id>] @pos(<x>,<y>) @size(<w>,<h>) @color(<c>)
  *   [text #<id>] @pos(<x>,<y>) @text("<t>") @color(<c>)
  *   [arrow #<id>] from #<a> to #<b> @label("<l>") @color(<c>) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none)
- *   [freedraw #<id>] @pos(<x>,<y>)            ← metadata only, NO point sequence
  *
- * Legacy kinds (ellipse/line/note/image) are NOT serialized — they're not in
- * the active set. freedraw emits position only; its point sequence stays in the
- * engine store (R2: hand-draw is vector; also keeps point data out of AI view).
+ * Legacy kinds (ellipse/line/note/image) and freedraw are NOT serialized — they're
+ * not in DSL_KINDS. freedraw is program-managed (R2 store + renderer): point sequence
+ * is heavy / low-value / privacy-sensitive, so it stays out of the text format entirely.
  * Canonical single source: ./dsl-grammar.ts (DSL_KINDS / DSL_COLORS / DSL_GRAMMAR_REFERENCE).
  */
 import type { CanvasElement } from '@cys-stift/canvas-engine'
@@ -111,10 +110,12 @@ export function serializeElement(
       return `[arrow #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${sig}`
     }
     case 'freedraw':
-      // Position only — never the point sequence (R2 + privacy).
+      // Position only — never the point sequence (R2 + privacy)。注意:freedraw 已出 DSL 契约
+      // (serializeCanvas 按 DSL_KINDS 过滤,不 emit)。本 case 仅供**直接调用方**(如 AI snapshot,
+      // 它是单向上下文格式、非往返 DSL)用;parseDsl 不接受 `[freedraw]`(→ unrecognized)。
       return `[freedraw #${e.id}] ${pos}`
     default:
-      // ellipse/line/note/image (legacy) — not in the DSL.
+      // ellipse / line / note / image (legacy) — not in the DSL。
       return ''
   }
 }

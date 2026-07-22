@@ -53,8 +53,9 @@ export function truncateDslText(v: string, max: number): string {
   return v.slice(0, end)
 }
 
-/** 指令种类(parser 识别 + serializer 序列化的集合;freedraw 是透传 no-op)。 */
-export const DSL_KINDS = ['card', 'rect', 'frame', 'text', 'arrow', 'freedraw'] as const
+/** 指令种类(parser 识别 + serializer 序列化的集合)。freedraw 不在 DSL——程序自管(R2 + 渲染),
+ *  非 DSL 可表达(点序列重、意义低、隐私);serialize 按 DSL_KINDS 过滤,freedraw 同 legacy 被丢。 */
+export const DSL_KINDS = ['card', 'rect', 'frame', 'text', 'arrow'] as const
 export type DslKind = (typeof DSL_KINDS)[number]
 
 /** Bauhaus-6 颜色(canonical)。grey 是 gray 的输入别名。 */
@@ -67,7 +68,7 @@ export const DSL_COLOR_ALIASES: Record<string, DslColor> = { grey: 'gray' }
 /**
  * cys-dsl 语法的规范文字描述。给所有 AI prompt 和用户向语法帮助 import。
  * 指令 shape 取自原 canvas-prompt.ts 的 GRAMMAR(权威,与 parser 一致)+ 版号行。
- * 故意不含 [freedraw #id]——AI 不该产手绘(freedraw 仍在 DSL_KINDS 给 parser/serializer 用)。
+ * 故意不含 [freedraw #id]——freedraw 不在 DSL(程序自管:R2 + 渲染;点序列重/意义低/隐私),AI 不该也不产。
  */
 export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one element per line):
   [card #id] @pos(x, y) @size(w, h) @color(red|yellow|blue|black|white|gray|grey) [@title("…")] [@content("…")]

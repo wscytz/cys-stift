@@ -140,7 +140,7 @@ describe('serializeCanvas — exclusions (R2 + privacy)', () => {
     expect(out).toBe('')
   })
 
-  it('freedraw emits position only — never the point sequence', () => {
+  it('freedraw 出 DSL:serialize 整元素被丢(程序自管 R2),位置/点序列都不进 text', () => {
     const out = serializeCanvas([
       {
         id: 'f1',
@@ -153,7 +153,8 @@ describe('serializeCanvas — exclusions (R2 + privacy)', () => {
         meta: { segments: [{ points: [{ x: 9, y: 9 }, { x: 10, y: 10 }] }] },
       },
     ])
-    expect(out).toContain('[freedraw #f1] @pos(5.0,6.0)')
+    expect(out).toBe('') // DSL_KINDS 过滤掉 freedraw,整元素不进 text
+    expect(out).not.toContain('[freedraw')
     expect(out).not.toContain('points')
     expect(out).not.toContain('(9,9)')
   })

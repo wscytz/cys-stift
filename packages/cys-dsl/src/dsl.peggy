@@ -14,7 +14,7 @@
 // 可接受语言与旧正则 parser 等价(契约见 dsl-parser/robustness/e2e-roundtrip/sync 测试)。
 
 Line
-  = cardLine / arrowLine / rectLine / textLine / frameLine / freedrawLine / bracketUnknown / prose
+  = cardLine / arrowLine / rectLine / textLine / frameLine / bracketUnknown / prose
 
 // ── card:`[card ` 提交;#id / right-of|below #anchor / create 都是 directive ──
 cardLine
@@ -43,11 +43,8 @@ frameLine
 freeDir
   = ws d:(idDir / posDir / sizeDir / colorDir / textDir / skipChunk) { return d }
 
-// ── freedraw:透传 no-op(不产 op 不报错)──
-freedrawLine
-  = '[' 'freedraw' sp .* { return { kind: 'freedraw' } }
-
 // ── [ 开头但非已知 kind(或已知 kind 缺空格如 [card])→ unrecognized diagnostic ──
+// 注:freedraw 已移出 DSL([freedraw] 落到这里 → unrecognized);程序自管(R2 + 渲染)。
 bracketUnknown
   = '[' .* { return { kind: 'unknown' } }
 

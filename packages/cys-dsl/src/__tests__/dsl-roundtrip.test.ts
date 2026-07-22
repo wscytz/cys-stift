@@ -76,7 +76,7 @@ describe('DSL round-trip (serialize → parse) — lossless on all active kinds'
       dash: 'solid',
       arrowhead: 'arrow',
     },
-    // freedraw (position only — NOT round-tripped by design)
+    // freedraw — 已出 DSL(程序自管):serialize 按 DSL_KINDS 过滤,整元素被丢,不进 text。
     {
       id: 'f1',
       kind: 'freedraw',
@@ -91,15 +91,15 @@ describe('DSL round-trip (serialize → parse) — lossless on all active kinds'
 
   const text = serializeCanvas(elements)
 
-  it('serializes all 5 active kinds (each element on its own line)', () => {
+  it('serializes the 5 DSL elements (freedraw 被过滤掉,不进 text)', () => {
     const lines = text.split('\n').filter(Boolean)
-    expect(lines).toHaveLength(6)
+    expect(lines).toHaveLength(5)
     expect(text).toContain('[card #c1]')
     expect(text).toContain('[rect #r1]')
     expect(text).toContain('[text #t1]')
     expect(text).toContain('[arrow #a1]')
     expect(text).toContain('[arrow #fa1]')
-    expect(text).toContain('[freedraw #f1]')
+    expect(text).not.toContain('[freedraw') // freedraw 出 DSL
   })
 
   it('card round-trips id + pos + size + color', () => {
@@ -144,17 +144,17 @@ describe('DSL round-trip (serialize → parse) — lossless on all active kinds'
 
   // ── freedraw: the deliberate asymmetry guard ──
 
-  it('freedraw is serialized (position only) — point sequence stays out of DSL', () => {
-    expect(text).toContain('[freedraw #f1] @pos(7.0,8.0)')
+  it('freedraw 出 DSL:serialize 整元素被丢,点序列/位置都不进 text', () => {
+    expect(text).not.toContain('[freedraw')
     expect(text).not.toContain('points')
-    expect(text).not.toContain('(1,2)')
+    expect(text).not.toContain('(7.0,8.0)') // 连 freedraw 的位置都不发
   })
 
-  it('freedraw is NOT restored by the parser (by design — no freedraw branch)', () => {
+  it('freedraw is NOT restored by the parser (by design — 出 DSL,程序自管)', () => {
     const ops = parseDsl(text)
     const freedrawOps = ops.filter((o) => o.type === 'free' && (o as { shape?: string }).shape === 'freedraw')
     expect(freedrawOps).toHaveLength(0)
-    // 5 ops parsed (card, rect, text, relation arrow, free arrow) — freedraw line is dropped.
+    // 5 ops parsed (card, rect, text, relation arrow, free arrow) — freedraw 不在 text。
     expect(ops).toHaveLength(5)
   })
 

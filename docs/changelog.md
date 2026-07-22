@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-07-22 · 1.0.0 · freedraw 出 DSL(程序自管,不文字化)
+
+freedraw 此前在 DSL 里只存位置(点序列已不入),但仍占一个 kind。本轮按"freedraw 非核心/存储重/意义低/隐私"将其**整出 DSL 契约**,完全归程序(R2 + 渲染)。DSL 从 6 kind 收敛到 5 kind;序列化格式变了(少一个 kind)但未 bump `DSL_VERSION`(freedraw 本就非 AI 可产、非 round-trip 核心,grammar reference 早已不含)。
+
+- **grammar**:`DSL_KINDS` 去 `freedraw`(6→5);`DSL_GRAMMAR_REFERENCE` 注释更新(freedraw 出 DSL)。
+- **peggy**:删 `freedrawLine` 规则 + `Line` 引用;`[freedraw]` 落 `bracketUnknown` → `unrecognized`。重生成 parser(`pnpm gen`)。
+- **parser**:删 `LineResult` 的 `freedraw` kind + `buildOp`/strict 的 freedraw 检查;`[freedraw]` 行现报 unrecognized(graceful `parseDsl` 丢弃,strict 报错)。
+- **serialize**:`serializeCanvas` 按 `DSL_KINDS` 过滤 → freedraw 整元素被丢,不进 DSL 文本(位置都不发)。`serializeElement`(底层,被 AI snapshot 直接用)**保留** freedraw case——snapshot 是单向 AI 上下文格式(非往返 DSL),照发 freedraw 行给 AI 看 shape;parseDsl 不接受它。
+- **程序渲染不受影响**:canvas-engine 的 freedraw(渲染/SVG/adapter)走 element + meta.points,与 DSL 无关;freedraw 仍正常画。
+- **测试**:翻转 9 个文件的 freedraw 断言(从"freedraw 在 DSL"翻成"出 DSL:serialize 丢/parse unrecognized/kind 5 个");e2e-roundtrip 的 freedraw guard 更新。dsl 338 / web 1702 passed;lint/build 全绿。
+- **未 push**(等用户手测)。
+
+---
+
 ## 2026-07-22 · 1.0.0 · v5 内容的 D/E 局限闭合(纯内容编辑 + 清空)
 
 承接同日「/ask 路径消费 v5 内容」,把 v5 内容区剩余两处文法层局限(D/E)一并闭合。序列化格式未变(serialize 始终发绝对 `@pos`)→ 未 bump `DSL_VERSION`。

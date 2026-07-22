@@ -26,8 +26,8 @@ describe('glm-5.2 不变量 —— 版本/枚举/隐私/单一源', () => {
       expect(DSL_VERSION).toBe(5)
     })
 
-    it('DSL_KINDS 恰好 6 个 active kind(顺序锁定)', () => {
-      expect([...DSL_KINDS]).toEqual(['card', 'rect', 'frame', 'text', 'arrow', 'freedraw'])
+    it('DSL_KINDS 恰好 5 个 active kind(freedraw 出 DSL,顺序锁定)', () => {
+      expect([...DSL_KINDS]).toEqual(['card', 'rect', 'frame', 'text', 'arrow'])
     })
 
     it('DSL_COLORS 是 Bauhaus 6 token(顺序锁定)', () => {
@@ -73,7 +73,7 @@ describe('glm-5.2 不变量 —— 版本/枚举/隐私/单一源', () => {
     })
   })
 
-  describe('隐私不变量:freedraw 点序列永不进文本', () => {
+  describe('隐私不变量:freedraw 永不进文本(已出 DSL,程序自管)', () => {
     const freedraw: CanvasElement = {
       id: 'f1',
       kind: 'freedraw',
@@ -85,15 +85,16 @@ describe('glm-5.2 不变量 —— 版本/枚举/隐私/单一源', () => {
       meta: { segments: [{ points: [{ x: 1, y: 2 }, { x: 3, y: 4 }] }] },
     }
 
-    it('serialize 只输出位置,不含 points/segments', () => {
+    it('serialize 整元素被丢(连位置都不进 text;程序自管 R2)', () => {
       const text = serializeCanvas([freedraw])
-      expect(text).toContain('[freedraw #f1] @pos(7.0,8.0)')
+      expect(text).toBe('')
+      expect(text).not.toContain('[freedraw')
       expect(text).not.toContain('points')
       expect(text).not.toContain('segments')
-      expect(text).not.toContain('1,2')
+      expect(text).not.toContain('7.0,8.0')
     })
 
-    it('parse 不还原 freedraw(透传 no-op,隐私 = 单向)', () => {
+    it('parse 不还原 freedraw(serialize 根本不产 freedraw 行;隐私 = 单向)', () => {
       const ops = parseDsl(serializeCanvas([freedraw]))
       expect(ops).toHaveLength(0)
     })

@@ -141,7 +141,7 @@ describe('glm-5.2 健壮性 —— 脏输入永不崩 + 截断精确 + v4 兼容
         '[freedraw #f] @pos(7,8)',
       ].join('\n')
       const ops = parseDsl(v4)
-      // freedraw 被 parser 透传跳过(设计如此,隐私)→ 5 ops。
+      // freedraw 已出 DSL → 该行 unrecognized,graceful parseDsl 丢弃(errors 不返)→ 5 ops。
       expect(ops).toHaveLength(5)
       // 所有 card 的 title/content 都是 undefined(v4 无内容语义)。
       const cards = ops.filter((o) => o.type === 'card')

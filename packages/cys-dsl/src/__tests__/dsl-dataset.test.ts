@@ -45,7 +45,7 @@ const fixtures: { name: string; dsl: string; minOps: number }[] = [
     dsl: '# a comment\n[card #c1] @pos(0,0) @size(10,10)\nprose line\n  # title: legacy comment',
     minOps: 1,
   },
-  { name: 'freedraw passthrough (no op)', dsl: '[freedraw #fd1] @pos(5,6)', minOps: 0 },
+  { name: 'freedraw line (已出 DSL → unrecognized,graceful 丢弃,0 ops)', dsl: '[freedraw #fd1] @pos(5,6)', minOps: 0 },
   {
     name: 'colon id + unicode title',
     dsl: '[card #ka:1] @pos(0,0) @size(10,10) @title("中文标题")',

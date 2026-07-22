@@ -14,8 +14,8 @@ describe('dsl-grammar', () => {
     expect(DSL_VERSION).toBeGreaterThan(0)
   })
 
-  it('DSL_KINDS is the 6 canonical directive kinds', () => {
-    expect([...DSL_KINDS]).toEqual(['card', 'rect', 'frame', 'text', 'arrow', 'freedraw'])
+  it('DSL_KINDS is the 5 canonical directive kinds (freedraw 出 DSL,程序自管)', () => {
+    expect([...DSL_KINDS]).toEqual(['card', 'rect', 'frame', 'text', 'arrow'])
   })
 
   it('DSL_COLORS is the 6 Bauhaus tokens', () => {
@@ -30,9 +30,8 @@ describe('dsl-grammar', () => {
     expect(DSL_GRAMMAR_REFERENCE).toContain(`cys-dsl grammar v${DSL_VERSION}`)
   })
 
-  it('DSL_GRAMMAR_REFERENCE mentions every AI-producible kind (excl freedraw)', () => {
+  it('DSL_GRAMMAR_REFERENCE mentions every DSL kind (all 5 are AI-producible)', () => {
     for (const kind of DSL_KINDS) {
-      if (kind === 'freedraw') continue // freedraw 故意不进 AI 面向 REFERENCE
       expect(DSL_GRAMMAR_REFERENCE).toContain(`[${kind} #id]`)
     }
   })

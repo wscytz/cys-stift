@@ -159,8 +159,7 @@ type DirectiveTuple =
 /** directive* 收集的元组列表(null = skipChunk 消费的未知残余,过滤掉)。 */
 type LineResult =
   | null // prose / 注释 / 围栏 / 空(静默 skip)
-  | { kind: 'freedraw' } // 透传 no-op(skip,不报错)
-  | { kind: 'unknown' } // [ 开头但非已知 kind → unrecognized
+  | { kind: 'unknown' } // [ 开头但非已知 kind → unrecognized([freedraw] 也落此:freedraw 已出 DSL)
   | { kind: 'card'; ds: unknown[] }
   | { kind: 'arrow'; ds: unknown[] }
   | { kind: 'rect'; ds: unknown[] }
@@ -394,7 +393,7 @@ function buildFree(kind: 'rect' | 'text' | 'frame', ds: unknown[]): BuildResult 
 }
 
 function buildOp(r: LineResult): BuildResult {
-  if (r === null || r.kind === 'freedraw') return null // 静默 skip
+  if (r === null) return null // 静默 skip
   if (r.kind === 'unknown') return { diag: 'unrecognized element kind' }
   if (r.kind === 'card') return buildCard(r.ds)
   if (r.kind === 'arrow') return buildArrow(r.ds)
@@ -436,7 +435,7 @@ export function parseDslWithDiagnostics(dslText: string): {
     }
 
     const built = buildOp(result)
-    if (built === null) continue // prose / freedraw skip
+    if (built === null) continue // prose skip
     if ('op' in built) {
       ops.push(built.op)
     } else {
@@ -478,8 +477,8 @@ export function parseDslStrictWithDiagnostics(dslText: string): {
       errors.push({ line: lineNo, text: line, message: 'malformed directive' })
       continue
     }
-    if (result === null || result.kind === 'unknown' || result.kind === 'freedraw') {
-      errors.push({ line: lineNo, text: line, message: result?.kind === 'freedraw' ? 'freedraw is not mutable through AI DSL' : 'unrecognized directive' })
+    if (result === null || result.kind === 'unknown') {
+      errors.push({ line: lineNo, text: line, message: 'unrecognized directive' })
       continue
     }
     const tuples = result.ds.filter(Array.isArray) as DirectiveTuple[]

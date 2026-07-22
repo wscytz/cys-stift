@@ -4,7 +4,7 @@ cys-dsl — cy's Stift 画布的**双向文字表示(转义)**。整张画布能
 
 ## 是什么
 
-cys-dsl **v5** 文法:6 种元素(`card`/`rect`/`frame`/`text`/`arrow`/`freedraw`)、6 Bauhaus 色、关系式放置(`right-of`/`below` + `@gap`)、箭头签名(label/color/dash/arrowhead/route/wikilink)、**v5 卡片内容 `@title`(短)/`@content`(长 markdown,`\n` 转义多行)**。几何 + 内容;`freedraw` 仅位置(点序列 R2 隐私,不外发)。
+cys-dsl **v5** 文法:**5 种元素**(`card`/`rect`/`frame`/`text`/`arrow`)、6 Bauhaus 色、关系式放置(`right-of`/`below` + `@gap`)、箭头签名(label/color/dash/arrowhead/route/wikilink)、**v5 卡片内容 `@title`(短)/`@content`(长 markdown,`\n` 转义多行)**。几何 + 内容;`freedraw` **已出 DSL**(程序自管 R2 + 渲染:存储重/意义低/隐私,不文字化)。
 
 ## public API
 
@@ -40,7 +40,7 @@ const clean = sanitizeDslOps(ops, ctx)      // 修正非法值(永不抛错)
 
 - **round-trip**:活跃 kind 的 serialize↔parse 双向稳定。
 - **sanitize 永不抛错**:坏输入降级,不整块丢。
-- **freedraw 仅位置**:点序列永不进 DSL(隐私 + 防 DoS)。
+- **freedraw 不在 DSL**:freedraw 已出 DSL(程序自管 R2 + 渲染);serialize 按 `DSL_KINDS` 过滤,`[freedraw]` 行 parse 报 unrecognized。点序列/位置都不进 DSL(隐私 + 防 DoS + 存储重/意义低)。
 - **Bauhaus 6 色**:不新增色。
 - **截断代理对安全**:`truncateDslText` 不劈开 emoji/增补平面字符(不产孤立代理位)。
 
