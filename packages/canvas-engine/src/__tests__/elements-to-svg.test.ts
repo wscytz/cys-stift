@@ -348,3 +348,82 @@ describe('elementsToSvg — freedraw 单点画 <circle>(L1:导出与渲染一致
     expect(circleFill).not.toBe('none')
   })
 })
+
+describe('elementsToSvg — 卡正文行数按卡高派生(P1)+ 属性转义/halo token(P3)', () => {
+  const view = { panX: 0, panY: 0, zoom: 1, gridMode: 'free' as const }
+
+  it('P1:高卡(h=180)正文显 >3 行,不再硬截 3', () => {
+    // 旧:estimateSoftWrap maxLines 硬编码 3,跟卡高无关 → 高卡也只 3 行,下面全空。
+    // 新:行数按卡高派生(CARD_TITLE_AREA+BOTTOM_PAD / LINE_H)。h=180 → 7 行。
+    const els: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 240, h: 180, rotation: 0 },
+    ]
+    const r = elementsToSvg(
+      els, view,
+      () => ({ title: 'T', body: 'l1\nl2\nl3\nl4\nl5\nl6', type: 'n', pinned: false }),
+      { background: false, border: 0 },
+    )
+    expect(r.svg).toContain('>l4<')
+    expect(r.svg).toContain('>l5<')
+    expect(r.svg).toContain('>l6<')
+  })
+
+  it('P1:默认卡(h=120)仍 ≤3 行(向后兼容)', () => {
+    const els: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 240, h: 120, rotation: 0 },
+    ]
+    const r = elementsToSvg(
+      els, view,
+      () => ({ title: 'T', body: 'l1\nl2\nl3\nl4\nl5\nl6', type: 'n', pinned: false }),
+      { background: false, border: 0 },
+    )
+    // h=120 → maxLines=3 → l4+ 丢;l3 在。
+    expect(r.svg).toContain('>l3<')
+    expect(r.svg).not.toContain('>l4<')
+  })
+
+  it('P1:正文短时不凑行(2 段 = 2 个 body <text>)', () => {
+    const els: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 240, h: 180, rotation: 0 },
+    ]
+    const r = elementsToSvg(
+      els, view,
+      () => ({ title: 'T', body: 'only\nshort', type: 'n', pinned: false }),
+      { background: false, border: 0 },
+    )
+    // 类型标 + title + 2 行 body = 4 个 <text>。
+    expect((r.svg.match(/<text/g) ?? []).length).toBe(4)
+  })
+
+  it('P3:font-family 双引号字体名 → 转义 &quot;(不劈开 XML 属性)', () => {
+    // 属性值没走 esc():双引号字体名会把 font-family="..." 劈成非法 XML。
+    const dblQuoteResolver: TokenResolver = (_name, fallback) =>
+      fallback.includes('mono') ? `"JetBrains Mono", ${fallback}` : fallback
+    const els: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 },
+    ]
+    const r = elementsToSvg(
+      els, view,
+      () => ({ title: 'T', body: 'B', type: 'n', pinned: false }),
+      { background: false, border: 0 }, dblQuoteResolver,
+    )
+    expect(r.svg).toContain('&quot;')
+    expect(r.svg).not.toContain('font-family=""')
+  })
+
+  it('P3:frame 标题 halo 走 token(不再字面量 fill="white")', () => {
+    const stubResolver: TokenResolver = (name, fallback) => {
+      const m: Record<string, string> = {
+        '--color-white': '#fafafa', '--color-blue': '#003f7f',
+        '--font-mono': 'monospace',
+      }
+      return m[name] ?? fallback
+    }
+    const els: CanvasElement[] = [
+      { id: 'fr', kind: 'frame', x: 0, y: 0, w: 200, h: 100, rotation: 0, text: '标题', color: 'blue' },
+    ]
+    const r = elementsToSvg(els, view, () => null, { background: false, border: 0 }, stubResolver)
+    expect(r.svg).not.toContain('fill="white"')
+    expect(r.svg).toContain('fill="#fafafa"')
+  })
+})

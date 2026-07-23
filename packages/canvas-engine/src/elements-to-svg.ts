@@ -1,7 +1,7 @@
 
 import type { CanvasElement, CanvasView } from './canvas-host'
 import { sortByLayer } from './canvas-host'
-import { colorOf, groupColorOf, domTokenResolver, type TokenResolver } from './self-built-render'
+import { colorOf, groupColorOf, domTokenResolver, CARD_TITLE_AREA, CARD_BOTTOM_PAD, CARD_LINE_H, type TokenResolver } from './self-built-render'
 import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments, arrowHeadAngle, autoElbowPath, cardObstacles } from './self-built-arrow'
 import { unionBounds, expandBounds, normalizeBox, type Bounds } from './bounds'
 import { freedrawPointsOf } from './self-built-freedraw'
@@ -92,9 +92,11 @@ export function elementsToSvg(
   const textCol = tokenResolver('--color-black', '#0a0a0a')
   const grayCol = tokenResolver('--color-gray', '#666666')
   const yellow = tokenResolver('--color-yellow', '#eab308')
-  const fontBody = tokenResolver('--font-body', 'Inter, sans-serif')
-  const fontDisplay = tokenResolver('--font-display', 'Inter, sans-serif')
-  const fontMono = tokenResolver('--font-mono', 'monospace')
+  // 字体名可能含双引号(如 "JetBrains Mono")→ 属性值须转义,否则劈开 font-family="…"。
+  // esc 对单引号 / 无引号 token 是 no-op(不破生产),双引号 → &quot;。
+  const fontBody = esc(tokenResolver('--font-body', 'Inter, sans-serif'))
+  const fontDisplay = esc(tokenResolver('--font-display', 'Inter, sans-serif'))
+  const fontMono = esc(tokenResolver('--font-mono', 'monospace'))
 
   void view // 导出时 view 不参与坐标变换(导出通常 zoom=1,pan=0);保留参数为 Task 2-4 兼容。
 
@@ -140,7 +142,10 @@ function elementToSvg(
         parts.push(`<text x="${x + 10}" y="${y + 32}" fill="${c.textCol}" font-family="${c.fontDisplay}" font-size="15" font-weight="500">${esc(info.title || '(untitled)')}</text>`)
         const displayBody = markdownPreview(info.body, Number.POSITIVE_INFINITY)
         if (displayBody) {
-          const lines = estimateSoftWrap(displayBody, el.w - 20, 3)
+          // 行数按卡高派生(对齐实时渲染几何 CARD_TITLE_AREA/LINE_H/BOTTOM_PAD),
+          // 不再硬编码 3:默认 120px 卡仍 3 行(向后兼容),高卡显更多,文本不溢出 bbox。
+          const maxLines = Math.max(1, Math.floor((el.h - CARD_TITLE_AREA - CARD_BOTTOM_PAD) / CARD_LINE_H))
+          const lines = estimateSoftWrap(displayBody, el.w - 20, maxLines)
           lines.forEach((ln, i) => {
             parts.push(`<text x="${x + 10}" y="${y + 50 + i * 16}" fill="${c.textCol}" font-family="${c.fontBody}" font-size="12">${esc(ln)}</text>`)
           })
@@ -162,7 +167,7 @@ function elementToSvg(
       const b = normalizeBox(el)
       const stroke = colorOf(el.color, tokenResolver)
       const title = el.text
-        ? `<rect x="${b.x + dx}" y="${b.y + dy}" width="${Math.min(el.text.length * 7 + 12, b.w)}" height="18" fill="white" fill-opacity="0.85"/><text x="${b.x + dx + 6}" y="${b.y + dy + 14}" font-family="${c.fontMono}" font-size="11" fill="${stroke}">${esc(el.text)}</text>`
+        ? `<rect x="${b.x + dx}" y="${b.y + dy}" width="${Math.min(el.text.length * 7 + 12, b.w)}" height="18" fill="${tokenResolver('--color-white', '#ffffff')}" fill-opacity="0.85"/><text x="${b.x + dx + 6}" y="${b.y + dy + 14}" font-family="${c.fontMono}" font-size="11" fill="${stroke}">${esc(el.text)}</text>`
         : ''
       return `<rect x="${b.x + dx}" y="${b.y + dy}" width="${b.w}" height="${b.h}" fill="${stroke}" fill-opacity="0.06" stroke="${stroke}" stroke-width="1.5" stroke-dasharray="8,4"/>${title}`
     }
