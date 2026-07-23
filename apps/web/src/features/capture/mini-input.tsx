@@ -21,6 +21,8 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { Button, Input } from '@cys-stift/ui'
+import type { TagRef } from '@cys-stift/domain'
+import { solidTagChipStyle, stableTagColor } from '@/lib/tag-color'
 import { draftStore, useDraft, isDraftPersistOk } from '@/lib/draft-store'
 import { useDebouncedCallback } from '@/lib/use-debounced-callback'
 import { useI18n } from '@/lib/i18n'
@@ -37,7 +39,7 @@ export interface MiniInputProps {
   /** Returns true on success (card persisted), false on failure (e.g. quota).
    *  On false the modal stays open and the draft is preserved so the user
    *  can retry (H2 fix — silent data loss on capture quota failure). */
-  onSubmit: (input: { title: string; body?: string }) => Promise<boolean>
+  onSubmit: (input: { title: string; body?: string; tags?: TagRef[] }) => Promise<boolean>
 }
 
 export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
@@ -60,6 +62,9 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
   // knows the draft won't survive a reload. Re-checked after each debounced
   // persist; isDraftPersistOk() is a module-level flag, not reactive.
   const [persistFailed, setPersistFailed] = useState(false)
+  // tag 快速输入(回车/逗号加 chip;color 派生)。session-only,不进 draft。
+  const [tags, setTags] = useState<TagRef[]>([])
+  const [tagInput, setTagInput] = useState('')
   const bodyRef = useRef<HTMLTextAreaElement | null>(null)
 
   // Debounced autosave (spec §5.5). 500ms of silence → persist. The store
@@ -89,6 +94,8 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
       setTitle(restored?.title ?? '')
       setBody(restored?.body ?? '')
       setBodyOpen(Boolean(restored?.body && restored.body.trim().length > 0))
+      setTags([])
+      setTagInput('')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, ready])
@@ -100,6 +107,15 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
   const setBodyAndPersist = (b: string) => {
     setBody(b)
     persistDraft(title, b)
+  }
+  const addTag = (raw: string) => {
+    const val = raw.trim()
+    if (!val || tags.some((tg) => tg.value === val)) {
+      setTagInput('')
+      return
+    }
+    setTags((prev) => [...prev, { value: val, color: stableTagColor(val) }])
+    setTagInput('')
   }
 
   const submit = async () => {
@@ -113,7 +129,7 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
     persistDraft.cancel()
     let ok = false
     try {
-      ok = await onSubmit({ title: t, body: body.trim() || undefined })
+      ok = await onSubmit({ title: t, body: body.trim() || undefined, tags })
     } finally {
       if (!ok) {
         // H2 fix: 保存失败(配额满)。保持 modal 打开 + 保留草稿(不清),
@@ -208,6 +224,35 @@ if (
               rows={5}
             />
           )}
+          <div className="mi-tags">
+            {tags.map((tag) => (
+              <span key={tag.value} className="mi-tag-chip" style={solidTagChipStyle(tag.color)}>
+                {tag.value}
+                <button
+                  type="button"
+                  className="mi-tag-remove"
+                  aria-label={t('tag.remove') + ': ' + tag.value}
+                  onClick={() => setTags((prev) => prev.filter((x) => x.value !== tag.value))}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            <input
+              className="mi-tag-input"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ',') {
+                  e.preventDefault()
+                  addTag(tagInput)
+                }
+              }}
+              onBlur={() => addTag(tagInput)}
+              placeholder={t('tag.placeholder')}
+              aria-label={t('tag.add')}
+            />
+          </div>
         </div>
         <div className="mi-actions">
           <strong className="mi-hint mi-hint--primary" data-testid="mini-submit-hint">
@@ -293,6 +338,22 @@ const styles = `
   color: var(--color-red); text-transform: lowercase; letter-spacing: 0.04em;
 }
 .mi-hint--primary { color: var(--color-red); font-weight: 700; }
+.mi-tags {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+.mi-tag-chip {
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  padding: 0 var(--space-1);
+}
+.mi-tag-remove { background: transparent; border: 0; color: inherit; cursor: pointer; padding: 0; font-size: inherit; line-height: 1; }
+.mi-tag-input {
+  flex: 1; min-width: 100px; border: 0; outline: 0; background: transparent;
+  font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black);
+  padding: var(--space-quarter) 0;
+}
+.mi-tag-input:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 @media (max-width: 768px) {
   .mi-backdrop { padding-top: 12vh; }
   .mi-frame { width: calc(100vw - var(--space-4)); }

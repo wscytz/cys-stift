@@ -216,6 +216,7 @@ export interface CaptureInput {
   links?: string[]
   codeSnippets?: CodeBlock[]
   quotes?: Quote[]
+  tags?: TagRef[]
   source: CaptureSource
   canvasPosition?: {
     canvasId: CanvasId

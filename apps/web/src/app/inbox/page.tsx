@@ -377,6 +377,7 @@ export default function InboxPage() {
                   links: input.links.map((l) => l.url),
                   codeSnippets: input.codeSnippets,
                   quotes: input.quotes,
+                  tags: input.tags,
                 })
                 .then(() => true)
                 .catch((e: unknown) => {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useId } from 'react'
 import { Button, Input, Tag } from '@cys-stift/ui'
-import type { CodeBlock, LinkPreview, Quote } from '@cys-stift/domain'
+import type { CodeBlock, LinkPreview, Quote, TagRef } from '@cys-stift/domain'
 import { draftStore, useDraft, isDraftPersistOk } from '@/lib/draft-store'
 import { useDebouncedCallback } from '@/lib/use-debounced-callback'
 import {
@@ -18,6 +18,7 @@ import {
   draftQuotesToPayload,
 } from '@/features/card/editors'
 import { useI18n } from '@/lib/i18n'
+import { solidTagChipStyle, stableTagColor } from '@/lib/tag-color'
 
 export interface CreateCardFormProps {
   /**
@@ -33,6 +34,7 @@ export interface CreateCardFormProps {
     links: LinkPreview[]
     codeSnippets: CodeBlock[]
     quotes: Quote[]
+    tags: TagRef[]
   }) => Promise<boolean>
   /**
    * Whether the backing DB/service is hydrated and ready to accept writes.
@@ -76,6 +78,9 @@ export function CreateCardForm({ onCreate, ready = true }: CreateCardFormProps) 
   const [links, setLinks] = useState<DraftLink[]>([])
   const [codes, setCodes] = useState<DraftCode[]>([])
   const [quotes, setQuotes] = useState<DraftQuote[]>([])
+  // tag 快速输入(session-only,不进 draft,与 MiniInput 一致)。
+  const [tags, setTags] = useState<TagRef[]>([])
+  const [tagInput, setTagInput] = useState('')
   // Submit latch: while awaiting onCreate's promise we disable the button
   // to prevent double-submit (onCreate is now async — see handleSubmit).
   // Replaces the former useTransition `pending` latch, which only covered
@@ -138,6 +143,15 @@ export function CreateCardForm({ onCreate, ready = true }: CreateCardFormProps) 
     setQuotes(next)
     persistDraft({ title, body, links, codes, quotes: next })
   }
+  const addTag = (raw: string) => {
+    const val = raw.trim()
+    if (!val || tags.some((tg) => tg.value === val)) {
+      setTagInput('')
+      return
+    }
+    setTags((prev) => [...prev, { value: val, color: stableTagColor(val) }])
+    setTagInput('')
+  }
 
   useEffect(() => {
     // No-op: focus management is opt-in via document.activeElement;
@@ -152,6 +166,8 @@ export function CreateCardForm({ onCreate, ready = true }: CreateCardFormProps) 
     setLinks([])
     setCodes([])
     setQuotes([])
+    setTags([])
+    setTagInput('')
     setOpenSection(null)
     draftStore.clear('manual')
   }
@@ -183,6 +199,7 @@ export function CreateCardForm({ onCreate, ready = true }: CreateCardFormProps) 
         links: draftLinksToPayload(links),
         codeSnippets: draftCodesToPayload(codes),
         quotes: draftQuotesToPayload(quotes),
+        tags,
       })
     } catch {
       // Defensive: onCreate is specced to never throw (it .catches
@@ -225,6 +242,36 @@ export function CreateCardForm({ onCreate, ready = true }: CreateCardFormProps) 
           rows={4}
         />
       </label>
+
+      <div className="ccf__tags">
+        {tags.map((tag) => (
+          <span key={tag.value} className="ccf__tag-chip" style={solidTagChipStyle(tag.color)}>
+            {tag.value}
+            <button
+              type="button"
+              className="ccf__tag-remove"
+              aria-label={t('tag.remove') + ': ' + tag.value}
+              onClick={() => setTags((prev) => prev.filter((x) => x.value !== tag.value))}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        <input
+          className="ccf__tag-input"
+          value={tagInput}
+          onChange={(e) => setTagInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ',') {
+              e.preventDefault()
+              addTag(tagInput)
+            }
+          }}
+          onBlur={() => addTag(tagInput)}
+          placeholder={t('tag.placeholder')}
+          aria-label={t('tag.add')}
+        />
+      </div>
 
       <div className="ccf__sections" role="group" aria-label={t('inbox.create.mediaAria')}>
         <button
@@ -347,6 +394,21 @@ const styles = `
   cursor: pointer;
 }
 .ccf__toggle:hover { background: var(--color-red-soft); }
+.ccf__tags {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1);
+}
+.ccf__tag-chip {
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  padding: 0 var(--space-1);
+}
+.ccf__tag-remove { background: transparent; border: 0; color: inherit; cursor: pointer; padding: 0; font-size: inherit; line-height: 1; }
+.ccf__tag-input {
+  flex: 1; min-width: 120px; border: 0; outline: 0; background: transparent;
+  font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black);
+  padding: var(--space-quarter) 0;
+}
+.ccf__tag-input:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .ccf__actions { display: flex; gap: var(--space-2); align-items: center; }
 .ccf__actions-spacer { flex: 1; }
 .ccf__warn {

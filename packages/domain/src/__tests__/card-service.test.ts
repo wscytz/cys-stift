@@ -130,6 +130,15 @@ describe('CardService', () => {
     }
   })
 
+  it('fromCapture 透传 tags(CaptureInput.tags)', () => {
+    const card = service.fromCapture({
+      title: 'tagged',
+      source: { kind: 'manual', deviceId: 'd1' },
+      tags: [{ value: '灵感', color: 'red' }, { value: '待办', color: 'blue' }],
+    })
+    expect(card.tags.map((t) => t.value)).toEqual(['灵感', '待办'])
+  })
+
   it('update mutates whitelisted fields and bumps updatedAt', async () => {
     const c = service.create({ title: 'old', body: 'b', source: dummySource })
     const before = c.updatedAt.getTime()

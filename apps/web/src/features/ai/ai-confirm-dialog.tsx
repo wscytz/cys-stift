@@ -290,14 +290,32 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
           kind: res.arrowsCreated > 0 ? 'success' : 'info',
           message: res.arrowsCreated > 0 ? t('canvas.aiClusterDone', { n: String(res.arrowsCreated) }) : t('canvas.aiClusterNone'),
         })
-      } else { // outline
+      } else { // outline → 总结卡落画布(不自动连线),不再建 inbox 卡(用户嫌"不在画布搞笑")
         const body = editing ? editedMarkdown : props.outlineMarkdown
-        props.service.create({
+        const created = props.service.create({
           title: t('ai.confirm.outlineCardTitle'),
           body,
           source: { kind: 'manual', deviceId: 'web' },
         })
-        pushToast({ kind: 'success', message: t('ai.confirm.outlineCreated') })
+        if (!created) {
+          pushToast({ kind: 'info', message: t('storage.quotaExceeded') })
+        } else {
+          // 落在当前画布上一个空位(z 取最大+1,网格错开),不自动建关系(用户手动连)。
+          const existing = props.service.listOnCanvas(props.canvasId)
+          const z = existing.reduce((m, c) => Math.max(m, c.canvasPosition?.z ?? 0), 0) + 1
+          const moved = props.service.moveToCanvas(created.id, {
+            canvasId: props.canvasId,
+            x: 120 + (z % 5) * 40,
+            y: 120 + (z % 5) * 40,
+            w: 280,
+            h: 140,
+            z,
+          })
+          pushToast({
+            kind: moved === false ? 'info' : 'success',
+            message: moved === false ? t('storage.quotaExceeded') : t('ai.confirm.outlineCreated'),
+          })
+        }
       }
       setPhase('applied')
       props.onApplied()

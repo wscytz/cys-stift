@@ -184,6 +184,7 @@ export class CardService {
       })),
       codeSnippets: input.codeSnippets,
       quotes: input.quotes,
+      tags: input.tags,
     })
   }
 

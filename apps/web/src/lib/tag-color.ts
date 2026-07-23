@@ -1,4 +1,5 @@
-import { normalizeTagColor } from '@cys-stift/domain'
+import { normalizeTagColor, TAG_COLORS } from '@cys-stift/domain'
+import type { TagRef } from '@cys-stift/domain'
 
 /**
  * Return the CSS variables used by tag chips and the foreground that keeps
@@ -33,4 +34,14 @@ export function solidTagTextColor(color: unknown): 'var(--color-black)' | 'var(-
 export function solidTagBarColor(color: unknown): string {
   const normalized = normalizeTagColor(color)
   return normalized === 'var(--color-white)' ? 'var(--color-gray)' : normalized
+}
+
+/**
+ * 稳定派生 tag 颜色:value hash → 调色板取色(同 value 永远同色)。
+ * 用于建卡时快速打标签(MiniInput / 工作台等),color 存进 TagRef。
+ */
+export function stableTagColor(value: string): TagRef['color'] {
+  let hash = 0
+  for (let i = 0; i < value.length; i += 1) hash = (hash * 31 + value.charCodeAt(i)) | 0
+  return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length] ?? TAG_COLORS[0]!
 }

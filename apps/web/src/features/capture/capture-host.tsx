@@ -22,6 +22,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useDb } from '@/lib/db-client'
+import type { TagRef } from '@cys-stift/domain'
 import { useSettings } from '@/lib/settings-store'
 import { MiniInput } from './mini-input'
 import { captureSinkRegistry } from './capture-sink'
@@ -53,7 +54,7 @@ export function CaptureHost() {
   // latch(可重试);成功时关闭 modal,返回 true(MiniInput 清草稿)。happy path
   // 仍是单 microtask(WebCaptureSink.submit 同步 resolve),不阻塞 UI。
   const onSubmit = useCallback(
-    ({ title, body }: { title: string; body?: string }): Promise<boolean> => {
+    ({ title, body, tags }: { title: string; body?: string; tags?: TagRef[] }): Promise<boolean> => {
       const did = getDeviceId()
       const source =
         openKind === 'menubar'
@@ -64,7 +65,7 @@ export function CaptureHost() {
               deviceId: did,
             }
       return captureSinkRegistry
-        .submit({ title, body, source })
+        .submit({ title, body, tags, source })
         .then(({ cardId }) => {
           setOpen(false)
           const actions = buildCaptureRedirectActions({
