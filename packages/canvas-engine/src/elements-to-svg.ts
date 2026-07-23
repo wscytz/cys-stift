@@ -10,7 +10,7 @@ import { markdownPreview } from './markdown-preview'
 
 /** SVG 无 ctx.measureText:用字符宽度估算量宽,委托 wrapText 词界换行后截 maxLines。
  *  与 estimateTextWidth 同源 cw(CJK/全角 code≥0x1100≈字号 12,latin≈0.58 字号 7)。*/
-function estimateSoftWrap(text: string, maxW: number, maxLines: number): string[] {
+function estimateSoftWrap(text: string, maxW: number, maxLines: number): { lines: string[]; truncated: boolean } {
   const measure = (s: string): number => {
     let width = 0
     for (const ch of s) {
@@ -19,7 +19,8 @@ function estimateSoftWrap(text: string, maxW: number, maxLines: number): string[
     }
     return width
   }
-  return wrapText(text, Math.max(maxW, 20), measure).slice(0, maxLines)
+  const all = wrapText(text, Math.max(maxW, 20), measure)
+  return { lines: all.slice(0, maxLines), truncated: all.length > maxLines }
 }
 
 /** SVG 无 ctx.measureText:估文本块最大行宽(像素),给 halo rect 量宽用。
@@ -131,9 +132,11 @@ function elementToSvg(
           // 行数按卡高派生(对齐实时渲染几何 CARD_TITLE_AREA/LINE_H/BOTTOM_PAD),
           // 不再硬编码 3:默认 120px 卡仍 3 行(向后兼容),高卡显更多,文本不溢出 bbox。
           const maxLines = Math.max(1, Math.floor((el.h - CARD_TITLE_AREA - CARD_BOTTOM_PAD) / CARD_LINE_H))
-          const lines = estimateSoftWrap(displayBody, el.w - 20, maxLines)
+          const { lines, truncated } = estimateSoftWrap(displayBody, el.w - 20, maxLines)
           lines.forEach((ln, i) => {
-            parts.push(`<text x="${x + 10}" y="${y + 50 + i * 16}" fill="${c.textCol}" font-family="${c.fontBody}" font-size="12">${esc(ln)}</text>`)
+            // 截断时末行补 …(与实时渲染同源)。
+            const text = truncated && i === lines.length - 1 ? `${ln}…` : ln
+            parts.push(`<text x="${x + 10}" y="${y + 50 + i * 16}" fill="${c.textCol}" font-family="${c.fontBody}" font-size="12">${esc(text)}</text>`)
           })
         }
       } else {

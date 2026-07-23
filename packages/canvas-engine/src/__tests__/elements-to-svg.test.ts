@@ -377,9 +377,23 @@ describe('elementsToSvg — 卡正文行数按卡高派生(P1)+ 属性转义/hal
       () => ({ title: 'T', body: 'l1\nl2\nl3\nl4\nl5\nl6', type: 'n', pinned: false }),
       { background: false, border: 0 },
     )
-    // h=120 → maxLines=3 → l4+ 丢;l3 在。
-    expect(r.svg).toContain('>l3<')
+    // h=120 → maxLines=3 → l4+ 丢;l3 在(截断时末行带 …,故匹配 l3 而非 >l3<)。
+    expect(r.svg).toContain('l3')
     expect(r.svg).not.toContain('>l4<')
+    expect(r.svg).toContain('…') // 截断明示
+  })
+
+  it('P2:不截断(高卡放得下)→ 无 …', () => {
+    const els: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 240, h: 180, rotation: 0 },
+    ]
+    const r = elementsToSvg(
+      els, view,
+      () => ({ title: 'T', body: 'l1\nl2\nl3\nl4\nl5\nl6', type: 'n', pinned: false }),
+      { background: false, border: 0 },
+    )
+    // h=180 → maxLines=7 ≥ 6 → 不截 → 无 …
+    expect(r.svg).not.toContain('…')
   })
 
   it('P1:正文短时不凑行(2 段 = 2 个 body <text>)', () => {

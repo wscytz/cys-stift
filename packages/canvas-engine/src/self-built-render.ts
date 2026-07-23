@@ -180,8 +180,11 @@ function drawElement(
           const lines = wrapLines(displayBody, el.w - pad * 2, ctx)
           const cap = cardMode === 'compact' ? 3 : CARD_AUTO_MAX_LINES
           const lineCount = Math.min(cap, lines.length)
+          const truncated = lines.length > cap
           for (let i = 0; i < lineCount; i++) {
-            ctx.fillText(lines[i]!, el.x + pad, el.y + pad + 38 + i * 16)
+            // 截断时末行补 …,明示用户卡里还有更多内容(开卡详情看全文)。
+            const ln = truncated && i === lineCount - 1 ? `${lines[i]}…` : lines[i]!
+            ctx.fillText(ln, el.x + pad, el.y + pad + 38 + i * 16)
           }
         }
       }

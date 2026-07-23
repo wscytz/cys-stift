@@ -127,6 +127,12 @@ describe('renderElements', () => {
     expect(ft.length).toBe(6) // type + title + 4 body
   })
 
+  it('cardMode=compact:截断时末 body 行带 …(明示有更多);auto 全显无 …', () => {
+    // 100 字 → 4 wrapped → compact 截到 3,末行(第 3 行)补 …;auto 全显 4 行(≤30)不截 → 无 …
+    expect(cardCalls('compact').some((c) => c.includes('…'))).toBe(true)
+    expect(cardCalls('auto').some((c) => c.includes('…'))).toBe(false)
+  })
+
   it('renders readable card text instead of Markdown source markers', () => {
     const ctx = mockCtx()
     const els: CanvasElement[] = [{ id: 'c1', kind: 'card', x: 0, y: 0, w: 240, h: 160, rotation: 0 }]
