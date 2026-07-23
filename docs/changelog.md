@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-07-23 · 1.1.0 · 导出保真 + 卡显示 UX(截断按卡高 / 词界换行 / … 标记)
+
+承接"外部 AI ↔ 画布 DSL 桥"实战——用真实 `elementsToSvg` 出图描绘 cys-dsl 语法速查,暴露一批导出/卡显示问题,TDD 逐条修(实时渲染 + SVG 导出同源):
+
+- **fix(canvas-engine): 导出卡正文行数按卡高派生**:SVG 导出 `estimateSoftWrap` 行数从硬编码 `3` 改为 `(h - CARD_TITLE_AREA - CARD_BOTTOM_PAD) / CARD_LINE_H`(import 实时渲染几何常量)。默认 120px 卡仍 3 行(向后兼容),高卡显更多,文本不溢出 bbox。**卡高是 mode 派生** → 导出自动对齐实时渲染(compact h≈106→3 行,auto h=随内容→行数=内容)。
+- **fix(canvas-engine): font-family 属性转义 + frame halo 走 token**:字体属性值裹 `esc()`(双引号字体名不再劈开 XML,单引号 token 是 no-op,不破生产);frame 标题 halo `fill="white"` → `tokenResolver('--color-white')`(与 text/arrow halo 同源)。
+- **refactor(canvas-engine): 词界换行(统一 `wrapText`)**:新增纯函数 `wrapText(text, maxWidth, measureFn)`——拉丁词不从中间劈开(`yellow` 不再断成 `yell/ow`),CJK/全角任意位置可断,放不下的超宽单词按字回退(CSS `overflow-wrap: break-word` 语义,免溢出卡宽)。`wrapLines` 与 `estimateSoftWrap` 两份重复的逐字换行逻辑统一委托它。无空格长串走回退分支,行数/卡高不变。
+- **feat(canvas-engine): 截断末行补 `…`**:compact/auto body 超行数上限(默认 compact=3)被截时,末可见行补 `…`,明示卡里还有更多内容。导出与实时渲染同源逻辑;放得下无 `…`。
+- **研究出处**:私仓 `docs/research/2026-07-23-ai-canvas-bridge-demo.md`(外部 AI 读写 DSL 驱动画布实证)+ `2026-07-23-dsl-export-image-test.md`(出图实测 + 问题自查)。
+- **测试**:canvas-engine +11(elements-to-svg 导出 5 / wrapText 4 / 截断 … 2)。canvas-engine 585 / web 1738 / lint 0 / build 0。
+
 ## 2026-07-23 · 1.1.0 · v7 做圆(A 计划):@compute 修 + @group/@href 可见
 
 承接多维度审查 A 组合,把 v7 三新做圆(核心承诺:AI 写 v7 指令 → 画布有可见变化 + 不静默失败):
