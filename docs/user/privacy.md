@@ -17,7 +17,7 @@
 
 | 数据 | 默认位置 / 去向 | 什么时候会离开本机 |
 |---|---|---|
-| **prompt** | 只在启用 AI 的那次请求中,由客户端组装后发给你选的 provider | 发送请求时。包括当前问题、最近对话上下文(最多 20 条)、RAG 允许字段和目标画布几何快照;不是后台同步 |
+| **prompt** | 只在启用 AI 的那次请求中,由客户端组装后发给你选的 provider | 发送请求时。包括当前问题、最近对话上下文(最多 20 条)、allowlist 允许字段和目标画布快照(几何 + 默认含卡片正文,可在设置关闭正文);不是后台同步 |
 | **conversation** | `cys-stift.conversation.<canvasId>.v2` 的本地 localStorage; `/ask` 与 Canvas companion 共用,每画布隔离,最多保留 100 条 | 不会自动外发;只有后续 AI 请求会把最近上下文带给你选的 provider,或你主动导出 JSON |
 | **sample** | `cys-stift.ai-samples.v1` 的本地 localStorage;默认关闭,只有你在设置中明确开启后才累积,最近 500 条 | 不会自动外发;你在设置中导出样本或把完整 JSON 备份交给第三方时才离开本机 |
 | **proposal** | Proposal payload/review/receipt 存在本地 OPFS（不可用时 localStorage）；持久化来源锚点只保存 identity、revision、path/position 与 excerpt hash，不重复保存 `title/body` 原文；审计报告也不包含来源正文、API key 或完整 prompt | 只有生成时 allowlisted Working Set 会发给你选的 provider；本地 proposal 仅在你主动导出报告时离开设备 |
@@ -51,12 +51,15 @@
 |---|---|---|
 | `card.title` | summarize 用 | |
 | `card.body` | summarize / rewrite / translate 直接操作 | |
+| `card.type` | 卡类型枚举 | |
 | `card.capturedAt` | "按时间排" 指令用 | |
 | `card.color` | cluster 染色 | |
 | `card.pinned` | 区分重要卡 | |
 | `card.canvasPosition` | 知道卡在哪个画布 | |
+| `card.tags` | summarize / 关系推荐用 | 标签值数组 |
 | `card.media[i].kind` | 知道是 image / file | 不发送图片二进制 |
-| `card.links[i].url` + `title` + `description` | summarize 时能引用 | |
+| `card.mediaCount` | 知道卡带几个媒体 | |
+| `card.links[i]` 的 `title` 或 `url` | summarize 时能引用 | |
 | `card.codeSnippets[i].code` + `language` | summarize 看到代码 | |
 | `card.quotes[i].text` + `attribution` | summarize 看到引用 | |
 | `card.source.kind` | 知道卡从哪来(manual / paste / file-drop) | 不发送设备 ID |
@@ -203,11 +206,7 @@ provider 的服务端会按它的[隐私政策](https://openai.com/policies/row-
 
 ## 详细技术设计
 
-开发面向的隐私设计 spec:
-`docs/development/privacy-design.md`
-
-每个 phase 怎么审计"AI 是否看到了不该看的":
-`docs/development/privacy-design.md` 第 3 节「字段审计 check-list」
+开发面向的隐私设计 spec 在私有仓 `cys-stift-docs`(`docs/development/privacy-design.md`),本地并排 clone 可读;其第 3 节「字段审计 check-list」用于每个 phase 审计"AI 是否看到了不该看的"。
 
 ---
 

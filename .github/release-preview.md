@@ -1,5 +1,7 @@
 # cy's Stift 1.0.0-preview.2
 
+> **历史档**:这是 1.0.0 preview 线的 release notes。stable `1.0.0` 此后已正式发布(见 `release-stable.md` / [Releases](https://github.com/wscytz/cys-stift/releases));本文件保留作 preview 阶段的历史记录。
+
 This is an installable preview for the core local-first workflow:
 
 Capture -> Inbox -> Canvas -> Search/Workbench -> Export and recovery.

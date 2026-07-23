@@ -267,6 +267,6 @@
 
 ---
 
-详见 [当前状态](../STATE.md) 与 [架构总览](../architecture/overview.md)。
+更多见 [Release notes](https://github.com/wscytz/cys-stift/releases) 与 [changelog](../changelog.md)。
 
-产品工作流展示见 [`/showcase`](http://localhost:3000/showcase/)；它只展示功能边界，不替代用户指南。
+产品工作流展示见独立静态预览页 [wscytz.com/cys-stift](https://wscytz.com/cys-stift/)(本地 `/showcase` 由 `pnpm dev` 起,供贡献者自查)。

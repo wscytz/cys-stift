@@ -6,7 +6,7 @@
 
 ## 为什么单独做一个
 
-tldraw / excalidraw 是优秀的画布库,但:① 许可有张力(tldraw 商用收费 / 遥测);② 箭头是「用户手选样式的几何箭头」,不是语义关系;③ 数据模型不透明。
+现成开源画布库通常:① 许可 / 商用条款需逐一评估;② 箭头是「用户手选样式的几何箭头」,不是语义关系;③ 数据模型不透明。
 
 canvas-engine 反过来:① **零许可依赖**(纯自研);② **关系箭头是语义签名**(线型 + 箭头形 + 颜色,一眼读出关系性质);③ **CanvasElement 透明统一**(live / SVG / PNG / .cystift / DSL 全是它的视图)。
 
@@ -84,4 +84,4 @@ host.undo() // 内置 50 步 undo 栈
 
 从 [cy's Stift](https://github.com/wscytz/cys-stift) 画布路线 A 抽出
 (ADR:[`2026-06-23-canvas-engine-extract.md`](https://github.com/wscytz/cys-stift/blob/main/docs/adr/2026-06-23-canvas-engine-extract.md))。
-在 cy's Stift 中作为主画布引擎实战验证(3D 渲染 + AI 编辑 + 导出全链路)。
+在 cy's Stift 中作为主画布引擎实战验证(2D 渲染 + AI 编辑 + 导出全链路)。
