@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   resolveCardLayout,
+  wrapText,
   CARD_TITLE_AREA,
   CARD_LINE_H,
   CARD_BOTTOM_PAD,
@@ -58,5 +59,37 @@ describe('resolveCardLayout', () => {
   it('compact 是默认密度(3 行截断,等价旧行为)', () => {
     // 旧行为:Math.min(3, lines.length)。55 字 -> 5 wrapped -> 3。
     expect(resolveCardLayout('compact', 'a'.repeat(55), W, mockCtx()).lineCount).toBe(3)
+  })
+})
+
+describe('wrapText — 词界换行(拉丁词不劈 / CJK 任意断 / 超宽词按字回退)', () => {
+  const mLatin = (s: string) => s.length * 7 // 每字 7px(同 card-layout mockCtx)
+  const mCjk = (s: string) =>
+    [...s].reduce((w, ch) => w + ((ch.codePointAt(0) ?? 0) >= 0x1100 ? 12 : 7), 0)
+
+  it('带空格文本不劈词:整词挪下一行,不从中间断', () => {
+    // 旧逐字断:"alpha beta" @56px(8 字/行)会断成 "alpha be"/"ta";词界换行 → "alpha "/"beta"。
+    const lines = wrapText('alpha beta', 56, mLatin)
+    expect(lines[1]!.trimStart()).toBe('beta')
+  })
+
+  it('超宽单词按字回退:不整词溢出,而是逐字断(免溢出卡宽)', () => {
+    // "yellowish"(9 字)=63px > 56 → 不能整词放 → 按字断 "yellowis"(56)/"h"。
+    const lines = wrapText('yellowish', 56, mLatin)
+    expect(lines.length).toBe(2)
+    for (const l of lines) expect(mLatin(l)).toBeLessThanOrEqual(56)
+  })
+
+  it('CJK 每字可断(任意位置),不并入拉丁词', () => {
+    // 8 CJK @12px=96,宽 36(3 CJK)→ 每 3 字一行。
+    const lines = wrapText('你好世界你好世界', 36, mCjk)
+    expect(lines.length).toBe(3)
+    for (const l of lines) expect(l.length).toBeLessThanOrEqual(3)
+  })
+
+  it('向后兼容:无空格长串按字断(同旧逐字,行数不变)', () => {
+    // card-layout 依赖:'a'.repeat(55) @80px(11 字/行)→ 5 行;11 字 → 1 行。
+    expect(wrapText('a'.repeat(55), 80, mLatin).length).toBe(5)
+    expect(wrapText('a'.repeat(11), 80, mLatin).length).toBe(1)
   })
 })

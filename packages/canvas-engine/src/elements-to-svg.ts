@@ -1,39 +1,25 @@
 
 import type { CanvasElement, CanvasView } from './canvas-host'
 import { sortByLayer } from './canvas-host'
-import { colorOf, groupColorOf, domTokenResolver, CARD_TITLE_AREA, CARD_BOTTOM_PAD, CARD_LINE_H, type TokenResolver } from './self-built-render'
+import { colorOf, groupColorOf, domTokenResolver, wrapText, CARD_TITLE_AREA, CARD_BOTTOM_PAD, CARD_LINE_H, type TokenResolver } from './self-built-render'
 import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments, arrowHeadAngle, autoElbowPath, cardObstacles } from './self-built-arrow'
 import { unionBounds, expandBounds, normalizeBox, type Bounds } from './bounds'
 import { freedrawPointsOf } from './self-built-freedraw'
 import { buildSmoothPath } from './smooth-path'
 import { markdownPreview } from './markdown-preview'
 
-/** SVG 无 ctx.measureText,用字符宽度估算软换行(近似实时渲染 wrapLines 的视觉)。
- *  CJK/全角(code≥0x1100)按字号(12px),latin 按约 0.58 字号(7px)。
- *  替代旧的硬截断 slice(0,40):窄卡不再溢出、宽卡不再被截。返回 ≤maxLines 行。 */
+/** SVG 无 ctx.measureText:用字符宽度估算量宽,委托 wrapText 词界换行后截 maxLines。
+ *  与 estimateTextWidth 同源 cw(CJK/全角 code≥0x1100≈字号 12,latin≈0.58 字号 7)。*/
 function estimateSoftWrap(text: string, maxW: number, maxLines: number): string[] {
-  const out: string[] = []
-  const w = Math.max(maxW, 20)
-  for (const para of text.split('\n')) {
-    if (out.length >= maxLines) break
-    let line = ''
+  const measure = (s: string): number => {
     let width = 0
-    for (const ch of para) {
+    for (const ch of s) {
       const code = ch.codePointAt(0) ?? 0
-      const cw = code >= 0x1100 ? 12 : 7
-      if (width + cw > w && line) {
-        out.push(line)
-        if (out.length >= maxLines) return out
-        line = ch
-        width = cw
-      } else {
-        line += ch
-        width += cw
-      }
+      width += code >= 0x1100 ? 12 : 7
     }
-    out.push(line)
+    return width
   }
-  return out.slice(0, maxLines)
+  return wrapText(text, Math.max(maxW, 20), measure).slice(0, maxLines)
 }
 
 /** SVG 无 ctx.measureText:估文本块最大行宽(像素),给 halo rect 量宽用。

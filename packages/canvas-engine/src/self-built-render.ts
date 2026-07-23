@@ -538,27 +538,64 @@ export function drawMarquee(
   ctx.restore()
 }
 
-/** 按可用宽度把文本拆成行(Canvas 2D 无自动换行)。纯函数。 */
-export function wrapLines(text: string, maxWidth: number, ctx: CanvasRenderingContext2D): string[] {
+/**
+ * 按词界贪婪换行(拉丁词不劈开;CJK/全角任意位置可断;放不下的超宽单词按字回退,不溢出)。
+ * 纯函数:宽度由 measureFn 量(实时渲染传 ctx.measureText;SVG 导出传字符宽度估算)。
+ *
+ * 取代旧"逐字断":带空格的正文不再从词中间劈开(如 yellow→yell/ow);长到一行放不下
+ * 的单词(URL / 长标识符 / 连续无空格串)仍逐字断,免得溢出卡片宽度
+ * (CSS `overflow-wrap: break-word` 同款语义)。CJK/全角(code≥0x1100)每字是独立断点。
+ */
+export function wrapText(text: string, maxWidth: number, measureFn: (s: string) => number): string[] {
+  const limit = Math.max(maxWidth, 1)
   const out: string[] = []
   for (const para of text.split('\n')) {
-    if (para === '') {
-      out.push('')
-      continue
-    }
+    if (para === '') { out.push(''); continue }
     let line = ''
-    for (const ch of para) {
-      const test = line + ch
-      if (ctx.measureText(test).width > maxWidth && line) {
-        out.push(line)
-        line = ch
+    let word = ''
+    /** 把 token 接到当前行:放得下就接,放不下就换行;空行总接(首字必放,免死循环)。 */
+    const place = (token: string): void => {
+      if (line === '' || measureFn(line + token) <= limit) line += token
+      else { out.push(line); line = token }
+    }
+    const flushWord = (): void => {
+      if (!word) return
+      if (measureFn(line + word) <= limit) {
+        line += word // 整词放进当前行
+      } else if (measureFn(word) <= limit) {
+        // 当前行放不下整词,但词自身不超宽 → 换行整词放
+        if (line !== '') out.push(line)
+        line = word
       } else {
-        line = test
+        // 词自身超宽 → 逐字放(place 处理逐字换行),免整词溢出卡宽
+        for (const ch of word) place(ch)
+      }
+      word = ''
+    }
+    for (const ch of para) {
+      const code = ch.codePointAt(0) ?? 0
+      if (ch === ' ' || ch === '\t') {
+        flushWord()
+        // 空格:当前行放得下就留(保词间空格);放不下 = 换行点,空格丢弃,新行空起。
+        if (line !== '' && measureFn(line + ch) <= limit) line += ch
+        else if (line !== '') { out.push(line); line = '' }
+      } else if (code >= 0x1100) {
+        // CJK / Hangul / 全角:每字独立断点,不并入拉丁词。
+        flushWord()
+        place(ch)
+      } else {
+        word += ch
       }
     }
-    if (line) out.push(line)
+    flushWord()
+    if (line !== '') out.push(line)
   }
   return out
+}
+
+/** 按可用宽度把文本拆成行(Canvas 2D 无自动换行)。委托 wrapText,measureFn = ctx.measureText。纯函数。 */
+export function wrapLines(text: string, maxWidth: number, ctx: CanvasRenderingContext2D): string[] {
+  return wrapText(text, maxWidth, (s) => ctx.measureText(s).width)
 }
 
 /**
