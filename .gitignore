@@ -32,6 +32,8 @@ Thumbs.db
 !.vscode/settings.json
 !.vscode/extensions.json
 .idea/
+# Claude Code 本地工件(会话 worktrees / 本地设置 / 循环笔记)——不进仓库
+.claude/
 
 # Test / coverage
 coverage/
