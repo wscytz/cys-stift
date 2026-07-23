@@ -3,8 +3,8 @@ import { createGraphSimulation } from '../graph-layout'
 import type { GraphNode, GraphEdge } from '../aggregate-edges'
 
 const nodes: GraphNode[] = [
-  { id: 'n1', type: 'note', title: 'a', tagColor: null, archived: false },
-  { id: 'n2', type: 'note', title: 'b', tagColor: null, archived: false },
+  { id: 'n1', type: 'note', title: 'a', tagColor: null, archived: false, hrefTargets: [] },
+  { id: 'n2', type: 'note', title: 'b', tagColor: null, archived: false, hrefTargets: [] },
 ]
 const edges: GraphEdge[] = []
 

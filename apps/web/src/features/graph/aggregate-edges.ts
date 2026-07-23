@@ -19,6 +19,8 @@ export interface GraphNode {
   type: CardType
   tagColor: string | null
   archived: boolean
+  /** v7 @href:该 card 在画布上声明的显式引用(meta.href 裸 id 列表)。graph 用它画端点标记 + hover 临时连线,不画常驻线。 */
+  hrefTargets: string[]
 }
 
 // 双链标记:wiki-links.ts 的 syncWikiLinkArrows 给 arrow 设 meta.wikilink===true。
@@ -72,15 +74,46 @@ export async function aggregateEdges(
   return edges
 }
 
-/** Card[] → GraphNode[](主标签色 = tags[0]?.color)。 */
-export function cardsToNodes(cards: Card[]): GraphNode[] {
+/** Card[] → GraphNode[](主标签色 = tags[0]?.color;hrefTargets 从 hrefMap 填,默认空)。 */
+export function cardsToNodes(cards: Card[], hrefMap?: Map<string, string[]>): GraphNode[] {
   return cards.map((c) => ({
     id: String(c.id),
     title: c.title,
     type: c.type,
     tagColor: c.tags?.[0]?.color ?? null,
     archived: c.archived,
+    hrefTargets: hrefMap?.get(String(c.id)) ?? [],
   }))
+}
+
+/**
+ * 遍历所有画布 card 元素,收 meta.href → Map<cardId, string[]>。
+ * v7 @href 是声明式引用(区别于 arrow 的语义关系),graph 用端点标记 + hover 临时连线消费,**不画常驻线**。
+ * loadFreeform 注入(解耦,单测传 mock),与 aggregateEdges 同源。
+ */
+export async function aggregateHrefs(
+  canvases: { id: CanvasId }[],
+  loadFreeform: (id: CanvasId) => Promise<CanvasFreeformSnapshot | null>,
+): Promise<Map<string, string[]>> {
+  const snaps = await Promise.all(
+    canvases.map(async (c) => ({ id: c.id, snap: await loadFreeform(c.id) })),
+  )
+  const map = new Map<string, string[]>()
+  for (const { snap } of snaps) {
+    if (!snap) continue
+    for (const el of snap.elements) {
+      if (el.kind !== 'card') continue
+      const raw = el.meta?.href
+      if (!Array.isArray(raw)) continue
+      const id = String(el.id)
+      const prev = map.get(id) ?? []
+      for (const t of raw) {
+        if (typeof t === 'string' && !prev.includes(t)) prev.push(t)
+      }
+      map.set(id, prev)
+    }
+  }
+  return map
 }
 
 /**

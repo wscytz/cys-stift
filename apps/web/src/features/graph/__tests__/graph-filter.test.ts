@@ -10,6 +10,7 @@ function node(over: Partial<GraphNode>): GraphNode {
     type: 'note',
     tagColor: null,
     archived: false,
+    hrefTargets: [],
     ...over,
   }
 }

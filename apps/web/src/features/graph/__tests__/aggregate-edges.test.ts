@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { aggregateEdges, cardsToNodes, liveEdgesOnly } from '../aggregate-edges'
+import { aggregateEdges, aggregateHrefs, cardsToNodes, liveEdgesOnly } from '../aggregate-edges'
 import type { Card } from '@cys-stift/domain'
 import type { CanvasFreeformSnapshot } from '@/lib/canvas-freeform-store'
 
@@ -91,6 +91,30 @@ describe('cardsToNodes', () => {
   it('preserves archived + type + title', () => {
     const nodes = cardsToNodes([card({ id: 'c3' as never, title: 'T', type: 'code', archived: true })])
     expect(nodes[0]).toMatchObject({ id: 'c3', title: 'T', type: 'code', archived: true })
+  })
+  it('v7 @href:hrefMap 填 hrefTargets(默认空)', () => {
+    const hm = new Map([['c1', ['c2', 'c3']]])
+    expect(cardsToNodes([card({ id: 'c1' as never })], hm)[0]!.hrefTargets).toEqual(['c2', 'c3'])
+    expect(cardsToNodes([card({ id: 'c1' as never })])[0]!.hrefTargets).toEqual([])
+  })
+})
+
+function cardEl(over: Record<string, unknown>) {
+  return { id: 'cardA', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0, ...over }
+}
+
+describe('aggregateHrefs(v7 @href)', () => {
+  it('card meta.href → Map<cardId, targets>(无 href 不进 map)', async () => {
+    const load = async () =>
+      snap([
+        cardEl({ id: 'cardA', meta: { href: ['cardB', 'cardC'] } }),
+        cardEl({ id: 'cardB', meta: { href: ['cardA'] } }),
+        cardEl({ id: 'cardC' }), // 无 href
+      ])
+    const m = await aggregateHrefs([{ id: 'c1' as never }], load)
+    expect(m.get('cardA')).toEqual(['cardB', 'cardC'])
+    expect(m.get('cardB')).toEqual(['cardA'])
+    expect(m.has('cardC')).toBe(false)
   })
 })
 

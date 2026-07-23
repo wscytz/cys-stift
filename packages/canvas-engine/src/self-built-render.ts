@@ -128,6 +128,17 @@ function drawElement(
       ctx.strokeStyle = tokenResolver('--color-gray', '#d9d9d9')
       ctx.lineWidth = 1
       ctx.stroke()
+      // v7 @group 组色带:同组 card 共享组色(左边条 5px);clip 到 card 圆角避免角溢出。
+      const groupName = el.meta?.group
+      if (typeof groupName === 'string' && groupName !== '') {
+        ctx.save()
+        ctx.beginPath()
+        ctx.roundRect(el.x, el.y, el.w, el.h, 4)
+        ctx.clip()
+        ctx.fillStyle = groupColorOf(groupName, tokenResolver)
+        ctx.fillRect(el.x, el.y, 5, el.h)
+        ctx.restore()
+      }
       // 内容(对齐 card-shape-util:类型标 mono 灰 + title display + body 3 行)
       const pad = 10
       ctx.textBaseline = 'top'
@@ -394,6 +405,21 @@ export function colorOf(c: string | undefined, tokenResolver: TokenResolver = do
     black: '--color-black',
   }
   return tokenResolver(tokenFor[c ?? 'black'] ?? '--color-black', '#0a0a0a')
+}
+
+/** v7 @group 组色:组名 hash → Bauhaus 鲜明色 token(red/yellow/blue/black,避开白/灰在色带上不可见)。 */
+const GROUP_COLOR_TOKENS = ['--color-red', '--color-yellow', '--color-blue', '--color-black'] as const
+const GROUP_COLOR_FALLBACKS: Record<string, string> = {
+  '--color-red': '#d40000',
+  '--color-yellow': '#ffce00',
+  '--color-blue': '#003f7f',
+  '--color-black': '#0a0a0a',
+}
+export function groupColorOf(name: string, tokenResolver: TokenResolver = domTokenResolver): string {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0
+  const token = GROUP_COLOR_TOKENS[Math.abs(h) % GROUP_COLOR_TOKENS.length]!
+  return tokenResolver(token, GROUP_COLOR_FALLBACKS[token]!)
 }
 
 /**

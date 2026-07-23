@@ -24,6 +24,7 @@ describe('DSL round-trip (serialize → parse) — lossless on all active kinds'
       h: 120,
       rotation: 0,
       color: 'blue',
+      meta: { group: 'Q3', href: ['r1'] },
     },
     // rect
     {
@@ -47,6 +48,7 @@ describe('DSL round-trip (serialize → parse) — lossless on all active kinds'
       rotation: 0,
       text: 'hello',
       color: 'red',
+      meta: { compute: '#c1.w + 10' },
     },
     // arrow with id + dash + arrowhead + label + color + from + to
     {
@@ -140,6 +142,21 @@ describe('DSL round-trip (serialize → parse) — lossless on all active kinds'
     expect(fa.h).toBe(-50)
     expect(fa.dash).toBe('solid')
     expect(fa.arrowhead).toBe('arrow')
+  })
+
+  // ── v7: @group / @href / @compute round-trip(状态挂 meta)──
+
+  it('card round-trips v7 @group + @href', () => {
+    const card = parseDsl(text).find((o) => o.type === 'card')
+    if (card?.type !== 'card') throw new Error('expected card op')
+    expect(card.group).toBe('Q3')
+    expect(card.href).toEqual(['r1'])
+  })
+
+  it('text round-trips v7 @compute formula', () => {
+    const t = parseDsl(text).find((o) => o.type === 'free' && o.shape === 'text')
+    if (t?.type !== 'free') throw new Error('expected free text op')
+    expect(t.compute).toBe('#c1.w + 10')
   })
 
   // ── freedraw: the deliberate asymmetry guard ──

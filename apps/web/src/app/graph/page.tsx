@@ -30,15 +30,15 @@ export default function GraphPage() {
   const { snap, service, ready } = useDb()
 
   // 异步聚合边(提升为 hook,供详情页 backlinks 共用)。
-  const { edges, loaded: edgesLoaded } = useGlobalEdges()
+  const { edges, hrefMap, loaded: edgesLoaded } = useGlobalEdges()
   const loaded = ready && edgesLoaded
 
-  // 节点:未软删的卡片。
+  // 节点:未软删的卡片(含 v7 @href 端点标记用的 hrefTargets)。
   const nodes = useMemo(
-    () => cardsToNodes(service.listAll().filter((c) => !c.deletedAt)),
+    () => cardsToNodes(service.listAll().filter((c) => !c.deletedAt), hrefMap),
     // snap 是 useSyncExternalStore 快照引用,数据变化才重新分配。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [snap, service],
+    [snap, service, hrefMap],
   )
 
   // 可选标签色(去重,给 select)。

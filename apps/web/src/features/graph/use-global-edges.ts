@@ -19,9 +19,9 @@ import {
   subscribeFreeformChanges,
   getFreeformVersion,
 } from '@/lib/canvas-freeform-store'
-import { aggregateEdges, type GraphEdge } from './aggregate-edges'
+import { aggregateEdges, aggregateHrefs, type GraphEdge } from './aggregate-edges'
 
-export function useGlobalEdges(): { edges: GraphEdge[]; loaded: boolean } {
+export function useGlobalEdges(): { edges: GraphEdge[]; hrefMap: Map<string, string[]>; loaded: boolean } {
   const { snapshot } = useCanvases()
   // 订阅 freeform 内容变更:save/remove 触发 notifyChange → version++ → 重渲染 → effect 重聚合。
   const freeformVersion = useSyncExternalStore(
@@ -30,16 +30,21 @@ export function useGlobalEdges(): { edges: GraphEdge[]; loaded: boolean } {
     getFreeformVersion,
   )
   const [edges, setEdges] = useState<GraphEdge[]>([])
+  const [hrefMap, setHrefMap] = useState<Map<string, string[]>>(new Map())
   const [loaded, setLoaded] = useState(false)
   useEffect(() => {
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | null = null
     // debounce 120ms:合并突发写入(relation-builder 连加 / 画布 save 已 debounced 但保个底),
-    // 免 aggregateEdges 遍历所有画布 load 的高频抖动。
+    // 免遍历所有画布 load 的高频抖动。edges + hrefs 并行聚合(同源画布)。
     timer = setTimeout(() => {
-      aggregateEdges(snapshot.canvases, (id) => canvasFreeformStore.load(id)).then((es) => {
+      Promise.all([
+        aggregateEdges(snapshot.canvases, (id) => canvasFreeformStore.load(id)),
+        aggregateHrefs(snapshot.canvases, (id) => canvasFreeformStore.load(id)),
+      ]).then(([es, hm]) => {
         if (cancelled) return
         setEdges(es)
+        setHrefMap(hm)
         setLoaded(true)
       })
     }, 120)
@@ -48,5 +53,5 @@ export function useGlobalEdges(): { edges: GraphEdge[]; loaded: boolean } {
       if (timer) clearTimeout(timer)
     }
   }, [snapshot.canvases, freeformVersion])
-  return { edges, loaded }
+  return { edges, hrefMap, loaded }
 }

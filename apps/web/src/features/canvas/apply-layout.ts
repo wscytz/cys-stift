@@ -2,7 +2,7 @@
 
 import type { CanvasElement, CanvasHost } from '@cys-stift/canvas-engine'
 import type { DslArrowOp, DslCardOp, DslFreeOp, DslOp } from '@cys-stift/dsl'
-import { sanitizeDslOps, evalCompute, formatComputeNumber } from '@cys-stift/dsl'
+import { sanitizeDslOps, evalCompute, evalComputeDetail, formatComputeNumber } from '@cys-stift/dsl'
 import type { SanitizeCtx, SanitizeDiagnostic, ComputeResolver } from '@cys-stift/dsl'
 import { solveRelational } from '../ai/relational-solver'
 import type { ExistingGeom } from '../ai/relational-solver'
@@ -137,6 +137,26 @@ export function buildApplyPlan(
       )
     ) {
       diagnostics.push({ opIndex, message: item.reason })
+    }
+  }
+
+  // v7 post-pass:用完整 shadow 重算 @compute,解前向引用(AI 把汇总 text 写在被引用元素之前时,
+  // 初遍 resolver 读到的 shadow 还没那些元素 → 失败 fallback)。这里 shadow 已完整,重算覆盖 text;
+  // 仍失败(未解析引用/语法错)→ 记诊断,与 sanitize/solve diagnostics 同列。
+  for (const item of items) {
+    if (item.disposition !== 'ready' || !item.element) continue
+    const el = item.element
+    if (el.kind !== 'text') continue
+    const formula = el.meta?.compute
+    if (typeof formula !== 'string') continue
+    const result = evalComputeDetail(formula, (refId) => {
+      const g = shadow.get(refId)
+      return g ? { x: g.x, y: g.y, w: g.w, h: g.h } : undefined
+    })
+    if (result.value !== undefined) {
+      el.text = formatComputeNumber(result.value)
+    } else if (result.error) {
+      diagnostics.push({ opIndex: item.opIndex, message: `compute: ${result.error}` })
     }
   }
 

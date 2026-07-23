@@ -24,6 +24,16 @@ describe('elementsToSvg', () => {
     expect(r.svg).toContain('NOTE') // 类型标
   })
 
+  it('card meta.group → SVG 含 v7 组色带(clip-path + width=5 左边条)', () => {
+    const els: CanvasElement[] = [
+      { id: 'c1', kind: 'card', x: 0, y: 0, w: 240, h: 120, rotation: 0, meta: { group: 'Q3' } },
+    ]
+    const r = elementsToSvg(els, view, info as never, { background: true, border: 0 })
+    expect(r.svg).toContain('clip-path')
+    expect(r.svg).toContain('width="5"')
+    expect(r.svg).toContain('cg-c1') // clipPath id(card id 派生)
+  })
+
   it('card SVG strips Markdown preview markers', () => {
     const els: CanvasElement[] = [
       { id: 'c1', kind: 'card', x: 0, y: 0, w: 240, h: 120, rotation: 0 },

@@ -129,19 +129,30 @@ function tokenize(src: string): Tok[] {
   return toks
 }
 
+/** 求值结果:成功→value(有限数);失败→value undefined + error(原因,供 apply 诊断)。 */
+export interface ComputeResult {
+  value: number | undefined
+  error?: string
+}
+
+function errMsg(e: unknown): string {
+  return e instanceof Error ? e.message : String(e)
+}
+
 /**
- * 求值 `@compute` 公式。成功 → 有限数;任何失败(语法 / 未解析引用 / 越界)→ undefined。
- * 永不抛错(内部 catch)。resolve 用来把 `#id.field` 解析成几何值。
+ * 求值 `@compute` 公式(同 evalCompute,但暴露失败原因 error 供 apply 诊断)。
+ * 成功 → { value: 有限数 };任何失败(语法 / 未解析引用 / 越界)→ { value: undefined, error }。
+ * 永不抛错。resolve 用来把 `#id.field` 解析成几何值。
  */
-export function evalCompute(expr: string, resolve: ComputeResolver): number | undefined {
-  if (typeof expr !== 'string' || expr.trim() === '') return undefined
+export function evalComputeDetail(expr: string, resolve: ComputeResolver): ComputeResult {
+  if (typeof expr !== 'string' || expr.trim() === '') return { value: undefined }
   let toks: Tok[]
   try {
     toks = tokenize(expr)
-  } catch {
-    return undefined
+  } catch (e) {
+    return { value: undefined, error: errMsg(e) }
   }
-  if (toks.length === 0) return undefined
+  if (toks.length === 0) return { value: undefined }
 
   let pos = 0
   const peek = (): Tok | undefined => toks[pos]
@@ -228,9 +239,17 @@ export function evalCompute(expr: string, resolve: ComputeResolver): number | un
 
   try {
     const result = parseExpr(0)
-    if (pos !== toks.length) return undefined // 尾部残余 → 语法错
-    return Number.isFinite(result) ? result : 0
-  } catch {
-    return undefined
+    if (pos !== toks.length) return { value: undefined, error: 'trailing tokens' } // 尾部残余 → 语法错
+    return { value: Number.isFinite(result) ? result : 0 }
+  } catch (e) {
+    return { value: undefined, error: errMsg(e) }
   }
+}
+
+/**
+ * 求值 `@compute` 公式(薄封装,仅返回 value);需失败原因用 {@link evalComputeDetail}。
+ * 成功 → 有限数;任何失败 → undefined。永不抛错。
+ */
+export function evalCompute(expr: string, resolve: ComputeResolver): number | undefined {
+  return evalComputeDetail(expr, resolve).value
 }

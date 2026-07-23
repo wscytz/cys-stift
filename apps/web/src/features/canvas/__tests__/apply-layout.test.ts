@@ -927,6 +927,38 @@ describe('applyLayout — v7 directives (@group / @href / @compute)', () => {
     expect(t.meta?.compute).toBe('#ghost.w')
   })
 
+  it('@compute 前向引用(汇总 text 在被引用元素之前)→ post-pass 用完整 shadow 重算', () => {
+    const host = new InMemoryCanvasHost()
+    applyLayout(
+      host,
+      parseDsl('[text #t] @pos(0,0) @compute("#c1.w * 2")\n[card #c1 create] @pos(0,0) @size(100,50)'),
+    )
+    expect(host.getElement('t')?.text).toBe('200')
+  })
+
+  it('@compute 未解析引用 → fallback 保留 text + 记诊断', () => {
+    const host = new InMemoryCanvasHost()
+    const report = applyLayout(host, parseDsl('[text #t] @pos(0,0) @text("orig") @compute("#ghost.w")'))
+    expect(host.getElement('t')?.text).toBe('orig')
+    expect(
+      report.sanitizeDiagnostics?.some((d) => d.message.includes('compute') && d.message.includes('ghost')),
+    ).toBe(true)
+  })
+
+  it('@compute 语法错 → 记诊断', () => {
+    const host = new InMemoryCanvasHost()
+    const report = applyLayout(host, parseDsl('[text #t] @pos(0,0) @compute("1++2")'))
+    expect(report.sanitizeDiagnostics?.some((d) => d.message.startsWith('compute'))).toBe(true)
+  })
+
+  it('@compute 更新路径:existing text 元素重求值', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'a1', kind: 'card', x: 0, y: 0, w: 100, h: 50, rotation: 0 })
+    host.upsert({ id: 't', kind: 'text', x: 0, y: 0, w: 100, h: 40, rotation: 0, text: 'old' })
+    applyLayout(host, [{ type: 'free', shape: 'text', id: 't', x: 0, y: 0, compute: '#a1.w + 5' }])
+    expect(host.getElement('t')?.text).toBe('105')
+  })
+
   it('@group/@href 经 apply 后存活于 element.meta(serialize 可往返)', () => {
     const host = new InMemoryCanvasHost()
     seedCard(host, 'a1')

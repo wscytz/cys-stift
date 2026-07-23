@@ -5,6 +5,15 @@
 
 ---
 
+## 2026-07-23 · 1.1.0 · v7 做圆(A 计划):@compute 修 + @group/@href 可见
+
+承接多维度审查 A 组合,把 v7 三新做圆(核心承诺:AI 写 v7 指令 → 画布有可见变化 + 不静默失败):
+
+- **fix(dsl): `@compute` 前向引用 + 失败诊断**:汇总 text 写在被引用元素之前时,初遍 resolver 读到的 shadow 还没它们 → 静默失败 fallback。`buildApplyPlan` 加 post-pass,用完整 shadow 重算所有 `@compute`;失败(未解析引用/语法错)记诊断(与 sanitize/solve 同列)。`dsl-compute` 加 `evalComputeDetail` 暴露 error。
+- **feat(canvas): `@group` 组色带(G1)**:同组 card 共享组色左边条(组名 hash → Bauhaus 4 鲜明色 token:red/yellow/blue/black),画布直接见分组。新增 `groupColorOf`;canvas 渲染 + SVG 镜像(clip 到 card 圆角)。
+- **feat(graph): `@href` 端点标记(H1b)**:graph 节点边缘 ● 表"有显式引用",hover/选中显临时无头灰细点线到目标。**不画常驻线**——避开 arrow 的 dash/head/color 样式空间,两类零重叠。新增 `aggregateHrefs` 收 card `meta.href` → `GraphNode.hrefTargets`。
+- **测试**:apply-layout +4(`@compute` 前向引用/未解析诊断/语法错诊断/更新路径)、aggregate-edges +2(`aggregateHrefs`/`hrefMap`)、dsl-roundtrip cornerstone +2(v7 往返)、elements-to-svg +1(组色带)。全包 lint 0 / cys-dsl 370 / canvas-engine 574 / web 1736 / web build 0。
+
 ## 2026-07-23 · 1.1.0 · post-release 汇总(cys-dsl v7 + editWithInstruction,已合并 main)
 
 承接 v1.0.0 发布(cys-dsl v4 冻结),post-release `feat/cys-dsl-extract` 工作已合并到 main:DSL 抽包 + 升级到 cys-dsl v7(`@group`/`@href`/`@compute`)+ 单卡自定义指令编辑(editWithInstruction)+ 全路径适配。版本号 1.0.0 → 1.1.0 反映 post-release 实质内容;**尚未 tag**(tag = 手测绿的发版门)。下面 1.0.0 条目为开发期记录(归在当时版本号下)。

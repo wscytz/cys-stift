@@ -1,7 +1,7 @@
 
 import type { CanvasElement, CanvasView } from './canvas-host'
 import { sortByLayer } from './canvas-host'
-import { colorOf, domTokenResolver, type TokenResolver } from './self-built-render'
+import { colorOf, groupColorOf, domTokenResolver, type TokenResolver } from './self-built-render'
 import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments, arrowHeadAngle, autoElbowPath, cardObstacles } from './self-built-arrow'
 import { unionBounds, expandBounds, normalizeBox, type Bounds } from './bounds'
 import { freedrawPointsOf } from './self-built-freedraw'
@@ -129,6 +129,11 @@ function elementToSvg(
     case 'card': {
       const info = getCardInfo(el.id)
       const parts = [`<rect x="${x}" y="${y}" width="${el.w}" height="${el.h}" rx="4" fill="${c.cardFill}" stroke="${c.cardStroke}"/>`]
+      // v7 @group 组色带(左边条 5px,clip 到 card 圆角避免角溢出)。
+      const groupName = el.meta?.group
+      if (typeof groupName === 'string' && groupName !== '') {
+        parts.push(`<clipPath id="cg-${el.id}"><rect x="${x}" y="${y}" width="${el.w}" height="${el.h}" rx="4"/></clipPath><rect clip-path="url(#cg-${el.id})" x="${x}" y="${y}" width="5" height="${el.h}" fill="${groupColorOf(groupName, tokenResolver)}"/>`)
+      }
       if (info) {
         if (info.pinned) parts.push(`<text x="${x + el.w - 14}" y="${y + 16}" fill="${c.yellow}" font-family="${c.fontMono}" font-size="14">★</text>`)
         parts.push(`<text x="${x + 10}" y="${y + 14}" fill="${c.grayCol}" font-family="${c.fontMono}" font-size="10">${esc(info.type.toUpperCase())}</text>`)

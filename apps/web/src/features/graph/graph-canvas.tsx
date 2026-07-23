@@ -164,6 +164,27 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
       ctx.restore()
     }
 
+    // v7 @href:hover 节点的显式引用 → 临时无头灰细点线(不画常驻,区别于 arrow 的有头语义线)。
+    if (hover) {
+      const hn = byId.get(hover)
+      if (hn && hn.hrefTargets && hn.hrefTargets.length > 0) {
+        ctx.save()
+        ctx.strokeStyle = readToken('--color-gray', '#666666')
+        ctx.lineWidth = 1
+        ctx.setLineDash([2, 3])
+        ctx.globalAlpha = 0.6
+        for (const target of hn.hrefTargets) {
+          const tn = byId.get(target)
+          if (!tn) continue
+          ctx.beginPath()
+          ctx.moveTo(sx(hn.x), sy(hn.y))
+          ctx.lineTo(sx(tn.x), sy(tn.y))
+          ctx.stroke()
+        }
+        ctx.restore()
+      }
+    }
+
     // ── 节点(逆序不影响,逐个画)──
     for (const n of positioned) {
       const dim = faded && !neighborIds.has(n.id)
@@ -500,6 +521,17 @@ function drawNode(
   ctx.lineWidth = isHover ? 2.5 : 1
 
   drawShape(ctx, node.type, cx, cy)
+
+  // v7 @href 端点标记:节点边缘 ● 表"有显式引用"(引用本身不画常驻线,区别于 arrow)。
+  if (node.hrefTargets && node.hrefTargets.length > 0) {
+    ctx.save()
+    ctx.globalAlpha = dim ? 0.3 : 1
+    ctx.fillStyle = readToken('--color-gray', '#666666')
+    ctx.beginPath()
+    ctx.arc(cx + NODE_R * 0.7, cy - NODE_R * 0.7, 3, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
 
   // hover 描边圈(高亮)。
   if (isHover) {
