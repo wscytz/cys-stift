@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-07-23 · 1.1.0-preview.3 · AI 三连(工作台 AI + 思考适配 + 截断检测/max_tokens)
+
+承接用户反馈"AI 工作台不能用 / 输出截断 / 为什么不开思考",AI 可用性一轮(全走 OpenAI 兼容路径,不引入新 provider):
+
+- **feat(web): 工作台接入 ✨ AI**:`WorkbenchPanel` 复用 card-detail 的 aiView 状态机,header 加 ✨AI 入口 → AiActionMenu/AiSetupCard/AIPopover。填卡时直接 AI 摘要/改写/翻译/自定义指令;替换正文走既有 onSave 落库;「存为新卡」走统一 captureSink(与 inbox 同路径)。
+- **feat(ai): DeepSeek/Qwen 思考适配(兼容路径唯一适配点)**:联网确认无业界统一(DeepSeek `thinking:{type}`,Qwen `enable_thinking`,各家不同)。新增纯函数 `buildExtraBody(baseUrl, model, structuredOutput)` —— OpenAI 兼容端点的唯一 provider-适配点,按端点/模型检测:结构化任务(DSL/cluster)关思考(省 token 防截断),自由文本(摘要/改写)开思考。新增 `isQwenEndpoint`。**不引入新 ProviderId、不写死模型**(DeepSeek/Qwen 都配 openai provider + 各自 baseUrl/model)。
+- **fix(ai): 输出截断检测 + max_tokens 默认提高**:`runAIAction` 默认 maxTokens 1024→4096(summarize/rewrite/translate/edit),透传 `finishReason`;`AIPopover` 据 `finish_reason=length` 显示"输出被截断,调高 maxTokens"(不再静默砍)。
+- **研究出处**:联网(tavily)DeepSeek + Qwen DashScope OpenAI 兼容端点 + 思考参数(无业界统一)。
+- **测试**:openai-provider +buildExtraBody 直测 + Qwen 端点;ai-actions maxTokens 上限 4096。web 1749 passed / lint 0。
+
 ## 2026-07-23 · 1.1.0-preview.2 · inbox 卡显示降噪 + AI「配置了却无效」修
 
 preview.1 手测反馈两轮修:
