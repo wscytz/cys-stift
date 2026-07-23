@@ -721,9 +721,12 @@ function CardTile({
   onTogglePin: () => void
 }) {
   const { t } = useI18n()
-  const preview = markdownPreview(card.body)
+  // A — 卡片美化:body 预览放宽(140→200);note 是默认类型,red type chip 信息量为零且
+  // 视觉最重 → 默认不显,非 note 才显;新增 tags 行(标了 tag 此前 tile 看不到);时间补时分。
+  const preview = markdownPreview(card.body, 200)
   const totalMedia =
     (card.links ?? []).length + (card.codeSnippets ?? []).length + (card.quotes ?? []).length
+  const tags = card.tags ?? []
   return (
     <div className={`tile ${card.pinned ? 'tile--pinned' : ''} ${selected ? 'tile--selected' : ''}`}>
       <button
@@ -755,11 +758,24 @@ function CardTile({
         <div className="tile__body">
           <h3 className="tile__title">{card.title || t('card.untitled')}</h3>
           {preview && <p className="tile__preview">{preview}</p>}
+          {tags.length > 0 && (
+            <div className="tile__tags">
+              {tags.slice(0, 4).map((tag) => (
+                <Tag key={tag.value} color="gray">{tag.value}</Tag>
+              ))}
+              {tags.length > 4 && <Tag color="gray">+{tags.length - 4}</Tag>}
+            </div>
+          )}
           <div className="tile__meta">
-            <Tag color="red">{t(typeKeyOf(card.type))}</Tag>
+            {card.type !== 'note' && <Tag color="red">{t(typeKeyOf(card.type))}</Tag>}
             {totalMedia > 0 && <Tag color="blue">{t('card.mediaCount', { n: totalMedia })}</Tag>}
             <span className="tile__time">
-              {card.capturedAt.toLocaleDateString()}
+              {card.capturedAt.toLocaleString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
             </span>
           </div>
         </div>
