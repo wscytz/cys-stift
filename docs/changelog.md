@@ -5,6 +5,14 @@
 
 ---
 
+## 2026-07-23 · 1.1.0-preview.4 · capture/inbox tag 输入 + AI 大纲落画布
+
+承接用户选定方向(⑥⑦;⑤ v8 范围评估 + ① 思维导图差异化文档见私仓):
+
+- **feat(web): capture/inbox 建卡加快速 tag 输入**:`MiniInput`(Cmd+Shift+E 速记)+ inbox `CreateCardForm` 都加 tag chip 输入(回车/逗号加,color 派生)。`CaptureInput` 加 `tags?`,`fromCapture` 透传。`stableTagColor` 抽到 `@/lib/tag-color` 共享。
+- **feat(web): AI「总结大纲」落画布(不自动连线)**:`ai-confirm-dialog` outline 分支从"建 inbox 卡"改为 create + moveToCanvas(落当前画布空位,z=max+1 网格错开)。**不自动建关系**(用户手动连)。用户此前嫌"大纲归卡片还不在画布,搞笑"。
+- **测试**:domain fromCapture +tags。web 1749 passed / lint 0。
+
 ## 2026-07-23 · 1.1.0-preview.3 · AI 三连(工作台 AI + 思考适配 + 截断检测/max_tokens)
 
 承接用户反馈"AI 工作台不能用 / 输出截断 / 为什么不开思考",AI 可用性一轮(全走 OpenAI 兼容路径,不引入新 provider):
