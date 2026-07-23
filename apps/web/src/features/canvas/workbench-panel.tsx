@@ -30,8 +30,8 @@ export interface WorkbenchPanelProps {
   onClose: () => void
   onBackToList?: () => void
   onDirtyChange?: (dirty: boolean) => void
-  /** A3 — AI「存为新卡」:page 用 captureSink 建新卡(工作台编辑的是当前卡)。 */
-  onAIAppendNew?: (c: { title: string; body: string }) => void
+  /** A3 — AI「存为新卡」:page 用 captureSink 建新卡。返回 promise(失败 reject,page 已推 error toast)。 */
+  onAIAppendNew?: (c: { title: string; body: string }) => Promise<void>
 }
 
 /**
@@ -288,10 +288,14 @@ export function WorkbenchPanel({
                 setBody(newBody)
                 setAiView(null)
               }}
-              onAppendNew={(c) => {
+              onAppendNew={async (c) => {
                 if (onAIAppendNew) {
-                  onAIAppendNew(c)
-                  pushToast({ kind: 'success', message: t('ai.appendedAsNew') })
+                  try {
+                    await onAIAppendNew(c)
+                    pushToast({ kind: 'success', message: t('ai.appendedAsNew') })
+                  } catch {
+                    // page 的 onAIAppendNew 已在 .catch 推 error toast,这里不重复
+                  }
                 }
                 setAiView(null)
               }}

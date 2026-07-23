@@ -243,6 +243,7 @@ if (
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
               onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing) return // IME 组合态(中文选词回车)不触发,免误加残词
                 if (e.key === 'Enter' || e.key === ',') {
                   e.preventDefault()
                   addTag(tagInput)

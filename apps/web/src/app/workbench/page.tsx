@@ -70,13 +70,16 @@ export default function WorkbenchPage() {
   }
 
   // A3 — 工作台 AI「存为新卡」:走统一 captureSink(与 inbox 同路径)建新 inbox 卡。
+  // 返回 promise:失败 reject(已推 error toast),让工作台 await 后再显 success,免抢跑。
   const deviceId = getDeviceId()
-  const onAIAppendNew = (c: { title: string; body: string }) => {
-    void captureSinkRegistry
+  const onAIAppendNew = (c: { title: string; body: string }): Promise<void> => {
+    return captureSinkRegistry
       .submit({ source: { kind: 'manual', deviceId }, title: c.title, body: c.body })
+      .then(() => undefined)
       .catch((e: unknown) => {
         const msg = e instanceof Error ? e.message : String(e)
         pushToast({ kind: 'error', message: t('capture.persistFailed', { error: msg }) })
+        throw e // 让调用方 await 知道失败,不显 success toast
       })
   }
 

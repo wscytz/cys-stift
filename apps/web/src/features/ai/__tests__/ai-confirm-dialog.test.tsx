@@ -179,7 +179,7 @@ describe('AiConfirmDialog — cluster mode', () => {
 describe('AiConfirmDialog — outline mode', () => {
   it('渲染 markdown 预览;点应用 → service.create 建卡;onApplied 触发', async () => {
     const created: unknown[] = []
-    const service = { create: (input: unknown) => { created.push(input) } } as never
+    const service = { create: (input: unknown) => { created.push(input); return { id: 'c1' } }, listOnCanvas: () => [], moveToCanvas: () => true } as never
     const onApplied = vi.fn()
     const { host: dom, unmount } = mount(
       <AiConfirmDialog mode="outline" outlineMarkdown={'## T\n- a'} canvasId={'cv' as never} service={service} onApplied={onApplied} onRejected={() => {}} />,
@@ -196,7 +196,7 @@ describe('AiConfirmDialog — outline mode', () => {
 
   it('编辑 markdown(不退出编辑)点应用 → service.create body 用编辑后值', async () => {
     const created: unknown[] = []
-    const service = { create: (input: unknown) => { created.push(input) } } as never
+    const service = { create: (input: unknown) => { created.push(input); return { id: 'c1' } }, listOnCanvas: () => [], moveToCanvas: () => true } as never
     const { host: dom, unmount } = mount(
       <AiConfirmDialog mode="outline" outlineMarkdown={'## original'} canvasId={'cv' as never} service={service} onApplied={() => {}} onRejected={() => {}} />,
     )
