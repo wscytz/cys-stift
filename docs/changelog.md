@@ -5,6 +5,14 @@
 
 ---
 
+## 2026-07-23 · 1.1.0-preview.2 · inbox 卡显示降噪 + AI「配置了却无效」修
+
+preview.1 手测反馈两轮修:
+
+- **fix(web): inbox 卡片降噪 + 信息密度**:`CardTile` 默认类型(note)不再顶红色 type chip(信息量为零且视觉最重),非 note 才显;新增 tags 行(标了 tag 此前 tile 完全不显示,最多 4 个 + 溢出计数);body 预览放宽(3→4 行、140→200 字);时间补时分(`toLocaleString` month/day + HH:MM)。
+- **fix(web): AI profile 保存即自动激活(根因:「配置了却无效」)**:`upsertProfile` 保存 profile 时若当前无有效 active(null 或指向已不存在),自动把该 profile 设为 active(对齐 `deleteProfile` 的自动切活逻辑;不抢已有 active,覆盖已存档未激活)。此前保存≠激活 → `activeProfileId` 留 null → `getCurrentAI()` 返 null → `isAIReady=false` → ✨AI 永远跳 setup 卡。`enabled` 默认 false 不动(刻意设计 + 专测守)。`ai.setup.lede` 文案补"确认已启用 + 设为当前"。
+- **测试**:settings-store +3(自动激活首 profile / 不抢已有 active / 已存档未激活再存激活)。web 1741 passed / lint 0。
+
 ## 2026-07-23 · 1.1.0 · 导出保真 + 卡显示 UX(截断按卡高 / 词界换行 / … 标记)
 
 承接"外部 AI ↔ 画布 DSL 桥"实战——用真实 `elementsToSvg` 出图描绘 cys-dsl 语法速查,暴露一批导出/卡显示问题,TDD 逐条修(实时渲染 + SVG 导出同源):
