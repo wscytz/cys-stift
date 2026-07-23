@@ -17,7 +17,23 @@
  * Canonical single source: ./dsl-grammar.ts (DSL_KINDS / DSL_COLORS / DSL_GRAMMAR_REFERENCE).
  */
 import type { CanvasElement } from '@cys-stift/canvas-engine'
+import type { CardType, TagRef, LinkPreview, CodeBlock, Quote } from '@cys-stift/domain'
 import { DSL_KINDS } from './dsl-grammar'
+
+/**
+ * v8:card 行可注入的卡片内容/结构化字段(消费者从 CardService 读,经 resolve 回调传入)。
+ * title/content 是 v5;type/tags/links/codeSnippets/quotes 是 v8。media 故意不在(二进制重/隐私,
+ * 不进 DSL)。缺省几何-only(不传 resolve → 所有现有调用点零改动,向后兼容)。
+ */
+export type CardDslContent = {
+  title?: string
+  content?: string
+  type?: CardType
+  tags?: TagRef[]
+  links?: LinkPreview[]
+  codeSnippets?: CodeBlock[]
+  quotes?: Quote[]
+}
 
 /**
  * Serialize the canvas's active elements to a text block the AI can read.
@@ -25,9 +41,9 @@ import { DSL_KINDS } from './dsl-grammar'
  */
 export function serializeCanvas(
   elements: CanvasElement[],
-  /** v5:可选,card id → {title, content}(消费者注入,如 CardService 的 title/body)。
-   *  不传 → 几何-only(向后兼容,所有现有调用点零改动)。传了 → card 行附 @title/@content。 */
-  resolve?: (id: string) => { title?: string; content?: string } | undefined,
+  /** v5:可选,card id → 卡片内容(v8:含结构化字段,见 {@link CardDslContent})。
+   *  不传 → 几何-only(向后兼容,所有现有调用点零改动)。传了 → card 行附相应指令。 */
+  resolve?: (id: string) => CardDslContent | undefined,
 ): string {
   return elements
     .filter((e) => (DSL_KINDS as readonly string[]).includes(e.kind))
@@ -50,24 +66,25 @@ export function serializeCanvas(
  */
 export function serializeCanvasReadable(
   elements: CanvasElement[],
-  resolve?: (id: string) => { title?: string; content?: string } | undefined,
+  resolve?: (id: string) => CardDslContent | undefined,
 ): string {
   return serializeCanvas(elements, resolve)
 }
 
 export function serializeElement(
   e: CanvasElement,
-  /** v5:card 的 title/content(可选,由 serializeCanvas 的 resolve 注入)。非 card 元素忽略。 */
-  content?: { title?: string; content?: string },
+  /** v5/v8:card 的内容与结构化字段(可选,由 serializeCanvas 的 resolve 注入)。非 card 元素忽略。 */
+  content?: CardDslContent,
 ): string {
   const pos = `@pos(${e.x.toFixed(1)},${e.y.toFixed(1)})`
   const color = e.color ? ` @color(${e.color})` : ''
   switch (e.kind) {
     case 'card': {
-      // v5:可选 @title/@content(消费者注入)。缺省几何-only(round-trip 与 v4 等价)。
+      // v5:可选 @title/@content;v8:可选 @type/@tags/@links/@code/@quote(消费者注入)。
+      // 缺省几何-only(round-trip 与 v4 等价)。
       const titleAttr = content?.title ? ` @title("${escapeQuoted(content.title)}")` : ''
       const contentAttr = content?.content ? ` @content("${escapeQuoted(content.content)}")` : ''
-      return `[card #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}${titleAttr}${contentAttr}${metaGroup(e)}${metaHref(e)}`
+      return `[card #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}${titleAttr}${contentAttr}${metaGroup(e)}${metaHref(e)}${metaType(content)}${metaTags(content)}${metaLinks(content)}${metaCode(content)}${metaQuote(content)}`
     }
     case 'rect':
       return `[rect #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}${metaGroup(e)}`
@@ -121,10 +138,16 @@ export function serializeElement(
   }
 }
 
-/** Escape a string for a quoted DSL value:\\ = backslash, \" = quote, \n = newline(v5,@content 多行)。
- *  顺序:先 \ (防后续插入的 \ 被二次转义),再 ",再换行。是 dsl-parser unescapeQuoted 的逆。 */
+/** Escape a string for a quoted DSL value:\\ = backslash, \" = quote, \n = newline(v5,@content 多行),
+ *  \` = backtick(v8,@code/@quote 内容里的 ``` 不提前闭合 AI prompt 的 markdown 围栏)。
+ *  顺序:先 \ (防后续插入的 \ 被二次转义),再 ",再换行,再反引号。是 dsl-parser unescapeQuoted 的逆
+ *  (unescapeQuoted 的 \X→X 通用,天然对称)。 */
 function escapeQuoted(s: string): string {
-  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')
+  return s
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/`/g, '\\`')
 }
 
 /** v7:读 element.meta.group(语义分组名)。非字符串 / 空 → 不 emit。 */
@@ -147,4 +170,59 @@ function metaHref(e: CanvasElement): string {
 function metaCompute(e: CanvasElement): string {
   const c = e.meta?.compute
   return typeof c === 'string' && c !== '' ? ` @compute("${escapeQuoted(c)}")` : ''
+}
+
+/** v8:读注入的卡片 type(语义类型)。缺省 / 空 → 不 emit。CardType 枚举值(note|image|link|code|quote)
+ *  为安全 token,无需转义。image 卡照样 emit type(media 另排除,不进 DSL)。 */
+function metaType(c: CardDslContent | undefined): string {
+  return c?.type ? ` @type(${c.type})` : ''
+}
+
+/** v8:读注入的卡片 tags。value 过滤空 → 各 encodeURIComponent(防 `;` 等分隔符碰撞)→ `;` 连接。
+ *  无有效 tag → 不 emit。是 parseTagList 的逆。 */
+function metaTags(c: CardDslContent | undefined): string {
+  const values = (c?.tags ?? [])
+    .map((t) => (typeof t?.value === 'string' ? t.value.trim() : ''))
+    .filter((v) => v !== '')
+  return values.length > 0 ? ` @tags(${values.map(encodeURIComponent).join(';')})` : ''
+}
+
+/** v8:读注入的卡片 links(仅 URL,见 CardDslContent 说明)。url 过滤空 → 各 encodeURIComponent
+ *  (URL 含 `;`/`=`/`&` 会撞分隔符)→ `;` 连接。无有效 url → 不 emit。是 parseLinkList 的逆。 */
+function metaLinks(c: CardDslContent | undefined): string {
+  const urls = (c?.links ?? [])
+    .map((l) => (typeof l?.url === 'string' ? l.url.trim() : ''))
+    .filter((u) => u !== '')
+  return urls.length > 0 ? ` @links(${urls.map(encodeURIComponent).join(';')})` : ''
+}
+
+/** v8:读注入的卡片 codeSnippets。每个 emit 一条 ` @code(lang,"code"[,"caption"])`(可重复指令)。
+ *  lang 收窄到 grammar codeLang 字符集(越界字符丢弃,防破坏指令;空语言合法)。code/caption 走
+ *  escapeQuoted(多行/引号/反引号)。是 fold code 累积的逆。 */
+function metaCode(c: CardDslContent | undefined): string {
+  return (c?.codeSnippets ?? [])
+    .filter((b) => typeof b?.code === 'string' && b.code !== '')
+    .map((b) => {
+      const lang = (typeof b.language === 'string' ? b.language : '').replace(/[^a-zA-Z0-9_+#.-]/g, '')
+      const caption = typeof b.caption === 'string' && b.caption !== '' ? `,"${escapeQuoted(b.caption)}"` : ''
+      return ` @code(${lang},"${escapeQuoted(b.code)}"${caption})`
+    })
+    .join('')
+}
+
+/** v8:读注入的卡片 quotes。每个 emit 一条 ` @quote("text"[,"attribution"[,"sourceUrl"]])`(可重复)。
+ *  arity:有 sourceUrl → 三参(attribution 缺省补空串占位);否则有 attribution → 两参;否则一参。
+ *  各值走 escapeQuoted。是 fold quote 累积的逆(空串占位 parse 侧归一 undefined)。 */
+function metaQuote(c: CardDslContent | undefined): string {
+  return (c?.quotes ?? [])
+    .filter((q) => typeof q?.text === 'string' && q.text !== '')
+    .map((q) => {
+      const text = `"${escapeQuoted(q.text)}"`
+      const by = typeof q.attribution === 'string' ? q.attribution : ''
+      const url = typeof q.sourceUrl === 'string' ? q.sourceUrl : ''
+      if (url !== '') return ` @quote(${text},"${escapeQuoted(by)}","${escapeQuoted(url)}")`
+      if (by !== '') return ` @quote(${text},"${escapeQuoted(by)}")`
+      return ` @quote(${text})`
+    })
+    .join('')
 }

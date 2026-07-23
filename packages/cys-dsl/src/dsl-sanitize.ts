@@ -17,7 +17,17 @@
  *              + case 3(free op 跨 kind 告警)。
  */
 import type { DslOp, DslCardOp, DslFreeOp, DslArrowOp } from './dsl-parser'
-import { DSL_MAX_TEXT_LEN, DSL_MAX_CONTENT_LEN, DSL_MAX_HREF_TARGETS, truncateDslText } from './dsl-grammar'
+import {
+  DSL_MAX_TEXT_LEN,
+  DSL_MAX_CONTENT_LEN,
+  DSL_MAX_HREF_TARGETS,
+  DSL_MAX_TAG_COUNT,
+  DSL_MAX_LINK_COUNT,
+  DSL_MAX_CODE_BLOCKS,
+  DSL_MAX_QUOTES,
+  DSL_CARD_TYPES,
+  truncateDslText,
+} from './dsl-grammar'
 
 /** Sanitize 诊断:亮给用户/AI 看(让 AgentConfirmCard/dsl-dialog 把"引用了不存在的卡 #X"反馈出来)。 */
 export type SanitizeDiagnostic = {
@@ -116,8 +126,56 @@ function sanitizeCard(
     op.href !== undefined && op.href.length > DSL_MAX_HREF_TARGETS
       ? op.href.slice(0, DSL_MAX_HREF_TARGETS)
       : op.href
-  if (w === op.w && h === op.h && x === op.x && y === op.y && rel === op.rel && title === op.title && content === op.content && group === op.group && href === op.href) return op
-  return { ...op, w, h, x, y, rel, title, content, group, href }
+  // v8:结构化字段二次防线(幂等 —— parser 已截/校验,这里防程序构造 op 绕过)。
+  //     引用稳定:仅在真被改时才产新数组/对象,合规输入原样(不破 round-trip byte-equal)。
+  const cardType =
+    op.cardType !== undefined && !(DSL_CARD_TYPES as readonly string[]).includes(op.cardType)
+      ? undefined
+      : op.cardType
+  const tags =
+    op.tags !== undefined && op.tags.length > DSL_MAX_TAG_COUNT
+      ? op.tags.slice(0, DSL_MAX_TAG_COUNT)
+      : op.tags
+  const links =
+    op.links !== undefined && op.links.length > DSL_MAX_LINK_COUNT
+      ? op.links.slice(0, DSL_MAX_LINK_COUNT)
+      : op.links
+  let code = op.code
+  if (code !== undefined) {
+    const capped = code.length > DSL_MAX_CODE_BLOCKS ? code.slice(0, DSL_MAX_CODE_BLOCKS) : code
+    let changed = capped !== code
+    const mapped = capped.map((b) => {
+      const c = truncateDslText(b.code, DSL_MAX_CONTENT_LEN)
+      if (c !== b.code) {
+        changed = true
+        return { ...b, code: c }
+      }
+      return b
+    })
+    code = changed ? mapped : op.code
+  }
+  let quotes = op.quotes
+  if (quotes !== undefined) {
+    const capped = quotes.length > DSL_MAX_QUOTES ? quotes.slice(0, DSL_MAX_QUOTES) : quotes
+    let changed = capped !== quotes
+    const mapped = capped.map((q) => {
+      const t = truncateDslText(q.text, DSL_MAX_CONTENT_LEN)
+      if (t !== q.text) {
+        changed = true
+        return { ...q, text: t }
+      }
+      return q
+    })
+    quotes = changed ? mapped : op.quotes
+  }
+  if (
+    w === op.w && h === op.h && x === op.x && y === op.y && rel === op.rel &&
+    title === op.title && content === op.content && group === op.group && href === op.href &&
+    cardType === op.cardType && tags === op.tags && links === op.links && code === op.code && quotes === op.quotes
+  ) {
+    return op
+  }
+  return { ...op, w, h, x, y, rel, title, content, group, href, cardType, tags, links, code, quotes }
 }
 
 /** free shape(rect/text/frame)op:case 6(size)+ case 3(跨 kind 告警)。

@@ -1,6 +1,7 @@
 'use client'
 
 import type { CanvasElement, CanvasHost } from '@cys-stift/canvas-engine'
+import type { CardType, CodeBlock, Quote } from '@cys-stift/domain'
 import type { DslArrowOp, DslCardOp, DslFreeOp, DslOp } from '@cys-stift/dsl'
 import { sanitizeDslOps, evalCompute, evalComputeDetail, formatComputeNumber } from '@cys-stift/dsl'
 import type { SanitizeCtx, SanitizeDiagnostic, ComputeResolver } from '@cys-stift/dsl'
@@ -26,13 +27,29 @@ export interface CardCreateParams {
   title?: string
   /** v5:卡片正文(DSL @content)。建卡时写入 Card.body。 */
   content?: string
+  /** v8:卡片类型(DSL @type)。建卡时写入 Card.type。 */
+  cardType?: CardType
+  /** v8:标签值列表(DSL @tags)。建卡时由 web 指派颜色映射成 TagRef[]。 */
+  tags?: string[]
+  /** v8:外链 URL 列表(DSL @links)。建卡时由 web 映射成 LinkPreview[](fetchedAt=now)。 */
+  links?: string[]
+  /** v8:代码块(DSL @code,可重复)。建卡时写入 Card.codeSnippets。 */
+  code?: CodeBlock[]
+  /** v8:引文(DSL @quote,可重复)。建卡时写入 Card.quotes。 */
+  quotes?: Quote[]
 }
 
-/** v5:更新现有卡片内容(DSL @title/@content on an existing card)。apply 时写回 Card.title/body。 */
+/** v5:更新现有卡片内容(DSL @title/@content on an existing card)。apply 时写回 Card.title/body。
+ *  v8:同机制扩到 @type/@tags/@links/@code/@quote。 */
 export interface CardUpdateContent {
   cardId: string
   title?: string
   content?: string
+  cardType?: CardType
+  tags?: string[]
+  links?: string[]
+  code?: CodeBlock[]
+  quotes?: Quote[]
 }
 
 export type CardUpdateHandler = (params: CardUpdateContent) => void
@@ -412,6 +429,28 @@ function resolveComputedText(
   return { text: formatComputeNumber(val) }
 }
 
+/** v8:从 card op 抽结构化字段(type/tags/links/code/quotes)成可 spread 对象(缺省不带 → apply 侧"缺省不改")。
+ *  create 与 update 两路共用,消除重复。tags 是值列表(web 指派颜色),links 是 URL 列表(web 映射 LinkPreview)。 */
+function v8CardFields(
+  op: DslCardOp,
+): Partial<Pick<CardCreateParams, 'cardType' | 'tags' | 'links' | 'code' | 'quotes'>> {
+  return {
+    ...(op.cardType !== undefined ? { cardType: op.cardType } : {}),
+    ...(op.tags !== undefined ? { tags: op.tags } : {}),
+    ...(op.links !== undefined ? { links: op.links } : {}),
+    ...(op.code !== undefined ? { code: op.code } : {}),
+    ...(op.quotes !== undefined ? { quotes: op.quotes } : {}),
+  }
+}
+
+/** op 是否携带任一 v8 结构化字段(触发 update 写回 / create 携带)。 */
+function hasV8Fields(op: DslCardOp): boolean {
+  return (
+    op.cardType !== undefined || op.tags !== undefined || op.links !== undefined ||
+    op.code !== undefined || op.quotes !== undefined
+  )
+}
+
 function planCard(
   shadow: Map<string, CanvasElement>,
   op: DslCardOp,
@@ -454,6 +493,7 @@ function planCard(
         color: op.color,
         ...(op.title !== undefined ? { title: op.title } : {}),
         ...(op.content !== undefined ? { content: op.content } : {}),
+        ...v8CardFields(op),
       },
     )
   }
@@ -481,12 +521,13 @@ function planCard(
     },
     'card-update',
   )
-  // v5:card-update 带 @title/@content → 携带,commit 时写回 CardService。
-  if (op.title !== undefined || op.content !== undefined) {
+  // v5:card-update 带 @title/@content → 携带,commit 时写回 CardService。v8:同机制扩到结构化字段。
+  if (op.title !== undefined || op.content !== undefined || hasV8Fields(op)) {
     updateItem.cardUpdateContent = {
       cardId: id,
       ...(op.title !== undefined ? { title: op.title } : {}),
       ...(op.content !== undefined ? { content: op.content } : {}),
+      ...v8CardFields(op),
     }
   }
   return updateItem

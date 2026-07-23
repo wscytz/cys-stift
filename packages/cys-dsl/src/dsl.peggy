@@ -10,7 +10,7 @@
 // directive* 末尾的 skipChunk 消费"未知非空白串",让后续已知 directive 仍能被找到 ——
 // 等价旧正则的整行任意位置提取(如 from #card:1 中 from 截到 #card 后,skipChunk 吃 :1,to 仍命中)。
 //
-// 改本文件后跑:`pnpm --filter web gen:dsl` 重生 dsl-parser.gen.js。
+// 改本文件后跑:`pnpm --filter @cys-stift/cys-dsl gen` 重生 dsl-parser.gen.js。
 // 可接受语言与旧正则 parser 等价(契约见 dsl-parser/robustness/e2e-roundtrip/sync 测试)。
 
 Line
@@ -21,7 +21,7 @@ cardLine
   = '[' 'card' sp ds:cardDir* .* { return { kind: 'card', ds: ds } }
 
 cardDir
-  = ws d:(idDir / posDir / sizeDir / colorDir / relationDir / gapDir / createDir / titleDir / contentDir / groupDir / hrefDir / skipChunk) { return d }
+  = ws d:(idDir / posDir / sizeDir / colorDir / relationDir / gapDir / createDir / titleDir / contentDir / groupDir / hrefDir / typeDir / tagsDir / linksDir / codeDir / quoteDir / skipChunk) { return d }
 
 // ── arrow:`[arrow ` 或 `[arrow]` 提交;#id 可省([arrow]);relation(from/to) vs free(pos/size) ──
 arrowLine
@@ -134,6 +134,31 @@ hrefDir
 computeDir
   = '@compute(' v:quotedString ')' { return ['compute', v] }
 
+// v8: 卡片结构化字段(media 排除——二进制重/隐私)。
+// @type 单值枚举(TS 层 validEnum 收窄);@tags/@links 单指令 `;` 列表(镜像 @href);
+// @code/@quote 可重复指令(一指令一块/条,TS 层累积成数组——保住多块往返 cornerstone)。
+// 值里的 `;` `=` `&` 由序列化侧 encodeURIComponent 规避分隔符碰撞,parse 侧 decode。
+typeDir
+  = '@type(' c:$([^)]+) ')' { return ['type', c] }
+
+tagsDir
+  = '@tags(' v:$([^)]+) ')' { return ['tags', v] }
+
+linksDir
+  = '@links(' v:$([^)]+) ')' { return ['links', v] }
+
+// @code(lang,"code"[,"caption"]) —— lang 裸 token(ts/py/js/c++/c#/objective-c/… 或空),
+//   code/caption 为 quotedString(转义承载多行/引号/反引号)。两 arity 有序择一(3 参在前)。
+codeDir
+  = '@code(' lang:codeLang ',' ws code:quotedString ',' ws cap:quotedString ')' { return ['code', lang, code, cap] }
+  / '@code(' lang:codeLang ',' ws code:quotedString ')' { return ['code', lang, code, null] }
+
+// @quote("text"[,"attribution"[,"sourceUrl"]]) —— 三 arity 有序择一(3→2→1)。
+quoteDir
+  = '@quote(' text:quotedString ',' ws by:quotedString ',' ws url:quotedString ')' { return ['quote', text, by, url] }
+  / '@quote(' text:quotedString ',' ws by:quotedString ')' { return ['quote', text, by, null] }
+  / '@quote(' text:quotedString ')' { return ['quote', text, null, null] }
+
 // ─── lexemes ───
 num
   = '-'? [0-9]+ ('.' [0-9]+)?
@@ -143,6 +168,10 @@ escChar
 
 quotedString
   = '"' v:$(escChar*) '"' { return v }
+
+// v8: @code 的语言裸 token。允许空(无语言代码块)。`+`(c++)/`#`(c#)/`-`(objective-c)/`.`(vue.ts)合法。
+codeLang
+  = $[a-zA-Z0-9_+#.-]*
 
 idRef
   = '#' id:$idChars { return id }

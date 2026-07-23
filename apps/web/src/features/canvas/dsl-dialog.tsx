@@ -167,7 +167,7 @@ export function DslDialog({
     if (!open || !host) return
     const els = cloneElements(host.getElements())
     setBase({ elements: els, revision: revisionOf(els) })
-    setText(initialText ?? serializeCanvasReadable(els, (id) => { const c = service.get(id as CardId); return c ? { title: c.title, content: c.body } : undefined }))
+    setText(initialText ?? serializeCanvasReadable(els, (id) => { const c = service.get(id as CardId); return c ? { title: c.title, content: c.body, type: c.type, tags: c.tags, links: c.links, codeSnippets: c.codeSnippets, quotes: c.quotes } : undefined }))
     setAppliedHashes(new Set())
     setStale(false)
   }, [open, host, service, initialText])
@@ -194,7 +194,7 @@ export function DslDialog({
     if (!host) return
     const elements = cloneElements(host.getElements())
     setBase({ elements, revision: revisionOf(elements) })
-    setText(serializeCanvasReadable(elements, (id) => { const c = service.get(id as CardId); return c ? { title: c.title, content: c.body } : undefined }))
+    setText(serializeCanvasReadable(elements, (id) => { const c = service.get(id as CardId); return c ? { title: c.title, content: c.body, type: c.type, tags: c.tags, links: c.links, codeSnippets: c.codeSnippets, quotes: c.quotes } : undefined }))
     setAppliedHashes(new Set())
     setStale(false)
   }
@@ -241,7 +241,7 @@ export function DslDialog({
     // 重序列化:apply 后画布变了,文本同步,防重复 Apply 造副本(create 类 op 幂等失效)。
     // host 是同引用 + host.batch 原地变更,上面填充 text 的 useEffect([open,host,service])
     // 不会重跑,必须手动 setText。
-    setText(serializeCanvasReadable(host.getElements(), (id) => { const c = service.get(id as CardId); return c ? { title: c.title, content: c.body } : undefined }))
+    setText(serializeCanvasReadable(host.getElements(), (id) => { const c = service.get(id as CardId); return c ? { title: c.title, content: c.body, type: c.type, tags: c.tags, links: c.links, codeSnippets: c.codeSnippets, quotes: c.quotes } : undefined }))
     if (parseErrors.length > 0 || skipped > 0 || failed > 0) {
       // 有 parse 错误或 apply 跳过 → 用带 skipped 的诚实反馈(parse 错误数也在列表里展示)。
       pushToast({

@@ -12,13 +12,18 @@
  * 内的 skipChunk 吃未知残余 → 复刻旧正则的任意位置/任意顺序容错。
  */
 
-import type { CardId } from '@cys-stift/domain'
+import type { CardId, CardType, CodeBlock, Quote } from '@cys-stift/domain'
 import {
   DSL_COLORS,
   DSL_COLOR_ALIASES,
   DSL_MAX_TEXT_LEN,
   DSL_MAX_CONTENT_LEN,
   DSL_MAX_HREF_TARGETS,
+  DSL_MAX_TAG_COUNT,
+  DSL_MAX_LINK_COUNT,
+  DSL_MAX_CODE_BLOCKS,
+  DSL_MAX_QUOTES,
+  DSL_CARD_TYPES,
   truncateDslText,
 } from './dsl-grammar'
 // Peggy 生成;类型垫片见 dsl-parser.gen.d.ts
@@ -53,6 +58,18 @@ export type DslCardOp = {
   /** v7:卡片显式语义引用目标 id 列表(KG 边,不画线)。落 element.meta.href。
    *  区别于正文 [[...]]→自动 references 箭头:这是 DSL 里直接声明的语义边。 */
   href?: string[]
+  /** v8:卡片语义类型(@type)。media 不进 DSL,故 image 卡只往返 type。apply 写回 Card.type。 */
+  cardType?: CardType
+  /** v8:卡片标签**值**列表(@tags;颜色由 apply 层按 stableTagColor 指派,parser 不知色)。
+   *  apply 映射成 TagRef[]。 */
+  tags?: string[]
+  /** v8:卡片外链 **URL** 列表(@links;仅 URL,预览 title/image 是抓取派生态不往返)。
+   *  apply 映射成 LinkPreview[](fetchedAt=new Date())。 */
+  links?: string[]
+  /** v8:卡片代码块(@code,可重复)。apply 写回 Card.codeSnippets。 */
+  code?: CodeBlock[]
+  /** v8:卡片引文(@quote,可重复)。apply 写回 Card.quotes。 */
+  quotes?: Quote[]
 }
 
 export type DslFreeOp =
@@ -173,6 +190,11 @@ type DirectiveTuple =
   | ['group', string]
   | ['href', string]
   | ['compute', string]
+  | ['type', string]
+  | ['tags', string]
+  | ['links', string]
+  | ['code', string, string, string | null]
+  | ['quote', string, string | null, string | null]
 
 /** directive* 收集的元组列表(null = skipChunk 消费的未知残余,过滤掉)。 */
 type LineResult =
@@ -248,6 +270,55 @@ function parseHref(raw: string): string[] | undefined {
   return out.length >= 1 ? out : undefined
 }
 
+/** v8:卡片类型枚举用 dsl-grammar 的 DSL_CARD_TYPES(单一可信源;parser/sanitize 共用)。 */
+
+/** v8:可重复指令(strict 模式 dup 检查豁免)—— @code/@quote 一指令一块/条,多个是合法的多块/多引文,
+ *  不是重复错误。@tags/@links 仍是单指令列表(重复算 dup)。 */
+const REPEATABLE_DIRECTIVES: ReadonlySet<string> = new Set(['code', 'quote'])
+
+/** @tags(a;b;c) 拆分(v8):`;` 分隔,每个 trim + decodeURIComponent(序列化侧 encode 防碰撞);
+ *  过滤空值,去重保序,截断到 DSL_MAX_TAG_COUNT。无有效 tag → undefined。是 metaTags 的逆。 */
+function parseTagList(raw: string): string[] | undefined {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const part of raw.split(';')) {
+    let value = part.trim()
+    if (value === '') continue
+    try {
+      value = decodeURIComponent(value)
+    } catch {
+      // 非法百分号编码(如裸 `%`)→ 用原串,不丢
+    }
+    if (value === '' || seen.has(value)) continue
+    seen.add(value)
+    out.push(value)
+    if (out.length >= DSL_MAX_TAG_COUNT) break
+  }
+  return out.length >= 1 ? out : undefined
+}
+
+/** @links(<enc-url>;…) 拆分(v8):`;` 分隔,每个 trim + decodeURIComponent(序列化侧 encode,
+ *  URL 含 `;`/`=`/`&`);过滤空值,去重保序,截断到 DSL_MAX_LINK_COUNT。无有效 url → undefined。
+ *  产出 **URL 字符串列表**(apply 层映射 LinkPreview + fetchedAt)。是 metaLinks 的逆。 */
+function parseLinkList(raw: string): string[] | undefined {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const part of raw.split(';')) {
+    let url = part.trim()
+    if (url === '') continue
+    try {
+      url = decodeURIComponent(url)
+    } catch {
+      // 非法百分号编码 → 用原串,不丢
+    }
+    if (url === '' || seen.has(url)) continue
+    seen.add(url)
+    out.push(url)
+    if (out.length >= DSL_MAX_LINK_COUNT) break
+  }
+  return out.length >= 1 ? out : undefined
+}
+
 // ── fold:directive 元组列表 → 结构化字段(首遇优先,复刻旧正则"首个 match"语义)────────
 
 interface Folded {
@@ -273,13 +344,18 @@ interface Folded {
   group?: string
   href?: string[]
   compute?: string
+  cardType?: CardType
+  tags?: string[]
+  links?: string[]
+  code?: CodeBlock[]
+  quotes?: Quote[]
 }
 
 function fold(ds: unknown[]): Folded {
   const a: Folded = {}
   for (const d of ds) {
     if (!Array.isArray(d)) continue // null(skipChunk)/非元组 → 跳过
-    const [tag, v1, v2] = d as [string, unknown, unknown]
+    const [tag, v1, v2, v3] = d as [string, unknown, unknown, unknown]
     switch (tag) {
       case 'id': if (a.id === undefined) a.id = String(v1); break
       case 'pos': if (!a.pos) a.pos = [finiteNum(String(v1)), finiteNum(String(v2))]; break
@@ -303,6 +379,44 @@ function fold(ds: unknown[]): Folded {
       case 'group': if (a.group === undefined) a.group = truncate(unescapeQuoted(String(v1))); break
       case 'href': if (!a.href) a.href = parseHref(String(v1)); break
       case 'compute': if (a.compute === undefined) a.compute = truncate(unescapeQuoted(String(v1))); break
+      case 'type': {
+        if (a.cardType === undefined) {
+          const t = validEnum(String(v1), DSL_CARD_TYPES)
+          if (t !== undefined) a.cardType = t // 非法 type(green 等)→ 不设,不静默变 note
+        }
+        break
+      }
+      case 'tags': if (a.tags === undefined) a.tags = parseTagList(String(v1)); break
+      case 'links': if (a.links === undefined) a.links = parseLinkList(String(v1)); break
+      case 'code': {
+        // 可重复指令 → 累积成数组(非首遇优先);截断到 DSL_MAX_CODE_BLOCKS。code 走 long 级截断。
+        if (a.code === undefined) a.code = []
+        if (a.code.length < DSL_MAX_CODE_BLOCKS) {
+          const code = truncateDslText(unescapeQuoted(String(v2)), DSL_MAX_CONTENT_LEN)
+          const caption = v3 == null ? undefined : unescapeQuoted(String(v3))
+          a.code.push({
+            language: String(v1),
+            code,
+            ...(caption ? { caption } : {}),
+          })
+        }
+        break
+      }
+      case 'quote': {
+        // 可重复指令 → 累积成数组;截断到 DSL_MAX_QUOTES。text 走 long 级截断;空串占位归一 undefined。
+        if (a.quotes === undefined) a.quotes = []
+        if (a.quotes.length < DSL_MAX_QUOTES) {
+          const text = truncateDslText(unescapeQuoted(String(v1)), DSL_MAX_CONTENT_LEN)
+          const attribution = v2 == null ? undefined : unescapeQuoted(String(v2))
+          const sourceUrl = v3 == null ? undefined : unescapeQuoted(String(v3))
+          a.quotes.push({
+            text,
+            ...(attribution ? { attribution } : {}),
+            ...(sourceUrl ? { sourceUrl } : {}),
+          })
+        }
+        break
+      }
     }
   }
   return a
@@ -311,6 +425,16 @@ function fold(ds: unknown[]): Folded {
 // ── build:结构 → DslOp 或 diagnostic ──────────────────────────────────────────
 
 type BuildResult = { op: DslOp } | { diag: string } | null
+
+/** v8:把 fold 出的结构化字段(type/tags/links/code/quotes)拷到 card op —— 镜像 title/content/group/href
+ *  的 if-set(缺省不带,apply 侧"缺省不改")。三个 buildCard 分支共用,消除重复。 */
+function applyCardFieldsV8(op: DslCardOp, d: Folded): void {
+  if (d.cardType !== undefined) op.cardType = d.cardType
+  if (d.tags !== undefined) op.tags = d.tags
+  if (d.links !== undefined) op.links = d.links
+  if (d.code !== undefined) op.code = d.code
+  if (d.quotes !== undefined) op.quotes = d.quotes
+}
 
 function buildCard(ds: unknown[]): BuildResult {
   const d = fold(ds)
@@ -335,6 +459,7 @@ function buildCard(ds: unknown[]): BuildResult {
     if (d.content !== undefined) op.content = d.content
     if (d.group !== undefined) op.group = d.group
     if (d.href !== undefined) op.href = d.href
+    applyCardFieldsV8(op, d)
     return { op }
   }
   if (d.pos) {
@@ -352,12 +477,19 @@ function buildCard(ds: unknown[]): BuildResult {
     if (d.content !== undefined) op.content = d.content
     if (d.group !== undefined) op.group = d.group
     if (d.href !== undefined) op.href = d.href
+    applyCardFieldsV8(op, d)
     return { op }
   }
   // v5(E):无 @pos 的非 create 卡片行,若携带 title/content/color/size 之一 = "纯属性/内容编辑"
   // (几何沿用现有卡,由 planCard 处理)。x/y 占位(0,0);裸行(无任何字段)与 create 仍 missing @pos。
   // v7:group/href 同为"无几何属性编辑"——给现有卡分组/加出链不该要求 @pos。
-  if (!d.create && (d.title !== undefined || d.content !== undefined || d.color !== undefined || d.size !== undefined || d.group !== undefined || d.href !== undefined)) {
+  // v8:type/tags/links/code/quotes 同理——给现有卡改结构化字段不要求 @pos。
+  if (
+    !d.create &&
+    (d.title !== undefined || d.content !== undefined || d.color !== undefined || d.size !== undefined ||
+      d.group !== undefined || d.href !== undefined || d.cardType !== undefined || d.tags !== undefined ||
+      d.links !== undefined || d.code !== undefined || d.quotes !== undefined)
+  ) {
     const op: DslCardOp = {
       type: 'card',
       cardId: d.id as CardId,
@@ -371,6 +503,7 @@ function buildCard(ds: unknown[]): BuildResult {
       ...(d.group !== undefined ? { group: d.group } : {}),
       ...(d.href !== undefined ? { href: d.href } : {}),
     }
+    applyCardFieldsV8(op, d)
     return { op }
   }
   return { diag: 'missing @pos' }
@@ -536,6 +669,7 @@ export function parseDslStrictWithDiagnostics(dslText: string): {
     const tuples = result.ds.filter(Array.isArray) as DirectiveTuple[]
     const seen = new Set<string>()
     const duplicate = tuples.find(([tag]) => {
+      if (REPEATABLE_DIRECTIVES.has(tag)) return false // v8:@code/@quote 可重复(一指令一块/条),不算 dup
       if (seen.has(tag)) return true
       seen.add(tag)
       return false

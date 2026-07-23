@@ -23,7 +23,7 @@
 - **画布 → 文字**:序列化(serialize)。整张画布压成一段可读文本。
 - **文字 → 画布**:解析 + 应用(parse + apply)。一段文本变回画布上的几何。
 
-这两向**对称、确定**:卡片几何/颜色、文本/框、关系签名和自由箭头可往返;卡片正文、媒体和手绘点序列有意留在本地存储,不进入 DSL(见 §六隐私)。这就是"转义"。
+这两向**对称、确定**:卡片几何/颜色、文本/框、关系签名、自由箭头,以及卡片标题/正文(v5)与结构化字段——类型/标签/外链/代码/引文(v8)——都可往返;**媒体二进制**和**手绘点序列**有意留在本地存储,不进入 DSL(见 §六隐私)。这就是"转义"。
 
 ---
 
@@ -42,7 +42,7 @@
 
 ## 三、DSL 语法速查
 
-每行一个元素。`#id` 是元素标识(往返用),`@pos/@size/@color` 是几何与样式。main 分支语法是 **cys-dsl v7**(v5 加卡片内容;v6 将 freedraw 移出 DSL;v7 加语义分组 `@group` / 卡片显式引用 `@href` / 安全公式 `@compute`)。**已发布的稳定版 v1.0.0 随 cys-dsl v4**——v5 `@title/@content` 与 v7 三条语义 directive 在 v1.0.0 里不可用,需 main(1.1.0 预览)。下面速查同时含 v4 基线与 v5–v7 预览能力,使用前请对照版本。
+每行一个元素。`#id` 是元素标识(往返用),`@pos/@size/@color` 是几何与样式。main 分支语法是 **cys-dsl v8**(v5 加卡片内容;v6 将 freedraw 移出 DSL;v7 加语义分组 `@group` / 卡片显式引用 `@href` / 安全公式 `@compute`;v8 加卡片结构化字段 `@type` / `@tags` / `@links` / `@code` / `@quote`)。**已发布的稳定版 v1.0.0 随 cys-dsl v4**——v5 `@title/@content`、v7 三条语义 directive 与 v8 结构化字段在 v1.0.0 里不可用,需 main(1.1.0 预览)。下面速查同时含 v4 基线与 v5–v8 预览能力,使用前请对照版本。
 
 ```
 # 卡片:默认更新既有卡;可改几何/颜色/title/content
@@ -64,6 +64,23 @@
 # v7 卡片显式引用(KG 边,不画线;区别于正文 [[wikilink]]→自动箭头);;分隔,≤20 个
 [card #<id>] @href(#<目标1>;#<目标2>)
 
+# v8 卡片语义类型(单值;image 卡只往返 type,媒体二进制不进 DSL)
+[card #<id>] @type(note|image|link|code|quote)
+
+# v8 卡片标签(单指令 ;分隔的值列表;每个值 URL 编码防碰撞;≤20 个;颜色由程序派生)
+[card #<id>] @tags(灵感;待办)
+
+# v8 卡片外链(单指令 ;分隔的 URL 列表;每个 URL 编码;≤10 个;仅 URL,预览标题/图是抓取派生态不往返)
+[card #<id>] @links(<encodeURIComponent(url1)>;<encodeURIComponent(url2)>)
+
+# v8 代码块(可重复——一条一个块,多块多写几条;lang 裸 token,code 引号串可含 \n;≤8 块)
+[card #<id>] @code(ts,"const a = 1\nconsole.log(a)","可选标题")
+[card #<id>] @code(py,"print('hi')")
+
+# v8 引文(可重复——一条一个引文;text 必填,attribution/sourceUrl 可选;≤8 条)
+[card #<id>] @quote("知识就是力量","培根")
+[card #<id>] @quote("纯文本引文")
+
 # 矩形等自由形状(v7 可加 @group)
 [rect #<id>] @pos(<x>,<y>) @size(<w>,<h>) @color(<c>)
 
@@ -82,7 +99,7 @@
 
 **freedraw 不在 DSL**:手绘由程序的 R2 存储 + canvas-engine 渲染负责;`serializeCanvas` 不输出 freedraw,`[freedraw #id]` 输入会报 `unrecognized directive`。AI 的单向画布快照仍可看到本地计算的 shape 描述符,但不是 DSL 往返的一部分。
 
-**内容转义**:`@title/@content/@text/@label` 使用引号字符串;`\"` 表示引号、`\\` 表示反斜杠、`\n` 表示正文换行。`@title` 最长 200 字符,`@content` 最长 8000 字符。
+**内容转义**:`@title/@content/@text/@label/@code/@quote` 使用引号字符串;`\"` 表示引号、`\\` 表示反斜杠、`\n` 表示换行、反引号前加 `\` 表示字面反引号(v8:防代码里的三反引号提前闭合 AI 的 markdown 围栏)。`@title` 最长 200 字符,`@content`/`@code` 代码体/`@quote` 引文最长 8000 字符。
 
 **颜色**:固定 Bauhaus 6 原色 + grey(`red`/`yellow`/`blue`/`black`/`white`/`gray`/`grey`)。越界色(如 green)不匹配 → 回退默认色(而非静默变黑)。
 
@@ -150,18 +167,23 @@
 - **颜色固定 6+1**:越界色回退默认,不静默变黑。
 - **vision 当前未接入**:默认只保留 `kind`(image/pdf)元数据,二进制永不外发。Settings 的 Labs 区会明确显示没有可开启的 Vision consumer;详见 [`privacy.md`](privacy.md)。
 
-### DSL coverage(v7;稳定版 v1.0.0 随 v4)
+### DSL coverage(v8;稳定版 v1.0.0 随 v4)
 
 | 字段 | DSL 状态 |
 |---|---|
 | card/rect/frame/text 的 id、位置、尺寸、颜色 | 可序列化、可解析、可回写 |
 | card `@title` / `@content` | 可序列化、可解析、可回写;空串清空;无 `@pos` 可纯内容编辑 |
 | relation/free arrow 的端点、标签、颜色、线型、箭头头、curve/elbow route、wikilink 标记 | 可序列化、可解析、可回写 |
-| `create` 卡 | 显式 `create`;可带 title/content;持久化失败标 failed,不留 ghost |
+| `create` 卡 | 显式 `create`;可带 title/content 及 v8 字段;持久化失败标 failed,不留 ghost |
 | v7 `@group`(语义分组) | card/rect/text/frame 均可;落 `element.meta.group`;空串清空;组的样式/折叠是视图层 |
 | v7 `@href(#a;#b)`(卡片显式引用) | 落 `element.meta.href`(裸 id 列表);去重 ≤20;不画线,区别于正文 wikilink→箭头 |
 | v7 `@compute("公式")`(安全公式) | 仅 text;只引用几何 `#id.x\|y\|w\|h`,apply 时求值写 text;禁裸 eval、不碰卡片内容;每次 apply 重算(非 live) |
-| 正文内 links/wikilink、code、quotes、media 二进制 | 不属于 DSL;仍由程序/CardService/导出数据管理(卡片间的**显式**引用可走 `@href`) |
+| v8 `@type`(卡片语义类型) | note\|image\|link\|code\|quote;可序列化/解析/回写;image 卡只往返 type(媒体二进制不进 DSL) |
+| v8 `@tags(a;b)`(标签) | 值列表(单指令 `;` 分隔,各值 URL 编码);去重 ≤20;颜色由程序按值派生(不往返色) |
+| v8 `@links(url;…)`(外链) | URL 列表(单指令 `;` 分隔,各 URL 编码);去重 ≤10;**仅 URL**——预览标题/图/抓取时间是派生态,不往返 |
+| v8 `@code(lang,"代码")`(代码块) | **可重复**(一指令一块,≤8);代码体走引号转义(含 `\n`);可带第三参 caption;多块全往返 |
+| v8 `@quote("文"[,"出处"[,"url"]])`(引文) | **可重复**(一指令一条,≤8);出处/来源 URL 可选;多条全往返 |
+| 正文内 `[[wikilink]]`、media 二进制 | 不属于 DSL;仍由程序/CardService/导出数据管理(卡片间的**显式**引用可走 `@href`;结构化 code/quote/links 走 v8 对应指令) |
 | freedraw | **不属于 DSL**;位置/点序列均不进文本,由程序 R2 + 渲染管理 |
 
 ---
@@ -170,8 +192,8 @@
 
 告诉 AI:
 
-> 这是一张 cys-dsl v7 画布描述。每行一个元素;使用 grammar 给出的 `[kind #id]` 与 `@directive(...)` 形式。
-> 卡片默认更新既有 id;可按任务改几何/颜色/`@title`/`@content`;纯内容编辑可省 `@pos`,确实新建时才使用 `[card #new-id create] @pos(...)`,且 ID 必须不存在。语义分组用 `@group("名")`,卡片间显式引用用 `@href(#a;#b)`,文本公式用 `@compute("#id.w + …")`(只读几何)。freedraw 不属于 DSL。
+> 这是一张 cys-dsl v8 画布描述。每行一个元素;使用 grammar 给出的 `[kind #id]` 与 `@directive(...)` 形式。
+> 卡片默认更新既有 id;可按任务改几何/颜色/`@title`/`@content`;纯内容编辑可省 `@pos`,确实新建时才使用 `[card #new-id create] @pos(...)`,且 ID 必须不存在。语义分组用 `@group("名")`,卡片间显式引用用 `@href(#a;#b)`,文本公式用 `@compute("#id.w + …")`(只读几何)。卡片结构化字段用 v8 指令:类型 `@type(note|image|link|code|quote)`、标签 `@tags(a;b)`、外链 `@links(<url>;…)`(URL 编码)、代码 `@code(lang,"代码")`(可重复)、引文 `@quote("文"[,"出处"])`(可重复);代码/引文是引号串,反引号要转义。freedraw 与媒体二进制不属于 DSL。
 > 输出一段 DSL 重排或编辑这张画布。应用前会预演、校验并显示确认门;坏行会被诊断并跳过,不会静默成功。
 
 DSL 模态编辑器里还内嵌了一份语法速查(可折叠 details),双语。

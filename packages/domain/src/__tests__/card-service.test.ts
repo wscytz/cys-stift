@@ -134,7 +134,7 @@ describe('CardService', () => {
     const card = service.fromCapture({
       title: 'tagged',
       source: { kind: 'manual', deviceId: 'd1' },
-      tags: [{ value: '灵感', color: 'red' }, { value: '待办', color: 'blue' }],
+      tags: [{ value: '灵感', color: 'var(--color-red)' }, { value: '待办', color: 'var(--color-blue)' }],
     })
     expect(card.tags.map((t) => t.value)).toEqual(['灵感', '待办'])
   })

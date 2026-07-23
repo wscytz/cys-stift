@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-07-24 · 1.1.0-preview.6 · cys-dsl v8:卡片结构化字段进转义(type/tags/links/code/quote)
+
+转义(画布完全文字化、AI 可读写)此前只覆盖卡片几何 + `@title/@content/@group/@href`;v8 把卡片的结构化字段也纳入 `[card]` 行,**media 排除**(二进制重/隐私):
+
+- **feat(dsl): `[card]` 行新增 5 指令**:`@type(note|image|link|code|quote)`(语义类型)/ `@tags(a;b;c)`(标签值列表,单指令 `;` 分隔)/ `@links(<url>;…)`(外链 URL 列表,URL 编码防分隔符碰撞)/ `@code(lang,"code"[,"caption"])`(代码块,**可重复**)/ `@quote("text"[,"by"[,"url"]])`(引文,**可重复**)。`@code`/`@quote` 可重复以保住多块/多引文的无损往返(转义 cornerstone);`@tags`/`@links` 是单指令列表。
+- **feat(dsl): escapeQuoted 加反引号转义**(反引号 → `\` 反引号):防 @code/@quote 内容里的三反引号提前闭合 AI prompt 的 markdown 围栏;与 unescape 天然对称,既有字符串往返不变。
+- **feat(dsl): 治理**:DSL_VERSION 7→8 + 上限常量(DSL_MAX_TAG_COUNT/LINK_COUNT/CODE_BLOCKS/QUOTES)+ `DSL_GRAMMAR_REFERENCE`(AI 面向语法)同步新指令。parser strict 模式对 @code/@quote 豁免重复检查(可重复指令),@tags/@links 重复仍报错。sanitize 加第二道防线(枚举校验 + 上限截断,引用稳定不破合规往返)。
+- **feat(web): apply 写回**:`apply-layout` + `canvas-host-builder` 把 v8 字段经 create/update 写回 Card(createWithId/update);tags 值列表 → TagRef[](颜色走 stableTagColor),links URL → LinkPreview[](fetchedAt=now)。update 走 diff:**相同 tag 值/URL 序列不重写**(保住用户自定义色 / 已抓 link title)。rollback 同步恢复 v8 字段。
+- **feat(web): serialize 消费侧**:dsl-dialog 的 resolve 回调注入 type/tags/links/codeSnippets/quotes → DSL 编辑器读到完整卡片。AI prompt(agent-prompt/retry-until-valid)指引用 @code/@quote 承载代码/引文(而非塞进 @content)。
+- **域类型零改动**(Card/CreateCardInput/UpdateCardPatch 已含字段)。**已知限制**(用户文档注明):media 不往返(image 卡只往返 type);links 仅 URL(预览 title/image 是抓取派生态);多 code/quote 块全往返。
+- **顺手修**:domain card-service 测试用裸 'red'/'blue'(不符 TagColor token)的既有 lint 错(上轮 tag 输入引入,当时 domain lint 未跑)→ 改 token;grammar 注释 stale gen 命令(`web gen:dsl` → `cys-dsl gen`)修正。
+- **测试**:cys-dsl 新增 dsl-fields.test.ts(parse/round-trip/strict/sanitize 29 例);web apply-content +5(create/update/keepExistingPos/多块);版本断言 7→8(cys-dsl + web)。**全包 lint 0 + test 全绿(domain 87 / canvas-engine 585 / cys-dsl 399 / db 8 / web 1754)+ web build exit 0**。
+- **⚠️ 未打包 / 未 push**:preview.6 源码就绪,DMG/NSIS 未构建(待发话);commit 本地未推。
+
 ## 2026-07-23 · 1.1.0-preview.5 · code-review 修补(IME 守卫 + outline 死代码 + toast 抢跑)
 
 - **fix(web): tag 输入加 IME 守卫**:mini-input + create-card-form 的 tag 回车/逗号加 `e.nativeEvent.isComposing` 守卫——中文 IME 选词回车不再误加残词(默认中文用户每次打 tag 都中招的 HIGH bug)。

@@ -176,7 +176,7 @@ export function buildDslCorrection(errors: DslDiagnostic[]): string {
     .slice(0, 8)
     .map((e) => `Line ${e.line}: "${e.text}" — ${e.message}`)
     .join('\n')
-  return `Your previous output was invalid cys-dsl. Fix these errors and regenerate the FULL output (same format, ONLY dsl directives):\n${list}\nMost common cause: @title/@content are string literals — never embed \`\`\` inside them (it breaks the cys-dsl fence), and escape " as \\" and \\ as \\\\.`
+  return `Your previous output was invalid cys-dsl. Fix these errors and regenerate the FULL output (same format, ONLY dsl directives):\n${list}\nMost common cause: @title/@content/@code/@quote are string literals — never embed \`\`\` inside them (it breaks the cys-dsl fence), and escape " as \\" , \\ as \\\\ , newline as \\n , backtick as \\\` .`
 }
 
 export function buildIntentCorrection(errors: DslDiagnostic[]): string {

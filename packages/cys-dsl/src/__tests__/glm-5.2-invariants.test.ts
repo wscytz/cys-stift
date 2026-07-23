@@ -22,8 +22,8 @@ import { parseDsl } from '../dsl-parser'
  */
 describe('glm-5.2 不变量 —— 版本/枚举/隐私/单一源', () => {
   describe('grammar 单一源常量', () => {
-    it('DSL_VERSION === 7(v5 内容 + v6 freedraw 出 DSL + v7 group/href/compute)', () => {
-      expect(DSL_VERSION).toBe(7)
+    it('DSL_VERSION === 8(v5 内容 + v6 freedraw 出 DSL + v7 group/href/compute + v8 卡片结构化字段)', () => {
+      expect(DSL_VERSION).toBe(8)
     })
 
     it('DSL_KINDS 恰好 5 个 active kind(freedraw 出 DSL,顺序锁定)', () => {

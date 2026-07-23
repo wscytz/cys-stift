@@ -11,7 +11,7 @@
  * bump 规则:增删指令种类 / 增删属性 / 改颜色枚举 → bump DSL_VERSION。
  * 纯改 prompt 措辞、改 parser 正则细节(不动语法)→ 不 bump。
  */
-export const DSL_VERSION = 7
+export const DSL_VERSION = 8
 
 /**
  * `@text("...")` / `@label("...")` / `@title("...")` 值的最大字符数(int 级)。
@@ -48,6 +48,54 @@ export const DSL_MAX_CONTENT_LEN = 8000
 export const DSL_MAX_HREF_TARGETS = 20
 
 /**
+ * `@tags(a;b;c)` 标签最大个数(v8:卡片标签列表)。
+ *
+ * 防护:AI 输出不可信,可能产超长标签列表 → 存储膨胀 / 渲染卡顿(DoS)。parser 解析 @tags
+ * 时把个数**静默截断**到上限(保前 N 个,不报错)。20 远超正常一张卡的标签数(典型 <5)。
+ *
+ * 不 bump DSL_VERSION:parser 防护,不改语法形态(语法层面 @tags 仍接任意长 `;` 列表)。
+ */
+export const DSL_MAX_TAG_COUNT = 20
+
+/**
+ * `@links(<url>;…)` 链接最大个数(v8:卡片外链列表,仅 URL)。
+ *
+ * 防护同 @tags。10 覆盖正常一张卡的外链数(典型 1-3)。
+ *
+ * 不 bump DSL_VERSION:parser 防护,不改语法形态。
+ */
+export const DSL_MAX_LINK_COUNT = 10
+
+/**
+ * `@code(…)` 代码块最大个数(v8:卡片代码片段,可重复指令)。
+ *
+ * 防护:多 @code 指令累积,上限防 LLM 失控膨胀。8 远超正常一张卡的代码块数(典型 1)。
+ *
+ * 不 bump DSL_VERSION:parser 防护,不改语法形态。
+ */
+export const DSL_MAX_CODE_BLOCKS = 8
+
+/**
+ * `@quote(…)` 引文最大个数(v8:卡片引文,可重复指令)。
+ *
+ * 防护同 @code。8 远超正常一张卡的引文数(典型 1)。
+ *
+ * 不 bump DSL_VERSION:parser 防护,不改语法形态。
+ */
+export const DSL_MAX_QUOTES = 8
+
+/**
+ * `@type(…)` 合法值(v8:卡片语义类型,镜像 domain CardType)。
+ *
+ * 声明性事实,放语法单一可信源。parser(validEnum 收窄)与 sanitize(二次枚举校验)共用,
+ * 消除两处重复列表。media 不进 DSL,故 image 卡只往返 type。
+ *
+ * 不 bump DSL_VERSION 于本常量本身:它是 @type 指令的值域(增删此枚举值 = 改语法 → bump,见上)。
+ */
+export const DSL_CARD_TYPES = ['note', 'image', 'link', 'code', 'quote'] as const
+export type DslCardType = (typeof DSL_CARD_TYPES)[number]
+
+/**
  * 文本截断到 max 个 UTF-16 码元,**不劈开代理对**(emoji / 增补平面字符占 2 码元)。
  *
  * 若切点正好落在高代理位(其配对的低代理位在 max 处、会被切掉),回退一位 —— 避免产生
@@ -82,15 +130,25 @@ export const DSL_COLOR_ALIASES: Record<string, DslColor> = { grey: 'gray' }
  * 故意不含 [freedraw #id]——freedraw 不在 DSL(程序自管:R2 + 渲染;点序列重/意义低/隐私),AI 不该也不产。
  */
 export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one element per line):
-  [card #id] @pos(x, y) @size(w, h) @color(red|yellow|blue|black|white|gray|grey) [@title("…")] [@content("…")] [@group("…")] [@href(#a;#b)]
-  [card #id create] @pos(x, y) @size(w, h) @color(c) [@title("…")] [@content("…")]   # create a card; id must not exist
+  [card #id] @pos(x, y) @size(w, h) @color(red|yellow|blue|black|white|gray|grey) [@title("…")] [@content("…")] [@group("…")] [@href(#a;#b)] [@type(…)] [@tags(…)] [@links(…)] [@code(…)]… [@quote(…)]…
+  [card #id create] @pos(x, y) @size(w, h) @color(c) [@title("…")] [@content("…")] [@type(…)] [@tags(…)] [@links(…)] [@code(…)]… [@quote(…)]…   # create a card; id must not exist
   #   @title: short card title (≤200 chars, int-tier). @content: long markdown body (≤8000 chars, long-tier).
-  #   Quoted-string escapes: \\" = quote, \\\\ = backslash, \\n = newline (so @content carries multi-line markdown on one DSL line).
+  #   Quoted-string escapes: \\" = quote, \\\\ = backslash, \\n = newline, \\\` = backtick (so @content/@code carry multi-line markdown or code on one DSL line).
   #   @group("name") (v7): tag the card with a semantic group name (grouping/styling is a view concern, not DSL state).
   #     Assign a group to an EXISTING card without moving it: [card #id] @group("name") (no @pos needed).
   #   @href(#a;#b) (v7): declare explicit semantic links from this card to other card ids — a knowledge-graph edge
   #     with NO arrow drawn (distinct from body [[wikilinks]] which auto-build reference arrows). Semicolon-separated,
   #     leading # optional, deduped, ≤20 targets.
+  #   @type(note|image|link|code|quote) (v8): the card's semantic type. One value. image carries no binary (media is
+  #     excluded from DSL — heavy/privacy), so an image card round-trips its type only.
+  #   @tags(a;b;c) (v8): the card's tags as one semicolon-separated list (each value URL-encoded, ≤20). Single directive.
+  #   @links(<url>;…) (v8): the card's external links as one semicolon-separated list of URL-ENCODED urls (≤10).
+  #     Only the URL round-trips (link-preview title/image are fetch-derived state, not DSL). Single directive.
+  #   @code(lang,"code"[,"caption"]) (v8): one code block — lang is a bare token (ts/py/js/…), code is a quoted string
+  #     (escapes carry newlines/quotes/backticks). REPEATABLE: emit one @code per block (≤8). caption optional.
+  #   @quote("text"[,"attribution"[,"sourceUrl"]]) (v8): one quotation — text quoted, attribution/sourceUrl optional quoted.
+  #     REPEATABLE: emit one @quote per quotation (≤8). Trailing args may be "" when a later one is present.
+  #   Edit an EXISTING card's type/tags/links/code/quote in place WITHOUT moving it — omit @pos (geometry kept), same as @title/@content.
   # relational placement — PREFER for structured layouts (trees, lists, grids, hierarchies;
   #   anything row/column-shaped). The engine computes coords AND avoids overlaps, so you skip
   #   error-prone coordinate math. Reserve @pos for free/scattered positioning only:
@@ -115,6 +173,7 @@ export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one eleme
   #   manual references arrows so the marker survives DSL round-trip.
 Rules: card updates are the default; explicit create persists a new card before its host element (title/content optional).
   @title/@content (v5) update an existing card's title/body; "" clears it, omit to leave unchanged.
+  @type/@tags/@links/@code/@quote (v8) update an existing card's structured fields the same way (omit to leave unchanged).
   To edit an EXISTING card's content/color/size WITHOUT moving it, omit @pos (geometry is kept):
   [card #id] @title("…") @content("…")   # content-only edit, position preserved
   [card #id] @color(c)                   # recolor in place

@@ -110,3 +110,83 @@ describe('applyLayout v5 — DSL apply 写卡片内容(@title/@content)', () => 
     expect(updated).toMatchObject({ cardId: 'c1', title: '', content: '' })
   })
 })
+
+/**
+ * v8 集成:DSL 带 @type/@tags/@links/@code/@quote 时,applyLayout 经 onCardCreate/onCardUpdate
+ * 把结构化字段桥接到 CardService 侧(CanvasElement 无这些字段)。tags 是值列表(web 指派颜色),
+ * links 是 URL 列表(web 映射 LinkPreview),code/quotes 是完整对象。
+ */
+describe('applyLayout v8 — DSL apply 写卡片结构化字段(@type/@tags/@links/@code/@quote)', () => {
+  const enc = encodeURIComponent
+
+  it('card-create with v8 fields → onCardCreate 收到 cardType/tags/links/code/quotes', () => {
+    const host = new InMemoryCanvasHost()
+    let created: CardCreateParams | undefined
+    const ops = parseDsl(
+      `[card #c1 create] @pos(10,20) @size(100,80) @type(code) @tags(a;b) @links(${enc('https://x.com/p?q=1')}) @code(ts,"const a=1") @quote("q text","by me")`,
+    )
+    applyLayout(host, ops, undefined, (p) => {
+      created = p
+      return { ok: true }
+    })
+    expect(created).toMatchObject({
+      cardId: 'c1',
+      cardType: 'code',
+      tags: ['a', 'b'],
+      links: ['https://x.com/p?q=1'],
+      code: [{ language: 'ts', code: 'const a=1' }],
+      quotes: [{ text: 'q text', attribution: 'by me' }],
+    })
+  })
+
+  it('card-update with v8 fields → onCardUpdate 收到结构化字段', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 80, rotation: 0 })
+    let updated: CardUpdateContent | undefined
+    const ops = parseDsl(`[card #c1] @pos(0,0) @type(quote) @tags(x;y) @code(py,"print(1)","cap") @quote("a") @quote("b")`)
+    applyLayout(host, ops, undefined, undefined, (p) => {
+      updated = p
+    })
+    expect(updated).toMatchObject({
+      cardId: 'c1',
+      cardType: 'quote',
+      tags: ['x', 'y'],
+      code: [{ language: 'py', code: 'print(1)', caption: 'cap' }],
+      quotes: [{ text: 'a' }, { text: 'b' }],
+    })
+  })
+
+  it('多 @code/@quote 累积进数组(multi-block cornerstone 穿到 apply 层)', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    let updated: CardUpdateContent | undefined
+    const ops = parseDsl('[card #c1] @pos(0,0) @code(ts,"a") @code(js,"b") @code(py,"c")')
+    applyLayout(host, ops, undefined, undefined, (p) => {
+      updated = p
+    })
+    expect(updated?.code).toHaveLength(3)
+  })
+
+  it('v8: 无 @pos 的纯结构化编辑 → keepExistingPos 触发 + 几何沿用 + onCardUpdate 收到字段', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'c1', kind: 'card', x: 50, y: 60, w: 100, h: 80, rotation: 0 })
+    let updated: CardUpdateContent | undefined
+    const ops = parseDsl('[card #c1] @type(link) @tags(newtag)')
+    applyLayout(host, ops, undefined, undefined, (p) => {
+      updated = p
+    })
+    expect(updated).toMatchObject({ cardId: 'c1', cardType: 'link', tags: ['newtag'] })
+    expect(host.getElement('c1')).toMatchObject({ x: 50, y: 60, w: 100, h: 80 })
+  })
+
+  it('v8: 无结构化字段的几何编辑 → onCardUpdate 不被调用(不回归)', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    let called = false
+    const ops = parseDsl('[card #c1] @pos(30,40)')
+    applyLayout(host, ops, undefined, undefined, () => {
+      called = true
+    })
+    expect(called).toBe(false)
+  })
+})

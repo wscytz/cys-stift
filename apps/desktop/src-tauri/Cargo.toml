@@ -1,6 +1,6 @@
 [package]
 name = "cys-stift"
-version = "1.1.0-preview.5"
+version = "1.1.0-preview.6"
 description = "cy's Stift — local-first inspiration canvas"
 authors = ["cy"]
 edition = "2021"

@@ -18,8 +18,9 @@
  * 【引用提取】[card #id] 模式提取,UI 渲染成可点链接(开 CardDetailModal)。
  *
  * 【R2 安全】RAG 走 serializeCardsForAI(allowlist:无 deviceId/media.dataUrl/apiKey;
- * 软删卡过滤)。DSL v6 可携带 @title/@content,但不含 apiKey/媒体二进制/freedraw;
- * 卡片内容写入仍经过严格 parser → 预演/确认门 → 事务回写。不手拼卡片字符串。
+ * 软删卡过滤)。DSL v8 可携带 @title/@content/@type/@tags/@links/@code/@quote,但**不含** apiKey/
+ * 媒体二进制/freedraw(media 故意排除);卡片内容写入仍经过严格 parser → 预演/确认门 → 事务回写。
+ * 不手拼卡片字符串。
  */
 import type { Card } from '@cys-stift/domain'
 import { searchCards } from '@cys-stift/domain'
@@ -50,10 +51,11 @@ DSL output contract (CRITICAL — a regex extracts the block):
 - Wrap DSL in a single \`\`\`cys-dsl fence. One block per reply.
 - Each directive line MUST start with "[" — use the exact forms in the grammar above.
 - Use @title/@content when the user's request creates or edits card content; omit them for geometry-only changes. Empty strings explicitly clear title/content.
-- @title/@content are DSL STRING LITERALS — CRITICAL escaping rules, or the cys-dsl fence breaks and your whole reply is lost:
-  - NEVER embed a triple-backtick fence inside @title/@content — it prematurely closes the outer cys-dsl fence and your whole reply is lost. If the user wants a code block, put it in prose OUTSIDE the DSL block, not inside @content.
-  - Escape every double-quote as \" and every backslash as \\ inside the string.
-  - Keep content as plain text or simple markdown (headings / **bold** / lists). No fenced code blocks inside content.
+- For a card whose payload is code or a quotation, PREFER the structured directives @code(lang,"code") and @quote("text"[,"by"[,"url"]]) (both repeatable — one per block/quote) over cramming code into @content. Set @type accordingly (code|quote|link|note|image). Use @tags(a;b) for tags and @links(<url>) for external links.
+- @title/@content/@code/@quote are DSL STRING LITERALS — CRITICAL escaping rules, or the cys-dsl fence breaks and your whole reply is lost:
+  - NEVER emit a raw triple-backtick fence inside a quoted value — it prematurely closes the outer cys-dsl fence and your whole reply is lost. If code itself contains backticks, escape each as \\\`.
+  - Escape every double-quote as \\" , every backslash as \\\\ , and every newline as \\n inside the string.
+  - Keep @content as plain text or simple markdown (headings / **bold** / lists); put actual code in @code, not @content.
 - Reuse an existing #id to UPDATE it (content/color/size-only edits may omit @pos and preserve geometry); to CREATE a new card use [card #newid create] with @pos and optional @title/@content.
 - Do NOT invent syntax like "reuse #id" or "update #id" — always use the [kind #id] form.
 

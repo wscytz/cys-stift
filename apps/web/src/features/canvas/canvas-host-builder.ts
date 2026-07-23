@@ -21,13 +21,56 @@
  * 不碰 deviceId / media.dataUrl。freeform store 本就不含 card 内容。
  */
 import { InMemoryCanvasHost, type CanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
-import type { CanvasId, CardId, CardService, Card, ColorToken } from '@cys-stift/domain'
+import type { CanvasId, CardId, CardService, Card, ColorToken, CardType, TagRef, LinkPreview, CodeBlock, Quote } from '@cys-stift/domain'
 import { canvasFreeformStore } from '@/lib/canvas-freeform-store'
+import { stableTagColor } from '@/lib/tag-color'
 import { loadCardsIntoEditor, cardToElement, elementToCardPosition } from './canvas-binding'
 import { applyLayout, type ApplyOpResult } from './apply-layout'
 import type { SanitizeDiagnostic } from '@cys-stift/dsl'
 import type { DslOp } from '@cys-stift/dsl'
 import { freeformElementsOf } from './canvas-freeform-binding'
+
+/** v8:DSL 结构化字段 → domain 写入字段。tags 值列表 → TagRef[](颜色走 stableTagColor,与 capture/inbox
+ *  建卡一致);links URL 列表 → LinkPreview[](fetchedAt=now;title/ogImage 是抓取派生态,DSL 不携带);
+ *  code/quotes/type 直传。create 与 update 两路共用。 */
+function v8ToDomainFields(v8: {
+  cardType?: CardType
+  tags?: string[]
+  links?: string[]
+  code?: CodeBlock[]
+  quotes?: Quote[]
+}): {
+  type?: CardType
+  tags?: TagRef[]
+  links?: LinkPreview[]
+  codeSnippets?: CodeBlock[]
+  quotes?: Quote[]
+} {
+  const fetchedAt = new Date()
+  return {
+    ...(v8.cardType !== undefined ? { type: v8.cardType } : {}),
+    ...(v8.tags !== undefined
+      ? { tags: v8.tags.map((value) => ({ value, color: stableTagColor(value) })) }
+      : {}),
+    ...(v8.links !== undefined
+      ? { links: v8.links.map((url) => ({ url, fetchedAt })) }
+      : {}),
+    ...(v8.code !== undefined ? { codeSnippets: v8.code } : {}),
+    ...(v8.quotes !== undefined ? { quotes: v8.quotes } : {}),
+  }
+}
+
+/** tags 值序列是否相同(忽略颜色 —— DSL 只携带值;相同值不重写,保住用户自定义色)。 */
+function sameTagValues(existing: TagRef[] | undefined, next: TagRef[]): boolean {
+  if (!existing || existing.length !== next.length) return false
+  return next.every((t, i) => existing[i]?.value === t.value)
+}
+
+/** links URL 序列是否相同(忽略 fetchedAt/title —— DSL 只携带 URL;相同 URL 不重写,保住已抓 title)。 */
+function sameLinkUrls(existing: LinkPreview[] | undefined, next: LinkPreview[]): boolean {
+  if (!existing || existing.length !== next.length) return false
+  return next.every((l, i) => existing[i]?.url === l.url)
+}
 
 /**
  * 构建目标画布的临时 host(只读快照):cards(listOnCanvas 过滤 archived/deleted)
@@ -116,16 +159,21 @@ export async function applyOpsAndPersist(
   // 也必须把这张尚未可见的 ghost card 一并清掉。
   const createdCardIds: CardId[] = []
   // onCardCreate:create 指令落 service.createWithId。v5:带 @title/@content 时即写入
-  // (不再落空标题卡);几何 + 颜色来自 DSL。后续 applyLayout 会在 host 里 upsert 该 card
-  // 元素,统一进 after 回写。
-  const result = applyLayout(host, ops, undefined, ({ cardId, x, y, w, h, color, title, content }) => {
+  // (不再落空标题卡);v8:带 @type/@tags/@links/@code/@quote 时一并写入。几何 + 颜色来自 DSL。
+  // 后续 applyLayout 会在 host 里 upsert 该 card 元素,统一进 after 回写。
+  const result = applyLayout(host, ops, undefined, ({ cardId, x, y, w, h, color, title, content, cardType, tags, links, code, quotes }) => {
     try {
+      const v8 = v8ToDomainFields({ cardType, tags, links, code, quotes })
       service.createWithId(cardId as CardId, {
         title: title ?? '',
         body: content ?? '',
-        type: 'note',
+        type: cardType ?? 'note',
         canvasPosition: { canvasId, x, y, w, h, z: Date.now(), rotation: 0 },
         ...(color ? { color: color as ColorToken } : {}),
+        ...(v8.tags !== undefined ? { tags: v8.tags } : {}),
+        ...(v8.links !== undefined ? { links: v8.links } : {}),
+        ...(v8.codeSnippets !== undefined ? { codeSnippets: v8.codeSnippets } : {}),
+        ...(v8.quotes !== undefined ? { quotes: v8.quotes } : {}),
         source: { kind: 'manual', deviceId: 'ask-agent' },
       })
       createdCardIds.push(cardId as CardId)
@@ -152,15 +200,29 @@ export async function applyOpsAndPersist(
       )
       .map((entry) => (entry.op as Extract<DslOp, { type: 'card' }>).cardId as CardId),
   )
-  // v5:从 opResults 收集 update 指令携带的 @title/@content(card op、非 create)。post-hoc
-  // 回写循环据此把内容写回 Card.title/body(与几何/颜色同阶段,保持 /ask 事务模型单一)。
-  const contentByCardId = new Map<CardId, { title?: string; body?: string }>()
+  // v5:从 opResults 收集 update 指令携带的 @title/@content(card op、非 create)。v8:同机制扩到
+  // @type/@tags/@links/@code/@quote。post-hoc 回写循环据此写回 Card(与几何/颜色同阶段,保持 /ask 事务模型单一)。
+  const contentByCardId = new Map<
+    CardId,
+    { title?: string; body?: string; cardType?: CardType; tags?: string[]; links?: string[]; code?: CodeBlock[]; quotes?: Quote[] }
+  >()
   for (const entry of result.opResults) {
     if (entry.op.type !== 'card' || entry.op.create) continue
-    if (entry.op.title === undefined && entry.op.content === undefined) continue
-    contentByCardId.set(entry.op.cardId as CardId, {
-      ...(entry.op.title !== undefined ? { title: entry.op.title } : {}),
-      ...(entry.op.content !== undefined ? { body: entry.op.content } : {}),
+    const op = entry.op
+    if (
+      op.title === undefined && op.content === undefined && op.cardType === undefined &&
+      op.tags === undefined && op.links === undefined && op.code === undefined && op.quotes === undefined
+    ) {
+      continue
+    }
+    contentByCardId.set(op.cardId as CardId, {
+      ...(op.title !== undefined ? { title: op.title } : {}),
+      ...(op.content !== undefined ? { body: op.content } : {}),
+      ...(op.cardType !== undefined ? { cardType: op.cardType } : {}),
+      ...(op.tags !== undefined ? { tags: op.tags } : {}),
+      ...(op.links !== undefined ? { links: op.links } : {}),
+      ...(op.code !== undefined ? { code: op.code } : {}),
+      ...(op.quotes !== undefined ? { quotes: op.quotes } : {}),
     })
   }
 
@@ -234,12 +296,29 @@ export async function applyOpsAndPersist(
           console.warn('[canvas-host-builder] card color rollback failed', id, error)
         }
       }
-      // v5:恢复标题/正文(content writeback 回滚)。beforeCards 是全卡快照;重新取 current
-      // (几何/颜色写回后旧引用已陈旧)。
+      // v5:恢复标题/正文(content writeback 回滚)。v8:同机制恢复 type/tags/links/codeSnippets/quotes。
+      // beforeCards 是全卡快照;重新取 current(几何/颜色写回后旧引用已陈旧)。
       const now = service.get(id)
-      if (now && (previous.title !== now.title || previous.body !== now.body)) {
+      if (
+        now &&
+        (previous.title !== now.title ||
+          previous.body !== now.body ||
+          previous.type !== now.type ||
+          JSON.stringify(previous.tags) !== JSON.stringify(now.tags) ||
+          JSON.stringify(previous.codeSnippets) !== JSON.stringify(now.codeSnippets) ||
+          JSON.stringify(previous.quotes) !== JSON.stringify(now.quotes) ||
+          JSON.stringify((previous.links ?? []).map((l) => l.url)) !== JSON.stringify((now.links ?? []).map((l) => l.url)))
+      ) {
         try {
-          const restored = service.update(id, { title: previous.title, body: previous.body }) as unknown
+          const restored = service.update(id, {
+            title: previous.title,
+            body: previous.body,
+            type: previous.type,
+            tags: previous.tags,
+            links: previous.links,
+            codeSnippets: previous.codeSnippets,
+            quotes: previous.quotes,
+          }) as unknown
           if (restored === null || restored === false || restored === undefined) ok = false
         } catch (error) {
           ok = false
@@ -385,18 +464,38 @@ export async function applyOpsAndPersist(
       }
       opCounted = true
     }
-    // v5:内容写回(@title/@content)。与几何/颜色同阶段;只传发生变化的字段;失败 →
-    // cardUpdatesFailed(触发整体回滚,见 makeFailure)。
+    // v5:内容写回(@title/@content)。v8:同机制扩到 @type/@tags/@links/@code/@quote。与几何/颜色同阶段;
+    // 只传发生变化的字段;失败 → cardUpdatesFailed(触发整体回滚,见 makeFailure)。
     const contentPatch = contentByCardId.get(cardId)
     if (contentPatch) {
-      const patch: { title?: string; body?: string } = {}
+      const patch: {
+        title?: string
+        body?: string
+        type?: CardType
+        tags?: TagRef[]
+        links?: LinkPreview[]
+        codeSnippets?: CodeBlock[]
+        quotes?: Quote[]
+      } = {}
       if (contentPatch.title !== undefined && contentPatch.title !== card.title) {
         patch.title = contentPatch.title
       }
       if (contentPatch.body !== undefined && contentPatch.body !== card.body) {
         patch.body = contentPatch.body
       }
-      if (patch.title !== undefined || patch.body !== undefined) {
+      // v8:结构化字段。diff 保住用户数据 —— tags/links 值/URL 序列相同则不重写(保住自定义色/已抓 title);
+      //     code/quotes 用 JSON 比较(无 Date 干扰)。
+      const v8 = v8ToDomainFields(contentPatch)
+      if (v8.type !== undefined && v8.type !== card.type) patch.type = v8.type
+      if (v8.tags !== undefined && !sameTagValues(card.tags, v8.tags)) patch.tags = v8.tags
+      if (v8.links !== undefined && !sameLinkUrls(card.links, v8.links)) patch.links = v8.links
+      if (v8.codeSnippets !== undefined && JSON.stringify(v8.codeSnippets) !== JSON.stringify(card.codeSnippets)) {
+        patch.codeSnippets = v8.codeSnippets
+      }
+      if (v8.quotes !== undefined && JSON.stringify(v8.quotes) !== JSON.stringify(card.quotes)) {
+        patch.quotes = v8.quotes
+      }
+      if (Object.keys(patch).length > 0) {
         let updated: unknown = null
         try {
           updated = service.update(card.id, patch) as unknown

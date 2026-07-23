@@ -29,8 +29,8 @@ function card(id: string, title: string, body = ''): Card {
 }
 
 describe('AGENT_SYSTEM_PROMPT', () => {
-  it('含 cys-dsl v7 输出契约 + 内容能力 + 引用格式 + 能力分诊', () => {
-    expect(AGENT_SYSTEM_PROMPT).toContain('cys-dsl grammar v7')
+  it('含 cys-dsl v8 输出契约 + 内容能力 + 引用格式 + 能力分诊', () => {
+    expect(AGENT_SYSTEM_PROMPT).toContain('cys-dsl grammar v8')
     expect(AGENT_SYSTEM_PROMPT).toContain('[card #id]')
     expect(AGENT_SYSTEM_PROMPT).toContain('UPDATE')
     expect(AGENT_SYSTEM_PROMPT).toContain('create')
@@ -40,6 +40,12 @@ describe('AGENT_SYSTEM_PROMPT', () => {
     expect(AGENT_SYSTEM_PROMPT).toContain('@group')
     expect(AGENT_SYSTEM_PROMPT).toContain('@href')
     expect(AGENT_SYSTEM_PROMPT).toContain('@compute')
+    // v8:卡片结构化字段指令(type/tags/links/code/quote)也必须出现在语法参考里。
+    expect(AGENT_SYSTEM_PROMPT).toContain('@type(')
+    expect(AGENT_SYSTEM_PROMPT).toContain('@tags(')
+    expect(AGENT_SYSTEM_PROMPT).toContain('@links(')
+    expect(AGENT_SYSTEM_PROMPT).toContain('@code(')
+    expect(AGENT_SYSTEM_PROMPT).toContain('@quote(')
     expect(AGENT_SYSTEM_PROMPT).not.toContain('[freedraw #id]')
     expect(AGENT_SYSTEM_PROMPT).not.toContain('NEVER put card titles')
   })
