@@ -5,6 +5,13 @@
 
 ---
 
+## 2026-07-23 · 1.1.0-preview.5 · code-review 修补(IME 守卫 + outline 死代码 + toast 抢跑)
+
+- **fix(web): tag 输入加 IME 守卫**:mini-input + create-card-form 的 tag 回车/逗号加 `e.nativeEvent.isComposing` 守卫——中文 IME 选词回车不再误加残词(默认中文用户每次打 tag 都中招的 HIGH bug)。
+- **fix(web): AI 大纲 outline 去死代码**:`service.create()` 配额满抛错(不返 null),`if (!created)` 不可达——移除;配额走外层 try/catch。
+- **fix(web): 工作台「存为新卡」toast 不抢跑**:`onAIAppendNew` 改返 promise(失败 reject + 已推 error toast),工作台 await 后再显 success。
+- **⚠️ UNCERTAIN(留实测)**:DeepSeek/Qwen 自由文本开思考(`thinking:enabled`/`enable_thinking`)格式对(文档),但未对 deepseek-chat/qwen-plus 实跑——测时留意 400/静默忽略。
+
 ## 2026-07-23 · 1.1.0-preview.4 · capture/inbox tag 输入 + AI 大纲落画布
 
 承接用户选定方向(⑥⑦;⑤ v8 范围评估 + ① 思维导图差异化文档见私仓):
