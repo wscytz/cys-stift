@@ -390,6 +390,29 @@ describe('settingsStore — multi-profile CRUD', () => {
     expect(store.get().profiles).toHaveLength(1)
   })
 
+  it('upsertProfile auto-activates when no valid active exists (save ≠ activate was a bug)', () => {
+    // 根因:保存 profile 后 activeProfileId 仍为 null → getCurrentAI() 返回 null
+    // → isAIReady=false → ✨AI 永远跳 setup 卡。无有效 active 时,保存即激活。
+    expect(store.get().activeProfileId).toBeNull()
+    store.upsertProfile(profile('p1'))
+    expect(store.get().activeProfileId).toBe('p1')
+  })
+
+  it('upsertProfile does not steal active when a valid one already exists', () => {
+    store.upsertProfile(profile('p1'))
+    store.upsertProfile(profile('p2', 'anthropic'))
+    expect(store.get().activeProfileId).toBe('p1') // 第二个不抢已存在的 active
+  })
+
+  it('upsertProfile re-activates an existing saved-but-inactive profile (the DeepSeek case)', () => {
+    // 用户已保存 profile 但未激活(activeProfileId=null),再次保存(更新)应自动激活。
+    store.upsertProfile(profile('p1'))
+    store.setActiveProfile(null) // 模拟「存了没激活」
+    expect(store.get().activeProfileId).toBeNull()
+    store.upsertProfile({ ...profile('p1'), apiKey: 'sk-deepseek' }) // 更新已存在
+    expect(store.get().activeProfileId).toBe('p1')
+  })
+
   it('setActiveProfile sets activeProfileId', () => {
     store.upsertProfile(profile('p1'))
     store.setActiveProfile('p1')

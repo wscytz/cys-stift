@@ -477,7 +477,14 @@ export const settingsStore = {
     const profiles = idx >= 0
       ? _settings.profiles.map((x) => (x.id === p.id ? p : x))
       : [..._settings.profiles, p]
-    _settings = { ..._settings, profiles }
+    // 自动激活:当前无有效 active(null 或指向已不存在)时,把刚保存的 profile 设为 active。
+    // 修「保存≠激活」陷阱 —— 否则用户保存 profile 后 activeProfileId 仍为 null,
+    // getCurrentAI() 返回 null → isAIReady=false → ✨AI 永远跳 setup 卡(「配置了却无效」)。
+    // 已有有效 active 时不抢(对齐 deleteProfile 的自动切活逻辑);不限新建,覆盖已存档未激活。
+    const activeValid =
+      _settings.activeProfileId !== null && profiles.some((x) => x.id === _settings.activeProfileId)
+    const activeProfileId = !activeValid ? p.id : _settings.activeProfileId
+    _settings = { ..._settings, profiles, activeProfileId }
     if (!saveSettings(_settings)) {
       _settings = prev
       notifyQuota()

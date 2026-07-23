@@ -969,7 +969,7 @@ export const messages = {
   'ai.suggestion': { zh: 'AI 建议', en: 'AI suggestion' },
   'ai.streaming': { zh: '生成中…', en: 'Streaming…' },
   'ai.setup.title': { zh: '✨ AI 尚未启用', en: '✨ AI not enabled yet' },
-  'ai.setup.lede': { zh: '最快的方式：装一个 Ollama，完全本地、免费、私密，无需 API key。', en: 'Fastest path: run Ollama — fully local, free, private, no API key.' },
+  'ai.setup.lede': { zh: '最快的方式：装一个 Ollama，完全本地、免费、私密，无需 API key。若你已配置（如 DeepSeek）仍见此卡，到设置里确认该 profile 已「启用」并点「设为当前」。', en: 'Fastest path: run Ollama — fully local, free, private, no API key. If you already configured a provider (e.g. DeepSeek) but still see this, open Settings, make sure that profile is "enabled" and click "Set active".' },
   'ai.setup.goto': { zh: '去设置', en: 'Go to settings' },
   'ai.menu.title': { zh: '✨ AI', en: '✨ AI' },
   'ai.menu.summarize': { zh: 'AI 摘要', en: 'AI summarize' },
