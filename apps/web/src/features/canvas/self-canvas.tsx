@@ -93,6 +93,13 @@ export function SelfCanvas({
   const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(null)
   const [accessibleAdapter, setAccessibleAdapter] = useState<SelfBuiltAdapter | null>(null)
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // hide 防抖:离开卡/浮层不立即消失(免"一闪而过"),延迟 400ms;再进入卡或浮层则取消。
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cancelHide = () => { if (hideTimer.current) { clearTimeout(hideTimer.current); hideTimer.current = null } }
+  const scheduleHide = () => {
+    if (hideTimer.current) clearTimeout(hideTimer.current)
+    hideTimer.current = setTimeout(() => { setHoveredCardId(null); setPopoverPos(null) }, 400)
+  }
   // Bug 7: mirror the in-progress edit state into refs so an unmount cleanup
   // (canvas switch) can commit the latest typed text. `commitEdit` reads
   // component state, but on unmount React captures the last-render values —
@@ -214,6 +221,7 @@ export function SelfCanvas({
     if (hitId !== hoveredCardId) {
       if (hoverTimer.current) clearTimeout(hoverTimer.current)
       if (hitId) {
+        cancelHide() // 进入卡 → 取消任何待隐藏
         const el = adapter.getElement(hitId)
         const view = adapter.getView()
         if (el) {
@@ -224,15 +232,13 @@ export function SelfCanvas({
           }, 300)
         }
       } else {
-        setHoveredCardId(null)
-        setPopoverPos(null)
+        scheduleHide() // 离开卡 → 延迟隐藏(不再瞬移消失)
       }
     }
   }
   const onPointerLeave = () => {
     if (hoverTimer.current) clearTimeout(hoverTimer.current)
-    setHoveredCardId(null)
-    setPopoverPos(null)
+    scheduleHide()
   }
 
   // 双击开卡:select 模式下 dblclick 命中卡元素 → onOpenCard。
@@ -422,6 +428,8 @@ export function SelfCanvas({
             card={c}
             onEdit={() => onOpenCard(c)}
             style={{ left: popoverPos.x, top: popoverPos.y }}
+            onMouseEnter={cancelHide}
+            onMouseLeave={scheduleHide}
           />
         )
       })()}

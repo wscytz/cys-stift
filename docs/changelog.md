@@ -13,6 +13,7 @@
 - **fix(canvas-engine): font-family 属性转义 + frame halo 走 token**:字体属性值裹 `esc()`(双引号字体名不再劈开 XML,单引号 token 是 no-op,不破生产);frame 标题 halo `fill="white"` → `tokenResolver('--color-white')`(与 text/arrow halo 同源)。
 - **refactor(canvas-engine): 词界换行(统一 `wrapText`)**:新增纯函数 `wrapText(text, maxWidth, measureFn)`——拉丁词不从中间劈开(`yellow` 不再断成 `yell/ow`),CJK/全角任意位置可断,放不下的超宽单词按字回退(CSS `overflow-wrap: break-word` 语义,免溢出卡宽)。`wrapLines` 与 `estimateSoftWrap` 两份重复的逐字换行逻辑统一委托它。无空格长串走回退分支,行数/卡高不变。
 - **feat(canvas-engine): 截断末行补 `…`**:compact/auto body 超行数上限(默认 compact=3)被截时,末可见行补 `…`,明示卡里还有更多内容。导出与实时渲染同源逻辑;放得下无 `…`。
+- **fix(web): 画布 hover 只读速览不再局促/一闪而过**:`CardPreviewPopover` 加宽(200-320→280-440px)、字号放大(xs/sm→sm/base)、标题换行不截断(最多 2 行)、正文区加高;`self-canvas` 离开卡/浮层改 400ms 延迟隐藏(原瞬移消失)+ 悬停浮层本身保持,可移进去读/滚。
 - **研究出处**:私仓 `docs/research/2026-07-23-ai-canvas-bridge-demo.md`(外部 AI 读写 DSL 驱动画布实证)+ `2026-07-23-dsl-export-image-test.md`(出图实测 + 问题自查)。
 - **测试**:canvas-engine +11(elements-to-svg 导出 5 / wrapText 4 / 截断 … 2)。canvas-engine 585 / web 1738 / lint 0 / build 0。
 
