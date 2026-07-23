@@ -59,19 +59,19 @@
 
 **其他** —— 命令面板(⌘K)+ 标签墙 `/tags`(六色 canonical 调色板)+ 时间线 `/timeline`(全局)+ 全文搜索(title 加权 + 摘要)+ 软删恢复 + JSON 导出/导入(含画布几何 + freeform + 本机恢复点)+ 中英双语。
 
-完整能力见 [`docs/STATE.md`](docs/STATE.md)「当前能力」段。
+完整能力见最新 [Release notes](https://github.com/wscytz/cys-stift/releases) 与 [`docs/changelog.md`](docs/changelog.md)。
 
-产品工作流展示：本地应用内 [`/showcase`](http://localhost:3000/showcase/)；独立静态预览页为 [wscytz.com/cys-stift](https://wscytz.com/cys-stift/)。两者展示 **1.0.0** 的核心能力边界。
+产品工作流展示见独立静态预览页 [wscytz.com/cys-stift](https://wscytz.com/cys-stift/)。(本地开发态的 `/showcase` 由 `pnpm dev` 起在 http://localhost:3000/showcase,供贡献者自查,不代表某个已发布版本。)
 
 ---
 
 ## 状态
 
-**1.0.0** — 首个稳定版(版本源见根 `package.json`)。核心闭环、恢复事务、DSL v4 与跨平台构建流水线已冻结；签名/公证、实机无障碍与真实 provider 证据继续作为发布后加固工作。
+**v1.0.0** — 首个稳定版,已在 GitHub Release 发布。核心闭环、恢复事务、cys-dsl v4 与跨平台构建流水线已冻结；签名/公证、实机无障碍与真实 provider 证据继续作为发布后加固工作。`main` 分支当前为 `1.1.0`(post-release,已升级到 cys-dsl v7,尚未 tag)。
 
 DSL 的实现与内部稳定性验证已经具备，但“普通用户是否愿意学习并重复使用”仍是待外部研究验证的产品假设；README 和展示页不会把内部测试写成用户价值结论。
 
-当前状态、版本里程碑、下一步、已知 debt 全见 [`docs/STATE.md`](docs/STATE.md) — 单一可信源。历史见 [`docs/changelog.md`](docs/changelog.md)。
+版本里程碑与变更历史见 [`docs/changelog.md`](docs/changelog.md) 与 [Release notes](https://github.com/wscytz/cys-stift/releases)；当前开发状态板(版本 / 能力 / 下一步 / 已知 debt)在私有仓 `cys-stift-docs` 维护,不随公开仓分发。
 
 ---
 
@@ -87,11 +87,11 @@ cys-stift/
 │   ├── ui/              包豪斯设计系统(6 原色 + 8px 网格 + token)
 │   ├── db/              Drizzle ORM + SQLite schema
 │   └── domain/          纯 TS 核心领域模型(零依赖)
-├── docs/                用户向文档(STATE / changelog / user / setup / tokens / architecture)
+├── docs/                用户向与开发向教学文档(user / development / changelog)
 └── package.json
 ```
 
-> 过程文档(设计思考 / 实现计划 / 决策 / 审计 / spec / plan)在私有仓库 `cys-stift-docs`,本地并排 clone 对照,见 [`docs/INTERNAL-DOCS.md`](docs/INTERNAL-DOCS.md)。
+> 设计思考 / 实现计划 / 决策 / 审计 / spec / 当前状态板等**过程文档**在私有仓库 `cys-stift-docs` 维护,本地并排 clone 对照。
 
 ---
 
@@ -99,19 +99,15 @@ cys-stift/
 
 | 你想知道什么 | 看哪里 |
 |---|---|
-| 架构总览 | [`docs/architecture/overview.md`](./docs/architecture/overview.md) |
-| 设计 token / 包豪斯规则 | [`docs/design/tokens.md`](./docs/design/tokens.md) |
-| 如何搭建开发环境 | [`docs/development/setup.md`](./docs/development/setup.md) |
-| 如何预览 / 部署产品展示页 | [`docs/development/showcase.md`](./docs/development/showcase.md) |
 | 用户指南 | [`docs/user/README.md`](./docs/user/README.md) |
-| 隐私说明(AI 隐私必读) | [`docs/user/privacy.md`](./docs/user/privacy.md) |
 | 转义手册(画布 ↔ DSL) | [`docs/user/transliteration.md`](./docs/user/transliteration.md) |
-| 当前状态 / 版本里程碑 | [`docs/STATE.md`](./docs/STATE.md) |
-| 产品展示 / 核心工作流 | [`/showcase`](http://localhost:3000/showcase/) |
-| 独立静态预览页 | [wscytz.com/cys-stift](https://wscytz.com/cys-stift/) |
+| 隐私说明(AI 隐私必读) | [`docs/user/privacy.md`](./docs/user/privacy.md) |
+| 如何搭建开发环境 | [`docs/development/setup.md`](./docs/development/setup.md) |
 | 阶段变更历史 | [`docs/changelog.md`](./docs/changelog.md) |
-| AI 方向文档 | [`docs/ai-direction.md`](./docs/ai-direction.md) |
-| 内部过程文档(已迁私有仓) | [`docs/INTERNAL-DOCS.md`](./docs/INTERNAL-DOCS.md) |
+| 产品展示 / 核心工作流 | [wscytz.com/cys-stift](https://wscytz.com/cys-stift/) |
+| 下载 / Release | [Releases](https://github.com/wscytz/cys-stift/releases) |
+
+> 架构总览、设计 token 规则、AI 方向、状态板、决策记录、实现计划等过程文档在私有仓库 `cys-stift-docs`,不随公开仓分发。
 
 ---
 

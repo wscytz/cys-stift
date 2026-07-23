@@ -9,11 +9,11 @@
 
 ## 当前状态
 
-> **单一可信源:`docs/STATE.md`。** 本文件只放不变量,不复制状态。
-> 新会话 / `/clear` 后先读 `docs/STATE.md`(版本里程碑 + 当前能力 + 下一步 + 已知 debt)。
-> 历史变更见 `docs/changelog.md`(newest-first)。
+> **单一可信源:🔒 `docs/STATE.md`(私有仓 `cys-stift-docs`)。** 本文件只放不变量,不复制状态。
+> 新会话 / `/clear` 后先读私有仓 `docs/STATE.md`(版本里程碑 + 当前能力 + 下一步 + 已知 debt)。
+> 历史变更见公开仓 `docs/changelog.md`(newest-first)。
 
-- 完整进度：`docs/STATE.md`(当前状态) + `docs/changelog.md`(历史) + 🔒 `docs/development/polish-phase.md`(私有,打磨判据/流程) + `docs/user/README.md`（用户指南）+ `docs/user/privacy.md`（**AI 隐私必读**）；🔒 `docs/development/roadmap.md`(私有)是 Phase 7-9 **已完成**的历史档
+- 完整进度：🔒 `docs/STATE.md`(私有,当前状态) + `docs/changelog.md`(公开,历史) + 🔒 `docs/development/polish-phase.md`(私有,打磨判据/流程) + `docs/user/README.md`(公开,用户指南) + `docs/user/privacy.md`(公开,**AI 隐私必读**)；🔒 `docs/development/roadmap.md`(私有)是 Phase 7-9 **已完成**的历史档
 - 任务流程参考：🔒 `docs/archive/ralph/README.md`（私有,已归档,见下）
 
 ## 技术栈（不可重新选型）
@@ -39,7 +39,7 @@
 
 ## 关键文件位置
 
-> **过程文档已迁移至私有仓库 `cys-stift-docs`(2026-07-01)。** 本仓库(public)只留用户向文档(STATE/changelog/user/setup/tokens/architecture-overview)。下表标 🔒 的在私有仓库 —— 本地需并排 clone `cys-stift-docs` 才能读。详见 [`docs/INTERNAL-DOCS.md`](docs/INTERNAL-DOCS.md)。
+> **过程文档在私有仓库 `cys-stift-docs`(2026-07-23 起公开仓只留教学文档)。** 本仓库(public)只留用户向与开发向教学文档(README / user 指南与隐私 / development/setup / changelog / 各包 README);STATE、架构总览、设计 token、AI 方向、决策、计划等均在私有仓。下表标 🔒 的在私有仓库 —— 本地需并排 clone `cys-stift-docs` 才能读。
 
 | 想知道什么 | 看哪里 |
 |---|---|
@@ -48,7 +48,7 @@
 | 当前 phase 的实现计划 | 🔒 `docs/plans/`(私有) |
 | Ralph 任务指南 + compact/clear 规则 | 🔒 `docs/archive/ralph/README.md`(私有,已归档) |
 | 架构决策记录 | 🔒 `docs/adr/`(私有) |
-| 设计 token 规则 | `docs/design/tokens.md` |
+| 设计 token 规则 | 🔒 `docs/design/tokens.md`(私有) |
 | 跨模型记忆 | 🔒 `docs/decisions/INDEX.md`(私有) |
 | 阶段变更历史 | `docs/changelog.md` |
 | 开发环境搭建 | `docs/development/setup.md` |
