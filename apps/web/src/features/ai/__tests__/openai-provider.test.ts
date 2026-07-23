@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { createOpenAIProvider, isDeepSeekEndpoint } from '../providers/openai'
+import { createOpenAIProvider, isDeepSeekEndpoint, isQwenEndpoint, buildExtraBody } from '../providers/openai'
 import type { AIConfig } from '../types'
 
 /**
@@ -53,11 +53,26 @@ describe('openai provider — structuredOutput 思考模式适配', () => {
     expect(calls[0]!.body.thinking).toEqual({ type: 'disabled' })
   })
 
-  it('DeepSeek 端点 + 非 structuredOutput → body 不含 thinking(保留思考,如总结/改写)', async () => {
+  it('DeepSeek 端点 + 非 structuredOutput(自由文本)→ body 含 thinking:enabled(开思考)', async () => {
     const calls = mockFetch('data: [DONE]\n\n')
     const p = createOpenAIProvider({ apiKey: 'sk-test', baseUrl: 'https://api.deepseek.com/v1', model: 'm' })
     await p.streamText({ system: 's', user: 'u' }, () => {}, undefined)
+    expect(calls[0]!.body.thinking).toEqual({ type: 'enabled' })
+  })
+
+  it('Qwen 端点 + structuredOutput → body 含 enable_thinking:false', async () => {
+    const calls = mockFetch('data: [DONE]\n\n')
+    const p = createOpenAIProvider({ apiKey: 'sk-test', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' })
+    await p.streamText({ system: 's', user: 'u', structuredOutput: true }, () => {}, undefined)
+    expect(calls[0]!.body.enable_thinking).toBe(false)
     expect(calls[0]!.body.thinking).toBeUndefined()
+  })
+
+  it('Qwen 端点 + 自由文本 → body 含 enable_thinking:true(开思考)', async () => {
+    const calls = mockFetch('data: [DONE]\n\n')
+    const p = createOpenAIProvider({ apiKey: 'sk-test', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' })
+    await p.streamText({ system: 's', user: 'u' }, () => {}, undefined)
+    expect(calls[0]!.body.enable_thinking).toBe(true)
   })
 
   it('真 OpenAI 端点 + structuredOutput → 不发 thinking(避免被端点拒绝)', async () => {
@@ -107,11 +122,12 @@ describe('openai provider — structuredOutput 思考模式适配', () => {
     expect(calls[0]!.body.thinking).toEqual({ type: 'disabled' })
   })
 
-  it('非 deepseek baseUrl + 非 deepseek 模型 + structuredOutput → 不发 thinking', async () => {
+  it('非 deepseek/qwen 端点 + structuredOutput → 不发 thinking/enable_thinking(不破坏兼容)', async () => {
     const calls = mockFetch('data: [DONE]\n\n')
-    const p = createOpenAIProvider({ apiKey: 'sk-test', baseUrl: 'https://api.siliconflow.cn/v1', model: 'qwen2.5-72b' })
+    const p = createOpenAIProvider({ apiKey: 'sk-test', baseUrl: 'https://api.siliconflow.cn/v1', model: 'llama3-70b' })
     await p.streamText({ system: 's', user: 'u', structuredOutput: true }, () => {}, undefined)
     expect(calls[0]!.body.thinking).toBeUndefined()
+    expect(calls[0]!.body.enable_thinking).toBeUndefined()
   })
 
   it('保留流末帧 finish_reason=length，避免上层把截断当普通格式错', async () => {
@@ -170,6 +186,35 @@ describe('isDeepSeekEndpoint', () => {
   it('两者都不是 deepseek → false', () => {
     expect(isDeepSeekEndpoint('https://api.openai.com/v1', 'gpt-4o-mini')).toBe(false)
     expect(isDeepSeekEndpoint('https://api.siliconflow.cn/v1', 'qwen2.5-72b')).toBe(false)
+  })
+})
+
+describe('isQwenEndpoint', () => {
+  it('dashscope baseUrl 命中', () => {
+    expect(isQwenEndpoint('https://dashscope.aliyuncs.com/compatible-mode/v1', 'whatever')).toBe(true)
+  })
+  it('qwen 模型名命中(即使 baseUrl 非 dashscope)', () => {
+    expect(isQwenEndpoint('https://api.siliconflow.cn/v1', 'qwen2.5-72b')).toBe(true)
+    expect(isQwenEndpoint('https://api.openai.com/v1', 'qwen-plus')).toBe(true)
+  })
+  it('非 qwen → false', () => {
+    expect(isQwenEndpoint('https://api.openai.com/v1', 'gpt-4o-mini')).toBe(false)
+    expect(isQwenEndpoint('https://api.deepseek.com/v1', 'deepseek-chat')).toBe(false)
+  })
+})
+
+describe('buildExtraBody — 兼容端点唯一适配点(扩展性)', () => {
+  it('DeepSeek 结构化→disabled,自由文本→enabled', () => {
+    expect(buildExtraBody('https://api.deepseek.com', 'deepseek-chat', true)).toEqual({ thinking: { type: 'disabled' } })
+    expect(buildExtraBody('https://api.deepseek.com', 'deepseek-chat', false)).toEqual({ thinking: { type: 'enabled' } })
+  })
+  it('Qwen 结构化→enable_thinking:false,自由文本→true', () => {
+    expect(buildExtraBody('https://dashscope.aliyuncs.com/compatible-mode/v1', 'qwen-plus', true)).toEqual({ enable_thinking: false })
+    expect(buildExtraBody('https://dashscope.aliyuncs.com/compatible-mode/v1', 'qwen-plus', false)).toEqual({ enable_thinking: true })
+  })
+  it('未知端点(含真 OpenAI)→ {} no-op(加新 provider 不破坏既有)', () => {
+    expect(buildExtraBody('https://api.openai.com/v1', 'gpt-4o-mini', false)).toEqual({})
+    expect(buildExtraBody('https://api.siliconflow.cn/v1', 'llama3-70b', true)).toEqual({})
   })
 })
 

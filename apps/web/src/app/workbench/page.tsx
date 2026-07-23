@@ -7,6 +7,9 @@ import type { Card, CardId, TagRef } from '@cys-stift/domain'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
+import { captureSinkRegistry } from '@/features/capture/capture-sink'
+import { getDeviceId } from '@/lib/device-id'
+import { pushToast } from '@/lib/toast-store'
 import { useWorkbench, workbenchStore } from '@/lib/workbench-store'
 import { PageLoading } from '@/components/page-loading'
 import { WorkbenchBrowser } from '@/features/workbench/workbench-browser'
@@ -66,6 +69,17 @@ export default function WorkbenchPage() {
     return service.update(id as CardId, patch) !== null
   }
 
+  // A3 — 工作台 AI「存为新卡」:走统一 captureSink(与 inbox 同路径)建新 inbox 卡。
+  const deviceId = getDeviceId()
+  const onAIAppendNew = (c: { title: string; body: string }) => {
+    void captureSinkRegistry
+      .submit({ source: { kind: 'manual', deviceId }, title: c.title, body: c.body })
+      .catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : String(e)
+        pushToast({ kind: 'error', message: t('capture.persistFailed', { error: msg }) })
+      })
+  }
+
   const openCard = (nextCard: Card) => {
     const id = nextCard.id
     if (active && editorDirty && active.id !== id) {
@@ -122,6 +136,7 @@ export default function WorkbenchPage() {
                 <WorkbenchPanel
                   card={active}
                   onSave={wbSave}
+                  onAIAppendNew={onAIAppendNew}
                   onDirtyChange={setEditorDirty}
                   onClose={() => { workbenchStore.close(); setMobileLibrary(true); setEditorDirty(false) }}
                   onBackToList={() => {

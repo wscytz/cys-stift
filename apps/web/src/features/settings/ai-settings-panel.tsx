@@ -343,7 +343,7 @@ export function AISettingsPanel() {
               </div>
               <div className="aip__row">
                 <label className="aip__label" htmlFor="ai-maxtokens">{t('settings.aiMaxTokens')}</label>
-                <input id="ai-maxtokens" type="number" min={1} max={8192} step={1} className="aip__input" value={draft.maxTokens ?? ''} onChange={(e) => update({ maxTokens: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="1024" disabled={!draft.enabled} />
+                <input id="ai-maxtokens" type="number" min={1} max={8192} step={1} className="aip__input" value={draft.maxTokens ?? ''} onChange={(e) => update({ maxTokens: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="4096" disabled={!draft.enabled} />
                 <p className="aip__hint">{t('settings.ai.maxTokensHint')}</p>
               </div>
             </div>

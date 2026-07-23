@@ -123,10 +123,10 @@ describe('runAIAction — per-action temperature + maxTokens defaults', () => {
     const opts = mockStreamText.mock.calls[0]?.[1] as { temperature: number }
     expect(opts.temperature).toBeLessThan(0.5)
   })
-  it('caps maxTokens at a sane default (<= 2048)', async () => {
+  it('caps maxTokens at a sane default (<= 4096)', async () => {
     await runAIAction(FAKE_CFG, 'summarize', fakeCard())
     const opts = mockStreamText.mock.calls[0]?.[1] as { maxTokens: number }
-    expect(opts.maxTokens).toBeLessThanOrEqual(2048)
+    expect(opts.maxTokens).toBeLessThanOrEqual(4096)
     expect(opts.maxTokens).toBeGreaterThan(0)
   })
 })

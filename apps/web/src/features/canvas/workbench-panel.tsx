@@ -12,7 +12,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Card, TagRef } from '@cys-stift/domain'
 import { TAG_COLORS } from '@cys-stift/domain'
-import { Tag } from '@cys-stift/ui'
+import { Button, Tag } from '@cys-stift/ui'
+import { AiActionMenu } from '@/features/ai/ai-action-menu'
+import { AiSetupCard } from '@/features/ai/ai-setup-card'
+import { AIPopover } from '@/features/ai/ai-popover'
+import { isAIReady, getCurrentAI } from '@/features/ai/ai-settings-provider'
+import { pushToast } from '@/lib/toast-store'
 import { MarkdownEditor } from '@/features/card/markdown-editor'
 import { solidTagChipStyle } from '@/lib/tag-color'
 import { typeKeyOf } from '@/lib/type-label'
@@ -25,6 +30,8 @@ export interface WorkbenchPanelProps {
   onClose: () => void
   onBackToList?: () => void
   onDirtyChange?: (dirty: boolean) => void
+  /** A3 — AI「存为新卡」:page 用 captureSink 建新卡(工作台编辑的是当前卡)。 */
+  onAIAppendNew?: (c: { title: string; body: string }) => void
 }
 
 /**
@@ -40,6 +47,7 @@ export function WorkbenchPanel({
   onClose,
   onBackToList,
   onDirtyChange,
+  onAIAppendNew,
 }: WorkbenchPanelProps) {
   const { t } = useI18n()
   const [title, setTitle] = useState(card.title)
@@ -49,6 +57,11 @@ export function WorkbenchPanel({
   // savedFlash:flush 后短暂亮「已保存」1.5s,让 autosave 可见(用户知道编辑落了)。
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle')
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // A3 — 工作台 AI:复用 card-detail 的 aiView 状态机(menu/setup/popover/edit)。
+  type AiView = null | 'menu' | 'setup' | 'summarize' | 'rewrite' | 'translate' | 'edit'
+  const [aiView, setAiView] = useState<AiView>(null)
+  const [translateTo, setTranslateTo] = useState<'zh' | 'en'>('en')
+  const [editInstruction, setEditInstruction] = useState('')
 
   // 最新草稿 + 最新 onSave 放 ref,避免防抖 effect 依赖函数身份。
   const draftRef = useRef({ title, body, tags })
@@ -77,6 +90,7 @@ export function WorkbenchPanel({
     setBody(card.body)
     setTags(card.tags ?? [])
     setTagInput('')
+    setAiView(null) // 切卡收起 AI 浮层
   }, [card.id, card.title, card.body, card.tags])
 
   // 切卡防丢编辑(bug 1 修):card.id 变时,上一张的脏 draft 在 cleanup flush。
@@ -174,6 +188,17 @@ export function WorkbenchPanel({
         )}
         <button
           type="button"
+          data-testid="wb-ai-entry"
+          className="wb-panel__ai-btn"
+          onClick={() => setAiView(isAIReady(getCurrentAI()) ? 'menu' : 'setup')}
+          aria-expanded={aiView !== null}
+          aria-label={t('card.ai')}
+          title={t('card.ai')}
+        >
+          ✨
+        </button>
+        <button
+          type="button"
           data-testid="wb-done"
           className="wb-panel__done"
           onClick={handleClose}
@@ -226,6 +251,54 @@ export function WorkbenchPanel({
       <div className="wb-panel__body">
         <MarkdownEditor value={body} onChange={setBody} />
       </div>
+      {aiView && (
+        <div className="wb-panel__ai" role="dialog" aria-label={t('card.ai')}>
+          {aiView === 'setup' && (
+            <>
+              <AiSetupCard onGoToSettings={() => { window.location.href = '/settings' }} />
+              <Button variant="ghost" onClick={() => setAiView(null)}>{t('common.cancel')}</Button>
+            </>
+          )}
+          {aiView === 'menu' && (
+            <>
+              <AiActionMenu
+                onPick={(action, targetLang, instruction) => {
+                  if (action === 'translate' && targetLang) setTranslateTo(targetLang)
+                  if (action === 'editWithInstruction') {
+                    setEditInstruction(instruction ?? '')
+                    setAiView('edit')
+                    return
+                  }
+                  setAiView(action === 'improveWriting' ? 'rewrite' : action)
+                }}
+              />
+              <Button variant="ghost" onClick={() => setAiView(null)}>{t('common.cancel')}</Button>
+            </>
+          )}
+          {(aiView === 'summarize' || aiView === 'rewrite' || aiView === 'translate' || aiView === 'edit') && (
+            <AIPopover
+              card={card}
+              action={aiView === 'rewrite' ? 'improveWriting' : aiView === 'edit' ? 'editWithInstruction' : aiView}
+              targetLang={aiView === 'translate' ? translateTo : undefined}
+              instruction={aiView === 'edit' ? editInstruction : undefined}
+              onClose={() => setAiView(null)}
+              onReplace={(newBody) => {
+                // AI 替换正文:直接落库 + 更新编辑器视图(走既有 onSave,autosave 幂等)。
+                onSave(card.id, { title: title.trim() || card.title, body: newBody, tags })
+                setBody(newBody)
+                setAiView(null)
+              }}
+              onAppendNew={(c) => {
+                if (onAIAppendNew) {
+                  onAIAppendNew(c)
+                  pushToast({ kind: 'success', message: t('ai.appendedAsNew') })
+                }
+                setAiView(null)
+              }}
+            />
+          )}
+        </div>
+      )}
     </aside>
   )
 }
@@ -256,6 +329,7 @@ function stableTagColor(value: string): TagRef['color'] {
 
 const styles = `
 .wb-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -376,4 +450,21 @@ const styles = `
   flex-direction: column;
 }
 .wb-panel__body .md-editor { flex: 1; min-height: 0; }
+/* A3 — 工作台 AI 入口 + 浮层(absolute,不挤编辑器布局)。 */
+.wb-panel__ai-btn {
+  min-height: 44px; padding: 0 var(--space-2);
+  border: 1.5px solid var(--color-black); background: var(--color-white);
+  cursor: pointer; border-radius: 1px; font-size: var(--font-size-base); line-height: 1;
+  flex-shrink: 0;
+}
+.wb-panel__ai-btn:hover { background: var(--color-yellow); }
+.wb-panel__ai-btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.wb-panel__ai {
+  position: absolute; right: var(--space-2); bottom: var(--space-2); z-index: 20;
+  width: min(440px, calc(100% - var(--space-4)));
+  max-height: calc(100% - var(--space-4)); overflow: auto;
+  background: var(--color-white); border: 2px solid var(--color-black);
+  box-shadow: 4px 4px 0 var(--color-black); padding: var(--space-2);
+  display: flex; flex-direction: column; gap: var(--space-2);
+}
 `

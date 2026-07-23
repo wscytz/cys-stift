@@ -46,6 +46,7 @@ export function AIPopover({
   const [streamed, setStreamed] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [running, setRunning] = useState(true)
+  const [truncated, setTruncated] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -58,6 +59,7 @@ export function AIPopover({
     const ctrl = new AbortController()
     abortRef.current = ctrl
     setRunning(true)
+    setTruncated(false)
     runAIAction(ai, action, card, {
       targetLang,
       locale: locale,
@@ -65,7 +67,10 @@ export function AIPopover({
       signal: ctrl.signal,
       onDelta: (chunk) => setStreamed((s) => s + chunk),
     })
-      .then(() => setRunning(false))
+      .then((res) => {
+        setRunning(false)
+        if (res.finishReason === 'length') setTruncated(true)
+      })
       .catch((e: unknown) => {
         if (e instanceof Error && e.name === 'AbortError') return
         setError(t('ai.error', { error: (e as Error).message }))
@@ -95,6 +100,9 @@ export function AIPopover({
           <pre className="ai-popover__text">{streamed || (running ? '…' : '')}</pre>
         )}
       </div>
+      {truncated && !error && (
+        <div className="ai-popover__truncated" role="status">⚠ {t('ai.truncated')}</div>
+      )}
       <div className="ai-popover__actions">
         <button
           type="button"
@@ -171,6 +179,11 @@ const styles = `
 .ai-popover__error {
   color: var(--color-red);
   font-size: var(--font-size-sm);
+}
+.ai-popover__truncated {
+  color: var(--color-red);
+  font-size: var(--font-size-xs);
+  margin-bottom: var(--space-1);
 }
 .ai-popover__actions {
   display: flex;

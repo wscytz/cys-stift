@@ -36,6 +36,39 @@ export function isDeepSeekEndpoint(baseUrl: string, model: string): boolean {
   return /deepseek/i.test(baseUrl) || /deepseek/i.test(model)
 }
 
+/** 是否为 Qwen(DashScope)系端点。纯函数,可单测。
+ *  DashScope 兼容端点 URL 含 dashscope;模型名以 qwen 开头(qwen-plus / qwen-max / qwen2.5-72b 等)。
+ *  用于发 enable_thinking(各家思考参数不同,无业界统一)。 */
+export function isQwenEndpoint(baseUrl: string, model: string): boolean {
+  return /dashscope/i.test(baseUrl) || /^qwen/i.test(model)
+}
+
+/**
+ * 构造 OpenAI 兼容端点的 provider 特有请求字段(思考模式等)。这是兼容路径的**唯一
+ * 适配点** —— DeepSeek / Qwen 等都走 openai provider,靠端点/模型检测决定发什么参数,
+ * 不引入新 ProviderId、不写死模型。新增一个兼容 provider(如 Kimi / Grok)只需在此扩展。
+ *
+ * 规则(无业界统一,各家参数不同):
+ * - 结构化任务(structuredOutput,如 DSL/cluster):关思考(省 token、防截断,实测根因)。
+ * - 自由文本(摘要/改写/翻译):开思考(质量更好,用户要"开思考")。
+ * - 非 deepseek/qwen 端点(含真 OpenAI):返回 {} no-op,不破坏兼容。
+ *
+ * 纯函数,导出供单测 + 未来扩展。
+ */
+export function buildExtraBody(
+  baseUrl: string,
+  model: string,
+  structuredOutput: boolean,
+): Record<string, unknown> {
+  if (isDeepSeekEndpoint(baseUrl, model)) {
+    return { thinking: { type: structuredOutput ? 'disabled' : 'enabled' } }
+  }
+  if (isQwenEndpoint(baseUrl, model)) {
+    return { enable_thinking: !structuredOutput }
+  }
+  return {}
+}
+
 export function createOpenAIProvider(cfg: OpenAIConfig): AIProvider {
   const jsonSchemaResponse = /^https:\/\/api\.openai\.com(?:\/|$)/i.test(cfg.baseUrl)
   return {
@@ -51,9 +84,9 @@ export function createOpenAIProvider(cfg: OpenAIConfig): AIProvider {
       // 输出被截断(实测根因)。真正的 OpenAI 端点不认此字段 → 只对 deepseek 端点发,
       // 其他端点 no-op,不破坏兼容。思考是 DeepSeek 专有扩展,靠 isDeepSeekEndpoint
       // 检测(baseUrl OR model,见下方纯函数)而非 provider id(DeepSeek 走 openai provider)。
-      const isDeepSeek = isDeepSeekEndpoint(cfg.baseUrl, cfg.model)
-      const extraBody =
-        req.structuredOutput && isDeepSeek ? { thinking: { type: 'disabled' } } : {}
+      // provider 特有请求字段(思考模式等)走 buildExtraBody —— OpenAI 兼容端点的唯一
+      // 适配点,按端点/模型检测;新增兼容 provider 只需扩展 buildExtraBody,不动 ProviderId/工厂。
+      const extraBody = buildExtraBody(cfg.baseUrl, cfg.model, req.structuredOutput === true)
       const responseFormat = req.responseSchema && jsonSchemaResponse
         ? { response_format: { type: 'json_schema', json_schema: { name: req.responseSchema.name, strict: req.responseSchema.strict ?? true, schema: req.responseSchema.schema } } }
         : {}

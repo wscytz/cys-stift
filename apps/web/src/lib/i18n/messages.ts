@@ -968,6 +968,7 @@ export const messages = {
   'ai.outputNetwork': { zh: 'AI 连接失败，未生成内容。请检查网络或 provider 设置。', en: 'The AI connection failed and produced no output. Check the network or provider settings.' },
   'ai.suggestion': { zh: 'AI 建议', en: 'AI suggestion' },
   'ai.streaming': { zh: '生成中…', en: 'Streaming…' },
+  'ai.truncated': { zh: '输出被长度限制截断 — 可在设置调高 maxTokens', en: 'Output truncated by length limit — raise maxTokens in Settings' },
   'ai.setup.title': { zh: '✨ AI 尚未启用', en: '✨ AI not enabled yet' },
   'ai.setup.lede': { zh: '最快的方式：装一个 Ollama，完全本地、免费、私密，无需 API key。若你已配置（如 DeepSeek）仍见此卡，到设置里确认该 profile 已「启用」并点「设为当前」。', en: 'Fastest path: run Ollama — fully local, free, private, no API key. If you already configured a provider (e.g. DeepSeek) but still see this, open Settings, make sure that profile is "enabled" and click "Set active".' },
   'ai.setup.goto': { zh: '去设置', en: 'Go to settings' },
