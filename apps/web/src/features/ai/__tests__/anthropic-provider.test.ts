@@ -60,3 +60,30 @@ describe('anthropic provider — stream termination metadata', () => {
     expect(provider().capabilities).toEqual({ jsonSchemaResponse: false })
   })
 })
+
+describe('anthropic provider — 错误消息友好化(对齐 openai)', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  // 此前直接把整段 errText 塞进 AIProviderHttpError;现走 anthropicErrorMessage
+  // 提取 error.message + 按 status 给中文提示。
+  it('401 → 友好的 key 无效提示(而非整段 JSON)', async () => {
+    const errBody = JSON.stringify({ type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } })
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 401, body: null, text: async () => errBody }) as any))
+    await expect(provider().streamText({ system: 's', user: 'u' }, () => {}, undefined)).rejects.toThrow(/key 无效/)
+  })
+
+  it('404 → 端点/模型不存在提示', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 404, body: null, text: async () => '{"type":"error","error":{"message":"model not found"}}' }) as any))
+    await expect(provider().streamText({ system: 's', user: 'u' }, () => {}, undefined)).rejects.toThrow(/端点或模型不存在/)
+  })
+
+  it('429 → 限额提示 + retryAfterMs', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 429, body: null, headers: new Headers({ 'Retry-After': '2' }), text: async () => '{"type":"error","error":{"message":"rate limited"}}' }) as any))
+    await expect(provider().streamText({ system: 's', user: 'u' }, () => {}, undefined)).rejects.toMatchObject({ message: expect.stringMatching(/过频或额度/), status: 429, retryAfterMs: 2_000 })
+  })
+
+  it('其它 status → 提取 error.message(不塞整段 JSON)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500, body: null, text: async () => '{"type":"error","error":{"message":"internal boom"}}' }) as any))
+    await expect(provider().streamText({ system: 's', user: 'u' }, () => {}, undefined)).rejects.toThrow(/internal boom/)
+  })
+})

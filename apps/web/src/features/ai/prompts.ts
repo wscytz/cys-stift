@@ -30,10 +30,11 @@ export interface PromptTemplate {
 
 /**
  * Privacy rule #3: soft-deleted cards are NEVER in the AI's view. The guard
- * must run BEFORE the `ctx || fallback` pattern in each buildUser —
- * otherwise the empty string `serializeCardForAI` returns for a deleted
- * card is falsy and the `||` falls through to hand-concatenating the raw
- * title/body. Review fix (v0.37.0). (See prompts.test.ts "rule #3".)
+ * makes buildUser return '' for a deleted card up front, so no prompt is
+ * built. Body text always comes from `serializeCardForAI` (allowlist) — there
+ * is NO raw title/body hand-concatenation fallback (P6 migration removed the
+ * `ctx || fallback` so prompts can never bypass the allowlist). (See
+ * prompts.test.ts "rule #3".)
  */
 function hiddenFromAI(card: Card): boolean {
   return Boolean(card.deletedAt)
@@ -51,7 +52,7 @@ export const PROMPTS: Record<AIAction, PromptTemplate> = {
     buildUser: (card, locale) => {
       if (hiddenFromAI(card)) return ''
       const ctx = serializeCardForAI(card)
-      const body = ctx || `Title: ${card.title}\n\nBody: ${card.body || '(empty)'}`
+      const body = ctx
       return `${outputLangLine(locale)}\n\nSummarize this note.\n\n${body}`
     },
   },
@@ -61,7 +62,7 @@ export const PROMPTS: Record<AIAction, PromptTemplate> = {
     buildUser: (card, locale) => {
       if (hiddenFromAI(card)) return ''
       const ctx = serializeCardForAI(card)
-      const body = ctx || `Title: ${card.title}\n\nBody: ${card.body || '(empty)'}`
+      const body = ctx
       return `${outputLangLine(locale)}\n\nRewrite the body of this note.\n\n${body}`
     },
   },
@@ -72,7 +73,7 @@ export const PROMPTS: Record<AIAction, PromptTemplate> = {
     buildUser: (card) => {
       if (hiddenFromAI(card)) return ''
       const ctx = serializeCardForAI(card)
-      const body = ctx || `${card.body || '(empty)'}`
+      const body = ctx
       return `Target: {{LANG}}\n\n---\n\n${body}`
     },
   },
@@ -84,7 +85,7 @@ export const PROMPTS: Record<AIAction, PromptTemplate> = {
     buildUser: (card, locale) => {
       if (hiddenFromAI(card)) return ''
       const ctx = serializeCardForAI(card)
-      const body = ctx || `Title: ${card.title}\n\nBody: ${card.body || '(empty)'}`
+      const body = ctx
       return `${outputLangLine(locale)}\n\nInstruction: {{INSTRUCTION}}\n\nApply the instruction to the body of this note and output the full result.\n\n${body}`
     },
   },

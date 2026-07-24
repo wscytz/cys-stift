@@ -29,6 +29,26 @@ interface AnthropicConfig {
   model: string
 }
 
+/**
+ * 把 Anthropic 错误响应解析成用户可读消息(对齐 openai.ts 的 openAiErrorMessage)。
+ * Anthropic 错误体通常是 `{type:"error", error:{type, message}}`;直接抛整段对用户
+ * 不友好 —— 提取 message + 按 status 给中文提示。
+ */
+function anthropicErrorMessage(status: number, body: string): string {
+  let apiMsg = ''
+  try {
+    const parsed = JSON.parse(body)
+    apiMsg = parsed?.error?.message ?? parsed?.message ?? ''
+  } catch {
+    apiMsg = body.slice(0, 200)
+  }
+  if (status === 401) return `API key 无效或未授权(${apiMsg || 'authentication failed'})`
+  if (status === 403) return `无访问权限(${apiMsg || 'forbidden'})`
+  if (status === 404) return `端点或模型不存在 — 检查 baseUrl 和 model(${apiMsg || 'not found'})`
+  if (status === 429) return `请求过频或额度用尽(${apiMsg || 'rate limited'})`
+  return `Anthropic ${status}: ${apiMsg || body.slice(0, 120)}`
+}
+
 export function createAnthropicProvider(cfg: AnthropicConfig): AIProvider {
   return {
     id: 'anthropic',
@@ -61,7 +81,7 @@ export function createAnthropicProvider(cfg: AnthropicConfig): AIProvider {
       })
       if (!res.ok || !res.body) {
         const errText = await res.text().catch(() => '')
-        throw new AIProviderHttpError(`Anthropic ${res.status}: ${errText}`, res.status, parseRetryAfterMs(res.headers?.get?.('Retry-After')))
+        throw new AIProviderHttpError(anthropicErrorMessage(res.status, errText), res.status, parseRetryAfterMs(res.headers?.get?.('Retry-After')))
       }
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
