@@ -203,7 +203,7 @@ const rpStyles = `
 .rp__item-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rp__item-body {
   font-family: var(--font-mono); font-size: var(--font-size-xs);
-  color: var(--color-gray);
+  color: var(--color-black-soft);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 

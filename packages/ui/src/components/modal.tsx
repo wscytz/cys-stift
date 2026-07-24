@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import styles from './modal.module.css'
 
 export interface ModalProps {
@@ -34,6 +34,7 @@ const FOCUSABLE =
 export function Modal({ open, onClose, title, children, closeLabel = 'Close' }: ModalProps) {
   const frameRef = useRef<HTMLDivElement | null>(null)
   const previouslyFocused = useRef<HTMLElement | null>(null)
+  const titleId = useId()
 
   // On open: stash the active element and move focus inside. On close:
   // restore it so the user resumes where they left off.
@@ -97,6 +98,7 @@ export function Modal({ open, onClose, title, children, closeLabel = 'Close' }: 
       className={styles.backdrop}
       role="dialog"
       aria-modal="true"
+      aria-labelledby={title ? titleId : undefined}
       onClick={onClose}
     >
       <div
@@ -106,7 +108,7 @@ export function Modal({ open, onClose, title, children, closeLabel = 'Close' }: 
         onClick={(e) => e.stopPropagation()}
       >
         <div className={styles.titleRow}>
-          {title && <h2 className={styles.title}>{title}</h2>}
+          {title && <h2 id={titleId} className={styles.title}>{title}</h2>}
           <button
             type="button"
             className={styles.closeBtn}

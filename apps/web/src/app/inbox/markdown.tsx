@@ -311,10 +311,10 @@ const styles = `
 .md-embed__title {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
-  color: var(--color-gray);
+  color: var(--color-black-soft);
   margin-bottom: var(--space-1);
 }
-.md-embed--missing { color: var(--color-gray); font-style: italic; }
+.md-embed--missing { color: var(--color-black-soft); font-style: italic; }
 .md-embed--cycle { color: var(--color-red); font-size: var(--font-size-xs); }
 /* 代码高亮 Bauhaus 语法主题(rehype-highlight 注入 hljs-* class)。
    代码块 .md pre 始终黑底白字,故用黑底可读的亮色变体,只用 6 原色,避免 blue(#003f7f 黑底不可读)。 */
