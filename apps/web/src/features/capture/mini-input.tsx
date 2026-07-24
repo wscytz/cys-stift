@@ -1,9 +1,9 @@
 'use client'
 
 /**
- * MiniInput — spec §5.5 Mini Input 视觉：居中浮层 + 红边框强调 +
- * 顶部 8px 红条（capture region）。MVP 极简：标题 Input + 可展开 body
- * textarea + Save / Cancel 按钮组。
+ * MiniInput — 轻量贴顶小框(无全屏暗化;z-110 透明 overlay 只为点外关闭)。
+ * 红仅作 input/textarea 聚焦强调。标题 Input + 可展开 body textarea +
+ * tag + Save / Cancel 按钮组。
  *
  * 键盘交互（plan §3 T2）：
  * - Escape → onClose（不保存）
@@ -187,7 +187,6 @@ if (
       onKeyDown={onKeyDown}
     >
       <div className="mi-frame" onClick={(e) => e.stopPropagation()}>
-        <div className="mi-region" aria-hidden="true" />
         <div className="mi-body">
           <Input
             type="text"
@@ -221,7 +220,7 @@ if (
               placeholder={t('capture.miniBody')}
               value={body}
               onChange={(e) => setBodyAndPersist(e.target.value)}
-              rows={5}
+              rows={3}
             />
           )}
           <div className="mi-tags">
@@ -283,25 +282,21 @@ if (
 const styles = `
 .mi-backdrop {
   position: fixed; inset: 0; z-index: 110;
-  background: color-mix(in srgb, var(--color-black) 50%, transparent);
+  /* 无全屏暗化:透明 overlay 只为捕点外部关闭 + 承载 z-110。视觉读作浮动小框。 */
+  background: transparent;
   display: grid; place-items: start center;
-  padding-top: 20vh;
+  padding-top: 18vh;
 }
 .mi-frame {
-  width: min(480px, calc(100vw - var(--space-6)));
+  width: min(440px, calc(100vw - var(--space-6)));
   background: var(--color-white);
-  /* v0.23.0 polish: thinner border keeps the red accent recognisable
-     without overpowering on dark theme where the bright --color-red
-     (#ff4d4d) on near-black gives strong contrast. */
-  border: 1px solid var(--color-red);
+  /* 中性 hairline 边(对齐 Modal/搜索 frame);红只留 input/textarea 聚焦强调。 */
+  border: 1px solid color-mix(in srgb, var(--color-black) 12%, transparent);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-md);
   overflow: hidden;
 }
-.mi-region { /* 8px red stripe across the top — capture region (spec §5.5 / §5.2) */
-  height: 8px; background: var(--color-red);
-}
-.mi-body { padding: var(--space-4) var(--space-4) var(--space-2); }
+.mi-body { padding: var(--space-3) var(--space-3) var(--space-2); }
 .mi-title { width: 100%; }
 .mi-add-note {
   display: block; margin-top: var(--space-2);
@@ -317,7 +312,7 @@ const styles = `
   font-family: var(--font-body); font-size: var(--font-size-base);
   color: var(--color-black); background: transparent;
   border: none; border-bottom: var(--border-hairline);
-  outline: none; resize: vertical; min-height: 96px;
+  outline: none; resize: vertical; min-height: 64px;
 }
 .mi-textarea:focus { border-bottom-color: var(--color-red); }
 .mi-actions {

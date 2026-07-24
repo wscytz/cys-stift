@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-07-24 · 1.1.0-preview.6 · capture MiniInput 改轻量小框(去全屏暗化)
+
+快捷建卡(Cmd+Shift+E)此前是全屏 50% 暗化蒙层 + 红边框 + 顶部红条的较重模态;改成**无全屏暗化的贴顶轻量小框**,更接近通用搜索/AI 工具的速记条:
+
+- **fix(web): `MiniInput` 去全屏暗化**:`.mi-backdrop` 背景由 50% 黑遮罩 → 透明(保留 `fixed inset:0 z-110` 透明 overlay 负责点外部关闭 + 承载 z-110 层级)。视觉读作浮动小框,不再压暗整屏。
+- **fix(web): 去红条 + 红边**:删 8px 红条(`.mi-region`)+ 红边框 → 中性 hairline 边(对齐 Modal/搜索 frame);**红色保留为 input/textarea 聚焦强调**(不丢 capture 色身份)。框宽 480→440,展开正文 textarea rows 5→3 / min-height 96→64,整体更 compact。
+- **交互/class/role/testid 全不变**:Cmd+Enter 存、Enter 展开正文、Esc 取消、草稿恢复、tag 输入(IME 守卫)、配额失败保留草稿——一律不动。z-index 保持 110(通知/捕获层,设计档/守卫白名单未变)。
+- **测试零改动**:`mini-input-hint` 断言的 `.mi-title` / `[role="dialog"]` / testid 全保留 → capture 43 tests 全绿;web build exit 0。
+- **⚠️ DMG 未重建**:此为 preview.6 源码后的 UX 后续;未 bump 版本 / 未重新打包(待发话)。
+
 ## 2026-07-24 · 1.1.0-preview.6 · cys-dsl v8:卡片结构化字段进转义(type/tags/links/code/quote)
 
 转义(画布完全文字化、AI 可读写)此前只覆盖卡片几何 + `@title/@content/@group/@href`;v8 把卡片的结构化字段也纳入 `[card]` 行,**media 排除**(二进制重/隐私):
