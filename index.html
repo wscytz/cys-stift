@@ -97,7 +97,7 @@
   .poster{position:relative;border:1.5px solid var(--ink);background:var(--paper);box-shadow:8px 8px 0 var(--blue);overflow:hidden}
   .poster::before{content:"REAL PRODUCT / CANVAS";display:block;padding:10px 14px;border-bottom:1px solid var(--ink);font-family:var(--mono);font-size:11px;color:var(--muted)}
   .poster img{display:block;width:100%;height:auto;aspect-ratio:16/10;object-fit:cover;object-position:left top}
-  .preview-marker{position:absolute;right:12px;bottom:12px;background:var(--yellow);border:1px solid var(--ink);padding:7px 10px;font-family:var(--mono);font-size:11px;font-weight:600}
+  .version-badge{position:absolute;right:12px;bottom:12px;background:var(--yellow);border:1px solid var(--ink);padding:7px 10px;font-family:var(--mono);font-size:11px;font-weight:600}
   .poster .sh{position:absolute;will-change:transform;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
   .poster .sh.drag{cursor:grabbing}
   .poster-reset{position:absolute;top:10px;left:10px;width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:color-mix(in srgb,var(--paper) 70%,transparent);color:var(--ink-2);font-size:15px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:opacity .3s ease,background .15s,transform .4s ease;z-index:5;opacity:0;pointer-events:none}
@@ -338,7 +338,7 @@
     </div>
     <div class="poster reveal">
       <img src="product-canvas.png" alt="cy's Stift 1.0.0 画布真实界面">
-      <span class="preview-marker">1.0.0</span>
+      <span class="version-badge">1.0.0</span>
     </div>
   </div>
 </header>
