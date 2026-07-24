@@ -176,6 +176,7 @@ export default function DslPlaygroundPage() {
             onChange={(e) => setText(e.target.value)}
             spellCheck={false}
             autoComplete="off"
+            maxLength={200000}
             placeholder="每行一个元素:[card #id create] @pos(x,y) @size(w,h) @color(red) @title(&quot;…&quot;)"
           />
           <Diagnostics errors={parseErrors} result={result} skippedOps={skippedOps} />

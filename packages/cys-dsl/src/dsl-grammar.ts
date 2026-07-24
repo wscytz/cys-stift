@@ -85,6 +85,22 @@ export const DSL_MAX_CODE_BLOCKS = 8
 export const DSL_MAX_QUOTES = 8
 
 /**
+ * 单块 DSL 的元素(card/arrow/free)总数上限 —— parse 层 DoS 防御。
+ *
+ * 防「粘贴炸弹」/恶意超大输入:无上限时无限行 → 无限 op 数组 → sanitize 全扫 +
+ * applyLayout 逐个 upsert + (含 relational card 时) solveRelational O(N³) 碰撞避让,
+ * 主线程卡死。sanitize 已钳每 op 的字段(size/coord/text/tag/code…),但未限 op 总数 ——
+ * 本常量补这层(parse 层,在 sanitize 之前)。
+ *
+ * 值取 1000:正常单画布远不触达(典型几十到几百);卡在 solveRelational 的安全区边缘
+ * (N=1000 → 约 1e9,几秒降级,用户得到截断 diagnostic 而非无限卡死)。彻底把 solver
+ * 降到 O(N) 单调栈是后续独立工作(relational-solver.ts,高风险,另立 plan)。
+ *
+ * 不 bump DSL_VERSION:parse 防护,不改语法形态。
+ */
+export const DSL_MAX_OPS = 1000
+
+/**
  * `@type(…)` 合法值(v8:卡片语义类型,镜像 domain CardType)。
  *
  * 声明性事实,放语法单一可信源。parser(validEnum 收窄)与 sanitize(二次枚举校验)共用,

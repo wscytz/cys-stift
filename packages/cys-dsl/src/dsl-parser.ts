@@ -23,6 +23,7 @@ import {
   DSL_MAX_LINK_COUNT,
   DSL_MAX_CODE_BLOCKS,
   DSL_MAX_QUOTES,
+  DSL_MAX_OPS,
   DSL_CARD_TYPES,
   truncateDslText,
 } from './dsl-grammar'
@@ -622,6 +623,10 @@ export function parseDslWithDiagnostics(dslText: string): {
     const built = buildOp(result)
     if (built === null) continue // prose skip
     if ('op' in built) {
+      if (ops.length >= DSL_MAX_OPS) {
+        errors.push({ line: lineNo, text: line, message: `元素数已达上限 ${DSL_MAX_OPS},本行及后续被截断` })
+        break
+      }
       ops.push(built.op)
     } else {
       errors.push({ line: lineNo, text: line, message: built.diag })
@@ -691,6 +696,10 @@ export function parseDslStrictWithDiagnostics(dslText: string): {
     if (built === null) {
       errors.push({ line: lineNo, text: line, message: 'unsupported directive' })
     } else if ('op' in built) {
+      if (ops.length >= DSL_MAX_OPS) {
+        errors.push({ line: lineNo, text: line, message: `元素数已达上限 ${DSL_MAX_OPS},本行及后续被截断` })
+        break
+      }
       ops.push(built.op)
     } else {
       errors.push({ line: lineNo, text: line, message: built.diag })
