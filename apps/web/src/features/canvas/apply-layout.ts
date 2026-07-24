@@ -321,9 +321,8 @@ function errorReason(error: unknown): string {
 }
 
 function finiteRound(value: unknown, fallback: number): number {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? Math.round(value)
-    : fallback
+  // 只做 NaN/Infinity 防御,不取整 —— 取整会破坏小数坐标的 byte-equal 往返(x=100.5 → apply → 101)。
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }
 
 function readyItem(

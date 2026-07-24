@@ -23,54 +23,12 @@
 import { InMemoryCanvasHost, type CanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
 import type { CanvasId, CardId, CardService, Card, ColorToken, CardType, TagRef, LinkPreview, CodeBlock, Quote } from '@cys-stift/domain'
 import { canvasFreeformStore } from '@/lib/canvas-freeform-store'
-import { stableTagColor } from '@/lib/tag-color'
+import { v8ToDomainFields, sameTagValues, sameLinkUrls } from './v8-fields'
 import { loadCardsIntoEditor, cardToElement, elementToCardPosition } from './canvas-binding'
 import { applyLayout, type ApplyOpResult } from './apply-layout'
 import type { SanitizeDiagnostic } from '@cys-stift/dsl'
 import type { DslOp } from '@cys-stift/dsl'
 import { freeformElementsOf } from './canvas-freeform-binding'
-
-/** v8:DSL 结构化字段 → domain 写入字段。tags 值列表 → TagRef[](颜色走 stableTagColor,与 capture/inbox
- *  建卡一致);links URL 列表 → LinkPreview[](fetchedAt=now;title/ogImage 是抓取派生态,DSL 不携带);
- *  code/quotes/type 直传。create 与 update 两路共用。 */
-function v8ToDomainFields(v8: {
-  cardType?: CardType
-  tags?: string[]
-  links?: string[]
-  code?: CodeBlock[]
-  quotes?: Quote[]
-}): {
-  type?: CardType
-  tags?: TagRef[]
-  links?: LinkPreview[]
-  codeSnippets?: CodeBlock[]
-  quotes?: Quote[]
-} {
-  const fetchedAt = new Date()
-  return {
-    ...(v8.cardType !== undefined ? { type: v8.cardType } : {}),
-    ...(v8.tags !== undefined
-      ? { tags: v8.tags.map((value) => ({ value, color: stableTagColor(value) })) }
-      : {}),
-    ...(v8.links !== undefined
-      ? { links: v8.links.map((url) => ({ url, fetchedAt })) }
-      : {}),
-    ...(v8.code !== undefined ? { codeSnippets: v8.code } : {}),
-    ...(v8.quotes !== undefined ? { quotes: v8.quotes } : {}),
-  }
-}
-
-/** tags 值序列是否相同(忽略颜色 —— DSL 只携带值;相同值不重写,保住用户自定义色)。 */
-function sameTagValues(existing: TagRef[] | undefined, next: TagRef[]): boolean {
-  if (!existing || existing.length !== next.length) return false
-  return next.every((t, i) => existing[i]?.value === t.value)
-}
-
-/** links URL 序列是否相同(忽略 fetchedAt/title —— DSL 只携带 URL;相同 URL 不重写,保住已抓 title)。 */
-function sameLinkUrls(existing: LinkPreview[] | undefined, next: LinkPreview[]): boolean {
-  if (!existing || existing.length !== next.length) return false
-  return next.every((l, i) => existing[i]?.url === l.url)
-}
 
 /**
  * 构建目标画布的临时 host(只读快照):cards(listOnCanvas 过滤 archived/deleted)

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import type { CanvasId, Card, CardId, TagRef } from '@cys-stift/domain'
+import type { CanvasId, Card, CardId, TagRef, CardType, LinkPreview, CodeBlock, Quote } from '@cys-stift/domain'
 import { SelfBuiltAdapter, applyAlign, elementCenter, unionBounds, normalizeBox, screenToPage } from '@cys-stift/canvas-engine'
 import type { AlignOp, CanvasElement } from '@cys-stift/canvas-engine'
 import { Button, Modal, Toolbar } from '@cys-stift/ui'
@@ -18,7 +18,8 @@ import { DslDialog } from '@/features/canvas/dsl-dialog'
 import { CanvasOverviewModal } from '@/features/canvas/canvas-overview-modal'
 import { ShortcutHelpDialog } from '@/features/canvas/shortcut-help-dialog'
 import { DiffDialog } from '@/features/canvas/diff-dialog'
-import { applyLayout } from '@/features/canvas/apply-layout'
+import { applyLayout, type CardCreateParams, type CardUpdateContent } from '@/features/canvas/apply-layout'
+import { v8ToDomainFields, sameTagValues, sameLinkUrls } from '@/features/canvas/v8-fields'
 import { nextFocusStates } from '@/features/canvas/focus-mode-transition'
 import { OrganizePopover } from '@/features/canvas/organize-popover'
 import { CanvasCommandMenu, canvasMenuTriggerIntent } from '@/features/canvas/canvas-command-menu'
@@ -724,12 +725,13 @@ ${formatted}`
   }, [zoomBy, toggleSnap, t, focusMode])
 
   // create 类 op 先落 CardService,applyLayout 收到成功结果后才写 host。
-  const onCardCreate = useCallback((p: { cardId: string; x: number; y: number; w: number; h: number; color?: string; title?: string; content?: string }) => {
+  const onCardCreate = useCallback((p: CardCreateParams) => {
     try {
+      const v8 = v8ToDomainFields({ cardType: p.cardType, tags: p.tags, links: p.links, code: p.code, quotes: p.quotes })
       service.createWithId(p.cardId as CardId, {
         title: p.title ?? '',
         body: p.content ?? '',
-        type: 'note',
+        type: p.cardType ?? 'note',
         canvasPosition: {
           canvasId: activeCanvasId,
           x: p.x,
@@ -739,6 +741,10 @@ ${formatted}`
           z: Date.now(),
           rotation: 0,
         },
+        ...(v8.tags !== undefined ? { tags: v8.tags } : {}),
+        ...(v8.links !== undefined ? { links: v8.links } : {}),
+        ...(v8.codeSnippets !== undefined ? { codeSnippets: v8.codeSnippets } : {}),
+        ...(v8.quotes !== undefined ? { quotes: v8.quotes } : {}),
         source: { kind: 'manual', deviceId: 'dsl-apply' },
       })
       return { ok: true } as const
@@ -751,12 +757,21 @@ ${formatted}`
   }, [service, activeCanvasId])
 
   // v5:card-update 带 @title/@content → 写回 CardService(Card.title/body)。只写 DSL 提供的字段。
-  const onCardUpdate = useCallback((p: { cardId: string; title?: string; content?: string }) => {
+  const onCardUpdate = useCallback((p: CardUpdateContent) => {
     try {
-      service.update(p.cardId as CardId, {
-        ...(p.title !== undefined ? { title: p.title } : {}),
-        ...(p.content !== undefined ? { body: p.content } : {}),
-      })
+      const current = service.get(p.cardId as CardId)
+      if (!current) return
+      const patch: { title?: string; body?: string; type?: CardType; tags?: TagRef[]; links?: LinkPreview[]; codeSnippets?: CodeBlock[]; quotes?: Quote[] } = {}
+      if (p.title !== undefined && p.title !== current.title) patch.title = p.title
+      if (p.content !== undefined && p.content !== current.body) patch.body = p.content
+      const v8 = v8ToDomainFields({ cardType: p.cardType, tags: p.tags, links: p.links, code: p.code, quotes: p.quotes })
+      if (v8.type !== undefined && v8.type !== current.type) patch.type = v8.type
+      if (v8.tags !== undefined && !sameTagValues(current.tags, v8.tags)) patch.tags = v8.tags
+      if (v8.links !== undefined && !sameLinkUrls(current.links, v8.links)) patch.links = v8.links
+      if (v8.codeSnippets !== undefined && JSON.stringify(v8.codeSnippets) !== JSON.stringify(current.codeSnippets)) patch.codeSnippets = v8.codeSnippets
+      if (v8.quotes !== undefined && JSON.stringify(v8.quotes) !== JSON.stringify(current.quotes)) patch.quotes = v8.quotes
+      if (Object.keys(patch).length === 0) return
+      service.update(p.cardId as CardId, patch)
     } catch {
       // 静默:内容写入失败不视为致命(几何已应用;内容下次同步)。与 onCardCreate 的硬失败语义区分。
     }

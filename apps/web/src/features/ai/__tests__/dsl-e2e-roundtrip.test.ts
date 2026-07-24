@@ -52,6 +52,17 @@ describe('DSL end-to-end round-trip (serialize → parse → apply → re-serial
     expect(roundtripped).toBe(original)
   })
 
+  it('card e2e round-trip with FRACTIONAL coords (finiteRound must NOT round — x=100.5 stays 100.5)', () => {
+    // 回归守卫:finiteRound 曾是 Math.round,把 100.5→101 破坏 byte-equal 往返
+    // (原 fixture 全整数,Math.round(100)===100 掩盖了问题)。全 .5 = 浮点精确 + toFixed(1) 精确。
+    const host = new InMemoryCanvasHost()
+    const { original, roundtripped } = roundTrip(host, [
+      { id: 'cf', kind: 'card', x: 100.5, y: 200.5, w: 240.5, h: 120.5, rotation: 0, color: 'blue' },
+    ])
+    expect(original).toBe('[card #cf] @pos(100.5,200.5) @size(240.5,120.5) @color(blue)')
+    expect(roundtripped).toBe(original)
+  })
+
   it('rect e2e round-trip (id + pos + size + color preserved through apply)', () => {
     const host = new InMemoryCanvasHost()
     const { original, roundtripped } = roundTrip(host, [

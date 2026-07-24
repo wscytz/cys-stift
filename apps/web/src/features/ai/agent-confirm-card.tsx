@@ -20,13 +20,14 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@cys-stift/ui'
-import type { CanvasId, CardId, CardService, ColorToken } from '@cys-stift/domain'
+import type { CanvasId, CardId, CardService, ColorToken, CardType, TagRef, LinkPreview, CodeBlock, Quote } from '@cys-stift/domain'
 import { InMemoryCanvasHost, type CanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
 import { parseDslStrictWithDiagnostics } from '@cys-stift/dsl'
 import type { DslOp, SanitizeDiagnostic } from '@cys-stift/dsl'
 import { applyLayout, type CardCreateHandler, type CardUpdateHandler } from '@/features/canvas/apply-layout'
 import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
 import { buildCanvasHostForCanvas, applyOpsAndPersist, type PersistResult } from '@/features/canvas/canvas-host-builder'
+import { v8ToDomainFields, sameTagValues, sameLinkUrls } from '@/features/canvas/v8-fields'
 import { useI18n } from '@/lib/i18n'
 import { pushToast } from '@/lib/toast-store'
 import { addSample, genSampleId } from './sample-store'
@@ -115,12 +116,17 @@ export function makeOnCardCreate(canvasId: CanvasId, service: CardService): {
   let failed = 0
   const onCardCreate: CardCreateHandler = (p) => {
     try {
+      const v8 = v8ToDomainFields({ cardType: p.cardType, tags: p.tags, links: p.links, code: p.code, quotes: p.quotes })
       service.createWithId(p.cardId as CardId, {
         title: p.title ?? '',
         body: p.content ?? '',
-        type: 'note',
+        type: p.cardType ?? 'note',
         canvasPosition: { canvasId, x: p.x, y: p.y, w: p.w, h: p.h, z: Date.now(), rotation: 0 },
         ...(p.color ? { color: p.color as ColorToken } : {}),
+        ...(v8.tags !== undefined ? { tags: v8.tags } : {}),
+        ...(v8.links !== undefined ? { links: v8.links } : {}),
+        ...(v8.codeSnippets !== undefined ? { codeSnippets: v8.codeSnippets } : {}),
+        ...(v8.quotes !== undefined ? { quotes: v8.quotes } : {}),
         source: { kind: 'manual', deviceId: 'companion-agent' },
       })
       return { ok: true } as const
@@ -144,13 +150,19 @@ export function makeOnCardCreate(canvasId: CanvasId, service: CardService): {
  * 反映);title/body 与当前一致时跳过(无谓写入)。
  */
 export function makeOnCardUpdate(service: CardService): CardUpdateHandler {
-  return ({ cardId, title, content }) => {
+  return ({ cardId, title, content, cardType, tags, links, code, quotes }) => {
     const current = service.get(cardId as CardId)
     if (!current) throw new Error(`card not found: ${cardId}`)
-    const patch: { title?: string; body?: string } = {}
+    const patch: { title?: string; body?: string; type?: CardType; tags?: TagRef[]; links?: LinkPreview[]; codeSnippets?: CodeBlock[]; quotes?: Quote[] } = {}
     if (title !== undefined && title !== current.title) patch.title = title
     if (content !== undefined && content !== current.body) patch.body = content
-    if (patch.title === undefined && patch.body === undefined) return
+    const v8 = v8ToDomainFields({ cardType, tags, links, code, quotes })
+    if (v8.type !== undefined && v8.type !== current.type) patch.type = v8.type
+    if (v8.tags !== undefined && !sameTagValues(current.tags, v8.tags)) patch.tags = v8.tags
+    if (v8.links !== undefined && !sameLinkUrls(current.links, v8.links)) patch.links = v8.links
+    if (v8.codeSnippets !== undefined && JSON.stringify(v8.codeSnippets) !== JSON.stringify(current.codeSnippets)) patch.codeSnippets = v8.codeSnippets
+    if (v8.quotes !== undefined && JSON.stringify(v8.quotes) !== JSON.stringify(current.quotes)) patch.quotes = v8.quotes
+    if (patch.title === undefined && patch.body === undefined && patch.type === undefined && patch.tags === undefined && patch.links === undefined && patch.codeSnippets === undefined && patch.quotes === undefined) return
     const updated = service.update(cardId as CardId, patch) as unknown
     if (updated === null || updated === false || updated === undefined) {
       throw new Error(`card content update failed: ${cardId}`)
