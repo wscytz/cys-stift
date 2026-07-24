@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { BauhausMotif, Button, Card as UICard, Modal, Tag, Toolbar } from '@cys-stift/ui'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
+import { mediaStore } from '@/lib/media-store'
 import { useI18n } from '@/lib/i18n'
 import { PageLoading } from '@/components/page-loading'
 import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
@@ -116,6 +117,11 @@ export default function TrashPage() {
                 variant="danger"
                 disabled={deleteConfirmText !== t('common.deleteConfirmWord')}
                 onClick={() => {
+                  // 清理 media 资源:硬删后 card record 没了,但其 media[].assetId 资源会孤立
+                  // 残留 localStorage/OPFS 持续占配额(每次导出还被带上)。删 card 前先释放。
+                  for (const m of confirmingCard.media ?? []) {
+                    mediaStore.remove(m.assetId)
+                  }
                   service.hardDelete(confirmingCard.id)
                   setConfirmHardDelete(null)
                   setDeleteConfirmText('')

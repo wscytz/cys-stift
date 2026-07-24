@@ -798,6 +798,8 @@ export const messages = {
   'settings.importOk': { zh: '已导入 {cards} 张卡片 · {mediaAssets} 个媒体 · {canvases} 个画布 · {freeform} 组画布几何。页面状态已更新。', en: 'Imported {cards} cards · {mediaAssets} media · {canvases} canvases · {freeform} freeform sets. Page state updated.' },
   'settings.importFreeformSkipped': { zh: '· {n} 个画布几何因存储满跳过', en: '· {n} canvas geometries skipped (storage full)' },
   'settings.importFail': { zh: '导入失败：{error}', en: 'Import failed: {error}' },
+  'settings.importCheckpointBlockedHint': { zh: '存储空间不足,无法创建恢复点(完整副本)。可跳过恢复点继续导入,但此次导入将不可撤销——请确保已另存外部备份。', en: 'Not enough storage to create a recovery snapshot (full copy). You can skip it and proceed, but this import becomes irreversible — make sure you have an external backup.' },
+  'settings.importSkipCheckpoint': { zh: '跳过恢复点导入', en: 'Skip snapshot & import' },
   'settings.importReadFailed': { zh: '读取文件失败', en: 'Read failed' },
   'settings.importCheckpointAvailable': { zh: '导入前状态快照可恢复：{createdAt} · {cards} 张卡片 · {media} 个媒体。后续导入失败不会覆盖这份快照。', en: 'A pre-import recovery snapshot is available: {createdAt} · {cards} cards · {media} media. A later failed import will not overwrite it.' },
   'settings.importCheckpointRestore': { zh: '恢复导入前状态', en: 'Restore pre-import state' },

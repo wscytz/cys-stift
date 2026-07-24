@@ -104,25 +104,24 @@ export default function SettingsPage() {
     }
   }
 
-  const confirmImport = async () => {
+  const confirmImport = async (opts?: { skipCheckpoint?: boolean }) => {
     const pending = pendingImport
     if (!pending || importing) return
     setImporting(true)
     setResultAction('import')
     try {
-      const result = await importFromJson(pending.text, { mode: importMode })
+      const result = await importFromJson(
+        pending.text,
+        opts?.skipCheckpoint ? { mode: importMode, checkpoint: false } : { mode: importMode },
+      )
       setImportResult(result)
       refreshCheckpointMeta()
-      if (result.ok) {
-        // importFromJson commits localStorage/freeform atomically and
-        // rehydrates every in-memory store before resolving. Keep the page
-        // alive so the user can read the result and continue working; a full
-        // reload used to hide the success report and could interrupt a
-        // capture that happened immediately after import.
-      }
+      // 近配额时 saveImportCheckpoint(写完整副本)会失败 → result.error 以 'checkpoint failed' 开头。
+      // 保留 pending 让用户能"跳过恢复点重试"(牺牲不可撤销换能导入);其余情况照常清 pending。
+      const checkpointBlocked = !result.ok && !!result.error && result.error.startsWith('checkpoint failed')
+      if (!checkpointBlocked) setPendingImport(null)
     } finally {
       setImporting(false)
-      setPendingImport(null)
     }
   }
 
@@ -241,6 +240,7 @@ export default function SettingsPage() {
             </label>
             <p className="mono mono--xs">{t('settings.importHint')}</p>
             {importResult && (
+              <>
               <p
                 className={`mono mono--xs ${importResult.ok ? '' : 'set__import-result--error'}`}
                 role={importResult.ok === false ? 'alert' : 'status'}
@@ -262,6 +262,19 @@ export default function SettingsPage() {
                     ? t('settings.clearWorkspaceFail', { error: importResult.error ?? '' })
                     : t('settings.importFail', { error: importResult.error ?? '' })}
               </p>
+              {!importResult.ok && importResult.error?.startsWith('checkpoint failed') && pendingImport && (
+                <div className="set__import-retry">
+                  <p className="mono mono--xs">{t('settings.importCheckpointBlockedHint')}</p>
+                  <Button
+                    variant="ghost"
+                    onClick={() => confirmImport({ skipCheckpoint: true })}
+                    disabled={importing}
+                  >
+                    {t('settings.importSkipCheckpoint')}
+                  </Button>
+                </div>
+              )}
+              </>
             )}
             {checkpointMeta && (
               <div className="set__import-recovery" data-testid="import-recovery">

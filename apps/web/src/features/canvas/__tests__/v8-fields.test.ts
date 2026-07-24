@@ -24,7 +24,7 @@ describe('v8ToDomainFields', () => {
   })
 
   it('code/quotes/cardType 直传(codeSnippets/quotes/type 键名对齐 domain)', () => {
-    const code = [{ lang: 'ts', code: 'const x = 1', caption: '示例' }]
+    const code = [{ language: 'ts', code: 'const x = 1', caption: '示例' }]
     const quotes = [{ text: '简单优于复杂', by: '设计原则' }]
     const r = v8ToDomainFields({ cardType: 'code', code, quotes })
     expect(r.type).toBe('code')
@@ -50,11 +50,11 @@ describe('sameTagValues / sameLinkUrls(update diff:相同则不重写,保用户�
   })
   it('tags 值不同 → false', () => {
     expect(
-      sameTagValues([{ value: 'a', color: 'r' }], [{ value: 'b', color: 'r' }]),
+      sameTagValues([{ value: 'a', color: 'var(--color-red)' }], [{ value: 'b', color: 'var(--color-red)' }]),
     ).toBe(false)
   })
   it('tags 长度不同 → false', () => {
-    expect(sameTagValues([{ value: 'a', color: 'r' }], [])).toBe(false)
+    expect(sameTagValues([{ value: 'a', color: 'var(--color-red)' }], [])).toBe(false)
   })
   it('links URL 序列相同 → true(忽略 fetchedAt)', () => {
     expect(
