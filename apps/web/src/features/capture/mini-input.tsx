@@ -28,6 +28,10 @@ import { useDebouncedCallback } from '@/lib/use-debounced-callback'
 import { useI18n } from '@/lib/i18n'
 import { useIsMac } from '@/lib/use-platform'
 
+/** focus trap:frame 内可聚焦元素选择器(与 Modal 同款)。 */
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
 interface CaptureDraftPayload {
   title: string
   body: string
@@ -66,6 +70,9 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
   const [tags, setTags] = useState<TagRef[]>([])
   const [tagInput, setTagInput] = useState('')
   const bodyRef = useRef<HTMLTextAreaElement | null>(null)
+  // a11y focus trap:frame ref + 先前焦点(open 记 / close 还原)。
+  const frameRef = useRef<HTMLDivElement | null>(null)
+  const previouslyFocused = useRef<HTMLElement | null>(null)
 
   // Debounced autosave (spec §5.5). 500ms of silence → persist. The store
   // write is best-effort; failure (quota) is recorded in the store flag.
@@ -99,6 +106,59 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, ready])
+
+  // a11y focus trap:open 时把焦点收到 frame 内(标题 Input 已 autoFocus,这里兜底 +
+  // 记住先前焦点),close 时还原 —— 本组件声明了 `aria-modal="true"`,须兑现该承诺。
+  useEffect(() => {
+    if (!open) return
+    previouslyFocused.current = document.activeElement as HTMLElement | null
+    const frame = frameRef.current
+    if (frame && !frame.contains(document.activeElement)) {
+      const first = frame.querySelector<HTMLElement>(FOCUSABLE)
+      if (first) first.focus()
+    }
+    return () => {
+      const prev = previouslyFocused.current
+      if (prev && typeof prev.focus === 'function') {
+        try {
+          prev.focus()
+        } catch {
+          // 元素可能已卸载
+        }
+      }
+    }
+  }, [open])
+
+  // Tab 陷:frame 内首尾循环,不逃到背后页面(与 Modal 同款;Escape/Cmd+Enter 仍由
+  // backdrop 的 onKeyDown 处理,本 listener 只管 Tab)。
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return
+      const frame = frameRef.current
+      if (!frame || !frame.contains(document.activeElement)) return
+      const items = Array.from(frame.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        (el) => el.offsetParent !== null || el === document.activeElement,
+      )
+      if (items.length === 0) {
+        e.preventDefault()
+        frame.focus()
+        return
+      }
+      const first = items[0]
+      const last = items[items.length - 1]
+      if (!first || !last) return
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open])
 
   const setTitleAndPersist = (t: string) => {
     setTitle(t)
@@ -186,11 +246,12 @@ if (
       onClick={onClose}
       onKeyDown={onKeyDown}
     >
-      <div className="mi-frame" onClick={(e) => e.stopPropagation()}>
+      <div className="mi-frame" ref={frameRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
         <div className="mi-body">
           <Input
             type="text"
             placeholder={t('capture.miniTitle')}
+            aria-label={t('capture.miniTitle')}
             value={title}
             onChange={(e) => setTitleAndPersist(e.target.value)}
             className="mi-title"
@@ -218,6 +279,7 @@ if (
               ref={bodyRef}
               className="mi-textarea"
               placeholder={t('capture.miniBody')}
+              aria-label={t('capture.miniBody')}
               value={body}
               onChange={(e) => setBodyAndPersist(e.target.value)}
               rows={3}
