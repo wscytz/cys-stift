@@ -46,6 +46,7 @@ export function ListEditor<T extends Record<string, string>>({
               className="le__input"
               value={item[fieldKey] as string}
               placeholder={placeholder}
+              aria-label={placeholder ?? label}
               onChange={(e) => {
                 const next = items.slice()
                 next[i] = { ...next[i], [fieldKey]: e.target.value } as T
@@ -94,6 +95,7 @@ export function CodeEditor({
                 className="le__lang"
                 value={item.language}
                 placeholder={t('editor.codeLangPlaceholder')}
+                aria-label={t('editor.codeLangPlaceholder')}
                 onChange={(e) => {
                   const next = items.slice()
                   const prev = next[i] as DraftCode
@@ -114,6 +116,7 @@ export function CodeEditor({
               className="le__code-area"
               value={item.code}
               placeholder={t('editor.codePlaceholder')}
+              aria-label={t('editor.codePlaceholder')}
               rows={3}
               onChange={(e) => {
                 const next = items.slice()
@@ -155,6 +158,7 @@ export function QuoteEditor({
               className="le__quote-text"
               value={item.text}
               placeholder={t('editor.quotePlaceholder')}
+              aria-label={t('editor.quotePlaceholder')}
               rows={2}
               onChange={(e) => {
                 const next = items.slice()
@@ -167,6 +171,7 @@ export function QuoteEditor({
               className="le__input"
               value={item.attribution}
               placeholder={t('editor.attributionPlaceholder')}
+              aria-label={t('editor.attributionPlaceholder')}
               onChange={(e) => {
                 const next = items.slice()
                 const prev = next[i] as DraftQuote
@@ -287,6 +292,7 @@ export const editorStyles = `
   outline: none;
   text-transform: lowercase;
 }
+.le__lang:focus { border-bottom-color: var(--color-red); }
 .le__code-area {
   appearance: none;
   background: var(--color-black-soft);
@@ -300,6 +306,7 @@ export const editorStyles = `
   min-height: 64px;
   border-radius: var(--radius-sm);
 }
+.le__code-area:focus { box-shadow: inset 0 0 0 2px var(--color-red); }
 .le__quote { display: flex; flex-direction: column; gap: var(--space-1); position: relative; }
 .le__quote-text {
   appearance: none;
@@ -314,5 +321,6 @@ export const editorStyles = `
   min-height: 48px;
   border-radius: var(--radius-sm);
 }
+.le__quote-text:focus { border-color: var(--color-red); }
 .le__quote .le__remove { position: absolute; top: 0; right: 0; }
 `
