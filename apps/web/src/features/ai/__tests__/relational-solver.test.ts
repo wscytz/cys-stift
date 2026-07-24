@@ -271,4 +271,23 @@ describe('solveRelational — relational → 绝对坐标', () => {
     // 推过最远障碍 obsN 右沿(c1.x ≥ obsN.x + w − clr)
     expect(c1.x).toBeGreaterThanOrEqual(120 * N + 100 - 20)
   })
+
+  it('大规模碰撞避让:N=800 right-of 同 anchor → 零重叠、毫秒级收敛(降复杂度守卫)', () => {
+    // resolveCollision 改 O(K log K) 排序单扫后,N=800 毫秒级完成。
+    // 若回退到原 O(N²) 多轮(每张 K²),N=800 → ~5e8 次比较会超 vitest 默认 5s 挂 → 守住复杂度。
+    // w=10/gap=2:c_k 沿 x 步进 12,800 张最远 9600 < DSL_MAX_COORD(10000),validate 不钳位。
+    const N = 800
+    const lines = ['[card #c0 create] @pos(0,0) @size(10,10)']
+    for (let k = 1; k <= N; k++) lines.push(`[card #c${k} create] right-of #c0 @gap(2) @size(10,10)`)
+    const ops = parseDsl(lines.join('\n'))
+    const { ops: out, diagnostics } = solveRelational(ops)
+    expect(diagnostics).toEqual([])
+    const xs = out
+      .filter((o): o is Extract<DslOp, { type: 'card' }> => o.type === 'card')
+      .map((o) => o.x!)
+      .sort((a, b) => a - b)
+    expect(xs).toHaveLength(N + 1)
+    // 零重叠:排序后相邻 x 间距 ≥ w(10)
+    for (let i = 1; i < xs.length; i++) expect(xs[i]!).toBeGreaterThanOrEqual(xs[i - 1]! + 10)
+  })
 })

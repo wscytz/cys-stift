@@ -164,26 +164,40 @@ function resolveCollision(
   clearance: number,
   selfId: string,
 ): { x: number; y: number } {
-  // clearance 钳 ≥0:负 @gap(parser 接受负数)会让推进推不过障碍(新坐标仍相交)→ 跑满 max 轮残留重叠。
-  // 钳 0 后负 gap 退化为"卡片贴合"(clearance=0,严格 >0 不算重叠),避让仍保证清空、且必收敛。
+  // clearance 钳 ≥0:负 @gap(parser 接受负数)会让推进推不过障碍(新坐标仍相交)→ 残留重叠。
+  // 钳 0 后负 gap 退化为"卡片贴合"(clearance=0,严格 >0 不算重叠),避让仍保证清空。
   const clr = Math.max(0, clearance)
-  let x = ax
-  let y = ay
-  // 每轮扫所有已置 card,越过最深相交障碍;无相交则停。坐标只增 → 必收敛。
-  // 上界 geom.size+1:最坏每轮新揭一张障碍(N 张需 N 轮越过 + 1 轮确认无相交),故 max=geom.size+1。
-  for (let iter = 0, max = geom.size + 1; iter < max; iter++) {
-    let bumped = false
+  // O(K log K) 排序单扫,替代原 O(N²) 多轮(每轮扫全 geom,最坏 N 轮)。
+  // 等价性:沿关系轴推进 = 跳过所有「垂直轴区间重叠 + 关系轴区间相交」的已置 card。
+  //   先筛垂直轴重叠集(只有它们可能在关系轴相撞),再按关系轴坐标升序单次扫描:
+  //   遇相交则推过其尾 + clr。cur 只增 → 已扫过的(更小坐标)不会被新位置再相交
+  //   → 一遍收敛,与原「多轮取 max」同果(已手验相邻/间隔/负 gap 多 case)。
+  if (axis === 'y') {
+    // below:x 由 anchor 固定(列归属)→ 沿 y 推。筛 x 区间重叠的障碍,按 y 升序。
+    const hit: ExistingGeom[] = []
     for (const [id, g] of geom) {
       if (id === selfId) continue
-      if (rectsOverlap({ x, y, w, h }, g)) {
-        if (axis === 'y') y = Math.max(y, g.y + g.h + clr)
-        else x = Math.max(x, g.x + g.w + clr)
-        bumped = true
-      }
+      if (ax < g.x + g.w && ax + w > g.x) hit.push(g)
     }
-    if (!bumped) break
+    hit.sort((a, b) => a.y - b.y)
+    let y = ay
+    for (const g of hit) {
+      if (y < g.y + g.h && g.y < y + h) y = g.y + g.h + clr
+    }
+    return { x: ax, y }
   }
-  return { x, y }
+  // right-of:y 由 anchor 固定(行归属)→ 沿 x 推。筛 y 区间重叠的障碍,按 x 升序。
+  const hit: ExistingGeom[] = []
+  for (const [id, g] of geom) {
+    if (id === selfId) continue
+    if (ay < g.y + g.h && ay + h > g.y) hit.push(g)
+  }
+  hit.sort((a, b) => a.x - b.x)
+  let x = ax
+  for (const g of hit) {
+    if (x < g.x + g.w && g.x < x + w) x = g.x + g.w + clr
+  }
+  return { x, y: ay }
 }
 
 /**
