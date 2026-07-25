@@ -5,6 +5,13 @@
 
 ---
 
+## 2026-07-25 · 1.1.0-preview.6 · 正式发 preview release(tag v1.1.0-preview.6)
+
+- push tag `v1.1.0-preview.6` 触发 `release-preview.yml`:verify(lint + test + build + version sync 门)→ Windows NSIS `.exe` + macOS Apple Silicon `.dmg` + `SHA256SUMS.txt` → 自动建 GitHub **prerelease**。
+- **release notes**(`.github/release-preview.md`)从 1.0.0-preview.2 历史档更新为本版:v8 结构化卡(`@type`/`@tags`/`@links`/`@code`/`@quote`)/ AI 思考适配 / a11y / 硬删媒体清理 + 检查点恢复 / solver 降复杂度;附 Windows SmartScreen(无 Authenticode)+ macOS Gatekeeper(ad-hoc 未公证)说明。
+- **DeepSeek provider 实跑**:`thinking:{type:disabled}` 200 且真关思考(原"是否 400"UNCERTAIN 解除);端点已只认 `deepseek-v4-flash`/`deepseek-v4-pro`(旧 `deepseek-chat`/`deepseek-reasoner` 400)—— app 未硬编码模型,用户自填;release notes 注明。
+- 此前两条 preview.6 条目标注的"未打包 / 未 push"随本条释放。
+
 ## 2026-07-24 · 1.1.0-preview.6 · capture MiniInput 改轻量小框(去全屏暗化)
 
 快捷建卡(Cmd+Shift+E)此前是全屏 50% 暗化蒙层 + 红边框 + 顶部红条的较重模态;改成**无全屏暗化的贴顶轻量小框**,更接近通用搜索/AI 工具的速记条:
