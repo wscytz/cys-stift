@@ -178,22 +178,38 @@ function metaType(c: CardDslContent | undefined): string {
   return c?.type ? ` @type(${c.type})` : ''
 }
 
-/** v8:读注入的卡片 tags。value 过滤空 → 各 encodeURIComponent(防 `;` 等分隔符碰撞)→ `;` 连接。
+/** v8 list 值编码:encodeURIComponent 之外再编码 `(` `)`——grammar 用 `[^)]+` 捕获 @tags/@links
+ *  (dsl.peggy tagsDir/linksDir),裸 `)` 会提前闭合指令并**级联吞掉后续项**(如 Wikipedia
+ *  `Cat_(disambiguation)` URL 丢尾 `)`→ 404,其后所有项被当残留丢弃)。parse 侧
+ *  decodeURIComponent(dsl-parser.ts parseTagList/parseLinkList)自动反向,无需改 grammar。 */
+function encodeListValue(v: string): string {
+  try {
+    return encodeURIComponent(v).replace(/\(/g, '%28').replace(/\)/g, '%29')
+  } catch {
+    // 孤立代理对(非法 Unicode,来自异常切片而非正常输入)会让 encodeURIComponent
+    // 抛 URIError,进而**整张画布**导出 / AI 快照崩。降级:替换孤立代理为 U+FFFD
+    // 再编码,保导出可用(非法输入本就不要求逐字节往返)。
+    return encodeURIComponent(v.replace(/[\ud800-\udfff]/g, '�')).replace(/\(/g, '%28').replace(/\)/g, '%29')
+  }
+}
+
+/** v8:读注入的卡片 tags。value 过滤空 → 各 encodeListValue(防 `;` 分隔符碰撞 + `)` 提前闭合)→ `;` 连接。
  *  无有效 tag → 不 emit。是 parseTagList 的逆。 */
 function metaTags(c: CardDslContent | undefined): string {
   const values = (c?.tags ?? [])
     .map((t) => (typeof t?.value === 'string' ? t.value.trim() : ''))
     .filter((v) => v !== '')
-  return values.length > 0 ? ` @tags(${values.map(encodeURIComponent).join(';')})` : ''
+  return values.length > 0 ? ` @tags(${values.map(encodeListValue).join(';')})` : ''
 }
 
-/** v8:读注入的卡片 links(仅 URL,见 CardDslContent 说明)。url 过滤空 → 各 encodeURIComponent
- *  (URL 含 `;`/`=`/`&` 会撞分隔符)→ `;` 连接。无有效 url → 不 emit。是 parseLinkList 的逆。 */
+/** v8:读注入的卡片 links(仅 URL,见 CardDslContent 说明)。url 过滤空 → 各 encodeListValue
+ *  (URL 含 `;`/`=`/`&` 会撞分隔符;含 `)` 如 Wikipedia 消歧义页会提前闭合)→ `;` 连接。
+ *  无有效 url → 不 emit。是 parseLinkList 的逆。 */
 function metaLinks(c: CardDslContent | undefined): string {
   const urls = (c?.links ?? [])
     .map((l) => (typeof l?.url === 'string' ? l.url.trim() : ''))
     .filter((u) => u !== '')
-  return urls.length > 0 ? ` @links(${urls.map(encodeURIComponent).join(';')})` : ''
+  return urls.length > 0 ? ` @links(${urls.map(encodeListValue).join(';')})` : ''
 }
 
 /** v8:读注入的卡片 codeSnippets。每个 emit 一条 ` @code(lang,"code"[,"caption"])`(可重复指令)。

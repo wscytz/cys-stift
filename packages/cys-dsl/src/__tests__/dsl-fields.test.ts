@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CanvasElement } from '@cys-stift/canvas-engine'
 import { parseDsl, parseDslStrictWithDiagnostics, type DslCardOp } from '../dsl-parser'
-import { serializeCanvas } from '../canvas-dsl'
+import { serializeCanvas, type CardDslContent } from '../canvas-dsl'
 import { sanitizeDslOps } from '../dsl-sanitize'
 import {
   DSL_MAX_CONTENT_LEN,
@@ -68,6 +68,40 @@ describe('cys-dsl v8 @links', () => {
   it('truncates to DSL_MAX_LINK_COUNT', () => {
     const many = Array.from({ length: DSL_MAX_LINK_COUNT + 3 }, (_, i) => encodeURIComponent(`https://x.com/${i}`)).join(';')
     expect(first(parseDsl(card(`@links(${many})`))).links).toHaveLength(DSL_MAX_LINK_COUNT)
+  })
+})
+
+// 回归:grammar 用 `[^)]+` 捕获 @tags/@links(dsl.peggy tagsDir/linksDir),修复前序列化侧
+// encodeURIComponent 不编码 `(` `)`,导致值里的裸 `)` 提前闭合指令——丢尾部 `)` 并**级联吞掉
+// 其后所有项**(如 Wikipedia `Cat_(disambiguation)` URL)。encodeListValue 现在也编码圆括号。
+describe('cys-dsl v8 @tags/@links ")" round-trip (serialize→parse identity)', () => {
+  const el: CanvasElement = { id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 80, rotation: 0, color: 'blue' }
+  const roundtrip = (content: CardDslContent) => first(parseDsl(serializeCanvas([el], () => content)))
+  const C = 'var(--color-teal)'
+
+  it('tag values containing "(" ")" survive with all siblings (no cascade drop)', () => {
+    const op = roundtrip({
+      tags: [
+        { value: 'todo (urgent)', color: C },
+        { value: 'a)b', color: C },
+        { value: 'plain', color: C },
+      ],
+    })
+    expect(op.tags).toEqual(['todo (urgent)', 'a)b', 'plain'])
+  })
+
+  it('link URLs containing "(" ")" (Wikipedia disambiguation) survive; later links not swallowed', () => {
+    const op = roundtrip({
+      links: [
+        { url: 'https://en.wikipedia.org/wiki/Cat_(disambiguation)', fetchedAt: new Date(0) },
+        { url: 'https://y.com/plain', fetchedAt: new Date(0) },
+      ],
+    })
+    // 修复前:第一个 URL 丢尾 ")",第二个链接整个被吞。
+    expect(op.links).toEqual([
+      'https://en.wikipedia.org/wiki/Cat_(disambiguation)',
+      'https://y.com/plain',
+    ])
   })
 })
 
