@@ -21,17 +21,17 @@
 
 ## 下载
 
-当前稳定版为 [**v1.0.0**](https://github.com/wscytz/cys-stift/releases/tag/v1.0.0)。桌面安装包和 `SHA256SUMS.txt` 均从该 Release 页面下载：
+当前稳定版为 [**v1.1.0**](https://github.com/wscytz/cys-stift/releases/tag/v1.1.0)。桌面安装包和 `SHA256SUMS.txt` 均从该 Release 页面下载：
 
 | 平台 | 文件 | 说明 |
 |---|---|---|
 | **macOS**(Apple Silicon) | release 页面中的 `.dmg` | 拖到 Applications |
 | **Windows** x64 | release 页面中的 NSIS `.exe` | 需 WebView2(Win11 自带;Win10 可单独安装) |
-| **Android** | 1.0.0 不提供 | 不在本次稳定版支持范围 |
+| **Android** | 1.1.0 不提供 | 不在本次稳定版支持范围 |
 
 > iPad/iOS 不做。Windows 安装包未经 Authenticode 签名，macOS 安装包为 ad-hoc 签名且未公证，系统可能显示“未知开发者/发布者”警告；安装前请先核对 Release 中的 SHA256。
 
-`v1.0.0` 冻结核心工作流、数据格式、cys-dsl v4 和 AI 修改确认门。外部 5-8 人研究、VoiceOver、真实系统 200% 缩放、代表性设备安装升级以及真实 provider 配额/拒绝演练没有在发布前伪装成已完成证据，列为发布后加固项。
+`v1.1.0` 冻结核心工作流、数据格式、cys-dsl v8 和 AI 修改确认门。外部 5-8 人研究、VoiceOver、真实系统 200% 缩放、代表性设备安装升级以及真实 provider 配额/拒绝演练没有在发布前伪装成已完成证据，列为发布后加固项。
 
 ---
 
@@ -53,7 +53,7 @@
 
 **AI** —— 多 provider(OpenAI / Anthropic / DeepSeek / Ollama 本地,零成本)+ AI 排版(诚实位移反馈:重排 N 张 / AI 认为已合理 / 未改动)+ AI 伴侣面板(发现 tab 本地预筛 + 对话 tab)+ **DSL 重试闭环**(AI 出坏 DSL 自动重试喂回错误,maxAttempts=3)+ 失败样本采集(可导出调优)。
 
-**可审计 AI 共编（Labs，默认关闭）** —— 选择卡片并确认发送范围后，本地 graph lint 与 AI 的 Logic / Ideas / Layout 建议按来源逐项审查；接受后仍需生成 ghost preview 再应用。三个 lane 的 accepted subset 合并为同一份不可变计划，使用可恢复事务、CommitReceipt 与 guarded Undo。该实验不改变 DSL v4，尚未取得外部用户验证，不能视为 1.0.0 稳定承诺。
+**可审计 AI 共编（Labs，默认关闭）** —— 选择卡片并确认发送范围后，本地 graph lint 与 AI 的 Logic / Ideas / Layout 建议按来源逐项审查；接受后仍需生成 ghost preview 再应用。三个 lane 的 accepted subset 合并为同一份不可变计划，使用可恢复事务、CommitReceipt 与 guarded Undo。该实验不改变 cys-dsl 版本，尚未取得外部用户验证，不能视为 1.1.0 稳定承诺。
 
 **画板适配** —— 响应式(<1024 汉堡抽屉 + companion 覆盖 + canvas 断点归一)+ 触摸手势(双指 pinch zoom + 双指平移 + 触摸目标 44px)+ Android 运行时(rustls ring provider + 平台检测 SSR-safe hooks)。
 
@@ -67,7 +67,7 @@
 
 ## 状态
 
-**v1.0.0** — 首个稳定版,已在 GitHub Release 发布。核心闭环、恢复事务、cys-dsl v4 与跨平台构建流水线已冻结；签名/公证、实机无障碍与真实 provider 证据继续作为发布后加固工作。`main` 分支当前为 `1.1.0`(post-release,已升级到 cys-dsl v7,尚未 tag)。
+**v1.1.0** — 当前稳定版，已在 GitHub Release 发布。核心闭环、恢复事务、cys-dsl v8 与跨平台构建流水线已冻结；签名/公证、画布对象键盘创建、实机无障碍（VoiceOver）与真实 provider 证据继续作为发布后加固工作。
 
 DSL 的实现与内部稳定性验证已经具备，但“普通用户是否愿意学习并重复使用”仍是待外部研究验证的产品假设；README 和展示页不会把内部测试写成用户价值结论。
 
@@ -84,6 +84,7 @@ cys-stift/
 │   └── desktop/         Tauri v2 桌面壳(macOS / Windows / Android)
 ├── packages/
 │   ├── canvas-engine/   自研 Canvas 2D 引擎(零业务依赖,框架无关 — 北极星:可剥离成独立包)
+│   ├── cys-dsl/         画布 ↔ 文字双向转义 DSL(Peggy 解析器 + sanitize + 序列化,核心卖点)
 │   ├── ui/              包豪斯设计系统(6 原色 + 8px 网格 + token)
 │   ├── db/              Drizzle ORM + SQLite schema
 │   └── domain/          纯 TS 核心领域模型(零依赖)

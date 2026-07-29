@@ -47,6 +47,9 @@ const files = [
   join(ROOT, 'docs/user/README.md'),
   join(ROOT, 'docs/user/privacy.md'),
   join(ROOT, 'docs/user/transliteration.md'),
+  // docs/changelog.md 故意不在严格本地链接门内:它是历史档,含大量指向私有仓
+  // (cys-stift-docs)的 plans/decisions/reviews/design 内部引用(已迁出),且夹两处
+  // 非链接的 `[文字](...)` 文本。面向用户的顶部 STATE.md 指针已改成纯文本。
 ]
 const failures = []
 const linkPattern = /!?\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g

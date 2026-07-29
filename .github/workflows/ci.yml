@@ -42,17 +42,22 @@ jobs:
       # `lint` script (tsc --noEmit) of the three typed packages. web is
       # typechecked by `next build` below; its `next lint` is interactive and
       # not used here.
-      - name: typecheck (domain / db / ui — tsc --noEmit)
+      - name: typecheck (domain / db / ui / cys-dsl / canvas-engine — tsc --noEmit)
         run: |
           pnpm --filter domain lint
           pnpm --filter @cys-stift/db lint
           pnpm --filter @cys-stift/ui lint
+          pnpm --filter @cys-stift/dsl lint
+          pnpm --filter @cys-stift/canvas-engine lint
 
       - name: domain test
         run: pnpm --filter domain test
 
       - name: db test
         run: pnpm --filter db test
+
+      - name: cys-dsl test
+        run: pnpm --filter @cys-stift/dsl test
 
       - name: canvas-engine test
         run: pnpm --filter @cys-stift/canvas-engine test

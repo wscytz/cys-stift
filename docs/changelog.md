@@ -1,7 +1,7 @@
 # 变更日志
 
 > 每完成一个 Phase 追加一段(newest-first,新条目加在本文件顶部)。格式:`## YYYY-MM-DD · <version> · <slug>`。
-> 当前状态/版本见 [`STATE.md`](STATE.md)。
+> 当前状态/版本见私有仓 cys-stift-docs 的 `STATE.md`(本文件是公开仓历史档)。
 
 ---
 
@@ -1274,7 +1274,7 @@ roadmap.md(Phase 7-9 已完成,指向 STATE)、reference.md + reference-patterns
 
 **教训(记入记忆)**:tldraw 移除 + 引擎独立化是大变更,但过程文档没同步,导致 4 份规范 + 2 个 package.json 脚本漂移。大迁移后该有一轮"准则对齐现实"。硬编码版本/test 数的文档最易漂移——改指向真相源(package.json/命令输出)。
 
-**续 · Definition of Done 固化(同轮)**:把"改完代码 → 能 commit"的标准门固化成 [`docs/development/definition-of-done.md`](development/definition-of-done.md) —— ① 验证门(改了哪个包跑哪个包的 test+lint;web ~25-error `__tests__/` fixture 基线,判据**零新增**非零错误;web build 是产品门必须 exit 0;不假装通过);② 提交纪律(一个逻辑一个 commit、`git -c user.name=cy -c user.email=cy@stift.local` 无 footer、SSH push、conventional 前缀、过程文档 gitignored);③ 文档收尾触发清单(加 Card 字段→ai-context+privacy;加依赖→ADR+dependencies.md 指向 package.json;加 CanvasElement kind→五视图对齐;加 i18n→zh+en);④ subagent 编排。根 CLAUDE.md 同步修测试栈(vitest 现 4 包)+ 验证命令(补 `pnpm -r test`/`lint`)+ 关键文件表(挂 DoD/dependencies 指针);polish-phase §六 指向 DoD 作权威门,避免两边漂移。
+**续 · Definition of Done 固化(同轮)**:把"改完代码 → 能 commit"的标准门固化成 `docs/development/definition-of-done.md`(私有仓) —— ① 验证门(改了哪个包跑哪个包的 test+lint;web ~25-error `__tests__/` fixture 基线,判据**零新增**非零错误;web build 是产品门必须 exit 0;不假装通过);② 提交纪律(一个逻辑一个 commit、`git -c user.name=cy -c user.email=cy@stift.local` 无 footer、SSH push、conventional 前缀、过程文档 gitignored);③ 文档收尾触发清单(加 Card 字段→ai-context+privacy;加依赖→ADR+dependencies.md 指向 package.json;加 CanvasElement kind→五视图对齐;加 i18n→zh+en);④ subagent 编排。根 CLAUDE.md 同步修测试栈(vitest 现 4 包)+ 验证命令(补 `pnpm -r test`/`lint`)+ 关键文件表(挂 DoD/dependencies 指针);polish-phase §六 指向 DoD 作权威门,避免两边漂移。
 
 ---
 
@@ -1882,7 +1882,7 @@ P1(技术债清扫 — 零行为变化):
 - **canvas-snapshot-store 单测**: 9 个 it(save→load 往返 / corrupt JSON 容错 / SSR no-op / quota 异常不 throw / canvas 隔离 / remove no-op),为 P3 B6 offload 铺安全网。
 - **测试**: vitest 12 → 21(12 AI + 9 snapshot-store);domain 26/26;db 7/7;build exit 0
 - **e2e**: m3 7/7 + canvas-refactor PASS + m1 7/8(1 个预存 bug 与本次无关)
-- **新增 P1.5 决策档**: [`docs/decisions/2026-06-21-debt-cleanup.md`](../decisions/2026-06-21-debt-cleanup.md)
+- **新增 P1.5 决策档**: `docs/decisions/2026-06-21-debt-cleanup.md`(私有仓)
 
 详见决策档。
 
@@ -1909,7 +1909,7 @@ AI 可访问性 & 隐私设计(**纯文档**,无代码改动):
 
 **M3.1 实装任务不在本 phase**:ai-context.ts / canvas-snapshot.ts / dsl-parser.ts / toolbar "📐 AI 排版" 按钮(~ 400 行,基于本文档设计)
 
-详见 [`docs/decisions/2026-06-21-ai-accessibility-design.md`](../decisions/2026-06-21-ai-accessibility-design.md)。
+详见 `docs/decisions/2026-06-21-ai-accessibility-design.md`(私有仓)。
 
 ---
 
@@ -1927,7 +1927,7 @@ M3(AI 元素 — 完全可选 / 本地优先 / 密钥不外泄):
 - **新 dep**: eventsource-parser (1 runtime) + vitest + @vitest/ui + jsdom (3 dev)
 - **e2e**: `scripts/m3-shots.cjs`(7/7 passed)
 
-详见 [`docs/decisions/2026-06-21-canvas-m3-ai.md`](../decisions/2026-06-21-canvas-m3-ai.md)。
+详见 `docs/decisions/2026-06-21-canvas-m3-ai.md`(私有仓)。
 
 ---
 
@@ -1943,7 +1943,7 @@ M2(画布智能化 + 多模态入口 + 传递出口): P0/P1 四个能力 + 单�
 - **新 dep**: markitdownllm 0.1.5 + pdfjs-dist 6.0.227 (markitdownllm 的 pdf 转换依赖)
 - **e2e**: `scripts/m2-shots.cjs` 6/6 passed (edge connector + inference + floating panel + file drop + export)
 
-详见 [`docs/decisions/2026-06-21-canvas-m2-smart.md`](../decisions/2026-06-21-canvas-m2-smart.md)。
+详见 `docs/decisions/2026-06-21-canvas-m2-smart.md`(私有仓)。
 
 ---
 

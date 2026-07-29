@@ -58,6 +58,9 @@ scripts/audit-canvas-*.cjs
 # One-off audit reports (not shipped, learning/recap only)
 docs/audit/
 
+# Stale release-evidence artifact (preview.1-era, references local FS paths; not shipped)
+STABILITY-EVIDENCE-SUMMARY.json
+
 # AI assistant skill scratch dir (session-local, not shipped)
 .superpowers/
 ralph-loop.local.md
