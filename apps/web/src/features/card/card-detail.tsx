@@ -207,6 +207,7 @@ export function CardDetailModal({
   const [tags, setTags] = useState<TagRef[]>(card.tags ?? [])
   const [tagInput, setTagInput] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   // RB-T3 — 关系建/删的乐观更新:backlinks 区渲染用 localEdges(不是 globalEdges),
   // 这样建/删后立刻可见,无需等 useGlobalEdges 重新聚合。globalEdges 变化时同步。
   const [localEdges, setLocalEdges] = useState<GraphEdge[]>(globalEdges ?? [])
@@ -335,6 +336,10 @@ export function CardDetailModal({
   void aiEnabled // kept for future "configured but disabled" affordances; the
   // ✨ AI entry is ALWAYS visible per spec §3.2 (the barrier fix).
   const dialogRef = useRef<HTMLDivElement>(null)
+  // 编辑期点 × 移除的媒体 assetId 先记在这里,**提交成功才真删**(见 handleSave)。
+  // 取消(Esc/×/遮罩)或保存失败时不删,card.media 引用仍在 → 图片不会被一次取消的
+  // 编辑永久毁掉(修复:点 × 即调 mediaStore.remove 致取消后图丢失)。
+  const removedAssetIds = useRef<Set<MediaRef['assetId']>>(new Set())
 
   const has = (a: CardDetailAction) => actions.includes(a)
 
@@ -379,7 +384,28 @@ export function CardDetailModal({
   // 切换到另一张卡时,清掉上一张的 AI 推荐候选(避免串卡)。
   useEffect(() => {
     setAiRecs([])
+    // 切到另一张卡:清掉上一张记录的待删媒体(否则会在本卡 save 时误删别卡的图)。
+    removedAssetIds.current.clear()
   }, [card.id])
+
+  // 草稿是否与已存卡片不同(仅 edit 模式有意义)。关闭前据此弹"丢弃?"守卫,避免
+  // Esc/×/遮罩 静默毁掉未保存编辑(对齐 MiniInput/建卡表单的草稿保护)。须声明在
+  // 下方 Escape effect 之前——该 effect 的依赖数组在渲染期就读取 dirty。
+  const dirty = useMemo(() => {
+    if (mode !== 'edit') return false
+    const ct = card.tags ?? []
+    const cm = card.media ?? []
+    const cl = card.links ?? []
+    const cc = card.codeSnippets ?? []
+    const cq = card.quotes ?? []
+    if (title !== card.title || body !== card.body) return true
+    if (tags.length !== ct.length || tags.some((tg, i) => tg.value !== ct[i]?.value)) return true
+    if (media.length !== cm.length || media.some((m, i) => m.assetId !== cm[i]?.assetId)) return true
+    if (links.length !== cl.length || links.some((l, i) => l.url !== cl[i]?.url)) return true
+    if (codes.length !== cc.length || codes.some((c, i) => c.language !== cc[i]?.language || c.code !== cc[i]?.code)) return true
+    if (quotes.length !== cq.length || quotes.some((q, i) => q.text !== cq[i]?.text || q.attribution !== (cq[i]?.attribution ?? ''))) return true
+    return false
+  }, [mode, title, body, tags, media, links, codes, quotes, card])
 
   // Escape closes — works whether in main modal or in confirm-delete modal.
   // Guard: when a nested Escape-consuming overlay is open, dismiss THAT inner
@@ -397,11 +423,12 @@ export function CardDetailModal({
       const active = typeof document !== 'undefined' ? document.activeElement : null
       if (active instanceof HTMLElement && active.classList.contains('cd__tag-input')) return
       if (confirmDelete) setConfirmDelete(false)
+      else if (dirty) setConfirmDiscard(true)
       else onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, confirmDelete, aiView])
+  }, [onClose, confirmDelete, aiView, dirty])
 
   // Focus the title input on entering edit mode
   useEffect(() => {
@@ -426,8 +453,12 @@ export function CardDetailModal({
         quotes: draftQuotesToPayload(quotes),
         tags,
       })
-      if (ok) setMode('view')
-      else pushToast({ kind: 'error', message: t('card.saveFailedQuota') })
+      if (ok) {
+        // 提交成功才真正删媒体二进制(点 × 时只从草稿移除 + 记 id;取消/失败不删)。
+        for (const id of removedAssetIds.current) mediaStore.remove(id)
+        removedAssetIds.current.clear()
+        setMode('view')
+      } else pushToast({ kind: 'error', message: t('card.saveFailedQuota') })
     })
   }
 
@@ -458,7 +489,7 @@ export function CardDetailModal({
     <>
       <Modal
         open
-        onClose={onClose}
+        onClose={() => (dirty ? setConfirmDiscard(true) : onClose())}
         title={mode === 'edit' ? t('card.detail.title') : card.title || t('card.untitled')}
         closeLabel={t('common.close')}
       >
@@ -781,7 +812,9 @@ export function CardDetailModal({
                             type="button"
                             className="le__remove"
                             onClick={() => {
-                              mediaStore.remove(m.assetId)
+                              // 只从草稿移除 + 记下 assetId;真删推迟到 handleSave 提交
+                              // 成功后。取消/保存失败时卡片引用仍在,图片不丢。
+                              removedAssetIds.current.add(m.assetId)
                               setMedia((prev) =>
                                 prev.filter((x) => x.assetId !== m.assetId),
                               )
@@ -1022,6 +1055,32 @@ export function CardDetailModal({
             }}
           >
             {t('card.detail.deleteConfirmAction')}
+          </Button>
+        </div>
+      </Modal>
+
+      {/* 未保存编辑守卫:edit 模式且 dirty 时,关闭(Esc/×/遮罩)先弹此确认,避免
+          静默丢弃用户编辑(样式/焦点模式对齐 confirmDelete)。丢弃 → onClose;
+          取消 → 留在编辑态。丢弃时不 flush removedAssetIds,被移除的图保留。 */}
+      <Modal
+        open={confirmDiscard}
+        onClose={() => setConfirmDiscard(false)}
+        title={t('card.detail.discardTitle')}
+        closeLabel={t('common.close')}
+      >
+        <p className="cd__confirm">{t('card.detail.discardBody')}</p>
+        <div className="cd__confirm-actions">
+          <Button variant="ghost" onClick={() => setConfirmDiscard(false)}>
+            {t('card.detail.cancel')}
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              setConfirmDiscard(false)
+              onClose()
+            }}
+          >
+            {t('card.detail.discardAction')}
           </Button>
         </div>
       </Modal>
