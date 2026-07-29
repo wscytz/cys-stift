@@ -24,6 +24,20 @@ import { typeKeyOf } from '@/lib/type-label'
 import { useI18n } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n/messages'
 
+/** 卡片色 → CSS token 的安全映射(镜像 canvas-engine colorOf 的 6 原色 allowlist)。
+ *  card.color 可能来自导入文件而未经校验;若直接进 CSS `background`,恶意值
+ *  `url(https://attacker)` 会在打开工作台时发请求(对"无遥测/本地优先"是隐私外泄)。
+ *  白名单之外一律回退 gray,杜绝 CSS 注入/网络外泄。 */
+const CARD_BAR_COLOR: Record<string, string> = {
+  blue: 'var(--color-blue)',
+  red: 'var(--color-red)',
+  yellow: 'var(--color-yellow)',
+  gray: 'var(--color-gray)',
+  grey: 'var(--color-gray)',
+  white: 'var(--color-white)',
+  black: 'var(--color-black)',
+}
+
 export interface WorkbenchPanelProps {
   card: Card
   onSave: (cardId: string, patch: { title: string; body: string; tags: TagRef[] }) => boolean | void
@@ -151,7 +165,7 @@ export function WorkbenchPanel({
     <aside className="wb-panel" aria-label={t('card.detail.title')}>
       <style>{styles}</style>
       <header className="wb-panel__head">
-        <span className="wb-panel__bar" style={{ background: card.color ?? 'var(--color-gray)' }} aria-hidden="true" />
+        <span className="wb-panel__bar" style={{ background: CARD_BAR_COLOR[card.color ?? 'gray'] ?? 'var(--color-gray)' }} aria-hidden="true" />
         <input
           className="wb-panel__title"
           value={title}

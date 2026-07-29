@@ -30,6 +30,7 @@ import { PageLoading } from '@/components/page-loading'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import { CardDetailModal } from '@/features/card/card-detail'
 import { AiSetupCard } from '@/features/ai/ai-setup-card'
+import { friendlyAIError } from '@/features/ai/friendly-error'
 import { isAIReady } from '@/features/ai/ai-settings-provider'
 import { streamText } from '@/features/ai/stream-text'
 import { retryFailureMessageKey, retryUntilValid, buildDslCorrection } from '@/features/ai/retry-until-valid'
@@ -356,13 +357,13 @@ export default function AskPage() {
       if ((e as Error).name === 'AbortError') {
         pushToast({ kind: 'info', message: t('ai.error', { error: 'cancelled' }) })
       } else {
-        pushToast({ kind: 'error', message: t('ai.error', { error: (e as Error).message }) })
+        pushToast({ kind: 'error', message: friendlyAIError((e as Error).message, t) })
       }
       setMessages((prev) => {
         const next = [...prev]
         const last = next[next.length - 1]
         if (last && last.role === 'assistant' && last.streaming) {
-          next[next.length - 1] = { ...last, content: last.content || t('ai.error', { error: (e as Error).message }), streaming: false }
+          next[next.length - 1] = { ...last, content: last.content || friendlyAIError((e as Error).message, t), streaming: false }
         }
         return next
       })

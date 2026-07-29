@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowRight, ArrowUpRight, FileDown, Plus, Search, ShieldCheck, Undo2 } from 'lucide-react'
+import { VERSION } from '@/lib/version'
 
 export const metadata: Metadata = {
   title: "showcase — cy's Stift",
@@ -101,7 +102,7 @@ export default function ShowcasePage() {
       </section>
 
       <footer className="showcase__footer">
-        <span>cy's Stift / v1.0.0-preview.1</span>
+        <span>cy's Stift / v{VERSION}</span>
         <span>开源 · 本地优先 · 可迁移</span>
         <Link href="/settings/">检查数据边界 <ArrowRight size={14} aria-hidden="true" /></Link>
       </footer>

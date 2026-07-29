@@ -18,6 +18,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Card } from '@cys-stift/domain'
 import { useI18n } from '@/lib/i18n'
+import { friendlyAIError } from './friendly-error'
 import { runAIAction } from './ai-actions'
 import type { AIAction } from './prompts'
 import { getCurrentAI } from './ai-settings-provider'
@@ -73,7 +74,7 @@ export function AIPopover({
       })
       .catch((e: unknown) => {
         if (e instanceof Error && e.name === 'AbortError') return
-        setError(t('ai.error', { error: (e as Error).message }))
+        setError(friendlyAIError((e as Error).message, t))
         setRunning(false)
       })
     return () => {

@@ -12,6 +12,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/lib/i18n'
+import { friendlyAIError } from './friendly-error'
 import { getCurrentAI, isAIReady } from '@/features/ai/ai-settings-provider'
 import type { AIConfig } from '@/features/ai/types'
 import { pushToast } from '@/lib/toast-store'
@@ -68,7 +69,7 @@ export function useAIAction(onNotReady: () => void) {
         if ((e as Error).name === 'AbortError') {
           pushToast({ kind: 'info', message: t('canvas.aiCancelled') })
         } else {
-          pushToast({ kind: 'error', message: t('ai.error', { error: (e as Error).message }) })
+          pushToast({ kind: 'error', message: friendlyAIError((e as Error).message, t) })
         }
       } finally {
         setAiBusy(null)
