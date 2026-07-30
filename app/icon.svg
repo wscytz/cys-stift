@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- v0.22.1-ux-polish-2: cy's Stift favicon.
+       6-colour Bauhaus mark — black square (background, brand
+       emphasis on dark surfaces) with a centred red square
+       (spec §5.4 — the same red used by Inbox tiles, Capture
+       button, and the design system in general).
+       Next.js App Router auto-discovers app/icon.svg and injects
+       <link rel="icon" href="/icon.svg"> in the HTML head. -->
+  <rect width="32" height="32" fill="#0a0a0a"/>
+  <rect x="6.4" y="6.4" width="19.2" height="19.2" fill="#d40000"/>
+</svg>
