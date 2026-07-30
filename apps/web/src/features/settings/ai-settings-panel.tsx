@@ -20,7 +20,13 @@ import { genProfileId, type AIProfile, type ProviderId } from '@/features/ai/typ
 import { useI18n } from '@/lib/i18n'
 import { pushToast } from '@/lib/toast-store'
 
-const PROVIDERS: ProviderId[] = ['openai', 'anthropic', 'ollama']
+// 网页测试版(NEXT_PUBLIC_WEB_PROVIDER_RESTRICT=1)只放 openai 兼容格式 —— 浏览器直连
+// 可用(OpenAI/DeepSeek/Qwen)。Anthropic/Ollama 暂藏(Anthropic 直连被 CORS 挡;
+// Ollama 要测试者本机设 OLLAMA_ORIGINS)。桌面/dev 不设 → 三家全开。
+const PROVIDERS: ProviderId[] =
+  process.env.NEXT_PUBLIC_WEB_PROVIDER_RESTRICT === '1'
+    ? ['openai']
+    : ['openai', 'anthropic', 'ollama']
 
 type ConfirmAction =
   | { kind: 'switch'; id: string }
