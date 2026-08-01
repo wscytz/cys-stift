@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-08-01 · 1.1.1 · 正式发 stable release(tag v1.1.1)
+
+- **发布前全面审核**(5 维子代理 + 基线全绿 + 对抗验证)后定版。preview.6 之后的修复批次 + 本轮审核修复合入:
+  - **核心契约**:v8 字段主路径落库 + `finiteRound` 小数往返(`@tags`/`@links` 含 `)` 的往返,Wikipedia 消歧义 URL 不再被级联吞);硬删孤立媒体清理 + 检查点阻塞导入 escape hatch。
+  - **a11y + 注入防护**:卡片色 CSS 注入防护(workbench `CARD_BAR_COLOR` 白名单,镜像 canvas-engine `colorOf`);编辑态缩略图补 `isSafeImageDataUrl` 守卫(SVG data URL 不进 `<img>`);4 处输入框补 accessible name;卡片丢弃确认框可 Esc 关闭。
+  - **隐私契约兑现**:`MediaRef` 加 `kind`,AI 上下文按 MIME 报 image/file(之前恒 unknown,privacy.md 承诺兑现);privacy.md 对齐 DSL v8 / `canvasId`。
+  - **AI 体验**:AI 失败文案友好化(认证/模型/限流/网络分类);prompts 去 fallback 手拼;首页接回 AI 样本首提告知。
+  - **网页测试版**:basePath env 化(`/cys-stift/app` 子路径部署)+ provider 限 openai 兼容;Aliyun + GitHub Pages 双宿上线。
+  - **依赖**:next 15.0.3 → 15.5.22(清除 4 critical + 大量 high 依赖漏洞);移除未用 pdfjs-dist + coauthor 旧 fixture。
+- **桌面签名状态不变**:Windows 无 Authenticode、macOS ad-hoc 未公证,安装前核对 SHA256(详见 release notes)。
+
 ## 2026-07-25 · 1.1.0-preview.6 · 正式发 preview release(tag v1.1.0-preview.6)
 
 - push tag `v1.1.0-preview.6` 触发 `release-preview.yml`:verify(lint + test + build + version sync 门)→ Windows NSIS `.exe` + macOS Apple Silicon `.dmg` + `SHA256SUMS.txt` → 自动建 GitHub **prerelease**。
