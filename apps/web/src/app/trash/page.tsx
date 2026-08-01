@@ -99,6 +99,7 @@ export default function TrashPage() {
               className="confirm__type"
               type="text"
               autoFocus
+              aria-label={t('common.deleteConfirmWord')}
               placeholder={t('common.deleteConfirmWord')}
               value={deleteConfirmText}
               onChange={(e) => setDeleteConfirmText(e.target.value)}

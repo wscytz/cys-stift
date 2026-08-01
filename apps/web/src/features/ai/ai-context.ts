@@ -86,7 +86,7 @@ export const AI_CARD_FIELDS: Record<string, FieldDef> = {
   mediaCount: { kind: 'count', include: (c) => c.media?.length ?? 0 },
   mediaKinds: {
     kind: 'list',
-    include: (c: Card) => (c.media?.length ? c.media.map((m) => (m as unknown as { kind?: string }).kind || 'unknown') : undefined),
+    include: (c: Card) => (c.media?.length ? c.media.map((m) => m.kind ?? 'unknown') : undefined),
   },
 
   // ── Capture source (metadata only — NO deviceId) ──

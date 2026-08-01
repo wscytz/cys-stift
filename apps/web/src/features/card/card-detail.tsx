@@ -802,13 +802,20 @@ export function CardDetailModal({
                           key={String(m.assetId)}
                           className="cd__media-item cd__media-item--edit"
                         >
-                          {asset.kind === 'image' && (
-                            <img
-                              src={asset.dataUrl}
-                              alt={t('card.detail.mediaAlt', { n: i + 1 })}
-                              className="cd__media-img cd__media-img--thumb"
-                            />
-                          )}
+                          {asset.kind === 'image' &&
+                            (asset.byteSize <= MAX_SAFE_MEDIA_BYTES &&
+                            isSafeImageDataUrl(asset.dataUrl) ? (
+                              <img
+                                src={asset.dataUrl}
+                                alt={t('card.detail.mediaAlt', { n: i + 1 })}
+                                className="cd__media-img cd__media-img--thumb"
+                              />
+                            ) : (
+                              // 对齐只读态:非安全 data URL(SVG/超大)渲染文本 fallback,不进 <img>。
+                              <span>
+                                {asset.mimeType} ({(asset.byteSize / 1024).toFixed(1)} KB)
+                              </span>
+                            ))}
                           <button
                             type="button"
                             className="le__remove"

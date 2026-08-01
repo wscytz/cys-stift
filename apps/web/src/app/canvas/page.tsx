@@ -1536,6 +1536,7 @@ ${formatted}`
           type="text"
           autoFocus
           autoComplete="off"
+          aria-label={t('common.deleteConfirmWord')}
           placeholder={t('common.deleteConfirmWord')}
           value={deleteConfirmText}
           onChange={(e) => setDeleteConfirmText(e.target.value)}
@@ -1637,6 +1638,7 @@ function CanvasSwitcher({
     return (
       <input
         autoFocus className="crename"
+        aria-label={t('canvas.renameTitle')}
         defaultValue={canvases.find((c) => c.id === renamingId)?.name ?? ''}
         onBlur={(e) => onCommitRename(e.target.value)}
         onKeyDown={(e) => {

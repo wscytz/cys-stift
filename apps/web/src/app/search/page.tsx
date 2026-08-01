@@ -75,6 +75,7 @@ export default function SearchPage() {
           autoFocus
           className="search-input"
           type="text"
+          aria-label={t('search.placeholder')}
           placeholder={t('search.placeholder')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}

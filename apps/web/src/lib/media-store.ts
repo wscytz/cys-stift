@@ -140,7 +140,7 @@ export const mediaStore = {
       if (!ok) {
         throw new Error('mediaStore.attach: storage quota exceeded')
       }
-      const ref: MediaRef = { assetId: id, order: 0 }
+      const ref: MediaRef = { assetId: id, order: 0, kind: asset.kind }
       return ref
     })
   },

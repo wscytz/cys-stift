@@ -87,6 +87,8 @@ export interface MediaRef {
   assetId: MediaAssetId
   caption?: string
   order: number
+  /** image / file —— attach 时从 MIME 判断写入;旧数据或未知 → unknown。只发类型,不发二进制。 */
+  kind?: 'image' | 'file' | 'unknown'
 }
 
 export interface LinkPreview {
