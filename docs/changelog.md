@@ -5,6 +5,13 @@
 
 ---
 
+## 2026-08-01 · 1.1.2 · AI 画布快照给结构化字段元数据 + 约束不编造(tag v1.1.2)
+
+- **修复数据完整性风险**:AI 提议改画布时,快照此前只给 title/body,`@code`/`@quote`/`@links`/`@tags` 内容根本不在字段面 —— AI 第一轮准确报告"丢失结构化内容",第二轮却**编造**代码/引文"补回",若用户确认会覆盖真实数据。
+- **A 字段面**:`formatCanvasSnapshot` 给结构化字段加元数据行(`code: N blocks (langs)` / `quote: N (署名)` / `tags: 值` / `links: N`)。code 正文 / quote 全文 / link URL **不外发**(privacy + token),AI 只拿到"有什么、有多少"。
+- **B 约束**:快照 header 加字段面说明 + 指令(PRESERVE 原样、不得编造不可见内容、限布局/关系)。集中在 `formatCanvasSnapshot`,所有 AI 路径(ask/canvas/companion/复制提示词)自动带上。
+- 回归测试:元数据行输出 + 正文不外泄 + `parseDsl` round-trip 干净(annotation 行 parser 逐行跳过)。
+
 ## 2026-08-01 · 1.1.1 · 正式发 stable release(tag v1.1.1)
 
 - **发布前全面审核**(5 维子代理 + 基线全绿 + 对抗验证)后定版。preview.6 之后的修复批次 + 本轮审核修复合入:
