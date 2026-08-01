@@ -423,12 +423,13 @@ export function CardDetailModal({
       const active = typeof document !== 'undefined' ? document.activeElement : null
       if (active instanceof HTMLElement && active.classList.contains('cd__tag-input')) return
       if (confirmDelete) setConfirmDelete(false)
+      else if (confirmDiscard) setConfirmDiscard(false)
       else if (dirty) setConfirmDiscard(true)
       else onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, confirmDelete, aiView, dirty])
+  }, [onClose, confirmDelete, confirmDiscard, aiView, dirty])
 
   // Focus the title input on entering edit mode
   useEffect(() => {
