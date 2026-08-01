@@ -24,7 +24,7 @@
     "katex": "^0.17.0",
     "lucide-react": "^1.22.0",
     "markitdownllm": "^0.1.5",
-    "next": "15.0.3",
+    "next": "15.5.22",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-markdown": "9",
