@@ -13,6 +13,7 @@ import { useI18n } from '@/lib/i18n'
 import { VERSION } from '@/lib/version'
 import { isMac as detectIsMac, isDesktop } from '@/lib/platform'
 import { CaptureHint } from '@/features/capture/capture-hint'
+import { CaptureSampleHint } from '@/components/capture-sample-hint'
 import { CAPTURE_OPEN_EVENT } from '@/features/capture/capture-host'
 import { useDb } from '@/lib/db-client'
 import { useCanvases } from '@/lib/canvas-store'
@@ -42,6 +43,7 @@ export default function HomePage() {
   return (
     <main id="main" tabIndex={-1} className="home">
       <CaptureHint />
+      <CaptureSampleHint />
       <header className="home__bar" aria-hidden="true" />
       <section className="home__content">
         <p className="home__eyebrow">{t('home.eyebrow')}</p>
