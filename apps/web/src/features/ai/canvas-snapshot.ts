@@ -35,6 +35,13 @@ export interface SnapshotCard {
   title: string
   /** 卡片正文(总是采集;是否输出给 AI 由 formatCanvasSnapshot 的 includeContent 决定)。 */
   body?: string
+  /** 结构化字段元数据(只给 AI 信号,**不含正文**):@code 语言+块数 / @quote 署名 / @tags 值 / @links 条数。
+   *  快照刻意不发 code 正文 / quote 全文 / link URL —— AI 知道卡带什么结构但编不出内容
+   *  (privacy + token + 防 AI「恢复丢失内容」时编造覆盖真实数据)。 */
+  codeLanguages?: string[]
+  quoteAttributions?: string[]
+  tagValues?: string[]
+  linkCount?: number
 }
 
 export interface SnapshotArrow {
@@ -113,6 +120,11 @@ export function snapshotCanvas(
           color: el.color,
           title: card?.title ?? '',
           body: card?.body,
+          // 结构化字段只采元数据(语言/署名/标签值/链接数),正文/全文不发 —— 见 SnapshotCard 注释。
+          codeLanguages: card?.codeSnippets?.map((c) => c.language).filter((l) => !!l && l.length > 0),
+          quoteAttributions: card?.quotes?.map((q) => q.attribution ?? '').filter((a) => a.length > 0),
+          tagValues: card?.tags?.map((t) => t.value).filter((v) => v.length > 0),
+          linkCount: card?.links?.length ?? 0,
         })
         break
       }
@@ -193,6 +205,11 @@ export function formatCanvasSnapshot(
   parts.push(
     `Canvas: ${snapshot.cards.length} cards, ${snapshot.arrows.length} arrows, ${snapshot.freeShapes.length} free shapes`,
   )
+  // B:字段面说明 + 约束。让 AI 知道结构化字段存在但内容不随快照,重新输出卡时保持原样、别编造。
+  // 集中在此处而非各 prompt —— 所有注入快照的路径(ask/canvas/companion/dsl-dialog)自动带上。
+  parts.push(
+    `Note: cards may carry @code/@quote/@links/@tags structured fields whose CONTENT is NOT in this snapshot — only metadata lines (code: N blocks/langs, quote: N, tags: …, links: N) appear below each card. When re-emitting a card, PRESERVE its existing structured fields as-is; do NOT invent or replace content you cannot see. Restrict yourself to layout/relations unless the user explicitly asks to edit a card's content.`,
+  )
 
   for (const c of snapshot.cards) {
     // 重建 CanvasElement 调 serializeElement(唯一文法源:AI 看到的 = parser 能读回的)。
@@ -204,6 +221,22 @@ export function formatCanvasSnapshot(
     parts.push(`  title: ${c.title || '(untitled)'}`)
     if (includeContent && c.body) {
       parts.push(`  content: ${c.body}`)
+    }
+    // 结构化字段元数据(只在非空时输出,避免噪声)。annotation 行不以 `[kind ` 开头,
+    // parser 逐行静默跳过,round-trip 安全。code 只发语言+块数,不发正文;quote 只发
+    // 条数(+首条署名),不发全文;links 只发条数,不发 URL —— 防止 AI 编造覆盖真实内容。
+    if (c.codeLanguages && c.codeLanguages.length > 0) {
+      parts.push(`  code: ${c.codeLanguages.length} blocks (${c.codeLanguages.join(', ')})`)
+    }
+    if (c.quoteAttributions && c.quoteAttributions.length > 0) {
+      const first = c.quoteAttributions[0]
+      parts.push(`  quote: ${c.quoteAttributions.length}${first ? ` (${first})` : ''}`)
+    }
+    if (c.tagValues && c.tagValues.length > 0) {
+      parts.push(`  tags: ${c.tagValues.join('; ')}`)
+    }
+    if (c.linkCount && c.linkCount > 0) {
+      parts.push(`  links: ${c.linkCount}`)
     }
   }
 

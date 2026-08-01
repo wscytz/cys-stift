@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { snapshotCanvas, formatCanvasSnapshot } from '../canvas-snapshot'
 import { parseDsl } from '@cys-stift/dsl'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
-import type { CardService, CardId, CanvasId } from '@cys-stift/domain'
+import type { CardService, CardId, CanvasId, Card } from '@cys-stift/domain'
 
 /** Minimal CardService stub — snapshotCanvas only calls service.get(id).title. */
 function stubService(titles: Record<string, string>): CardService {
@@ -20,6 +20,16 @@ function stubServiceWithBody(cards: Record<string, { title?: string; body?: stri
     get: (id: CardId) => {
       const c = cards[String(id)]
       return c ? ({ id, title: c.title ?? '', body: c.body } as never) : undefined
+    },
+  } as unknown as CardService
+}
+
+/** CardService stub 带结构化字段(codeSnippets/quotes/tags/links)— 测元数据采集 + 正文不外泄。 */
+function stubServiceWithStructured(cards: Record<string, Partial<Card>>): CardService {
+  return {
+    get: (id: CardId) => {
+      const c = cards[String(id)]
+      return c ? ({ id, title: c.title ?? '', ...c } as never) : undefined
     },
   } as unknown as CardService
 }
@@ -65,6 +75,44 @@ describe('snapshotCanvas → formatCanvasSnapshot', () => {
     )
     const ops = parseDsl(text)
     expect(ops.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('结构化字段元数据行:code/quote/tags/links 元数据输出 + 正文不外泄 + round-trip 安全', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'c1', kind: 'card', x: 10, y: 20, w: 240, h: 120, rotation: 0 })
+    host.upsert({ id: 'c2', kind: 'card', x: 10, y: 160, w: 240, h: 120, rotation: 0 })
+    const text = formatCanvasSnapshot(
+      snapshotCanvas(
+        host,
+        stubServiceWithStructured({
+          c1: {
+            title: '代码片段',
+            codeSnippets: [
+              { language: 'js', code: 'SECRET_JS_CODE' },
+              { language: 'py', code: 'SECRET_PY_CODE' },
+            ],
+          },
+          c2: {
+            title: '名言',
+            quotes: [{ text: 'SECRET_QUOTE_TEXT', attribution: '乔布斯' }],
+            tags: [{ value: '创意', color: 'var(--color-red)' }],
+            links: [{ url: 'https://secret.example.com/x', fetchedAt: new Date(0) }],
+          },
+        }),
+        CV,
+      ),
+    )
+    // 元数据行输出(语言+块数 / 署名 / 标签值 / 链接数)
+    expect(text).toContain('code: 2 blocks (js, py)')
+    expect(text).toContain('quote: 1 (乔布斯)')
+    expect(text).toContain('tags: 创意')
+    expect(text).toContain('links: 1')
+    // 正文/全文/URL 不外泄(隐私:AI 只拿到元数据,拿不到 code 正文 / quote 全文 / link URL)
+    expect(text).not.toContain('SECRET')
+    expect(text).not.toContain('secret.example.com')
+    // round-trip 安全:parser 静默跳过元数据 annotation 行,2 张卡干净解析
+    const ops = parseDsl(text)
+    expect(ops.filter((o) => o.type === 'card').length).toBe(2)
   })
 
   it('renders arrows + rect + text with the unified grammar', () => {
