@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunk_N_E=self.webpackChunk_N_E||[]).push([[5827],{95827:(e,r,s)=>{s.r(r),s.d(r,{MenuCaptureSink:()=>c});var u=s(55566);class c{submit(e){return Promise.resolve({cardId:this.service.fromCapture({...e,source:{kind:"menubar",deviceId:(0,u.I)()}}).id})}constructor(e){this.service=e}}}}]);
