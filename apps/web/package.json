@@ -13,8 +13,8 @@
   },
   "dependencies": {
     "@cys-stift/canvas-engine": "workspace:*",
-    "@cys-stift/dsl": "workspace:*",
     "@cys-stift/domain": "workspace:*",
+    "@cys-stift/dsl": "workspace:*",
     "@cys-stift/ui": "workspace:*",
     "@tauri-apps/plugin-dialog": "2",
     "@tauri-apps/plugin-fs": "2",
@@ -25,7 +25,6 @@
     "lucide-react": "^1.22.0",
     "markitdownllm": "^0.1.5",
     "next": "15.0.3",
-    "pdfjs-dist": "^6.0.227",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-markdown": "9",

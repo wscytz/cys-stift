@@ -75,9 +75,6 @@ importers:
       next:
         specifier: 15.0.3
         version: 15.0.3(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
-      pdfjs-dist:
-        specifier: ^6.0.227
-        version: 6.0.227
       react:
         specifier: 19.0.0
         version: 19.0.0
@@ -4292,6 +4289,7 @@ snapshots:
   pdfjs-dist@6.0.227:
     optionalDependencies:
       '@napi-rs/canvas': 1.0.0
+    optional: true
 
   peggy@5.1.0:
     dependencies:
