@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { BauhausMotif, Button, Card as UICard, Modal, Tag, Toolbar } from '@cys-stift/ui'
+import { BauhausMotif, Button, Card as UICard, Modal, Tag } from '@cys-stift/ui'
+import { PageHeader } from '@/features/page-header'
 import type { Card, CardId, CanvasId } from '@cys-stift/domain'
 import { findDuplicateGroups, type DuplicateGroup } from '@cys-stift/domain'
 import { CreateCardForm } from './create-card-form'
@@ -272,84 +273,79 @@ export default function InboxPage() {
 
   return (
     <main id="main" tabIndex={-1} className="page">
-      <Toolbar region="inbox">
-        <span className="crumb">{t('brand.name')}</span>
-        <span className="crumb-sep">/</span>
-        <h1 className="crumb crumb--here">{t('inbox.crumb')}</h1>
-        <span className="crumb-spacer" />
-        <div
-          role="tablist"
-          aria-label={t('inbox.crumb')}
-          className="tablist"
-        >
-          <button
-            type="button"
-            role="tab"
-            id="tab-inbox"
-            aria-selected={view === 'inbox'}
-            tabIndex={view === 'inbox' ? 0 : -1}
-            className={`tab ${view === 'inbox' ? 'tab--active' : ''}`}
-            onClick={() => setView('inbox')}
-            onKeyDown={(e) => {
-              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-                e.preventDefault()
-                const next = view === 'inbox' ? 'archived' : 'inbox'
-                setView(next)
-                // Move focus to the newly active tab (roving tabindex).
-                requestAnimationFrame(() => {
-                  document.getElementById(`tab-${next}`)?.focus()
-                })
-              }
-            }}
-          >
-            {t('inbox.tab.inbox')}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            id="tab-archived"
-            aria-selected={view === 'archived'}
-            tabIndex={view === 'archived' ? 0 : -1}
-            className={`tab ${view === 'archived' ? 'tab--active' : ''}`}
-            onClick={() => setView('archived')}
-            onKeyDown={(e) => {
-              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-                e.preventDefault()
-                const next = view === 'inbox' ? 'archived' : 'inbox'
-                setView(next)
-                requestAnimationFrame(() => {
-                  document.getElementById(`tab-${next}`)?.focus()
-                })
-              }
-            }}
-          >
-            {t('inbox.tab.archived')}
-          </button>
-        </div>
-        <Tag color={view === 'inbox' ? 'red' : 'blue'}>
-          {view === 'inbox' ? inbox.length : archived.length}
-        </Tag>
-        <span className="crumb-spacer" />
-        <button
-          type="button"
-          className="tb-snap"
-          onClick={findDuplicates}
-          disabled={visible.length < 2}
-          title={t('inbox.dup.title')}
-        >
-          {t('inbox.dup.title')}
-          {dupGroups.length > 0 && (
-            <Tag color="yellow">{dupGroups.length}</Tag>
-          )}
-        </button>
-      </Toolbar>
-
       <div
         className="page-content page-content--wide"
         role="tabpanel"
         id={`tabpanel-${view}`}
         aria-labelledby={`tab-${view}`}
       >
+        <PageHeader
+          title={t('inbox.crumb')}
+          actions={
+            <>
+              <div role="tablist" aria-label={t('inbox.crumb')} className="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  id="tab-inbox"
+                  aria-selected={view === 'inbox'}
+                  tabIndex={view === 'inbox' ? 0 : -1}
+                  className={`tab ${view === 'inbox' ? 'tab--active' : ''}`}
+                  onClick={() => setView('inbox')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                      e.preventDefault()
+                      const next = view === 'inbox' ? 'archived' : 'inbox'
+                      setView(next)
+                      // Move focus to the newly active tab (roving tabindex).
+                      requestAnimationFrame(() => {
+                        document.getElementById(`tab-${next}`)?.focus()
+                      })
+                    }
+                  }}
+                >
+                  {t('inbox.tab.inbox')}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  id="tab-archived"
+                  aria-selected={view === 'archived'}
+                  tabIndex={view === 'archived' ? 0 : -1}
+                  className={`tab ${view === 'archived' ? 'tab--active' : ''}`}
+                  onClick={() => setView('archived')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                      e.preventDefault()
+                      const next = view === 'inbox' ? 'archived' : 'inbox'
+                      setView(next)
+                      requestAnimationFrame(() => {
+                        document.getElementById(`tab-${next}`)?.focus()
+                      })
+                    }
+                  }}
+                >
+                  {t('inbox.tab.archived')}
+                </button>
+              </div>
+              <Tag color={view === 'inbox' ? 'red' : 'blue'}>
+                {view === 'inbox' ? inbox.length : archived.length}
+              </Tag>
+              <button
+                type="button"
+                className="tb-snap"
+                onClick={findDuplicates}
+                disabled={visible.length < 2}
+                title={t('inbox.dup.title')}
+              >
+                {t('inbox.dup.title')}
+                {dupGroups.length > 0 && (
+                  <Tag color="yellow">{dupGroups.length}</Tag>
+                )}
+              </button>
+            </>
+          }
+        />
         {view === 'inbox' && (
           <CreateCardForm
             ready={ready}

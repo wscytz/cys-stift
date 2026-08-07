@@ -20,7 +20,8 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { BauhausMotif, Card as UICard, Tag, Toolbar, Button } from '@cys-stift/ui'
+import { BauhausMotif, Card as UICard, Tag, Button } from '@cys-stift/ui'
+import { PageHeader } from '@/features/page-header'
 import { searchCards } from '@cys-stift/domain'
 import type { Card, CardId, CanvasId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
@@ -442,51 +443,51 @@ export default function AskPage() {
 
   return (
     <main id="main" tabIndex={-1} className="page">
-      <Toolbar region="system">
-        <span className="crumb">{t('brand.name')}</span>
-        <span className="crumb-sep">/</span>
-        <h1 className="crumb crumb--here">{t('ask.crumb')}</h1>
-        <span className="crumb-spacer" />
-        {/* 目标画布下拉 + ➕ 新建即出生(Task 4) */}
-        <select
-          className="ask__canvas-select"
-          value={String(targetCanvasId)}
-          onChange={(e) => {
-            const v = e.target.value
-            if (v === NEW_CANVAS_SENTINEL) {
-              // 新建即出生:立即创建画布并绑定对话。新 canvas 出现在 canvasesSnap
-              // (useCanvases 订阅 notify),select re-render 后自动选中新 id。
-              const id = canvasStore.create(
-                t('ask.newCanvasName', { n: canvasesSnap.canvases.length + 1 }),
-              )
-              if (id) {
-                askCreatedRef.current.add(id)
-                setTargetCanvasId(id)
-              }
-            } else {
-              setTargetCanvasId(v as CanvasId)
-            }
-          }}
-          aria-label={t('ask.targetCanvas')}
-        >
-          {canvasesSnap.canvases.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-          <option value={NEW_CANVAS_SENTINEL}>➕ {t('ask.newCanvas')}</option>
-        </select>
-        {messages.length > 0 && (
-          <Button
-            variant="ghost"
-            onClick={() => {
-              if (window.confirm(`${t('ask.clearConfirmTitle')}\n\n${t('ask.clearConfirmBody')}`)) handleClear()
-            }}
-          >
-            {t('ask.clear')}
-          </Button>
-        )}
-      </Toolbar>
-
       <div className="page-content page-content--wide">
+        <PageHeader
+          title={t('ask.crumb')}
+          actions={
+            <>
+              {/* 目标画布下拉 + ➕ 新建即出生(Task 4) */}
+              <select
+                className="ask__canvas-select"
+                value={String(targetCanvasId)}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (v === NEW_CANVAS_SENTINEL) {
+                    // 新建即出生:立即创建画布并绑定对话。新 canvas 出现在 canvasesSnap
+                    // (useCanvases 订阅 notify),select re-render 后自动选中新 id。
+                    const id = canvasStore.create(
+                      t('ask.newCanvasName', { n: canvasesSnap.canvases.length + 1 }),
+                    )
+                    if (id) {
+                      askCreatedRef.current.add(id)
+                      setTargetCanvasId(id)
+                    }
+                  } else {
+                    setTargetCanvasId(v as CanvasId)
+                  }
+                }}
+                aria-label={t('ask.targetCanvas')}
+              >
+                {canvasesSnap.canvases.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+                <option value={NEW_CANVAS_SENTINEL}>➕ {t('ask.newCanvas')}</option>
+              </select>
+              {messages.length > 0 && (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    if (window.confirm(`${t('ask.clearConfirmTitle')}\n\n${t('ask.clearConfirmBody')}`)) handleClear()
+                  }}
+                >
+                  {t('ask.clear')}
+                </Button>
+              )}
+            </>
+          }
+        />
         {!ready ? (
           <PageLoading />
         ) : !aiReady ? (
