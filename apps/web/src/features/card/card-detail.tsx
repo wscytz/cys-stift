@@ -52,11 +52,10 @@ import { solidTagChipStyle } from '@/lib/tag-color'
 import { editorStyles } from './editors'
 import { useCardDraft } from './use-card-draft'
 import { DETAIL_FIELDS } from './field-registry'
-import { FieldEditors } from './field-editors'
+import { FieldEditors, FieldViews, FieldSection as Section } from './field-editors'
 import { MarkdownBody } from '@/app/inbox/markdown'
 import { mediaStore } from '@/lib/media-store'
 import {
-  safeHref,
   isSafeFileDataUrl,
   isSafeImageDataUrl,
   MAX_SAFE_MEDIA_BYTES,
@@ -669,47 +668,10 @@ export function CardDetailModal({
                   </ul>
                 </Section>
               )}
-              {(card.links ?? []).length > 0 && (
-                <Section label={t('card.detail.links')}>
-                  <ul className="cd__links">
-                    {(card.links ?? []).map((l, i) => (
-                      <li key={i}>
-                        <a
-                          href={safeHref(l.url)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {l.url}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </Section>
-              )}
-              {(card.codeSnippets ?? []).length > 0 && (
-                <Section label={t('card.detail.code')}>
-                  {(card.codeSnippets ?? []).map((c, i) => (
-                    <div key={i} className="cd__code">
-                      <div className="cd__code-lang">{c.language}</div>
-                      <pre className="cd__code-pre">
-                        <code>{c.code}</code>
-                      </pre>
-                    </div>
-                  ))}
-                </Section>
-              )}
-              {(card.quotes ?? []).length > 0 && (
-                <Section label={t('card.detail.quotes')}>
-                  {(card.quotes ?? []).map((q, i) => (
-                    <blockquote key={i} className="cd__quote">
-                      <p>{q.text}</p>
-                      {q.attribution && (
-                        <cite className="cd__cite">— {q.attribution}</cite>
-                      )}
-                    </blockquote>
-                  ))}
-                </Section>
-              )}
+              {/* links/codes/quotes 只读态走 registry(FieldViews),与 edit 侧
+                  FieldEditors 对称 —— 加结构化字段注册 View 一处即自动渲染,
+                  不再手写 Section(根治 view 侧"两套、漏一边")。 */}
+              <FieldViews fields={DETAIL_FIELDS} card={card} />
             </>
           ) : (
             <>
@@ -1099,21 +1061,6 @@ function formatCapturedAt(value: Date): string {
   return value instanceof Date && Number.isFinite(value.getTime())
     ? value.toISOString().slice(0, 19).replace('T', ' ')
     : '—'
-}
-
-function Section({
-  label,
-  children,
-}: {
-  label: string
-  children: React.ReactNode
-}) {
-  return (
-    <section className="cd__sec">
-      <h3 className="cd__sec-h">{label}</h3>
-      <div className="cd__sec-body">{children}</div>
-    </section>
-  )
 }
 
 const styles = `

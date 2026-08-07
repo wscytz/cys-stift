@@ -18,7 +18,14 @@ import {
   type DraftLink,
   type DraftQuote,
 } from './editors'
-import { CodesFieldEditor, LinksFieldEditor, QuotesFieldEditor } from './field-editors'
+import {
+  CodesFieldEditor,
+  CodesFieldView,
+  LinksFieldEditor,
+  LinksFieldView,
+  QuotesFieldEditor,
+  QuotesFieldView,
+} from './field-editors'
 
 function jsonEquals<T>(a: T, b: T): boolean {
   return JSON.stringify(a) === JSON.stringify(b)
@@ -37,6 +44,7 @@ const codesField: CardDraftField<unknown> = {
     jsonEquals,
   ),
   Editor: CodesFieldEditor,
+  View: CodesFieldView,
 }
 const quotesField: CardDraftField<unknown> = {
   ...defineField<DraftQuote[]>(
@@ -46,6 +54,7 @@ const quotesField: CardDraftField<unknown> = {
     jsonEquals,
   ),
   Editor: QuotesFieldEditor,
+  View: QuotesFieldView,
 }
 const mediaField = defineField<MediaRef[]>('media', (c) => c.media ?? [], (d) => d, jsonEquals)
 const linksField: CardDraftField<unknown> = {
@@ -56,6 +65,7 @@ const linksField: CardDraftField<unknown> = {
     jsonEquals,
   ),
   Editor: LinksFieldEditor,
+  View: LinksFieldView,
 }
 
 // ── 字段集(各壳按需用;Step 3 后 WORKBENCH = DETAIL,字段集统一) ─────────────
@@ -71,7 +81,8 @@ export const WORKBENCH_FIELDS: CardDraftField<unknown>[] = [
   quotesField,
 ]
 
-/** 详情弹窗 edit 字段集(全字段:title/body/media/links/codes/quotes/tags)。 */
+/** 详情弹窗字段集(edit + view 共用;title/body/media 壳特化无 Editor/View,
+ *  links/codes/quotes 走 registry 自动渲染两态)。 */
 export const DETAIL_FIELDS: CardDraftField<unknown>[] = [
   titleField,
   bodyField,
