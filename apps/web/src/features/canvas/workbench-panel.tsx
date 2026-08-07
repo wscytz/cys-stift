@@ -10,7 +10,7 @@
  * 存:autosave 防抖 500ms;收起时若脏则 flush 再 close(防丢编辑)。
  */
 import { useEffect, useRef, useState } from 'react'
-import type { Card, CodeBlock, Quote, TagRef } from '@cys-stift/domain'
+import type { Card, TagRef, UpdateCardPatch } from '@cys-stift/domain'
 import { TAG_COLORS } from '@cys-stift/domain'
 import { Button, Tag } from '@cys-stift/ui'
 import { AiActionMenu } from '@/features/ai/ai-action-menu'
@@ -22,12 +22,12 @@ import { MarkdownEditor } from '@/features/card/markdown-editor'
 import {
   CodeEditor,
   QuoteEditor,
-  draftCodesToPayload,
-  draftQuotesToPayload,
   editorStyles,
   type DraftCode,
   type DraftQuote,
 } from '@/features/card/editors'
+import { useCardDraft, isDirty } from '@/features/card/use-card-draft'
+import { WORKBENCH_FIELDS } from '@/features/card/field-registry'
 import { solidTagChipStyle } from '@/lib/tag-color'
 import { typeKeyOf } from '@/lib/type-label'
 import { useI18n } from '@/lib/i18n'
@@ -49,7 +49,7 @@ const CARD_BAR_COLOR: Record<string, string> = {
 
 export interface WorkbenchPanelProps {
   card: Card
-  onSave: (cardId: string, patch: { title: string; body: string; tags: TagRef[]; codeSnippets: CodeBlock[]; quotes: Quote[] }) => boolean | void
+  onSave: (cardId: string, patch: UpdateCardPatch) => boolean | void
   onClose: () => void
   onBackToList?: () => void
   onDirtyChange?: (dirty: boolean) => void
@@ -73,15 +73,7 @@ export function WorkbenchPanel({
   onAIAppendNew,
 }: WorkbenchPanelProps) {
   const { t } = useI18n()
-  const [title, setTitle] = useState(card.title)
-  const [body, setBody] = useState(card.body)
-  const [tags, setTags] = useState<TagRef[]>(card.tags ?? [])
-  const [codes, setCodes] = useState<DraftCode[]>(() =>
-    (card.codeSnippets ?? []).map((c) => ({ language: c.language, code: c.code })),
-  )
-  const [quotes, setQuotes] = useState<DraftQuote[]>(() =>
-    (card.quotes ?? []).map((q) => ({ text: q.text, attribution: q.attribution ?? '' })),
-  )
+  const { draft, setField, dirty, toPatch, reset } = useCardDraft(card, WORKBENCH_FIELDS)
   const [tagInput, setTagInput] = useState('')
   // savedFlash:flush 后短暂亮「已保存」1.5s,让 autosave 可见(用户知道编辑落了)。
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle')
@@ -92,88 +84,57 @@ export function WorkbenchPanel({
   const [translateTo, setTranslateTo] = useState<'zh' | 'en'>('en')
   const [editInstruction, setEditInstruction] = useState('')
 
-  // 最新草稿 + 最新 onSave 放 ref,避免防抖 effect 依赖函数身份。
-  const draftRef = useRef({ title, body, tags, codes, quotes })
-  draftRef.current = { title, body, tags, codes, quotes }
+  // toPatch/onSave/draft 放 ref:避免防抖 effect 依赖函数身份 + 切卡 cleanup 读最新 draft
+  // (cleanup 闭包的 draft 是 stale —— effect deps [card.id],编辑时 draft 变不重跑 effect,
+  //  闭包还停在 card.id 变时的旧 draft;切卡 flush 上一卡脏编辑要靠 draftRef.current 读最新)。
+  const toPatchRef = useRef(toPatch)
+  toPatchRef.current = toPatch
+  const draftRef = useRef(draft)
+  draftRef.current = draft
   const onSaveRef = useRef(onSave)
   onSaveRef.current = onSave
 
   // flush:脏才存 + 亮「已保存」。放 ref 让防抖 effect / close 共用,不进 effect deps。
   const flushRef = useRef<() => void>(() => {})
   flushRef.current = () => {
-    const d = draftRef.current
-    const curTags = card.tags ?? []
-    const tagsChanged = JSON.stringify(d.tags) !== JSON.stringify(curTags)
-    const codesChanged = JSON.stringify(d.codes) !== JSON.stringify((card.codeSnippets ?? []).map((c) => ({ language: c.language, code: c.code })))
-    const quotesChanged = JSON.stringify(d.quotes) !== JSON.stringify((card.quotes ?? []).map((q) => ({ text: q.text, attribution: q.attribution ?? '' })))
-    if (d.title !== card.title || d.body !== card.body || tagsChanged || codesChanged || quotesChanged) {
-      setSaveState('saving')
-      const ok = onSaveRef.current(card.id, {
-        title: d.title,
-        body: d.body,
-        tags: d.tags,
-        codeSnippets: draftCodesToPayload(d.codes),
-        quotes: draftQuotesToPayload(d.quotes),
-      })
-      setSaveState(ok === false ? 'failed' : 'saved')
-      if (flashTimer.current) clearTimeout(flashTimer.current)
-      flashTimer.current = setTimeout(() => setSaveState('idle'), 3000)
-    }
+    if (!dirty) return
+    setSaveState('saving')
+    const ok = onSaveRef.current(card.id, toPatchRef.current())
+    setSaveState(ok === false ? 'failed' : 'saved')
+    if (flashTimer.current) clearTimeout(flashTimer.current)
+    flashTimer.current = setTimeout(() => setSaveState('idle'), 3000)
   }
 
-  // 切卡时重置草稿(card.id 变或 card 内容变)。
+  // 切卡时重置草稿(card.id 变或 card 引用变 → reset deps [card])。
   useEffect(() => {
-    setTitle(card.title)
-    setBody(card.body)
-    setTags(card.tags ?? [])
-    setCodes((card.codeSnippets ?? []).map((c) => ({ language: c.language, code: c.code })))
-    setQuotes((card.quotes ?? []).map((q) => ({ text: q.text, attribution: q.attribution ?? '' })))
+    reset()
     setTagInput('')
     setAiView(null) // 切卡收起 AI 浮层
-  }, [card.id, card.title, card.body, card.tags, card.codeSnippets, card.quotes])
+  }, [card.id, reset])
 
   // 切卡防丢编辑(bug 1 修):card.id 变时,上一张的脏 draft 在 cleanup flush。
-  // 否则 autosave effect 的 cleanup 清掉旧 timer(<500ms 未触发)+ state 重置 +
-  // draftRef 覆盖 → 旧卡编辑丢。onSave 带 cardId 落对卡。close 场景 handleClose
-  // 已 flush,这里幂等再 flush(service.update 同 patch 无副作用)。
+  // cleanup 跑在所有 effect setup 前(React 顺序),此时 draft 还是上一卡(本卡 reset
+  // 在上面的 reset effect setup 里),isDirty(prev, draft) 显式比上一卡 draft vs 上一卡 card。
+  // close 场景 handleClose 已 flush,这里幂等再 flush(service.update 同 patch 无副作用)。
   useEffect(() => {
     const prev = card
     return () => {
-      const d = draftRef.current
-      const tagsChanged = JSON.stringify(d.tags) !== JSON.stringify(prev.tags ?? [])
-      const codesChanged = JSON.stringify(d.codes) !== JSON.stringify((prev.codeSnippets ?? []).map((c) => ({ language: c.language, code: c.code })))
-      const quotesChanged = JSON.stringify(d.quotes) !== JSON.stringify((prev.quotes ?? []).map((q) => ({ text: q.text, attribution: q.attribution ?? '' })))
-      if (d.title !== prev.title || d.body !== prev.body || tagsChanged || codesChanged || quotesChanged) {
-        onSaveRef.current(prev.id, {
-          title: d.title,
-          body: d.body,
-          tags: d.tags,
-          codeSnippets: draftCodesToPayload(d.codes),
-          quotes: draftQuotesToPayload(d.quotes),
-        })
+      if (isDirty(prev, draftRef.current, WORKBENCH_FIELDS)) {
+        onSaveRef.current(prev.id, toPatchRef.current())
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card.id])
 
-  // dirty = 有未 flush 的编辑(草稿 vs card 当前值)。tags/codes/quotes 用 JSON 比(小数组)。
-  const curTags = card.tags ?? []
-  const cardCodesNorm = (card.codeSnippets ?? []).map((c) => ({ language: c.language, code: c.code }))
-  const cardQuotesNorm = (card.quotes ?? []).map((q) => ({ text: q.text, attribution: q.attribution ?? '' }))
-  const dirty =
-    title !== card.title ||
-    body !== card.body ||
-    JSON.stringify(tags) !== JSON.stringify(curTags) ||
-    JSON.stringify(codes) !== JSON.stringify(cardCodesNorm) ||
-    JSON.stringify(quotes) !== JSON.stringify(cardQuotesNorm)
+  // dirty 来自 useCardDraft(草稿 vs card,聚合所有 field)。
 
   useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
 
-  // 防抖自动存。脏才存。
+  // 防抖自动存。脏才存。draft 变(编辑或 reset)→ timer 重置。
   useEffect(() => {
     const id = setTimeout(() => flushRef.current(), AUTOSAVE_DEBOUNCE_MS)
     return () => clearTimeout(id)
-  }, [title, body, tags, codes, quotes, card.title, card.body, card.tags, card.codeSnippets, card.quotes])
+  }, [draft])
 
   // 卸载清 flash 定时器。
   useEffect(
@@ -190,11 +151,12 @@ export function WorkbenchPanel({
 
   const addTag = (raw: string) => {
     const val = raw.trim()
-    if (!val || tags.some((tg) => tg.value === val)) {
+    const cur = draft.tags as TagRef[]
+    if (!val || cur.some((tg) => tg.value === val)) {
       setTagInput('')
       return
     }
-    setTags((prev) => [...prev, { value: val, color: stableTagColor(val) }])
+    setField('tags', [...cur, { value: val, color: stableTagColor(val) }])
     setTagInput('')
   }
 
@@ -206,8 +168,8 @@ export function WorkbenchPanel({
         <span className="wb-panel__bar" style={{ background: CARD_BAR_COLOR[card.color ?? 'gray'] ?? 'var(--color-gray)' }} aria-hidden="true" />
         <input
           className="wb-panel__title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          value={draft.title as string}
+          onChange={(e) => setField('title', e.target.value)}
           placeholder={t('card.untitled')}
           maxLength={200}
           aria-label={t('card.detail.fieldTitle')}
@@ -261,7 +223,7 @@ export function WorkbenchPanel({
         </button>
       </header>
       <div className="wb-panel__tags">
-        {tags.map((tag) => (
+        {(draft.tags as TagRef[]).map((tag) => (
           <span key={tag.value} className="wb-panel__tag-chip" style={solidTagChipStyle(tag.color)}>
             {tag.value}
             <button
@@ -269,7 +231,7 @@ export function WorkbenchPanel({
               className="wb-panel__tag-remove"
               aria-label={t('tag.remove') + ': ' + tag.value}
               onClick={() =>
-                setTags((prev) => prev.filter((x) => x.value !== tag.value))
+                setField('tags', (draft.tags as TagRef[]).filter((x) => x.value !== tag.value))
               }
             >
               ×
@@ -303,15 +265,15 @@ export function WorkbenchPanel({
       <div className="wb-panel__fields">
         <div className="wb-panel__field">
           <span className="wb-panel__field-label">{t('card.detail.code')}</span>
-          <CodeEditor items={codes} onChange={setCodes} />
+          <CodeEditor items={draft.codeSnippets as DraftCode[]} onChange={(v) => setField('codeSnippets', v)} />
         </div>
         <div className="wb-panel__field">
           <span className="wb-panel__field-label">{t('card.detail.quotes')}</span>
-          <QuoteEditor items={quotes} onChange={setQuotes} />
+          <QuoteEditor items={draft.quotes as DraftQuote[]} onChange={(v) => setField('quotes', v)} />
         </div>
       </div>
       <div className="wb-panel__body">
-        <MarkdownEditor value={body} onChange={setBody} />
+        <MarkdownEditor value={draft.body as string} onChange={(v) => setField('body', v)} />
       </div>
       {aiView && (
         <div className="wb-panel__ai" role="dialog" aria-label={t('card.ai')}>
@@ -345,16 +307,9 @@ export function WorkbenchPanel({
               instruction={aiView === 'edit' ? editInstruction : undefined}
               onClose={() => setAiView(null)}
               onReplace={(newBody) => {
-                // AI 替换正文:直接落库 + 更新编辑器视图(走既有 onSave,autosave 幂等)。
-                // 带 codes/quotes:AI 只改正文,结构化字段保留当前草稿,避免被清空。
-                onSave(card.id, {
-                  title: title.trim() || card.title,
-                  body: newBody,
-                  tags,
-                  codeSnippets: draftCodesToPayload(codes),
-                  quotes: draftQuotesToPayload(quotes),
-                })
-                setBody(newBody)
+                // AI 替换正文:落全字段 patch(其他字段跟当前草稿,AI 只改 body)+ 更新草稿 body。
+                onSave(card.id, { ...toPatch(), body: newBody })
+                setField('body', newBody)
                 setAiView(null)
               }}
               onAppendNew={async (c) => {

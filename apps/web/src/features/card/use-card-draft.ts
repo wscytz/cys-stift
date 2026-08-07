@@ -1,0 +1,154 @@
+'use client'
+
+import {
+  useCallback,
+  useMemo,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react'
+import type { Card, UpdateCardPatch } from '@cys-stift/domain'
+
+/**
+ * useCardDraft — 统一卡片编辑草稿的生命周期管理。
+ *
+ * 背景:CardDetailModal(弹窗,确认门)+ WorkbenchPanel(侧栏,autosave)两套编辑器
+ * 此前各自手写一遍 draft state / dirty / save patch / 切卡重置,导致 v8 加
+ * code/quote 时工作台漏适配(1.1.3 才补)。本 hook 收敛 draft 管理,两壳共用,
+ * 根治"两套、漏一边"。详见私有仓 decisions/2026-08-07-structured-fields-registry.md。
+ *
+ * 职责(只管 draft,不含保存策略):
+ *  - draft state(每字段一个值,单一 Record)
+ *  - toDraft 初始化 / reset()(壳在切卡时调)
+ *  - dirty(草稿 vs Card 原值,聚合所有 field)
+ *  - toPatch()(壳的 onSave / autosave flush 调)
+ *
+ * 保存策略由壳决定:
+ *  - CardDetailModal:onSave(toPatch()) 确认门(用户点保存)
+ *  - WorkbenchPanel:autosave 防抖 + 切卡 cleanup flush(壳用 toPatch + 自管 draftRef)
+ *
+ * fields 应为模块级常量(壳传稳定引用),避免 useMemo/useCallback 因 fields 身份变化。
+ */
+
+export interface CardDraftField<D> {
+  /** Card 字段 key(也是 UpdateCardPatch 的 key)。 */
+  key: keyof UpdateCardPatch
+  /** Card → 编辑草稿(初始化 / reset 用)。 */
+  toDraft: (card: Card) => D
+  /** 草稿 → UpdateCardPatch 字段值(空过滤 / payload 转换)。 */
+  toPayload: (draft: D) => unknown
+  /** 草稿相等判断(dirty 用;省略 = 严格 ===)。数组/对象字段传深比(如 JSON.stringify)。 */
+  equals?: (a: D, b: D) => boolean
+}
+
+export interface CardDraftApi {
+  /** 草稿(field key → 值)。 */
+  draft: Record<string, unknown>
+  /** 改单字段。 */
+  setField: (key: keyof UpdateCardPatch, value: unknown) => void
+  /** 整体替换草稿(AI onReplace 等批量改;或传 updater)。 */
+  setDraft: Dispatch<SetStateAction<Record<string, unknown>>>
+  /** 是否有未保存改动(任一 field 草稿 ≠ Card 原值)。 */
+  dirty: boolean
+  /** 构造 UpdateCardPatch(收集所有 field 的 toPayload)。壳的 save 调。 */
+  toPatch: () => UpdateCardPatch
+  /** 重置草稿回 Card(壳在切卡 / 外部更新时调)。 */
+  reset: () => void
+}
+
+export function useCardDraft(
+  card: Card,
+  fields: CardDraftField<unknown>[],
+): CardDraftApi {
+  const [draft, setDraft] = useState<Record<string, unknown>>(() =>
+    initDraft(card, fields),
+  )
+
+  // reset 闭包捕获最新 card;fields 是模块级常量(不入 deps)。
+  const reset = useCallback(() => {
+    setDraft(initDraft(card, fields))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card])
+
+  const dirty = useMemo(
+    () =>
+      fields.some((f) => {
+        const cur = draft[f.key as string]
+        const orig = f.toDraft(card)
+        return !(f.equals ?? strictEquals)(cur, orig)
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [draft, card, fields],
+  )
+
+  const toPatch = useCallback(() => {
+    const patch: Record<string, unknown> = {}
+    for (const f of fields) {
+      patch[f.key as string] = f.toPayload(draft[f.key as string] as never)
+    }
+    return patch as UpdateCardPatch
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, fields])
+
+  const setField = useCallback(
+    (key: keyof UpdateCardPatch, value: unknown) =>
+      setDraft((prev) => ({ ...prev, [key]: value })),
+    [],
+  )
+
+  return { draft, setField, setDraft, dirty, toPatch, reset }
+}
+
+function initDraft(
+  card: Card,
+  fields: CardDraftField<unknown>[],
+): Record<string, unknown> {
+  const d: Record<string, unknown> = {}
+  for (const f of fields) d[f.key as string] = f.toDraft(card)
+  return d
+}
+
+function strictEquals<T>(a: T, b: T): boolean {
+  return a === b
+}
+
+/**
+ * defineField — 类型安全的字段定义 helper。
+ *
+ * registry 是异构数组(每 field 的草稿类型 D 不同),不能直接用 CardDraftField<D>[]
+ * (TS 不协变 toPayload 的参数)。defineField<D> 在定义处给 D 类型(toDraft/toPayload/equals
+ * 都类型安全),返回 CardDraftField<unknown>(内部 cast,供 hook 用)。
+ */
+export function defineField<D>(
+  key: keyof UpdateCardPatch,
+  toDraft: (card: Card) => D,
+  toPayload: (draft: D) => unknown,
+  equals?: (a: D, b: D) => boolean,
+): CardDraftField<unknown> {
+  return {
+    key,
+    toDraft,
+    toPayload: (d: unknown) => toPayload(d as D),
+    equals: equals
+      ? (a: unknown, b: unknown) => equals(a as D, b as D)
+      : undefined,
+  }
+}
+
+/**
+ * isDirty — 纯函数版 dirty 判断(给切卡 cleanup 用)。
+ *
+ * hook 的 dirty 基于当前 card props;WorkbenchPanel 切卡 cleanup 要比"上一卡 draft vs
+ * 上一卡 card"(card 已变新),用 isDirty(prevCard, prevDraft, fields) 显式传。
+ */
+export function isDirty(
+  card: Card,
+  draft: Record<string, unknown>,
+  fields: CardDraftField<unknown>[],
+): boolean {
+  return fields.some((f) => {
+    const cur = draft[f.key as string]
+    const orig = f.toDraft(card)
+    return !(f.equals ?? strictEquals)(cur, orig)
+  })
+}
