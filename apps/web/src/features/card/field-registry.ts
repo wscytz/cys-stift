@@ -18,6 +18,7 @@ import {
   type DraftLink,
   type DraftQuote,
 } from './editors'
+import { CodesFieldEditor, QuotesFieldEditor } from './field-editors'
 
 function jsonEquals<T>(a: T, b: T): boolean {
   return JSON.stringify(a) === JSON.stringify(b)
@@ -28,18 +29,24 @@ function jsonEquals<T>(a: T, b: T): boolean {
 const titleField = defineField<string>('title', (c) => c.title, (d) => d)
 const bodyField = defineField<string>('body', (c) => c.body, (d) => d)
 const tagsField = defineField('tags', (c) => c.tags ?? [], (d) => d, jsonEquals)
-const codesField = defineField<DraftCode[]>(
-  'codeSnippets',
-  (c) => (c.codeSnippets ?? []).map((x) => ({ language: x.language, code: x.code })),
-  draftCodesToPayload,
-  jsonEquals,
-)
-const quotesField = defineField<DraftQuote[]>(
-  'quotes',
-  (c) => (c.quotes ?? []).map((x) => ({ text: x.text, attribution: x.attribution ?? '' })),
-  draftQuotesToPayload,
-  jsonEquals,
-)
+const codesField: CardDraftField<unknown> = {
+  ...defineField<DraftCode[]>(
+    'codeSnippets',
+    (c) => (c.codeSnippets ?? []).map((x) => ({ language: x.language, code: x.code })),
+    draftCodesToPayload,
+    jsonEquals,
+  ),
+  Editor: CodesFieldEditor,
+}
+const quotesField: CardDraftField<unknown> = {
+  ...defineField<DraftQuote[]>(
+    'quotes',
+    (c) => (c.quotes ?? []).map((x) => ({ text: x.text, attribution: x.attribution ?? '' })),
+    draftQuotesToPayload,
+    jsonEquals,
+  ),
+  Editor: QuotesFieldEditor,
+}
 const mediaField = defineField<MediaRef[]>('media', (c) => c.media ?? [], (d) => d, jsonEquals)
 const linksField = defineField<DraftLink[]>(
   'links',

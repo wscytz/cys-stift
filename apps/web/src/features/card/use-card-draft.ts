@@ -4,6 +4,7 @@ import {
   useCallback,
   useMemo,
   useState,
+  type ComponentType,
   type Dispatch,
   type SetStateAction,
 } from 'react'
@@ -30,6 +31,11 @@ import type { Card, UpdateCardPatch } from '@cys-stift/domain'
  * fields 应为模块级常量(壳传稳定引用),避免 useMemo/useCallback 因 fields 身份变化。
  */
 
+export interface FieldEditorProps<D> {
+  value: D
+  onChange: (value: D) => void
+}
+
 export interface CardDraftField<D> {
   /** Card 字段 key(也是 UpdateCardPatch 的 key)。 */
   key: keyof UpdateCardPatch
@@ -39,6 +45,10 @@ export interface CardDraftField<D> {
   toPayload: (draft: D) => unknown
   /** 草稿相等判断(dirty 用;省略 = 严格 ===)。数组/对象字段传深比(如 JSON.stringify)。 */
   equals?: (a: D, b: D) => boolean
+  /** 编辑态控件(Step 2 FieldEditors 渲染);省略 = 该字段不进 FieldEditors(壳手写,如 title/body 在壳特化)。 */
+  Editor?: ComponentType<FieldEditorProps<D>>
+  /** 只读态渲染(Step 2 FieldViews);省略 = view 不显示该字段。 */
+  View?: ComponentType<{ card: Card }>
 }
 
 export interface CardDraftApi {

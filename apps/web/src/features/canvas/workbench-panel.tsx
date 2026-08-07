@@ -19,15 +19,10 @@ import { AIPopover } from '@/features/ai/ai-popover'
 import { isAIReady, getCurrentAI } from '@/features/ai/ai-settings-provider'
 import { pushToast } from '@/lib/toast-store'
 import { MarkdownEditor } from '@/features/card/markdown-editor'
-import {
-  CodeEditor,
-  QuoteEditor,
-  editorStyles,
-  type DraftCode,
-  type DraftQuote,
-} from '@/features/card/editors'
+import { editorStyles } from '@/features/card/editors'
 import { useCardDraft, isDirty } from '@/features/card/use-card-draft'
 import { WORKBENCH_FIELDS } from '@/features/card/field-registry'
+import { FieldEditors } from '@/features/card/field-editors'
 import { solidTagChipStyle } from '@/lib/tag-color'
 import { typeKeyOf } from '@/lib/type-label'
 import { useI18n } from '@/lib/i18n'
@@ -263,14 +258,7 @@ export function WorkbenchPanel({
         </span>
       </div>
       <div className="wb-panel__fields">
-        <div className="wb-panel__field">
-          <span className="wb-panel__field-label">{t('card.detail.code')}</span>
-          <CodeEditor items={draft.codeSnippets as DraftCode[]} onChange={(v) => setField('codeSnippets', v)} />
-        </div>
-        <div className="wb-panel__field">
-          <span className="wb-panel__field-label">{t('card.detail.quotes')}</span>
-          <QuoteEditor items={draft.quotes as DraftQuote[]} onChange={(v) => setField('quotes', v)} />
-        </div>
+        <FieldEditors fields={WORKBENCH_FIELDS} draft={draft} setField={setField} />
       </div>
       <div className="wb-panel__body">
         <MarkdownEditor value={draft.body as string} onChange={(v) => setField('body', v)} />

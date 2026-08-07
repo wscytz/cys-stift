@@ -60,6 +60,7 @@ import {
 } from './editors'
 import { useCardDraft } from './use-card-draft'
 import { DETAIL_FIELDS } from './field-registry'
+import { FieldEditors } from './field-editors'
 import { MarkdownBody } from '@/app/inbox/markdown'
 import { mediaStore } from '@/lib/media-store'
 import {
@@ -801,8 +802,7 @@ export function CardDetailModal({
                 placeholder="https://…"
                 fieldKey="url"
               />
-              <CodeEditor items={codes} onChange={(v) => setField('codeSnippets', v)} />
-              <QuoteEditor items={quotes} onChange={(v) => setField('quotes', v)} />
+              <FieldEditors fields={DETAIL_FIELDS} draft={draft} setField={setField} />
               <div className="cd__field">
                 <span className="cd__label">{t('tag.add')}</span>
                 <div className="cd__tags">
