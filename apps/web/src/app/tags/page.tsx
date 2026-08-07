@@ -2,7 +2,8 @@
 
 import { useMemo } from 'react'
 import Link from 'next/link'
-import { BauhausMotif, Card as UICard, Tag, Toolbar } from '@cys-stift/ui'
+import { BauhausMotif, Card as UICard, Tag } from '@cys-stift/ui'
+import { PageHeader } from '@/features/page-header'
 import type { CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
@@ -39,15 +40,8 @@ export default function TagsPage() {
 
   return (
     <main id="main" tabIndex={-1} className="page">
-      <Toolbar region="archive">
-        <span className="crumb">{t('brand.name')}</span>
-        <span className="crumb-sep">/</span>
-        <h1 className="crumb crumb--here">{t('tags.title')}</h1>
-        <span className="crumb-spacer" />
-        <Tag color="blue">{t('tags.count', { n: String(countTaggedCards(cards)) })}</Tag>
-      </Toolbar>
-
       <div className="page-content page-content--wide">
+        <PageHeader title={t('tags.title')} actions={<Tag color="blue">{t('tags.count', { n: String(countTaggedCards(cards)) })}</Tag>} />
         {!ready ? (
           <PageLoading />
         ) : !hasTags ? (

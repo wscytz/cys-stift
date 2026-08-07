@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { BauhausMotif, Button, Card as UICard, Modal, Tag, Toolbar } from '@cys-stift/ui'
+import { BauhausMotif, Button, Card as UICard, Modal, Tag } from '@cys-stift/ui'
+import { PageHeader } from '@/features/page-header'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
 import { mediaStore } from '@/lib/media-store'
@@ -48,15 +49,8 @@ export default function TrashPage() {
 
   return (
     <main id="main" tabIndex={-1} className="page">
-      <Toolbar region="trash">
-        <span className="crumb">{t('brand.name')}</span>
-        <span className="crumb-sep">/</span>
-        <h1 className="crumb crumb--here">{t('trash.crumb')}</h1>
-        <span className="crumb-spacer" />
-        <Tag color="gray">{trashed.length}</Tag>
-      </Toolbar>
-
       <div className="page-content page-content--wide">
+        <PageHeader title={t('trash.crumb')} actions={<Tag color="gray">{trashed.length}</Tag>} />
         {!ready ? (
           <PageLoading />
         ) : trashed.length === 0 ? (

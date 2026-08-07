@@ -3,7 +3,8 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { BauhausMotif, Card as UICard, Tag, Toolbar } from '@cys-stift/ui'
+import { BauhausMotif, Card as UICard, Tag } from '@cys-stift/ui'
+import { PageHeader } from '@/features/page-header'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
 import { useCanvases } from '@/lib/canvas-store'
@@ -102,15 +103,8 @@ export default function TimelinePage() {
 
   return (
     <main id="main" tabIndex={-1} className="page">
-      <Toolbar region="timeline">
-        <span className="crumb">{t('brand.name')}</span>
-        <span className="crumb-sep">/</span>
-        <h1 className="crumb crumb--here">{t('timeline.crumb')}</h1>
-        <span className="crumb-spacer" />
-        <Tag color="red">{sorted.length}</Tag>
-      </Toolbar>
-
       <div className="page-content page-content--wide">
+        <PageHeader title={t('timeline.crumb')} actions={<Tag color="red">{sorted.length}</Tag>} />
         {!ready ? (
           <PageLoading />
         ) : sorted.length === 0 ? (

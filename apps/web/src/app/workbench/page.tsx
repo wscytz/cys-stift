@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
-import { BauhausMotif, Card as UICard, Modal, Tag, Toolbar, Button } from '@cys-stift/ui'
+import { BauhausMotif, Card as UICard, Modal, Tag, Button } from '@cys-stift/ui'
+import { PageHeader } from '@/features/page-header'
 import type { Card, CardId, UpdateCardPatch } from '@cys-stift/domain'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import { useDb } from '@/lib/db-client'
@@ -108,23 +109,23 @@ export default function WorkbenchPage() {
 
   return (
     <main id="main" tabIndex={-1} className="page">
-      <Toolbar region="archive">
-        <span className="crumb">{t('brand.name')}</span>
-        <span className="crumb-sep">/</span>
-        <h1 className="crumb crumb--here">{t('workbench.title')}</h1>
-        <span className="crumb-spacer" />
-        <button
-          type="button"
-          className="crumb-link"
-          onClick={() => router.push(returnTarget)}
-          aria-label={t('workbench.backToCanvas')}
-        >
-          {t('workbench.backToCanvas')}
-        </button>
-        <Tag color="blue">{t('workbench.count', { n: String(cards.length) })}</Tag>
-      </Toolbar>
-
       <div className="page-content page-content--wide">
+        <PageHeader
+          title={t('workbench.title')}
+          actions={
+            <>
+              <button
+                type="button"
+                className="crumb-link"
+                onClick={() => router.push(returnTarget)}
+                aria-label={t('workbench.backToCanvas')}
+              >
+                {t('workbench.backToCanvas')}
+              </button>
+              <Tag color="blue">{t('workbench.count', { n: String(cards.length) })}</Tag>
+            </>
+          }
+        />
         {!ready ? (
           <PageLoading />
         ) : cards.length === 0 ? (
