@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Toolbar, Modal, Button } from '@cys-stift/ui'
+import { Modal, Button } from '@cys-stift/ui'
+import { PageHeader } from '@/features/page-header'
 import { settingsStore, useSettings } from '@/lib/settings-store'
 import { useI18n } from '@/lib/i18n'
 import { useIsDesktop } from '@/lib/use-platform'
@@ -163,14 +164,8 @@ export default function SettingsPage() {
 
   return (
     <main id="main" tabIndex={-1} className="page">
-      <Toolbar region="system">
-        <span className="crumb">{t('brand.name')}</span>
-        <span className="crumb-sep">/</span>
-        <h1 className="crumb crumb--here">{t('settings.crumb')}</h1>
-        <span className="crumb-spacer" />
-      </Toolbar>
-
       <div className="page-content">
+        <PageHeader title={t('settings.crumb')} />
         <nav className="set__index" aria-label={t('settings.sections')}>
           <a href="#settings-data">{t('settings.data')}</a>
           <a href="#settings-capture">{t('settings.capture')}</a>

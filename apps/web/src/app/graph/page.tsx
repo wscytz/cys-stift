@@ -9,7 +9,7 @@
  * 静态导出:无 'use server' / API route;数据全走客户端 store。
  */
 import { useMemo, useRef, useState } from 'react'
-import { Toolbar } from '@cys-stift/ui'
+import { PageHeader } from '@/features/page-header'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
@@ -90,13 +90,8 @@ export default function GraphPage() {
 
   return (
     <main id="main" tabIndex={-1} className="page">
-      <Toolbar region="system">
-        <span className="crumb">{t('brand.name')}</span>
-        <span className="crumb-sep">/</span>
-        <h1 className="crumb crumb--here">{t('graph.title')}</h1>
-      </Toolbar>
-
       <div className="page-content page-content--wide">
+        <PageHeader title={t('graph.title')} />
         <GraphFilters filter={filter} onChange={setFilter} tags={allTags} />
 
         {isLoading ? (

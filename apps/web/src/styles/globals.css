@@ -288,3 +288,31 @@ h1.crumb {
   font-size: inherit;
   font-weight: inherit;
 }
+
+/* ── PageHeader — Toolbar 精简后的页面标题/操作 sub-header(page-content 内)──────
+   顶部删各页 Toolbar 后只留 AppMenu 一条全宽条;页面标题/操作收进 page-content 内的
+   PageHeader(居中属内容区,不顶满宽)。零度页(无 actions + sr-only title)只渲染
+   sr-only h1,不进 .ph(零视觉)。轻度/重度页(有 actions)才用 .ph 可见条。
+   详见 plans/2026-08-07-toolbar-simplification.md。 */
+.ph {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
+  border-bottom: var(--border-hairline);
+}
+.ph__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--font-size-lg);
+}
+.ph__actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}

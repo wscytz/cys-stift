@@ -2,7 +2,8 @@
 
 import { useDeferredValue, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Toolbar, Tag } from '@cys-stift/ui'
+import { Tag } from '@cys-stift/ui'
+import { PageHeader } from '@/features/page-header'
 import type { Card, CardId, SearchResult } from '@cys-stift/domain'
 import { searchCards } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
@@ -64,13 +65,8 @@ export default function SearchPage() {
 
   return (
     <main id="main" tabIndex={-1} className="page">
-      <Toolbar region="system">
-        <span className="crumb">{t('brand.name')}</span>
-        <span className="crumb-sep">/</span>
-        <h1 className="crumb crumb--here">{t('search.crumb')}</h1>
-      </Toolbar>
-
       <div className="page-content page-content--wide">
+        <PageHeader title={t('search.crumb')} />
         <input
           autoFocus
           className="search-input"
