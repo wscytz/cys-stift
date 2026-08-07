@@ -10,7 +10,7 @@
 import type { ComponentType } from 'react'
 import type { UpdateCardPatch } from '@cys-stift/domain'
 import type { CardDraftField, FieldEditorProps } from './use-card-draft'
-import { CodeEditor, QuoteEditor, type DraftCode, type DraftQuote } from './editors'
+import { CodeEditor, ListEditor, QuoteEditor, type DraftCode, type DraftLink, type DraftQuote } from './editors'
 import { useI18n } from '@/lib/i18n'
 
 /** 代码块字段编辑器(label + CodeEditor)。 */
@@ -31,6 +31,24 @@ export function QuotesFieldEditor({ value, onChange }: FieldEditorProps<unknown>
     <div className="fe">
       <span className="fe__label">{t('card.detail.quotes')}</span>
       <QuoteEditor items={value as DraftQuote[]} onChange={(v) => onChange(v)} />
+    </div>
+  )
+}
+
+/** 链接字段编辑器(label + ListEditor)。壳传 DraftLink[](url 单字段);toPayload 时过滤空 + 补 fetchedAt。 */
+export function LinksFieldEditor({ value, onChange }: FieldEditorProps<unknown>) {
+  const { t } = useI18n()
+  return (
+    <div className="fe">
+      <span className="fe__label">{t('card.detail.links')}</span>
+      <ListEditor
+        items={value as DraftLink[]}
+        onChange={(v) => onChange(v)}
+        make={() => ({ url: '' })}
+        label={t('card.detail.linkLabel')}
+        placeholder="https://…"
+        fieldKey="url"
+      />
     </div>
   )
 }

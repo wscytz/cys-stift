@@ -18,7 +18,7 @@ import {
   type DraftLink,
   type DraftQuote,
 } from './editors'
-import { CodesFieldEditor, QuotesFieldEditor } from './field-editors'
+import { CodesFieldEditor, LinksFieldEditor, QuotesFieldEditor } from './field-editors'
 
 function jsonEquals<T>(a: T, b: T): boolean {
   return JSON.stringify(a) === JSON.stringify(b)
@@ -48,20 +48,25 @@ const quotesField: CardDraftField<unknown> = {
   Editor: QuotesFieldEditor,
 }
 const mediaField = defineField<MediaRef[]>('media', (c) => c.media ?? [], (d) => d, jsonEquals)
-const linksField = defineField<DraftLink[]>(
-  'links',
-  (c) => (c.links ?? []).map((l) => ({ url: l.url })),
-  draftLinksToPayload,
-  jsonEquals,
-)
+const linksField: CardDraftField<unknown> = {
+  ...defineField<DraftLink[]>(
+    'links',
+    (c) => (c.links ?? []).map((l) => ({ url: l.url })),
+    draftLinksToPayload,
+    jsonEquals,
+  ),
+  Editor: LinksFieldEditor,
+}
 
 // ── 字段集(各壳按需用;Step 3 后 WORKBENCH = DETAIL,字段集统一) ─────────────
 
-/** 工作台字段集(Step 3 补 media/links 后 = DETAIL_FIELDS)。 */
+/** 工作台字段集(Step 3 补 media 后 = DETAIL_FIELDS)。links/codes/quotes 进 FieldEditors;
+ *  顺序与 DETAIL_FIELDS 一致(links→codes→quotes),两壳 FieldEditors 渲染顺序统一。 */
 export const WORKBENCH_FIELDS: CardDraftField<unknown>[] = [
   titleField,
   bodyField,
   tagsField,
+  linksField,
   codesField,
   quotesField,
 ]

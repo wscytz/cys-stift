@@ -49,15 +49,7 @@ import type {
 } from '@cys-stift/domain'
 import { TAG_COLORS } from '@cys-stift/domain'
 import { solidTagChipStyle } from '@/lib/tag-color'
-import {
-  CodeEditor,
-  ListEditor,
-  QuoteEditor,
-  editorStyles,
-  type DraftCode,
-  type DraftLink,
-  type DraftQuote,
-} from './editors'
+import { editorStyles } from './editors'
 import { useCardDraft } from './use-card-draft'
 import { DETAIL_FIELDS } from './field-registry'
 import { FieldEditors } from './field-editors'
@@ -194,12 +186,10 @@ export function CardDetailModal({
   const [mode, setMode] = useState<'view' | 'edit'>(initialMode)
   const { draft, setField, setDraft, dirty, toPatch, reset } = useCardDraft(card, DETAIL_FIELDS)
   // alias:让 edit JSX 的 value={title}/{body}/... 读法不变(只读);setter 改 setField(见 JSX)。
+  // codes/quotes/links 进 FieldEditors(registry),不在此 alias。
   const title = draft.title as string
   const body = draft.body as string
   const media = draft.media as MediaRef[]
-  const links = draft.links as DraftLink[]
-  const codes = draft.codeSnippets as DraftCode[]
-  const quotes = draft.quotes as DraftQuote[]
   const tags = draft.tags as TagRef[]
   const [tagInput, setTagInput] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -794,14 +784,6 @@ export function CardDetailModal({
                   </ul>
                 )}
               </div>
-              <ListEditor
-                items={links}
-                onChange={(v) => setField('links', v)}
-                make={() => ({ url: '' })}
-                label={t('card.detail.linkLabel')}
-                placeholder="https://…"
-                fieldKey="url"
-              />
               <FieldEditors fields={DETAIL_FIELDS} draft={draft} setField={setField} />
               <div className="cd__field">
                 <span className="cd__label">{t('tag.add')}</span>
