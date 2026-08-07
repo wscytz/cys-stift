@@ -5,6 +5,12 @@
 
 ---
 
+## 2026-08-07 · 1.1.3 · 工作台 code/quote 编辑 + 详情弹窗标题间距(tag v1.1.3)
+
+- **fix(web): 工作台补 code/quote 渲染+编辑**:`WorkbenchPanel` 此前只读 `card.body`,`codeSnippets`/`quotes` 结构化字段完全不读不写 —— code/quote 卡进工作台"显示空"(图谱用的 `CardDetailModal` 正常,唯独工作台是简陋特例)。补齐 state/autosave/dirty/切卡 cleanup/AI 替换全链路带 code/quote;UI 在详细信息下方加「代码」「引用」编辑区(复用详情弹窗同款 CodeEditor/QuoteEditor)。`service.update` 是 patch 语义,AI 改正文时 code/quote 跟草稿回写不被清。
+- **fix(web): 详情弹窗标题↔打标重叠**:`CardDetailModal` 的 `.cd > :first-child` 有条 `margin-top: -16px` 上拉(v0.22.0 加,注释说要抵消"Modal body padding"),但 Modal body 实际无 padding —— 负 margin 让 type 标签/彩色打标与标题挤到一起(用户反馈"重叠")。去掉,标题↔打标回到 24px(与弹窗内部区块间距一致)。
+- 全包 lint 0 + web test 1775 passed + web build exit 0。
+
 ## 2026-08-01 · 1.1.2 · AI 画布快照给结构化字段元数据 + 约束不编造(tag v1.1.2)
 
 - **修复数据完整性风险**:AI 提议改画布时,快照此前只给 title/body,`@code`/`@quote`/`@links`/`@tags` 内容根本不在字段面 —— AI 第一轮准确报告"丢失结构化内容",第二轮却**编造**代码/引文"补回",若用户确认会覆盖真实数据。

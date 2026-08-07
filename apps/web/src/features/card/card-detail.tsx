@@ -1187,12 +1187,10 @@ function Section({
 
 const styles = `
 .cd { display: flex; flex-direction: column; gap: var(--space-3); }
-/* v0.22.0-ux-bugfix parity with canvas modal: tighten the gap between
-   modal title and first body field. The .cd flex container's gap of
-   space-3 (24px) plus the Modal component's body padding makes the
-   first child feel detached; pulling it up by space-2 (16px) hugs
-   the title. */
-.cd > :first-child { margin-top: calc(-1 * var(--space-2)); }
+/* title→首字段间距交给 Modal frame 的 gap(space-3=24px),与 .cd 内部各区块
+   间距一致。历史上这里曾用 -space-2 负 margin 把首字段上拉贴近标题,前提是
+   "Modal body 有 padding 会把首字段推远" —— 但 Modal body 实际无 padding,
+   负 margin 反而让 type 标签/打标与标题挤到一起(用户反馈"重叠")。去掉。 */
 .cd__meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .cd__time { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black-soft); }
 .cd__provenance {

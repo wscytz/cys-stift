@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import { BauhausMotif, Card as UICard, Modal, Tag, Toolbar, Button } from '@cys-stift/ui'
-import type { Card, CardId, TagRef } from '@cys-stift/domain'
+import type { Card, CardId, CodeBlock, Quote, TagRef } from '@cys-stift/domain'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
@@ -65,7 +65,10 @@ export default function WorkbenchPage() {
     return () => { stale = true }
   }, [previewCanvasId, service, snap, freeformVersion])
 
-  const wbSave = (id: CardId | string, patch: { title: string; body: string; tags: TagRef[] }) => {
+  const wbSave = (
+    id: CardId | string,
+    patch: { title: string; body: string; tags: TagRef[]; codeSnippets: CodeBlock[]; quotes: Quote[] },
+  ) => {
     return service.update(id as CardId, patch) !== null
   }
 

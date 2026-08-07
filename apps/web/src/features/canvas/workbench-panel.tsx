@@ -10,7 +10,7 @@
  * 存:autosave 防抖 500ms;收起时若脏则 flush 再 close(防丢编辑)。
  */
 import { useEffect, useRef, useState } from 'react'
-import type { Card, TagRef } from '@cys-stift/domain'
+import type { Card, CodeBlock, Quote, TagRef } from '@cys-stift/domain'
 import { TAG_COLORS } from '@cys-stift/domain'
 import { Button, Tag } from '@cys-stift/ui'
 import { AiActionMenu } from '@/features/ai/ai-action-menu'
@@ -19,6 +19,15 @@ import { AIPopover } from '@/features/ai/ai-popover'
 import { isAIReady, getCurrentAI } from '@/features/ai/ai-settings-provider'
 import { pushToast } from '@/lib/toast-store'
 import { MarkdownEditor } from '@/features/card/markdown-editor'
+import {
+  CodeEditor,
+  QuoteEditor,
+  draftCodesToPayload,
+  draftQuotesToPayload,
+  editorStyles,
+  type DraftCode,
+  type DraftQuote,
+} from '@/features/card/editors'
 import { solidTagChipStyle } from '@/lib/tag-color'
 import { typeKeyOf } from '@/lib/type-label'
 import { useI18n } from '@/lib/i18n'
@@ -40,7 +49,7 @@ const CARD_BAR_COLOR: Record<string, string> = {
 
 export interface WorkbenchPanelProps {
   card: Card
-  onSave: (cardId: string, patch: { title: string; body: string; tags: TagRef[] }) => boolean | void
+  onSave: (cardId: string, patch: { title: string; body: string; tags: TagRef[]; codeSnippets: CodeBlock[]; quotes: Quote[] }) => boolean | void
   onClose: () => void
   onBackToList?: () => void
   onDirtyChange?: (dirty: boolean) => void
@@ -67,6 +76,12 @@ export function WorkbenchPanel({
   const [title, setTitle] = useState(card.title)
   const [body, setBody] = useState(card.body)
   const [tags, setTags] = useState<TagRef[]>(card.tags ?? [])
+  const [codes, setCodes] = useState<DraftCode[]>(() =>
+    (card.codeSnippets ?? []).map((c) => ({ language: c.language, code: c.code })),
+  )
+  const [quotes, setQuotes] = useState<DraftQuote[]>(() =>
+    (card.quotes ?? []).map((q) => ({ text: q.text, attribution: q.attribution ?? '' })),
+  )
   const [tagInput, setTagInput] = useState('')
   // savedFlash:flush 后短暂亮「已保存」1.5s,让 autosave 可见(用户知道编辑落了)。
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle')
@@ -78,8 +93,8 @@ export function WorkbenchPanel({
   const [editInstruction, setEditInstruction] = useState('')
 
   // 最新草稿 + 最新 onSave 放 ref,避免防抖 effect 依赖函数身份。
-  const draftRef = useRef({ title, body, tags })
-  draftRef.current = { title, body, tags }
+  const draftRef = useRef({ title, body, tags, codes, quotes })
+  draftRef.current = { title, body, tags, codes, quotes }
   const onSaveRef = useRef(onSave)
   onSaveRef.current = onSave
 
@@ -89,9 +104,17 @@ export function WorkbenchPanel({
     const d = draftRef.current
     const curTags = card.tags ?? []
     const tagsChanged = JSON.stringify(d.tags) !== JSON.stringify(curTags)
-    if (d.title !== card.title || d.body !== card.body || tagsChanged) {
+    const codesChanged = JSON.stringify(d.codes) !== JSON.stringify((card.codeSnippets ?? []).map((c) => ({ language: c.language, code: c.code })))
+    const quotesChanged = JSON.stringify(d.quotes) !== JSON.stringify((card.quotes ?? []).map((q) => ({ text: q.text, attribution: q.attribution ?? '' })))
+    if (d.title !== card.title || d.body !== card.body || tagsChanged || codesChanged || quotesChanged) {
       setSaveState('saving')
-      const ok = onSaveRef.current(card.id, { title: d.title, body: d.body, tags: d.tags })
+      const ok = onSaveRef.current(card.id, {
+        title: d.title,
+        body: d.body,
+        tags: d.tags,
+        codeSnippets: draftCodesToPayload(d.codes),
+        quotes: draftQuotesToPayload(d.quotes),
+      })
       setSaveState(ok === false ? 'failed' : 'saved')
       if (flashTimer.current) clearTimeout(flashTimer.current)
       flashTimer.current = setTimeout(() => setSaveState('idle'), 3000)
@@ -103,9 +126,11 @@ export function WorkbenchPanel({
     setTitle(card.title)
     setBody(card.body)
     setTags(card.tags ?? [])
+    setCodes((card.codeSnippets ?? []).map((c) => ({ language: c.language, code: c.code })))
+    setQuotes((card.quotes ?? []).map((q) => ({ text: q.text, attribution: q.attribution ?? '' })))
     setTagInput('')
     setAiView(null) // 切卡收起 AI 浮层
-  }, [card.id, card.title, card.body, card.tags])
+  }, [card.id, card.title, card.body, card.tags, card.codeSnippets, card.quotes])
 
   // 切卡防丢编辑(bug 1 修):card.id 变时,上一张的脏 draft 在 cleanup flush。
   // 否则 autosave effect 的 cleanup 清掉旧 timer(<500ms 未触发)+ state 重置 +
@@ -116,19 +141,31 @@ export function WorkbenchPanel({
     return () => {
       const d = draftRef.current
       const tagsChanged = JSON.stringify(d.tags) !== JSON.stringify(prev.tags ?? [])
-      if (d.title !== prev.title || d.body !== prev.body || tagsChanged) {
-        onSaveRef.current(prev.id, { title: d.title, body: d.body, tags: d.tags })
+      const codesChanged = JSON.stringify(d.codes) !== JSON.stringify((prev.codeSnippets ?? []).map((c) => ({ language: c.language, code: c.code })))
+      const quotesChanged = JSON.stringify(d.quotes) !== JSON.stringify((prev.quotes ?? []).map((q) => ({ text: q.text, attribution: q.attribution ?? '' })))
+      if (d.title !== prev.title || d.body !== prev.body || tagsChanged || codesChanged || quotesChanged) {
+        onSaveRef.current(prev.id, {
+          title: d.title,
+          body: d.body,
+          tags: d.tags,
+          codeSnippets: draftCodesToPayload(d.codes),
+          quotes: draftQuotesToPayload(d.quotes),
+        })
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card.id])
 
-  // dirty = 有未 flush 的编辑(草稿 vs card 当前值)。tags 用 JSON 比(小数组)。
+  // dirty = 有未 flush 的编辑(草稿 vs card 当前值)。tags/codes/quotes 用 JSON 比(小数组)。
   const curTags = card.tags ?? []
+  const cardCodesNorm = (card.codeSnippets ?? []).map((c) => ({ language: c.language, code: c.code }))
+  const cardQuotesNorm = (card.quotes ?? []).map((q) => ({ text: q.text, attribution: q.attribution ?? '' }))
   const dirty =
     title !== card.title ||
     body !== card.body ||
-    JSON.stringify(tags) !== JSON.stringify(curTags)
+    JSON.stringify(tags) !== JSON.stringify(curTags) ||
+    JSON.stringify(codes) !== JSON.stringify(cardCodesNorm) ||
+    JSON.stringify(quotes) !== JSON.stringify(cardQuotesNorm)
 
   useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
 
@@ -136,7 +173,7 @@ export function WorkbenchPanel({
   useEffect(() => {
     const id = setTimeout(() => flushRef.current(), AUTOSAVE_DEBOUNCE_MS)
     return () => clearTimeout(id)
-  }, [title, body, tags, card.title, card.body, card.tags])
+  }, [title, body, tags, codes, quotes, card.title, card.body, card.tags, card.codeSnippets, card.quotes])
 
   // 卸载清 flash 定时器。
   useEffect(
@@ -163,6 +200,7 @@ export function WorkbenchPanel({
 
   return (
     <aside className="wb-panel" aria-label={t('card.detail.title')}>
+      <style>{editorStyles}</style>
       <style>{styles}</style>
       <header className="wb-panel__head">
         <span className="wb-panel__bar" style={{ background: CARD_BAR_COLOR[card.color ?? 'gray'] ?? 'var(--color-gray)' }} aria-hidden="true" />
@@ -262,6 +300,16 @@ export function WorkbenchPanel({
             : `${t('card.detail.canvas')}: ${t('card.detail.inbox')}`}
         </span>
       </div>
+      <div className="wb-panel__fields">
+        <div className="wb-panel__field">
+          <span className="wb-panel__field-label">{t('card.detail.code')}</span>
+          <CodeEditor items={codes} onChange={setCodes} />
+        </div>
+        <div className="wb-panel__field">
+          <span className="wb-panel__field-label">{t('card.detail.quotes')}</span>
+          <QuoteEditor items={quotes} onChange={setQuotes} />
+        </div>
+      </div>
       <div className="wb-panel__body">
         <MarkdownEditor value={body} onChange={setBody} />
       </div>
@@ -298,7 +346,14 @@ export function WorkbenchPanel({
               onClose={() => setAiView(null)}
               onReplace={(newBody) => {
                 // AI 替换正文:直接落库 + 更新编辑器视图(走既有 onSave,autosave 幂等)。
-                onSave(card.id, { title: title.trim() || card.title, body: newBody, tags })
+                // 带 codes/quotes:AI 只改正文,结构化字段保留当前草稿,避免被清空。
+                onSave(card.id, {
+                  title: title.trim() || card.title,
+                  body: newBody,
+                  tags,
+                  codeSnippets: draftCodesToPayload(codes),
+                  quotes: draftQuotesToPayload(quotes),
+                })
                 setBody(newBody)
                 setAiView(null)
               }}
@@ -459,6 +514,22 @@ const styles = `
   .wb-panel__head { flex-wrap: wrap; padding-top: var(--space-2); }
   .wb-panel__title { flex: 1 0 100%; width: 100%; padding: var(--space-1) 0; }
   .wb-panel__done { min-height: 44px; }
+}
+.wb-panel__fields {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: var(--border-hairline);
+  background: var(--color-white-soft);
+  max-height: 40vh;
+  overflow: auto;
+}
+.wb-panel__field { display: flex; flex-direction: column; gap: var(--space-1); }
+.wb-panel__field-label {
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-black-soft);
 }
 .wb-panel__body {
   flex: 1;
