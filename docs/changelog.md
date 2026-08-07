@@ -5,6 +5,13 @@
 
 ---
 
+## 2026-08-07 · 1.1.4 · 全局 layout 视口溢出修复(tag v1.1.4)
+
+- **fix(web): 整页垂直溢出(每页多一截滚动条)**:共用 layout 里顶部 `AppMenu`(sticky,占文档流 ~52px)+ 各页 `main.page`(min-height:100vh) 叠在 `body`(min-height:100vh flex column) 里 → body = AppMenu + 100vh > 100vh,**每个页面都多溢出约 52px 的垂直滚动条**,内容再少也溢出(用户反馈"内容不多却溢出、全屏明明能刚好放下")。
+- **修复**:globals.css 加一条高优先级规则 `body > main.page { flex:1; min-height:0 }`(优先级 0,1,1 高于各页 .page 的 0,1,0)——让 main.page 在 body flex 内填满剩余视口、min-height:0 覆盖各页 min-height:100vh,AppMenu + main 刚好 100vh。一处改全局,所有页面受益;内容多时 main 自然撑高触发整页滚(flex item 内容超 basis 正常)。
+- **未做(后续单独一轮)**:各页 Toolbar(重复面包屑)的精简分级——零度(graph/search/settings)、轻度(workbench/trash/tags/timeline)、重度(inbox/archive/ask 的 tab/选择 sub-header),canvas 工具栏保留(纯操作面非重复 title)。
+- 全包 lint 0 + web test 1775 passed + web build exit 0。
+
 ## 2026-08-07 · 1.1.3 · 工作台 code/quote 编辑 + 详情弹窗标题间距(tag v1.1.3)
 
 - **fix(web): 工作台补 code/quote 渲染+编辑**:`WorkbenchPanel` 此前只读 `card.body`,`codeSnippets`/`quotes` 结构化字段完全不读不写 —— code/quote 卡进工作台"显示空"(图谱用的 `CardDetailModal` 正常,唯独工作台是简陋特例)。补齐 state/autosave/dirty/切卡 cleanup/AI 替换全链路带 code/quote;UI 在详细信息下方加「代码」「引用」编辑区(复用详情弹窗同款 CodeEditor/QuoteEditor)。`service.update` 是 patch 语义,AI 改正文时 code/quote 跟草稿回写不被清。

@@ -32,6 +32,15 @@ body {
   flex-direction: column;
 }
 
+/* 共用 layout 视口修复:body 是 flex column,顶部 AppMenu(sticky)占文档流 ~52px,
+   各页 main.page 又是 min-height:100vh → body = AppMenu + 100vh > 100vh,每页都
+   多溢出一截垂直滚动条(内容再少也溢出,"全屏明明能刚好放下"的根因)。
+   让 main.page 在 body flex 内 flex:1 填满剩余视口、min-height:0 覆盖各页 .page
+   的 min-height:100vh(优先级 body>main.page = 0,1,1,高于各页 .page = 0,1,0),
+   AppMenu + main 刚好 100vh;内容多时 main 自然撑高触发整页滚(flex item 内容超
+   basis 属正常)。 */
+body > main.page { flex: 1; min-height: 0; }
+
 /* Bauhaus 滚动条(v0.39.1 跨平台适配):硬色块、无圆角、无渐变,贴合 6 原色气质。
    Mac 不复用系统 overlay 滚动条,Win 不用系统灰滚动条 —— 两端统一。
    Firefox 走 scrollbar-color/width(不支持 webkit 伪元素)。 */

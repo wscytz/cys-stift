@@ -1,6 +1,6 @@
-# cy's Stift 1.1.3
+# cy's Stift 1.1.4
 
-cy's Stift 1.1.3 is the stable release of the local-first idea canvas. Capture -> Inbox -> Canvas -> Workbench -> Export and recovery stays fully on your machine; the app sends nothing to a server and collects no usage telemetry. It freezes the core workflow, cys-dsl v8, and the review-before-apply contract for AI-assisted changes.
+cy's Stift 1.1.4 is the stable release of the local-first idea canvas. Capture -> Inbox -> Canvas -> Workbench -> Export and recovery stays fully on your machine; the app sends nothing to a server and collects no usage telemetry. It freezes the core workflow, cys-dsl v8, and the review-before-apply contract for AI-assisted changes.
 
 ## Downloads
 
