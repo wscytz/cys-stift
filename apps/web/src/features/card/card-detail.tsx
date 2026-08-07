@@ -57,10 +57,9 @@ import {
   type DraftCode,
   type DraftLink,
   type DraftQuote,
-  draftCodesToPayload,
-  draftLinksToPayload,
-  draftQuotesToPayload,
 } from './editors'
+import { useCardDraft } from './use-card-draft'
+import { DETAIL_FIELDS } from './field-registry'
 import { MarkdownBody } from '@/app/inbox/markdown'
 import { mediaStore } from '@/lib/media-store'
 import {
@@ -192,19 +191,15 @@ export function CardDetailModal({
     return { body: c.body, title: c.title }
   }
   const [mode, setMode] = useState<'view' | 'edit'>(initialMode)
-  const [title, setTitle] = useState(card.title)
-  const [body, setBody] = useState(card.body)
-  const [media, setMedia] = useState<MediaRef[]>(card.media ?? [])
-  const [links, setLinks] = useState<DraftLink[]>(() =>
-    (card.links ?? []).map((l) => ({ url: l.url })),
-  )
-  const [codes, setCodes] = useState<DraftCode[]>(() =>
-    (card.codeSnippets ?? []).map((c) => ({ language: c.language, code: c.code })),
-  )
-  const [quotes, setQuotes] = useState<DraftQuote[]>(() =>
-    (card.quotes ?? []).map((q) => ({ text: q.text, attribution: q.attribution ?? '' })),
-  )
-  const [tags, setTags] = useState<TagRef[]>(card.tags ?? [])
+  const { draft, setField, setDraft, dirty, toPatch, reset } = useCardDraft(card, DETAIL_FIELDS)
+  // alias:让 edit JSX 的 value={title}/{body}/... 读法不变(只读);setter 改 setField(见 JSX)。
+  const title = draft.title as string
+  const body = draft.body as string
+  const media = draft.media as MediaRef[]
+  const links = draft.links as DraftLink[]
+  const codes = draft.codeSnippets as DraftCode[]
+  const quotes = draft.quotes as DraftQuote[]
+  const tags = draft.tags as TagRef[]
   const [tagInput, setTagInput] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
@@ -359,27 +354,11 @@ export function CardDetailModal({
   // isn't actively editing through).
   useEffect(() => {
     if (mode === 'edit') return
-    setTitle(card.title)
-    setBody(card.body)
-    setMedia(card.media ?? [])
-    setLinks((card.links ?? []).map((l) => ({ url: l.url })))
-    setCodes((card.codeSnippets ?? []).map((c) => ({ language: c.language, code: c.code })))
-    setQuotes((card.quotes ?? []).map((q) => ({ text: q.text, attribution: q.attribution ?? '' })))
-    setTags(card.tags ?? [])
+    reset()
     setTagInput('')
     setMode(initialMode)
     setConfirmDelete(false)
-  }, [
-    mode,
-    card.id,
-    card.title,
-    card.body,
-    card.media,
-    card.links,
-    card.codeSnippets,
-    card.quotes,
-    initialMode,
-  ])
+  }, [mode, card.id, reset, initialMode])
 
   // 切换到另一张卡时,清掉上一张的 AI 推荐候选(避免串卡)。
   useEffect(() => {
@@ -388,24 +367,8 @@ export function CardDetailModal({
     removedAssetIds.current.clear()
   }, [card.id])
 
-  // 草稿是否与已存卡片不同(仅 edit 模式有意义)。关闭前据此弹"丢弃?"守卫,避免
-  // Esc/×/遮罩 静默毁掉未保存编辑(对齐 MiniInput/建卡表单的草稿保护)。须声明在
-  // 下方 Escape effect 之前——该 effect 的依赖数组在渲染期就读取 dirty。
-  const dirty = useMemo(() => {
-    if (mode !== 'edit') return false
-    const ct = card.tags ?? []
-    const cm = card.media ?? []
-    const cl = card.links ?? []
-    const cc = card.codeSnippets ?? []
-    const cq = card.quotes ?? []
-    if (title !== card.title || body !== card.body) return true
-    if (tags.length !== ct.length || tags.some((tg, i) => tg.value !== ct[i]?.value)) return true
-    if (media.length !== cm.length || media.some((m, i) => m.assetId !== cm[i]?.assetId)) return true
-    if (links.length !== cl.length || links.some((l, i) => l.url !== cl[i]?.url)) return true
-    if (codes.length !== cc.length || codes.some((c, i) => c.language !== cc[i]?.language || c.code !== cc[i]?.code)) return true
-    if (quotes.length !== cq.length || quotes.some((q, i) => q.text !== cq[i]?.text || q.attribution !== (cq[i]?.attribution ?? ''))) return true
-    return false
-  }, [mode, title, body, tags, media, links, codes, quotes, card])
+  // dirty 来自 useCardDraft(草稿 vs card);view 模式 draft 不编辑(reset 保持)=card → dirty false,
+  // edit 模式真实。Escape 守卫 / Modal onClose 守卫直接用。
 
   // Escape closes — works whether in main modal or in confirm-delete modal.
   // Guard: when a nested Escape-consuming overlay is open, dismiss THAT inner
@@ -443,17 +406,12 @@ export function CardDetailModal({
   }, [mode])
 
   const handleSave = () => {
-    if (!title.trim()) return
+    if (!(draft.title as string).trim()) return
     startTransition(() => {
       const ok = onSave({
-        title: title.trim(),
-        body,
-        media: media,
-        links: draftLinksToPayload(links),
-        codeSnippets: draftCodesToPayload(codes),
-        quotes: draftQuotesToPayload(quotes),
-        tags,
-      })
+        ...toPatch(),
+        title: (draft.title as string).trim(),
+      } as unknown as CardDetailSavePatch)
       if (ok) {
         // 提交成功才真正删媒体二进制(点 × 时只从草稿移除 + 记 id;取消/失败不删)。
         for (const id of removedAssetIds.current) mediaStore.remove(id)
@@ -468,7 +426,7 @@ export function CardDetailModal({
     for (const file of Array.from(files)) {
       try {
         const ref = await mediaStore.attach(file)
-        setMedia((prev) => [...prev, ref])
+        setDraft((prev) => ({ ...prev, media: [...(prev.media as MediaRef[]), ref] }))
       } catch (err) {
         console.error('[CardDetailModal] attach failed', err)
         pushToast({ kind: 'error', message: t('card.mediaAttachFail', { name: file.name }) })
@@ -768,7 +726,7 @@ export function CardDetailModal({
                 name="edit-title"
                 label={t('card.detail.fieldTitle')}
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => setField('title', e.target.value)}
                 maxLength={200}
               />
               <label className="cd__field">
@@ -776,7 +734,7 @@ export function CardDetailModal({
                 <textarea
                   className="cd__textarea"
                   value={body}
-                  onChange={(e) => setBody(e.target.value)}
+                  onChange={(e) => setField('body', e.target.value)}
                   rows={6}
                 />
               </label>
@@ -823,9 +781,7 @@ export function CardDetailModal({
                               // 只从草稿移除 + 记下 assetId;真删推迟到 handleSave 提交
                               // 成功后。取消/保存失败时卡片引用仍在,图片不丢。
                               removedAssetIds.current.add(m.assetId)
-                              setMedia((prev) =>
-                                prev.filter((x) => x.assetId !== m.assetId),
-                              )
+                              setField('media', media.filter((x) => x.assetId !== m.assetId))
                             }}
                             aria-label={t('card.detail.removeMediaAria')}
                           >
@@ -839,14 +795,14 @@ export function CardDetailModal({
               </div>
               <ListEditor
                 items={links}
-                onChange={setLinks}
+                onChange={(v) => setField('links', v)}
                 make={() => ({ url: '' })}
                 label={t('card.detail.linkLabel')}
                 placeholder="https://…"
                 fieldKey="url"
               />
-              <CodeEditor items={codes} onChange={setCodes} />
-              <QuoteEditor items={quotes} onChange={setQuotes} />
+              <CodeEditor items={codes} onChange={(v) => setField('codeSnippets', v)} />
+              <QuoteEditor items={quotes} onChange={(v) => setField('quotes', v)} />
               <div className="cd__field">
                 <span className="cd__label">{t('tag.add')}</span>
                 <div className="cd__tags">
@@ -858,7 +814,7 @@ export function CardDetailModal({
                       style={solidTagChipStyle(tag.color)}
                       aria-label={t('tag.remove') + ': ' + tag.value}
                       onClick={() =>
-                        setTags((prev) => prev.filter((x) => x.value !== tag.value))
+                        setField('tags', tags.filter((x) => x.value !== tag.value))
                       }
                     >
                       {tag.value} ×
@@ -875,7 +831,7 @@ export function CardDetailModal({
                         if (!tags.some((tag) => tag.value === val)) {
                           const color =
                             TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)]!
-                          setTags((prev) => [...prev, { value: val, color }])
+                          setField('tags', [...tags, { value: val, color }])
                         }
                         setTagInput('')
                       }
@@ -1010,21 +966,14 @@ export function CardDetailModal({
               targetLang={aiView === 'translate' ? translateTo : undefined}
               instruction={aiView === 'edit' ? editInstruction : undefined}
               onClose={() => setAiView(null)}
-              onReplace={(body) => {
+              onReplace={(newBody) => {
                 // Bug A fix (preserved): AI replaces only the BODY. Every
-                // other field comes from the COMPONENT's current edit state,
-                // NOT the card prop snapshot. Payload converters
-                // (draftLinksToPayload etc.) are existing helpers in this file.
+                // other field comes from the draft via toPatch(); body overridden.
                 const ok = onSave({
-                  title: title.trim() || card.title,
-                  body,
-                  media,
-                  links: draftLinksToPayload(links),
-                  codeSnippets: draftCodesToPayload(codes),
-                  quotes: draftQuotesToPayload(quotes),
-                  tags,
-                })
-                setBody(body)
+                  ...toPatch(),
+                  body: newBody,
+                } as unknown as CardDetailSavePatch)
+                setField('body', newBody)
                 setAiView(null)
                 if (!ok) pushToast({ kind: 'error', message: t('card.saveFailedQuota') })
               }}
