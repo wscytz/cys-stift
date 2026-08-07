@@ -50,23 +50,28 @@ export default function TrashPage() {
   return (
     <main id="main" tabIndex={-1} className="page">
       <div className="page-content page-content--wide">
-        <PageHeader title={t('trash.crumb')} actions={<Tag color="gray">{trashed.length}</Tag>} />
+        <PageHeader title={t('trash.crumb')} />
         {!ready ? (
           <PageLoading />
         ) : trashed.length === 0 ? (
           <EmptyState />
         ) : (
-          <ul className="grid">
-            {trashed.map((card) => (
-              <li key={card.id}>
-                <TrashItem
-                  card={card}
-                  onRestore={() => service.restore(card.id)}
-                  onRequestHardDelete={() => setConfirmHardDelete(card.id)}
-                />
-              </li>
-            ))}
-          </ul>
+          <>
+            <div className="ph-meta">
+              <Tag color="gray">{trashed.length}</Tag>
+            </div>
+            <ul className="grid">
+              {trashed.map((card) => (
+                <li key={card.id}>
+                  <TrashItem
+                    card={card}
+                    onRestore={() => service.restore(card.id)}
+                    onRequestHardDelete={() => setConfirmHardDelete(card.id)}
+                  />
+                </li>
+              ))}
+            </ul>
+          </>
         )}
 
         <p className="footnote">

@@ -104,7 +104,7 @@ export default function TimelinePage() {
   return (
     <main id="main" tabIndex={-1} className="page">
       <div className="page-content page-content--wide">
-        <PageHeader title={t('timeline.crumb')} actions={<Tag color="red">{sorted.length}</Tag>} />
+        <PageHeader title={t('timeline.crumb')} />
         {!ready ? (
           <PageLoading />
         ) : sorted.length === 0 ? (
@@ -119,7 +119,12 @@ export default function TimelinePage() {
             </div>
           </UICard>
         ) : (
-          <p className="lede">{t('timeline.lede')}</p>
+          <>
+            <div className="ph-meta">
+              <Tag color="red">{sorted.length}</Tag>
+            </div>
+            <p className="lede">{t('timeline.lede')}</p>
+          </>
         )}
 
         {ready && sorted.length > 0 && (

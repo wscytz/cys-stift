@@ -444,11 +444,23 @@ export default function AskPage() {
   return (
     <main id="main" tabIndex={-1} className="page">
       <div className="page-content page-content--wide">
-        <PageHeader
-          title={t('ask.crumb')}
-          actions={
-            <>
-              {/* 目标画布下拉 + ➕ 新建即出生(Task 4) */}
+        <PageHeader title={t('ask.crumb')} />
+        {!ready ? (
+          <PageLoading />
+        ) : !aiReady ? (
+          <UICard>
+            <div className="page-empty">
+              <BauhausMotif />
+              <p className="eyebrow">{t('ask.crumb')}</p>
+              <h2 className="display-title display-title--lg">{t('ask.title')}</h2>
+              <p className="empty__lede">{t('ask.empty')}</p>
+              <AiSetupCard onGoToSettings={() => router.push('/settings')} />
+            </div>
+          </UICard>
+        ) : (
+          <div className="ask">
+            {/* 目标画布下拉 + ➕ 新建即出生(Task 4):和对话强绑,贴对话区顶部。 */}
+            <div className="ph-meta ask__meta">
               <select
                 className="ask__canvas-select"
                 value={String(targetCanvasId)}
@@ -485,23 +497,7 @@ export default function AskPage() {
                   {t('ask.clear')}
                 </Button>
               )}
-            </>
-          }
-        />
-        {!ready ? (
-          <PageLoading />
-        ) : !aiReady ? (
-          <UICard>
-            <div className="page-empty">
-              <BauhausMotif />
-              <p className="eyebrow">{t('ask.crumb')}</p>
-              <h2 className="display-title display-title--lg">{t('ask.title')}</h2>
-              <p className="empty__lede">{t('ask.empty')}</p>
-              <AiSetupCard onGoToSettings={() => router.push('/settings')} />
             </div>
-          </UICard>
-        ) : (
-          <div className="ask">
             <div className="ask__thread" ref={scrollRef} role="log" aria-live="polite" aria-relevant="additions text" aria-label={t('ask.threadLabel')}>
               {messages.length === 0 && (
                 <div className="ask__empty-state">

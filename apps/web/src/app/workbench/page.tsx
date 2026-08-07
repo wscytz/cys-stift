@@ -110,10 +110,14 @@ export default function WorkbenchPage() {
   return (
     <main id="main" tabIndex={-1} className="page">
       <div className="page-content page-content--wide">
-        <PageHeader
-          title={t('workbench.title')}
-          actions={
-            <>
+        <PageHeader title={t('workbench.title')} />
+        {!ready ? (
+          <PageLoading />
+        ) : cards.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <>
+            <div className="ph-meta">
               <button
                 type="button"
                 className="crumb-link"
@@ -123,37 +127,31 @@ export default function WorkbenchPage() {
                 {t('workbench.backToCanvas')}
               </button>
               <Tag color="blue">{t('workbench.count', { n: String(cards.length) })}</Tag>
-            </>
-          }
-        />
-        {!ready ? (
-          <PageLoading />
-        ) : cards.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <div className="wb-page">
-            <div className={`wb-page__lib${!mobileLibrary && active ? ' wb-page__lib--mobile-hidden' : ''}`}>
-              <WorkbenchBrowser cards={cards} onOpenCard={openCard} />
             </div>
-            {active ? (
-              <div className={`wb-page__editor${mobileLibrary ? ' wb-page__editor--mobile-hidden' : ''}`}>
-                <WorkbenchPanel
-                  card={active}
-                  onSave={wbSave}
-                  onAIAppendNew={onAIAppendNew}
-                  onDirtyChange={setEditorDirty}
-                  onClose={() => { workbenchStore.close(); setMobileLibrary(true); setEditorDirty(false) }}
-                  onBackToList={() => {
-                    setMobileLibrary(true)
-                    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'auto' }))
-                  }}
-                />
-                <MinimapPreview host={canvasPreviewHost} activeElementId={String(active.id)} />
+            <div className="wb-page">
+              <div className={`wb-page__lib${!mobileLibrary && active ? ' wb-page__lib--mobile-hidden' : ''}`}>
+                <WorkbenchBrowser cards={cards} onOpenCard={openCard} />
               </div>
-            ) : (
-              <div className="wb-page__empty">{t('workbench.selectHint')}</div>
-            )}
-          </div>
+              {active ? (
+                <div className={`wb-page__editor${mobileLibrary ? ' wb-page__editor--mobile-hidden' : ''}`}>
+                  <WorkbenchPanel
+                    card={active}
+                    onSave={wbSave}
+                    onAIAppendNew={onAIAppendNew}
+                    onDirtyChange={setEditorDirty}
+                    onClose={() => { workbenchStore.close(); setMobileLibrary(true); setEditorDirty(false) }}
+                    onBackToList={() => {
+                      setMobileLibrary(true)
+                      requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'auto' }))
+                    }}
+                  />
+                  <MinimapPreview host={canvasPreviewHost} activeElementId={String(active.id)} />
+                </div>
+              ) : (
+                <div className="wb-page__empty">{t('workbench.selectHint')}</div>
+              )}
+            </div>
+          </>
         )}
       </div>
 

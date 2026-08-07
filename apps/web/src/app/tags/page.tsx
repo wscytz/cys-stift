@@ -41,13 +41,18 @@ export default function TagsPage() {
   return (
     <main id="main" tabIndex={-1} className="page">
       <div className="page-content page-content--wide">
-        <PageHeader title={t('tags.title')} actions={<Tag color="blue">{t('tags.count', { n: String(countTaggedCards(cards)) })}</Tag>} />
+        <PageHeader title={t('tags.title')} />
         {!ready ? (
           <PageLoading />
         ) : !hasTags ? (
           <EmptyState />
         ) : (
-          <TagManagement cards={cards} onApplyChanges={applyTagChanges} />
+          <>
+            <div className="ph-meta">
+              <Tag color="blue">{t('tags.count', { n: String(countTaggedCards(cards)) })}</Tag>
+            </div>
+            <TagManagement cards={cards} onApplyChanges={applyTagChanges} />
+          </>
         )}
 
         <p className="footnote">

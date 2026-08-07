@@ -279,73 +279,67 @@ export default function InboxPage() {
         id={`tabpanel-${view}`}
         aria-labelledby={`tab-${view}`}
       >
-        <PageHeader
-          title={t('inbox.crumb')}
-          actions={
-            <>
-              <div role="tablist" aria-label={t('inbox.crumb')} className="tablist">
-                <button
-                  type="button"
-                  role="tab"
-                  id="tab-inbox"
-                  aria-selected={view === 'inbox'}
-                  tabIndex={view === 'inbox' ? 0 : -1}
-                  className={`tab ${view === 'inbox' ? 'tab--active' : ''}`}
-                  onClick={() => setView('inbox')}
-                  onKeyDown={(e) => {
-                    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-                      e.preventDefault()
-                      const next = view === 'inbox' ? 'archived' : 'inbox'
-                      setView(next)
-                      // Move focus to the newly active tab (roving tabindex).
-                      requestAnimationFrame(() => {
-                        document.getElementById(`tab-${next}`)?.focus()
-                      })
-                    }
-                  }}
-                >
-                  {t('inbox.tab.inbox')}
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  id="tab-archived"
-                  aria-selected={view === 'archived'}
-                  tabIndex={view === 'archived' ? 0 : -1}
-                  className={`tab ${view === 'archived' ? 'tab--active' : ''}`}
-                  onClick={() => setView('archived')}
-                  onKeyDown={(e) => {
-                    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-                      e.preventDefault()
-                      const next = view === 'inbox' ? 'archived' : 'inbox'
-                      setView(next)
-                      requestAnimationFrame(() => {
-                        document.getElementById(`tab-${next}`)?.focus()
-                      })
-                    }
-                  }}
-                >
-                  {t('inbox.tab.archived')}
-                </button>
-              </div>
-              <Tag color={view === 'inbox' ? 'red' : 'blue'}>
-                {view === 'inbox' ? inbox.length : archived.length}
-              </Tag>
-              <button
-                type="button"
-                className="tb-snap"
-                onClick={findDuplicates}
-                disabled={visible.length < 2}
-                title={t('inbox.dup.title')}
-              >
-                {t('inbox.dup.title')}
-                {dupGroups.length > 0 && (
-                  <Tag color="yellow">{dupGroups.length}</Tag>
-                )}
-              </button>
-            </>
-          }
-        />
+        <PageHeader title={t('inbox.crumb')} />
+        <div className="ph-meta" role="tablist" aria-label={t('inbox.crumb')}>
+          <button
+            type="button"
+            role="tab"
+            id="tab-inbox"
+            aria-selected={view === 'inbox'}
+            tabIndex={view === 'inbox' ? 0 : -1}
+            className={`tab ${view === 'inbox' ? 'tab--active' : ''}`}
+            onClick={() => setView('inbox')}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                e.preventDefault()
+                const next = view === 'inbox' ? 'archived' : 'inbox'
+                setView(next)
+                // Move focus to the newly active tab (roving tabindex).
+                requestAnimationFrame(() => {
+                  document.getElementById(`tab-${next}`)?.focus()
+                })
+              }
+            }}
+          >
+            {t('inbox.tab.inbox')}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="tab-archived"
+            aria-selected={view === 'archived'}
+            tabIndex={view === 'archived' ? 0 : -1}
+            className={`tab ${view === 'archived' ? 'tab--active' : ''}`}
+            onClick={() => setView('archived')}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                e.preventDefault()
+                const next = view === 'inbox' ? 'archived' : 'inbox'
+                setView(next)
+                requestAnimationFrame(() => {
+                  document.getElementById(`tab-${next}`)?.focus()
+                })
+              }
+            }}
+          >
+            {t('inbox.tab.archived')}
+          </button>
+          <Tag color={view === 'inbox' ? 'red' : 'blue'}>
+            {view === 'inbox' ? inbox.length : archived.length}
+          </Tag>
+          <button
+            type="button"
+            className="tb-snap"
+            onClick={findDuplicates}
+            disabled={visible.length < 2}
+            title={t('inbox.dup.title')}
+          >
+            {t('inbox.dup.title')}
+            {dupGroups.length > 0 && (
+              <Tag color="yellow">{dupGroups.length}</Tag>
+            )}
+          </button>
+        </div>
         {view === 'inbox' && (
           <CreateCardForm
             ready={ready}

@@ -160,67 +160,61 @@ export default function ArchivePage() {
         id={`tabpanel-${view}`}
         aria-labelledby={`tab-${view}`}
       >
-        <PageHeader
-          title={t('archive.crumb')}
-          actions={
-            <>
-              <div role="tablist" aria-label={t('archive.crumb')} className="tablist">
-                <button
-                  type="button"
-                  role="tab"
-                  id="tab-grid"
-                  aria-selected={view === 'grid'}
-                  tabIndex={view === 'grid' ? 0 : -1}
-                  className={`tab ${view === 'grid' ? 'tab--active' : ''}`}
-                  onClick={() => setView('grid')}
-                  onKeyDown={(e) => {
-                    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-                      e.preventDefault()
-                      const next: View = view === 'grid' ? 'timeline' : 'grid'
-                      setView(next)
-                      requestAnimationFrame(() => {
-                        document.getElementById(`tab-${next}`)?.focus()
-                      })
-                    }
-                  }}
-                >
-                  {t('archive.viewGrid')}
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  id="tab-timeline"
-                  aria-selected={view === 'timeline'}
-                  tabIndex={view === 'timeline' ? 0 : -1}
-                  className={`tab ${view === 'timeline' ? 'tab--active' : ''}`}
-                  onClick={() => setView('timeline')}
-                  onKeyDown={(e) => {
-                    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-                      e.preventDefault()
-                      const next: View = view === 'grid' ? 'timeline' : 'grid'
-                      setView(next)
-                      requestAnimationFrame(() => {
-                        document.getElementById(`tab-${next}`)?.focus()
-                      })
-                    }
-                  }}
-                >
-                  {t('archive.viewTimeline')}
-                </button>
-              </div>
-              <Tag color="blue">{cards.length}</Tag>
-              {selectMode ? (
-                <Button variant="ghost" onClick={exitSelectMode}>
-                  {t('archive.selectNone')}
-                </Button>
-              ) : (
-                <Button variant="ghost" onClick={() => setSelectMode(true)} disabled={cards.length === 0}>
-                  {t('archive.select')}
-                </Button>
-              )}
-            </>
-          }
-        />
+        <PageHeader title={t('archive.crumb')} />
+        <div className="ph-meta" role="tablist" aria-label={t('archive.crumb')}>
+          <button
+            type="button"
+            role="tab"
+            id="tab-grid"
+            aria-selected={view === 'grid'}
+            tabIndex={view === 'grid' ? 0 : -1}
+            className={`tab ${view === 'grid' ? 'tab--active' : ''}`}
+            onClick={() => setView('grid')}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                e.preventDefault()
+                const next: View = view === 'grid' ? 'timeline' : 'grid'
+                setView(next)
+                requestAnimationFrame(() => {
+                  document.getElementById(`tab-${next}`)?.focus()
+                })
+              }
+            }}
+          >
+            {t('archive.viewGrid')}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="tab-timeline"
+            aria-selected={view === 'timeline'}
+            tabIndex={view === 'timeline' ? 0 : -1}
+            className={`tab ${view === 'timeline' ? 'tab--active' : ''}`}
+            onClick={() => setView('timeline')}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                e.preventDefault()
+                const next: View = view === 'grid' ? 'timeline' : 'grid'
+                setView(next)
+                requestAnimationFrame(() => {
+                  document.getElementById(`tab-${next}`)?.focus()
+                })
+              }
+            }}
+          >
+            {t('archive.viewTimeline')}
+          </button>
+          <Tag color="blue">{cards.length}</Tag>
+          {selectMode ? (
+            <Button variant="ghost" onClick={exitSelectMode}>
+              {t('archive.selectNone')}
+            </Button>
+          ) : (
+            <Button variant="ghost" onClick={() => setSelectMode(true)} disabled={cards.length === 0}>
+              {t('archive.select')}
+            </Button>
+          )}
+        </div>
         {!ready ? (
           <PageLoading />
         ) : cards.length === 0 ? (
