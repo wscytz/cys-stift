@@ -450,7 +450,7 @@ export default function AskPage() {
         ) : !aiReady ? (
           <UICard>
             <div className="page-empty">
-              <BauhausMotif />
+              <BauhausMotif size={64} />
               <p className="eyebrow">{t('ask.crumb')}</p>
               <h2 className="display-title display-title--lg">{t('ask.title')}</h2>
               <p className="empty__lede">{t('ask.empty')}</p>
@@ -572,9 +572,11 @@ export default function AskPage() {
           </div>
         )}
 
-        <p className="footnote">
-          <Link href="/" className="footnote__link">← {t('common.home')}</Link>
-        </p>
+        {aiReady && (
+          <p className="footnote">
+            <Link href="/" className="footnote__link">← {t('common.home')}</Link>
+          </p>
+        )}
       </div>
 
       {effectiveDetail && (
@@ -702,8 +704,8 @@ function MessageContent({
 }
 
 const styles = `
-.ask { display: flex; flex-direction: column; gap: var(--space-3); }
-.ask__thread { max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-2); border: var(--border-hairline); border-radius: var(--radius-sm); background: var(--color-white); min-height: 200px; }
+.ask { display: flex; flex-direction: column; gap: var(--space-3); height: calc(100vh - 186px); }
+.ask__thread { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-2); border: var(--border-hairline); border-radius: var(--radius-sm); background: var(--color-white); min-height: 200px; }
 .ask__empty { color: var(--color-gray); font-family: var(--font-mono); font-size: var(--font-size-sm); margin: var(--space-3) auto; max-width: 50ch; text-align: center; line-height: 1.6; }
 .ask__empty-state { display: grid; gap: var(--space-2); justify-items: center; padding: var(--space-3); }
 .ask__starters { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-1); }
