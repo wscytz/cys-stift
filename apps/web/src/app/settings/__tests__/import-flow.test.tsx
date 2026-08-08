@@ -62,7 +62,7 @@ vi.mock('@/components/storage-meter', () => ({ StorageMeter: () => null }))
 vi.mock('@/features/settings/ai-settings-panel', () => ({ AISettingsPanel: () => null }))
 vi.mock('@/features/settings/sample-export-panel', () => ({ SampleExportPanel: () => null }))
 vi.mock('@/features/ai/lab-toggle', () => ({ LabToggle: () => null }))
-vi.mock('@/features/ai/labs-registry', () => ({ LAB_REGISTRY: [] }))
+vi.mock('@/features/ai/labs-registry', () => ({ LAB_REGISTRY: [], useLabEnabled: () => false }))
 vi.mock('@/features/capture/capture-shortcut-settings', () => ({
   CaptureShortcutSettings: () => null,
 }))

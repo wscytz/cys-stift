@@ -13,6 +13,7 @@ import { AISettingsPanel } from '@/features/settings/ai-settings-panel'
 import { SampleExportPanel } from '@/features/settings/sample-export-panel'
 import { LabToggle } from '@/features/ai/lab-toggle'
 import { LAB_REGISTRY } from '@/features/ai/labs-registry'
+import { useCapabilities } from '@/features/capabilities/capability-registry'
 import { CaptureShortcutSettings } from '@/features/capture/capture-shortcut-settings'
 import {
   buildExportPayload,
@@ -173,6 +174,7 @@ export default function SettingsPage() {
           <a href="#settings-ai">{t('settings.ai')}</a>
           <a href="#settings-research">{t('settings.research')}</a>
           <a href="#settings-labs">{t('settings.labs.title')}</a>
+          <a href="#settings-capabilities">{t('settings.capabilities.title')}</a>
         </nav>
         <section className="section" id="settings-data">
           <h2 className="section__h">{t('settings.data')}</h2>
@@ -412,6 +414,38 @@ export default function SettingsPage() {
           ))}
         </section>
 
+        {/* 能力清单(B-5 统一功能管理):核心能力默认开启,可选能力就绪/开关状态 +
+            去开启锚点。单一真相源 CAPABILITY_REGISTRY,加新能力注册一处即自动渲染。 */}
+        <section className="section" id="settings-capabilities">
+          <h2 className="section__h">{t('settings.capabilities.title')}</h2>
+          <p className="section__lede">{t('settings.capabilities.lede')}</p>
+          <dl className="set__capabilities">
+            {useCapabilities().map(({ cap, status }) => (
+              <div key={cap.id}>
+                <dt>
+                  {t(cap.labelKey)}
+                  <span className="mono-label set__capabilities-kind">
+                    {cap.kind === 'core'
+                      ? t('settings.capabilities.kindCore')
+                      : t('settings.capabilities.kindOptional')}
+                  </span>
+                </dt>
+                <dd>
+                  {t(cap.descKey)}
+                  <span className="set__capabilities-status">
+                    <strong>{t(status.noteKey)}</strong>
+                    {status.hintKey && status.hintAnchor && (
+                      <a className="set__capabilities-hint" href={status.hintAnchor}>
+                        {t(status.hintKey)}
+                      </a>
+                    )}
+                  </span>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
         <footer className="footnote">
           <Link href="/" className="footnote__link">← {t('common.home')}</Link>
           {' · '}
@@ -533,6 +567,17 @@ export default function SettingsPage() {
 .set__labs-status dd { margin: 0; color: var(--color-gray); font-size: var(--font-size-sm); line-height: 1.5; }
 .set__lab-item { display: flex; gap: var(--space-2); align-items: flex-start; }
 .set__lab-warn { display: block; margin-top: 2px; color: var(--color-red); }
+/* 能力清单区:dt 能力名 + kind 标签,dd 描述 + 状态 + 去开启锚点。 */
+.set__capabilities { margin: var(--space-2) 0 0; display: grid; gap: var(--space-2); }
+.set__capabilities dl { margin: 0; display: grid; gap: var(--space-2); }
+.set__capabilities dl > div { display: grid; grid-template-columns: minmax(160px, 0.4fr) minmax(0, 1fr); gap: var(--space-2); padding-top: var(--space-2); border-top: var(--border-hairline); }
+.set__capabilities dt { display: flex; align-items: baseline; gap: var(--space-1); font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); }
+.set__capabilities-kind { opacity: 0.6; }
+.set__capabilities dd { margin: 0; color: var(--color-gray); font-size: var(--font-size-sm); line-height: 1.5; display: flex; flex-direction: column; gap: 2px; }
+.set__capabilities-status { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; }
+.set__capabilities-status strong { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black); }
+.set__capabilities-hint { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; }
+@media (max-width: 560px) { .set__capabilities dl > div { grid-template-columns: 1fr; gap: var(--space-quarter); } }
 @media (max-width: 560px) {
   .set__labs-status dl > div { grid-template-columns: 1fr; gap: var(--space-quarter); }
 }
