@@ -41,7 +41,6 @@ jobs:
           echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Checkout private docs repo
-        if: secrets.DOCS_SYNC_TOKEN != ''
         uses: actions/checkout@v5
         with:
           repository: wscytz/cys-stift-docs
@@ -49,7 +48,6 @@ jobs:
           token: ${{ secrets.DOCS_SYNC_TOKEN }}
 
       - name: Sync STATE.md version line
-        if: secrets.DOCS_SYNC_TOKEN != ''
         working-directory: cys-stift-docs
         run: |
           args="${{ steps.ver.outputs.version }}"
@@ -60,7 +58,6 @@ jobs:
           node scripts/sync-state-version.mjs $args
 
       - name: Commit + push (if changed)
-        if: secrets.DOCS_SYNC_TOKEN != ''
         working-directory: cys-stift-docs
         run: |
           git config user.name "github-actions[bot]"
