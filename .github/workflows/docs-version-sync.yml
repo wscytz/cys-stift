@@ -40,7 +40,16 @@ jobs:
           echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
           echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
 
+      # DOCS_SYNC_TOKEN 未配置时,私仓三步(checkout/sync/commit)整体跳过 → workflow 仍绿
+      # (release 时可在私仓本地 node scripts/sync-state-version.mjs 兜底)。不用
+      # `if: secrets.X != ''` —— 实测会让 workflow 文件校验失败(2026-08-08 v1.2.0),
+      # 改由 step output 门控。
+      - name: Check DOCS_SYNC_TOKEN presence
+        id: check-token
+        run: echo "has_token=${{ secrets.DOCS_SYNC_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout private docs repo
+        if: steps.check-token.outputs.has_token == 'true'
         uses: actions/checkout@v5
         with:
           repository: wscytz/cys-stift-docs
@@ -48,6 +57,7 @@ jobs:
           token: ${{ secrets.DOCS_SYNC_TOKEN }}
 
       - name: Sync STATE.md version line
+        if: steps.check-token.outputs.has_token == 'true'
         working-directory: cys-stift-docs
         run: |
           args="${{ steps.ver.outputs.version }}"
@@ -58,6 +68,7 @@ jobs:
           node scripts/sync-state-version.mjs $args
 
       - name: Commit + push (if changed)
+        if: steps.check-token.outputs.has_token == 'true'
         working-directory: cys-stift-docs
         run: |
           git config user.name "github-actions[bot]"
