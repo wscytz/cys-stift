@@ -218,7 +218,16 @@ export default function AskPage() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const messagesRef = useRef(messages)
   messagesRef.current = messages
+  // 对抗测试 2026-08-08 复现的根因:挂载首帧 messages 是 [] (SSR-safe,靠 effect 加载),
+  // 若此时 save 定时器就排一次,dev StrictMode 双挂载的第一次 unmount cleanup 会把
+  // 「空 messages」flush 成 [] → 覆盖已持久化的对话 → 切页回来记忆没了。
+  // 修:跳过首次渲染的 save(空占位不该落盘);load 应用后的真实变化才排保存。
+  const skipInitialSave = useRef(true)
   useEffect(() => {
+    if (skipInitialSave.current) {
+      skipInitialSave.current = false
+      return
+    }
     if (saveTimerRef.current) return // 已有 pending 写入,等它跑(覆盖最新 messages)
     saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null
