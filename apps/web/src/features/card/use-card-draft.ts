@@ -60,7 +60,7 @@ export interface CardDraftApi {
   setDraft: Dispatch<SetStateAction<Record<string, unknown>>>
   /** 是否有未保存改动(任一 field 草稿 ≠ Card 原值)。 */
   dirty: boolean
-  /** 构造 UpdateCardPatch(收集所有 field 的 toPayload)。壳的 save 调。 */
+  /** 构造 UpdateCardPatch(只收集脏字段 toPayload;未改字段不进 patch → 不误伤 links 富字段等)。壳的 save 调。 */
   toPatch: () => UpdateCardPatch
   /** 重置草稿回 Card(壳在切卡 / 外部更新时调)。 */
   reset: () => void
@@ -91,14 +91,10 @@ export function useCardDraft(
     [draft, card, fields],
   )
 
-  const toPatch = useCallback(() => {
-    const patch: Record<string, unknown> = {}
-    for (const f of fields) {
-      patch[f.key as string] = f.toPayload(draft[f.key as string] as never)
-    }
-    return patch as UpdateCardPatch
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft, fields])
+  const toPatch = useCallback(
+    () => buildPatch(card, draft, fields),
+    [card, draft, fields],
+  )
 
   const setField = useCallback(
     (key: keyof UpdateCardPatch, value: unknown) =>
@@ -161,4 +157,30 @@ export function isDirty(
     const orig = f.toDraft(card)
     return !(f.equals ?? strictEquals)(cur, orig)
   })
+}
+
+/**
+ * buildPatch — 纯函数版 toPatch(给测试 + 壳直接用)。
+ *
+ * per-field dirty 门控:只把【脏】字段(草稿 ≠ Card 原值)的 toPayload 放进 patch,
+ * 未改字段不进 patch → service.update 不碰它们。这样编辑 body 不会触发 links 的
+ * 有损重建(draftLinksToPayload 只留 {url, fetchedAt: now},丢 title/ogImage)抹掉
+ * 富字段 —— 与 v8-fields.sameLinkUrls「相同 URL 不重写,保住已抓 title」同款语义。
+ *
+ * 不变式:dirty 为真时 buildPatch 必含 ≥1 字段(dirty 的定义就是 some(!eq),
+ * buildPatch 收集的正是这些 !eq 字段),故 autosave/确认门不会发出空 patch。
+ */
+export function buildPatch(
+  card: Card,
+  draft: Record<string, unknown>,
+  fields: CardDraftField<unknown>[],
+): UpdateCardPatch {
+  const patch: Record<string, unknown> = {}
+  for (const f of fields) {
+    const cur = draft[f.key as string]
+    const orig = f.toDraft(card)
+    if ((f.equals ?? strictEquals)(cur, orig)) continue
+    patch[f.key as string] = f.toPayload(cur as never)
+  }
+  return patch as UpdateCardPatch
 }

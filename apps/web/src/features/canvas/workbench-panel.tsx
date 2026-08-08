@@ -295,7 +295,7 @@ export function WorkbenchPanel({
               instruction={aiView === 'edit' ? editInstruction : undefined}
               onClose={() => setAiView(null)}
               onReplace={(newBody) => {
-                // AI 替换正文:落全字段 patch(其他字段跟当前草稿,AI 只改 body)+ 更新草稿 body。
+                // AI 替换正文:落脏字段 patch(未改字段不进 patch,AI 只改 body)+ 更新草稿 body。
                 onSave(card.id, { ...toPatch(), body: newBody })
                 setField('body', newBody)
                 setAiView(null)
