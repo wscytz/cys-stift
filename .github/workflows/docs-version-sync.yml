@@ -1,0 +1,67 @@
+name: docs-version-sync
+
+# Release tag 一发布就把私有 STATE.md 的版本行同步到代码真源(package.json 版本),
+# 消除「STATE 手抄版本号 → 必漂 → docs-truth 守卫兜底失败」(2026-08-08 兜底时已漏
+# 1.1.1-.4 四个 stable)。脚本在私仓 scripts/sync-state-version.mjs;根因与方案见
+# 私仓决策档 docs/decisions/2026-08-07-structured-fields-registry.md 后记。
+#
+# 前置(必做,否则本 workflow 的私仓 checkout 会失败):
+#   公开仓 Settings → Secrets and variables → Actions → New repository secret
+#   名字 DOCS_SYNC_TOKEN = 一个 PAT(classic:repo 权限;或 fine-grained:
+#   contents:write on wscytz/cys-stift-docs)。未配时,STATE 仍可由 release 前
+#   在私仓本地 `node scripts/sync-state-version.mjs <version> [--stable-tag v...]` 兜底。
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout public code (version truth)
+        uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Read released version + tag
+        id: ver
+        run: |
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout private docs repo
+        uses: actions/checkout@v5
+        with:
+          repository: wscytz/cys-stift-docs
+          path: cys-stift-docs
+          token: ${{ secrets.DOCS_SYNC_TOKEN }}
+
+      - name: Sync STATE.md version line
+        working-directory: cys-stift-docs
+        run: |
+          args="${{ steps.ver.outputs.version }}"
+          if [[ ! "${{ steps.ver.outputs.tag }}" == *-* ]]; then
+            # 稳定 tag(无 -,如 v1.1.4)才同步「已发布稳定版」行;preview 不动它
+            args="$args --stable-tag ${{ steps.ver.outputs.tag }}"
+          fi
+          node scripts/sync-state-version.mjs $args
+
+      - name: Commit + push (if changed)
+        working-directory: cys-stift-docs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/STATE.md
+          if git diff --cached --quiet; then
+            echo "STATE.md 无变化,跳过 push"
+          else
+            git commit -m "docs(state): 自动同步版本 → ${{ steps.ver.outputs.tag }}"
+            git push
+          fi
