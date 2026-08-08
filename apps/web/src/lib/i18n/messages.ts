@@ -667,6 +667,10 @@ export const messages = {
   'canvas.rail.shortcuts': { zh: '快捷键', en: 'Shortcuts' },
   'canvas.more': { zh: '更多', en: 'More' },
   'canvas.rail.more': { zh: '更多', en: 'More' },
+  'canvas.rail.unplaced': { zh: '未放', en: 'Unplaced' },
+  'canvas.unplaced': { zh: '未放置', en: 'Unplaced' },
+  'canvas.unplaced.empty': { zh: '没有未放置的卡片', en: 'No unplaced cards' },
+  'canvas.unplaced.place': { zh: '放置到画布', en: 'Place on canvas' },
 
   /* ── Archive ── */
   'archive.crumb': { zh: '归档', en: 'archive' },

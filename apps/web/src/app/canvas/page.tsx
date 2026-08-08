@@ -79,7 +79,10 @@ import {
   syncCardsToEditor,
   updateCardShape,
   createCardOnCanvas,
+  focusCanvasItem,
 } from '@/features/canvas/canvas-binding'
+import { planInboxCanvasPlacements } from '@/features/canvas/canvas-placement'
+import { CanvasUnplacedPanel } from '@/features/canvas/unplaced-panel'
 import { canvasStore, useCanvases, getSnapshot as getCanvasesSnapshot } from '@/lib/canvas-store'
 import { canvasViewStore } from '@/lib/canvas-view-store'
 
@@ -156,6 +159,7 @@ export default function CanvasPage() {
   const [exportOpen, setExportOpen] = useState(false)
   const [outlineOpen, setOutlineOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [unplacedOpen, setUnplacedOpen] = useState(false)
   const [companionOpen, setCompanionOpen] = useState(false)
   const [proposalReview, setProposalReview] = useState<{ envelope: import('@/features/ai/coauthor/proposal-contract').ProposalEnvelopeV1; sources: import('@/features/ai/coauthor/working-set-types').SourceRefV1[]; review: import('@/features/ai/coauthor/proposal-contract').ProposalReviewRecordV1 } | null>(null)
   const [proposalPlan, setProposalPlan] = useState<ProposalCommitPlanV1 | null>(null)
@@ -177,6 +181,35 @@ export default function CanvasPage() {
     () => service.listOnCanvas(activeCanvasId).filter((c) => !c.archived && !c.deletedAt).length,
     [service, activeCanvasId, snap],
   )
+  // B-4「canvas 为家」安全增量:未放置面板数据源(inbox 谓词 = 无 canvasPosition、
+  // 未归档、未软删)。canvas 成为看「已放 + 未放」的唯一主场,inbox 缩为纯捕获整理。
+  const unplaced = useMemo(
+    () => snap.cards.filter((c) => !c.canvasPosition && !c.archived && !c.deletedAt),
+    [snap],
+  )
+
+  // 未放置面板:「放置」到当前画布。collision-aware 自动排版(复用 inbox 批量同款),
+  // 放完等 snap→syncCardsToEditor 把它 upsert 进 host,再居中选中。
+  const handlePlaceUnplaced = (card: Card) => {
+    const targetCanvasId = activeCanvasId ?? DEFAULT_CANVAS_ID
+    const existing = service.listOnCanvas(targetCanvasId)
+    const [placement] = planInboxCanvasPlacements(
+      [String(card.id)],
+      existing,
+      targetCanvasId,
+    )
+    if (!placement) return
+    const moved = service.moveToCanvas(card.id, placement.position)
+    if (moved === false) {
+      pushToast({ kind: 'info', message: t('storage.quotaExceeded') })
+      return
+    }
+    if (adapter && canvasElRef.current) {
+      window.setTimeout(() => {
+        focusCanvasItem(adapter, canvasElRef.current!, String(card.id))
+      }, 0)
+    }
+  }
 
   const toggleSnap = useCallback(() => {
     const adapter = handle.current.adapter
@@ -1340,6 +1373,7 @@ ${formatted}`
           outlineOpen={outlineOpen}
           companionOpen={companionOpen}
           searchOpen={searchOpen}
+          unplacedOpen={unplacedOpen}
           canUndo={canUndo}
           canRedo={canRedo}
           canRename={!!activeCanvas}
@@ -1360,6 +1394,7 @@ ${formatted}`
           onOutline={() => { setOutlineOpen((o) => !o); setCompanionOpen(false) }}
           onCompanion={() => { setCompanionOpen((o) => !o); setOutlineOpen(false) }}
           onSearch={() => { setSearchOpen((o) => !o); setOutlineOpen(false); setCompanionOpen(false) }}
+          onUnplaced={() => { setUnplacedOpen((o) => !o); setOutlineOpen(false); setCompanionOpen(false); setSearchOpen(false) }}
           onOverview={() => setOverviewOpen(true)}
           onDsl={() => { setDslSeedText(null); setDslOpen(true) }}
           onExport={() => setExportOpen(true)}
@@ -1373,6 +1408,13 @@ ${formatted}`
             canvasEl={canvasElRef.current}
             getCardTitle={(id) => service.get(id as CardId)?.title}
             getEndpointTitle={(id) => service.get(id as CardId)?.title}
+          />
+        )}
+        {unplacedOpen && (
+          <CanvasUnplacedPanel
+            cards={unplaced}
+            onPlace={handlePlaceUnplaced}
+            onClose={() => setUnplacedOpen(false)}
           />
         )}
         {companionOpen && (
@@ -1730,6 +1772,7 @@ function CanvasSideRail({
   outlineOpen,
   companionOpen,
   searchOpen,
+  unplacedOpen,
   canUndo,
   canRedo,
   canRename,
@@ -1750,6 +1793,7 @@ function CanvasSideRail({
   onOutline,
   onCompanion,
   onSearch,
+  onUnplaced,
   onDsl,
   onOverview,
   onExport,
@@ -1764,6 +1808,7 @@ function CanvasSideRail({
   outlineOpen: boolean
   companionOpen: boolean
   searchOpen: boolean
+  unplacedOpen: boolean
   canUndo: boolean
   canRedo: boolean
   canRename: boolean
@@ -1784,6 +1829,7 @@ function CanvasSideRail({
   onOutline: () => void
   onCompanion: () => void
   onSearch: () => void
+  onUnplaced: () => void
   onOverview: () => void
   onDsl: () => void
   onExport: () => void
@@ -1828,6 +1874,8 @@ function CanvasSideRail({
       <RailButton label={t('canvas.outline')} short={t('canvas.rail.outline')} disabled={!adapterReady} onClick={onOutline} pressed={outlineOpen} icon="outline" />
       <RailButton label={t('canvas.overview')} short={t('canvas.rail.overview')} disabled={!adapterReady} onClick={onOverview} icon="overview" />
       <RailButton label={t('canvas.search.title')} short={t('canvas.rail.search')} disabled={!adapterReady} onClick={onSearch} pressed={searchOpen} icon="search" />
+      {/* B-4「canvas 为家」:未放置面板入口 —— canvas 看「已放 + 未放」,inbox 缩为纯捕获整理。 */}
+      <RailButton label={t('canvas.unplaced')} short={t('canvas.rail.unplaced')} disabled={!adapterReady} onClick={onUnplaced} pressed={unplacedOpen} icon="inbox" />
       {/* 转义(DSL)是核心卖点,提一级独立按钮(双向:编辑画布文本/导出 DSL)。
           导出菜单里保留同名项(作为「导出 DSL」入口),两条路都通 DslDialog。 */}
       <RailButton label={t('canvas.dslTitle')} short={t('canvas.rail.dsl')} disabled={!adapterReady} onClick={onDsl} icon="dsl" />

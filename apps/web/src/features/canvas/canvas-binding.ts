@@ -23,7 +23,7 @@ import type {
   CardService,
   CaptureSource,
 } from '@cys-stift/domain'
-import type { CanvasElement, CanvasHost } from '@cys-stift/canvas-engine'
+import { elementCenter, type CanvasElement, type CanvasHost } from '@cys-stift/canvas-engine'
 
 const WRITEBACK_DEBOUNCE_MS = 300
 const DEFAULT_W = 240
@@ -222,6 +222,24 @@ export function syncCardsToEditor(
       if (!wantedIds.has(el.id)) host.remove(el.id)
     }
   })
+}
+
+/** Center the canvas on a card element's page-coord center and select it。
+ *  「未放置」面板放置后定位(与 outline focusItem 同款,提为共享 helper)。 */
+export function focusCanvasItem(
+  host: CanvasHost,
+  canvasEl: HTMLCanvasElement,
+  itemId: string,
+): void {
+  const el = host.getElement(itemId)
+  if (!el) return
+  const c = elementCenter(el)
+  const view = host.getView()
+  const zoom = view.zoom || 1
+  const cx = canvasEl.clientWidth / 2
+  const cy = canvasEl.clientHeight / 2
+  host.setView({ ...view, panX: cx - c.x * zoom, panY: cy - c.y * zoom })
+  host.setSelectedIds([itemId])
 }
 
 /**

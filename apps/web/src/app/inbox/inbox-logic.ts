@@ -4,6 +4,11 @@ import type {
   CanvasPosition,
   CreateCardInput,
 } from '@cys-stift/domain'
+// B-4:画布放置规划提到 features/canvas(未放置面板复用 collision-aware 排版),
+// 这里 re-export 保持 inbox page / inbox-logic.test 的既有 import 不破。
+export { nextCanvasZ, planInboxCanvasPlacements } from '@/features/canvas/canvas-placement'
+// applyInboxCanvasPlacements 的签名仍用该类型(re-export 不建本地绑定,需显式 import)。
+import type { InboxCanvasPlacement } from '@/features/canvas/canvas-placement'
 
 /** A card placement read from an inbox `[card ... create]` DSL line. */
 export interface InboxCardPlacement {
@@ -102,23 +107,6 @@ export function sortCardsByCapturedAtDesc<T extends Pick<Card, 'capturedAt'>>(
     .map(({ card }) => card)
 }
 
-/** Return the first free z layer, ignoring malformed persisted values. */
-export function nextCanvasZ(
-  cards: readonly Pick<Card, 'canvasPosition'>[],
-): number {
-  let max = Number.NEGATIVE_INFINITY
-  for (const card of cards) {
-    const z = card.canvasPosition?.z
-    if (typeof z === 'number' && Number.isFinite(z)) max = Math.max(max, z)
-  }
-  return Number.isFinite(max) ? max + 1 : 0
-}
-
-export interface InboxCanvasPlacement {
-  cardId: string
-  position: CanvasPosition
-}
-
 export interface InboxCanvasUndoResult {
   restored: number
   failed: number
@@ -129,54 +117,6 @@ export interface InboxCanvasMoveResult {
   movedIds: string[]
   failedIds: string[]
   undo: () => InboxCanvasUndoResult
-}
-
-const BATCH_CARD_W = 200
-const BATCH_CARD_H = 80
-const BATCH_ORIGIN_X = 100
-const BATCH_ORIGIN_Y = 100
-const BATCH_STEP_X = 240
-const BATCH_STEP_Y = 120
-const BATCH_COLUMNS = 5
-
-/**
- * Allocate a deterministic grid for an inbox batch. Existing cards are
- * treated as occupied rectangles, so the first free slot is chosen instead
- * of stacking every fifth card at the same coordinates.
- */
-export function planInboxCanvasPlacements(
-  cardIds: readonly string[],
-  existing: readonly Pick<Card, 'canvasPosition'>[],
-  canvasId: CanvasId,
-): InboxCanvasPlacement[] {
-  const occupied = existing
-    .map((card) => card.canvasPosition)
-    .filter((position): position is CanvasPosition => isUsablePosition(position))
-  const startZ = nextCanvasZ(existing)
-  const placements: InboxCanvasPlacement[] = []
-  let slot = 0
-
-  for (const cardId of cardIds) {
-    while (true) {
-      const column = slot % BATCH_COLUMNS
-      const row = Math.floor(slot / BATCH_COLUMNS)
-      const candidate: CanvasPosition = {
-        canvasId,
-        x: BATCH_ORIGIN_X + column * BATCH_STEP_X,
-        y: BATCH_ORIGIN_Y + row * BATCH_STEP_Y,
-        w: BATCH_CARD_W,
-        h: BATCH_CARD_H,
-        z: startZ + placements.length,
-      }
-      slot++
-      if (occupied.every((other) => !rectanglesOverlap(candidate, other))) {
-        occupied.push(candidate)
-        placements.push({ cardId, position: candidate })
-        break
-      }
-    }
-  }
-  return placements
 }
 
 /**
@@ -229,27 +169,6 @@ export function applyInboxCanvasPlacements(
     failedIds,
     undo,
   }
-}
-
-function isUsablePosition(position: CanvasPosition | undefined): position is CanvasPosition {
-  return Boolean(
-    position &&
-      Number.isFinite(position.x) &&
-      Number.isFinite(position.y) &&
-      Number.isFinite(position.w) &&
-      Number.isFinite(position.h) &&
-      position.w > 0 &&
-      position.h > 0,
-  )
-}
-
-function rectanglesOverlap(a: CanvasPosition, b: CanvasPosition): boolean {
-  return (
-    a.x < b.x + b.w &&
-    a.x + a.w > b.x &&
-    a.y < b.y + b.h &&
-    a.y + a.h > b.y
-  )
 }
 
 function finiteDateTime(value: Date): number {
