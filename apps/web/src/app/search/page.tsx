@@ -15,6 +15,13 @@ import { liveEdgesOnly } from '@/features/graph/aggregate-edges'
 import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
 import { openCardFromOverview } from '@/features/card/card-reentry'
 import { readableBodySnippet } from './search-result'
+import { SearchFilters } from '@/features/search/search-filters'
+import {
+  applySearchFilters,
+  collectTagValues,
+  DEFAULT_SEARCH_FILTER,
+  type SearchFilter,
+} from '@/features/search/search-filter'
 
 /**
  * /search — v0.22.5-search restore / P11 v0.36.0 enhance.
@@ -37,6 +44,8 @@ export default function SearchPage() {
   )
   const [query, setQuery] = useState('')
   const [detail, setDetail] = useState<{ card: Card } | null>(null)
+  // B-3「收敛找回」:筛选框架(状态 / tags any-match / 时间),让搜索成为找回的唯一主场。
+  const [filter, setFilter] = useState<SearchFilter>(DEFAULT_SEARCH_FILTER)
   // BUG-1 fix: detail 是 local state,跨 tab 软删/归档后 useDb re-render 但 detail 不清
   // → modal 残留幽灵卡。从 store 实时取卡 + 过滤软删,变 null 则 modal 自动卸载
   // (与 canvas/timeline/graph effectiveDetail 同口径)。
@@ -48,10 +57,22 @@ export default function SearchPage() {
     : null
 
   const allCards = useMemo(() => service.listAll(), [snap, service])
+  // B-3「收敛找回」:搜索页承载找回的全部维度。活卡(排除软删)先过筛选框架
+  // (状态 / tags any-match / 时间),再走全文 searchCards —— 文本与筛选 AND。
+  const liveCards = useMemo(() => allCards.filter((c) => !c.deletedAt), [allCards])
+  const filteredCards = useMemo(
+    () => applySearchFilters(liveCards, filter, Date.now()),
+    [liveCards, filter],
+  )
+  const tagOptions = useMemo(() => collectTagValues(liveCards), [liveCards])
+  const hasActiveFilter =
+    filter.tags.length > 0 || filter.status !== 'all' || filter.timeRange !== 'all'
+  // 有文本或有筛选才展示结果;两者皆空显示「输入关键词开始搜索」提示。
+  const showResults = query.trim() !== '' || hasActiveFilter
   // useDeferredValue:input 保持即时响应,搜索计算退到空闲帧 —— 500 卡时不阻塞每次按键。
   const deferred = useDeferredValue(query)
   const results = useMemo(() => {
-    const matched = searchCards(allCards, deferred)
+    const matched = searchCards(filteredCards, deferred)
     // G1 (v0.25.1): lift pinned matches to the front. We preserve the
     // score ordering within each group (pinned first, then unpinned).
     const pinned: typeof matched = []
@@ -61,7 +82,7 @@ export default function SearchPage() {
       else rest.push(r)
     }
     return [...pinned, ...rest]
-  }, [allCards, deferred])
+  }, [filteredCards, deferred])
 
   return (
     <main id="main" tabIndex={-1} className="page">
@@ -77,12 +98,16 @@ export default function SearchPage() {
           onChange={(e) => setQuery(e.target.value)}
         />
 
+        <SearchFilters filter={filter} onChange={setFilter} tags={tagOptions} />
+
         {!ready ? (
           <PageLoading />
-        ) : query.trim() === '' ? (
+        ) : !showResults ? (
           <p className="search-hint">{t('search.empty')}</p>
         ) : results.length === 0 ? (
-          <p className="search-hint">{t('search.noMatch', { q: query })}</p>
+          <p className="search-hint">
+            {query.trim() !== '' ? t('search.noMatch', { q: query }) : t('search.noFilterMatch')}
+          </p>
         ) : (
           <>
             <p className="mono-label">{t('search.resultsCount', { n: results.length })}</p>

@@ -895,6 +895,18 @@ export const messages = {
   'search.empty': { zh: '输入关键词开始搜索。', en: 'Type to search.' },
   'search.noMatch': { zh: '未找到匹配 "{q}" 的卡片。', en: 'No cards match "{q}".' },
   'search.resultsCount': { zh: '找到 {n} 个结果', en: '{n} results' },
+  'search.status.all': { zh: '全部', en: 'All' },
+  'search.status.active': { zh: '收件箱', en: 'Inbox' },
+  'search.status.archived': { zh: '归档', en: 'Archived' },
+  'search.time.all': { zh: '全部时间', en: 'Any time' },
+  'search.time.7d': { zh: '近 7 天', en: 'Last 7 days' },
+  'search.time.30d': { zh: '近 30 天', en: 'Last 30 days' },
+  'search.time.90d': { zh: '近 90 天', en: 'Last 90 days' },
+  'search.filter.status': { zh: '状态', en: 'Status' },
+  'search.filter.time': { zh: '时间', en: 'Time' },
+  'search.filter.tags': { zh: '标签', en: 'Tags' },
+  'search.clearFilters': { zh: '清除筛选', en: 'Clear filters' },
+  'search.noFilterMatch': { zh: '没有符合筛选条件的卡片。', en: 'No cards match the filters.' },
 
   /* ── Design page ── */
   'design.toolbar.canvas': { zh: '画布 · 灵感墙', en: 'Canvas · inspiration wall' },
