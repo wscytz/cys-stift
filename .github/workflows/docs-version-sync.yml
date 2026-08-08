@@ -29,6 +29,10 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+          # 本 workflow 只跑 node 脚本,不装依赖;setup-node@v5.4+ 检测到 packageManager
+          # 字段会默认开 package-manager-cache 并尝试跑 pnpm(runner 无 pnpm → 挂),
+          # 显式关掉。见 2026-08-08 v1.2.0 CI 实测。可考虑 Corepack 装 pnpm 替代。
+          package-manager-cache: false
 
       - name: Read released version + tag
         id: ver
@@ -37,6 +41,7 @@ jobs:
           echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Checkout private docs repo
+        if: secrets.DOCS_SYNC_TOKEN != ''
         uses: actions/checkout@v5
         with:
           repository: wscytz/cys-stift-docs
@@ -44,6 +49,7 @@ jobs:
           token: ${{ secrets.DOCS_SYNC_TOKEN }}
 
       - name: Sync STATE.md version line
+        if: secrets.DOCS_SYNC_TOKEN != ''
         working-directory: cys-stift-docs
         run: |
           args="${{ steps.ver.outputs.version }}"
@@ -54,6 +60,7 @@ jobs:
           node scripts/sync-state-version.mjs $args
 
       - name: Commit + push (if changed)
+        if: secrets.DOCS_SYNC_TOKEN != ''
         working-directory: cys-stift-docs
         run: |
           git config user.name "github-actions[bot]"
