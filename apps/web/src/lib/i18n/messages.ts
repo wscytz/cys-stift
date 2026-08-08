@@ -26,6 +26,7 @@ export const messages = {
   'nav.group.capture': { zh: '捕获与创作', en: 'Capture and create' },
   'nav.group.think': { zh: '思考', en: 'Think' },
   'nav.group.find': { zh: '查找与整理', en: 'Find and organize' },
+  'nav.group.views': { zh: '更多视图', en: 'More views' },
   'nav.group.system': { zh: '系统', en: 'System' },
   'nav.homeNav': { zh: '主页导航', en: 'Home navigation' },
   'nav.tags': { zh: '标签', en: 'Tags' },

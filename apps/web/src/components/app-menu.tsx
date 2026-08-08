@@ -85,11 +85,15 @@ export function AppMenu() {
       { href: '/ask', key: 'nav.ask' },
       { href: '/graph', key: 'nav.graph' },
     ] },
+    // B-3「收敛找回」:search 是唯一主找回入口(含 tag/时间/状态筛选);archive/tags/
+    // timeline 是次级视图(专有角色:生命周期/治理/时间浏览),不再与 search 平级。
     { label: 'nav.group.find', entries: [
+      { href: '/search', key: 'nav.search' },
+    ] },
+    { label: 'nav.group.views', entries: [
       { href: '/archive', key: 'nav.archive' },
       { href: '/tags', key: 'nav.tags' },
       { href: '/timeline', key: 'nav.timeline' },
-      { href: '/search', key: 'nav.search' },
       { href: '/trash', key: 'nav.trash' },
     ] },
     { label: 'nav.group.system', entries: [
