@@ -74,25 +74,31 @@ describe('saveConversation — quota silent', () => {
   })
 })
 
-describe('loadConversation — streaming-revival guard', () => {
-  it('clears streaming:true to false on load', () => {
+describe('saveConversation — 只持久化完整回合(对抗测试 B2 修复)', () => {
+  it('单条 streaming 半截回答不落盘(否则 reload 后看起来已答完)', () => {
     const CID = 'cv-str' as CanvasId
     saveConversation(CID, [
       { role: 'assistant', content: '...', dslBlocks: ['x'], streaming: true },
     ])
-    expect(loadConversation(CID)).toEqual([
-      { role: 'assistant', content: '...', dslBlocks: ['x'], streaming: false },
-    ])
+    expect(loadConversation(CID)).toEqual([])
   })
 
-  it('clears streaming in multi-message arrays', () => {
+  it('保留完整提问,丢弃它的半截流式回答', () => {
     const CID = 'cv-str2' as CanvasId
     saveConversation(CID, [
       { role: 'user', content: 'q' },
-      { role: 'assistant', content: 'a', streaming: true },
+      { role: 'assistant', content: 'half...', streaming: true },
     ])
-    const loaded = loadConversation(CID)
-    expect(loaded.every((m) => m.streaming !== true)).toBe(true)
+    expect(loadConversation(CID)).toEqual([{ role: 'user', content: 'q' }])
+  })
+
+  it('完整回合(streaming:false)原样持久化', () => {
+    const CID = 'cv-done' as CanvasId
+    saveConversation(CID, [
+      { role: 'user', content: 'q1' },
+      { role: 'assistant', content: 'a1', streaming: false },
+    ])
+    expect(loadConversation(CID).map((m) => m.content)).toEqual(['q1', 'a1'])
   })
 })
 
@@ -150,15 +156,13 @@ describe('migration — legacy companion v1 → new v2', () => {
     expect(window.localStorage.getItem('cys-stift.companion-chat.old-comp.v1')).toBeTruthy()
   })
 
-  it('normalizes streaming:true during migration', () => {
+  it('drops stale streaming messages during migration (dead-stream partials)', () => {
     const CID = 'old-str' as CanvasId
     window.localStorage.setItem(
       'cys-stift.companion-chat.old-str.v1',
       JSON.stringify([{ role: 'assistant', content: '...', streaming: true }]),
     )
-    expect(loadConversation(CID)).toEqual([
-      { role: 'assistant', content: '...', streaming: false },
-    ])
+    expect(loadConversation(CID)).toEqual([])
   })
 })
 

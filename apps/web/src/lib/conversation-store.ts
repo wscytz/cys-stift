@@ -345,7 +345,13 @@ export function saveConversation(
     // Persist only the conversation contract. Components may attach
     // ephemeral render/sample fields (for example `sampleContext`); letting
     // those leak into the store would bloat exports and expose prompt text.
-    const persisted = messages.slice(-CAP).map((message) => ({
+    //
+    // 只持久化「完整回合」:streaming 中的半截回答永不落盘 —— 导航/刷新中断的流
+    // 会在本地留一段看起来「已答完」的截断回复(对抗测试 2026-08-08 发现)。旧的
+    // 已落盘 streaming(修复前写入 / 迁移遗留)由 loadConversation 的 revival guard
+    // 兜底清 flag。用户问题保留(它是完整输入;半截回答才是脏数据)。
+    const complete = messages.filter((message) => !message.streaming)
+    const persisted = complete.slice(-CAP).map((message) => ({
       role: message.role,
       content: message.content,
       ...(message.dslBlocks ? { dslBlocks: message.dslBlocks } : {}),

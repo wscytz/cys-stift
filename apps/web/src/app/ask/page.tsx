@@ -60,6 +60,27 @@ interface ChatMessage extends PersistedConversationMessage {
 
 const MAX_HISTORY = 20
 
+// B1 修复(对抗测试 2026-08-08):目标画布记忆 —— 切页回来恢复上次选的画布上下文,
+// 否则 /ask 每次重挂载回 DEFAULT,之前对话(per-canvas 隔离)看起来"没了"。
+const ASK_TARGET_CANVAS_KEY = 'cys-stift.ask-target-canvas.v1'
+function readLastAskCanvas(): CanvasId | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(ASK_TARGET_CANVAS_KEY)
+    return raw ? (raw as CanvasId) : null
+  } catch {
+    return null
+  }
+}
+function saveLastAskCanvas(id: CanvasId): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(ASK_TARGET_CANVAS_KEY, String(id))
+  } catch {
+    /* quota / 隐私模式 —— 跳过 */
+  }
+}
+
 function aiProfileSignature(profile: AIProfile | null): string {
   if (!profile) return ''
   return JSON.stringify([
@@ -97,6 +118,20 @@ export default function AskPage() {
   )
   // 对话按 targetCanvasId 隔离 —— 每个画布有自己的上下文(per-canvas localStorage key)。
   const [targetCanvasId, setTargetCanvasId] = useState<CanvasId>(DEFAULT_CANVAS_ID)
+  // B1 修复(对抗测试):目标画布记忆。SSR-safe —— 首帧与 SSR 同为 DEFAULT,effect 再
+  // 恢复上次选的画布(此时 loadConversation effect 用新 targetCanvasId 重载对应对话)。
+  const lastAskCanvasRestored = useRef(false)
+  useEffect(() => {
+    if (lastAskCanvasRestored.current) return
+    lastAskCanvasRestored.current = true
+    const last = readLastAskCanvas()
+    if (last && last !== DEFAULT_CANVAS_ID) setTargetCanvasId(last)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  // 目标画布变化即记忆,下次进 /ask 恢复上下文。
+  useEffect(() => {
+    saveLastAskCanvas(targetCanvasId)
+  }, [targetCanvasId])
   // SSR 与客户端首帧必须同为 []。若在 lazy initializer 读 localStorage，服务端
   // 渲染空对话、客户端首帧渲染历史，会触发 hydration mismatch 并重建整页。
   // 持久历史统一在下方 effect（挂载 + 切画布）载入。

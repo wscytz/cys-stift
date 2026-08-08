@@ -68,6 +68,9 @@ export function CompanionChat({
   const [busy, setBusy] = useState(false)
   const [detailCard, setDetailCard] = useState<Card | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  // 切画布防串(对抗测试 B3 修复):画布切换抬 seq + abort,旧流的异步回调经
+  // isRequestCurrent 不再写入新画布的 messages(否则 A 画布对话会写进 B 画布 key)。
+  const requestSeqRef = useRef(0)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // 历史持久化:debounce ~400ms 写入,避免每个流式 token 都打 localStorage。
@@ -93,6 +96,17 @@ export function CompanionChat({
     }
   }, [canvasId])
 
+  // 切画布重载对话(per-canvas 隔离;lazy init 只跑一次,不能只靠它)。同时 abort
+  // 在飞 stream + 抬 requestSeq,让旧流回调不再写新画布的 messages。
+  useEffect(() => {
+    requestSeqRef.current += 1
+    abortRef.current?.abort()
+    abortRef.current = null
+    setBusy(false)
+    setMessages(loadConversation(canvasId))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasId])
+
   const aiReady = isAIReady(getCurrentAI())
 
   const send = async (override?: string) => {
@@ -101,6 +115,8 @@ export function CompanionChat({
     const cfg = getCurrentAI()!
     if (override === undefined) setInput('')
     setBusy(true)
+    const requestId = ++requestSeqRef.current
+    const isRequestCurrent = () => requestSeqRef.current === requestId
 
     // 截断老消息(超 MAX_HISTORY 丢最早);history 发给 AI 让它有上下文。
     const history = messages.slice(-MAX_HISTORY).map((m) => ({
@@ -136,6 +152,7 @@ export function CompanionChat({
             // 重试:清 acc,显「重新生成中…」占位;onDelta 静默(不流中间版)。
             acc = ''
             setMessages((prev) => {
+              if (!isRequestCurrent()) return prev
               const next = [...prev]
               const last = next[next.length - 1]
               if (last && last.role === 'assistant') {
@@ -149,6 +166,7 @@ export function CompanionChat({
               ? (chunk: string) => {
                   acc += chunk
                   setMessages((prev) => {
+                    if (!isRequestCurrent()) return prev
                     const next = [...prev]
                     const last = next[next.length - 1]
                     if (last && last.role === 'assistant') {
@@ -184,6 +202,7 @@ export function CompanionChat({
         const failureMessage = t(failureKey)
         pushToast({ kind: 'info', message: failureMessage })
         setMessages((prev) => {
+          if (!isRequestCurrent()) return prev
           const next = [...prev]
           const last = next[next.length - 1]
           if (last?.role === 'assistant') {
@@ -211,6 +230,7 @@ export function CompanionChat({
         )
       }
       setMessages((prev) => {
+        if (!isRequestCurrent()) return prev
         const next = [...prev]
         const last = next[next.length - 1]
         if (last && last.role === 'assistant') {
@@ -225,6 +245,7 @@ export function CompanionChat({
         pushToast({ kind: 'error', message: friendlyAIError((e as Error).message, t) })
       }
       setMessages((prev) => {
+        if (!isRequestCurrent()) return prev
         const next = [...prev]
         const last = next[next.length - 1]
         if (last && last.role === 'assistant' && last.streaming) {
