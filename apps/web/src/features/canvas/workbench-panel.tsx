@@ -10,7 +10,7 @@
  * 存:autosave 防抖 500ms;收起时若脏则 flush 再 close(防丢编辑)。
  */
 import { useEffect, useRef, useState } from 'react'
-import type { Card, TagRef, UpdateCardPatch } from '@cys-stift/domain'
+import type { Card, MediaRef, TagRef, UpdateCardPatch } from '@cys-stift/domain'
 import { Button, Tag } from '@cys-stift/ui'
 import { AiActionMenu } from '@/features/ai/ai-action-menu'
 import { AiSetupCard } from '@/features/ai/ai-setup-card'
@@ -21,8 +21,9 @@ import { MarkdownEditor } from '@/features/card/markdown-editor'
 import { editorStyles } from '@/features/card/editors'
 import { useCardDraft, isDirty } from '@/features/card/use-card-draft'
 import { CARD_FIELDS } from '@/features/card/field-registry'
-import { FieldEditors } from '@/features/card/field-editors'
+import { FieldEditors, MediaFieldEditor } from '@/features/card/field-editors'
 import { solidTagChipStyle, stableTagColor } from '@/lib/tag-color'
+import { mediaStore } from '@/lib/media-store'
 import { typeKeyOf } from '@/lib/type-label'
 import { useI18n } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n/messages'
@@ -87,13 +88,27 @@ export function WorkbenchPanel({
   draftRef.current = draft
   const onSaveRef = useRef(onSave)
   onSaveRef.current = onSave
+  // B-1 — media 删除推迟:点 × 只从草稿摘引用 + 记下 assetId,真删(mediaStore.remove)
+  // 等 save/flush 成功后(防保存失败时卡片引用已删、图还在 → 丢图 / 悬挂引用)。
+  const removedAssetsRef = useRef<Set<MediaRef['assetId']>>(new Set())
+
+  /** 落脏 patch;成功后清掉已删媒体二进制。flush / 切卡 cleanup / AI 共用。
+   *  读的都是 ref(onSaveRef/removedAssetsRef),stale 闭包也安全。 */
+  const commitSave = (targetCardId: string, patch: UpdateCardPatch) => {
+    const ok = onSaveRef.current(targetCardId, patch)
+    if (ok !== false) {
+      for (const id of removedAssetsRef.current) mediaStore.remove(id)
+      removedAssetsRef.current.clear()
+    }
+    return ok
+  }
 
   // flush:脏才存 + 亮「已保存」。放 ref 让防抖 effect / close 共用,不进 effect deps。
   const flushRef = useRef<() => void>(() => {})
   flushRef.current = () => {
     if (!dirty) return
     setSaveState('saving')
-    const ok = onSaveRef.current(card.id, toPatchRef.current())
+    const ok = commitSave(card.id, toPatchRef.current())
     setSaveState(ok === false ? 'failed' : 'saved')
     if (flashTimer.current) clearTimeout(flashTimer.current)
     flashTimer.current = setTimeout(() => setSaveState('idle'), 3000)
@@ -104,6 +119,8 @@ export function WorkbenchPanel({
     reset()
     setTagInput('')
     setAiView(null) // 切卡收起 AI 浮层
+    // 切卡:上一卡待删媒体已由 cleanup flush 在成功后清掉,这里兜底清空防串卡。
+    removedAssetsRef.current.clear()
   }, [card.id, reset])
 
   // 切卡防丢编辑(bug 1 修):card.id 变时,上一张的脏 draft 在 cleanup flush。
@@ -114,7 +131,7 @@ export function WorkbenchPanel({
     const prev = card
     return () => {
       if (isDirty(prev, draftRef.current, CARD_FIELDS)) {
-        onSaveRef.current(prev.id, toPatchRef.current())
+        commitSave(prev.id, toPatchRef.current())
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -257,6 +274,11 @@ export function WorkbenchPanel({
         </span>
       </div>
       <div className="wb-panel__fields">
+        <MediaFieldEditor
+          value={draft.media as MediaRef[]}
+          onChange={(m) => setField('media', m)}
+          onRemoveAsset={(id) => removedAssetsRef.current.add(id)}
+        />
         <FieldEditors fields={CARD_FIELDS} draft={draft} setField={setField} />
       </div>
       <div className="wb-panel__body">
@@ -295,7 +317,7 @@ export function WorkbenchPanel({
               onClose={() => setAiView(null)}
               onReplace={(newBody) => {
                 // AI 替换正文:落脏字段 patch(未改字段不进 patch,AI 只改 body)+ 更新草稿 body。
-                onSave(card.id, { ...toPatch(), body: newBody })
+                commitSave(card.id, { ...toPatch(), body: newBody })
                 setField('body', newBody)
                 setAiView(null)
               }}

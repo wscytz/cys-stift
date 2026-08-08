@@ -11,11 +11,13 @@
  * MarkdownEditor(B-1,2026-08-08),仅因两壳渲染位置不同而暂留壳特化,不再有 textarea 之分。
  */
 import type { ComponentType, ReactNode } from 'react'
-import type { Card, UpdateCardPatch } from '@cys-stift/domain'
+import type { Card, MediaRef, UpdateCardPatch } from '@cys-stift/domain'
 import type { CardDraftField, FieldEditorProps } from './use-card-draft'
 import { CodeEditor, ListEditor, QuoteEditor, type DraftCode, type DraftLink, type DraftQuote } from './editors'
 import { useI18n } from '@/lib/i18n'
-import { safeHref } from '@/lib/safe-href'
+import { safeHref, isSafeImageDataUrl, MAX_SAFE_MEDIA_BYTES } from '@/lib/safe-href'
+import { mediaStore } from '@/lib/media-store'
+import { pushToast } from '@/lib/toast-store'
 
 /** 代码块字段编辑器(label + CodeEditor)。 */
 export function CodesFieldEditor({ value, onChange }: FieldEditorProps<unknown>) {
@@ -53,6 +55,92 @@ export function LinksFieldEditor({ value, onChange }: FieldEditorProps<unknown>)
         placeholder="https://…"
         fieldKey="url"
       />
+    </div>
+  )
+}
+
+/**
+ * 媒体字段编辑器(label + file input + 缩略图)。两壳共用(B-1 补工作台 media 缺口,
+ * 详情弹窗从内联 JSX 抽到此共享组件)。
+ *
+ * attach 即写入 mediaStore(建 asset,立即持久);删除只 onChange 摘掉引用,**不**在此调
+ * mediaStore.remove —— 真删时机由壳经 onRemoveAsset 决定(详情弹窗 defer 到 handleSave
+ * 成功、工作台 defer 到 flush 成功):否则取消/保存失败时卡片引用已删而图还在(丢图),
+ * 或保存失败留下悬挂引用。自包含样式(mfe-*),不依赖壳注入 CSS。
+ */
+export function MediaFieldEditor({
+  value,
+  onChange,
+  onRemoveAsset,
+}: {
+  value: MediaRef[]
+  onChange: (media: MediaRef[]) => void
+  onRemoveAsset?: (id: MediaRef['assetId']) => void
+}) {
+  const { t } = useI18n()
+  const handleFiles = async (files: FileList | null) => {
+    if (!files) return
+    for (const file of Array.from(files)) {
+      try {
+        const ref = await mediaStore.attach(file)
+        onChange([...value, ref])
+      } catch (err) {
+        console.error('[MediaFieldEditor] attach failed', err)
+        pushToast({ kind: 'error', message: t('card.mediaAttachFail', { name: file.name }) })
+      }
+    }
+  }
+  return (
+    <div className="mfe">
+      <style>{mfeStyles}</style>
+      <span className="mfe__label">{t('card.detail.mediaFiles')}</span>
+      <input
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={(e) => {
+          void handleFiles(e.target.files)
+          e.target.value = ''
+        }}
+        className="mfe__file"
+      />
+      {value.length > 0 && (
+        <ul className="mfe__list">
+          {value.map((m, i) => {
+            const asset = mediaStore.getAsset(m.assetId)
+            if (!asset) return null
+            return (
+              <li key={String(m.assetId)} className="mfe__item">
+                {asset.kind === 'image' &&
+                  (asset.byteSize <= MAX_SAFE_MEDIA_BYTES && isSafeImageDataUrl(asset.dataUrl) ? (
+                    <img
+                      src={asset.dataUrl}
+                      alt={t('card.detail.mediaAlt', { n: i + 1 })}
+                      className="mfe__thumb"
+                    />
+                  ) : (
+                    // 对齐只读态:非安全 data URL(SVG/超大)渲染文本 fallback,不进 <img>。
+                    <span className="mfe__fallback">
+                      {asset.mimeType} ({(asset.byteSize / 1024).toFixed(1)} KB)
+                    </span>
+                  ))}
+                <button
+                  type="button"
+                  className="mfe__remove"
+                  onClick={() => {
+                    // 只摘引用 + 上报待删 id;真删交给壳(save/flush 成功后)。
+                    onRemoveAsset?.(m.assetId)
+                    onChange(value.filter((x) => x.assetId !== m.assetId))
+                  }}
+                  aria-label={t('card.detail.removeMediaAria')}
+                >
+                  ×
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </div>
   )
 }
@@ -192,4 +280,16 @@ export function FieldViews({
 const feStyles = `
 .fe { display: flex; flex-direction: column; gap: var(--space-2); }
 .fe__label { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-black-soft); }
+`
+
+const mfeStyles = `
+.mfe { display: flex; flex-direction: column; gap: var(--space-2); }
+.mfe__label { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-black-soft); }
+.mfe__file { font-family: var(--font-mono); font-size: var(--font-size-sm); margin-top: var(--space-1); }
+.mfe__list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.mfe__item { position: relative; display: inline-flex; }
+.mfe__thumb { width: 96px; height: 96px; object-fit: cover; border: var(--border-hairline); display: block; }
+.mfe__fallback { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black-soft); border: var(--border-hairline); padding: var(--space-1); }
+.mfe__remove { position: absolute; top: 0; right: 0; background: var(--color-white); border: var(--border-hairline); min-width: 44px; min-height: 44px; cursor: pointer; font-family: var(--font-mono); font-size: var(--font-size-sm); line-height: 1; }
+.mfe__remove:hover { background: var(--color-red); color: var(--color-white); }
 `

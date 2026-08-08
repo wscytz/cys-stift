@@ -51,7 +51,7 @@ import { solidTagChipStyle, stableTagColor } from '@/lib/tag-color'
 import { editorStyles } from './editors'
 import { useCardDraft } from './use-card-draft'
 import { CARD_FIELDS } from './field-registry'
-import { FieldEditors, FieldViews, FieldSection as Section } from './field-editors'
+import { FieldEditors, FieldViews, FieldSection as Section, MediaFieldEditor } from './field-editors'
 import { MarkdownEditor } from './markdown-editor'
 import { MarkdownBody } from '@/app/inbox/markdown'
 import { mediaStore } from '@/lib/media-store'
@@ -183,7 +183,7 @@ export function CardDetailModal({
     return { body: c.body, title: c.title }
   }
   const [mode, setMode] = useState<'view' | 'edit'>(initialMode)
-  const { draft, setField, setDraft, dirty, toPatch, reset } = useCardDraft(card, CARD_FIELDS)
+  const { draft, setField, dirty, toPatch, reset } = useCardDraft(card, CARD_FIELDS)
   // alias:让 edit JSX 的 value={title}/{body}/... 读法不变(只读);setter 改 setField(见 JSX)。
   // codes/quotes/links 进 FieldEditors(registry),不在此 alias。
   const title = draft.title as string
@@ -409,19 +409,6 @@ export function CardDetailModal({
         setMode('view')
       } else pushToast({ kind: 'error', message: t('card.saveFailedQuota') })
     })
-  }
-
-  const handleFiles = async (files: FileList | null) => {
-    if (!files) return
-    for (const file of Array.from(files)) {
-      try {
-        const ref = await mediaStore.attach(file)
-        setDraft((prev) => ({ ...prev, media: [...(prev.media as MediaRef[]), ref] }))
-      } catch (err) {
-        console.error('[CardDetailModal] attach failed', err)
-        pushToast({ kind: 'error', message: t('card.mediaAttachFail', { name: file.name }) })
-      }
-    }
   }
 
   // Action visibility — single self-routing toggle for archive/unarchive
@@ -688,61 +675,11 @@ export function CardDetailModal({
                   <MarkdownEditor value={body} onChange={(v) => setField('body', v)} />
                 </div>
               </div>
-              <div className="cd__field">
-                <span className="cd__label">{t('card.detail.mediaFiles')}</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => {
-                    void handleFiles(e.target.files)
-                    e.target.value = ''
-                  }}
-                  className="cd__file"
-                />
-                {media.length > 0 && (
-                  <ul className="cd__media-list cd__media-list--edit">
-                    {media.map((m, i) => {
-                      const asset = mediaStore.getAsset(m.assetId)
-                      if (!asset) return null
-                      return (
-                        <li
-                          key={String(m.assetId)}
-                          className="cd__media-item cd__media-item--edit"
-                        >
-                          {asset.kind === 'image' &&
-                            (asset.byteSize <= MAX_SAFE_MEDIA_BYTES &&
-                            isSafeImageDataUrl(asset.dataUrl) ? (
-                              <img
-                                src={asset.dataUrl}
-                                alt={t('card.detail.mediaAlt', { n: i + 1 })}
-                                className="cd__media-img cd__media-img--thumb"
-                              />
-                            ) : (
-                              // 对齐只读态:非安全 data URL(SVG/超大)渲染文本 fallback,不进 <img>。
-                              <span>
-                                {asset.mimeType} ({(asset.byteSize / 1024).toFixed(1)} KB)
-                              </span>
-                            ))}
-                          <button
-                            type="button"
-                            className="le__remove"
-                            onClick={() => {
-                              // 只从草稿移除 + 记下 assetId;真删推迟到 handleSave 提交
-                              // 成功后。取消/保存失败时卡片引用仍在,图片不丢。
-                              removedAssetIds.current.add(m.assetId)
-                              setField('media', media.filter((x) => x.assetId !== m.assetId))
-                            }}
-                            aria-label={t('card.detail.removeMediaAria')}
-                          >
-                            ×
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-              </div>
+              <MediaFieldEditor
+                value={media}
+                onChange={(m) => setField('media', m)}
+                onRemoveAsset={(id) => removedAssetIds.current.add(id)}
+              />
               <FieldEditors fields={CARD_FIELDS} draft={draft} setField={setField} />
               <div className="cd__field">
                 <span className="cd__label">{t('tag.add')}</span>
@@ -1113,10 +1050,6 @@ const styles = `
 .cd__media-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .cd__media-item { display: inline-flex; }
 .cd__media-img { max-width: 100%; border: var(--border-hairline); display: block; }
-.cd__media-list--edit { margin-top: var(--space-2); }
-.cd__media-item--edit { position: relative; }
-.cd__media-img--thumb { width: 96px; height: 96px; object-fit: cover; }
-.cd__media-item--edit .le__remove { position: absolute; top: 0; right: 0; background: var(--color-white); }
 
 .cd__links { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
 .cd__links a { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
