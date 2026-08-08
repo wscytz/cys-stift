@@ -521,7 +521,7 @@ export default function AskPage() {
               )}
               {messages.map((m, i) => (
                 <div key={i} className={`ask__msg ask__msg--${m.role}`}>
-                  {m.role === 'assistant' && <span className="ask__role">✨ AI</span>}
+                  {m.role === 'assistant' && <span className="ask__role">AI</span>}
                   {m.role === 'user' && <span className="ask__role">{t('brand.name')}</span>}
                   <MessageContent
                     content={m.content}

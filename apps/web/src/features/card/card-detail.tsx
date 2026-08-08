@@ -589,7 +589,7 @@ export function CardDetailModal({
                       onClick={() => { void handleAISuggest() }}
                       disabled={aiSuggestBusy}
                     >
-                      {aiSuggestBusy ? t('relation.aiSuggestBusy') : `✨ ${t('relation.aiSuggest')}`}
+                      {aiSuggestBusy ? t('relation.aiSuggestBusy') : t('relation.aiSuggest')}
                     </Button>
                   )}
                 </Section>

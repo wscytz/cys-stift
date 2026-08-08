@@ -220,7 +220,7 @@ export function WorkbenchPanel({
           aria-label={t('card.ai')}
           title={t('card.ai')}
         >
-          ✨
+          <span className="wb-panel__ai-mark" aria-hidden="true">»</span> {t('card.ai')}
         </button>
         <button
           type="button"
@@ -506,6 +506,7 @@ const styles = `
 }
 .wb-panel__ai-btn:hover { background: var(--color-yellow); }
 .wb-panel__ai-btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.wb-panel__ai-mark { font-family: var(--font-mono); }
 .wb-panel__ai {
   position: absolute; right: var(--space-2); bottom: var(--space-2); z-index: 20;
   width: min(440px, calc(100% - var(--space-4)));
