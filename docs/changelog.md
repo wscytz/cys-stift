@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-08-08 · 1.2.0 · UI 布局与功能管理重构(B 路径)+ 对话记忆修复(tag v1.2.0)
+
+- **编辑器合并(B-1)**:详情弹窗与工作台收敛为同一字段集(`CARD_FIELDS`)与同一 body 编辑器(MarkdownEditor);tag 色统一(同值同色);**工作台补 media 编辑**(此前工作台改不了媒体/链接)。
+- **AI 入口统一(B-2)**:AI 动作分类(正文变换/画布结构/关系推荐/发现/对话 agent);入口统一为「» + 动作文案」,移除 ✨ emoji 的一词多义。
+- **找回收敛(B-3)**:`/search` 承载 tag/状态/时间筛选(筛选框架),成为唯一主找回入口;archive/tags/timeline 降为「更多视图」次级导航。
+- **canvas 为家(B-4)**:canvas 新增「未放置」面板(列出无 canvasPosition 的卡,一键放置 + collision-aware 自动排版);导航 capture 组 canvas 排第一。
+- **功能管理(B-5)**:能力注册表(`CAPABILITY_REGISTRY`)+ settings「能力清单」真相源(core 常开 + 可选门控,复用 isAIReady/useLabEnabled)。
+- **对话记忆修复**:根因 = StrictMode 双挂载时首帧空 messages 被 save 定时器落盘清空已存对话;修 = 跳过首帧空 save。配套:/ask 目标画布记忆、只持久化完整回合、companion 切画布重载 + 流守卫。
+- **自动化测试**:新增 `scripts/e2e-ai.mjs`(puppeteer 驱动真实 Chrome,11 用例覆盖 AI 门控/对话记忆/卡片编辑/未放置/搜索筛选/能力清单/隐私)。
+- 全包 lint 0 + web test 1791 passed + web build exit 0。
+
 ## 2026-08-07 · 1.1.4 · 全局 layout 视口溢出修复(tag v1.1.4)
 
 - **fix(web): 整页垂直溢出(每页多一截滚动条)**:共用 layout 里顶部 `AppMenu`(sticky,占文档流 ~52px)+ 各页 `main.page`(min-height:100vh) 叠在 `body`(min-height:100vh flex column) 里 → body = AppMenu + 100vh > 100vh,**每个页面都多溢出约 52px 的垂直滚动条**,内容再少也溢出(用户反馈"内容不多却溢出、全屏明明能刚好放下")。

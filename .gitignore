@@ -108,3 +108,4 @@ docs/design/*
 # architecture/ 只跟踪 overview.md
 docs/architecture/*
 !docs/architecture/overview.md
+scripts/_e2e-screenshots/
