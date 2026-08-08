@@ -76,9 +76,11 @@ export function AppMenu() {
     label: MessageKey
     entries: { href: string; key: MessageKey }[]
   }> = [
+    // B-4「canvas 为家」:capture 组 canvas 排第一(唯一空间主场),inbox 是「未放置
+    // 队列」(canvas 未放置面板已承载「看未放」,inbox 缩为捕获整理入口)。
     { label: 'nav.group.capture', entries: [
-      { href: '/inbox', key: 'nav.inbox' },
       { href: '/canvas', key: 'nav.canvas' },
+      { href: '/inbox', key: 'nav.inbox' },
       { href: '/workbench', key: 'nav.workbench' },
     ] },
     { label: 'nav.group.think', entries: [
