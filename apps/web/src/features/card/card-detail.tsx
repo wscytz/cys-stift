@@ -47,12 +47,12 @@ import type {
   Quote,
   TagRef,
 } from '@cys-stift/domain'
-import { TAG_COLORS } from '@cys-stift/domain'
-import { solidTagChipStyle } from '@/lib/tag-color'
+import { solidTagChipStyle, stableTagColor } from '@/lib/tag-color'
 import { editorStyles } from './editors'
 import { useCardDraft } from './use-card-draft'
-import { DETAIL_FIELDS } from './field-registry'
+import { CARD_FIELDS } from './field-registry'
 import { FieldEditors, FieldViews, FieldSection as Section } from './field-editors'
+import { MarkdownEditor } from './markdown-editor'
 import { MarkdownBody } from '@/app/inbox/markdown'
 import { mediaStore } from '@/lib/media-store'
 import {
@@ -183,7 +183,7 @@ export function CardDetailModal({
     return { body: c.body, title: c.title }
   }
   const [mode, setMode] = useState<'view' | 'edit'>(initialMode)
-  const { draft, setField, setDraft, dirty, toPatch, reset } = useCardDraft(card, DETAIL_FIELDS)
+  const { draft, setField, setDraft, dirty, toPatch, reset } = useCardDraft(card, CARD_FIELDS)
   // alias:让 edit JSX 的 value={title}/{body}/... 读法不变(只读);setter 改 setField(见 JSX)。
   // codes/quotes/links 进 FieldEditors(registry),不在此 alias。
   const title = draft.title as string
@@ -671,7 +671,7 @@ export function CardDetailModal({
               {/* links/codes/quotes 只读态走 registry(FieldViews),与 edit 侧
                   FieldEditors 对称 —— 加结构化字段注册 View 一处即自动渲染,
                   不再手写 Section(根治 view 侧"两套、漏一边")。 */}
-              <FieldViews fields={DETAIL_FIELDS} card={card} />
+              <FieldViews fields={CARD_FIELDS} card={card} />
             </>
           ) : (
             <>
@@ -682,15 +682,12 @@ export function CardDetailModal({
                 onChange={(e) => setField('title', e.target.value)}
                 maxLength={200}
               />
-              <label className="cd__field">
+              <div className="cd__field">
                 <span className="cd__label">{t('card.detail.bodyLabel')}</span>
-                <textarea
-                  className="cd__textarea"
-                  value={body}
-                  onChange={(e) => setField('body', e.target.value)}
-                  rows={6}
-                />
-              </label>
+                <div className="cd__body-editor">
+                  <MarkdownEditor value={body} onChange={(v) => setField('body', v)} />
+                </div>
+              </div>
               <div className="cd__field">
                 <span className="cd__label">{t('card.detail.mediaFiles')}</span>
                 <input
@@ -746,7 +743,7 @@ export function CardDetailModal({
                   </ul>
                 )}
               </div>
-              <FieldEditors fields={DETAIL_FIELDS} draft={draft} setField={setField} />
+              <FieldEditors fields={CARD_FIELDS} draft={draft} setField={setField} />
               <div className="cd__field">
                 <span className="cd__label">{t('tag.add')}</span>
                 <div className="cd__tags">
@@ -773,9 +770,7 @@ export function CardDetailModal({
                         e.preventDefault()
                         const val = tagInput.trim()
                         if (!tags.some((tag) => tag.value === val)) {
-                          const color =
-                            TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)]!
-                          setField('tags', [...tags, { value: val, color }])
+                          setField('tags', [...tags, { value: val, color: stableTagColor(val) }])
                         }
                         setTagInput('')
                       }
@@ -1079,12 +1074,7 @@ const styles = `
 }
 .cd__field { display: flex; flex-direction: column; gap: var(--space-1); }
 .cd__label { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-black-soft); }
-.cd__textarea {
-  appearance: none; background: transparent; border: 0; border-bottom: var(--border-hairline);
-  padding: var(--space-1) 0; font-family: var(--font-body); font-size: var(--font-size-base);
-  color: var(--color-black); outline: none; resize: vertical; min-height: 120px; line-height: 1.5;
-}
-.cd__textarea:focus { border-bottom-color: var(--color-red); }
+.cd__body-editor { height: 320px; display: flex; flex-direction: column; }
 .cd__file { font-family: var(--font-mono); font-size: var(--font-size-sm); margin-top: var(--space-1); }
 .cd__actions {
   display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center;

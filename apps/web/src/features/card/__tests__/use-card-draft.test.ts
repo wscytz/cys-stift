@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Card, LinkPreview } from '@cys-stift/domain'
-import { DETAIL_FIELDS } from '../field-registry'
+import { CARD_FIELDS } from '../field-registry'
 import { buildPatch } from '../use-card-draft'
 
 // ── 为什么有这个文件 ──────────────────────────────────────────────────────────
@@ -39,7 +39,7 @@ function makeCard(over: Partial<Card> = {}): Card {
 /** 模拟 useCardDraft 的 draft:每 field 跑 toDraft,再用用户编辑覆盖。 */
 function draftOf(card: Card, overrides: Record<string, unknown>): Record<string, unknown> {
   const d: Record<string, unknown> = {}
-  for (const f of DETAIL_FIELDS) d[f.key as string] = f.toDraft(card)
+  for (const f of CARD_FIELDS) d[f.key as string] = f.toDraft(card)
   return { ...d, ...overrides }
 }
 
@@ -54,7 +54,7 @@ const richLink: LinkPreview = {
 describe('buildPatch — per-field dirty 门控(不误伤未改字段)', () => {
   it('只改 body → patch 只含 body;links(带富字段)/title/tags 等未改字段不进 patch', () => {
     const card = makeCard({ links: [richLink] })
-    const patch = buildPatch(card, draftOf(card, { body: 'new body' }), DETAIL_FIELDS)
+    const patch = buildPatch(card, draftOf(card, { body: 'new body' }), CARD_FIELDS)
 
     expect(patch.body).toBe('new body')
     // links 未改 → 不进 patch → service.update 不会用 {url, fetchedAt:now} 覆盖 → 富字段存活
@@ -70,7 +70,7 @@ describe('buildPatch — per-field dirty 门控(不误伤未改字段)', () => {
     const draft = draftOf(card, {
       links: [{ url: 'https://a.com' }, { url: 'https://b.com' }],
     })
-    const patch = buildPatch(card, draft, DETAIL_FIELDS)
+    const patch = buildPatch(card, draft, CARD_FIELDS)
 
     expect(patch.links).toBeDefined()
     expect((patch.links as Array<{ url: string }>).map((l) => l.url)).toEqual([
@@ -84,7 +84,7 @@ describe('buildPatch — per-field dirty 门控(不误伤未改字段)', () => {
       links: [richLink],
       tags: [{ value: 'a', color: 'red' } as never],
     })
-    const patch = buildPatch(card, draftOf(card, {}), DETAIL_FIELDS)
+    const patch = buildPatch(card, draftOf(card, {}), CARD_FIELDS)
 
     expect(Object.keys(patch)).toHaveLength(0)
   })

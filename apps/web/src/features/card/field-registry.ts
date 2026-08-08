@@ -68,22 +68,19 @@ const linksField: CardDraftField<unknown> = {
   View: LinksFieldView,
 }
 
-// ── 字段集(各壳按需用;Step 3 后 WORKBENCH = DETAIL,字段集统一) ─────────────
+// ── 字段集(B-1:两壳共用单一字段集,根治"两套数组漂移、漏 media")─────────────
 
-/** 工作台字段集(Step 3 补 media 后 = DETAIL_FIELDS)。links/codes/quotes 进 FieldEditors;
- *  顺序与 DETAIL_FIELDS 一致(links→codes→quotes),两壳 FieldEditors 渲染顺序统一。 */
-export const WORKBENCH_FIELDS: CardDraftField<unknown>[] = [
-  titleField,
-  bodyField,
-  tagsField,
-  linksField,
-  codesField,
-  quotesField,
-]
-
-/** 详情弹窗字段集(edit + view 共用;title/body/media 壳特化无 Editor/View,
- *  links/codes/quotes 走 registry 自动渲染两态)。 */
-export const DETAIL_FIELDS: CardDraftField<unknown>[] = [
+/**
+ * 卡片字段集(详情弹窗 + 工作台共用同一份)。title/body/media/tags 壳特化(渲染位置 /
+ * 形态各壳定,无 Editor/View);links/codes/quotes 走 registry(FieldEditors/FieldViews
+ * 自动渲染两态)。
+ *
+ * 此前 WORKBENCH_FIELDS 与 DETAIL_FIELDS 是两份独立数组, drifted:工作台漏 mediaField
+ * + tags 顺序与详情不一致(注释号称"Step 3 后相等"实则否)。B-1(2026-08-08)合并为单一
+ * CARD_FIELDS —— 两壳编辑同一份字段集,永不漂移;真要某壳用子集,该壳自行声明(不再靠
+ * "两份保持同步"这种必漂的约定)。
+ */
+export const CARD_FIELDS: CardDraftField<unknown>[] = [
   titleField,
   bodyField,
   mediaField,

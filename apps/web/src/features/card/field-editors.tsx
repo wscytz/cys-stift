@@ -7,7 +7,8 @@
  * 重复);FieldViews 按 registry 渲染各字段的 View(详情弹窗 view 模式,消除 view
  * Section 手写)。两者对称:加新结构化字段只需 registry 一处注册 Editor + View,
  * edit/view 自动渲染,根治"两套、漏一边"(见 decisions/2026-08-07-structured-fields-registry.md)。
- * title/body 在两壳差异大(textarea vs MarkdownEditor 三态),暂留壳特化(不进 registry)。
+ * title/body/media/tags 壳特化(渲染位置 / 形态各壳定,不进 registry)。body 两壳统一用
+ * MarkdownEditor(B-1,2026-08-08),仅因两壳渲染位置不同而暂留壳特化,不再有 textarea 之分。
  */
 import type { ComponentType, ReactNode } from 'react'
 import type { Card, UpdateCardPatch } from '@cys-stift/domain'

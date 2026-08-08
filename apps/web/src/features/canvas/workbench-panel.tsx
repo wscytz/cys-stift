@@ -11,7 +11,6 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import type { Card, TagRef, UpdateCardPatch } from '@cys-stift/domain'
-import { TAG_COLORS } from '@cys-stift/domain'
 import { Button, Tag } from '@cys-stift/ui'
 import { AiActionMenu } from '@/features/ai/ai-action-menu'
 import { AiSetupCard } from '@/features/ai/ai-setup-card'
@@ -21,9 +20,9 @@ import { pushToast } from '@/lib/toast-store'
 import { MarkdownEditor } from '@/features/card/markdown-editor'
 import { editorStyles } from '@/features/card/editors'
 import { useCardDraft, isDirty } from '@/features/card/use-card-draft'
-import { WORKBENCH_FIELDS } from '@/features/card/field-registry'
+import { CARD_FIELDS } from '@/features/card/field-registry'
 import { FieldEditors } from '@/features/card/field-editors'
-import { solidTagChipStyle } from '@/lib/tag-color'
+import { solidTagChipStyle, stableTagColor } from '@/lib/tag-color'
 import { typeKeyOf } from '@/lib/type-label'
 import { useI18n } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n/messages'
@@ -68,7 +67,7 @@ export function WorkbenchPanel({
   onAIAppendNew,
 }: WorkbenchPanelProps) {
   const { t } = useI18n()
-  const { draft, setField, dirty, toPatch, reset } = useCardDraft(card, WORKBENCH_FIELDS)
+  const { draft, setField, dirty, toPatch, reset } = useCardDraft(card, CARD_FIELDS)
   const [tagInput, setTagInput] = useState('')
   // savedFlash:flush 后短暂亮「已保存」1.5s,让 autosave 可见(用户知道编辑落了)。
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle')
@@ -114,7 +113,7 @@ export function WorkbenchPanel({
   useEffect(() => {
     const prev = card
     return () => {
-      if (isDirty(prev, draftRef.current, WORKBENCH_FIELDS)) {
+      if (isDirty(prev, draftRef.current, CARD_FIELDS)) {
         onSaveRef.current(prev.id, toPatchRef.current())
       }
     }
@@ -258,7 +257,7 @@ export function WorkbenchPanel({
         </span>
       </div>
       <div className="wb-panel__fields">
-        <FieldEditors fields={WORKBENCH_FIELDS} draft={draft} setField={setField} />
+        <FieldEditors fields={CARD_FIELDS} draft={draft} setField={setField} />
       </div>
       <div className="wb-panel__body">
         <MarkdownEditor value={draft.body as string} onChange={(v) => setField('body', v)} />
@@ -337,12 +336,6 @@ function workbenchCapturedAt(value: Date): string {
     : '—'
 }
 
-function stableTagColor(value: string): TagRef['color'] {
-  let hash = 0
-  for (let i = 0; i < value.length; i += 1) hash = (hash * 31 + value.charCodeAt(i)) | 0
-  return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length] ?? TAG_COLORS[0]!
-}
-
 const styles = `
 .wb-panel {
   position: relative;
@@ -414,7 +407,7 @@ const styles = `
 }
 .wb-panel__done:hover { background: var(--color-red); border-color: var(--color-red); }
 .wb-panel__done:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-/* tags 编辑行:chip(× 删)+ input 回车加。复用 card-detail 范式 + TAG_COLORS 随机色。 */
+/* tags 编辑行:chip(× 删)+ input 回车加。色用 stableTagColor(同 value 同色,与建卡/详情统一)。 */
 .wb-panel__tags {
   display: flex;
   flex-wrap: wrap;
