@@ -744,6 +744,7 @@ export const messages = {
   'settings.key': { zh: '按键', en: 'Key' },
   'settings.current': { zh: '当前', en: 'Current' },
   'settings.currentSuffix': { zh: '（加载中…）', en: '(loading…)' },
+  'settings.captureShortcutConflict': { zh: '该组合是系统/浏览器通用快捷键（如复制、粘贴），关闭 Shift 时会劫持全局操作。请勾选 Shift 或换一个按键。', en: 'This combo is a browser/system shortcut (e.g. copy/paste). Without Shift it would hijack global actions. Enable Shift or pick another key.' },
   'settings.captureHint': {
     zh: '若全局热键注册失败:可能被其他应用占用。系统偏好 > 键盘 > 快捷键 查冲突,或在此换一个键。',
     en: 'If the global hotkey fails to register: it may be occupied by another app. Check System Settings > Keyboard > Shortcuts for conflicts, or pick a different key here.',
@@ -1061,6 +1062,9 @@ export const messages = {
   'tags.recolorTag': { zh: '改色「{value}」', en: 'Recolor "{value}"' },
   'tags.renameTag': { zh: '改名「{value}」', en: 'Rename "{value}"' },
   'tags.deleteTag': { zh: '删标签「{value}」', en: 'Delete tag "{value}"' },
+  'tags.deleteConfirmTitle': { zh: '删除标签？', en: 'Delete tag?' },
+  'tags.deleteConfirmBody': { zh: '将从 {n} 张卡片上移除「{value}」。此操作不可撤销。', en: 'This removes "{value}" from {n} card(s). This cannot be undone.' },
+  'tags.deleteConfirmAction': { zh: '删除标签', en: 'Delete tag' },
   /* ── Workbench 库页 (D4) ── */
   'workbench.title': { zh: '工作台', en: 'Workbench' },
   'workbench.saving': { zh: '保存中…', en: 'Saving…' },

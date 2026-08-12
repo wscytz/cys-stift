@@ -13,6 +13,15 @@ import { TagManagement } from '../tag-management'
 vi.mock('@/lib/i18n', () => ({
   useI18n: () => ({ t: (k: string, p?: Record<string, string>) => (p ? Object.entries(p).reduce((s, [k2, v]) => s.replace(`{${k2}}`, v), k) : k), locale: 'zh', setLocale: () => {} }),
 }))
+vi.mock('@cys-stift/ui', () => ({
+  Modal: ({ children }: { children?: React.ReactNode }) =>
+    React.createElement('div', null, children),
+  Button: ({ children, onClick, variant }: { children?: React.ReactNode; onClick?: () => void; variant?: string }) =>
+    React.createElement('button', { onClick, type: 'button', 'data-variant': variant }, children),
+}))
+vi.mock('@/features/canvas/workbench-icons', () => ({
+  WorkbenchIcon: () => null,
+}))
 
 const RED = 'var(--color-red)' as TagColor
 const BLUE = 'var(--color-blue)' as TagColor
@@ -86,11 +95,18 @@ describe('TagManagement', () => {
     expect(changes.find((c) => c.id === '2')!.tags).toEqual([{ value: 'a', color: RED }])
   })
 
-  it('点删按钮 → onApplyChanges 收到 deleteTag', () => {
+  it('点删按钮 → 弹确认门 → 确认后 onApplyChanges 收到 deleteTag', () => {
     const onApply = vi.fn()
     const { host } = render(<TagManagement cards={[mk('1', [['a', RED], ['b', BLUE]])]} onApplyChanges={onApply} />)
-    // 第一行的删按钮（.tm__act--danger）
+    // 第一行的删按钮(.tm__act--danger)只弹确认门,不直接 onApplyChanges
     act(() => { (host.querySelector('.tm__act--danger') as HTMLButtonElement).click() })
+    expect(onApply).not.toHaveBeenCalled()
+    // 确认 Modal 里的 danger 按钮 → 确认删除
+    const confirmBtn = [...host.querySelectorAll('button')].find(
+      (b) => (b.textContent ?? '') === 'tags.deleteConfirmAction',
+    ) as HTMLButtonElement
+    expect(confirmBtn).toBeTruthy()
+    act(() => { confirmBtn.click() })
     const changes = onApply.mock.calls[0]![0] as Array<{ id: string; tags: TagRef[] }>
     expect(changes[0]!.tags).toEqual([{ value: 'b', color: BLUE }])
   })

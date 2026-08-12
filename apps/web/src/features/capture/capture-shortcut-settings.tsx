@@ -2,11 +2,19 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/lib/i18n'
+import { pushToast } from '@/lib/toast-store'
 import {
   settingsStore,
   type CaptureShortcut,
 } from '@/lib/settings-store'
 import { captureShortcutCommitCoordinator } from './capture-shortcut-commit'
+
+/** 浏览器/系统通用快捷键:shift-off 时若绑为捕获键会劫持全局行为,一律拒绝。 */
+const BROWSER_UNIVERSAL_KEYS = new Set([
+  'KeyC', 'KeyV', 'KeyX', 'KeyA', 'KeyZ', // 复制/粘贴/剪切/全选/撤销
+  'KeyN', 'KeyI', 'KeyT', 'KeyF', 'KeyW', // 新建/斜体/新标签/查找/关闭
+  'Comma', 'Period', // 系统偏好设置 / 取消（macOS）
+])
 
 export function CaptureShortcutSettings({
   shortcut,
@@ -37,6 +45,14 @@ export function CaptureShortcutSettings({
 
   const commit = (patch: Partial<CaptureShortcut>) => {
     const next = { ...candidateRef.current, ...patch }
+    // R6:浏览器/系统通用快捷键(C/V/X/A/Z/N/I/T/F/W + 逗号/句号)在 shift-off 时会被
+    // 全局捕获 handler 劫持,破坏复制粘贴/新建/查找等系统行为(也撞画布 ⌘. focus-mode)。
+    // 对齐 Space 迁移守卫:拒绝这类组合,保留原值并提示,而非让用户踩坑。
+    if (!next.shift && BROWSER_UNIVERSAL_KEYS.has(next.code)) {
+      setCandidate(candidateRef.current)
+      pushToast({ kind: 'info', message: t('settings.captureShortcutConflict') })
+      return
+    }
     const requestId = ++requestRef.current
     pendingRef.current = true
     candidateRef.current = next

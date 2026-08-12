@@ -372,6 +372,10 @@ export function CardDetailModal({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
+      // R6:对齐 dsl-dialog/export-dialog/shortcut-help 等兄弟弹层 —— 若内层弹层
+      // (capture mini-input 等)已消费 Escape,不叠关本 modal(否则按 Esc 关一次
+      // 内层 + 关掉底下详情两层同时消失)。
+      if (e.defaultPrevented) return
       // AI popover 在前面:Escape 关掉 popover(而不是整个 CardDetail)。
       if (aiView) {
         setAiView(null)

@@ -115,6 +115,9 @@ vi.mock('@cys-stift/ui', () => ({
     React.createElement('div', null, children),
   Button: ({ children, onClick, disabled }: { children?: React.ReactNode; onClick?: () => void; disabled?: boolean }) =>
     React.createElement('button', { onClick, disabled, type: 'button' }, children),
+  // R6:清空对话改自定义 confirm Modal(替代 window.confirm)。
+  Modal: ({ children, open }: { children?: React.ReactNode; open?: boolean }) =>
+    open ? React.createElement('div', { className: 'test-modal' }, children) : null,
 }))
 
 vi.mock('@/components/page-loading', () => ({ PageLoading: () => null }))

@@ -41,6 +41,9 @@ export default function WorkbenchPage() {
   const [mobileLibrary, setMobileLibrary] = useState(() => cardId === null)
   const [editorDirty, setEditorDirty] = useState(false)
   const [pendingCardId, setPendingCardId] = useState<string | null>(null)
+  // R6:返回画布按钮在 dirty 时弹确认门 —— 保存失败(quota)时编辑可能还没落盘,
+  // 直接导航会静默丢编辑。确认后仍走同一路由(卸载 flush 兜底)。
+  const [confirmLeave, setConfirmLeave] = useState(false)
   const [canvasPreviewHost, setCanvasPreviewHost] = useState<CanvasHost | null>(null)
 
   const cards = useMemo(
@@ -121,7 +124,14 @@ export default function WorkbenchPage() {
               <button
                 type="button"
                 className="crumb-link"
-                onClick={() => router.push(returnTarget)}
+                onClick={() => {
+                  // R6:dirty(含保存失败的脏状态)时先确认,防静默丢编辑。
+                  if (editorDirty) {
+                    setConfirmLeave(true)
+                    return
+                  }
+                  router.push(returnTarget)
+                }}
                 aria-label={t('workbench.backToCanvas')}
               >
                 {t('workbench.backToCanvas')}
@@ -160,6 +170,15 @@ export default function WorkbenchPage() {
         <div className="wb-page__confirm-actions">
           <Button variant="ghost" onClick={() => setPendingCardId(null)}>{t('common.cancel')}</Button>
           <Button variant="primary" onClick={confirmSwitch}>{t('workbench.switchCard')}</Button>
+        </div>
+      </Modal>
+
+      {/* R6 返回画布确认门:未保存编辑时确认再走(保存失败也不静默丢编辑)。 */}
+      <Modal open={confirmLeave} onClose={() => setConfirmLeave(false)} title={t('workbench.unsavedTitle')} closeLabel={t('common.close')}>
+        <p>{t('workbench.unsavedBody')}</p>
+        <div className="wb-page__confirm-actions">
+          <Button variant="ghost" onClick={() => setConfirmLeave(false)}>{t('common.cancel')}</Button>
+          <Button variant="primary" onClick={() => { setConfirmLeave(false); router.push(returnTarget) }}>{t('workbench.backToCanvas')}</Button>
         </div>
       </Modal>
 

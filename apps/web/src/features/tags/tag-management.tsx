@@ -9,6 +9,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import type { Card, TagColor } from '@cys-stift/domain'
+import { Modal, Button } from '@cys-stift/ui'
 import { TAG_COLORS } from '@cys-stift/domain'
 import {
   aggregateTags,
@@ -35,6 +36,8 @@ export function TagManagement({ cards, onApplyChanges }: TagManagementProps) {
   const [draft, setDraft] = useState('')
   const [colorFor, setColorFor] = useState<string | null>(null)
   const [mergeTarget, setMergeTarget] = useState('')
+  // R6:删除标签是批量破坏性操作(从所有带此标签的卡上移除),加确认门,对齐 app 其它删除。
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null)
   const renameRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -202,7 +205,7 @@ export function TagManagement({ cards, onApplyChanges }: TagManagementProps) {
                 <button
                   type="button"
                   className="tm__act tm__act--danger"
-                  onClick={() => onApplyChanges(deleteTag(cards, tag.value))}
+                  onClick={() => setPendingDelete(tag.value)}
                   aria-label={t('tags.deleteTag', { value: tag.value })}
                   title={t('tags.deleteTag', { value: tag.value })}
                 >
@@ -213,6 +216,36 @@ export function TagManagement({ cards, onApplyChanges }: TagManagementProps) {
           )
         })}
       </div>
+
+      {/* R6 确认门:删除标签是批量操作(改所有带此标签的卡),需用户确认 + 显示受影响卡数。 */}
+      {pendingDelete && (() => {
+        const target = tags.find((x) => x.value === pendingDelete)
+        const count = target?.count ?? 0
+        return (
+          <Modal
+            open
+            onClose={() => setPendingDelete(null)}
+            title={t('tags.deleteConfirmTitle')}
+            closeLabel={t('common.cancel')}
+          >
+            <p className="tm__confirm">{t('tags.deleteConfirmBody', { value: pendingDelete, n: String(count) })}</p>
+            <div className="tm__confirm-actions">
+              <Button variant="ghost" onClick={() => setPendingDelete(null)}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => {
+                  onApplyChanges(deleteTag(cards, pendingDelete))
+                  setPendingDelete(null)
+                }}
+              >
+                {t('tags.deleteConfirmAction')}
+              </Button>
+            </div>
+          </Modal>
+        )
+      })()}
     </div>
   )
 }

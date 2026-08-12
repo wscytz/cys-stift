@@ -20,7 +20,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { BauhausMotif, Card as UICard, Tag, Button } from '@cys-stift/ui'
+import { BauhausMotif, Card as UICard, Tag, Button, Modal } from '@cys-stift/ui'
 import { PageHeader } from '@/features/page-header'
 import { searchCards } from '@cys-stift/domain'
 import type { Card, CardId, CanvasId } from '@cys-stift/domain'
@@ -139,6 +139,9 @@ export default function AskPage() {
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [detailCard, setDetailCard] = useState<Card | null>(null)
+  // R6:清空对话改自定义 confirm Modal(原 window.confirm 与全 app 确认门不一致,
+  // 且 Tauri/WebKitGTK WebView 上 window.confirm 不可靠)。
+  const [confirmClear, setConfirmClear] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const requestSeqRef = useRef(0)
   const targetCanvasIdRef = useRef(targetCanvasId)
@@ -532,12 +535,7 @@ export default function AskPage() {
                 <option value={NEW_CANVAS_SENTINEL}>➕ {t('ask.newCanvas')}</option>
               </select>
               {messages.length > 0 && (
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    if (window.confirm(`${t('ask.clearConfirmTitle')}\n\n${t('ask.clearConfirmBody')}`)) handleClear()
-                  }}
-                >
+                <Button variant="ghost" onClick={() => setConfirmClear(true)}>
                   {t('ask.clear')}
                 </Button>
               )}
@@ -648,6 +646,30 @@ export default function AskPage() {
         />
       )}
 
+      {/* R6 清空对话确认门(替换 window.confirm,对齐全 app 确认 Modal 样式 + Tauri 兼容)。 */}
+      <Modal
+        open={confirmClear}
+        onClose={() => setConfirmClear(false)}
+        title={t('ask.clearConfirmTitle')}
+        closeLabel={t('common.cancel')}
+      >
+        <p className="ask__confirm">{t('ask.clearConfirmBody')}</p>
+        <div className="ask__confirm-actions">
+          <Button variant="ghost" onClick={() => setConfirmClear(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              setConfirmClear(false)
+              handleClear()
+            }}
+          >
+            {t('ask.clear')}
+          </Button>
+        </div>
+      </Modal>
+
       <style>{styles}</style>
     </main>
   )
@@ -749,6 +771,8 @@ function MessageContent({
 
 const styles = `
 .ask { display: flex; flex-direction: column; gap: var(--space-3); height: calc(100vh - 186px); }
+.ask__confirm { margin: 0; font-family: var(--font-body); font-size: var(--font-size-sm); line-height: 1.6; }
+.ask__confirm-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-2); }
 .ask__thread { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-2); border: var(--border-hairline); border-radius: var(--radius-sm); background: var(--color-white); min-height: 200px; }
 .ask__empty { color: var(--color-gray); font-family: var(--font-mono); font-size: var(--font-size-sm); margin: var(--space-3) auto; max-width: 50ch; text-align: center; line-height: 1.6; }
 .ask__empty-state { display: grid; gap: var(--space-2); justify-items: center; padding: var(--space-3); }
