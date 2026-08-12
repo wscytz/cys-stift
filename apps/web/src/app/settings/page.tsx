@@ -92,8 +92,6 @@ export default function SettingsPage() {
       return t('settings.importErrorVersion')
     if (error.startsWith('payload.cards is not an array'))
       return t('settings.importErrorNotBackup')
-    if (error.startsWith('checkpoint failed'))
-      return t('settings.importErrorCheckpoint')
     return t('settings.importFail', { error })
   }
 
@@ -126,22 +124,19 @@ export default function SettingsPage() {
     }
   }
 
-  const confirmImport = async (opts?: { skipCheckpoint?: boolean }) => {
+  const confirmImport = async () => {
     const pending = pendingImport
     if (!pending || importing) return
     setImporting(true)
     setResultAction('import')
     try {
-      const result = await importFromJson(
-        pending.text,
-        opts?.skipCheckpoint ? { mode: importMode, checkpoint: false } : { mode: importMode },
-      )
+      // R18(OCR):R17 起 importFromJson 不再因 checkpoint 写失败硬失败(配额满自动放行,
+      // 结果带 checkpointSkipped),旧「跳过恢复点重试」路径已成死代码 —— 直接清掉。
+      // checkpoint:false 仅 restoreImportCheckpoint 内部使用(防止恢复覆盖自身恢复点)。
+      const result = await importFromJson(pending.text, { mode: importMode })
       setImportResult(result)
       refreshCheckpointMeta()
-      // 近配额时 saveImportCheckpoint(写完整副本)会失败 → result.error 以 'checkpoint failed' 开头。
-      // 保留 pending 让用户能"跳过恢复点重试"(牺牲不可撤销换能导入);其余情况照常清 pending。
-      const checkpointBlocked = !result.ok && !!result.error && result.error.startsWith('checkpoint failed')
-      if (!checkpointBlocked) setPendingImport(null)
+      setPendingImport(null)
     } finally {
       setImporting(false)
     }
@@ -296,20 +291,6 @@ export default function SettingsPage() {
                     ? t('settings.clearWorkspaceFail', { error: importResult.error ?? '' })
                     : friendlyImportError(importResult.error)}
               </p>
-              {/* R17:checkpoint 不再因空间不足阻塞导入(放行,结果带 checkpointSkipped)。
-                  保留对旧"checkpoint failed 硬失败"的提示(异常路径仍有)。 */}
-              {!importResult.ok && importResult.error?.startsWith('checkpoint failed') && pendingImport && (
-                <div className="set__import-retry">
-                  <p className="mono mono--xs">{t('settings.importCheckpointBlockedHint')}</p>
-                  <Button
-                    variant="ghost"
-                    onClick={() => confirmImport({ skipCheckpoint: true })}
-                    disabled={importing}
-                  >
-                    {t('settings.importSkipCheckpoint')}
-                  </Button>
-                </div>
-              )}
               </>
             )}
             {checkpointMeta && (
