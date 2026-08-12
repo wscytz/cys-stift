@@ -67,6 +67,12 @@ function dispatchFiles(
         .catch(() => captureAndToast(file, source, t))
       return
     }
+    // R10:把备份 JSON(cys-stift-export-*.json)拖进来是用户从 Downloads 恢复的
+    // 自然直觉 —— 直接报 Unsupported 是死胡同。引导去「设置 → 数据 → 导入 JSON」。
+    if (lower.endsWith('.json') && lower.startsWith('cys-stift-export-')) {
+      pushToast({ kind: 'info', message: t('capture.dropImportJsonHint') })
+      return
+    }
     captureAndToast(file, source, t)
   })
 }

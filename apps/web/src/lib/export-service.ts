@@ -355,6 +355,8 @@ export interface ImportCheckpointMeta {
   cards: number
   mediaAssets: number
   canvases: number
+  /** R10:恢复点字节大小(含媒体 dataUrl 的完整副本,可能 MB 级 —— 用户需看到占多少空间)。 */
+  byteSize: number
 }
 
 /**
@@ -618,6 +620,7 @@ export function getImportCheckpoint(): ImportCheckpoint | null {
 export const readImportCheckpoint = getImportCheckpoint
 
 export function getImportCheckpointMeta(): ImportCheckpointMeta | null {
+  const raw = typeof window === 'undefined' ? null : window.localStorage.getItem(IMPORT_CHECKPOINT_STORAGE_KEY)
   const checkpoint = getImportCheckpoint()
   if (!checkpoint) return null
   return {
@@ -627,6 +630,7 @@ export function getImportCheckpointMeta(): ImportCheckpointMeta | null {
     cards: checkpoint.payload.cards.length,
     mediaAssets: Object.keys(checkpoint.payload.mediaAssets ?? {}).length,
     canvases: checkpoint.payload.canvases?.canvases.length ?? 0,
+    byteSize: raw ? raw.length : 0,
   }
 }
 

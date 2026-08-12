@@ -17,6 +17,7 @@ import { useCapabilities } from '@/features/capabilities/capability-registry'
 import { CaptureShortcutSettings } from '@/features/capture/capture-shortcut-settings'
 import {
   buildExportPayload,
+  clearImportCheckpoint,
   clearWorkspace,
   downloadExport,
   getImportCheckpointMeta,
@@ -49,11 +50,14 @@ export default function SettingsPage() {
   } | null>(null)
   const [importMode, setImportMode] = useState<ImportMode>('replace')
   const [importing, setImporting] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [importReading, setImportReading] = useState(false)
   const [resultAction, setResultAction] = useState<'import' | 'restore' | 'clear'>('import')
   const [checkpointMeta, setCheckpointMeta] = useState<ImportCheckpointMeta | null>(null)
   const [restorePending, setRestorePending] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [clearPending, setClearPending] = useState(false)
+  const [deleteCheckpointPending, setDeleteCheckpointPending] = useState(false)
   const [clearing, setClearing] = useState(false)
 
   const refreshCheckpointMeta = () => {
@@ -80,11 +84,25 @@ export default function SettingsPage() {
     }).format(date)
   }
 
+  // R10:把最常见的导入校验错误映射成用户可读提示(否则用户看到英文索引级报错
+  // 「cards[3].capturedAt missing or not a date」不知道是哪张卡/怎么办)。
+  const friendlyImportError = (error: string | undefined): string => {
+    if (!error) return t('settings.importFail', { error: '' })
+    if (error.startsWith('unsupported version'))
+      return t('settings.importErrorVersion')
+    if (error.startsWith('payload.cards is not an array'))
+      return t('settings.importErrorNotBackup')
+    if (error.startsWith('checkpoint failed'))
+      return t('settings.importErrorCheckpoint')
+    return t('settings.importFail', { error })
+  }
+
   // 选文件后先弹确认门(覆盖不可撤销),确认后才真正导入。
   const handleImportFile = async (files: FileList | null) => {
     if (!files || files.length === 0) return
     const file = files[0]
     if (!file) return
+    setImportReading(true) // R10:文件读取 + dryRun 可能数秒,给进行中反馈
     try {
       const text = await file.text()
       setResultAction('import')
@@ -103,6 +121,8 @@ export default function SettingsPage() {
         mediaAssets: 0,
         error: (error as Error).message || t('settings.importReadFailed'),
       })
+    } finally {
+      setImportReading(false)
     }
   }
 
@@ -199,11 +219,16 @@ export default function SettingsPage() {
             variant="primary"
             type="button"
             className="set__export-btn"
+            disabled={exporting}
             onClick={async () => {
+              if (exporting) return
+              setExporting(true)
               try {
                 const includeDeleted = settings.export?.includeDeleted ?? true
-                const bytes = await downloadExport({ includeDeleted })
+                // R10:构建一次 payload 复用(原代码 downloadExport + buildExportPayload
+                // 各构建一次,大工作区 gap 数秒)。downloadExport 返回 bytes 且已触发下载。
                 const payload = await buildExportPayload({ includeDeleted })
+                const bytes = await downloadExport({ includeDeleted })
                 const live = payload.cards.filter((c) => !c.archived && !c.deletedAt).length
                 pushToast({
                   kind: 'success',
@@ -217,10 +242,12 @@ export default function SettingsPage() {
                 })
               } catch (e) {
                 pushToast({ kind: 'error', message: t('settings.exportFail', { error: (e as Error).message }) })
+              } finally {
+                setExporting(false)
               }
             }}
           >
-            {t('settings.exportJson')}
+            {exporting ? t('settings.exporting') : t('settings.exportJson')}
           </Button>
           <div className="set__import">
             <label className="mono-label">
@@ -235,6 +262,9 @@ export default function SettingsPage() {
                 className="set__file"
               />
             </label>
+            {importReading && (
+              <p className="mono mono--xs" role="status">{t('settings.importReading')}</p>
+            )}
             <p className="mono mono--xs">{t('settings.importHint')}</p>
             {importResult && (
               <>
@@ -257,7 +287,7 @@ export default function SettingsPage() {
                       })
                   : resultAction === 'clear'
                     ? t('settings.clearWorkspaceFail', { error: importResult.error ?? '' })
-                    : t('settings.importFail', { error: importResult.error ?? '' })}
+                    : friendlyImportError(importResult.error)}
               </p>
               {!importResult.ok && importResult.error?.startsWith('checkpoint failed') && pendingImport && (
                 <div className="set__import-retry">
@@ -280,17 +310,29 @@ export default function SettingsPage() {
                     createdAt: checkpointTime(checkpointMeta.createdAt),
                     cards: checkpointMeta.cards,
                     media: checkpointMeta.mediaAssets,
+                    bytes: formatBytes(checkpointMeta.byteSize),
                   })}
                 </p>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="set__recovery-btn"
-                  onClick={() => setRestorePending(true)}
-                  disabled={restoring || importing}
-                >
-                  {t('settings.importCheckpointRestore')}
-                </Button>
+                <div className="set__recovery-actions">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="set__recovery-btn"
+                    onClick={() => setRestorePending(true)}
+                    disabled={restoring || importing}
+                  >
+                    {t('settings.importCheckpointRestore')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="set__recovery-delete-btn"
+                    onClick={() => setDeleteCheckpointPending(true)}
+                    disabled={restoring || importing}
+                  >
+                    {t('settings.importCheckpointDelete')}
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -492,7 +534,9 @@ export default function SettingsPage() {
         closeLabel={t('common.close')}
       >
         <p className="set__confirm-body">
-          {t('settings.importCheckpointConfirmBody')}
+          {t('settings.importCheckpointConfirmBody', {
+            createdAt: checkpointMeta ? checkpointTime(checkpointMeta.createdAt) : '',
+          })}
         </p>
         <div className="set__confirm-actions">
           <Button variant="ghost" onClick={() => setRestorePending(false)} disabled={restoring}>
@@ -502,6 +546,33 @@ export default function SettingsPage() {
             {restoring
               ? t('settings.importCheckpointRestoring')
               : t('settings.importCheckpointRestore')}
+          </Button>
+        </div>
+      </Modal>
+
+      {/* R10:删除恢复点确认(恢复点是完整数据副本,占 localStorage;删除后可腾空间)。 */}
+      <Modal
+        open={deleteCheckpointPending}
+        onClose={() => setDeleteCheckpointPending(false)}
+        title={t('settings.importCheckpointDeleteTitle')}
+        closeLabel={t('common.close')}
+      >
+        <p className="set__confirm-body">{t('settings.importCheckpointDeleteBody')}</p>
+        <div className="set__confirm-actions">
+          <Button variant="ghost" onClick={() => setDeleteCheckpointPending(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              setDeleteCheckpointPending(false)
+              if (clearImportCheckpoint()) {
+                setCheckpointMeta(getImportCheckpointMeta())
+                pushToast({ kind: 'success', message: t('settings.importCheckpointDeleted') })
+              }
+            }}
+          >
+            {t('settings.importCheckpointDelete')}
           </Button>
         </div>
       </Modal>

@@ -89,6 +89,10 @@ export function ExportDialog({
       const effectiveScope: ExportScope =
         scopeIsSelection && selectionDisabled ? 'diagram' : scope
       const baseName = canvasName || 'canvas'
+      const scopeLabel =
+        effectiveScope === 'selection'
+          ? t('canvas.exportScopeSelection')
+          : t('canvas.exportScopeDiagram')
       if (format === 'markdown') {
         const md = exportCanvasMarkdown(host, service, canvasId, canvasName, {
           scope: effectiveScope,
@@ -98,7 +102,14 @@ export function ExportDialog({
           return
         }
         await downloadMarkdown(md, baseName)
-        pushToast({ kind: 'success', message: t('canvas.exportDone', { name: baseName }) })
+        pushToast({
+          kind: 'success',
+          message: t('canvas.exportDoneDetail', {
+            name: baseName,
+            format: 'MD',
+            scope: scopeLabel,
+          }),
+        })
         onClose()
         return
       }
@@ -128,7 +139,14 @@ export function ExportDialog({
         }
         await downloadImage(blob, baseName, format)
       }
-      pushToast({ kind: 'success', message: t('canvas.exportDone', { name: baseName }) })
+      pushToast({
+        kind: 'success',
+        message: t('canvas.exportDoneDetail', {
+          name: baseName,
+          format: format.toUpperCase(),
+          scope: scopeLabel,
+        }),
+      })
       onClose()
     } catch (e) {
       pushToast({
