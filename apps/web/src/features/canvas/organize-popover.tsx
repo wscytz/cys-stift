@@ -16,7 +16,7 @@
  * popover 专属类名 cv-organize__(panel|section|label|grid|seg|range|apply)见 page.tsx styles。
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useI18n } from '@/lib/i18n'
 import { computeAutoLayout } from './auto-layout'
@@ -41,6 +41,20 @@ const DIRECTIONS: OrganizeDirection[] = ['TB', 'LR', 'BT', 'RL']
 
 export function OrganizePopover({ pos, host, onFit, onClose, toast }: Props) {
   const { t } = useI18n()
+  // R8 焦点可达:popover portal 到 body 末尾,Tab 无法自然到达 —— 打开时把焦点移入
+  // 首个控件(键盘用户聚焦「整理」按 Enter 后焦点应进 popover,而非掉到下一工具)。
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (pos) {
+      // 下一个微任务等 portal 挂载后再聚焦。
+      const id = setTimeout(() => {
+        const panel = panelRef.current
+        const first = panel?.querySelector<HTMLElement>('button, input, [tabindex]:not([tabindex="-1"])')
+        ;(first ?? panel)?.focus()
+      }, 0)
+      return () => clearTimeout(id)
+    }
+  }, [pos])
   // 默认:mindmap / TB / gap60。这是"有默认方向"的体现——用户开 popover 即见明确默认。
   const [strategy, setStrategy] = useState<OrganizeStrategy>('mindmap')
   const [direction, setDirection] = useState<OrganizeDirection>('TB')
@@ -106,6 +120,7 @@ export function OrganizePopover({ pos, host, onFit, onClose, toast }: Props) {
         className="cv-rail__menu cv-organize__panel"
         role="dialog"
         aria-label={t('canvas.organize.title')}
+        ref={panelRef}
         style={pos ? { left: `${pos.left}px`, top: `${pos.top}px` } : { visibility: 'hidden' }}
       >
         {/* 策略 */}

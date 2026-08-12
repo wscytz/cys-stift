@@ -729,7 +729,8 @@ ${formatted}`
       const tgt = e.target as HTMLElement | null
       if (tgt) {
         const tag = tgt.tagName
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tgt.isContentEditable) return
+        // R8:含 SELECT —— 画布切换器下拉 type-ahead(如按 g 跳画布名)会被单字母快捷键劫持。
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tgt.isContentEditable) return
       }
       if (e.key === '/') {
         e.preventDefault()
@@ -1346,6 +1347,16 @@ ${formatted}`
             router.push('/workbench')
           }}
           onDoubleClickEmpty={(px, py, cx, cy) => setCtxMenu({ x: cx, y: cy, px, py, creating: true })}
+          onKeyboardContextMenu={(cx, cy) => {
+            // R8:键盘打开右键菜单(Menu 键 / Shift+F10)—— 从视口中心 client 坐标转 page 坐标。
+            const adapter = handle.current.adapter
+            const canvas = canvasElRef.current
+            if (!adapter || !canvas) return
+            const rect = canvas.getBoundingClientRect()
+            const view = adapter.getView()
+            const p = screenToPage(view, cx - rect.left, cy - rect.top)
+            setCtxMenu({ x: cx, y: cy, px: p.x, py: p.y })
+          }}
           adapterRef={handle}
           canvasElRef={canvasElRef}
           onAdapterReady={setAdapter}
@@ -1566,7 +1577,7 @@ ${formatted}`
         </div>
       </Modal>
 
-      <Modal open={confirmDeleteId !== null} onClose={() => { setConfirmDeleteId(null); setDeleteConfirmText('') }} title={t('canvas.deleteModalTitle')} closeLabel={t('common.close')}>
+      <Modal open={confirmDeleteId !== null} onClose={() => { setConfirmDeleteId(null); setDeleteConfirmText('') }} onEscape={() => { setConfirmDeleteId(null); setDeleteConfirmText('') }} title={t('canvas.deleteModalTitle')} closeLabel={t('common.close')}>
         <p className="confirm__body">
           {cardCountOnTarget > 0
             ? t('canvas.deleteModalBodyCards', { name: canvases.find((c) => c.id === confirmDeleteId)?.name ?? '', n: cardCountOnTarget })

@@ -194,6 +194,9 @@ export const messages = {
   'graph.zoom.out': { zh: '缩小', en: 'Zoom out' },
   'graph.zoom.reset': { zh: '复位', en: 'Reset' },
   'graph.zoom.slider': { zh: '缩放级别', en: 'Zoom level' },
+  'graph.a11y.nodesLabel': { zh: '图谱节点（键盘可访问）', en: 'Graph nodes (keyboard accessible)' },
+  'graph.a11y.node': { zh: '打开「{title}」', en: 'Open "{title}"' },
+  'graph.a11y.hint': { zh: '图谱画布用方向键平移、缩放条调整视图；从下方列表打开卡片。', en: 'Use arrow keys to pan the graph, the zoom bar to scale, and the list below to open a card.' },
 
   /* ── Canvas ── */
   'canvas.crumb': { zh: '画布', en: 'canvas' },

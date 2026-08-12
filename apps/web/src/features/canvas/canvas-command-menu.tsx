@@ -135,7 +135,9 @@ export function CanvasCommandMenu({
             className="cv-rail__menu-item"
             disabled={item.disabled}
             onClick={() => {
-              onClose()
+              // R8:与 backdrop 同走 closeAndRestoreFocus —— 键盘用户 Enter 选中项后
+              // 焦点回到 trigger(此前 onClose() 直接卸载,焦点掉 body,读屏光标回页面开头)。
+              closeAndRestoreFocus()
               item.onSelect()
             }}
           >

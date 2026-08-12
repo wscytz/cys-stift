@@ -441,6 +441,7 @@ export default function InboxPage() {
         <Modal
           open
           onClose={() => setConfirmDeleteIds(null)}
+          onEscape={() => setConfirmDeleteIds(null)}
           title={t('inbox.batch.deleteConfirmTitle', { n: confirmDeleteIds.length })}
           closeLabel={t('common.close')}
         >

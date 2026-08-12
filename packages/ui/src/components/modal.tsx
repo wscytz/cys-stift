@@ -14,6 +14,13 @@ export interface ModalProps {
    * should pass a localized label (e.g. `t('common.close')`).
    */
   closeLabel?: string
+  /**
+   * Escape → this handler. Default: none (Escape stays the caller's
+   * responsibility). Pass `onEscape={onClose}` for a standard "Esc closes
+   * this modal" dialog. Don't pass it when an inner layer (popover /
+   * nested dialog) inside the frame must consume Escape first.
+   */
+  onEscape?: () => void
 }
 
 const FOCUSABLE =
@@ -31,7 +38,7 @@ const FOCUSABLE =
  * own frame, so a modal stack (card-detail → confirm-delete) lets only the
  * top trap handle the key. Escape stays the caller's responsibility.
  */
-export function Modal({ open, onClose, title, children, closeLabel = 'Close' }: ModalProps) {
+export function Modal({ open, onClose, title, children, closeLabel = 'Close', onEscape }: ModalProps) {
   const frameRef = useRef<HTMLDivElement | null>(null)
   const previouslyFocused = useRef<HTMLElement | null>(null)
   const titleId = useId()
@@ -91,6 +98,23 @@ export function Modal({ open, onClose, title, children, closeLabel = 'Close' }: 
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [open])
+
+  // Optional Escape → onEscape. Only wired when the caller passes it (the
+  // caller owns Escape semantics otherwise, e.g. nested popovers inside the
+  // frame). Fire only when focus is inside this frame so a stacked modal
+  // doesn't both close.
+  useEffect(() => {
+    if (!open || !onEscape) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      const frame = frameRef.current
+      if (!frame?.contains(document.activeElement)) return
+      e.stopPropagation()
+      onEscape()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, onEscape])
 
   if (!open) return null
   return (

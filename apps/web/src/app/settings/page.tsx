@@ -456,6 +456,7 @@ export default function SettingsPage() {
       <Modal
         open={pendingImport !== null}
         onClose={() => !importing && setPendingImport(null)}
+        onEscape={() => !importing && setPendingImport(null)}
         title={t('settings.importConfirmTitle')}
         closeLabel={t('common.close')}
       >

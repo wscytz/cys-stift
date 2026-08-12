@@ -117,6 +117,24 @@ export default function GraphPage() {
               }}
               onZoomChange={setZoom}
             />
+            {/* R8 键盘可达:图谱 canvas 对键盘/读屏不可达,补一个可聚焦节点清单
+                (offscreen 但不 display:none,键盘用户 Tab 可达 + 读屏可读)。
+                Enter/Space 打开对应卡。 */}
+            <ul className="graph-a11y sr-only-focusable" aria-label={t('graph.a11y.nodesLabel')}>
+              {filtered.nodes.map((n) => (
+                <li key={n.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const card = cardById.get(n.id as CardId)
+                      if (card) setDetail(card)
+                    }}
+                  >
+                    {t('graph.a11y.node', { title: n.title })}
+                  </button>
+                </li>
+              ))}
+            </ul>
             <GraphZoomBar
               zoom={zoom}
               onZoomBy={(factor) => graphRef.current?.zoomBy(factor)}

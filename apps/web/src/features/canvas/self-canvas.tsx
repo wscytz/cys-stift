@@ -53,6 +53,7 @@ export function SelfCanvas({
   onEraseCard,
   onOpenCard,
   onDoubleClickEmpty,
+  onKeyboardContextMenu,
   adapterRef,
   canvasElRef,
   onAdapterReady,
@@ -69,6 +70,8 @@ export function SelfCanvas({
   /** 双击空白画布(未命中卡片/frame、且无选中箭头)→ 建卡。page 层打开「在此处建卡」内联输入。
    *  Figma/tldraw 惯例:双击空白直建卡(比右键菜单易发现);与右键菜单建卡并存。 */
   onDoubleClickEmpty?: (pageX: number, pageY: number, clientX: number, clientY: number) => void
+  /** R8 键盘可达:canvas 聚焦时按 Menu 键 / Shift+F10 → page 层打开右键菜单(键盘用户唯一入口)。 */
+  onKeyboardContextMenu?: (x: number, y: number) => void
   adapterRef: React.MutableRefObject<SelfCanvasHandle>
   /** Page-supplied ref so the RelationPanel can read the canvas rect for
    *  positioning (子4: panel floats above selected arrow, needs screen coords). */
@@ -409,6 +412,17 @@ export function SelfCanvas({
         onDoubleClick={onDoubleClick}
         onPointerMove={onPointerMove}
         onPointerLeave={onPointerLeave}
+        onKeyDown={(e) => {
+          // R8:Menu 键 / Shift+F10 → 键盘打开右键菜单(键鼠用户唯一入口)。
+          if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
+            e.preventDefault()
+            const el = innerCanvasRef.current
+            if (el && onKeyboardContextMenu) {
+              const rect = el.getBoundingClientRect()
+              onKeyboardContextMenu(rect.left + rect.width / 2, rect.top + rect.height / 2)
+            }
+          }
+        }}
         role="region"
         tabIndex={0}
         aria-label={t('canvas.srLabel')}

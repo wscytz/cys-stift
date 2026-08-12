@@ -237,6 +237,7 @@ export function CanvasAccessibleOutline({
             }}
             type="button"
             role="option"
+            tabIndex={activeId === object.id || (activeId === null && index === 0) ? 0 : -1}
             aria-selected={activeId === object.id}
             aria-label={describe(object)}
             className="canvas-a11y-outline__option"

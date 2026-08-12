@@ -140,32 +140,48 @@ export function TagManagement({ cards, onApplyChanges }: TagManagementProps) {
                 />
               </span>
               <span className="tm__cell tm__cell--color">
-                <button
-                  type="button"
+                <span
+                  role="button"
+                  tabIndex={0}
                   className="tm__swatch"
                   style={solidTagChipStyle(tag.color)}
                   aria-label={t('tags.recolorTag', { value: tag.value })}
+                  aria-expanded={popoverOpen}
                   onClick={() => setColorFor(popoverOpen ? null : tag.value)}
-                >
-                  {popoverOpen && (
-                    <span className="tm__popover" role="dialog" aria-label={t('tags.colColor')}>
-                      {TAG_COLORS.map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          className={`tm__swatch-mini${c === tag.color ? ' is-cur' : ''}`}
-                          style={{ background: c }}
-                          aria-label={String(c)}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onApplyChanges(recolorTag(cards, tag.value, c as TagColor))
-                            setColorFor(null)
-                          }}
-                        />
-                      ))}
-                    </span>
-                  )}
-                </button>
+                  onKeyDown={(e) => {
+                    // R8:swatch 从 button 改 span+role=button(色板按钮不能嵌套 button),
+                    // Enter/Space 与 button 语义一致,Menu 键也能开。
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setColorFor(popoverOpen ? null : tag.value)
+                    }
+                  }}
+                />
+                {popoverOpen && (
+                  <span
+                    className="tm__popover"
+                    role="dialog"
+                    aria-label={t('tags.colColor')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') setColorFor(null) // R8:Esc 关色板
+                    }}
+                  >
+                    {TAG_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        className={`tm__swatch-mini${c === tag.color ? ' is-cur' : ''}`}
+                        style={{ background: c }}
+                        aria-label={String(c)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onApplyChanges(recolorTag(cards, tag.value, c as TagColor))
+                          setColorFor(null)
+                        }}
+                      />
+                    ))}
+                  </span>
+                )}
               </span>
               <span className="tm__cell tm__cell--name">
                 {isRenaming ? (

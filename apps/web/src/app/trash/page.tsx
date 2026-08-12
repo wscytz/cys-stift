@@ -85,6 +85,10 @@ export default function TrashPage() {
           setConfirmHardDelete(null)
           setDeleteConfirmText('')
         }}
+        onEscape={() => {
+          setConfirmHardDelete(null)
+          setDeleteConfirmText('')
+        }}
         title={t('trash.deleteForeverTitle')}
         closeLabel={t('common.close')}
       >
