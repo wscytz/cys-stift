@@ -1357,6 +1357,7 @@ ${formatted}`
             const p = screenToPage(view, cx - rect.left, cy - rect.top)
             setCtxMenu({ x: cx, y: cy, px: p.x, py: p.y })
           }}
+          onTextClickHitElement={() => setTool('select')}
           adapterRef={handle}
           canvasElRef={canvasElRef}
           onAdapterReady={setAdapter}

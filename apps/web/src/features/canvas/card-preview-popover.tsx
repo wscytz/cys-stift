@@ -8,27 +8,24 @@ import { useI18n } from '@/lib/i18n'
 /**
  * CardPreviewPopover - 画布 hover 只读速览浮层。
  *
- * 显示标题 + 正文 markdown 渲染 + tags +「在工作台编辑」按钮(-> onEdit)。
- * 由 self-canvas 挂 pointermove 触发,absolute 定位(调用方传 left/top 坐标)。
- * 非编辑(编辑去工作台);只读速览,调布局时快速看卡内容。
+ * 显示标题 + 正文 markdown 渲染 + tags。由 self-canvas 挂 pointermove 触发,
+ * absolute 定位(调用方传 left/top 坐标)。
+ *
+ * R9:pointer-events:none —— 浮层是纯只读速览,绝不拦截画布指针。此前浮层
+ * 盖在卡上且可交互,用户想看内容停 300ms 后浮层挡住卡 → 拖/点这张卡 pointerdown
+ * 落在浮层上,画布收不到(拖不动/选不中)。编辑走双击卡 / 工作台(都有入口),
+ * 浮层不需要按钮;pointer-events:none 后指针落回 canvas,移出卡的延迟隐藏照常。
  */
 export function CardPreviewPopover({
   card,
-  onEdit,
   style,
-  onMouseEnter,
-  onMouseLeave,
 }: {
   card: Card
-  onEdit: () => void
   style?: React.CSSProperties
-  /** 悬停浮层本身时取消隐藏(让用户能移进来读/滚);离开浮层再延迟隐藏。 */
-  onMouseEnter?: () => void
-  onMouseLeave?: () => void
 }) {
   const { t } = useI18n()
   return (
-    <div className="cv-preview" style={style} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} role="dialog" aria-label={card.title || t('card.untitled')}>
+    <div className="cv-preview" style={style} role="dialog" aria-label={card.title || t('card.untitled')}>
       <style>{styles}</style>
       <div className="cv-preview__head">
         <span className="cv-preview__title">{card.title || t('card.untitled')}</span>
@@ -45,9 +42,6 @@ export function CardPreviewPopover({
           ))}
         </div>
       )}
-      <button type="button" className="cv-preview__edit" onClick={onEdit}>
-        {t('canvas.preview.editInWorkbench')}
-      </button>
     </div>
   )
 }
@@ -64,6 +58,7 @@ const styles = `
   border: var(--border-thick);
   box-shadow: var(--shadow-md);
   font-family: var(--font-body);
+  pointer-events: none; /* R9:纯只读速览,不拦截画布指针(否则盖住卡拖不动) */
 }
 .cv-preview__head {
   padding: var(--space-2) var(--space-3);

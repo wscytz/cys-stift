@@ -82,7 +82,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   private currentStroke: { points: [number, number][] } | null = null
   private selectedIds = new Set<string>()
   private resizing: { id: string; handle: Handle; start: { x: number; y: number; w: number; h: number } } | null = null
-  private dragGroup: { ids: string[]; offsets: Map<string, { x: number; y: number }> } | null = null
+  private dragGroup: { ids: string[]; offsets: Map<string, { x: number; y: number }>; startSx: number; startSy: number } | null = null
   private marquee: { startX: number; startY: number; curX: number; curY: number } | null = null
   private connecting: { fromId: string; pointer: { x: number; y: number }; toId: string | null } | null = null
   /** 拖动箭头弯曲手柄(设 curve 控制点)。null=未在拖。 */
@@ -939,7 +939,7 @@ export class SelfBuiltAdapter implements CanvasHost {
           const sel = this.getElement(sid)
           if (sel) offsets.set(sid, { x: p.x - sel.x, y: p.y - sel.y })
         }
-        this.dragGroup = { ids: [...this.selectedIds], offsets }
+        this.dragGroup = { ids: [...this.selectedIds], offsets, startSx: sx, startSy: sy }
         // undo 粒度:pushUndo 推迟到 onMove 首次实际移动(lazy),纯点击不拖不污染 undo 栈。
       } else if (!e.shiftKey) {
         // 空白 + 无 shift → pan + 清选择(现有)
@@ -1055,6 +1055,11 @@ export class SelfBuiltAdapter implements CanvasHost {
       }
       if (this.dragGroup) {
         const p = screenToPage(this.view, sx, sy)
+        // R9:位移阈值(~3px 屏幕)—— 微小手抖的「点击」不算拖动:未过阈值不 pushUndo
+        // 不移动(否则手抖就把元素挪 1px + 撤销栈多一条 no-op,⌘Z 先回抖动位置)。
+        const dxScreen = sx - this.dragGroup.startSx
+        const dyScreen = sy - this.dragGroup.startSy
+        if (Math.hypot(dxScreen, dyScreen) < 3) return
         // lazy pushUndo:首次实际移动才推快照(纯点击不拖不推),后续 upsert 被 coalescing 合并。
         if (!this.coalescing) {
           this.pushUndo()
@@ -1363,6 +1368,19 @@ export class SelfBuiltAdapter implements CanvasHost {
       // 单层模态的 Escape(选中态开模态 → Escape 只清选区不关模态)。adapter 清选区
       // 无需阻止默认行为,去掉 preventDefault 让模态正常关(画布选区被清无害,模态已遮住)。
       if (e.key === 'Escape') {
+        // R9:进行中的连线/手绘也要被 Esc 丢弃(指针已捕获,pointercancel 不触发)。
+        // 否则 connect 拖半条线按 Esc 什么都没发生、预览线还跟着松手照样建箭头;
+        // freedraw 画到一半 Esc 也停不下来。与 onCancel(pointercancel)丢弃路径一致。
+        if (this.connecting) {
+          this.connecting = null
+          this.scheduleRender()
+          return
+        }
+        if (this.currentStroke) {
+          this.currentStroke = null
+          this.scheduleRender()
+          return
+        }
         if (this.selectedIds.size === 0) return
         this.executeCommand({ type: 'clearSelection' })
         return

@@ -243,12 +243,16 @@ export function focusCanvasItem(
 }
 
 /**
- * Add a card to the host (e.g. just created via double-click). No-echo so it
- * doesn't trip the writeback listener.
+ * Add a card to the host (e.g. just created via double-click). Uses batch
+ * (echo) so the create lands on the undo stack — ⌘Z can take the card back
+ * (undo → host removes element → reconcile returns card to inbox), symmetric
+ * with delete's undo. Note: echoed upsert fires onUserChange → writeback, but
+ * createCardOnCanvas already wrote the card to the service (canvasPosition
+ * set), so the flush is idempotent.
  */
 export function addCardShape(host: CanvasHost, card: Card): void {
   if (host.getElement(String(card.id))) return
-  host.applyWithoutEcho(() => host.upsert(cardToElement(card)))
+  host.batch(() => host.upsert(cardToElement(card)))
 }
 
 /** Sync a card's size onto its host element (e.g. after a modal edit). */

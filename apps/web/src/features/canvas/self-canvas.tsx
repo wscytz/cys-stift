@@ -39,6 +39,9 @@ interface EditSession {
   /** B3 — frame 重命名:双击 frame 时设此 id。commit 时 upsert 该 frame 的 text
    *  (而非新建 text 元素)。无 frameId = 普通 text 工具新建文本。 */
   frameId?: string
+  /** R9 — text 元素原地编辑:双击已有 text 时设此 id。commit 时 upsert 该 text 的
+   *  text(而非新建),与 frame 重命名同范式。 */
+  textId?: string
 }
 
 export interface SelfCanvasHandle {
@@ -54,6 +57,7 @@ export function SelfCanvas({
   onOpenCard,
   onDoubleClickEmpty,
   onKeyboardContextMenu,
+  onTextClickHitElement,
   adapterRef,
   canvasElRef,
   onAdapterReady,
@@ -72,6 +76,9 @@ export function SelfCanvas({
   onDoubleClickEmpty?: (pageX: number, pageY: number, clientX: number, clientY: number) => void
   /** R8 键盘可达:canvas 聚焦时按 Menu 键 / Shift+F10 → page 层打开右键菜单(键盘用户唯一入口)。 */
   onKeyboardContextMenu?: (x: number, y: number) => void
+  /** R9 text 工具手感:text 模式下点击命中已有元素时,让 page 切回 select(而不是又放个空 textarea)。
+   *  主流画布肌肉记忆:点了已有内容就该进入选择/编辑,而非再放新文本。 */
+  onTextClickHitElement?: () => void
   adapterRef: React.MutableRefObject<SelfCanvasHandle>
   /** Page-supplied ref so the RelationPanel can read the canvas rect for
    *  positioning (子4: panel floats above selected arrow, needs screen coords). */
@@ -266,6 +273,21 @@ export function SelfCanvas({
         return
       }
     }
+    // R9:双击已有 text 元素 → 原地编辑(预填现有文本),与 frame 重命名同范式。
+    // 此前 text 元素双击无反应,用户得切回 Text 工具再点一遍。
+    for (let i = els.length - 1; i >= 0; i--) {
+      const el = els[i]!
+      if (el.kind === 'text' && p.x >= el.x && p.x <= el.x + el.w && p.y >= el.y && p.y <= el.y + el.h) {
+        const v = adapter.getView()
+        const zoom = v.zoom || 1
+        const screenX = el.x * zoom + v.panX
+        const screenY = el.y * zoom + v.panY
+        setEdit({ screenX, screenY, pageX: el.x, pageY: el.y, textId: el.id })
+        setTextValue(el.text ?? '')
+        committedRef.current = false
+        return
+      }
+    }
     // B3 — 未命中 card:检查 frame(底层容器,双击改标题)。frame 在 card 下层,
     // 双击点上方若无 card,命中 frame 空白边框区 → 起重命名 input。
     for (let i = els.length - 1; i >= 0; i--) {
@@ -336,6 +358,15 @@ export function SelfCanvas({
     const sy = e.clientY - rect.top
     const view = adapter.getView()
     const p = screenToPage(view, sx, sy)
+    // R9:text 模式下点击命中已有元素(card/arrow/text/rect/frame)→ 切回 select 让
+    // 用户进入选择/编辑,而非再放一个空 textarea(主流画布肌肉记忆)。
+    const hit = adapter.getElements().find((el) =>
+      p.x >= el.x && p.x <= el.x + el.w && p.y >= el.y && p.y <= el.y + el.h,
+    )
+    if (hit) {
+      onTextClickHitElement?.()
+      return
+    }
     setEdit({ screenX: sx, screenY: sy, pageX: Math.round(p.x), pageY: Math.round(p.y) })
     setTextValue('')
     committedRef.current = false // 新 edit session,重置 commit 守卫
@@ -366,6 +397,17 @@ export function SelfCanvas({
       const existing = adapter.getElement(curEdit.frameId)
       if (existing) {
         adapter.upsert({ ...existing, text: v })
+      }
+      setEdit(null)
+      setTextValue('')
+      return
+    }
+    // R9 — text 元素原地编辑:upsert 现有 text 的 text(不新建)。空文本 = 删除该元素。
+    if (curEdit.textId) {
+      const existing = adapter.getElement(curEdit.textId)
+      if (existing) {
+        if (v) adapter.upsert({ ...existing, text: v })
+        else adapter.remove(curEdit.textId)
       }
       setEdit(null)
       setTextValue('')
@@ -440,10 +482,7 @@ export function SelfCanvas({
         return (
           <CardPreviewPopover
             card={c}
-            onEdit={() => onOpenCard(c)}
             style={{ left: popoverPos.x, top: popoverPos.y }}
-            onMouseEnter={cancelHide}
-            onMouseLeave={scheduleHide}
           />
         )
       })()}

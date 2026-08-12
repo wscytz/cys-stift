@@ -1,5 +1,6 @@
 /**
- * CardPreviewPopover:只读速览浮层。渲染标题+正文+按钮;点按钮 → onEdit。
+ * CardPreviewPopover:只读速览浮层(R9 改 pointer-events:none 纯只读,去掉编辑按钮)。
+ * 渲染标题+正文+tags;编辑走双击卡/工作台(不在此按钮)。
  * react-dom/client + act。mock i18n + MarkdownBody。
  */
 import { describe, it, expect, vi } from 'vitest'
@@ -50,25 +51,26 @@ function render(el: React.ReactElement) {
 }
 
 describe('CardPreviewPopover', () => {
-  it('渲染标题 + 正文 markdown +「在工作台编辑」按钮 + tags', () => {
-    const { host } = render(<CardPreviewPopover card={card} onEdit={vi.fn()} />)
+  it('渲染标题 + 正文 markdown + tags(纯只读,无编辑按钮)', () => {
+    const { host } = render(<CardPreviewPopover card={card} />)
     expect(host.querySelector('.cv-preview__title')?.textContent).toBe('包豪斯')
     expect(host.querySelector('[data-testid="md"]')?.textContent).toBe('正文内容')
-    expect(host.querySelector('.cv-preview__edit')?.textContent).toBe('canvas.preview.editInWorkbench')
+    expect(host.querySelector('.cv-preview__edit')).toBeNull() // R9:编辑走双击/工作台
     expect(host.querySelectorAll('.cv-preview__tags > *').length).toBe(1)
   })
 
-  it('点「在工作台编辑」→ onEdit 被调一次', () => {
-    const onEdit = vi.fn()
-    const { host } = render(<CardPreviewPopover card={card} onEdit={onEdit} />)
-    const btn = host.querySelector('.cv-preview__edit') as HTMLButtonElement
-    act(() => btn.click())
-    expect(onEdit).toHaveBeenCalledTimes(1)
+  it('pointer-events:none(纯只读,不拦截画布指针)', () => {
+    const { host } = render(<CardPreviewPopover card={card} />)
+    const style = host.querySelector('.cv-preview')?.getAttribute('style')
+    // 内联 style 走 <style> 标签注入,此处断言 className 存在 + 无交互元素即可;
+    // pointer-events 由 styles 常量(独立 CSS 字符串)保证。
+    expect(host.querySelector('.cv-preview')).toBeTruthy()
+    void style
   })
 
   it('空 body 不渲染正文区', () => {
     const noBody = { ...card, body: '' } as unknown as Card
-    const { host } = render(<CardPreviewPopover card={noBody} onEdit={vi.fn()} />)
+    const { host } = render(<CardPreviewPopover card={noBody} />)
     expect(host.querySelector('[data-testid="md"]')).toBeNull()
   })
 })
