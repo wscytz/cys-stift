@@ -1,8 +1,8 @@
-# cy's Stift 1.3.0-preview.1
+# cy's Stift 1.3.0-preview.2
 
 A preview of the local-first idea canvas: Capture -> Inbox -> Canvas -> Workbench -> Export and recovery. All data stays on your machine; the app sends nothing to a server and collects no usage telemetry.
 
-This preview collects a round of experience polish since 1.2.0 — accessibility, canvas feel, search, import/export, and storage awareness — guided by the default-user perspective.
+This is a follow-up to 1.3.0-preview.1. A deep review (per-feature subagents + automated rule check) after the preview found one data-integrity bug and four quality issues; this release fixes all of them with regression tests.
 
 ## Downloads
 
@@ -13,11 +13,13 @@ This preview collects a round of experience polish since 1.2.0 — accessibility
 
 ## What's new in this preview
 
-- **Accessibility (keyboard reachability):** the graph view and canvas card creation are operable by keyboard; focus management and Esc-to-cancel are consistent; tool overlays no longer cover their targets.
-- **Canvas feel:** card creation is undoable; the text tool can place text inside a frame; the eraser no longer shows a misleading "mode mismatch" notice on empty clicks; wheel/trackpad zoom follows the actual scroll amount; double-clicking empty space while an arrow is selected still creates a card.
-- **Find (⌘K):** full keyboard navigation with match highlighting; linked-card titles are indexed; filters no longer mislead.
-- **Import/export + storage awareness:** controllable pre-import recovery points, clear export feedback, drag-back guidance, readable errors. **Import boundary:** when there is not enough space to write the full snapshot, the import proceeds and reports "no recovery point created" (the smaller new state may still fit); rollback is guaranteed by an independent snapshot, not the recovery point. Fixed lossy rebuilding when editing `@links` (URL-unchanged links keep their title/preview/fetched-at). Storage usage is computed against the real quota, with clear cleanup paths, large-file hints, and a visible data location.
-- **Relations / deep editing / cross-page consistency:** creating a connection sets its type; bidirectional links have a consistent direction; deletions are announced. The workbench preserves rich fields (`@code`/`@quote`/`@links`) when switching cards; IME composition no longer misfires; detail actions, tag gestures, and save feedback are consistent across pages; confirmation gates, shortcut conflicts, and Esc stacking are unified.
+- **Data integrity fix (workbench):** switching cards in the Workbench no longer strips a card's link rich fields (title / preview image / fetched-at) — they were being flattened to `{url, fetchedAt}` on flush. Switching cards now preserves them.
+- **DSL apply fix:** re-applying a DSL with partial failures no longer duplicates `#id`-less freeform shapes (rect / text / frame). Already-applied lines are now skipped on re-apply.
+- **Editor scroll:** typing in Markdown split/source mode no longer jumps the editor back to the top each keystroke (scroll position is only restored when switching back from preview).
+- **Tag input:** a half-typed tag no longer disappears when you click a chip's × right after the input blurs.
+- **Search snippets:** link matches now show why they matched (the link's title/description is included in the snippet, not just the URL).
+
+See 1.3.0-preview.1 notes below for the broader polish round (accessibility, canvas feel, search, import/export, storage awareness).
 
 ## Windows notice (no code signing)
 

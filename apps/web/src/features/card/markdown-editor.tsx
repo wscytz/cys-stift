@@ -120,6 +120,8 @@ export function MarkdownEditor({ value, onChange, className, resolveEmbed }: Mar
   }
 
   // onChange 后父组件回灌新 value → textarea 重渲染 → 这里恢复工具栏算出的选区。
+  // 只管选区;不碰 scrollTop —— 打字也会触发 value 变,若在此恢复 scrollTop 会把
+  // 编辑器每次按键都拉回切 preview 前的位置(R13 反向 bug:长文编辑滚动位置丢失)。
   useEffect(() => {
     const sel = pendingSel.current
     const ta = taRef.current
@@ -129,9 +131,14 @@ export function MarkdownEditor({ value, onChange, className, resolveEmbed }: Mar
       ta.focus()
       pendingSel.current = null
     }
-    // R13:从 preview 切回源/split,textarea 重挂 → 恢复之前的滚动位置。
+  }, [value])
+
+  // R13:从 preview 切回源/split,textarea 重挂 → 恢复之前的滚动位置。
+  // 只在 view 真正变化时执行(不跟 value 绑),避免打字时反复拉回旧 scrollTop。
+  useEffect(() => {
+    const ta = taRef.current
     if (ta) ta.scrollTop = savedScrollTop.current
-  }, [value, view])
+  }, [view])
 
   return (
     <div className={`md-editor${className ? ' ' + className : ''}`}>

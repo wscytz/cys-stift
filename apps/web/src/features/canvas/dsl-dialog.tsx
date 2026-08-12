@@ -246,12 +246,14 @@ export function DslDialog({
       return
     }
 
-    const { applied, skipped, failed } = applyLayout(host, ops, appliedHashes, onCardCreate, onCardUpdate)
-    // 合并新应用的 hash 到现有集合触发状态更新
+    const { applied, skipped, failed, newlyApplied } = applyLayout(host, ops, appliedHashes, onCardCreate, onCardUpdate)
+    // 合并【本次新应用】的 op hash 到现有集合 —— 部分失败时保留已应用行的 hash,
+    // 重复 Apply 会跳过它们(planFree 命中已应用 hash 走 update 不造副本),防造无 #id
+    // freeform 副本。全部成功时下方 else-if 分支会重序列化文本(画布即文本)并清空 hash。
     if (applied > 0) {
       const nextBase = cloneElements(host.getElements())
       setBase({ elements: nextBase, revision: revisionOf(nextBase) })
-      setAppliedHashes(new Set())
+      setAppliedHashes((prev) => new Set([...prev, ...newlyApplied]))
       setStale(false)
       // T5:风险 op 存档 —— DSL apply 成功(applied > 0)后落档(b 类,fire-and-forget,
       // 不阻塞 UI;apply 是同步函数,用 .then() 链接 append)。
@@ -277,8 +279,9 @@ export function DslDialog({
       })
     } else if (applied > 0) {
       // 全部成功:重序列化同步文本(画布即文本),视为已应用,不再 dirty。
-      // (base/appliedHashes 已在上方 applied>0 分支更新)
+      // 清空 hash —— 文本已与画布一致,旧 op hash 留着无意义(下次 apply 是全新 parse 集合)。
       setText(serializeCanvasReadable(host.getElements(), (id) => { const c = service.get(id as CardId); return c ? { title: c.title, content: c.body, type: c.type, tags: c.tags, links: c.links, codeSnippets: c.codeSnippets, quotes: c.quotes } : undefined }))
+      setAppliedHashes(new Set())
       dirtyRef.current = false
       pushToast({ kind: 'success', message: t('canvas.dslApplied', { n: String(applied) }) })
     } else {

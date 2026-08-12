@@ -25,7 +25,11 @@ export function snippetForResult(result: SearchResult, query: string): string | 
     return bodySnippet({ body: joined }, query)
   }
   if (field === 'link') {
-    const joined = (c.links ?? []).map((l) => l.url).join(' ')
+    // 对齐索引侧(search.ts):url + title + description 都进索引,snippet 也要带上,
+    // 否则用户搜「官方文档」(只在 link title 里)能搜到却看不到为什么匹配(无 snippet 无高亮)。
+    const joined = (c.links ?? [])
+      .map((l) => [l.url, l.title, l.description].filter(Boolean).join(' '))
+      .join(' ')
     return bodySnippet({ body: joined }, query)
   }
   if (field === 'code') {

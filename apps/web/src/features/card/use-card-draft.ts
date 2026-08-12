@@ -55,8 +55,10 @@ export interface CardDraftField<D> {
 export interface CardDraftApi {
   /** 草稿(field key → 值)。 */
   draft: Record<string, unknown>
-  /** 改单字段。 */
-  setField: (key: keyof UpdateCardPatch, value: unknown) => void
+  /** 改单字段。value 可以是终值,也可以是 (prevFieldValue) => 终值 的 updater ——
+   *  updater 形式用于同字段连续异步更新(如 tag onBlur 加 + 紧接着 chip × 删),
+   *  避免第二次更新基于陈旧闭包覆盖第一次(blur/click race 丢未提交输入)。 */
+  setField: (key: keyof UpdateCardPatch, value: unknown | ((prev: unknown) => unknown)) => void
   /** 整体替换草稿(AI onReplace 等批量改;或传 updater)。 */
   setDraft: Dispatch<SetStateAction<Record<string, unknown>>>
   /** 是否有未保存改动(任一 field 草稿 ≠ Card 原值)。 */
@@ -103,8 +105,11 @@ export function useCardDraft(
   )
 
   const setField = useCallback(
-    (key: keyof UpdateCardPatch, value: unknown) =>
-      setDraft((prev) => ({ ...prev, [key]: value })),
+    (key: keyof UpdateCardPatch, value: unknown | ((prev: unknown) => unknown)) =>
+      setDraft((prev) => ({
+        ...prev,
+        [key]: typeof value === 'function' ? (value as (p: unknown) => unknown)(prev[key as string]) : value,
+      })),
     [],
   )
 

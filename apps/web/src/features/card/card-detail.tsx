@@ -427,9 +427,13 @@ export function CardDetailModal({
   const addTag = (raw: string) => {
     const val = raw.trim()
     if (!val) return
-    if (!tags.some((tag) => tag.value === val)) {
-      setField('tags', [...tags, { value: val, color: stableTagColor(val) }])
-    }
+    // 函数式更新:基于 prev 推导,避免与 chip × 的删除(setField('tags', filter))
+    // 在 blur/click race 中互相用陈旧闭包覆盖(半截输入被 × 的旧 tags 覆盖丢失)。
+    setField('tags', (prev: unknown) => {
+      const cur = (prev as TagRef[]) ?? []
+      if (cur.some((tag) => tag.value === val)) return cur
+      return [...cur, { value: val, color: stableTagColor(val) }]
+    })
     setTagInput('')
   }
 
@@ -722,7 +726,9 @@ export function CardDetailModal({
                       style={solidTagChipStyle(tag.color)}
                       aria-label={t('tag.remove') + ': ' + tag.value}
                       onClick={() =>
-                        setField('tags', tags.filter((x) => x.value !== tag.value))
+                        setField('tags', (prev: unknown) =>
+                          ((prev as TagRef[]) ?? []).filter((x) => x.value !== tag.value),
+                        )
                       }
                     >
                       {tag.value} ×

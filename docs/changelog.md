@@ -5,7 +5,19 @@
 
 ---
 
-## 2026-08-12 · 1.3.0-preview.1 · 打磨轮:无障碍 / 画布手感 / 找回 / 导入导出 / 存储感知(tag v1.3.0-preview.1)
+## 2026-08-12 · 1.3.0-preview.2 · 深度审核修复(1 🔴 + 4 🟡)(tag v1.3.0-preview.2)
+
+> 1.3.0-preview.1 发布后跑了一轮深度审核(4 subagent 按 feature 分片 + ocr delegate 规则),发现 1 个数据完整性 🔴 + 4 个 🟡。本版全部修复并补回归测试。
+
+- **🔴 [数据完整性] 工作台切卡丢 link 富字段**(`workbench-panel.tsx`):切到另一张卡时,上一卡的 `@links` 富字段(title/预览图/抓取时间)被 flush 抹成 `{url, fetchedAt:now}`。根因:声称的 `prevToPatchRef` 修复无效 —— ref 在 render body 里被同一 render 的新卡 toPatch 先覆盖,从未真正存住"上一卡"。改为在覆盖前缓存旧 toPatch。配运行时回归测试(此前红,现已绿)。两 subagent 独立 probe + 源码时序追踪 + 运行时测试三层坐实。
+- **🟡 [回归] DSL 部分失败后重 Apply 复制无 #id freeform**(`dsl-dialog.tsx`):R14「部分失败保留原文」去掉了重序列化防重路径,但 `appliedHashes` 在 applied>0 分支被无条件清空 → 重 Apply 不跳过已应用行 → 无 id 的 rect/text/frame 被复制。改为用 `newlyApplied` 增量合并 hash;全部成功时才清空。配 apply-layout 层回归测试。
+- **🟡 Markdown split/source 打字滚回顶部**(`markdown-editor.tsx`):`scrollTop` 恢复错绑在 `[value,view]` effect,每次打字(value 变)都把编辑器拉回切 preview 前的位置。拆成只在 view 变化时恢复。
+- **🟡 标签 blur/click race 丢未提交输入**(`card-detail.tsx` / `workbench-panel.tsx`):input `onBlur` 加 tag 与点 chip × 删除用陈旧闭包互相覆盖,半截输入丢失。`setField` 支持 `(prev)=>value` 函数式更新,add/remove tag 改基于 prev 推导。
+- **🟡 搜索 link 命中无 snippet**(`search-result.ts`):索引侧把 link 的 url+title+description 都并入,但 snippet 只 join url → 搜「官方文档」(只在 title)能搜到却看不到为什么匹配。snippet 对齐索引侧带上 title/description。配回归测试。
+- 验证基线:全包 lint 0 / 全包 test 全绿(web 1809,新增 4 回归测试)/ web build exit 0 / render-sweep 18 路由全 CLEAN。
+- **桌面签名状态不变**:Windows 无 Authenticode、macOS ad-hoc 未公证,安装前核对 SHA256。
+
+
 
 > 自 1.2.0 起的一轮以"默认用户视角"为轴的体验打磨(细化交互、补无障碍、让数据边界更诚实)。预览版,不含稳定版门控的签名/公证/真实用户研究。相对上一版本 1.2.0 的改动如下。
 

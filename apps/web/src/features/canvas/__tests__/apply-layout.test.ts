@@ -967,4 +967,34 @@ describe('applyLayout — v7 directives (@group / @href / @compute)', () => {
     expect(el.meta?.group).toBe('g')
     expect(el.meta?.href).toEqual(['x'])
   })
+
+  it('部分失败后用累积 newlyApplied hash 重 Apply,不复制无 #id freeform(🟡1 回归)', () => {
+    // 模拟 dsl-dialog 场景:DSL 含一个无 #id 的 free rect(用户手写常不带 id)+ 一个
+    // 会 skipped 的 op(rect 端点不存在的 arrow)。首次 apply 部分成功(1 applied / 1 skipped),
+    // dsl-dialog 修复后应把 newlyApplied 合并进 appliedHashes 而非清空。二次 apply 同 ops
+    // → free rect 因 hash 命中走 update 不造副本(此前 hash 被清空 → 重 apply 又 create 一个)。
+    const host = new InMemoryCanvasHost()
+    const ops: DslOp[] = [
+      { type: 'free', shape: 'rect', x: 100, y: 200, w: 300, h: 150, color: 'red' },
+      // arrow 引用不存在的 card → skipped(模拟部分失败)
+      { type: 'arrow', from: 'ghost-a' as CardId, to: 'ghost-b' as CardId },
+    ]
+
+    // dsl-dialog 用 React state 持有 appliedHashes(不可变);applyLayout 不会回写 state,
+    // 所以 dialog 必须用返回的 newlyApplied 主动合并。这里模拟修复后的合并逻辑。
+    let appliedHashes = new Set<string>()
+    const result1 = applyLayout(host, ops, appliedHashes)
+    expect(result1.applied).toBe(1) // free rect 应用
+    expect(result1.skipped).toBe(1) // arrow skipped
+    // 修复:合并 newlyApplied(此前 bug:dialog 在 applied>0 分支清空 → new Set())
+    appliedHashes = new Set([...appliedHashes, ...result1.newlyApplied])
+    expect(appliedHashes.size).toBe(1)
+
+    const rectsAfter1 = host.getElements().filter((e) => e.kind === 'rect').length
+    // 二次 apply 同 ops —— free rect 的 hash 已在 appliedHashes,应 skip 不造副本
+    const result2 = applyLayout(host, ops, appliedHashes)
+    const rectsAfter2 = host.getElements().filter((e) => e.kind === 'rect').length
+    expect(result2.applied).toBe(0)
+    expect(rectsAfter2).toBe(rectsAfter1) // 关键:不复制
+  })
 })

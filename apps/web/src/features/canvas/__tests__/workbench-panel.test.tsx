@@ -217,6 +217,66 @@ describe('WorkbenchPanel', () => {
     })
     host.remove()
   })
+
+  it('切卡 flush 上一卡只改 body 时,links 富字段(title/ogImage/fetchedAt)不丢(数据完整性)', () => {
+    // c1 带一条已抓富字段 link(有 title/ogImage/fetchedAt);c2 的 links 不同(模拟两张
+    // 内容不同的卡)。用户只在 c1 改 body,随即切 c2。cleanup 必须 flush c1 的脏编辑,
+    // 且 links 不应被抹成 {url, fetchedAt: now} —— 这是 workbench-panel prevToPatchRef
+    // 修复声称要保护的场景(切卡时用上一卡的 toPatch,而非切卡后重绑的新卡 toPatch)。
+    const c1 = {
+      ...card,
+      id: 'c1',
+      body: '原正文',
+      links: [
+        { url: 'https://keep.example/a', title: '富标题 A', ogImageUrl: 'img-a', fetchedAt: new Date('2026-07-01T00:00:00.000Z') },
+      ],
+    } as unknown as Card
+    const c2 = {
+      ...card,
+      id: 'c2',
+      title: '另一张',
+      body: 'c2 正文',
+      // c2 的 links URL 不同 —— 触发 buildPatch 用 c2 当基准比 c1 草稿时 links 被判 dirty
+      links: [{ url: 'https://other.example/b' }],
+    } as unknown as Card
+
+    const onSave = vi.fn()
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    act(() => {
+      root.render(<WorkbenchPanel card={c1} onSave={onSave} onClose={vi.fn()} />)
+    })
+    // 只编辑 c1 的 body,不动 links
+    const ta = host.querySelector('textarea') as HTMLTextAreaElement
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    act(() => {
+      setter.call(ta, '改了正文')
+      ta.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    // 切卡 c2(模拟用户编辑后 <2.5s 点另一张,autosave 未触发)
+    act(() => {
+      root.render(<WorkbenchPanel card={c2} onSave={onSave} onClose={vi.fn()} />)
+    })
+
+    // 切卡 cleanup 应 flush c1 的脏编辑(body 改了)。
+    expect(onSave).toHaveBeenCalledWith('c1', expect.objectContaining({ body: '改了正文' }))
+    const c1Patch = onSave.mock.calls.find((c) => c[0] === 'c1')?.[1] as
+      | { links?: Array<{ url: string; title?: string; ogImageUrl?: string; fetchedAt?: unknown }> }
+      | undefined
+    // 数据完整性:若 links 进了 patch(因为 prevToPatchRef 用了新卡 toPatch),
+    // 它不应抹掉富字段 —— title/ogImageUrl 必须保留。bug 现状会把整条 links 重建为
+    // {url, fetchedAt: now},title/ogImage 丢失。
+    if (c1Patch?.links) {
+      for (const l of c1Patch.links) {
+        expect(l).toMatchObject({ url: 'https://keep.example/a', title: '富标题 A', ogImageUrl: 'img-a' })
+      }
+    }
+    act(() => {
+      root.unmount()
+    })
+    host.remove()
+  })
 })
 
 describe('WorkbenchPanel — media 删除推迟(保存成功才真删)', () => {

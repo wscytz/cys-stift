@@ -86,17 +86,22 @@ export function WorkbenchPanel({
   // (cleanup 闭包的 draft 是 stale —— effect deps [card.id],编辑时 draft 变不重跑 effect,
   //  闭包还停在 card.id 变时的旧 draft;切卡 flush 上一卡脏编辑要靠 draftRef.current 读最新)。
   const toPatchRef = useRef(toPatch)
-  toPatchRef.current = toPatch
-  // R13:切卡 cleanup 必须用「上一卡」的 toPatch,而非切卡后重绑的新卡 toPatch。
+  // R13fix:切卡 cleanup 必须用「上一卡」的 toPatch,而非切卡后重绑的新卡 toPatch。
   // 否则 buildPatch(新卡B, 旧草稿A) 会用 B 的 links 合并 A 的草稿 → A 已抓的
   // link title/ogImage 被 draftLinksToPayload 抹成 {url, fetchedAt:now}(数据丢失)。
-  // 检测 card.id 变化时,把当前(旧卡)的 toPatch 存到 prevToPatchRef 供 cleanup 用。
+  //
+  // 时序陷阱:render body 末尾 `toPatchRef.current = toPatch` 会把 ref 覆盖成【本 render
+  //  新卡】的 toPatch。所以检测 id 变化 + 缓存旧 toPatch 必须在【覆盖之前】完成 —— 此刻
+  //  toPatchRef.current 还持有上一卡的 toPatch。若在覆盖之后才读(旧实现的 bug),拿到的
+  //  已是混合态(buildPatch(新卡, 旧草稿)),prevToPatchRef 恒等于 toPatchRef,修复变 no-op。
   const prevToPatchRef = useRef(toPatch)
   const prevCardIdRef = useRef(card.id)
   if (prevCardIdRef.current !== card.id) {
+    // 覆盖前:toPatchRef.current 仍是上一卡的 toPatch → 存走供 cleanup 用。
     prevToPatchRef.current = toPatchRef.current
     prevCardIdRef.current = card.id
   }
+  toPatchRef.current = toPatch
   const draftRef = useRef(draft)
   draftRef.current = draft
   const onSaveRef = useRef(onSave)
@@ -187,12 +192,16 @@ export function WorkbenchPanel({
 
   const addTag = (raw: string) => {
     const val = raw.trim()
-    const cur = draft.tags as TagRef[]
-    if (!val || cur.some((tg) => tg.value === val)) {
+    if (!val) {
       setTagInput('')
       return
     }
-    setField('tags', [...cur, { value: val, color: stableTagColor(val) }])
+    // 函数式更新:基于 prev 推导,避免与 chip × 删除在 blur/click race 中互相覆盖。
+    setField('tags', (prev: unknown) => {
+      const cur = (prev as TagRef[]) ?? []
+      if (cur.some((tg) => tg.value === val)) return cur
+      return [...cur, { value: val, color: stableTagColor(val) }]
+    })
     setTagInput('')
   }
 
@@ -267,7 +276,9 @@ export function WorkbenchPanel({
               className="wb-panel__tag-remove"
               aria-label={t('tag.remove') + ': ' + tag.value}
               onClick={() =>
-                setField('tags', (draft.tags as TagRef[]).filter((x) => x.value !== tag.value))
+                setField('tags', (prev: unknown) =>
+                  ((prev as TagRef[]) ?? []).filter((x) => x.value !== tag.value),
+                )
               }
             >
               ×
