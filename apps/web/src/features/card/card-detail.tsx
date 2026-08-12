@@ -416,8 +416,21 @@ export function CardDetailModal({
         for (const id of removedAssetIds.current) mediaStore.remove(id)
         removedAssetIds.current.clear()
         setMode('view')
+        // R7:保存成功给反馈,对齐 workbench 的「已保存」(否则用户对编辑是否落盘没信心)。
+        pushToast({ kind: 'success', message: t('card.detail.saved') })
       } else pushToast({ kind: 'error', message: t('card.saveFailedQuota') })
     })
+  }
+
+  // R7:标签输入手势对齐建卡表单/工作台 —— Enter/逗号提交 + 失焦提交(IME 组合态守卫)。
+  // 此前只认 Enter,用户在别处养成的"打完点别处就加上"习惯在详情弹层失效。
+  const addTag = (raw: string) => {
+    const val = raw.trim()
+    if (!val) return
+    if (!tags.some((tag) => tag.value === val)) {
+      setField('tags', [...tags, { value: val, color: stableTagColor(val) }])
+    }
+    setTagInput('')
   }
 
   // Action visibility — single self-routing toggle for archive/unarchive
@@ -714,15 +727,13 @@ export function CardDetailModal({
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && tagInput.trim()) {
+                      if (e.nativeEvent.isComposing) return // IME 组合态不触发,免误加残词
+                      if (e.key === 'Enter' || e.key === ',') {
                         e.preventDefault()
-                        const val = tagInput.trim()
-                        if (!tags.some((tag) => tag.value === val)) {
-                          setField('tags', [...tags, { value: val, color: stableTagColor(val) }])
-                        }
-                        setTagInput('')
+                        addTag(tagInput)
                       }
                     }}
+                    onBlur={() => addTag(tagInput)}
                     placeholder={t('tag.placeholder')}
                   />
                 </div>

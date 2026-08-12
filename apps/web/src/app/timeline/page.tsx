@@ -145,6 +145,8 @@ export default function TimelinePage() {
                           (href) => router.push(href),
                           setDetail,
                         )}
+                        // R7:全局 timeline 行补置顶开关,与 inbox/archive 网格一致(★)。
+                        onTogglePin={() => service.update(c.id, { pinned: !c.pinned })}
                       />
                     </li>
                   ))}

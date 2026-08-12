@@ -12,7 +12,10 @@ import { useMemo, useRef, useState } from 'react'
 import { PageHeader } from '@/features/page-header'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
+import { useCanvases } from '@/lib/canvas-store'
 import { useI18n } from '@/lib/i18n'
+import { pushToast } from '@/lib/toast-store'
+import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import { PageLoading } from '@/components/page-loading'
 import { CardDetailModal } from '@/features/card/card-detail'
 import { GraphCanvas, type GraphCanvasHandle } from '@/features/graph/graph-canvas'
@@ -28,6 +31,7 @@ import { filterGraph, type GraphFilter } from '@/features/graph/graph-filter'
 export default function GraphPage() {
   const { t } = useI18n()
   const { snap, service, ready } = useDb()
+  const { snapshot: canvasesSnap } = useCanvases()
 
   // 异步聚合边(提升为 hook,供详情页 backlinks 共用)。
   const { edges, hrefMap, loaded: edgesLoaded } = useGlobalEdges()
@@ -126,7 +130,7 @@ export default function GraphPage() {
       {effectiveDetail && (
         <CardDetailModal
           card={effectiveDetail}
-          actions={['archive', 'softDelete', 'sendToCanvas', 'pin']}
+          actions={['archive', 'unarchive', 'sendToCanvas', 'softDelete', 'pin']}
           onClose={() => setDetail(null)}
           // BR-T5 — 注入全局边 + 卡标题查询,让详情里显示跨画布 backlinks 区。
           // onJumpToCard 第一版:关闭 modal(图谱内高亮节点留 2b)。
@@ -146,6 +150,34 @@ export default function GraphPage() {
           onTogglePin={() => {
             const updated = service.update(effectiveDetail.id, { pinned: !effectiveDetail.pinned })
             if (updated) setDetail(updated)
+          }}
+          onArchive={() => {
+            service.archive(effectiveDetail.id)
+            setDetail(null)
+          }}
+          onUnarchive={() => {
+            service.unarchive(effectiveDetail.id)
+            setDetail(null)
+          }}
+          onSendToCanvas={() => {
+            const targetCanvasId = canvasesSnap.activeCanvasId ?? DEFAULT_CANVAS_ID
+            const existing = service.listOnCanvas(targetCanvasId)
+            const nextZ = existing.length === 0
+              ? 0
+              : Math.max(...existing.map((c) => c.canvasPosition?.z ?? 0)) + 1
+            const moved = service.moveToCanvas(effectiveDetail.id, {
+              canvasId: targetCanvasId,
+              x: 100 + (nextZ % 5) * 40,
+              y: 100 + (nextZ % 5) * 40,
+              w: 200,
+              h: 80,
+              z: nextZ,
+            })
+            if (moved === false) {
+              pushToast({ kind: 'error', message: t('storage.quotaExceeded') })
+              return
+            }
+            setDetail(null)
           }}
           onConfirmDelete={() => {
             service.softDelete(effectiveDetail.id)

@@ -624,7 +624,7 @@ export default function AskPage() {
       {effectiveDetail && (
         <CardDetailModal
           card={effectiveDetail}
-          actions={['archive', 'softDelete', 'sendToCanvas', 'pin']}
+          actions={['archive', 'unarchive', 'sendToCanvas', 'softDelete', 'pin']}
           onClose={() => setDetailCard(null)}
           getCardTitle={(id) => service.get(id as CardId)?.title}
           onJumpToCard={() => setDetailCard(null)}
@@ -638,6 +638,34 @@ export default function AskPage() {
           onTogglePin={() => {
             const updated = service.update(effectiveDetail.id, { pinned: !effectiveDetail.pinned })
             if (updated) setDetailCard(updated)
+          }}
+          onArchive={() => {
+            service.archive(effectiveDetail.id)
+            setDetailCard(null)
+          }}
+          onUnarchive={() => {
+            service.unarchive(effectiveDetail.id)
+            setDetailCard(null)
+          }}
+          onSendToCanvas={() => {
+            const targetCanvasId = canvasesSnap.activeCanvasId ?? DEFAULT_CANVAS_ID
+            const existing = service.listOnCanvas(targetCanvasId)
+            const nextZ = existing.length === 0
+              ? 0
+              : Math.max(...existing.map((c) => c.canvasPosition?.z ?? 0)) + 1
+            const moved = service.moveToCanvas(effectiveDetail.id, {
+              canvasId: targetCanvasId,
+              x: 100 + (nextZ % 5) * 40,
+              y: 100 + (nextZ % 5) * 40,
+              w: 200,
+              h: 80,
+              z: nextZ,
+            })
+            if (moved === false) {
+              pushToast({ kind: 'error', message: t('storage.quotaExceeded') })
+              return
+            }
+            setDetailCard(null)
           }}
           onConfirmDelete={() => {
             service.softDelete(effectiveDetail.id)

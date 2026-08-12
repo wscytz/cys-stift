@@ -7,7 +7,10 @@ import { PageHeader } from '@/features/page-header'
 import type { Card, CardId, SearchResult } from '@cys-stift/domain'
 import { searchCards } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
+import { useCanvases } from '@/lib/canvas-store'
 import { useI18n } from '@/lib/i18n'
+import { pushToast } from '@/lib/toast-store'
+import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import { PageLoading } from '@/components/page-loading'
 import { CardDetailModal } from '@/features/card/card-detail'
 import { useGlobalEdges } from '@/features/graph/use-global-edges'
@@ -33,6 +36,7 @@ export default function SearchPage() {
   const { t } = useI18n()
   const router = useRouter()
   const { snap, service, ready } = useDb()
+  const { snapshot: canvasesSnap } = useCanvases()
   // 跨画布 backlinks(只读):聚合全局边后过滤端点已软删的(G7 防泄露),传 CardDetailModal
   // 显示「这张卡和谁有关系」。canEditRelations 不传(默认 false=只读,无 × 删除/+ 添加钮)。
   const { edges } = useGlobalEdges()
@@ -125,6 +129,8 @@ export default function SearchPage() {
                       (card) => setDetail({ card }),
                     )}
                     onToggleSelect={() => {}}
+                    // R7:搜索结果瓦片补置顶开关,与 inbox/archive 一致(★)。
+                    onTogglePin={() => service.update(r.card.id, { pinned: !r.card.pinned })}
                   />
                   {query.trim() !== '' && r.score > 0 && (
                     <SnippetLine result={r} query={query} />
@@ -141,7 +147,7 @@ export default function SearchPage() {
           card={effectiveDetail.card}
           globalEdges={liveEdges}
           getCardTitle={(id) => service.get(id as CardId)?.title}
-          actions={['archive', 'softDelete', 'sendToCanvas', 'pin']}
+          actions={['archive', 'unarchive', 'sendToCanvas', 'softDelete', 'pin']}
           onClose={() => setDetail(null)}
           onSave={(patch) => {
             const updated = service.update(effectiveDetail.card.id, patch)
@@ -153,6 +159,34 @@ export default function SearchPage() {
               pinned: !effectiveDetail.card.pinned,
             })
             if (updated) setDetail({ card: updated })
+          }}
+          onArchive={() => {
+            service.archive(effectiveDetail.card.id)
+            setDetail(null)
+          }}
+          onUnarchive={() => {
+            service.unarchive(effectiveDetail.card.id)
+            setDetail(null)
+          }}
+          onSendToCanvas={() => {
+            const targetCanvasId = canvasesSnap.activeCanvasId ?? DEFAULT_CANVAS_ID
+            const existing = service.listOnCanvas(targetCanvasId)
+            const nextZ = existing.length === 0
+              ? 0
+              : Math.max(...existing.map((c) => c.canvasPosition?.z ?? 0)) + 1
+            const moved = service.moveToCanvas(effectiveDetail.card.id, {
+              canvasId: targetCanvasId,
+              x: 100 + (nextZ % 5) * 40,
+              y: 100 + (nextZ % 5) * 40,
+              w: 200,
+              h: 80,
+              z: nextZ,
+            })
+            if (moved === false) {
+              pushToast({ kind: 'error', message: t('storage.quotaExceeded') })
+              return
+            }
+            setDetail(null)
           }}
           onConfirmDelete={() => {
             service.softDelete(effectiveDetail.card.id)
