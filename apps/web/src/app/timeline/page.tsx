@@ -189,7 +189,9 @@ export default function TimelinePage() {
             const nextZ = existing.length === 0
               ? 0
               : Math.max(...existing.map((c) => c.canvasPosition?.z ?? 0)) + 1
-            service.moveToCanvas(effectiveDetail.id, {
+            // 对齐 inbox:检查 moveToCanvas 失败(quota)并提示,失败时卡未移动、
+            // 保持详情开着(否则 setDetail(updated) 会把失败当成功收尾)。
+            const moved = service.moveToCanvas(effectiveDetail.id, {
               canvasId: targetCanvasId,
               x: 100 + (nextZ % 5) * 40,
               y: 100 + (nextZ % 5) * 40,
@@ -197,6 +199,10 @@ export default function TimelinePage() {
               h: 80,
               z: nextZ,
             })
+            if (moved === false) {
+              pushToast({ kind: 'error', message: t('storage.quotaExceeded') })
+              return
+            }
             const updated = service.get(effectiveDetail.id)
             if (updated) setDetail(updated)
           }}

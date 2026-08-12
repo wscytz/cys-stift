@@ -283,3 +283,34 @@ describe('WorkbenchPanel — media 删除推迟(保存成功才真删)', () => {
     host.remove()
   })
 })
+
+describe('WorkbenchPanel — Done 保存失败不关闭(防静默丢编辑)', () => {
+  it('flush onSave 返回 false → 面板不关,onClose 不被调(quota 失败保留编辑)', () => {
+    const onSave = vi.fn(() => false)
+    const onClose = vi.fn()
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    act(() => {
+      root.render(<WorkbenchPanel card={card} onSave={onSave} onClose={onClose} />)
+    })
+    // 编辑 body 制造脏
+    const ta = host.querySelector('textarea') as HTMLTextAreaElement
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    act(() => {
+      setter.call(ta, '会失败的编辑')
+      ta.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    // 点 Done(收起)
+    const done = host.querySelector('button[aria-label="workbench.done"]') as HTMLButtonElement
+    act(() => {
+      done.click()
+    })
+    expect(onSave).toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled() // 失败 → 保留面板
+    act(() => {
+      root.unmount()
+    })
+    host.remove()
+  })
+})

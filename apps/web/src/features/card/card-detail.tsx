@@ -348,6 +348,11 @@ export function CardDetailModal({
     setTagInput('')
     setMode(initialMode)
     setConfirmDelete(false)
+    // 离开编辑态(取消/保存/外部更新)时清掉待删媒体记录。此前只在卡切换或
+    // 保存成功时清,导致「移除图 → Cancel → 再编辑移除另一图 → Save」会把
+    // 上一轮取消的图真删(card.media 仍引用它)→ 破图 + 二进制永久丢失。
+    // save 成功路径已在 handleSave 清过,此处幂等。
+    removedAssetIds.current.clear()
   }, [mode, card.id, reset, initialMode])
 
   // 切换到另一张卡时,清掉上一张的 AI 推荐候选(避免串卡)。
@@ -414,8 +419,10 @@ export function CardDetailModal({
   // Action visibility — single self-routing toggle for archive/unarchive
   // (matches inbox's existing behaviour). The sendToCanvas button only
   // appears for cards not yet on a canvas (Phase 6.5c).
-  const showArchive = has('archive') && !card.archived
-  const showUnarchive = has('unarchive') && card.archived
+  // archive/unarchive 必须同时有 handler 才渲染:graph/ask/search/⌘K/companion
+  // 传 'archive' 但不传 onArchive,若无守卫会渲染静默死按钮(点了没反应)。
+  const showArchive = has('archive') && !card.archived && Boolean(onArchive)
+  const showUnarchive = has('unarchive') && card.archived && Boolean(onUnarchive)
   const showSendToCanvas =
     has('sendToCanvas') && !card.canvasPosition && Boolean(onSendToCanvas)
   const showPin =

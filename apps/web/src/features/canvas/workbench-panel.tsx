@@ -104,14 +104,16 @@ export function WorkbenchPanel({
   }
 
   // flush:脏才存 + 亮「已保存」。放 ref 让防抖 effect / close 共用,不进 effect deps。
-  const flushRef = useRef<() => void>(() => {})
+  // 返回 false 表示保存失败(quota 等)—— close 据此保留面板,防静默丢编辑。
+  const flushRef = useRef<() => boolean>(() => true)
   flushRef.current = () => {
-    if (!dirty) return
+    if (!dirty) return true
     setSaveState('saving')
     const ok = commitSave(card.id, toPatchRef.current())
     setSaveState(ok === false ? 'failed' : 'saved')
     if (flashTimer.current) clearTimeout(flashTimer.current)
     flashTimer.current = setTimeout(() => setSaveState('idle'), 3000)
+    return ok !== false
   }
 
   // 切卡时重置草稿(card.id 变或 card 引用变 → reset deps [card])。
@@ -156,7 +158,9 @@ export function WorkbenchPanel({
   )
 
   const handleClose = () => {
-    flushRef.current() // 收起前 flush 脏编辑,防丢。
+    // 收起前 flush 脏编辑,防丢。保存失败(quota)时保留面板 + 显示失败态,
+    // 让用户能重试 —— 直接关会静默丢编辑(service.update 已回滚内存改动)。
+    if (!flushRef.current()) return
     onClose()
   }
 

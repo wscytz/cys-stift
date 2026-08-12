@@ -3,6 +3,7 @@
 import {
   useCallback,
   useMemo,
+  useRef,
   useState,
   type ComponentType,
   type Dispatch,
@@ -74,11 +75,16 @@ export function useCardDraft(
     initDraft(card, fields),
   )
 
-  // reset 闭包捕获最新 card;fields 是模块级常量(不入 deps)。
+  // reset 读 ref 里最新 card,身份稳定(空 deps)而非依赖 card 对象身份:
+  // 跨 tab storage 同步会重建整批 card 对象(card 引用变),若 reset 身份跟着变,
+  // workbench 的 [card.id, reset] effect 会误触发 → 静默清掉进行中的草稿。
+  // 只有 card.id 真正切换才重置(fields 是模块级常量)。
+  const cardRef = useRef(card)
+  cardRef.current = card
   const reset = useCallback(() => {
-    setDraft(initDraft(card, fields))
+    setDraft(initDraft(cardRef.current, fields))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [card])
+  }, [])
 
   const dirty = useMemo(
     () =>
