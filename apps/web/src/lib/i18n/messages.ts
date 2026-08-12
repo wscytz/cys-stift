@@ -437,6 +437,7 @@ export const messages = {
   'relation.searchPlaceholder': { zh: '搜索卡片…', en: 'Search cards…' },
   'relation.confirm': { zh: '确认', en: 'Confirm' },
   'relation.notOnDefaultCanvas': { zh: '在画布上删除', en: 'Remove on canvas' },
+  'relation.wikilinkNotRemovable': { zh: '由 [[双链]] 生成，请在正文中删除 [[链接]]', en: 'From a [[wikilink]] — remove the [[link]] in the body instead' },
 
   'error.boundary.title': { zh: '渲染出错', en: 'Something went wrong' },
   'error.boundary.subtitle': { zh: '这一步崩了,但你的数据没丢(都存在本地)。可以重试,或回首页。', en: 'This step crashed, but your data is safe (stored locally). Retry or go home.' },

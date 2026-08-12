@@ -1191,6 +1191,9 @@ export class SelfBuiltAdapter implements CanvasHost {
             to: toId,
             color: 'black',
           })
+          // R15:建连后立即选中新箭头 —— web 层 RelationPanel 据此出现并自动推断
+          // 关系类型(此前箭头停留在"无类型黑线",用户不点它就没有类型/签名)。
+          this.setSelectedIds([id])
         }
         this.connecting = null
         try {

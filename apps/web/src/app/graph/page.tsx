@@ -151,10 +151,14 @@ export default function GraphPage() {
           actions={['archive', 'unarchive', 'sendToCanvas', 'softDelete', 'pin']}
           onClose={() => setDetail(null)}
           // BR-T5 — 注入全局边 + 卡标题查询,让详情里显示跨画布 backlinks 区。
-          // onJumpToCard 第一版:关闭 modal(图谱内高亮节点留 2b)。
+          // R15:onJumpToCard 聚焦目标节点(高亮 + 聚拢视野),而非只关弹窗 ——
+          // 此前点反链弹窗直接消失,回到图谱靠肉眼找卡(注释"高亮留 2b"未实现)。
           globalEdges={liveEdges}
           getCardTitle={(id) => service.get(id as CardId)?.title}
-          onJumpToCard={() => setDetail(null)}
+          onJumpToCard={(cardId) => {
+            setDetail(null)
+            graphRef.current?.focusNode(String(cardId))
+          }}
           // RB-T3 — graph 页有 useGlobalEdges + service.listAll,放开详情页建/删关系。
           // allCards 含已删,picker 内部过滤 !deletedAt。建/删走 relation-builder
           // (写 default canvas 的 freeform store),乐观更新见 card-detail 的 localEdges。

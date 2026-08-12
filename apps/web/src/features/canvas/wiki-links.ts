@@ -17,11 +17,11 @@
  */
 import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
 
-/** references 关系签名(与 relation-types.ts 的 references 定义对齐)。 */
+/** references 关系签名(与 relation-types.ts 的 references 定义对齐;R15 三角标记方向)。 */
 const REFERENCES_SIGNATURE = {
   color: 'blue',
   dash: 'dashed',
-  arrowhead: 'none',
+  arrowhead: 'triangle',
   text: 'references',
 } as const
 

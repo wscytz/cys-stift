@@ -67,6 +67,8 @@ export interface GraphCanvasHandle {
   zoomTo: (z: number) => void
   /** 重置视口:zoom=1,pan 居中于画布中心。 */
   resetView: () => void
+  /** R15:聚焦某节点(设置 hover 高亮 + 淡化非邻居),供详情反链跳转用。 */
+  focusNode: (id: string) => void
 }
 
 interface GraphCanvasProps {
@@ -265,8 +267,19 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
         if (!fit) return // 无节点 → no-op
         applyView(fit)
       },
+      /** R15:聚焦节点(高亮 + 淡化非邻居),供详情反链跳转。 */
+      focusNode: (id: string) => {
+        setHover(id)
+        const canvas = canvasRef.current
+        if (!canvas) return
+        const node = handleRef.current?.nodes?.find((n) => n.id === id)
+        if (node) {
+          const target = computeFitView([node], canvas.clientWidth, canvas.clientHeight)
+          if (target) applyView(target)
+        }
+      },
     }),
-    [applyView, zoomAt],
+    [applyView, zoomAt, setHover],
   )
 
   // ── useEffect 1:建/重建 simulation(nodes/edges 依赖)──

@@ -514,7 +514,9 @@ export function CardDetailModal({
                   // RB-T3 — 只 default canvas 上的边能在详情页删(关系活在 default
                   // canvas 的 freeform store,见 relation-builder)。其它画布上的边
                   // 显示提示,删要回对应画布。
-                  const removable = canEditRelations && e.canvasId === DEFAULT_CANVAS_ID
+                  // R15:[[双链]] 生成的 wikilink 边不能删(删了会因正文里的 [[标题]]
+                  // 被 syncWikiLinkArrows 重建复活)—— 显示提示「从正文删除 [[链接]]」。
+                  const removable = canEditRelations && e.canvasId === DEFAULT_CANVAS_ID && !e.isWikilink
                   return (
                     <li key={e.arrowId} className="cd__backlink">
                       <button
@@ -537,6 +539,10 @@ export function CardDetailModal({
                         >
                           ×
                         </button>
+                      ) : canEditRelations && e.isWikilink ? (
+                        <span className="cd__backlink-hint" title={t('relation.wikilinkNotRemovable')}>
+                          {t('relation.wikilinkNotRemovable')}
+                        </span>
                       ) : canEditRelations ? (
                         <span className="cd__backlink-hint" title={t('relation.notOnDefaultCanvas')}>
                           {t('relation.notOnDefaultCanvas')}

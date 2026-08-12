@@ -58,7 +58,9 @@ export const RELATION_TYPES: RelationType[] = [
     labelKey: 'relation.references',
     color: 'blue',
     dash: 'dashed',
-    arrowhead: 'none',
+    // R15:references 是 [[双链]] 的默认关系,原无箭头 → 画布/图谱上方向不可读
+    // (看不出 A 引用 B 还是 B 引用 A)。用实心三角标记方向,语义仍轻于 blocks。
+    arrowhead: 'triangle',
     labelColor: 'blue',
     swatch: 'var(--color-blue)',
   },
@@ -85,7 +87,7 @@ export const RELATION_TYPES: RelationType[] = [
     labelKey: 'relation.embeds',
     color: 'yellow',
     dash: 'dotted',
-    arrowhead: 'none',
+    arrowhead: 'triangle', // R15:方向可读(同 references)
     labelColor: 'yellow',
     swatch: 'var(--color-yellow)',
   },

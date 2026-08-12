@@ -37,7 +37,7 @@ function addManualReferenceArrow(host: InMemoryCanvasHost, from: string, to: str
     to,
     color: 'blue',
     dash: 'dashed',
-    arrowhead: 'none',
+    arrowhead: 'triangle',
     text: 'references',
   })
   return id
@@ -58,7 +58,7 @@ function addWikiLinkArrow(host: InMemoryCanvasHost, from: string, to: string): s
     to,
     color: 'blue',
     dash: 'dashed',
-    arrowhead: 'none',
+    arrowhead: 'triangle',
     text: 'references',
     meta: { wikilink: true },
   })
@@ -312,7 +312,7 @@ describe('syncWikiLinkArrows (cross-canvas, allCards)', () => {
     // references 签名(blue/dashed/none)+ text 含目标标题
     expect(a.color).toBe('blue')
     expect(a.dash).toBe('dashed')
-    expect(a.arrowhead).toBe('none')
+    expect(a.arrowhead).toBe('triangle')
     expect(a.text).toContain('目标卡')
   })
 
@@ -382,7 +382,7 @@ describe('syncWikiLinkArrows (cross-canvas, allCards)', () => {
       to: 'tgt',
       color: 'blue',
       dash: 'dashed',
-      arrowhead: 'none',
+      arrowhead: 'triangle',
       text: '→ 旧目标',
       meta: { wikilink: true, crossCanvas: true, targetTitle: '旧目标', targetCanvasId: 'canvas-other' },
     })
@@ -425,7 +425,7 @@ describe('syncWikiLinkArrows (cross-canvas, allCards)', () => {
       to: 'tgt',
       color: 'blue',
       dash: 'dashed',
-      arrowhead: 'none',
+      arrowhead: 'triangle',
       text: 'references',
       meta: { wikilink: true },
     })
@@ -531,7 +531,7 @@ describe('syncWikiLinkArrows (dedup race self-heal)', () => {
       to: 'b',
       color: 'blue',
       dash: 'dashed',
-      arrowhead: 'none',
+      arrowhead: 'triangle',
       text: 'references',
       meta: { wikilink: true },
     })
@@ -547,7 +547,7 @@ describe('syncWikiLinkArrows (dedup race self-heal)', () => {
       to: 'b',
       color: 'blue',
       dash: 'dashed',
-      arrowhead: 'none',
+      arrowhead: 'triangle',
       text: 'references',
       meta: { wikilink: true },
     })
@@ -587,7 +587,7 @@ describe('syncWikiLinkArrows (dedup race self-heal)', () => {
       to: 'b',
       color: 'blue',
       dash: 'dashed',
-      arrowhead: 'none',
+      arrowhead: 'triangle',
       text: 'references',
       meta: { wikilink: true },
     })
@@ -603,7 +603,7 @@ describe('syncWikiLinkArrows (dedup race self-heal)', () => {
       to: 'b',
       color: 'blue',
       dash: 'dashed',
-      arrowhead: 'none',
+      arrowhead: 'triangle',
       text: 'references',
       meta: { wikilink: true },
     })
@@ -645,7 +645,7 @@ describe('syncWikiLinkArrows', () => {
     // references 签名
     expect(a.color).toBe('blue')
     expect(a.dash).toBe('dashed')
-    expect(a.arrowhead).toBe('none')
+    expect(a.arrowhead).toBe('triangle')
     expect(a.text).toBe('references')
     expect(a.meta?.wikilink).toBe(true)
   })
