@@ -3,10 +3,10 @@
  * 无专注按钮(已砍 focusEdit);tag 编辑落 onSave。
  * react-dom/client + act(policy)。i18n mock(useI18n)。
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import type { Card } from '@cys-stift/domain'
+import type { Card, MediaRef } from '@cys-stift/domain'
 import { WorkbenchPanel } from '../workbench-panel'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -14,6 +14,17 @@ import { WorkbenchPanel } from '../workbench-panel'
 vi.mock('@/lib/i18n', () => ({
   useI18n: () => ({ t: (k: string) => k, locale: 'zh', setLocale: () => {} }),
 }))
+
+const removeSpy = vi.fn()
+vi.mock('@/lib/media-store', () => ({
+  mediaStore: {
+    getAsset: (id: string) => (id === 'ma-1' ? { id: 'ma-1', kind: 'image', mimeType: 'image/png', dataUrl: 'data:image/png;base64,AA==', byteSize: 10 } : null),
+    remove: (id: string) => removeSpy(id),
+  },
+}))
+beforeEach(() => {
+  removeSpy.mockClear()
+})
 
 const card = {
   id: 'c1',
@@ -201,6 +212,71 @@ describe('WorkbenchPanel', () => {
     })
     // bug 1 修:切卡 cleanup flush c1 的脏编辑,不丢
     expect(onSave).toHaveBeenCalledWith('c1', expect.objectContaining({ body: 'c1 的编辑' }))
+    act(() => {
+      root.unmount()
+    })
+    host.remove()
+  })
+})
+
+describe('WorkbenchPanel — media 删除推迟(保存成功才真删)', () => {
+  const mediaCard = {
+    ...card,
+    media: [{ assetId: 'ma-1', order: 0, kind: 'image' }] as MediaRef[],
+  } as unknown as Card
+
+  function renderMedia() {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    act(() => {
+      root.render(<WorkbenchPanel card={mediaCard} onSave={vi.fn()} onClose={vi.fn()} />)
+    })
+    return { host, root }
+  }
+
+  /** 点第 1 个 media 的 ×(摘引用)。 */
+  function clickRemove(host: HTMLElement) {
+    const btn = host.querySelector('.mfe__remove') as HTMLButtonElement
+    expect(btn, '应有 media 删除按钮').toBeTruthy()
+    act(() => {
+      btn.click()
+    })
+  }
+
+  it('点 × 只摘引用,onSave 返回 false → mediaStore.remove 不被调(保存失败不删图)', () => {
+    const onSave = vi.fn(() => false) // 保存失败(quota 等)
+    const { host, root } = renderMedia()
+    clickRemove(host)
+    // flush(close 场景)
+    act(() => {
+      root.render(<WorkbenchPanel card={mediaCard} onSave={onSave} onClose={vi.fn()} />)
+    })
+    const closeBtn = host.querySelector('button[aria-label="workbench.done"]') as HTMLButtonElement
+    act(() => {
+      closeBtn.click()
+    })
+    expect(onSave).toHaveBeenCalled()
+    expect(removeSpy).not.toHaveBeenCalled() // 失败 → 不真删(防丢图)
+    act(() => {
+      root.unmount()
+    })
+    host.remove()
+  })
+
+  it('onSave 成功 → flush 后 mediaStore.remove 被调(成功后清理二进制)', () => {
+    const onSave = vi.fn(() => true)
+    const { host, root } = renderMedia()
+    clickRemove(host)
+    act(() => {
+      root.render(<WorkbenchPanel card={mediaCard} onSave={onSave} onClose={vi.fn()} />)
+    })
+    const closeBtn = host.querySelector('button[aria-label="workbench.done"]') as HTMLButtonElement
+    act(() => {
+      closeBtn.click()
+    })
+    expect(onSave).toHaveBeenCalled()
+    expect(removeSpy).toHaveBeenCalledWith('ma-1') // 成功 → 真删
     act(() => {
       root.unmount()
     })
