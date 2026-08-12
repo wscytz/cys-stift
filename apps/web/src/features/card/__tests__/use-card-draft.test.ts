@@ -89,3 +89,58 @@ describe('buildPatch — per-field dirty 门控(不误伤未改字段)', () => {
     expect(Object.keys(patch)).toHaveLength(0)
   })
 })
+
+describe('buildPatch — 编辑 links 时保留既有富字段(不有损重建)', () => {
+  it('在既有 link 后新增一条 → 未改 URL 的 title/description/ogImage + 原 fetchedAt 全保留,新 URL 补 fetchedAt', () => {
+    const card = makeCard({ links: [richLink] })
+    const draft = draftOf(card, {
+      links: [
+        { url: 'https://x.com' },
+        { url: 'https://new.com' },
+      ],
+    })
+    const patch = buildPatch(card, draft, CARD_FIELDS)
+
+    expect(patch.links).toBeDefined()
+    const links = patch.links as LinkPreview[]
+    expect(links).toHaveLength(2)
+    // 未改 URL → 富字段 + 原 fetchedAt 全保
+    expect(links[0]!).toMatchObject({
+      url: 'https://x.com',
+      title: 'X Site',
+      description: 'desc',
+      ogImageUrl: 'https://x.com/og.png',
+    })
+    expect(links[0]!.fetchedAt).toBe(fixedDate)
+    // 新 URL → 无富字段,补 fetchedAt
+    expect(links[1]).toEqual({ url: 'https://new.com', fetchedAt: expect.any(Date) })
+  })
+
+  it('改 URL → 新 URL 不残留旧 title,补新 fetchedAt(等重抓)', () => {
+    const card = makeCard({ links: [richLink] })
+    const draft = draftOf(card, {
+      links: [{ url: 'https://changed.com' }],
+    })
+    const patch = buildPatch(card, draft, CARD_FIELDS)
+
+    const links = patch.links as LinkPreview[]
+    expect(links).toHaveLength(1)
+    expect(links[0]).toEqual({ url: 'https://changed.com', fetchedAt: expect.any(Date) })
+    expect(links[0]!.title).toBeUndefined()
+    expect(links[0]!.ogImageUrl).toBeUndefined()
+  })
+
+  it('删除一条 → 剩下一条的富字段保留(非整条重建抹掉)', () => {
+    const second = { url: 'https://y.com', title: 'Y Site', fetchedAt: fixedDate }
+    const card = makeCard({ links: [richLink, second] })
+    const draft = draftOf(card, {
+      links: [{ url: 'https://y.com' }],
+    })
+    const patch = buildPatch(card, draft, CARD_FIELDS)
+
+    const links = patch.links as LinkPreview[]
+    expect(links).toHaveLength(1)
+    expect(links[0]!).toMatchObject({ url: 'https://y.com', title: 'Y Site' })
+    expect(links[0]!.fetchedAt).toBe(fixedDate)
+  })
+})

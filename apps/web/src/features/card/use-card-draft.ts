@@ -41,8 +41,8 @@ export interface CardDraftField<D> {
   key: keyof UpdateCardPatch
   /** Card → 编辑草稿(初始化 / reset 用)。 */
   toDraft: (card: Card) => D
-  /** 草稿 → UpdateCardPatch 字段值(空过滤 / payload 转换)。 */
-  toPayload: (draft: D) => unknown
+  /** 草稿 → UpdateCardPatch 字段值(空过滤 / payload 转换;可读原卡做无损合并,如 links 保留既有富字段)。 */
+  toPayload: (draft: D, card: Card) => unknown
   /** 草稿相等判断(dirty 用;省略 = 严格 ===)。数组/对象字段传深比(如 JSON.stringify)。 */
   equals?: (a: D, b: D) => boolean
   /** 编辑态控件(Step 2 FieldEditors 渲染);省略 = 该字段不进 FieldEditors(壳手写,如 title/body 在壳特化)。 */
@@ -128,13 +128,13 @@ function strictEquals<T>(a: T, b: T): boolean {
 export function defineField<D>(
   key: keyof UpdateCardPatch,
   toDraft: (card: Card) => D,
-  toPayload: (draft: D) => unknown,
+  toPayload: (draft: D, card: Card) => unknown,
   equals?: (a: D, b: D) => boolean,
 ): CardDraftField<unknown> {
   return {
     key,
     toDraft,
-    toPayload: (d: unknown) => toPayload(d as D),
+    toPayload: (d: unknown, card: Card) => toPayload(d as D, card),
     equals: equals
       ? (a: unknown, b: unknown) => equals(a as D, b as D)
       : undefined,
@@ -164,8 +164,9 @@ export function isDirty(
  *
  * per-field dirty 门控:只把【脏】字段(草稿 ≠ Card 原值)的 toPayload 放进 patch,
  * 未改字段不进 patch → service.update 不碰它们。这样编辑 body 不会触发 links 的
- * 有损重建(draftLinksToPayload 只留 {url, fetchedAt: now},丢 title/ogImage)抹掉
- * 富字段 —— 与 v8-fields.sameLinkUrls「相同 URL 不重写,保住已抓 title」同款语义。
+ * 重建抹掉富字段 —— 与 v8-fields.sameLinkUrls「相同 URL 不重写,保住已抓 title」
+ * 同款语义。toPayload 接收原卡(card):links 等字段可按 URL 匹配既有记录做无损合并
+ * (draftLinksToPayload 保留 URL 未变 link 的 title/ogImage/fetchedAt),不丢已抓数据。
  *
  * 不变式:dirty 为真时 buildPatch 必含 ≥1 字段(dirty 的定义就是 some(!eq),
  * buildPatch 收集的正是这些 !eq 字段),故 autosave/确认门不会发出空 patch。
@@ -180,7 +181,7 @@ export function buildPatch(
     const cur = draft[f.key as string]
     const orig = f.toDraft(card)
     if ((f.equals ?? strictEquals)(cur, orig)) continue
-    patch[f.key as string] = f.toPayload(cur as never)
+    patch[f.key as string] = f.toPayload(cur as never, card)
   }
   return patch as UpdateCardPatch
 }

@@ -61,7 +61,8 @@ const linksField: CardDraftField<unknown> = {
   ...defineField<DraftLink[]>(
     'links',
     (c) => (c.links ?? []).map((l) => ({ url: l.url })),
-    draftLinksToPayload,
+    // 传原卡 links:URL 未变的 link 保留既有富字段(title/ogImage/fetchedAt)。
+    (draft, card) => draftLinksToPayload(draft, card.links),
     jsonEquals,
   ),
   Editor: LinksFieldEditor,

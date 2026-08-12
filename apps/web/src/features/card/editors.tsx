@@ -203,11 +203,31 @@ export function QuoteEditor({
 
 // ── Converters (draft → typed payload at save) ────────────────────────────
 
-export function draftLinksToPayload(links: DraftLink[]): LinkPreview[] {
+/**
+ * draftLinksToPayload — draft(URL 列表)→ LinkPreview[]。
+ *
+ * 传 existing(原卡 links)时按 URL 匹配:**URL 未变的 link 保留既有富字段**
+ * (title/description/ogImageUrl + 原 fetchedAt,不无意义刷新);新增 / 改动的 URL
+ * 才补 fetchedAt=now(无既有富字段,等重抓)。无 existing(建卡)行为不变。
+ * 修复前:编辑 links 字段时整条被 draftLinksToPayload 重建为 {url, fetchedAt: now},
+ * 抹掉所有已抓 title/ogImage + 无意义刷新 fetchedAt —— 与 buildPatch 的 per-field
+ * dirty 门控互补(门控护"未编辑字段",此处护"编辑 links 本身不丢已抓数据")。
+ */
+export function draftLinksToPayload(
+  links: DraftLink[],
+  existing?: LinkPreview[],
+): LinkPreview[] {
   return links
     .map((l) => l.url.trim())
     .filter(Boolean)
-    .map((url) => ({ url, fetchedAt: new Date() }))
+    .map((url) => {
+      const prev = existing?.find((e) => e.url === url)
+      if (prev) {
+        // URL 未变 → 保留既有富字段 + 原 fetchedAt(不无意义刷新)
+        return { url, ...(prev.title ? { title: prev.title } : {}), ...(prev.description ? { description: prev.description } : {}), ...(prev.ogImageUrl ? { ogImageUrl: prev.ogImageUrl } : {}), fetchedAt: prev.fetchedAt }
+      }
+      return { url, fetchedAt: new Date() }
+    })
 }
 
 export function draftCodesToPayload(codes: DraftCode[]): CodeBlock[] {
