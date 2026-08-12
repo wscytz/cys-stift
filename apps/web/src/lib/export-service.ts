@@ -1086,11 +1086,14 @@ export async function importFromJson(
     try {
       await saveImportCheckpoint(mode)
       checkpointCreated = true
-    } catch {
+    } catch (error) {
       // R17:checkpoint(完整快照)写失败不再阻碍导入 —— 配额满时快照写不下,
       // 但新状态可能更小仍能容纳。事务回滚由下方 storageSnapshot 独立保证
       // (不依赖 checkpoint),这里放行导入,结果带 checkpointSkipped 供 UI 提示
-      // "无恢复点(空间不足)"。
+      // "无恢复点(空间不足)"。warn 保留非配额失败(编码 bug 等)的可观测性。
+      console.warn(
+        `[export-service] import checkpoint skipped: ${error instanceof Error ? error.message : String(error)}`,
+      )
       checkpointSkipped = true
     }
   }

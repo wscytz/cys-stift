@@ -313,9 +313,8 @@ export function SelfCanvas({
     // R18:doubleClickArrowAt 返回 false(未命中该箭头/多选/悬空)时回落建卡 ——
     // 修「选中箭头后双击空白 = 死点击」(旧逻辑直接吞掉,空白建卡被阻断)。
     const selArrow = adapter.getSelectedIds().some((id) => adapter.getElement(id)?.kind === 'arrow')
-    if (selArrow && adapter.doubleClickArrowAt(p)) {
-      // 命中选中箭头 → 已加折点/重置,吞掉双击
-    } else if (onDoubleClickEmpty) {
+    const arrowHandled = selArrow && adapter.doubleClickArrowAt(p)
+    if (!arrowHandled && onDoubleClickEmpty) {
       onDoubleClickEmpty(p.x, p.y, e.clientX, e.clientY)
     }
   }
