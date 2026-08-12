@@ -856,6 +856,7 @@ export const messages = {
   'settings.importing': { zh: '导入中…', en: 'Importing…' },
   'settings.importOk': { zh: '已导入 {cards} 张卡片 · {mediaAssets} 个媒体 · {canvases} 个画布 · {freeform} 组画布几何。页面状态已更新。', en: 'Imported {cards} cards · {mediaAssets} media · {canvases} canvases · {freeform} freeform sets. Page state updated.' },
   'settings.importFreeformSkipped': { zh: '· {n} 个画布几何因存储满跳过', en: '· {n} canvas geometries skipped (storage full)' },
+  'settings.importOkNoCheckpoint': { zh: '已导入 {cards} 张卡片 · {mediaAssets} 个媒体 · {canvases} 个画布 · {freeform} 组画布几何（存储空间不足，未创建恢复点）。', en: 'Imported {cards} cards · {mediaAssets} media · {canvases} canvases · {freeform} freeform sets (storage full — no recovery point created).' },
   'settings.importFail': { zh: '导入失败：{error}', en: 'Import failed: {error}' },
   'settings.importErrorVersion': { zh: '这份备份来自更新版本的应用，当前版本无法读取。请升级应用后再导入。', en: 'This backup is from a newer version of the app and can’t be read by the current version. Update the app and try again.' },
   'settings.importErrorNotBackup': { zh: '这个文件不是 cy\'s Stift 的备份（缺少卡片数据）。请选择「导出 JSON」生成的文件。', en: "This file isn't a cy's Stift backup (no card data found). Pick a file produced by Export JSON." },

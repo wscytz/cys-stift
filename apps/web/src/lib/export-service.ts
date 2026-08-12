@@ -279,6 +279,8 @@ export interface ImportResult {
   mediaAssets: number
   /** Whether a pre-import recovery snapshot was persisted for this attempt. */
   checkpointCreated?: boolean
+  /** R17:checkpoint 因空间不足被跳过(导入仍进行,但无恢复点可回退)。 */
+  checkpointSkipped?: boolean
   /** Set by restoreImportCheckpoint after the recovery slot is removed. */
   checkpointCleared?: boolean
   /** 导入的 canvas 数(写入 canvases localStorage key 的条数)。 */
@@ -1079,17 +1081,17 @@ export async function importFromJson(
     // unavailable; treat the previous slot as absent for the rollback path.
   }
   let checkpointCreated = false
+  let checkpointSkipped = false
   if (options?.checkpoint !== false) {
     try {
       await saveImportCheckpoint(mode)
       checkpointCreated = true
-    } catch (error) {
-      return {
-        ok: false,
-        cards: 0,
-        mediaAssets: 0,
-        error: `checkpoint failed: ${(error as Error).message}`,
-      }
+    } catch {
+      // R17:checkpoint(完整快照)写失败不再阻碍导入 —— 配额满时快照写不下,
+      // 但新状态可能更小仍能容纳。事务回滚由下方 storageSnapshot 独立保证
+      // (不依赖 checkpoint),这里放行导入,结果带 checkpointSkipped 供 UI 提示
+      // "无恢复点(空间不足)"。
+      checkpointSkipped = true
     }
   }
 
@@ -1152,6 +1154,7 @@ export async function importFromJson(
     cards: payload.cards.length,
     mediaAssets: Object.keys(payload.mediaAssets ?? {}).length,
     ...(checkpointCreated ? { checkpointCreated: true } : {}),
+    ...(checkpointSkipped ? { checkpointSkipped: true } : {}),
     ...(payload.canvases ? { canvases: payload.canvases.canvases.length } : {}),
     ...(freeformCanvases > 0 ? { freeformCanvases } : {}),
     ...(payload.conversations && !Array.isArray(payload.conversations)

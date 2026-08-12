@@ -279,6 +279,13 @@ export default function SettingsPage() {
                       : t('settings.importCheckpointRestored')
                     : resultAction === 'clear'
                       ? t('settings.clearWorkspaceOk')
+                    : importResult.checkpointSkipped
+                      ? t('settings.importOkNoCheckpoint', {
+                          cards: importResult.cards,
+                          mediaAssets: importResult.mediaAssets,
+                          canvases: importResult.canvases ?? 0,
+                          freeform: importResult.freeformCanvases ?? 0,
+                        })
                     : t('settings.importOk', {
                         cards: importResult.cards,
                         mediaAssets: importResult.mediaAssets,
@@ -289,6 +296,8 @@ export default function SettingsPage() {
                     ? t('settings.clearWorkspaceFail', { error: importResult.error ?? '' })
                     : friendlyImportError(importResult.error)}
               </p>
+              {/* R17:checkpoint 不再因空间不足阻塞导入(放行,结果带 checkpointSkipped)。
+                  保留对旧"checkpoint failed 硬失败"的提示(异常路径仍有)。 */}
               {!importResult.ok && importResult.error?.startsWith('checkpoint failed') && pendingImport && (
                 <div className="set__import-retry">
                   <p className="mono mono--xs">{t('settings.importCheckpointBlockedHint')}</p>
