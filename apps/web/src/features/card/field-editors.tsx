@@ -85,6 +85,11 @@ export function MediaFieldEditor({
       try {
         const ref = await mediaStore.attach(file)
         onChange([...value, ref])
+        // R16:大文件(>500KB 建议上限,但 <5MB 能存)attach 成功时提示占空间,
+        // 否则用户 attach 一张 4MB 图毫无警告,下次保存失败才懵("存满了不知道")。
+        if (file.size > mediaStore.SOFT_LIMIT_BYTES) {
+          pushToast({ kind: 'info', message: t('card.mediaLargeWarning', { name: file.name, kb: String(Math.round(file.size / 1024)) }) })
+        }
       } catch (err) {
         console.error('[MediaFieldEditor] attach failed', err)
         pushToast({ kind: 'error', message: t('card.mediaAttachFail', { name: file.name }) })

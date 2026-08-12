@@ -88,6 +88,8 @@ function makeId(): MediaAssetId {
 }
 
 export const mediaStore = {
+  /** R16:建议单文件上限(500KB)。供调用方在 attach 大文件时提示占空间。 */
+  SOFT_LIMIT_BYTES,
   /**
    * Read a File, store its data URL in localStorage, and return a MediaRef
    * the caller can put into `card.media`. The actual blob lives only here

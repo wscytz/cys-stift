@@ -835,7 +835,7 @@ export const messages = {
   'settings.labs.agentToolCallingWarn': { zh: '/ask 对话里 AI 主动多轮检索卡片(token 不可控)', en: 'AI proactively searches cards across turns in /ask (token use less predictable)' },
   'settings.labs.agentToolCallingConfirmTitle': { zh: '开启 AI 主动检索', en: 'Enable AI Tool-calling' },
   'settings.labs.agentToolCallingConfirmBody': { zh: '开启后,/ask 对话里 AI 会主动多轮检索你的卡片来回答。这可能增加 token 消耗和多轮外发。可随时关闭(关闭后回退到预注入检索)。', en: 'Once enabled, AI in /ask proactively searches your cards across turns to answer. This may increase token use and multi-turn requests. Can be turned off any time (falls back to pre-injected retrieval).' },
-  'settings.dataLede': { zh: '你的数据仅保存于本机。随时导出开放的 JSON 备份——卡片、媒体、画布与手绘几何、草稿、画布对话和设置都在其中。（数据可移植，无锁定。）', en: 'Your data lives only on this machine. Export an open-format JSON backup any time — cards, media, canvas & freeform geometry, drafts, canvas chats, and settings are all included.' },
+  'settings.dataLede': { zh: '你的数据仅保存在此浏览器的本机存储中（清缓存、换浏览器或清除站点数据会丢失）——随时导出开放的 JSON 备份。备份包含卡片、媒体、画布与手绘几何、草稿、画布对话和设置。（数据可移植，无锁定。）', en: 'Your data lives only in this browser’s local storage (clearing site data, switching browsers, or clearing cache will lose it) — export an open-format JSON backup any time. Backups include cards, media, canvas & freeform geometry, drafts, canvas chats, and settings.' },
   'settings.exportJson': { zh: '导出 JSON', en: 'Export JSON' },
   'settings.exporting': { zh: '导出中…', en: 'Exporting…' },
   'settings.exportOk': { zh: '已导出 {cards} 张卡片 · {bytes}', en: 'Exported {cards} cards · {bytes}' },
@@ -951,6 +951,7 @@ export const messages = {
   'storage.category.canvas': { zh: '画布快照', en: 'Canvas snapshots' },
   'storage.category.other': { zh: '其他', en: 'Other' },
   'storage.quotaExceeded': { zh: '存储已满,无法保存——请导出备份后删除部分卡片/媒体', en: 'Storage full — could not save. Export a backup then delete some cards/media' },
+  'storage.quotaCleanAction': { zh: '去清理 →', en: 'Clean up →' },
 
   /* ── Search ── */
   'search.crumb': { zh: '搜索', en: 'search' },
@@ -1037,6 +1038,7 @@ export const messages = {
   'card.exportSuccess': { zh: '已导出 {n} 字节', en: 'Exported {n} bytes' },
   'card.exportFailed': { zh: '导出失败: {error}', en: 'Export failed: {error}' },
   'card.mediaAttachFail': { zh: '添加媒体失败:{name}', en: 'Failed to attach media: {name}' },
+  'card.mediaLargeWarning': { zh: '{name} 较大（{kb} KB），会占用较多本地空间。', en: '{name} is large ({kb} KB) and will take up local space.' },
   'card.summarize': { zh: 'AI 总结', en: 'AI summarize' },
   'card.rewrite': { zh: 'AI 改写', en: 'AI rewrite' },
   'card.translate': { zh: 'AI 翻译', en: 'AI translate' },

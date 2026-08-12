@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { scanStorageUsage } from '../storage-usage'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { scanStorageUsage, LOCAL_STORAGE_BUDGET_BYTES } from '../storage-usage'
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -45,38 +45,38 @@ describe('scanStorageUsage — byte-accurate sizing (v0.37.0)', () => {
   })
 })
 
-// ── OPFS 占用计入 used(审计 H4)────────────────────────────────────────────
-// estimate().usage 包含 localStorage + OPFS + IndexedDB 总占用,应作 used;
-// estimate().quota 作 total。此前 used 只算 localStorage → 显示偏低,
-// 80% 警告(防静默丢数据的网)触发太晚。
-describe('scanStorageUsage OPFS 计入', () => {
-  it('used 反映 estimate().usage(localStorage + OPFS 总和)', async () => {
-    // localStorage = 1MB,OPFS 让 estimate().usage = 4MB(含 localStorage)
-    const oneMb = 'x'.repeat(1024 * 1024)
-    window.localStorage.setItem('cys-stift.cards.v1', oneMb)
-    vi.stubGlobal('navigator', {
-      storage: {
-        estimate: vi.fn().mockResolvedValue({ quota: 10 * 1024 * 1024, usage: 4 * 1024 * 1024 }),
-      },
-    })
+// ── R16:percent/warning 按 localStorage 实际预算校准(5MB,写失败真正抛
+// QuotaExceeded 的上限),而非 estimate().quota(浏览器磁盘桶,常数百 MB~GB)。
+// 此前 4.8MB 实际占用只显示 0%,近满警告从不触发("存满了却不知道")。
+describe('scanStorageUsage — localStorage 预算校准 (R16)', () => {
+  it('percent 按 5MB 预算算:>80% → critical 警告(此前按 estimate 配额显示 0%)', async () => {
+    // jsdom localStorage 同样限 5MB,用 4.2MB(84%)避开真实配额崩溃。
+    const payload = 'x'.repeat(Math.round(0.84 * LOCAL_STORAGE_BUDGET_BYTES))
+    window.localStorage.setItem('cys-stift.cards.v1', payload)
     const u = await scanStorageUsage()
-    expect(u.used).toBe(4 * 1024 * 1024) // estimate().usage,非仅 localStorage 1MB
-    expect(u.total).toBe(10 * 1024 * 1024)
-    expect(u.percent).toBe(40)
-    vi.unstubAllGlobals()
+    expect(u.total).toBe(LOCAL_STORAGE_BUDGET_BYTES)
+    expect(u.percent).toBeGreaterThanOrEqual(80)
+    expect(u.warning).toBe('critical')
   })
 
-  it('estimate 不可用时回退 lsBytes(降级路径)', async () => {
-    // 模拟 SSR 降级:navigator.storage.estimate 不存在 → used 回退 lsBytes
+  it('60% → warn,30% → null(警告阈值按真实预算)', async () => {
+    const at60 = 'x'.repeat(Math.round(0.6 * LOCAL_STORAGE_BUDGET_BYTES))
+    window.localStorage.setItem('cys-stift.cards.v1', at60)
+    expect((await scanStorageUsage()).warning).toBe('warn')
+
+    window.localStorage.clear()
+    const at30 = 'x'.repeat(Math.round(0.3 * LOCAL_STORAGE_BUDGET_BYTES))
+    window.localStorage.setItem('cys-stift.cards.v1', at30)
+    expect((await scanStorageUsage()).warning).toBeNull()
+  })
+
+  it('estimate 不可用不影响本地计量(percent 恒按预算,不再回退 total=0)', async () => {
     const oneMb = 'x'.repeat(1024 * 1024)
     window.localStorage.setItem('cys-stift.cards.v1', oneMb)
-    vi.stubGlobal('navigator', {
-      storage: {} as StorageManager,
-    })
+    // 不 stub navigator.storage —— 新实现不依赖 estimate,直接算。
     const u = await scanStorageUsage()
-    expect(u.used).toBe(1024 * 1024) // 回退 lsBytes
-    expect(u.total).toBe(0)
-    expect(u.percent).toBe(0)
-    vi.unstubAllGlobals()
+    expect(u.used).toBe(1024 * 1024)
+    expect(u.total).toBe(LOCAL_STORAGE_BUDGET_BYTES)
+    expect(u.percent).toBe(20)
   })
 })

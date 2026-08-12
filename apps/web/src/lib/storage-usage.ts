@@ -4,11 +4,16 @@
  * Storage usage meter — F1 follow-up (v0.26.3).
  *
  * Scans every `cys-stift.*` key in localStorage and reports total bytes
- * used, percent of the browser's quota, and a per-key breakdown so the
+ * used, percent of the localStorage budget, and a per-key breakdown so the
  * user can see what's eating space (the canvas snapshot is the big one
- * once you draw hand-draw paths). Above 80% we surface a "export + clear"
+ * once you draw hand-draw paths). Above 60% we surface an "export + clear"
  * warning — losing the canvas to a silent QuotaExceeded is exactly the
  * failure mode this exists to prevent.
+ *
+ * R16:percent/warning 按 localStorage 实际预算(~5MB,写失败真正抛 QuotaExceeded
+ * 的上限)校准,而非 navigator.storage.estimate().quota(浏览器磁盘桶配额,常为
+ * 数百 MB~GB)。此前用 estimate 的配额 → 4.8MB 实际占用只显示 0%,近满警告几乎
+ * 从不触发("存满了却不知道")。estimate().usage 仅作为次要的"全部浏览器存储"显示。
  *
  * SSR-safe (returns zeros server-side).
  */
@@ -23,6 +28,9 @@ export interface StorageUsage {
   warning: StorageWarning
   byKey: Array<{ key: string; bytes: number; category: string }>
 }
+
+/** localStorage 每个 origin 的硬上限(写失败抛 QuotaExceededError 的真实预算)。 */
+export const LOCAL_STORAGE_BUDGET_BYTES = 5 * 1024 * 1024
 
 const CYS_PREFIX = 'cys-stift.'
 
@@ -46,26 +54,10 @@ function warnFor(percent: number): StorageWarning {
   return null
 }
 
-async function detectQuota(): Promise<{ quota: number; usage: number }> {
-  if (typeof navigator === 'undefined' || !navigator.storage?.estimate) {
-    return { quota: 0, usage: 0 }
-  }
-  try {
-    const est = await navigator.storage.estimate()
-    return {
-      quota: est.quota ?? 0,
-      usage: est.usage ?? 0,
-    }
-  } catch {
-    return { quota: 0, usage: 0 }
-  }
-}
-
 export async function scanStorageUsage(): Promise<StorageUsage> {
   if (typeof window === 'undefined') {
     return { used: 0, total: 0, percent: 0, warning: null, byKey: [] }
   }
-  const { quota: total, usage: estimateUsage } = await detectQuota()
   const byKey: StorageUsage['byKey'] = []
   let lsBytes = 0
   for (let i = 0; i < window.localStorage.length; i++) {
@@ -82,11 +74,11 @@ export async function scanStorageUsage(): Promise<StorageUsage> {
   }
   byKey.sort((a, b) => b.bytes - a.bytes)
 
-  // used 用 estimate().usage(含 OPFS + IndexedDB,浏览器汇总),它比 lsBytes
-  // 大或相等。此前 used 只算 localStorage → OPFS 几何不可见 → 计量偏低,
-  // 80% 警告(审计 H1 丢数据的网)触发太晚。estimate 不可用(SSR/降级)时
-  // 回退 lsBytes(localStorage 可见部分)。
-  const used = estimateUsage > 0 ? estimateUsage : lsBytes
+  // R16:percent/warning 以 localStorage 实际占用对 5MB 预算算 —— 这才是写失败
+  // 的真实边界。estimate().usage 只作为"全部浏览器存储"的次要展示(含 OPFS 几何,
+  // 供参考,不参与近满判断)。
+  const used = lsBytes
+  const total = LOCAL_STORAGE_BUDGET_BYTES
   const percent = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
   return { used, total, percent, warning: warnFor(percent), byKey }
 }

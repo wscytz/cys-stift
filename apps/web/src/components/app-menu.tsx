@@ -57,7 +57,13 @@ export function AppMenu() {
   // 卡片/媒体/画布几何/画布列表/设置/画布视图)。
   useEffect(() => {
     const message = t('storage.quotaExceeded')
-    const toast = () => pushToast({ kind: 'error', message })
+    // R16:配额 toast 带「去清理」action(指向回收站硬删,最直接的腾空间入口)。
+    // 此前纯文字 toast,用户刚保存失败还得凭记忆找清理路径。
+    const toast = () => pushToast({
+      kind: 'error',
+      message,
+      actions: [{ label: t('storage.quotaCleanAction'), onClick: () => { window.location.href = '/trash' } }],
+    })
     const unsubs = [
       onQuotaExceeded(toast),
       onMediaQuota(toast),
