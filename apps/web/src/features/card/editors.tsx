@@ -26,6 +26,8 @@ interface ListEditorProps<T> {
   label: string
   placeholder?: string
   fieldKey: keyof T
+  /** R13:行内上移/下移按钮(links/quotes 等列表字段可调序,此前只能删了重加)。 */
+  reorderable?: boolean
 }
 
 export function ListEditor<T extends Record<string, string>>({
@@ -35,8 +37,16 @@ export function ListEditor<T extends Record<string, string>>({
   label,
   placeholder,
   fieldKey,
+  reorderable,
 }: ListEditorProps<T>) {
   const { t } = useI18n()
+  const move = (i: number, dir: -1 | 1) => {
+    const next = items.slice()
+    const j = i + dir
+    if (j < 0 || j >= next.length) return
+    ;[next[i], next[j]] = [next[j]!, next[i]!]
+    onChange(next)
+  }
   return (
     <div className="le">
       <ul className="le__list">
@@ -53,6 +63,12 @@ export function ListEditor<T extends Record<string, string>>({
                 onChange(next)
               }}
             />
+            {reorderable && (
+              <span className="le__reorder">
+                <button type="button" className="le__move" aria-label={t('editor.moveUp')} onClick={() => move(i, -1)} disabled={i === 0}>↑</button>
+                <button type="button" className="le__move" aria-label={t('editor.moveDown')} onClick={() => move(i, 1)} disabled={i === items.length - 1}>↓</button>
+              </span>
+            )}
             <button
               type="button"
               className="le__remove"
@@ -96,6 +112,7 @@ export function CodeEditor({
                 value={item.language}
                 placeholder={t('editor.codeLangPlaceholder')}
                 aria-label={t('editor.codeLangPlaceholder')}
+                list="cys-editor-langs"
                 onChange={(e) => {
                   const next = items.slice()
                   const prev = next[i] as DraftCode
@@ -135,6 +152,12 @@ export function CodeEditor({
       >
         {t('editor.addCode')}
       </button>
+      {/* R13:语言输入候选(js/ts/python 等)——此前裸 text input,用户不确定该填啥。 */}
+      <datalist id="cys-editor-langs">
+        {['js', 'ts', 'python', 'py', 'java', 'c', 'cpp', 'go', 'rust', 'sql', 'json', 'html', 'css', 'bash', 'sh', 'text'].map((l) => (
+          <option key={l} value={l} />
+        ))}
+      </datalist>
     </div>
   )
 }
@@ -254,6 +277,15 @@ export const editorStyles = `
 .le { display: flex; flex-direction: column; gap: var(--space-2); border-left: 2px solid var(--color-red); padding-left: var(--space-3); }
 .le__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .le__row { display: flex; gap: var(--space-1); align-items: center; }
+.le__reorder { display: inline-flex; flex-direction: column; }
+.le__move {
+  appearance: none; -webkit-appearance: none;
+  background: var(--color-white); border: 0; cursor: pointer;
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  color: var(--color-blue); min-height: 22px; padding: 0 var(--space-1); line-height: 1;
+}
+.le__move:disabled { color: var(--color-gray); cursor: default; }
+.le__move:hover:not(:disabled) { background: var(--color-yellow); color: var(--color-black); }
 .le__input {
   flex: 1;
   appearance: none;

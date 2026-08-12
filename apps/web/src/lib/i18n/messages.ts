@@ -69,6 +69,8 @@ export const messages = {
 
   /* ── Editor row labels (shared ListEditor / CodeEditor / QuoteEditor) ── */
   'editor.add': { zh: '+ 添加{label}', en: '+ Add {label}' },
+  'editor.moveUp': { zh: '上移', en: 'Move up' },
+  'editor.moveDown': { zh: '下移', en: 'Move down' },
   'editor.addCode': { zh: '+ 添加代码块', en: '+ Add code block' },
   'editor.addQuote': { zh: '+ 添加引用', en: '+ Add quote' },
   'editor.codeLangPlaceholder': { zh: '语言(如 ts)', en: 'language (e.g. ts)' },
@@ -1091,7 +1093,9 @@ export const messages = {
   /* ── Workbench 库页 (D4) ── */
   'workbench.title': { zh: '工作台', en: 'Workbench' },
   'workbench.saving': { zh: '保存中…', en: 'Saving…' },
+  'workbench.pending': { zh: '待保存', en: 'Unsaved' },
   'workbench.saved': { zh: '✓ 已保存', en: '✓ Saved' },
+  'workbench.saveFailedFlush': { zh: '切换卡片时保存失败——上一张卡的编辑可能未落盘，请重试。', en: 'Save failed while switching cards — the previous card’s edit may not be saved. Please retry.' },
   'workbench.savedAt': { zh: '已保存于 {time}', en: 'Saved at {time}' },
   'workbench.saveFailed': { zh: '保存失败，请重试', en: 'Save failed, retry' },
   'workbench.backToList': { zh: '返回列表', en: 'Back to list' },

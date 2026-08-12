@@ -61,12 +61,16 @@ export interface MarkdownEditorProps {
   value: string
   onChange: (next: string) => void
   className?: string
+  /** R13:预览的嵌入解析(`((标题))` 展开)。不传时预览按字面渲染(与详情弹窗不一致)。 */
+  resolveEmbed?: (title: string) => { body: string; title: string } | null
 }
 
-export function MarkdownEditor({ value, onChange, className }: MarkdownEditorProps) {
+export function MarkdownEditor({ value, onChange, className, resolveEmbed }: MarkdownEditorProps) {
   const { t } = useI18n()
   const taRef = useRef<HTMLTextAreaElement>(null)
+  const previewRef = useRef<HTMLDivElement>(null)
   const pendingSel = useRef<{ s: number; e: number } | null>(null)
+  const savedScrollTop = useRef(0) // R13:三态切换保留滚动位置(长文编辑不丢)
   const [view, setView] = useState<View>('split')
   const isNarrow = useMatchMedia('(max-width: 640px)')
 
@@ -75,6 +79,37 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
   useEffect(() => {
     if (isNarrow) setView((current) => current === 'split' ? 'source' : current)
   }, [isNarrow])
+
+  // R13:split 双栏滚动同步 —— 源滚动时预览按比例跟随(校对长文时两栏对齐)。
+  const onSourceScroll = () => {
+    if (view !== 'split') return
+    const ta = taRef.current
+    const pre = previewRef.current
+    if (!ta || !pre) return
+    const ratio = ta.scrollTop / Math.max(1, ta.scrollHeight - ta.clientHeight)
+    pre.scrollTop = ratio * (pre.scrollHeight - pre.clientHeight)
+  }
+
+  // A two-column editor is not usable on phone widths. Start narrow screens
+  // in source mode; Preview remains one tap away in the same toolbar.
+  useEffect(() => {
+    if (isNarrow) setView((current) => current === 'split' ? 'source' : current)
+  }, [isNarrow])
+
+  // R13:切到 preview 前保存滚动位置 + 光标;回源/split 后恢复(textarea 卸载重挂)。
+  // 此前深度编辑长文滚到第 N 行,切预览再切回 → 回顶部 + 光标丢失。
+  const rememberTextareaState = () => {
+    const ta = taRef.current
+    if (!ta) return
+    savedScrollTop.current = ta.scrollTop
+    if (!pendingSel.current) {
+      pendingSel.current = { s: ta.selectionStart, e: ta.selectionEnd }
+    }
+  }
+  const onViewChange = (v: View) => {
+    if (v === 'preview') rememberTextareaState()
+    setView(v)
+  }
 
   const apply = (action: MdAction) => {
     const ta = taRef.current
@@ -94,7 +129,9 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
       ta.focus()
       pendingSel.current = null
     }
-  }, [value])
+    // R13:从 preview 切回源/split,textarea 重挂 → 恢复之前的滚动位置。
+    if (ta) ta.scrollTop = savedScrollTop.current
+  }, [value, view])
 
   return (
     <div className={`md-editor${className ? ' ' + className : ''}`}>
@@ -126,7 +163,7 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
               title={label}
               aria-label={label}
               aria-pressed={view === v.v}
-              onClick={() => setView(v.v)}
+              onClick={() => onViewChange(v.v)}
             >
               {label}
             </button>
@@ -140,14 +177,15 @@ export function MarkdownEditor({ value, onChange, className }: MarkdownEditorPro
             className="md-editor__textarea"
             value={value}
             onChange={(e) => onChange(e.target.value)}
+            onScroll={onSourceScroll}
             placeholder={t('editor.placeholder')}
             spellCheck={false}
           />
         )}
         {(view === 'split' || view === 'preview') && (
-          <div className="md-editor__preview">
+          <div className="md-editor__preview" ref={previewRef}>
             {value.trim() ? (
-              <MarkdownBody source={value} />
+              <MarkdownBody source={value} resolveEmbed={resolveEmbed} />
             ) : (
               <p className="md-editor__empty">{t('editor.previewEmpty')}</p>
             )}

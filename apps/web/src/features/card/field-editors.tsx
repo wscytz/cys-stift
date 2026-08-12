@@ -54,6 +54,7 @@ export function LinksFieldEditor({ value, onChange }: FieldEditorProps<unknown>)
         label={t('card.detail.linkLabel')}
         placeholder="https://…"
         fieldKey="url"
+        reorderable // R13:链接可排序
       />
     </div>
   )

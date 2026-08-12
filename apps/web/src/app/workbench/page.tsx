@@ -150,6 +150,12 @@ export default function WorkbenchPage() {
                     onSave={wbSave}
                     onAIAppendNew={onAIAppendNew}
                     onDirtyChange={setEditorDirty}
+                    // R13:预览嵌入解析(与详情弹窗一致)。
+                    resolveEmbed={(title) => {
+                      const target = service.listAll().find((c) => c.title === title && !c.deletedAt)
+                      if (!target) return null
+                      return { title: target.title, body: target.body }
+                    }}
                     onClose={() => { workbenchStore.close(); setMobileLibrary(true); setEditorDirty(false) }}
                     onBackToList={() => {
                       setMobileLibrary(true)

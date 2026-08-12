@@ -50,6 +50,8 @@ export interface WorkbenchPanelProps {
   onDirtyChange?: (dirty: boolean) => void
   /** A3 — AI「存为新卡」:page 用 captureSink 建新卡。返回 promise(失败 reject,page 已推 error toast)。 */
   onAIAppendNew?: (c: { title: string; body: string }) => Promise<void>
+  /** R13:预览嵌入解析(`((标题))` 展开,与详情弹窗一致)。page 用 service 按标题查卡传入。 */
+  resolveEmbed?: (title: string) => { body: string; title: string } | null
 }
 
 /**
@@ -66,6 +68,7 @@ export function WorkbenchPanel({
   onBackToList,
   onDirtyChange,
   onAIAppendNew,
+  resolveEmbed,
 }: WorkbenchPanelProps) {
   const { t } = useI18n()
   const { draft, setField, dirty, toPatch, reset } = useCardDraft(card, CARD_FIELDS)
@@ -84,6 +87,16 @@ export function WorkbenchPanel({
   //  闭包还停在 card.id 变时的旧 draft;切卡 flush 上一卡脏编辑要靠 draftRef.current 读最新)。
   const toPatchRef = useRef(toPatch)
   toPatchRef.current = toPatch
+  // R13:切卡 cleanup 必须用「上一卡」的 toPatch,而非切卡后重绑的新卡 toPatch。
+  // 否则 buildPatch(新卡B, 旧草稿A) 会用 B 的 links 合并 A 的草稿 → A 已抓的
+  // link title/ogImage 被 draftLinksToPayload 抹成 {url, fetchedAt:now}(数据丢失)。
+  // 检测 card.id 变化时,把当前(旧卡)的 toPatch 存到 prevToPatchRef 供 cleanup 用。
+  const prevToPatchRef = useRef(toPatch)
+  const prevCardIdRef = useRef(card.id)
+  if (prevCardIdRef.current !== card.id) {
+    prevToPatchRef.current = toPatchRef.current
+    prevCardIdRef.current = card.id
+  }
   const draftRef = useRef(draft)
   draftRef.current = draft
   const onSaveRef = useRef(onSave)
@@ -111,8 +124,12 @@ export function WorkbenchPanel({
     setSaveState('saving')
     const ok = commitSave(card.id, toPatchRef.current())
     setSaveState(ok === false ? 'failed' : 'saved')
-    if (flashTimer.current) clearTimeout(flashTimer.current)
-    flashTimer.current = setTimeout(() => setSaveState('idle'), 3000)
+    // R13:成功才 3s 后回落 idle;失败态常驻(用户能一直看到"保存失败"直到重试),
+    // 此前失败 3s 后静默退回"保存中"让人以为在重试实则没有。
+    if (ok !== false) {
+      if (flashTimer.current) clearTimeout(flashTimer.current)
+      flashTimer.current = setTimeout(() => setSaveState('idle'), 3000)
+    }
     return ok !== false
   }
 
@@ -133,7 +150,11 @@ export function WorkbenchPanel({
     const prev = card
     return () => {
       if (isDirty(prev, draftRef.current, CARD_FIELDS)) {
-        commitSave(prev.id, toPatchRef.current())
+        // R13:用上一卡的 toPatch(prevToPatchRef)而非切卡后重绑的 toPatchRef。
+        // commitSave 返回 false(quota 失败)时 toast 提示 —— 此前 cleanup 静默吞失败,
+        // 用户以为「切卡前会提交」实则编辑丢了。
+        const ok = commitSave(prev.id, prevToPatchRef.current())
+        if (ok === false) pushToast({ kind: 'error', message: t('workbench.saveFailedFlush') })
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -203,7 +224,7 @@ export function WorkbenchPanel({
                     }),
                   })
                 : dirty
-                  ? t('workbench.saving')
+                  ? t('workbench.pending')
                   : ''}
         </span>
         {onBackToList && (
@@ -258,6 +279,9 @@ export function WorkbenchPanel({
           value={tagInput}
           onChange={(e) => setTagInput(e.target.value)}
           onKeyDown={(e) => {
+            // R13:IME 组合态守卫(与 card-detail 对齐)—— 中文拼音按 Enter 确认
+            // 候选时,preventDefault 会取消 IME 提交或把残词加成 tag。
+            if (e.nativeEvent.isComposing) return
             if (e.key === 'Enter' || e.key === ',') {
               e.preventDefault()
               addTag(tagInput)
@@ -286,7 +310,11 @@ export function WorkbenchPanel({
         <FieldEditors fields={CARD_FIELDS} draft={draft} setField={setField} />
       </div>
       <div className="wb-panel__body">
-        <MarkdownEditor value={draft.body as string} onChange={(v) => setField('body', v)} />
+        <MarkdownEditor
+          value={draft.body as string}
+          onChange={(v) => setField('body', v)}
+          resolveEmbed={resolveEmbed}
+        />
       </div>
       {aiView && (
         <div className="wb-panel__ai" role="dialog" aria-label={t('card.ai')}>

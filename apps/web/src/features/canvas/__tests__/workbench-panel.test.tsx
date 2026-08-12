@@ -154,7 +154,7 @@ describe('WorkbenchPanel', () => {
     )
   })
 
-  it('保存状态:初始空;编辑后显「保存中…」(autosave 可见化)', () => {
+  it('保存状态:初始空;编辑后显「待保存」(dirty 态可感知)', () => {
     const { host } = render(<WorkbenchPanel card={card} onSave={vi.fn()} onClose={vi.fn()} />)
     const status = host.querySelector('[data-testid="wb-status"]') as HTMLElement
     expect(status.textContent).toBe('') // 初始无编辑 -> 空
@@ -167,7 +167,7 @@ describe('WorkbenchPanel', () => {
       setter.call(ta, '新内容')
       ta.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    expect(status.textContent).toBe('workbench.saving') // dirty -> 保存中
+    expect(status.textContent).toBe('workbench.pending') // dirty -> 待保存(非误导的"保存中")
     host.remove()
   })
 
