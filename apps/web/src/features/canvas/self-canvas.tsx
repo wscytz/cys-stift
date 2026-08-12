@@ -22,7 +22,7 @@ import { SelfBuiltAdapter } from '@cys-stift/canvas-engine'
 import { canvasViewStore } from '@/lib/canvas-view-store'
 import { settingsStore } from '@/lib/settings-store'
 import { subtitleOf } from '@/features/workbench/preview-text'
-import { screenToPage } from '@cys-stift/canvas-engine'
+import { screenToPage, hitTest } from '@cys-stift/canvas-engine'
 import { measureText, textEditKeyAction } from '@cys-stift/canvas-engine'
 import { readToken } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
@@ -310,9 +310,11 @@ export function SelfCanvas({
     }
     // 未命中卡片/frame:选中箭头 → 加折点(elbow 未满)/ 重置直线(existing);
     // 否则空白处双击 → 建卡(Figma/tldraw 惯例,比右键菜单易发现)。
+    // R18:doubleClickArrowAt 返回 false(未命中该箭头/多选/悬空)时回落建卡 ——
+    // 修「选中箭头后双击空白 = 死点击」(旧逻辑直接吞掉,空白建卡被阻断)。
     const selArrow = adapter.getSelectedIds().some((id) => adapter.getElement(id)?.kind === 'arrow')
-    if (selArrow) {
-      adapter.doubleClickArrowAt(p)
+    if (selArrow && adapter.doubleClickArrowAt(p)) {
+      // 命中选中箭头 → 已加折点/重置,吞掉双击
     } else if (onDoubleClickEmpty) {
       onDoubleClickEmpty(p.x, p.y, e.clientX, e.clientY)
     }
@@ -360,10 +362,12 @@ export function SelfCanvas({
     const p = screenToPage(view, sx, sy)
     // R9:text 模式下点击命中已有元素(card/arrow/text/rect/frame)→ 切回 select 让
     // 用户进入选择/编辑,而非再放一个空 textarea(主流画布肌肉记忆)。
-    const hit = adapter.getElements().find((el) =>
-      p.x >= el.x && p.x <= el.x + el.w && p.y >= el.y && p.y <= el.y + el.h,
-    )
-    if (hit) {
+    // R18:命中判定改顶层优先 hitTest 且忽略 frame —— 旧逻辑 getElements().find 是层序优先
+    // (frame 层 -1 排最前),点在 frame 内任何空白都先命中 frame → 文字工具在分区 frame 里
+    // 永远放不了字。现在:命中非 frame 元素(顶层优先)→ 切 select;frame 内空白/纯空白 → 放 textarea。
+    const hitId = hitTest(adapter.getElements(), p.x, p.y, view.zoom)
+    const hitEl = hitId ? adapter.getElement(hitId) : null
+    if (hitEl && hitEl.kind !== 'frame') {
       onTextClickHitElement?.()
       return
     }

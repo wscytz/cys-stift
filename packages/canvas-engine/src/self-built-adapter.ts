@@ -464,6 +464,21 @@ export class SelfBuiltAdapter implements CanvasHost {
   }
 
   /**
+   * R18:探测点是否命中「当前橡皮模式擦不掉」的元素(card 模式点 arrow/text、text 模式点 card)。
+   * 供 web 层区分「命中但被模式过滤」(真不匹配,才提示切全部)与「点到空白」(正常,不提示)。
+   * 返回 true = 命中但被模式过滤;false = 未命中 或 命中且当前模式可擦(all 模式恒 false)。
+   */
+  eraserHitFiltered(p: { x: number; y: number }): boolean {
+    const id = eraserHitTest(this.getElements(), p.x, p.y, this.view.zoom)
+    if (!id) return false
+    const el = this.getElement(id)
+    if (!el) return false
+    if (this.eraserMode === 'text' && el.kind !== 'text') return true
+    if (this.eraserMode === 'card' && el.kind !== 'card') return true
+    return false
+  }
+
+  /**
    * 双击箭头交互(选中箭头 + 双击点命中该箭头时):
    *  - route=elbow 且折点 < 2:在双击点加折点(按沿 from→to 投影排序,保持路径顺序)。
    *  - 否则(curve/straight,或 elbow 已满):重置 route=straight(保留 curve/elbow 数据)。
@@ -1440,7 +1455,11 @@ export class SelfBuiltAdapter implements CanvasHost {
   onWheel(sx: number, sy: number, deltaX: number, deltaY: number, ctrlKey: boolean): void {
     if (ctrlKey) {
       // zoom-to-cursor:以 (sx,sy) 为锚点。zoom 钳制 [0.1, 8];pan 补偿使 cursor 下页坐标缩放前后不变。
-      const factor = deltaY < 0 ? 1.1 : 1 / 1.1
+      // R18:倍率按 |delta| 折算(exp 曲线)而非固定 1.1 —— 触控板 pinch 一次手势拆成多个小 delta
+      // 的 wheel 事件,固定倍率会让同手势缩放量取决于拆帧数(快捏/慢捏手感不定)。delta 越大缩放越猛,
+      // 每事件钳 [0.5, 2](小 delta 近 1,手感连续;一次性大滚轮不会跳变)。
+      const delta = Math.abs(deltaY) > Math.abs(deltaX) ? deltaY : deltaX
+      const factor = Math.min(2, Math.max(0.5, Math.exp(-delta * 0.002)))
       const nextZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, this.view.zoom * factor))
       const pageX = (sx - this.view.panX) / this.view.zoom
       const pageY = (sy - this.view.panY) / this.view.zoom

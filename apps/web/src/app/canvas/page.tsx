@@ -368,21 +368,23 @@ export default function CanvasPage() {
   }, [service])
 
   // eraser 模式误选提示:card/text 模式下点了非匹配元素(如 card 模式点 arrow),
-  // 模式过滤导致没删 → 用户困惑"为什么擦不掉"。检测 pointerdown 未导致删除时,
-  // toast 引导切「全部」(5s 去重防刷屏)。all 模式不提示(能擦一切)。
+  // 模式过滤导致没删 → 用户困惑"为什么擦不掉"。用 adapter.eraserHitFiltered 精确区分
+  // 「命中但被模式过滤」(真不匹配,toast 引导切「全部」)与「点到空白」(正常,不提示)——
+  // R18:旧逻辑用元素数前后对比,点空白也会误报(擦除模式点空白很频繁)。
+  // 5s 去重防刷屏。all 模式不提示(能擦一切)。
   const lastMismatchRef = useRef(0)
   useEffect(() => {
     if (!adapter || tool !== 'eraser' || eraserMode === 'all') return
     const canvas = canvasElRef.current
     if (!canvas) return
-    const onDown = () => {
-      const before = adapter.getElements().length
-      setTimeout(() => {
-        if (adapter.getElements().length === before && Date.now() - lastMismatchRef.current > 5000) {
-          lastMismatchRef.current = Date.now()
-          pushToast({ kind: 'info', message: t('canvas.eraserModeMismatch') })
-        }
-      }, 0)
+    const onDown = (e: PointerEvent) => {
+      if (!adapter) return
+      const rect = canvas.getBoundingClientRect()
+      const p = screenToPage(adapter.getView(), e.clientX - rect.left, e.clientY - rect.top)
+      if (adapter.eraserHitFiltered(p) && Date.now() - lastMismatchRef.current > 5000) {
+        lastMismatchRef.current = Date.now()
+        pushToast({ kind: 'info', message: t('canvas.eraserModeMismatch') })
+      }
     }
     canvas.addEventListener('pointerdown', onDown)
     return () => canvas.removeEventListener('pointerdown', onDown)

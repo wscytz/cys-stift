@@ -20,6 +20,7 @@
     "smoke:proposal": "node scripts/smoke-proposal-coauthor.mjs",
     "e2e:ai": "node scripts/e2e-ai.mjs",
     "e2e:data": "node scripts/e2e-data.mjs",
+    "e2e:canvas": "node scripts/e2e-r18-canvas.mjs",
     "docs:links": "node scripts/check-doc-links.mjs",
     "tauri": "pnpm --filter desktop tauri",
     "clean": "pnpm -r exec rm -rf .next out dist node_modules/.cache"

@@ -26,7 +26,8 @@ describe('SelfBuiltAdapter pan/zoom', () => {
   it('wheel zoom adjusts zoom + pan (zoom-to-cursor at cursor point)', () => {
     const host = new SelfBuiltAdapter(document.createElement('canvas'))
     host.setView({ panX: 0, panY: 0, zoom: 1, gridMode: 'free' })
-    // delta < 0(放大)单步应用 1.1 因子;cursor 下页坐标应缩放前后不变。
+    // delta < 0(放大);R18:倍率按 |delta| 折算(exp 曲线)而非固定 1.1,deltaY=-1 → exp(0.002)≈1.002。
+    // cursor 下页坐标应缩放前后不变。
     // ctrlKey=true → 走 zoom 分支(pinch / ctrl+滚轮)。
     const sx = 100
     const sy = 100
@@ -34,7 +35,7 @@ describe('SelfBuiltAdapter pan/zoom', () => {
       onWheel: (sx: number, sy: number, deltaX: number, deltaY: number, ctrlKey: boolean) => void
     }).onWheel(sx, sy, 0, -1, true)
     const v = host.getView()
-    expect(v.zoom).toBeCloseTo(1.1, 5)
+    expect(v.zoom).toBeCloseTo(Math.exp(0.002), 5)
     // zoom-to-cursor: page coord under cursor 不变 → panX 补偿
     expect((sx - v.panX) / v.zoom).toBeCloseTo(100, 5)
     expect((sy - v.panY) / v.zoom).toBeCloseTo(100, 5)
@@ -1038,6 +1039,21 @@ describe('SelfBuiltAdapter eraser modes', () => {
     host.setEraserMode('text')
     tap(host, 50, 70) // 点 card,无 text → mode 过滤 → 不删
     expect(host.getElement('c1')).toBeDefined()
+  })
+
+  it('eraserHitFiltered:命中但被模式过滤 = true(真不匹配,web 层才提示)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 't1', kind: 'text', x: 0, y: 0, w: 100, h: 40, rotation: 0, text: 'hi' })
+    host.setEraserMode('text')
+    expect(host.eraserHitFiltered({ x: 50, y: 70 })).toBe(true)  // 点 card(被 text 模式过滤)
+    expect(host.eraserHitFiltered({ x: 50, y: 20 })).toBe(false) // 点 text(可擦)
+    host.setEraserMode('card')
+    expect(host.eraserHitFiltered({ x: 50, y: 20 })).toBe(true)  // 点 text(被 card 模式过滤)
+    expect(host.eraserHitFiltered({ x: 50, y: 70 })).toBe(false) // 点 card(可擦)
+    expect(host.eraserHitFiltered({ x: 500, y: 500 })).toBe(false) // 空白 → 不提示
+    host.setEraserMode('all')
+    expect(host.eraserHitFiltered({ x: 50, y: 70 })).toBe(false) // all 可擦一切 → 恒 false
   })
 })
 
