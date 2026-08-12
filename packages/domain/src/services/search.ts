@@ -87,6 +87,11 @@ export function searchCards(
         score += 1.0
         if (matchedField === 'body') matchedField = 'quote'
       }
+      // Media caption (R12): +1.0 per token。caption 是元数据搜索,不算核心命中字段
+      // (snippet 仍走 body;matchedField 保持 body 即可)。
+      if (haystack.media?.includes(token)) {
+        score += 1.0
+      }
     }
 
     // At least one token must match, otherwise the card is excluded.
@@ -112,6 +117,8 @@ interface Searchable {
   links: string
   code: string
   quotes: string
+  /** R12:媒体 caption(有 caption 时才存在,让纯 caption 卡可搜)。 */
+  media?: string
 }
 
 function buildSearchable(card: Card): Searchable {
@@ -121,9 +128,16 @@ function buildSearchable(card: Card): Searchable {
     title: normalise(card.title),
     body: normalise(card.body),
     tags: normalise((card.tags ?? []).map((t) => t.value).join(' ')),
-    links: normalise((card.links ?? []).map((l) => l.url).join(' ')),
+    // R12:链接标题/描述并入索引 —— 用户记得「React 官方文档」而非 URL 时也能搜到。
+    links: normalise(
+      (card.links ?? [])
+        .map((l) => [l.url, l.title, l.description].filter(Boolean).join(' '))
+        .join(' '),
+    ),
     code: normalise((card.codeSnippets ?? []).map((s) => s.code).join(' ')),
     quotes: normalise((card.quotes ?? []).map((q) => q.text).join(' ')),
+    // R12:媒体 caption 并入索引(图片/文件卡的 caption 此前完全不可搜)。
+    ...((card.media ?? []).some((m) => m.caption) ? { media: normalise((card.media ?? []).map((m) => m.caption ?? '').join(' ')) } : {}),
   }
 }
 

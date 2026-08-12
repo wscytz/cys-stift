@@ -21,6 +21,16 @@ export const DEFAULT_SEARCH_FILTER: SearchFilter = {
   timeRange: 'all',
 }
 
+/** R12:筛选是否处于默认态(无 tag / 状态全 / 时间全)。空结果文案据此区分
+ *  「筛选把结果滤成 0」vs「真的没搜到」,避免误导用户以为词错了。 */
+export function isDefaultSearchFilter(filter: SearchFilter): boolean {
+  return (
+    (filter.tags?.length ?? 0) === 0 &&
+    (filter.status ?? 'all') === 'all' &&
+    (filter.timeRange ?? 'all') === 'all'
+  )
+}
+
 const DAY_MS = 24 * 3600 * 1000
 const TIME_MS: Record<Exclude<SearchTimeRange, 'all'>, number> = {
   '7d': 7 * DAY_MS,

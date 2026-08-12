@@ -1,6 +1,6 @@
 'use client'
 
-import { useDeferredValue, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Tag } from '@cys-stift/ui'
 import { PageHeader } from '@/features/page-header'
@@ -16,13 +16,13 @@ import { CardDetailModal } from '@/features/card/card-detail'
 import { useGlobalEdges } from '@/features/graph/use-global-edges'
 import { liveEdgesOnly } from '@/features/graph/aggregate-edges'
 import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
-import { openCardFromOverview } from '@/features/card/card-reentry'
-import { readableBodySnippet } from './search-result'
+import { readableBodySnippet, snippetForResult } from './search-result'
 import { SearchFilters } from '@/features/search/search-filters'
 import {
   applySearchFilters,
   collectTagValues,
   DEFAULT_SEARCH_FILTER,
+  isDefaultSearchFilter,
   type SearchFilter,
 } from '@/features/search/search-filter'
 
@@ -50,6 +50,12 @@ export default function SearchPage() {
   const [detail, setDetail] = useState<{ card: Card } | null>(null)
   // B-3「收敛找回」:筛选框架(状态 / tags any-match / 时间),让搜索成为找回的唯一主场。
   const [filter, setFilter] = useState<SearchFilter>(DEFAULT_SEARCH_FILTER)
+  // R12:⌘K「在搜索页查看全部」带 ?q= 跳转 → 这里读 URL 预填输入框(找回不断链)。
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const q = params.get('q')
+    if (q) setQuery(q)
+  }, [])
   // BUG-1 fix: detail 是 local state,跨 tab 软删/归档后 useDb re-render 但 detail 不清
   // → modal 残留幽灵卡。从 store 实时取卡 + 过滤软删,变 null 则 modal 自动卸载
   // (与 canvas/timeline/graph effectiveDetail 同口径)。
@@ -109,9 +115,21 @@ export default function SearchPage() {
         ) : !showResults ? (
           <p className="search-hint">{t('search.empty')}</p>
         ) : results.length === 0 ? (
-          <p className="search-hint">
-            {query.trim() !== '' ? t('search.noMatch', { q: query }) : t('search.noFilterMatch')}
-          </p>
+          <div className="search-no-result">
+            {/* R12:筛选激活时文案不归咎 query(否则用户以为词错/卡没存,实际是筛选在收缩)。 */}
+            {query.trim() !== '' ? (
+              isDefaultSearchFilter(filter)
+                ? <p className="search-hint">{t('search.noMatch', { q: query })}</p>
+                : (
+                  <>
+                    <p className="search-hint">{t('search.noMatchWithFilter', { q: query })}</p>
+                    <button type="button" className="search-clear-filter" onClick={() => setFilter(DEFAULT_SEARCH_FILTER)}>
+                      {t('search.clearFilter')}
+                    </button>
+                  </>
+                )
+            ) : t('search.noFilterMatch')}
+          </div>
         ) : (
           <>
             <p className="mono-label">{t('search.resultsCount', { n: results.length })}</p>
@@ -123,11 +141,10 @@ export default function SearchPage() {
                     variant="tile"
                     selected={false}
                     selectMode={false}
-                    onClick={() => openCardFromOverview(
-                      r.card,
-                      (href) => router.push(href),
-                      (card) => setDetail({ card }),
-                    )}
+                    // R12:搜索结果一律开详情 modal(含画布卡)——此前画布卡经
+                    // openCardFromOverview 跳 /canvas,浏览器返回后搜索词/筛选全丢。
+                    // 搜索是找回现场,点开应能看内容再回来继续找。
+                    onClick={() => setDetail({ card: r.card })}
                     onToggleSelect={() => {}}
                     // R7:搜索结果瓦片补置顶开关,与 inbox/archive 一致(★)。
                     onTogglePin={() => service.update(r.card.id, { pinned: !r.card.pinned })}
@@ -200,12 +217,39 @@ export default function SearchPage() {
   )
 }
 
-/** Per-result snippet line: shows body excerpt centred on first match. */
+/** Per-result snippet line: shows excerpt centred on first match (by matchedField). */
 function SnippetLine({ result, query }: { result: SearchResult; query: string }) {
-  const snippet = readableBodySnippet(result.card, query)
+  const snippet = snippetForResult(result, query) ?? readableBodySnippet(result.card, query)
   if (!snippet) return null
   return (
-    <p className="search-snippet">{snippet}</p>
+    <p className="search-snippet">
+      <Highlight text={snippet} query={query} />
+    </p>
+  )
+}
+
+/**
+ * R12:高亮查询 token(否则结果一多用户分不清「为什么这张匹配」)。
+ * 大小写不敏感,对片段里每次出现的 token 包 <mark>。
+ */
+function Highlight({ text, query }: { text: string; query: string }) {
+  const q = query.trim()
+  if (!q) return <>{text}</>
+  const tokens = q.split(/\s+/).filter(Boolean).sort((a, b) => b.length - a.length)
+  const escaped = tokens.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const re = new RegExp(`(${escaped.join('|')})`, 'gi')
+  const parts = text.split(re)
+  const lower = (s: string) => s.toLowerCase()
+  return (
+    <>
+      {parts.map((part, i) =>
+        tokens.some((t) => lower(part) === lower(t)) ? (
+          <mark key={i} className="search-mark">{part}</mark>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
   )
 }
 
@@ -220,9 +264,20 @@ const styles = `
 }
 .search-input:focus-visible { border-color: var(--color-black); border-width: 2px; padding: 0 calc(var(--space-3) - 1px); }
 .search-hint { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-sm); color: var(--color-gray); }
+.search-mark {
+  background: var(--color-yellow); color: var(--color-black);
+  padding: 0 1px; border-radius: 2px;
+}
+.search-clear-filter {
+  appearance: none; -webkit-appearance: none;
+  background: transparent; border: 0; padding: 0;
+  font-family: var(--font-mono); font-size: var(--font-size-sm);
+  color: var(--color-blue); text-decoration: underline;
+  text-underline-offset: 2px; cursor: pointer; min-height: 44px;
+}
+.search-clear-filter:hover { color: var(--color-black); }
 .search-snippet {
-  margin: var(--space-1) 0 0; font-family: var(--font-mono);
-  font-size: var(--font-size-xs); color: var(--color-gray);
+  margin: var(--space-1) 0 0; font-family: var(--font-mono);  font-size: var(--font-size-xs); color: var(--color-gray);
   line-height: 1.4; word-break: break-all;
 }
 .grid {

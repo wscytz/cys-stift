@@ -18,6 +18,7 @@ import { searchCards } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
 import { CardDetailModal } from '@/features/card/card-detail'
+import { readableBodySnippet } from '@/app/search/search-result'
 import type { MessageKey } from '@/lib/i18n/messages'
 
 interface CommandPaletteProps {
@@ -52,6 +53,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [detail, setDetail] = useState<Card | null>(null)
+  const [activeIndex, setActiveIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   // 开/关时重置输入 + 详情。打开时聚焦输入框。
@@ -140,6 +142,35 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const hasNothing =
     navMatches.length === 0 && cardMatches.length === 0 && recentCards.length === 0
 
+  // R12:统一键盘导航选项(导航项 + 最近卡 + 搜索结果),ArrowUp/Down 移动、
+  // Enter 打开。此前 ⌘K 只支持 Esc,键盘流在输入后断裂(↓ 选不中/Enter 无反应)。
+  type CmdOption = { key: string; label: string; hint?: string; activate: () => void }
+  const options: CmdOption[] = useMemo(() => {
+    const list: CmdOption[] = []
+    for (const n of navMatches) {
+      const href = n.href
+      list.push({ key: `nav:${href}`, label: t(n.labelKey), hint: href, activate: () => go(href) })
+    }
+    for (const c of recentCards) {
+      list.push({
+        key: `recent:${String(c.id)}`,
+        label: c.title || t('card.untitled'),
+        hint: c.canvasPosition ? t('cmd.onCanvas') : t('cmd.inInbox'),
+        activate: () => openCard(c),
+      })
+    }
+    for (const r of cardMatches) {
+      list.push({ key: `card:${String(r.card.id)}`, label: r.card.title || t('card.untitled'), activate: () => openCard(r.card) })
+    }
+    return list
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navMatches, recentCards, cardMatches, t])
+
+  // query 变化重置键盘位置到首项。
+  useEffect(() => {
+    setActiveIndex(0)
+  }, [query])
+
   // CardDetailModal 打开时,面板主体藏掉避免视觉重叠(详情 modal 覆盖在上)。
   const showDetail = Boolean(detail)
 
@@ -156,6 +187,22 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             onChange={(e) => setQuery(e.target.value)}
             disabled={!ready}
             aria-label={t('cmd.placeholder')}
+            // R12:⌘K 键盘导航(ArrowUp/Down 移动高亮,Enter 打开,Esc 关闭)。
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown' && options.length > 0) {
+                e.preventDefault()
+                setActiveIndex((i) => (i + 1) % options.length)
+              } else if (e.key === 'ArrowUp' && options.length > 0) {
+                e.preventDefault()
+                setActiveIndex((i) => (i - 1 + options.length) % options.length)
+              } else if (e.key === 'Enter') {
+                const opt = options[activeIndex]
+                if (opt) {
+                  e.preventDefault()
+                  opt.activate()
+                }
+              }
+            }}
           />
 
           {!ready ? null : hasNothing ? (
@@ -166,11 +213,12 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                 <div className="cmd__group">
                   <p className="cmd__group-label">{t('cmd.group.navigate')}</p>
                   <ul className="cmd__items">
-                    {navMatches.map((n) => (
+                    {navMatches.map((n, i) => (
                       <li key={n.href}>
                         <button
                           type="button"
-                          className="cmd__item"
+                          className={`cmd__item${i === activeIndex ? ' cmd__item--active' : ''}`}
+                          onMouseEnter={() => setActiveIndex(i)}
                           onClick={() => go(n.href)}
                         >
                           <span className="cmd__item-label">{t(n.labelKey)}</span>
@@ -186,22 +234,26 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                 <div className="cmd__group">
                   <p className="cmd__group-label">{t('cmd.group.recent')}</p>
                   <ul className="cmd__items">
-                    {recentCards.map((c) => (
-                      <li key={c.id}>
-                        <button
-                          type="button"
-                          className="cmd__item"
-                          onClick={() => openCard(c)}
-                        >
-                          <span className="cmd__item-label">
-                            {c.title || t('card.untitled')}
-                          </span>
-                          <span className="cmd__item-hint">
-                            {c.canvasPosition ? t('cmd.onCanvas') : t('cmd.inInbox')}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
+                    {recentCards.map((c, i) => {
+                      const idx = navMatches.length + i
+                      return (
+                        <li key={c.id}>
+                          <button
+                            type="button"
+                            className={`cmd__item${idx === activeIndex ? ' cmd__item--active' : ''}`}
+                            onMouseEnter={() => setActiveIndex(idx)}
+                            onClick={() => openCard(c)}
+                          >
+                            <span className="cmd__item-label">
+                              {c.title || t('card.untitled')}
+                            </span>
+                            <span className="cmd__item-hint">
+                              {c.canvasPosition ? t('cmd.onCanvas') : t('cmd.inInbox')}
+                            </span>
+                          </button>
+                        </li>
+                      )
+                    })}
                   </ul>
                 </div>
               )}
@@ -210,20 +262,36 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                 <div className="cmd__group">
                   <p className="cmd__group-label">{t('cmd.group.cards')}</p>
                   <ul className="cmd__items">
-                    {cardMatches.map((r) => (
-                      <li key={r.card.id}>
-                        <button
-                          type="button"
-                          className="cmd__item"
-                          onClick={() => openCard(r.card)}
-                        >
-                          <span className="cmd__item-label">
-                            {r.card.title || t('card.untitled')}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
+                    {cardMatches.map((r, i) => {
+                      const idx = navMatches.length + recentCards.length + i
+                      return (
+                        <li key={r.card.id}>
+                          <button
+                            type="button"
+                            className={`cmd__item${idx === activeIndex ? ' cmd__item--active' : ''}`}
+                            onMouseEnter={() => setActiveIndex(idx)}
+                            onClick={() => openCard(r.card)}
+                          >
+                            <span className="cmd__item-label">
+                              {r.card.title || t('card.untitled')}
+                            </span>
+                            {/* R12:⌘K 卡片结果也带正文片段(纯正文命中的卡/未命名卡可分辨) */}
+                            <span className="cmd__item-snippet">
+                              {readableBodySnippet(r.card, q) ?? ''}
+                            </span>
+                          </button>
+                        </li>
+                      )
+                    })}
                   </ul>
+                  {/* R12:⌘K 只显示前 8 条,加「在搜索页查看全部」入口(带 query 预填)。 */}
+                  <button
+                    type="button"
+                    className="cmd__see-all"
+                    onClick={() => go(`/search?q=${encodeURIComponent(q)}`)}
+                  >
+                    {t('cmd.seeAll')}
+                  </button>
                 </div>
               )}
             </div>
