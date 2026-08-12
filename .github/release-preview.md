@@ -1,6 +1,8 @@
-# cy's Stift 1.1.0-preview.6
+# cy's Stift 1.3.0-preview.1
 
 A preview of the local-first idea canvas: Capture -> Inbox -> Canvas -> Workbench -> Export and recovery. All data stays on your machine; the app sends nothing to a server and collects no usage telemetry.
+
+This preview collects a round of experience polish since 1.2.0 — accessibility, canvas feel, search, import/export, and storage awareness — guided by the default-user perspective.
 
 ## Downloads
 
@@ -11,11 +13,11 @@ A preview of the local-first idea canvas: Capture -> Inbox -> Canvas -> Workbenc
 
 ## What's new in this preview
 
-- **Structured canvas cards:** the canvas can be written as plain text (DSL). Cards now carry `@type` / `@tags` / `@links` / `@code` / `@quote` as structured fields — multiple code blocks and quotes per card round-trip cleanly. The canvas remains fully text-editable and diff-friendly.
-- **AI (optional):** DeepSeek and Qwen work through the OpenAI-compatible path with per-endpoint thinking-mode handling; AI outlines drop summary cards onto the canvas; output truncation is detected. AI is opt-in and never required for core use.
-- **Accessibility:** capture and card forms have accessible names and focus handling; modals are labeled; contrast meets AA.
-- **Stability and recovery:** hard-deleted cards clean up their orphaned media; an import that would overwrite data is blocked behind a checkpoint you can restore.
-- **Performance:** the relational layout solver was rewritten to scale better on large canvases.
+- **Accessibility (keyboard reachability):** the graph view and canvas card creation are operable by keyboard; focus management and Esc-to-cancel are consistent; tool overlays no longer cover their targets.
+- **Canvas feel:** card creation is undoable; the text tool can place text inside a frame; the eraser no longer shows a misleading "mode mismatch" notice on empty clicks; wheel/trackpad zoom follows the actual scroll amount; double-clicking empty space while an arrow is selected still creates a card.
+- **Find (⌘K):** full keyboard navigation with match highlighting; linked-card titles are indexed; filters no longer mislead.
+- **Import/export + storage awareness:** controllable pre-import recovery points, clear export feedback, drag-back guidance, readable errors. **Import boundary:** when there is not enough space to write the full snapshot, the import proceeds and reports "no recovery point created" (the smaller new state may still fit); rollback is guaranteed by an independent snapshot, not the recovery point. Fixed lossy rebuilding when editing `@links` (URL-unchanged links keep their title/preview/fetched-at). Storage usage is computed against the real quota, with clear cleanup paths, large-file hints, and a visible data location.
+- **Relations / deep editing / cross-page consistency:** creating a connection sets its type; bidirectional links have a consistent direction; deletions are announced. The workbench preserves rich fields (`@code`/`@quote`/`@links`) when switching cards; IME composition no longer misfires; detail actions, tag gestures, and save feedback are consistent across pages; confirmation gates, shortcut conflicts, and Esc stacking are unified.
 
 ## Windows notice (no code signing)
 
@@ -40,6 +42,6 @@ Please report the operating system, app version, exact steps, what you expected,
 
 ## Known preview boundaries
 
-- Data is local-first; JSON exports redact API keys and media binary data. There is no usage telemetry, so your feedback is the only signal we have — please fill the questionnaire if you received one.
+- Data is local-first; JSON exports redact API keys and media binary data. There is no usage telemetry, so your feedback is the only signal we have.
 - AI is optional and user-configured; preview testing does not imply a provider reliability guarantee.
 - This is not the stable release. Code signing/notarization, VoiceOver and system 200% zoom checks, real-provider quota evidence, and external user research remain stable-release gates.

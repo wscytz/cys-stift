@@ -66,6 +66,10 @@ const routes = [
   '/',
   '/inbox',
   '/canvas',
+  '/workbench',
+  '/ask',
+  '/graph',
+  '/tags',
   '/timeline',
   '/archive',
   '/trash',
@@ -75,6 +79,8 @@ const routes = [
   '/dev/db',
   '/dev/min',
   '/dev/canvas-self',
+  '/dev/dsl-playground',
+  '/dev/archive',
 ]
 
 const browser = await puppeteer.launch({
