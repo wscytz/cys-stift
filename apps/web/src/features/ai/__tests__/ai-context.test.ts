@@ -189,4 +189,26 @@ describe('AI_CARD_FIELDS — every Card field accounted for', () => {
     expect(keys).toContain('sourceKind')
     expect(keys).toContain('tags')
   })
+
+  // R5 强化:allowlist 有意注册的字段(14)全部列齐。若有人加新 Card 字段漏注册
+  // 或误删已有注册,此断言红 —— 「手动注册」纪律从 review 印象变测试强制。
+  // 有意不注册的字段(id/createdAt/updatedAt/archived/deletedAt/source.deviceId/
+  // media[].dataUrl)由下方敏感字段测试守卫,不在本集合。
+  it('registers every field AI is meant to see (no silent allowlist shrink)', () => {
+    const expected = [
+      'title', 'body', 'type', 'capturedAt', 'color', 'pinned',
+      'canvasId', 'tags', 'links', 'code', 'quotes',
+      'mediaCount', 'mediaKinds', 'sourceKind',
+    ]
+    for (const key of expected) {
+      expect(AI_CARD_FIELDS).toHaveProperty(key)
+    }
+  })
+
+  it('never registers lifecycle/identity fields the allowlist should exclude', () => {
+    const keys = Object.keys(AI_CARD_FIELDS)
+    for (const forbidden of ['id', 'createdAt', 'updatedAt', 'archived', 'deletedAt', 'deviceId', 'assetId', 'dataUrl']) {
+      expect(keys).not.toContain(forbidden)
+    }
+  })
 })
