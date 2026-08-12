@@ -262,8 +262,8 @@ export function SelfCanvas({
     const sy = e.clientY - rect.top
     const view = adapter.getView()
     const p = screenToPage(view, sx, sy)
-    // 命中测试:SelfBuiltAdapter 的 hitTest 是纯函数,这里复用元素查找。
-    // adapter 没暴露 hitTest,用 getElements 遍历(简化;子项目 2 加 host.hitTest)。
+    // 命中测试:双击 card/text 走自有的层序遍历(需拿到 card 对象 + text 编辑坐标),
+    // 与顶层优先的 hitTest(用于工具命中)语义不同,故不复用。
     const els = adapter.getElements()
     for (let i = els.length - 1; i >= 0; i--) {
       const el = els[i]!

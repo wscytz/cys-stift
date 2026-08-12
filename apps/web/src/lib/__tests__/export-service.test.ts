@@ -843,6 +843,54 @@ describe('importFromJson — write failure rollback', () => {
   })
 })
 
+// ── R17:checkpoint 空间不足放行导入 (checkpoint-skipped-on-quota) ──────────
+//   此前 saveImportCheckpoint 写失败(配额满)会让整个 importFromJson 返回
+//   {ok:false, error:'checkpoint failed...'},用户被卡住无法导入。R17 改为
+//   try/catch 吞掉 → checkpointSkipped=true → 导入继续。事务回滚由独立的
+//   storageSnapshot 保证(不依赖 checkpoint),所以即使快照写不下,写入仍是原子的。
+//   钉死这条边界:checkpoint 写抛 QuotaExceededError 时,结果必须 ok 且带标记。
+
+describe('importFromJson — checkpoint skipped on quota (R17)', () => {
+  it('returns ok:true with checkpointSkipped when saveImportCheckpoint throws', async () => {
+    // A localStorage whose setItem throws only on the checkpoint key, then
+    // recovers — exactly the production failure mode (full quota rejects the
+    // large full-state snapshot, but smaller per-store writes still fit).
+    const real = window.localStorage
+    const failingLocalStorage = {
+      getItem: (k: string) => real.getItem(k),
+      setItem: (k: string, v: string) => {
+        if (k === mod.IMPORT_CHECKPOINT_STORAGE_KEY) {
+          throw new DOMException('quota', 'QuotaExceededError')
+        }
+        real.setItem(k, v)
+      },
+      removeItem: (k: string) => real.removeItem(k),
+      clear: () => real.clear(),
+    }
+    vi.stubGlobal('localStorage', failingLocalStorage)
+
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      cards: [{ id: 'c-new', title: 'new', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
+      mediaAssets: {},
+    })
+
+    const result = await mod.importFromJson(json)
+    vi.unstubAllGlobals()
+
+    // R17: checkpoint 写失败不再阻断导入。
+    expect(result.ok).toBe(true)
+    expect(result.checkpointSkipped).toBe(true)
+    expect(result.checkpointCreated ?? false).toBe(false) // 两者互斥
+    // 导入本身生效:卡片落盘,checkpoint slot 未被(部分)写入。
+    const cardsEnvelope = JSON.parse(real.getItem(CARDS_KEY) ?? '{"cards":[]}')
+    expect(cardsEnvelope.cards).toHaveLength(1)
+    expect(real.getItem(mod.IMPORT_CHECKPOINT_STORAGE_KEY)).toBeNull()
+  })
+})
+
 describe('importFromJson — replace / merge transaction', () => {
   const minimalPayload = (extra: Record<string, unknown> = {}) =>
     JSON.stringify({
