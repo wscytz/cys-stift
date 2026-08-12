@@ -32,6 +32,7 @@ const TOOLBAR: { name: WorkbenchIconName; action: MdAction }[] = [
   { name: 'task', action: 'task' },
   { name: 'table', action: 'table' },
   { name: 'link', action: 'link' },
+  { name: 'link', action: 'wikilink' }, // R11:[[双链]] 插入(图谱核心动线)
 ]
 
 const VIEWS: { v: View; key: 'editor.view.split' | 'editor.view.source' | 'editor.view.preview' }[] = [
@@ -53,6 +54,7 @@ const TOOLBAR_KEYS = {
   task: 'editor.task',
   table: 'editor.table',
   link: 'editor.link',
+  wikilink: 'editor.wikilink',
 } as const
 
 export interface MarkdownEditorProps {

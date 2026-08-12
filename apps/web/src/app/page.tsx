@@ -123,6 +123,11 @@ export default function HomePage() {
         </nav>
         <footer className="home__foot">
           <span>{t('home.eyebrow')}</span>
+          {/* R11:首启隐私承诺 —— 数据仅存本机 + 可导出 JSON,指向 settings 数据区。
+              此前完整说明埋在 /settings,隐私敏感用户第一天看不到会不安全感。 */}
+          <Link href="/settings#data" className="home__privacy">
+            {t('home.privacy')}
+          </Link>
           {/* Version:单一可信源 = root package.json "version",由
               scripts/gen-version.mjs 在 prebuild 时写入 lib/version.ts。
               静态导出无 server,这里只 import build-time 常量。 */}

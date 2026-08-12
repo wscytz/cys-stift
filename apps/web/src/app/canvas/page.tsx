@@ -1366,11 +1366,30 @@ ${formatted}`
         {!ready ? null : onCanvas === 0 && !hasFreeform && (adapter?.getElements().length ?? 0) === 0 && (
           <div className="cv-empty">
             <CanvasEmptyMotif />
-            <span className="eyebrow">{t('canvas.emptyTitle')}</span>
-            <span className="mono">{t('canvas.emptyHint')}</span>
-            <Link href="/inbox" className="cv-empty__cta">
-              {t('canvas.emptyCta')} →
-            </Link>
+            {unplaced.length > 0 ? (
+              <>
+                {/* R11:有未放卡时空态不说谎——提示卡在未放置面板 + 一键打开(此前只说
+                    "去收件箱",新用户捕获后进画布仍空白,卡藏在默认折叠的未放面板里,
+                    怀疑数据丢了)。 */}
+                <span className="eyebrow">{t('canvas.emptyUnplacedTitle')}</span>
+                <span className="mono">{t('canvas.emptyUnplacedHint', { n: String(unplaced.length) })}</span>
+                <button
+                  type="button"
+                  className="cv-empty__cta"
+                  onClick={() => { setUnplacedOpen(true); setOutlineOpen(false); setCompanionOpen(false); setSearchOpen(false) }}
+                >
+                  {t('canvas.emptyUnplacedCta')} →
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="eyebrow">{t('canvas.emptyTitle')}</span>
+                <span className="mono">{t('canvas.emptyHint')}</span>
+                <Link href="/inbox" className="cv-empty__cta">
+                  {t('canvas.emptyCta')} →
+                </Link>
+              </>
+            )}
           </div>
         )}
         <RelationPanel host={adapter} canvasEl={canvasElRef.current} />

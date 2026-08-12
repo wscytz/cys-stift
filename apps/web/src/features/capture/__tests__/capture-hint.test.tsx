@@ -17,7 +17,11 @@ import { createRoot } from 'react-dom/client'
 // i18n is required by CaptureHint; stub it to a passthrough so the rendered
 // text is deterministic and locale-independent.
 vi.mock('@/lib/i18n', () => ({
-  useI18n: () => ({ t: (k: string) => k, locale: 'zh' as const }),
+  useI18n: () => ({
+    t: (k: string, p?: Record<string, string>) =>
+      p ? `${k}(${Object.values(p).join(',')})` : k,
+    locale: 'zh' as const,
+  }),
 }))
 
 // The settings store drives seenCaptureHint. We mock it so we can flip the
@@ -34,11 +38,15 @@ const { mockState, mockMobile, markCaptureHintSeen } = vi.hoisted(() => {
 
 vi.mock('@/lib/settings-store', () => ({
   useSettings: () => ({ settings: mockState, ready: true }),
-  settingsStore: { markCaptureHintSeen },
+  settingsStore: {
+    markCaptureHintSeen,
+    get: () => ({ captureShortcut: { modKey: 'meta', shift: true, code: 'KeyE' } }),
+  },
 }))
 
 vi.mock('@/lib/use-platform', () => ({
   useIsMobile: () => mockMobile.value,
+  useIsMac: () => true,
 }))
 
 import { CaptureHint } from '../capture-hint'
@@ -75,7 +83,8 @@ describe('CaptureHint', () => {
     const { host, unmount } = renderToDOM()
     expect(host.querySelector('[data-testid="capture-hint"]')).not.toBeNull()
     expect(host.textContent).toContain('capture.hintFlow')
-    expect(host.textContent).toContain('capture.hint')
+    // R11:快捷键按平台显示(⌘⇧E on Mac),并带实际自定义快捷键
+    expect(host.textContent).toContain('⌘+⇧+E')
     unmount()
   })
 

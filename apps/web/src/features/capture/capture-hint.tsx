@@ -7,18 +7,30 @@
  */
 import { useSettings, settingsStore } from '@/lib/settings-store'
 import { useI18n } from '@/lib/i18n'
-import { useIsMobile } from '@/lib/use-platform'
+import { useIsMac, useIsMobile } from '@/lib/use-platform'
 
 export function CaptureHint() {
   const { settings, ready } = useSettings()
   const { t } = useI18n()
   const isMobile = useIsMobile()
+  const isMac = useIsMac()
   if (!ready || settings.seenCaptureHint) return null
+  // R11:快捷键按平台显示(⌘⇧E vs Ctrl+⇧E),并跟随用户自定义的快捷键。
+  // 此前写死 ⌘⇧E —— Windows 键盘没有 ⌘,新用户可能因此从不尝试捕获。
+  const sc = settingsStore.get().captureShortcut
+  const mod = isMac ? '⌘' : 'Ctrl'
+  const keyLabel =
+    sc?.code === 'Space' ? 'Space'
+    : sc?.code === 'Comma' ? ','
+    : sc?.code === 'Period' ? '.'
+    : sc?.code?.startsWith('Key') ? sc.code.slice(3)
+    : sc?.code ?? 'E'
+  const combo = `${mod}${sc?.shift ? '+⇧' : ''}+${keyLabel}`
   return (
     <div className="capture-hint" data-testid="capture-hint" role="status">
       <span className="capture-hint__text">
         <strong>{t('capture.hintFlow')}</strong>
-        {!isMobile && <span>{t('capture.hint')}</span>}
+        {!isMobile && <span>{t('capture.hintCombo', { combo })}</span>}
       </span>
       <button
         type="button"

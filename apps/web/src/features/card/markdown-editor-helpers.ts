@@ -16,6 +16,7 @@ export type MdAction =
   | 'strike'
   | 'code'
   | 'link'
+  | 'wikilink'
   | 'h2'
   | 'ul'
   | 'task'
@@ -73,6 +74,15 @@ export function insertMarkdown(
       // url 位于 s + '[' + label + '](' 之后
       const urlStart = s + 1 + label.length + 2
       return { text: next, selStart: urlStart, selEnd: urlStart + url.length }
+    }
+    // R11:[[双链]] 插入 —— 产品核心动线(图谱用双链连接卡),此前无工具栏入口。
+    // 无选区插 [[卡片标题]] 占位并选中,让用户直接输入标题替换。
+    case 'wikilink': {
+      const placeholder = s === e ? '卡片标题' : selected
+      const inserted = `[[${placeholder}]]`
+      const next = text.slice(0, s) + inserted + text.slice(e)
+      const inner = s + 2
+      return { text: next, selStart: inner, selEnd: inner + placeholder.length }
     }
     case 'h2':
       return prefixLines(text, s, e, '## ')

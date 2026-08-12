@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { BauhausMotif, Card as UICard, Modal, Tag, Button } from '@cys-stift/ui'
 import { PageHeader } from '@/features/page-header'
 import type { Card, CardId, UpdateCardPatch } from '@cys-stift/domain'
@@ -195,6 +196,11 @@ function EmptyState() {
         <BauhausMotif variant="overlap" size={160} />
         <p className="eyebrow">{t('workbench.title')}</p>
         <h2 className="display-title display-title--lg">{t('workbench.empty')}</h2>
+        {/* R11:空状态加可操作入口(此前纯文案死路,新用户进工作台不知怎么开始)。
+            与 inbox/canvas 空态 CTA 同款。 */}
+        <Link href="/" className="cv-empty__cta">
+          {t('workbench.emptyCta')} →
+        </Link>
       </div>
     </UICard>
   )

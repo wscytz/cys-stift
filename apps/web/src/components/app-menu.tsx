@@ -19,6 +19,20 @@ import { onQuotaExceeded as onGraphViewQuota } from '@/lib/graph-view-store'
 import { pushToast } from '@/lib/toast-store'
 import { VERSION } from '@/lib/version'
 import { useMatchMedia } from '@/lib/use-match-media'
+import { useIsMac } from '@/lib/use-platform'
+import { settingsStore } from '@/lib/settings-store'
+
+/** R11:捕获按钮的快捷键 tooltip —— 按平台(⌘/Ctrl)+ 用户自定义快捷键显示。 */
+function captureComboHint(isMac: boolean): string {
+  const sc = settingsStore.get().captureShortcut
+  const mod = isMac ? '⌘' : 'Ctrl'
+  const key =
+    sc?.code === 'Comma' ? ','
+    : sc?.code === 'Period' ? '.'
+    : sc?.code?.startsWith('Key') ? sc.code.slice(3)
+    : sc?.code ?? 'E'
+  return `${mod}${sc?.shift ? '+⇧' : ''}+${key} 随时记灵感`
+}
 
 /**
  * AppMenu — global top menu bar.
@@ -33,6 +47,7 @@ export function AppMenu() {
   const pathname = usePathname() ?? '/'
   const { t } = useI18n()
   const isNarrow = useMatchMedia('(max-width: 1199px)')
+  const isMac = useIsMac()
   const [open, setOpen] = useState(false)
 
   // 审计 H1 + R2.3/2.4 + quota-silence fix:所有非 React store(db-client /
@@ -138,7 +153,14 @@ export function AppMenu() {
         ))}
       </div>
       <span className="app-menu__spacer" />
-      <button type="button" className="app-menu__capture" onClick={onCaptureClick}>
+      <button
+        type="button"
+        className="app-menu__capture"
+        onClick={onCaptureClick}
+        // R11:捕获按钮恒带快捷键 tooltip(首次提示被过早关掉/从深链进入的用户
+        // 也能从这里发现 ⌘⇧E/Ctrl+⇧E —— 不再一次性 dismiss 永久失学)。
+        title={captureComboHint(isMac)}
+      >
         {t('nav.capture')}
       </button>
       {isNarrow && (

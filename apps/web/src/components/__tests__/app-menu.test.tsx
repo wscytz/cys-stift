@@ -20,13 +20,19 @@ vi.mock('@/lib/i18n', () => ({
 vi.mock('@/lib/use-match-media', () => ({
   useMatchMedia: () => false, // 宽屏 → 横向导航(非汉堡抽屉)
 }))
+vi.mock('@/lib/use-platform', () => ({
+  useIsMac: () => true,
+}))
 vi.mock('@/lib/toast-store', () => ({ pushToast: vi.fn() }))
 // 配额订阅源:AppMenu 全局订阅各 store 写失败事件(防静默丢),测试全部 mock 成 no-op。
 vi.mock('@/lib/db-client', () => ({ onQuotaExceeded: () => () => {} }))
 vi.mock('@/lib/media-store', () => ({ onQuotaExceeded: () => () => {} }))
 vi.mock('@/lib/canvas-freeform-store', () => ({ onQuotaExceeded: () => () => {} }))
 vi.mock('@/lib/canvas-store', () => ({ onQuotaExceeded: () => () => {} }))
-vi.mock('@/lib/settings-store', () => ({ onQuotaExceeded: () => () => {} }))
+vi.mock('@/lib/settings-store', () => ({
+  onQuotaExceeded: () => () => {},
+  settingsStore: { get: () => ({ captureShortcut: { modKey: 'meta', shift: true, code: 'KeyE' } }) },
+}))
 vi.mock('@/lib/canvas-view-store', () => ({ onQuotaExceeded: () => () => {} }))
 vi.mock('@/features/ai/sample-store', () => ({ onQuotaExceeded: () => () => {} }))
 vi.mock('@/lib/conversation-store', () => ({ onQuotaExceeded: () => () => {} }))

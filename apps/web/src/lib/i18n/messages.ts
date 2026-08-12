@@ -46,6 +46,7 @@ export const messages = {
 
   /* ── Home page ── */
   'home.eyebrow': { zh: '本地知识工作空间', en: 'Local knowledge workspace' },
+  'home.privacy': { zh: '数据仅存本机 · 随时导出 JSON 备份', en: 'Data stays on your machine · export a JSON backup any time' },
   'home.title': { zh: 'cy\'s Stift', en: "cy's Stift" },
   'home.tagline': { zh: '你的灵感，在画布上生长。', en: 'Your inspiration, growing on the canvas.' },
   'home.hint.mac': { zh: '⌘⇧E anywhere', en: '⌘⇧E anywhere' },
@@ -244,6 +245,9 @@ export const messages = {
   'canvas.emptyTitle': { zh: '空白画布', en: 'Empty canvas' },
   'canvas.emptyHint': { zh: '双击空白处建卡 · 拖动摆放', en: 'double-click empty to create · drag to place' },
   'canvas.emptyCta': { zh: '去收件箱', en: 'Go to inbox' },
+  'canvas.emptyUnplacedTitle': { zh: '画布还是空的', en: 'Canvas still empty' },
+  'canvas.emptyUnplacedHint': { zh: '你捕获的 {n} 张卡在「未放置」面板——点下方按钮查看并放到画布上。', en: 'Your {n} captured card(s) are in the "Unplaced" panel — open it below to see and place them.' },
+  'canvas.emptyUnplacedCta': { zh: '查看未放置的卡片', en: 'View unplaced cards' },
   'canvas.emptyMotifHint': { zh: '双击空白处建卡', en: 'double-click empty to create' },
   'canvas.tools': { zh: '绘图工具', en: 'Drawing tools' },
   'canvas.tool.select': { zh: '选择', en: 'Select' },
@@ -1006,6 +1010,7 @@ export const messages = {
   },
   'capture.hintFlow': { zh: '先捕获，稍后整理', en: 'Capture now, organize later' },
   'capture.hint': { zh: '⌘⇧E 随时记灵感', en: '⌘⇧E to capture anywhere' },
+  'capture.hintCombo': { zh: '{combo} 随时记灵感', en: '{combo} to capture anywhere' },
   'capture.hintDismiss': { zh: '知道了', en: 'Got it' },
   'capture.shortcutHelp': { zh: '⌘⇧E 唤起记录栏(全局)', en: '⌘⇧E open capture (global)' },
 
@@ -1092,6 +1097,7 @@ export const messages = {
   'workbench.switchCard': { zh: '保存并切换', en: 'Save and switch' },
   'workbench.done': { zh: '完成', en: 'Done' },
   'workbench.empty': { zh: '还没有卡片。先捕获一些灵感,再来这里整理。', en: 'No cards yet. Capture some sparks, then organize them here.' },
+  'workbench.emptyCta': { zh: '去捕获灵感', en: 'Go capture a spark' },
   'workbench.count': { zh: '{n} 张', en: '{n} cards' },
   'workbench.backToCanvas': { zh: '返回画布', en: 'Back to canvas' },
   'workbench.selectHint': { zh: '从左侧选一张卡', en: 'Select a card from the left' },
@@ -1169,6 +1175,7 @@ export const messages = {
   'editor.task': { zh: '任务列表', en: 'Task list' },
   'editor.table': { zh: '表格', en: 'Table' },
   'editor.link': { zh: '链接', en: 'Link' },
+  'editor.wikilink': { zh: '双链 [[…]]', en: 'Wikilink [[…]]' },
   'editor.view.split': { zh: '分屏', en: 'Split' },
   'editor.view.source': { zh: '源码', en: 'Source' },
   'editor.view.preview': { zh: '预览', en: 'Preview' },
