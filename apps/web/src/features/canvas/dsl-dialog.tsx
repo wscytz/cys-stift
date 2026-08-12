@@ -12,7 +12,7 @@
  * 不门控 AI:所有用户可用,这是核心卖点而非 AI 附属。模态照 export-dialog
  * 的结构(Modal + Button + 内联 token 化 <style> + pushToast + i18n)。
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Modal, Button } from '@cys-stift/ui'
 import type { CardId, CardService } from '@cys-stift/domain'
 import { InMemoryCanvasHost, type CanvasElement, type CanvasHost } from '@cys-stift/canvas-engine'
@@ -28,6 +28,24 @@ import { diffCanvasSnapshots } from './canvas-diff'
 import { archiveStore } from '@/lib/archive-store'
 import { buildArchivePayload } from '@/lib/build-archive-payload'
 import { VERSION } from '@/lib/version'
+import type { MessageKey } from '@/lib/i18n/messages'
+
+/** R14:诊断消息人话化 —— 修正误导性报错(如「missing @pos」但行里其实有 @pos,
+ *  那是 @pos 分隔符/参数格式错了)。可读诊断优先,原 message 兜底。 */
+function diagnosticMessage(
+  diag: { message: string; text?: string },
+  t: (k: MessageKey, params?: Record<string, string | number>) => string,
+): string {
+  const line = diag.text ?? ''
+  // 用户明明写了 @pos 却报 missing —— 是格式错(逗号写成空格/括号不全),提示标准形。
+  if (diag.message === 'missing @pos' && /@pos/i.test(line)) {
+    return t('canvas.dslErrPosFormat')
+  }
+  if (diag.message === 'missing @pos' && /@size/i.test(line) && !/@pos/i.test(line)) {
+    return t('canvas.dslErrPosMissing')
+  }
+  return diag.message
+}
 
 const DSL_EXAMPLES = {
   starter: '[text #welcome] @pos(80, 80) @text("从文字开始") @color(yellow)\n[rect #frame] @pos(60, 60) @size(260, 120) @color(blue)',
@@ -108,6 +126,9 @@ export function DslDialog({
   const [base, setBase] = useState<{ elements: CanvasElement[]; revision: string } | null>(null)
   const [revisionTick, setRevisionTick] = useState(0)
   const [stale, setStale] = useState(false)
+  // R14:未应用编辑的关闭确认。dirty = 文本自上次 apply 后改过(含新增未应用行)。
+  const [confirmClose, setConfirmClose] = useState(false)
+  const dirtyRef = useRef(false)
 
   // 实时预览:用户输入时即重新 parse,给出"待应用 N 条 / M 行无效"计数,
   // 不必等点 Apply。只在有可说之事时渲染(ok 或 warn),其余不渲染。
@@ -154,7 +175,7 @@ export function DslDialog({
       // 用户组词时按 Escape 会丢失整个 DSL 编辑(session 不存草稿)。
       if (e.isComposing) return
       e.preventDefault()
-      onClose()
+      requestClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -238,12 +259,15 @@ export function DslDialog({
         .then((p) => archiveStore.append('dsl-apply', `DSL apply ${applied}${skipped + failed ? ` (skipped/failed ${skipped + failed})` : ''}`, p, VERSION))
         .catch((err) => console.warn('[archive] dsl-apply append failed', err))
     }
-    // 重序列化:apply 后画布变了,文本同步,防重复 Apply 造副本(create 类 op 幂等失效)。
-    // host 是同引用 + host.batch 原地变更,上面填充 text 的 useEffect([open,host,service])
-    // 不会重跑,必须手动 setText。
-    setText(serializeCanvasReadable(host.getElements(), (id) => { const c = service.get(id as CardId); return c ? { title: c.title, content: c.body, type: c.type, tags: c.tags, links: c.links, codeSnippets: c.codeSnippets, quotes: c.quotes } : undefined }))
-    if (parseErrors.length > 0 || skipped > 0 || failed > 0) {
-      // 有 parse 错误或 apply 跳过 → 用带 skipped 的诚实反馈(parse 错误数也在列表里展示)。
+    const hadIssues = parseErrors.length > 0 || skipped > 0 || failed > 0
+    if (hadIssues) {
+      // R14:部分失败时保留用户原文 + 继续显示错误面板(此前重序列化会抹掉写错的行
+      // 和 # 注释,错误随 text 重新 parse 而消失,用户再也看不到错在哪)。
+      // base 仍要更新(已应用部分改了画布,防 stale),但不清 dirty —— 用户还有
+      // 未应用的编辑;appliedHashes 保留,重复 Apply 已应用的行会被跳过(防造副本)。
+      const nextBase = cloneElements(host.getElements())
+      setBase({ elements: nextBase, revision: revisionOf(nextBase) })
+      setStale(false)
       pushToast({
         kind: 'info',
         message: t('canvas.dslAppliedSkipped', {
@@ -252,6 +276,10 @@ export function DslDialog({
         }),
       })
     } else if (applied > 0) {
+      // 全部成功:重序列化同步文本(画布即文本),视为已应用,不再 dirty。
+      // (base/appliedHashes 已在上方 applied>0 分支更新)
+      setText(serializeCanvasReadable(host.getElements(), (id) => { const c = service.get(id as CardId); return c ? { title: c.title, content: c.body, type: c.type, tags: c.tags, links: c.links, codeSnippets: c.codeSnippets, quotes: c.quotes } : undefined }))
+      dirtyRef.current = false
       pushToast({ kind: 'success', message: t('canvas.dslApplied', { n: String(applied) }) })
     } else {
       pushToast({ kind: 'error', message: t('agent.applyFailed') })
@@ -314,8 +342,14 @@ export function DslDialog({
     }
   }
 
+  // R14:有未应用编辑时关闭先确认(此前手写 10 分钟点 backdrop/Esc 全丢)。
+  const requestClose = () => {
+    if (dirtyRef.current) setConfirmClose(true)
+    else onClose()
+  }
+
   return (
-    <Modal open={open} onClose={onClose} title={t('canvas.dslTitle')} closeLabel={t('common.close')}>
+    <Modal open={open} onClose={requestClose} title={t('canvas.dslTitle')} closeLabel={t('common.close')}>
       <p className="dsl-lede">{t('canvas.dslLede')}</p>
       <div className="dsl-bridge" role="note">
         <span className="dsl-bridge__label">Canvas</span>
@@ -369,7 +403,10 @@ export function DslDialog({
       <textarea
         className="dsl-text"
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value)
+          dirtyRef.current = true // R14:标记有未应用编辑
+        }}
         spellCheck={false}
         aria-label={t('canvas.dslTitle')}
       />
@@ -417,7 +454,10 @@ export function DslDialog({
             {preview.errors.map((e, i) => (
               <li key={i} className="dsl-errors__item">
                 <span className="dsl-errors__line">{t('canvas.dslErrorLine', { line: String(e.line) })}</span>
-                <span className="dsl-errors__msg">{e.message}</span>
+                {/* R14:显示出错行原文(此前只有"第 N 行",长文本要自己数行;含 @pos 却报
+                    missing @pos 的误导也由此可辨 —— 用户能看到自己写的原样)。 */}
+                {e.text && <code className="dsl-errors__source">{e.text}</code>}
+                <span className="dsl-errors__msg">{diagnosticMessage(e, t)}</span>
               </li>
             ))}
           </ul>
@@ -435,9 +475,27 @@ export function DslDialog({
         <Button variant="ghost" onClick={copyAsPrompt}>{t('canvas.dslCopyAsPrompt')}</Button>
         <Button variant="ghost" onClick={download}>{t('canvas.dslDownload')}</Button>
         <span className="dsl-spacer" />
-        <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
+        <Button variant="ghost" onClick={requestClose}>{t('common.cancel')}</Button>
         <Button variant="primary" onClick={apply} disabled={!host || liveStale || stale}>{t('canvas.dslApply')}</Button>
       </div>
+
+      {/* R14:未应用编辑的关闭确认(防手写/粘贴一大段被 backdrop/Esc 丢弃)。 */}
+      {confirmClose && (
+        <Modal
+          open
+          onClose={() => setConfirmClose(false)}
+          title={t('canvas.dslDiscardTitle')}
+          closeLabel={t('common.cancel')}
+        >
+          <p className="dsl-confirm">{t('canvas.dslDiscardBody')}</p>
+          <div className="dsl-confirm__actions">
+            <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
+            <Button variant="danger" onClick={() => { setConfirmClose(false); dirtyRef.current = false; onClose() }}>
+              {t('canvas.dslDiscardAction')}
+            </Button>
+          </div>
+        </Modal>
+      )}
       <style>{styles}</style>
     </Modal>
   )
@@ -472,6 +530,9 @@ const styles = `
   font-family: var(--font-mono); font-size: var(--font-size-sm);
   border: var(--border-hairline); border-radius: var(--radius-sm); outline: none;
   resize: vertical; line-height: 1.5;
+  /* R14:多行正文序列化成单条物理巨行 → 软换行显示,避免光标/滚动无法定位。
+     实际存储仍是单行(往返对称),仅视觉换行。 */
+  white-space: pre-wrap; word-break: break-all; overflow-wrap: anywhere;
 }
 .dsl-text:focus { border-color: var(--color-red); }
 .dsl-preview { margin: 0 0 var(--space-2); padding: var(--space-1) var(--space-2); border-left: var(--space-quarter) solid var(--color-blue); font-family: var(--font-mono); font-size: var(--font-size-xs); }
@@ -507,6 +568,13 @@ const styles = `
   padding: var(--space-1) 0;
 }
 .dsl-errors__line { color: var(--color-red); flex-shrink: 0; }
+.dsl-errors__source {
+  display: block; width: 100%; flex-basis: 100%;
+  background: var(--color-black-soft); color: var(--color-white);
+  padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  white-space: pre-wrap; word-break: break-all;
+}
 .dsl-errors__msg { word-break: break-word; }
 .dsl-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); align-items: center; }
 .dsl-spacer { flex: 1; min-width: 0; }
