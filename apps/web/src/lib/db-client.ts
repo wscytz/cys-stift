@@ -18,17 +18,41 @@ interface Snapshot {
   cards: Card[]
 }
 
+/** 必填日期字段的安全解析:坏值/缺失兜底 epoch(1970-01-01)。保证下游
+ *  toISOString()/排序不炸(adversarial D1/D2:坏 capturedAt 曾让 /timeline、/archive、
+ *  /search、/trash 全 RangeError 崩),且排序稳定沉底不漂移。 */
+function safeDate(value: unknown): Date {
+  if (value == null) return new Date(0)
+  const d = new Date(value as string)
+  return isNaN(d.getTime()) ? new Date(0) : d
+}
+
+/** 可选日期字段(deletedAt)的安全解析:坏值视为未设置(卡回 inbox 可见可恢复)。 */
+function safeOptDate(value: unknown): Date | undefined {
+  if (value == null) return undefined
+  const d = new Date(value as string)
+  return isNaN(d.getTime()) ? undefined : d
+}
+
 function loadSnapshot(): Snapshot {
   if (typeof window === 'undefined') return { cards: [] }
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return { cards: [] }
-    const parsed = JSON.parse(raw) as { cards: Card[] }
-    for (const c of parsed.cards) {
-      c.capturedAt = new Date(c.capturedAt)
-      c.createdAt = new Date(c.createdAt)
-      c.updatedAt = new Date(c.updatedAt)
-      c.deletedAt = c.deletedAt ? new Date(c.deletedAt) : undefined
+    const parsed = JSON.parse(raw) as { cards?: unknown }
+    // 幻影卡防御:无 id / id 非空字符串的记录不参与渲染(否则 React key 冲突 +
+    // 假数据卡;adversarial D1:`{cards:[{}]}` 曾渲染一张无标题幻影卡)。
+    const cards: Card[] = (Array.isArray(parsed.cards) ? parsed.cards : []).filter(
+      (c): c is Card =>
+        !!c && typeof c === 'object' &&
+        typeof (c as Card).id === 'string' &&
+        (c as Card).id.length > 0,
+    )
+    for (const c of cards) {
+      c.capturedAt = safeDate(c.capturedAt)
+      c.createdAt = safeDate(c.createdAt)
+      c.updatedAt = safeDate(c.updatedAt)
+      c.deletedAt = safeOptDate(c.deletedAt)
       // 数组字段防御性归一化(导入坏数据/旧版迁移/解析异常):非数组 → 空数组,
       // 防后续渲染 .map 崩(tags 非数组时 card-detail (card.tags ?? []).map 仍炸)。
       if (!Array.isArray(c.tags)) c.tags = []
@@ -41,7 +65,7 @@ function loadSnapshot(): Snapshot {
       if (c.codeSnippets != null && !Array.isArray(c.codeSnippets)) c.codeSnippets = []
       if (c.quotes != null && !Array.isArray(c.quotes)) c.quotes = []
     }
-    return parsed
+    return { cards }
   } catch {
     return { cards: [] }
   }

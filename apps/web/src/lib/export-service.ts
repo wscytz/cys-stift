@@ -737,6 +737,7 @@ export async function importFromJson(
   // (missing id, missing createdAt, non-string title) would corrupt the
   // DB schema on the next read. Reject the whole import — better than
   // silently importing half-good data the user can't tell is broken.
+  const seenIds = new Set<string>()
   for (let i = 0; i < payload.cards.length; i++) {
     const c = payload.cards[i]
     if (!c || typeof c !== 'object') {
@@ -756,6 +757,18 @@ export async function importFromJson(
         error: `cards[${i}].id missing or not a string`,
       }
     }
+    // 数组内重复 id:replace 直接写入违反数据模型唯一性 —— 编辑一张,两张同 id 卡
+    // 一起变(cardRepo.update .map 全匹配替换),applyBatch 也因 byId Map 去重预检失败。
+    // 与 freeform 元素重复 id 校验对齐,整个导入 reject(adversarial D4 P1)。
+    if (seenIds.has(card.id)) {
+      return {
+        ok: false,
+        cards: 0,
+        mediaAssets: 0,
+        error: `cards[${i}] duplicate id ${card.id}`,
+      }
+    }
+    seenIds.add(card.id)
     if (typeof card.title !== 'string') {
       return {
         ok: false,

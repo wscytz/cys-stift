@@ -83,7 +83,13 @@ export function useCardDraft(
   // 只有 card.id 真正切换才重置(fields 是模块级常量)。
   const cardRef = useRef(card)
   cardRef.current = card
+  // baseline:编辑基准 = 打开/重置时的卡快照,不随 card props 漂移。
+  // 否则跨 tab storage 同步换卡后,dirty/toPatch 会拿「对端 tab 改过的卡」当比较基准,
+  // 把用户没编辑的字段误判为脏并覆盖回去(双 tab 跨字段编辑 clobber 真 bug,
+  // adversarial D3 P1)。baseline 只随 reset(切卡/离开编辑态)更新,编辑期间冻结。
+  const baselineRef = useRef(card)
   const reset = useCallback(() => {
+    baselineRef.current = cardRef.current
     setDraft(initDraft(cardRef.current, fields))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -92,7 +98,7 @@ export function useCardDraft(
     () =>
       fields.some((f) => {
         const cur = draft[f.key as string]
-        const orig = f.toDraft(card)
+        const orig = f.toDraft(baselineRef.current)
         return !(f.equals ?? strictEquals)(cur, orig)
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -100,7 +106,7 @@ export function useCardDraft(
   )
 
   const toPatch = useCallback(
-    () => buildPatch(card, draft, fields),
+    () => buildPatch(baselineRef.current, draft, fields),
     [card, draft, fields],
   )
 
