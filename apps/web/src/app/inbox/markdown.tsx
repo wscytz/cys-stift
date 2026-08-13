@@ -7,6 +7,7 @@ import rehypeHighlight from 'rehype-highlight'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import { useI18n } from '@/lib/i18n'
+import { safeHref } from '@/lib/safe-href'
 
 /**
  * Markdown body renderer (spec §1.4 + §5.3).
@@ -109,23 +110,16 @@ function MarkdownBlock({ source }: { source: string }) {
         rehypeKatex,
       ]}
       components={{
-        a: ({ href, children, ...rest }) => {
-          const safeHref =
-            typeof href === 'string' &&
-            (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('/'))
-              ? href
-              : '#'
-          return (
-            <a
-              href={safeHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              {...rest}
-            >
-              {children}
-            </a>
-          )
-        },
+        a: ({ href, children, ...rest }) => (
+          <a
+            href={safeHref(href)}
+            target="_blank"
+            rel="noopener noreferrer"
+            {...rest}
+          >
+            {children}
+          </a>
+        ),
       }}
     >
       {source}

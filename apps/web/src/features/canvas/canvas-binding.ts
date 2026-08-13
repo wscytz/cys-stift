@@ -160,12 +160,15 @@ export function bindCardWriteback(
     for (const el of updated) {
       if (el.kind === 'card') pending.set(el.id, el)
     }
-    // 画布 Delete/橡皮 擦掉卡元素 = 把卡「送回 inbox」(清 canvasPosition),
+    // removed(键盘 Delete / 选择删除)→ 把卡「送回 inbox」(清 canvasPosition),
     // 不是删卡。原因:引擎 undo 只恢复 host 元素,不会回滚 DB 的 deletedAt ——
     // 如果这里 softDelete,Undo 后画布上看似恢复了,但 DB 已标记 deletedAt,
     // 切画布/reload 卡就永久丢失(静默数据丢失)。removeFromCanvas 让卡回 inbox
     // 可找回,且与 CardDetailModal 的「送回 inbox」语义一致。
-    // 真正的删卡(softDelete)只走 CardDetailModal 的显式「删除」(带 confirm)。
+    // 橡皮 card 模式例外:显式走 service.softDelete(卡进回收站、canvasPosition
+    // 保留、restore 后回画布),在 canvas/page.tsx 接线,不经过本 removed 路径。
+    // 真正的删卡(softDelete)只走 CardDetailModal 的显式「删除」(带 confirm)
+    // 或橡皮 card 模式。
     for (const id of removed) {
       const card = service.get(id as CardId)
       if (card && !card.deletedAt && card.canvasPosition?.canvasId === canvasId) {

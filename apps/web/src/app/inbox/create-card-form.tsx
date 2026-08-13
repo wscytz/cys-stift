@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useId } from 'react'
+import { useState, useEffect, useId, useRef } from 'react'
 import { Button, Input, Tag } from '@cys-stift/ui'
 import type { CodeBlock, LinkPreview, Quote, TagRef } from '@cys-stift/domain'
 import { draftStore, useDraft, isDraftPersistOk } from '@/lib/draft-store'
@@ -86,6 +86,9 @@ export function CreateCardForm({ onCreate, ready = true }: CreateCardFormProps) 
   // Replaces the former useTransition `pending` latch, which only covered
   // sync state updates and can't span the await.
   const [submitting, setSubmitting] = useState(false)
+  // 同步重入锁:useState latch 在同一同步 task 内多个事件共享陈旧闭包,
+  // 单 task 连发 submit 仍全数通过建 N 张卡(adversarial D3 P2)。ref 立即生效。
+  const submitLockRef = useRef(false)
   // R2.10: surface silent autosave failures (quota exceeded).
   const [persistFailed, setPersistFailed] = useState(false)
 
@@ -175,7 +178,8 @@ export function CreateCardForm({ onCreate, ready = true }: CreateCardFormProps) 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!ready) return // DB not hydrated yet — guard against crash into unhydrated service
-    if (!canSubmit) return
+    if (!canSubmit || submitLockRef.current) return
+    submitLockRef.current = true
     const cleanTitle = title.trim()
     const cleanBody = body.trim()
     // H3 fix (mirror MiniInput): cancel any pending debounced draft
@@ -208,6 +212,7 @@ export function CreateCardForm({ onCreate, ready = true }: CreateCardFormProps) 
       ok = false
     } finally {
       setSubmitting(false)
+      submitLockRef.current = false
     }
     if (ok) {
       reset()

@@ -56,10 +56,15 @@ function loadSnapshot(): Snapshot {
       // 数组字段防御性归一化(导入坏数据/旧版迁移/解析异常):非数组 → 空数组,
       // 防后续渲染 .map 崩(tags 非数组时 card-detail (card.tags ?? []).map 仍炸)。
       if (!Array.isArray(c.tags)) c.tags = []
-      else c.tags = c.tags.map((tag) => ({
-        ...tag,
-        color: normalizeTagColor(tag?.color),
-      }))
+      else {
+        // primitive / 无 value 的 tag 直接丢弃(adversarial D1:tags:["abc",42,null]
+        // 曾渲染成空 chip,数据在 UI 层被吞且无告警)。保留下 value 是 string 的对象。
+        const valid = (c.tags as unknown[]).filter(
+          (t): t is { value: string; color?: unknown } =>
+            !!t && typeof t === 'object' && typeof (t as { value?: unknown }).value === 'string',
+        )
+        c.tags = valid.map((tag) => ({ ...tag, color: normalizeTagColor(tag?.color) }))
+      }
       if (c.media != null && !Array.isArray(c.media)) c.media = []
       if (c.links != null && !Array.isArray(c.links)) c.links = []
       if (c.codeSnippets != null && !Array.isArray(c.codeSnippets)) c.codeSnippets = []

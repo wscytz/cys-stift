@@ -17,6 +17,9 @@ export function safeHref(href: string | undefined | null): string {
   if (typeof href !== 'string') return '#'
   const trimmed = href.trim()
   if (trimmed === '') return '#'
+  // 协议相对 URL(//host)按当前页面 scheme 跳到外部主机 —— 白名单 `startsWith('/')`
+  // 会把它当站内路径放行(视觉冒充站内,实际跳外域;adversarial D2 F2)。显式拒绝。
+  if (trimmed.startsWith('//')) return '#'
   return SAFE_HREF_PREFIXES.some((p) => trimmed.toLowerCase().startsWith(p))
     ? trimmed
     : '#'

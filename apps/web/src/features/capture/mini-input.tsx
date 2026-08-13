@@ -62,6 +62,9 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
   // re-enters submit() before setOpen(false) closes the modal — two
   // cards get created. Latch until the parent unmounts/closes us.
   const [submitting, setSubmitting] = useState(false)
+  // 同步重入锁:useState latch 在同一同步 task 内多个事件共享陈旧闭包,
+  // 单 task 连发 submit 仍全数通过建 N 张卡(adversarial D3 P2)。ref 立即生效。
+  const submitLockRef = useRef(false)
   // R2.10: surface silent autosave failures (quota exceeded) so the user
   // knows the draft won't survive a reload. Re-checked after each debounced
   // persist; isDraftPersistOk() is a module-level flag, not reactive.
@@ -98,6 +101,7 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
       // successful submit intentionally latches `submitting` for the current
       // open session, but the next capture session must be able to submit.
       setSubmitting(false)
+      submitLockRef.current = false
       setTitle(restored?.title ?? '')
       setBody(restored?.body ?? '')
       setBodyOpen(Boolean(restored?.body && restored.body.trim().length > 0))
@@ -179,9 +183,10 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
   }
 
   const submit = async () => {
-    if (submitting) return
+    if (submitting || submitLockRef.current) return
     const t = title.trim()
     if (t.length === 0) return
+    submitLockRef.current = true
     setSubmitting(true)
     // H3 fix: 取消挂起的 debounced 草稿持久化。否则用户在 Cmd+Enter 前最后
     // ~500ms 内的按键会排一个 persistDraft,在下面 clear('capture') 之后才
@@ -195,6 +200,7 @@ export function MiniInput({ open, onClose, onSubmit }: MiniInputProps) {
         // H2 fix: 保存失败(配额满)。保持 modal 打开 + 保留草稿(不清),
         // 重置 submitting latch 让用户可以重试。CaptureHost 已推 error toast。
         setSubmitting(false)
+        submitLockRef.current = false
       }
     }
     if (ok) {

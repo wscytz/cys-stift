@@ -108,14 +108,26 @@ function parseSnapshot(raw: string): CanvasFreeformSnapshot | null {
   try {
     const parsed = JSON.parse(raw) as { elements?: unknown }
     if (!Array.isArray(parsed.elements)) return null
-    // 逐元素校验(恶意/损坏数据):非对象 / 缺 kind / 缺 id 的元素直接丢弃,
-    // 不让它们进 host 后被几何/渲染函数假设字段类型正确而崩。
+    // 逐元素校验(恶意/损坏数据):非对象 / 缺 kind / 缺 id / 几何字段类型错 /
+    // 无源 image 的元素直接丢弃,不让它们进 host 后被几何/渲染函数假设字段类型
+    // 正确而崩,或成为「不可见不可选」的持久幽灵元素(adversarial D1 w:"abc"、
+    // D4 无源 image)。x/y/w/h/rotation 是 CanvasElement 必填字段(canvas-host.ts),
+    // 缺失即数据损坏,与导入路径 validateFreeformElements 对齐。
     const clean = (parsed.elements as unknown[]).filter(
-      (el): el is CanvasElement =>
-        !!el &&
-        typeof el === 'object' &&
-        typeof (el as CanvasElement).kind === 'string' &&
-        typeof (el as CanvasElement).id === 'string',
+      (el): el is CanvasElement => {
+        if (!el || typeof el !== 'object') return false
+        const e = el as Partial<CanvasElement>
+        if (typeof e.kind !== 'string' || typeof e.id !== 'string') return false
+        for (const field of ['x', 'y', 'w', 'h', 'rotation'] as const) {
+          if (typeof e[field] !== 'number') return false
+        }
+        // image 元素没有有效数据源 → 渲染层不画且 hitTest 命中空白区域(幽灵),
+        // 丢弃(有 dataUrl 的保留,等渲染器支持)。
+        if (e.kind === 'image' && typeof (e as { dataUrl?: unknown }).dataUrl !== 'string') {
+          return false
+        }
+        return true
+      },
     )
     return makeSnapshot(clean)
   } catch {

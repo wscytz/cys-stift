@@ -512,6 +512,10 @@ function validateFreeformElements(
       if (!finiteGeometry(element[field])) {
         return `freeform.${canvasId}.elements[${index}].${field} is invalid`
       }
+      // 尺寸非负(finiteGeometry 允许负数,但负 w/h 会翻转渲染几何;正常 UI 不产生)
+      if ((field === 'w' || field === 'h') && (element[field] as number) < 0) {
+        return `freeform.${canvasId}.elements[${index}].${field} must be >= 0`
+      }
     }
     if (element.text !== undefined && typeof element.text !== 'string') {
       return `freeform.${canvasId}.elements[${index}].text is invalid`
@@ -1050,7 +1054,9 @@ export async function importFromJson(
       ok: true,
       cards: payload.cards.length,
       mediaAssets: Object.keys(payload.mediaAssets ?? {}).length,
-      ...(payload.canvases ? { canvases: payload.canvases.canvases.length } : {}),
+      ...(payload.canvases && Array.isArray(payload.canvases.canvases)
+        ? { canvases: payload.canvases.canvases.length }
+        : {}),
       ...(incomingFreeform.size > 0 ? { freeformCanvases: incomingFreeform.size } : {}),
       ...(payload.conversations && !Array.isArray(payload.conversations)
         ? { conversations: Object.keys(payload.conversations).length }
