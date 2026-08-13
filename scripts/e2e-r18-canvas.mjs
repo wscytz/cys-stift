@@ -7,15 +7,64 @@
  *   C  橡皮 card 模式点空白不再误报「模式不匹配」(R18:adapter.eraserHitFiltered 区分
  *      「命中但被模式过滤」vs「点到空白」;正对照:点 text 元素仍应提示)。
  *
- * 用法:先 pnpm --filter web dev(localhost:3000),再 node scripts/e2e-r18-canvas.mjs [--headed]
+ * 用法:
+ *   node scripts/e2e-r18-canvas.mjs              # 默认:内置静态 server serve apps/web/out(=线上产物)
+ *   node scripts/e2e-r18-canvas.mjs --build      # 先 pnpm --filter web build 再 serve
+ *   node scripts/e2e-r18-canvas.mjs --base-url http://localhost:3000  # 指向 dev server(慢,不推荐)
+ *   node scripts/e2e-r18-canvas.mjs --headed     # 可视化跑(调试)
  */
 import puppeteer from 'puppeteer-core'
+import { createServer } from 'node:http'
+import { readFile, stat } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 
-const BASE_URL = (process.argv.find((a) => a.startsWith('--base-url=')) ?? '--base-url=http://localhost:3000').split('=')[1]
 const HEADED = process.argv.includes('--headed')
+const WANT_BUILD = process.argv.includes('--build')
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const SHOT_DIR = new URL('_e2e-screenshots/', import.meta.url)
 const fs = await import('node:fs')
+
+const OUT_DIR = path.resolve('apps/web/out')
+
+// ── 静态 server(默认 baseURL;--base-url 覆盖则跳过) ────────────────────────
+const MIME = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript',
+  '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
+  '.ico': 'image/x-icon', '.woff': 'font/woff', '.woff2': 'font/woff2', '.wasm': 'application/wasm',
+}
+
+function startStaticServer(port) {
+  const server = createServer(async (req, res) => {
+    try {
+      let p = path.join(OUT_DIR, decodeURIComponent(req.url.split('?')[0]))
+      if (existsSync(p) && (await stat(p)).isDirectory()) p = path.join(p, 'index.html')
+      if (!existsSync(p) && !path.extname(p)) { const h = p + '.html'; if (existsSync(h)) p = h }
+      if (!existsSync(p)) { const f = path.join(OUT_DIR, '404.html'); if (existsSync(f)) { res.writeHead(404); res.end(await readFile(f)); return } res.writeHead(404); res.end('nf'); return }
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(p)] ?? 'application/octet-stream' })
+      res.end(await readFile(p))
+    } catch (e) { res.writeHead(500); res.end(String(e)) }
+  })
+  return new Promise((r) => server.listen(port, () => r({ server, base: `http://localhost:${port}` })))
+}
+
+let BASE_URL = (process.argv.find((a) => a.startsWith('--base-url=')) ?? '').split('=')[1]
+let _staticServer
+if (WANT_BUILD && !existsSync(OUT_DIR)) {
+  console.log('▶ pnpm --filter web build(生成 out/)')
+  const r = spawnSync('pnpm', ['--filter', 'web', 'build'], { stdio: 'inherit', encoding: 'utf8' })
+  if (r.status !== 0) { console.error('✗ build 失败'); process.exit(1) }
+}
+if (!BASE_URL) {
+  if (!existsSync(path.join(OUT_DIR, 'index.html'))) {
+    console.error('✗ apps/web/out 不存在 —— 先 pnpm --filter web build,或加 --build,或 --base-url 指 dev server')
+    process.exit(1)
+  }
+  _staticServer = await startStaticServer(4497)
+  BASE_URL = _staticServer.base
+  console.log(`▶ 静态产物 server: ${BASE_URL} (serve ${OUT_DIR})`)
+}
 
 let results = []
 let browser
@@ -30,17 +79,39 @@ async function launch() {
   })
 }
 
+// dev server 会刷 favicon/HMR 404 噪音 —— 过滤掉,只留真错误。
+const NOISE_RE = /favicon|Failed to load resource.*404|ERR_ABORTED/i
+
 async function freshPage(seedFn) {
   const page = await browser.newPage()
   const errs = []
   page.on('pageerror', (e) => errs.push(`pageerror: ${e.message}`))
-  page.on('console', (m) => { if (m.type() === 'error') errs.push(`console.error: ${m.text()}`) })
+  page.on('console', (m) => {
+    const t = m.text()
+    if (m.type() === 'error' && !NOISE_RE.test(t)) errs.push(`console.error: ${t}`)
+  })
+  page.on('requestfailed', (r) => {
+    const u = r.url()
+    if (!NOISE_RE.test(u) && !u.includes('favicon')) errs.push(`requestfailed: ${u}`)
+  })
   await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 20000 })
   await page.evaluate(() => localStorage.clear())
   if (seedFn) await page.evaluate(seedFn)
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(800)
+  await waitReady(page)
   return { page, errs }
+}
+
+/** 等 app 水合完毕(导航后的通用就绪门)。 */
+async function waitReady(page) {
+  await page.waitForSelector('main', { timeout: 10000 }).catch(() => {})
+  await page.waitForFunction(() => !/读取中/.test(document.body.innerText || ''), { timeout: 10000 }).catch(() => {})
+}
+
+/** 导航到 route 并等水合就绪(用例内二次跳转用这个,别裸 goto)。 */
+async function go(page, route) {
+  await page.goto(BASE_URL + route, { waitUntil: 'domcontentloaded', timeout: 20000 })
+  await waitReady(page)
 }
 
 async function shot(page, name) {
@@ -129,8 +200,7 @@ async function caseATextInFrame(page) {
   await page.evaluate(seedCanvas([
     { id: 'fr-1', kind: 'frame', x: 200, y: 200, w: 600, h: 400, text: '主题区', rotation: 0 },
   ]))
-  await page.goto(BASE_URL + '/canvas', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(1000)
+  await go(page, '/canvas')
   // sanity:卡 + frame 应都在画布上(否则空画布假通过)
   const summaryA = await page.evaluate(() => document.getElementById('canvas-accessible-summary')?.textContent ?? '')
   assert(/2\s*个对象|2\s*objects/.test(summaryA), `画布对象数非 2(种子未加载):${summaryA}`)
@@ -150,8 +220,7 @@ async function caseCEraserEmpty(page) {
   await page.evaluate(seedCanvas([
     { id: 't1', kind: 'text', x: 600, y: 80, w: 100, h: 40, rotation: 0, text: '某个文字' },
   ]))
-  await page.goto(BASE_URL + '/canvas', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(1000)
+  await go(page, '/canvas')
   const summaryC = await page.evaluate(() => document.getElementById('canvas-accessible-summary')?.textContent ?? '')
   assert(/2\s*个对象|2\s*objects/.test(summaryC), `画布对象数非 2(种子未加载):${summaryC}`)
   await clickTool(page, /橡皮|^Eraser$/)
@@ -182,6 +251,7 @@ await launch()
 await runCase('R18-A text 工具在 frame 内放字', caseATextInFrame)
 await runCase('R18-C 橡皮 card 模式空白不误报', caseCEraserEmpty)
 await browser.close()
+if (_staticServer) _staticServer.server.close()
 
 let pass = 0
 for (const r of results) {

@@ -12,18 +12,68 @@
  *   G7  隐私边界(AI_CARD_FIELDS allowlist 纯函数断言)
  *
  * 用法:
- *   先起 dev server: pnpm --filter web dev  (localhost:3000)
- *   再跑:             node scripts/e2e-ai.mjs [--base-url http://localhost:3000] [--headed]
+ *   node scripts/e2e-ai.mjs              # 默认:内置静态 server serve apps/web/out(=线上产物)
+ *   node scripts/e2e-ai.mjs --build      # 先 pnpm --filter web build 再 serve
+ *   node scripts/e2e-ai.mjs --base-url http://localhost:3000  # 指向 dev server(慢,不推荐)
+ *   node scripts/e2e-ai.mjs --headed     # 可视化跑(调试)
+ *
+ * 为什么跑静态产物而非 dev:Next 15 dev 按需编译 + 水合,固定 sleep 等不够会让断言
+ * 在元素还没渲染时就跑,全部误报 FAIL。静态产物 = 线上真实产物,无编译延迟。
  * 通过 = PASS;失败 = FAIL + 描述 + 截图(scripts/_e2e-screenshots/)。
  * 每个用例独立 seed + 独立 page,互不污染。
  */
 import puppeteer from 'puppeteer-core'
+import { createServer } from 'node:http'
+import { readFile, stat } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 
-const BASE_URL = (process.argv.find((a) => a.startsWith('--base-url=')) ?? '--base-url=http://localhost:3000').split('=')[1]
 const HEADED = process.argv.includes('--headed')
+const WANT_BUILD = process.argv.includes('--build')
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const SHOT_DIR = new URL('_e2e-screenshots/', import.meta.url)
 const fs = await import('node:fs')
+
+const OUT_DIR = path.resolve('apps/web/out')
+
+// ── 静态 server(默认 baseURL;--base-url 覆盖则跳过) ────────────────────────
+const MIME = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript',
+  '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
+  '.ico': 'image/x-icon', '.woff': 'font/woff', '.woff2': 'font/woff2', '.wasm': 'application/wasm',
+}
+
+function startStaticServer(port) {
+  const server = createServer(async (req, res) => {
+    try {
+      let p = path.join(OUT_DIR, decodeURIComponent(req.url.split('?')[0]))
+      if (existsSync(p) && (await stat(p)).isDirectory()) p = path.join(p, 'index.html')
+      if (!existsSync(p) && !path.extname(p)) { const h = p + '.html'; if (existsSync(h)) p = h }
+      if (!existsSync(p)) { const f = path.join(OUT_DIR, '404.html'); if (existsSync(f)) { res.writeHead(404); res.end(await readFile(f)); return } res.writeHead(404); res.end('nf'); return }
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(p)] ?? 'application/octet-stream' })
+      res.end(await readFile(p))
+    } catch (e) { res.writeHead(500); res.end(String(e)) }
+  })
+  return new Promise((r) => server.listen(port, () => r({ server, base: `http://localhost:${port}` })))
+}
+
+let BASE_URL = (process.argv.find((a) => a.startsWith('--base-url=')) ?? '').split('=')[1]
+let _staticServer
+if (WANT_BUILD && !existsSync(OUT_DIR)) {
+  console.log('▶ pnpm --filter web build(生成 out/)')
+  const r = spawnSync('pnpm', ['--filter', 'web', 'build'], { stdio: 'inherit', encoding: 'utf8' })
+  if (r.status !== 0) { console.error('✗ build 失败'); process.exit(1) }
+}
+if (!BASE_URL) {
+  if (!existsSync(path.join(OUT_DIR, 'index.html'))) {
+    console.error('✗ apps/web/out 不存在 —— 先 pnpm --filter web build,或加 --build,或 --base-url 指 dev server')
+    process.exit(1)
+  }
+  _staticServer = await startStaticServer(4499)
+  BASE_URL = _staticServer.base
+  console.log(`▶ 静态产物 server: ${BASE_URL} (serve ${OUT_DIR})`)
+}
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -40,19 +90,44 @@ async function launch() {
   })
 }
 
+// dev server 会刷 favicon/HMR 404 噪音 —— 过滤掉,只留真错误。
+const NOISE_RE = /favicon|Failed to load resource.*404|ERR_ABORTED/i
+
 /** 打开一个干净页面(清 localStorage) + 收集 console/page errors。 */
 async function freshPage(seedFn) {
   const page = await browser.newPage()
   const errs = []
   page.on('pageerror', (e) => errs.push(`pageerror: ${e.message}`))
-  page.on('console', (m) => { if (m.type() === 'error') errs.push(`console.error: ${m.text()}`) })
+  page.on('console', (m) => {
+    const t = m.text()
+    if (m.type() === 'error' && !NOISE_RE.test(t)) errs.push(`console.error: ${t}`)
+  })
+  page.on('requestfailed', (r) => {
+    const u = r.url()
+    if (!NOISE_RE.test(u) && !u.includes('favicon')) errs.push(`requestfailed: ${u}`)
+  })
   await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 20000 })
   await page.evaluate(() => localStorage.clear())
   if (seedFn) await page.evaluate(seedFn)
   // 清空后 reload 让 app 以干净/seed 态初始化
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(600)
+  // 等 app 水合:主内容挂载 + 版本号出现(替代固定 sleep,既快又稳)
+  await waitReady(page)
   return { page, errs }
+}
+
+/** 等 app 水合完毕(导航后的通用就绪门):主内容 + 页面已停止 loading。
+ *  不用 networkidle0(本 app 多 page 反复跳转下行为不稳);用 DOM 就绪标志,~150ms。 */
+async function waitReady(page) {
+  await page.waitForSelector('main', { timeout: 10000 }).catch(() => {})
+  // 等"读取中…"占位消失(各页异步 hydrate 完的信号);没有该文案的页直接过
+  await page.waitForFunction(() => !/读取中/.test(document.body.innerText || ''), { timeout: 10000 }).catch(() => {})
+}
+
+/** 导航到 route 并等水合就绪(用例内二次跳转用这个,别裸 goto)。 */
+async function go(page, route) {
+  await page.goto(BASE_URL + route, { waitUntil: 'domcontentloaded', timeout: 20000 })
+  await waitReady(page)
 }
 
 async function shot(page, name) {
@@ -119,8 +194,7 @@ const aiSettings = {
 await launch()
 
 await runCase('G1 未配置 AI → /ask 显示 AiSetupCard(引导)', async (page) => {
-  await page.goto(BASE_URL + '/ask', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(800)
+  await go(page, '/ask')
   const hasSetup = await page.$('[data-testid="ai-setup-card"]')
   assert(hasSetup, '未配置 AI 时 /ask 应显示 AiSetupCard')
   return 'AiSetupCard 出现(未配置→引导)'
@@ -128,10 +202,7 @@ await runCase('G1 未配置 AI → /ask 显示 AiSetupCard(引导)', async (page
 
 await runCase('G1 配置 AI(openai-compat) → /ask 进入对话态', async (page) => {
   await page.evaluate(seed({ cards: [], settings: aiSettings }))
-  await page.reload({ waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(800)
-  await page.goto(BASE_URL + '/ask', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(800)
+  await go(page, '/ask')
   const hasInput = await page.$('.ask__input-row')
   assert(hasInput, '配置 AI 后 /ask 应进入对话态(有输入行)')
   return '对话输入行出现(已配置→可对话)'
@@ -146,8 +217,7 @@ const twoTurn = [
 
 await runCase('G2 对话种子渲染:注入 2 轮 → /ask 应显示', async (page) => {
   await page.evaluate(seed({ cards: [], settings: aiSettings, conversation: twoTurn }))
-  await page.goto(BASE_URL + '/ask', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(800)
+  await go(page, '/ask')
   assert(await hasText(page, '我叫小明'), '对话第一条 user 应渲染')
   assert(await hasText(page, '你好小明'), '对话第一条 assistant 应渲染')
   return '2 轮对话均在 /ask 渲染'
@@ -155,14 +225,11 @@ await runCase('G2 对话种子渲染:注入 2 轮 → /ask 应显示', async (pa
 
 await runCase('G2 切页回来对话不丢(StrictMode 清空修复 + B1 画布记忆)', async (page) => {
   await page.evaluate(seed({ cards: [], settings: aiSettings, conversation: twoTurn }))
-  await page.goto(BASE_URL + '/ask', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(800)
+  await go(page, '/ask')
   assert(await hasText(page, '我叫小明'), '进 /ask 应见旧对话')
   // 切到 /canvas 再回 /ask
-  await page.goto(BASE_URL + '/canvas', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(600)
-  await page.goto(BASE_URL + '/ask', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(800)
+  await go(page, '/canvas')
+  await go(page, '/ask')
   assert(await hasText(page, '我叫小明'), '切页回来对话应保留(不被清空)')
   assert(await hasText(page, '你好小明'), '切页回来 assistant 也应保留')
   return '切页回 /ask 两轮对话均在(未被挂载清空)'
@@ -170,18 +237,16 @@ await runCase('G2 切页回来对话不丢(StrictMode 清空修复 + B1 画布�
 
 await runCase('G2 刷新后对话不丢(localStorage 持久化)', async (page) => {
   await page.evaluate(seed({ cards: [], settings: aiSettings, conversation: twoTurn }))
-  await page.goto(BASE_URL + '/ask', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(800)
+  await go(page, '/ask')
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(800)
+  await waitReady(page)
   assert(await hasText(page, '我叫小明'), '刷新后对话应保留')
   return '刷新后对话仍在(localStorage 持久化正常)'
 })
 
 await runCase('G2 记忆目标画布 key 被写入(B1)', async (page) => {
   await page.evaluate(seed({ cards: [], settings: aiSettings, conversation: twoTurn }))
-  await page.goto(BASE_URL + '/ask', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(1000)
+  await go(page, '/ask')
   const key = await page.evaluate(() => localStorage.getItem('cys-stift.ask-target-canvas.v1'))
   assert(key, 'B1 应写入 ask-target-canvas.v1(记忆目标画布)')
   return `ask-target-canvas.v1 = ${key}`
@@ -192,8 +257,7 @@ await runCase('G2 记忆目标画布 key 被写入(B1)', async (page) => {
 await runCase('G3 卡片详情:body 是 MarkdownEditor(toolbar+三态)', async (page) => {
   const cards = [mkCard({ id: 'c-edit', title: '编辑测试', body: '## hi\n正文' })]
   await page.evaluate(seed({ cards, settings: {} }))
-  await page.goto(BASE_URL + '/inbox', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(1000)
+  await go(page, '/inbox')
   // 点击卡片开详情(编辑模式 —— 卡片无 canvasPosition,inbox 点击开 modal)
   const clicked = await page.evaluate(() => {
     const tile = [...document.querySelectorAll('button, a')].find((e) => (e.textContent ?? '').includes('编辑测试'))
@@ -216,8 +280,7 @@ await runCase('G3 卡片详情:body 是 MarkdownEditor(toolbar+三态)', async (
 await runCase('G4 未放置面板:列出未放卡 → 放置 → canvasPosition 写入', async (page) => {
   const cards = [mkCard({ id: 'c-unplaced', title: '未放置卡', body: '' })]
   await page.evaluate(seed({ cards, settings: {} }))
-  await page.goto(BASE_URL + '/canvas', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(1500)
+  await go(page, '/canvas')
   // 点 rail「未放」按钮
   const railClicked = await page.evaluate(() => {
     const b = [...document.querySelectorAll('.cv-rail button, .cv-rail a')].find((e) => (e.textContent ?? '').includes('未放') || (e.textContent ?? '').includes('Unplaced'))
@@ -254,8 +317,7 @@ await runCase('G5 搜索筛选:tag chip 过滤 + 导航降级', async (page) => 
     mkCard({ id: 's2', title: '无标签卡', tags: [] }),
   ]
   await page.evaluate(seed({ cards, settings: {} }))
-  await page.goto(BASE_URL + '/search', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(1000)
+  await go(page, '/search')
   const hasFilterRow = await page.$('.sf__seg')
   assert(hasFilterRow, '搜索页应有筛选条(状态分段)')
   const hasTagChip = await page.$('.sf__tag')
@@ -278,8 +340,7 @@ await runCase('G5 搜索筛选:tag chip 过滤 + 导航降级', async (page) => 
 
 await runCase('G6 能力清单:settings 渲染核心+可选能力', async (page) => {
   await page.evaluate(seed({ cards: [], settings: {} }))
-  await page.goto(BASE_URL + '/settings', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(1000)
+  await go(page, '/settings')
   await page.evaluate(() => document.querySelector('#settings-capabilities')?.scrollIntoView())
   await sleep(400)
   const section = await page.$('#settings-capabilities .set__capabilities')
@@ -298,8 +359,7 @@ await runCase('G7 AI 隐私:serializeCardsForAI 不含 deviceId/软删卡', asyn
   // 这里做浏览器级轻验证:/ask 的 contextMeta 只显示条数不显示卡内容。
   const cards = [mkCard({ id: 'priv1', title: '隐私卡', body: '机密正文XXX' })]
   await page.evaluate(seed({ cards, settings: {} }))
-  await page.goto(BASE_URL + '/ask', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(800)
+  await go(page, '/ask')
   const leakedInDom = await page.evaluate(() => {
     const s = document.body.innerText || ''
     return { hasSecret: s.includes('机密正文XXX'), hasDevice: s.includes('seed-device-abc') }
@@ -311,6 +371,7 @@ await runCase('G7 AI 隐私:serializeCardsForAI 不含 deviceId/软删卡', asyn
 // ── 汇总 ────────────────────────────────────────────────────────────────────
 
 await browser.close()
+if (_staticServer) _staticServer.server.close()
 let pass = 0
 for (const r of results) {
   const tag = r.pass ? '✅ PASS' : '❌ FAIL'
@@ -325,3 +386,4 @@ if (pass !== total) {
   console.log(`截图目录: ${SHOT_DIR.pathname}`)
   process.exit(1)
 }
+process.exit(0)

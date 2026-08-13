@@ -8,15 +8,67 @@
  *       (use-card-draft.ts buildPatch per-field dirty 门控的直接验证)
  *   (A1 JSON 全量往返、A3 DSL v8 往返、A4 导入 reject/回滚 待补)
  *
- * 用法:先 pnpm --filter web dev(localhost:3000),再 node scripts/e2e-data.mjs [--headed]
+ * 用法:
+ *   node scripts/e2e-data.mjs              # 默认:内置静态 server serve apps/web/out(=线上产物)
+ *   node scripts/e2e-data.mjs --build      # 先 pnpm --filter web build 再 serve
+ *   node scripts/e2e-data.mjs --base-url http://localhost:3000  # 指向 dev server(慢,不推荐)
+ *   node scripts/e2e-data.mjs --headed     # 可视化跑(调试)
+ *
+ * 为什么跑静态产物而非 dev:Next 15 dev 按需编译 + 水合,固定 sleep 等不够会让断言
+ * 在元素还没渲染时就跑,全部误报 FAIL。静态产物 = 线上真实产物,无编译延迟。
  */
 import puppeteer from 'puppeteer-core'
+import { createServer } from 'node:http'
+import { readFile, stat } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 
-const BASE_URL = (process.argv.find((a) => a.startsWith('--base-url=')) ?? '--base-url=http://localhost:3000').split('=')[1]
 const HEADED = process.argv.includes('--headed')
+const WANT_BUILD = process.argv.includes('--build')
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const SHOT_DIR = new URL('_e2e-screenshots/', import.meta.url)
 const fs = await import('node:fs')
+
+const OUT_DIR = path.resolve('apps/web/out')
+
+// ── 静态 server(默认 baseURL;--base-url 覆盖则跳过) ────────────────────────
+const MIME = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript',
+  '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
+  '.ico': 'image/x-icon', '.woff': 'font/woff', '.woff2': 'font/woff2', '.wasm': 'application/wasm',
+}
+
+function startStaticServer(port) {
+  const server = createServer(async (req, res) => {
+    try {
+      let p = path.join(OUT_DIR, decodeURIComponent(req.url.split('?')[0]))
+      if (existsSync(p) && (await stat(p)).isDirectory()) p = path.join(p, 'index.html')
+      if (!existsSync(p) && !path.extname(p)) { const h = p + '.html'; if (existsSync(h)) p = h }
+      if (!existsSync(p)) { const f = path.join(OUT_DIR, '404.html'); if (existsSync(f)) { res.writeHead(404); res.end(await readFile(f)); return } res.writeHead(404); res.end('nf'); return }
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(p)] ?? 'application/octet-stream' })
+      res.end(await readFile(p))
+    } catch (e) { res.writeHead(500); res.end(String(e)) }
+  })
+  return new Promise((r) => server.listen(port, () => r({ server, base: `http://localhost:${port}` })))
+}
+
+let BASE_URL = (process.argv.find((a) => a.startsWith('--base-url=')) ?? '').split('=')[1]
+let _staticServer
+if (WANT_BUILD && !existsSync(OUT_DIR)) {
+  console.log('▶ pnpm --filter web build(生成 out/)')
+  const r = spawnSync('pnpm', ['--filter', 'web', 'build'], { stdio: 'inherit', encoding: 'utf8' })
+  if (r.status !== 0) { console.error('✗ build 失败'); process.exit(1) }
+}
+if (!BASE_URL) {
+  if (!existsSync(path.join(OUT_DIR, 'index.html'))) {
+    console.error('✗ apps/web/out 不存在 —— 先 pnpm --filter web build,或加 --build,或 --base-url 指 dev server')
+    process.exit(1)
+  }
+  _staticServer = await startStaticServer(4498)
+  BASE_URL = _staticServer.base
+  console.log(`▶ 静态产物 server: ${BASE_URL} (serve ${OUT_DIR})`)
+}
 
 // ── helpers(复用 e2e-ai.mjs 模式)────────────────────────────────────────────
 
@@ -33,17 +85,39 @@ async function launch() {
   })
 }
 
+// dev server 会刷 favicon/HMR 404 噪音 —— 过滤掉,只留真错误。
+const NOISE_RE = /favicon|Failed to load resource.*404|ERR_ABORTED/i
+
 async function freshPage(seedFn) {
   const page = await browser.newPage()
   const errs = []
   page.on('pageerror', (e) => errs.push(`pageerror: ${e.message}`))
-  page.on('console', (m) => { if (m.type() === 'error') errs.push(`console.error: ${m.text()}`) })
+  page.on('console', (m) => {
+    const t = m.text()
+    if (m.type() === 'error' && !NOISE_RE.test(t)) errs.push(`console.error: ${t}`)
+  })
+  page.on('requestfailed', (r) => {
+    const u = r.url()
+    if (!NOISE_RE.test(u) && !u.includes('favicon')) errs.push(`requestfailed: ${u}`)
+  })
   await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 20000 })
   await page.evaluate(() => localStorage.clear())
   if (seedFn) await page.evaluate(seedFn)
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(600)
+  await waitReady(page)
   return { page, errs }
+}
+
+/** 等 app 水合完毕(导航后的通用就绪门)。 */
+async function waitReady(page) {
+  await page.waitForSelector('main', { timeout: 10000 }).catch(() => {})
+  await page.waitForFunction(() => !/读取中/.test(document.body.innerText || ''), { timeout: 10000 }).catch(() => {})
+}
+
+/** 导航到 route 并等水合就绪(用例内二次跳转用这个,别裸 goto)。 */
+async function go(page, route) {
+  await page.goto(BASE_URL + route, { waitUntil: 'domcontentloaded', timeout: 20000 })
+  await waitReady(page)
 }
 
 async function shot(page, name) {
@@ -112,8 +186,7 @@ await runCase('A2 软删→硬删:media eager 清理 + card record 删除', asyn
   const settings = { locale: 'zh', theme: 'system',
     captureShortcut: { modKey: 'meta', shift: true, code: 'KeyE' }, export: { includeDeleted: true } }
   await page.evaluate(seed({ cards: [card], settings, media }))
-  await page.goto(BASE_URL + '/trash', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(1200)
+  await go(page, '/trash')
 
   // 软删态:card record 在(带 deletedAt),media asset 保留
   assert(await mediaCount(page) === 1, `软删后 media 应保留(=1),实际 ${await mediaCount(page)}`)
@@ -176,8 +249,7 @@ await runCase('A1 JSON 全量往返:富卡(v8)+media+canvases 导出→导入等
   await page.evaluate(seed({ cards: [card], settings, media, canvases }))
 
   // ── 导出:CDP 抓 Blob 下载文件 ──
-  await page.goto(BASE_URL + '/settings', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(1500)
+  await go(page, '/settings')
   const dlDir = '/tmp/cys-e2e-export'
   fs.rmSync(dlDir, { recursive: true, force: true })
   fs.mkdirSync(dlDir, { recursive: true })
@@ -203,8 +275,7 @@ await runCase('A1 JSON 全量往返:富卡(v8)+media+canvases 导出→导入等
 
   // ── 清 localStorage → 导入同一文件 ──
   await page.evaluate(() => localStorage.clear())
-  await page.goto(BASE_URL + '/settings', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(1200)
+  await go(page, '/settings')
   const input = await page.$('input.set__file')
   assert(input, '/settings 应有导入 input.set__file')
   await input.uploadFile(`${dlDir}/${files[0]}`)
@@ -238,8 +309,7 @@ await runCase('A1 JSON 全量往返:富卡(v8)+media+canvases 导出→导入等
 await runCase('A4 导入校验:坏 capturedAt → reject,本地 cards 字节不变(事务回滚)', async (page) => {
   const goodCard = mkCard({ id: 'c-keep', title: '保留卡', body: '好数据' })
   await page.evaluate(seed({ cards: [goodCard], settings: {} }))
-  await page.goto(BASE_URL + '/settings', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(1200)
+  await go(page, '/settings')
   // 构造坏 payload(capturedAt 不可解析 → importFromJson 校验 reject 整个导入)
   const badPayload = {
     version: 1, exportedAt: '2026-08-10T00:00:00.000Z', app: "cy's Stift",
@@ -274,8 +344,7 @@ await runCase('B1 编辑器合并:改 body 不 clobber codeSnippets/quotes/links
     tags: [{ value: 'alpha', color: 'var(--color-red)' }],
   })
   await page.evaluate(seed({ cards: [card], settings: {} }))
-  await page.goto(BASE_URL + '/inbox', { waitUntil: 'domcontentloaded', timeout: 20000 })
-  await sleep(1000)
+  await go(page, '/inbox')
 
   // 开详情(点卡 —— 用 button/a 精确,div/li 容器 click 不触发 React onClick)
   const opened = await page.evaluate(() => {
@@ -322,6 +391,7 @@ await runCase('B1 编辑器合并:改 body 不 clobber codeSnippets/quotes/links
 // ── 汇总 ────────────────────────────────────────────────────────────────────
 
 await browser.close()
+if (_staticServer) _staticServer.server.close()
 let pass = 0
 for (const r of results) {
   const tag = r.pass ? '✅ PASS' : '❌ FAIL'
@@ -336,3 +406,4 @@ if (pass !== total) {
   console.log(`截图目录: ${SHOT_DIR.pathname}`)
   process.exit(1)
 }
+process.exit(0)
