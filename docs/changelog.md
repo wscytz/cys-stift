@@ -5,6 +5,24 @@
 
 ---
 
+## 2026-08-15 · 1.3.0-preview.3 · 对抗测试三轮修复(3 🔴 + 3 🟡 簇)(tag v1.3.0-preview.3)
+
+> 1.3.0-preview.2 发布后跑了三轮对抗测试(R1 存储/导入导出/AI/隐私、R2 设置/会话/DSL/归档、R3 大数据量/多画布/配额/AI 流式,共 13 维度约 120 场景,subagent 并行探索 + 主 agent 逐指控源码坐实 + 浏览器复现后才修)。本版含全部修复与回归测试;三轮未修项均为 P3 观察,留档不进版。
+
+- **🔴 [崩溃] 坏 `capturedAt/updatedAt` 日期炸 4 条路由**(`db-client.ts`):毒化 localStorage 的坏日期曾让 `/timeline` `/archive` `/search` `/trash` 全 RangeError 崩、`/inbox` 排序静默漂移。坏值兜底 epoch 不崩、排序稳定沉底、坏 `deletedAt` 视为未删回 inbox;顺带过滤无 id 幻影卡。
+- **🔴 [渲染崩溃] 毒化 `dslBlocks` 穿透防线崩 `/ask` 与画布伴侣**(`conversation-store.ts`):非 string[] 的 `dslBlocks` 曾穿透"丢畸形数据"校验,渲染期崩进 error boundary。`isValidMessage` 补 `dslBlocks`/`streaming` 字段校验。
+- **🔴 [数据一致性] 双 tab 跨字段编辑互相覆盖**(`use-card-draft.ts`):编辑基准在保存后漂移,对端改过的字段被误判为脏覆盖。加 `baselineRef` 冻结基准于打开时快照。
+- **🟡 导入拒绝数组内重复 card id**(`export-service.ts`):replace 写入违反唯一性,编辑一张两张变。
+- **🟡 归档 index 毒化 → 每次 boot unhandled rejection**(`archive-store.ts`):OPFS/LS 两条加载路径接 `sanitizeIndex`,entries 逐项校验 + 坏标量回默认,release 存档不再静默失败。
+- **🟡 设置整份校验失败即回默认丢用户全部配置**(`settings-store.ts`):改为逐字段挽救 —— 快捷键/主题/语言逐项保留,profiles 逐个过滤(只差可选采样参数非法的剥参数保留),activeProfileId 丢失自动锚定。仅救内存不在读时写盘,保 export/import 字节保真。另补 `temperature/maxTokens` 范围校验(0-2 / 1-8192),毒参数不再透传进请求体。
+- **🟡 AI 确定性失败重试 3 次且错误类别误导**(`retry-until-valid.ts`):401/429/500/超时曾一律当瞬时网络错重试 3 次 —— 用户 key 错/限流却提示"检查网络",超时把 60s 放大到 ~180s。改为 HTTP 状态错误与超时立即终止,新增 auth(401/403)/rate_limit(429)/model(404) 失败类别映射到可自救文案,4 个 AI 调用方自动生效。
+- **🟡 删画布孤儿派生数据永久残留**(`canvas-store.ts`):删除画布后 `conversation.<id>.v2` 与 canvas-view 条目永久残留、每次导出带出孤儿数据。删画布时同步清对话历史 + 视图状态。
+- **🟡 其余边界收口**:freeform load 路径几何字段校验 + 无源 image 过滤(幽灵元素);导入 freeform w/h 非负校验;tags primitive 过滤(空 chip);capture/建卡表单连发只建一张卡;markdown 链接 `safeHref` 单一真相源 + 拒协议相对 URL(两处漏)。
+- **测试基础设施**:e2e 三脚本(e2e-ai/e2e-data/e2e-r18-canvas)改静态产物驱动(serve `apps/web/out` = 线上真实产物)+ 等水合 + 修进程退出泄漏,此前断言全在水合前跑导致 0/11 误报;新增 `deploy:web` 一键部署脚本(build→备份→scp→HTTPS 12 路由验证)。
+- 三轮确认健壮达标的面(不再重复加固):DSL v8 解析 49 边界场景全 PASS、配额耗尽 8 场景优雅降级、2000 卡水合 <400ms、AI 隐私 allowlist 守卫。
+- 验证基线:全包 lint 0 / 全包 test 全绿(web 1832)/ web build exit 0;AI 错误分类修复配浏览器级复现(mock 401 → 恰 1 次请求 + 认证文案)。
+- **桌面签名状态不变**:Windows 无 Authenticode、macOS ad-hoc 未公证,安装前核对 SHA256。
+
 ## 2026-08-12 · 1.3.0-preview.2 · 深度审核修复(1 🔴 + 4 🟡)(tag v1.3.0-preview.2)
 
 > 1.3.0-preview.1 发布后跑了一轮深度审核(4 subagent 按 feature 分片 + ocr delegate 规则),发现 1 个数据完整性 🔴 + 4 个 🟡。本版全部修复并补回归测试。
