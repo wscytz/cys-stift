@@ -51,6 +51,8 @@ scripts/_*.cjs
 scripts/_*.mjs
 scripts/_*.json
 scripts/_screenshots/
+# Adversarial-test probe screenshots (evidence archived to cys-stift-docs/docs/screenshots/)
+scripts/_adv-shots*/
 
 # Canvas interaction audit scripts (process, multi-round, not shipped tooling)
 scripts/audit-canvas-*.cjs
