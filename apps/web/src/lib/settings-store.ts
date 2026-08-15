@@ -194,8 +194,9 @@ function isValid(v: unknown): v is Settings {
  *   - profiles:逐 profile isValidProfile,坏的丢弃、好的保留;只差可选采样
  *     参数(temperature/maxTokens)非法的 profile 剥掉参数后保留(key 不丢);
  *   - activeProfileId:仍指向抢救后存在的 profile 则保留,否则 null。
- * 返回值立即视为已迁移落盘(loadSettings 调用方持久化),localStorage 自愈,
- * 用户下次保存写的已是干净数据。
+ * 只挽救内存、**不读时写盘** —— 读时重写 LS 会破坏「部分字段的旧 settings 经
+ * export/import 字节保真往返」的既有契约(见调用点注释)。毒物留在 LS 直到用户
+ * 下次保存,那时写的已是干净数据(key 不丢)。
  */
 function salvageSettings(v: unknown): Settings {
   const o = (v && typeof v === 'object' && !Array.isArray(v) ? v : {}) as Record<string, unknown>

@@ -119,8 +119,12 @@ function parseSnapshot(raw: string): CanvasFreeformSnapshot | null {
         const e = el as Partial<CanvasElement>
         if (typeof e.kind !== 'string' || typeof e.id !== 'string') return false
         for (const field of ['x', 'y', 'w', 'h', 'rotation'] as const) {
-          if (typeof e[field] !== 'number') return false
+          // Number.isFinite 而非 typeof:JSON 合法的 1e400 解析成 Infinity,
+          // typeof 仍是 'number',进 host 后成为不可见不可选的持久幽灵
+          // (ocr 审 S1 P3-2)。w/h 另查非负(与导入路径 finiteGeometry 对齐)。
+          if (typeof e[field] !== 'number' || !Number.isFinite(e[field] as number)) return false
         }
+        if ((e.w as number) < 0 || (e.h as number) < 0) return false
         // image 元素没有有效数据源 → 渲染层不画且 hitTest 命中空白区域(幽灵),
         // 丢弃(有 dataUrl 的保留,等渲染器支持)。
         if (e.kind === 'image' && typeof (e as { dataUrl?: unknown }).dataUrl !== 'string') {

@@ -635,8 +635,12 @@ export function getImportCheckpointMeta(): ImportCheckpointMeta | null {
     mode: checkpoint.mode,
     cards: checkpoint.payload.cards.length,
     mediaAssets: Object.keys(checkpoint.payload.mediaAssets ?? {}).length,
-    canvases: checkpoint.payload.canvases?.canvases.length ?? 0,
-    byteSize: raw ? raw.length : 0,
+    canvases: Array.isArray(checkpoint.payload.canvases?.canvases)
+      ? checkpoint.payload.canvases.canvases.length
+      : 0,
+    // Blob().size = UTF-8 字节数;raw.length 是 UTF-16 码元数,CJK 内容低估 ~3x
+    // (与 storage-usage.ts 的口径对齐,防两处显示互相矛盾)。
+    byteSize: raw ? new Blob([raw]).size : 0,
   }
 }
 
@@ -1177,7 +1181,9 @@ export async function importFromJson(
     mediaAssets: Object.keys(payload.mediaAssets ?? {}).length,
     ...(checkpointCreated ? { checkpointCreated: true } : {}),
     ...(checkpointSkipped ? { checkpointSkipped: true } : {}),
-    ...(payload.canvases ? { canvases: payload.canvases.canvases.length } : {}),
+    ...(payload.canvases && Array.isArray(payload.canvases.canvases)
+      ? { canvases: payload.canvases.canvases.length }
+      : {}),
     ...(freeformCanvases > 0 ? { freeformCanvases } : {}),
     ...(payload.conversations && !Array.isArray(payload.conversations)
       ? { conversations: Object.keys(payload.conversations).length }

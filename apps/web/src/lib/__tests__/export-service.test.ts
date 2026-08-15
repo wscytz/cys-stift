@@ -1694,3 +1694,28 @@ describe('Minor — payload.conversations 数组守卫(防坏 key)', () => {
     expect(result.conversations).toBeUndefined()
   })
 })
+
+// ocr 审 S1 P2-1:非数组 canvases.canvases 的守卫此前只修了 dryRun(:1057),
+// 最终成功返回处仍是裸 .length —— 导入已全部提交 + stores 已 rehydrate 后才抛
+// TypeError,settings 页 confirmImport 无 catch → unhandled rejection,按钮
+// 永不结束而数据已替换。回归:dryRun 与最终返回都不得抛。
+describe('importFromJson — canvases 字段级畸形不炸返回路径(ocr 审 S1 P2-1)', () => {
+  it('canvases: {canvases: null} → dryRun ok 且最终导入 ok(不抛 TypeError)', async () => {
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      cards: [{ id: 'c-ocr', title: 't', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
+      canvases: { canvases: null },
+    })
+    // dryRun 路径(已有守卫)
+    const dry = await mod.importFromJson(json, { mode: 'replace', dryRun: true })
+    expect(dry.ok).toBe(true)
+    // 最终导入路径(修复点:此前这里抛 null.length)
+    const result = await mod.importFromJson(json, { mode: 'replace' })
+    expect(result.ok).toBe(true)
+    expect(result.canvases).toBeUndefined() // 非数组不进计数
+    // 数据确实导入成功
+    expect(result.cards).toBe(1)
+  })
+})

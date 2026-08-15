@@ -21,6 +21,17 @@ describe('safeHref — URL scheme allowlist', () => {
     expect(safeHref('tel:+8613800138000')).toBe('tel:+8613800138000')
     expect(safeHref('/inbox')).toBe('/inbox')
   })
+  it('WHATWG 规范化变体跳外域 → #(ocr 审 S1 P2-2:反斜杠/制表符/换行)', () => {
+    // WHATWG URL 把 \ 规范化为 /、删 URL 内 tab/newline:
+    // new URL("/\\evil.com", base) === "https://evil.com/"(Node 实测,浏览器同)
+    expect(safeHref('/\\evil.com')).toBe('#')
+    expect(safeHref('/\t/evil.com')).toBe('#')
+    expect(safeHref('/\nevil.com')).toBe('#')
+    expect(safeHref('//evil.com')).toBe('#') // 原协议相对 URL 守卫仍在
+    // 多重反斜杠与 URL 中段的反斜杠同样拦
+    expect(safeHref('/\\\\evil.com')).toBe('#')
+    expect(safeHref('https://ok.com\\evil.com')).toBe('#')
+  })
   it('大小写不敏感(scheme 可大写)', () => {
     expect(safeHref('HTTP://EXAMPLE.COM')).toBe('HTTP://EXAMPLE.COM')
     expect(safeHref('HTTPS://x')).toBe('HTTPS://x')

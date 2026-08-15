@@ -118,12 +118,19 @@ function sanitizeIndex(value: unknown): ArchiveIndex | null {
       ? o.nextVersion
       : 1
   const entries = Array.isArray(o.entries)
-    ? o.entries.filter(
-        (e): e is ArchiveEntryMeta =>
-          !!e && typeof e === 'object' &&
-          typeof (e as ArchiveEntryMeta).archiveVersion === 'number' &&
-          KNOWN_TRIGGERS.has(String((e as ArchiveEntryMeta).trigger)),
-      )
+    ? o.entries.filter((e): e is ArchiveEntryMeta => {
+        if (!e || typeof e !== 'object') return false
+        const m = e as Record<string, unknown>
+        // archiveVersion 必须是有限数(NaN 过 typeof 检查但让 key/排序失效)。
+        if (typeof m.archiveVersion !== 'number' || !Number.isFinite(m.archiveVersion)) return false
+        if (!KNOWN_TRIGGERS.has(String(m.trigger))) return false
+        // note/appVersion/createdAt 逐项校验:坏值(Object/NaN)会在 /dev/archive
+        // 渲染层崩(React child 对象错)或导出时抛 RangeError(ocr 审 S1 P3-1)。
+        if (typeof m.note !== 'string') return false
+        if (typeof m.appVersion !== 'string') return false
+        if (typeof m.createdAt !== 'number' || !Number.isFinite(m.createdAt)) return false
+        return true
+      })
     : []
   return { lastAppVersion, nextVersion, entries }
 }

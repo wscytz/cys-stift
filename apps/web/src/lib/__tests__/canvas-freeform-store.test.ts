@@ -176,6 +176,27 @@ describe('canvasFreeformStore — localStorage fallback', () => {
     expect(await store.load(CANVAS_A)).toBeNull()
   })
 
+  it('1e400(Infinity)坐标与负宽高的元素被滤,好元素保留(ocr 审 S1 P3-2)', async () => {
+    // JSON 合法的 1e400 → parse 成 Infinity,typeof 仍是 number;
+    // 修复前进 host 成为不可见不可选的持久幽灵,修复后 Number.isFinite 拦截。
+    const good = textEl('ok', 'keep me')
+    const snap = {
+      v: 1, app: 'cys-stift',
+      elements: [
+        { ...good },
+        { ...textEl('inf'), x: 1e400 },
+        { ...textEl('neg'), w: -5 },
+        { ...textEl('negh'), h: -1 },
+      ],
+    }
+    window.localStorage.setItem(
+      'cys-stift.canvas-freeform.canvas-a.v1',
+      JSON.stringify(snap),
+    )
+    const loaded = await store.load(CANVAS_A)
+    expect(loaded?.elements).toEqual([good])
+  })
+
   it('remove clears the localStorage entry', async () => {
     await store.save(CANVAS_A, [textEl('t1')])
     await store.remove(CANVAS_A)

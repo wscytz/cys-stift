@@ -17,9 +17,11 @@ export function safeHref(href: string | undefined | null): string {
   if (typeof href !== 'string') return '#'
   const trimmed = href.trim()
   if (trimmed === '') return '#'
-  // 协议相对 URL(//host)按当前页面 scheme 跳到外部主机 —— 白名单 `startsWith('/')`
-  // 会把它当站内路径放行(视觉冒充站内,实际跳外域;adversarial D2 F2)。显式拒绝。
-  if (trimmed.startsWith('//')) return '#'
+  // WHATWG URL 解析器把 `\` 规范化为 `/`、把 URL 内部的 tab/newline 直接删除:
+  // `/\evil.com`、`/\t/evil.com` 与 `//evil.com` 同效(跳外域),但字符串前缀检查
+  // 看不出来。先按 URL 语义解析,再校验解析后的路径确实是站内相对路径。
+  if (trimmed.startsWith('//') || trimmed.startsWith('/\\')) return '#'
+  if (/[\t\n\r\\]/.test(trimmed)) return '#'
   return SAFE_HREF_PREFIXES.some((p) => trimmed.toLowerCase().startsWith(p))
     ? trimmed
     : '#'

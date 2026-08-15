@@ -199,4 +199,32 @@ describe('archive-store index 毒化清洗(对抗测试 R2-D7 P2 修复)', () =>
     // 非 object / 坏标量 → 视为首启(prev=null,只记版本不落档)→ 无 entry
     expect(archiveStore.listMeta()).toEqual([])
   })
+
+  it('entry 字段级毒化(note 对象/createdAt 非数/archiveVersion NaN)→ 坏项丢弃(ocr 审 S1 P3-1)', async () => {
+    const { archiveStore } = await import('../archive-store')
+    localStorage.setItem('cys-stift.archive-index.v1', JSON.stringify({
+      lastAppVersion: '0.9.0', nextVersion: 3,
+      entries: [
+        // 好 entry
+        { archiveVersion: 1, createdAt: Date.now(), trigger: 'manual', appVersion: '1.0.0', note: 'ok' },
+        // note 是对象:修复前进渲染层(React child 对象错),修复后 sanitize 拦
+        { archiveVersion: 2, createdAt: Date.now(), trigger: 'manual', appVersion: '1.0.0', note: {} },
+        // createdAt 是字符串:修复后导出按钮的 toISOString RangeError 源头
+        { archiveVersion: 2, createdAt: 'garbage', trigger: 'manual', appVersion: '1.0.0', note: 'x' },
+        // appVersion 缺失
+        { archiveVersion: 2, createdAt: Date.now(), trigger: 'manual', note: 'x' },
+        // archiveVersion: 1e400(JSON 合法,parse 成 Infinity)
+        { archiveVersion: 1e400, createdAt: Date.now(), trigger: 'manual', appVersion: '1.0.0', note: 'x' },
+      ],
+    }))
+    await expect(
+      archiveStore.ensureReleaseRecord('1.0.0', vi.fn(async () => makePayload('r'))),
+    ).resolves.toBeUndefined()
+    // 只有第一条好 entry + 本次 release 落档;字段毒化的全滤
+    const list = archiveStore.listMeta()
+    expect(list).toHaveLength(2)
+    expect(list.some((m) => m.note === 'ok')).toBe(true)
+    expect(list.every((m) => typeof m.note === 'string')).toBe(true)
+    expect(list.every((m) => Number.isFinite(m.archiveVersion))).toBe(true)
+  })
 })
