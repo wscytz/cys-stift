@@ -9,6 +9,8 @@ import {
 } from '@cys-stift/domain'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import { canvasFreeformStore } from './canvas-freeform-store'
+import { clearConversation } from './conversation-store'
+import { canvasViewStore } from './canvas-view-store'
 
 // ── Multi-canvas store (spec §4.9, Phase multi-canvas 2026-06-20) ──────────
 // Web-local canvas list + active selection. The Canvas type already
@@ -354,6 +356,11 @@ export const canvasStore = {
     // before delete. canvasFreeformStore.remove also cleans up any leftover
     // pre-self-built tldraw snapshot for this canvas.
     canvasFreeformStore.remove(id).catch(() => {})
+    // B11 (对抗测试 R3-D11 P2):对齐 freeform 清理 —— 删画布同时清掉该画布的
+    // 派生 key(对话历史 + 视图状态),否则 conversation.<id>.v2 / canvas-view
+    // 条目永久残留 + 每次导出都带出孤儿数据。
+    clearConversation(id)
+    canvasViewStore.reset(id)
     notify() // 删除成功:通知订阅者画布列表已变
     return true
   },

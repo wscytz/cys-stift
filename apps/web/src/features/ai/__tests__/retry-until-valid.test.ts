@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { retryUntilValid, buildDslCorrection } from '../retry-until-valid'
+import { retryUntilValid, buildDslCorrection, retryFailureMessageKey, isTerminalRetryFailure } from '../retry-until-valid'
 import type { DslDiagnostic } from '@cys-stift/dsl'
 
 const ERR = (line: number, text: string, message: string): DslDiagnostic => ({ line, text, message })
@@ -136,6 +136,58 @@ describe('retryUntilValid — network errors', () => {
     expect(result.accepted).toBe(false)
     expect(result.attempts).toBe(3)
     expect(result.failureReason).toBe('network')
+  })
+})
+
+describe('retryUntilValid — 确定性失败不重试(对抗测试 R3-D13 P2 修复)', () => {
+  const AIProviderHttpError = (
+    message: string, status: number,
+  ) => { const e = new Error(message); (e as Error & { status?: number }).status = status; e.name = 'AIProviderHttpError'; return e }
+
+  it.each([
+    ['401 认证', 401, 'auth'],
+    ['403 认证', 403, 'auth'],
+    ['429 限流', 429, 'rate_limit'],
+    ['404 模型', 404, 'model'],
+    ['500 服务器', 500, 'network'],
+  ])('HTTP %s → 只打 1 次不重试, failureReason=%s', (_label, status, reason) => {
+    let calls = 0
+    const result = retryUntilValid({
+      initialMessages: [{ role: 'user', content: 'q' }],
+      produce: async () => { calls++; throw AIProviderHttpError('HTTP ' + status, status) },
+      parse: () => ({ ok: true, errors: [] }),
+      buildCorrection: () => 'fix',
+    })
+    // 异步;produce 抛 synchronous,但 retryUntilValid 是 async → 用 await 接
+    return result.then((r) => {
+      expect(calls).toBe(1) // 白打 0 次重试
+      expect(r.attempts).toBe(1)
+      expect(r.accepted).toBe(false)
+      expect(r.failureReason).toBe(reason)
+    })
+  })
+
+  it('超时(TimeoutError)→ 不重试,归 network', async () => {
+    let calls = 0
+    const result = await retryUntilValid({
+      initialMessages: [{ role: 'user', content: 'q' }],
+      produce: async () => { calls++; throw new DOMException('timeout', 'TimeoutError') },
+      parse: () => ({ ok: true, errors: [] }),
+      buildCorrection: () => 'fix',
+    })
+    expect(calls).toBe(1)
+    expect(result.attempts).toBe(1)
+    expect(result.failureReason).toBe('network')
+  })
+
+  it('retryFailureMessageKey 映射 auth/rate_limit/model 到可自救文案', () => {
+    expect(retryFailureMessageKey('auth')).toBe('ai.errorAuth')
+    expect(retryFailureMessageKey('rate_limit')).toBe('ai.errorRateLimit')
+    expect(retryFailureMessageKey('model')).toBe('ai.errorModel')
+    expect(retryFailureMessageKey('network')).toBe('ai.outputNetwork')
+    expect(isTerminalRetryFailure('auth')).toBe(true)
+    expect(isTerminalRetryFailure('rate_limit')).toBe(true)
+    expect(isTerminalRetryFailure('model')).toBe(true)
   })
 })
 

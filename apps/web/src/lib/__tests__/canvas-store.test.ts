@@ -102,6 +102,24 @@ describe('canvasStore.delete', () => {
     canvasStore.delete('ghost-id' as never)
     expect(freeformRemove).not.toHaveBeenCalled()
   })
+  it('cleans up conversation + canvas-view derived keys when deleting a non-default canvas (R3-D11 P2 fix)', () => {
+    const created = canvasStore.create('temp')
+    const cid = String(created)
+    // seed 该画布的派生 key(完整合法 CanvasView 形状,否则 load 时被 isValidView 丢弃)
+    window.localStorage.setItem(`cys-stift.conversation.${cid}.v2`, JSON.stringify([{ role: 'user', content: 'x' }]))
+    window.localStorage.setItem('cys-stift.canvas-view.v1', JSON.stringify({
+      views: {
+        [cid]: { zoom: 1, panX: 1, panY: 0, gridMode: 'snap', gridSize: 8 },
+        'default-canvas': { zoom: 1, panX: 2, panY: 0, gridMode: 'snap', gridSize: 8 },
+      },
+    }))
+    expect(canvasStore.delete(created)).toBe(true)
+    // conversation key 已清、default-canvas 的 view 保留
+    expect(window.localStorage.getItem(`cys-stift.conversation.${cid}.v2`)).toBeNull()
+    const views = JSON.parse(window.localStorage.getItem('cys-stift.canvas-view.v1') ?? '{}') as { views: Record<string, unknown> }
+    expect(views.views[cid]).toBeUndefined()
+    expect(views.views['default-canvas']).toBeDefined()
+  })
 })
 
 describe('canvasStore.setActive', () => {

@@ -31,13 +31,16 @@ export interface RetryResult {
   failureReason?: RetryFailureReason
 }
 
-export type RetryFailureReason = 'truncated' | 'refusal' | 'content_filter' | 'network' | 'invalid'
+export type RetryFailureReason =
+  | 'truncated' | 'refusal' | 'content_filter' | 'network'
+  | 'auth' | 'rate_limit' | 'model' | 'invalid'
 
 /** Terminal provider failures that must not open a misleading format-retry UI. */
 export function isTerminalRetryFailure(
   reason: RetryFailureReason | undefined,
-): reason is 'truncated' | 'refusal' | 'content_filter' | 'network' {
-  return reason === 'truncated' || reason === 'refusal' || reason === 'content_filter' || reason === 'network'
+): reason is 'truncated' | 'refusal' | 'content_filter' | 'network' | 'auth' | 'rate_limit' | 'model' {
+  return reason === 'truncated' || reason === 'refusal' || reason === 'content_filter' ||
+    reason === 'network' || reason === 'auth' || reason === 'rate_limit' || reason === 'model'
 }
 
 /** i18n keys for terminal failures; keeps all AI entry points on one vocabulary. */
@@ -46,6 +49,9 @@ export type RetryFailureMessageKey =
   | 'ai.outputRefused'
   | 'ai.outputFiltered'
   | 'ai.outputNetwork'
+  | 'ai.errorAuth'
+  | 'ai.errorRateLimit'
+  | 'ai.errorModel'
 
 export function retryFailureMessageKey(reason: RetryFailureReason | undefined): RetryFailureMessageKey | undefined {
   switch (reason) {
@@ -53,6 +59,9 @@ export function retryFailureMessageKey(reason: RetryFailureReason | undefined): 
     case 'refusal': return 'ai.outputRefused'
     case 'content_filter': return 'ai.outputFiltered'
     case 'network': return 'ai.outputNetwork'
+    case 'auth': return 'ai.errorAuth'
+    case 'rate_limit': return 'ai.errorRateLimit'
+    case 'model': return 'ai.errorModel'
     default: return undefined
   }
 }
@@ -88,6 +97,9 @@ export async function retryUntilValid(opts: RetryOptions): Promise<RetryResult> 
   let lastStopReason: string | undefined
   let lastRefusal: string | undefined
   let sawNetworkError = false
+  let sawHttpStatus: number | undefined
+  let sawTimeout = false
+  let stopAttempt = max // 确定性失败 break 时记录实际 attempt(默认满打 max)
   for (let attempt = 0; attempt < max; attempt++) {
     let generation: RetryGeneration
     try {
@@ -103,7 +115,25 @@ export async function retryUntilValid(opts: RetryOptions): Promise<RetryResult> 
       // 注意:DOMException 不继承 Error,不能用 instanceof Error 守卫(真实 streamText
       // abort 抛 DOMException)。按 name 判定,与 use-ai-action.ts 的范式一致。
       if (err && typeof err === 'object' && (err as { name?: string }).name === 'AbortError') throw err
-      // 网络错(非取消)→ 计入 attempt,重试同 messages(非 AI 输出错,不喂 correction)。
+      // 确定性失败(重试也不会变好):HTTP 状态错误与超时。立即终止循环而非重试
+      // —— 401/429/500 重试 3× 白打请求且把错误类别全归成"网络错"(用户 key 错/
+      // 限流却去查网络),超时重试 3× 把 60s 放大到 ~180s 页面不可用
+      // (对抗测试 R3-D13 P2)。终止后 failureReason 映射正确文案,4 个调用方的
+      // retryFailureMessageKey 自动生效。
+      const name = (err as { name?: string })?.name
+      const status = (err as { status?: number })?.status
+      if (name === 'AIProviderHttpError' && typeof status === 'number') {
+        sawHttpStatus = status
+        stopAttempt = attempt + 1
+        break
+      }
+      if (name === 'TimeoutError') {
+        sawTimeout = true
+        stopAttempt = attempt + 1
+        break
+      }
+      // 真正的瞬时网络错(非 HTTP 状态、非超时)→ 计入 attempt,重试同 messages
+      // (非 AI 输出错,不喂 correction)。
       console.warn('[retry-until-valid] network error, retrying', err)
       sawNetworkError = true
       continue
@@ -160,14 +190,35 @@ export async function retryUntilValid(opts: RetryOptions): Promise<RetryResult> 
   }
   return {
     text: lastText,
-    attempts: max,
+    attempts: stopAttempt,
     accepted: false,
     ...(lastErrors ? { lastErrors } : {}),
     ...(lastFinishReason ? { finishReason: lastFinishReason } : {}),
     ...(lastStopReason ? { stopReason: lastStopReason } : {}),
     ...(lastRefusal ? { refusal: lastRefusal } : {}),
-    failureReason: sawNetworkError && !lastText ? 'network' : 'invalid',
+    failureReason: terminalFailureReason(sawHttpStatus, sawTimeout, sawNetworkError, lastText),
   }
+}
+
+/**
+ * 失败原因归类(R3-D13 P2 修复):HTTP 状态错误按 status 映射到用户可自救的
+ * 类别(401/403→key、429→限流、404→模型),其余(5xx/超时/瞬时网络)归网络。
+ * 旧行为把一切非 AbortError 都归 'network' → 401/429 显示成"检查网络"误导排查。
+ */
+function terminalFailureReason(
+  sawHttpStatus: number | undefined,
+  sawTimeout: boolean,
+  sawNetworkError: boolean,
+  lastText: string,
+): RetryFailureReason {
+  if (sawHttpStatus !== undefined) {
+    if (sawHttpStatus === 401 || sawHttpStatus === 403) return 'auth'
+    if (sawHttpStatus === 429) return 'rate_limit'
+    if (sawHttpStatus === 404) return 'model'
+    return 'network'
+  }
+  if (sawTimeout) return 'network'
+  return sawNetworkError && !lastText ? 'network' : 'invalid'
 }
 
 /** 把 parse 错误格式化成模型可理解的修正提示(英文,给模型看不是用户)。取前 8 条防膨胀。 */
