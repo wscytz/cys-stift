@@ -40,5 +40,11 @@ export function snippetForResult(result: SearchResult, query: string): string | 
     const joined = (c.quotes ?? []).map((q) => q.text).join(' ')
     return bodySnippet({ body: joined }, query)
   }
+  if (field === 'media') {
+    // 对齐索引侧(search.ts R12):media caption 进索引,snippet 同口径带上,
+    // 纯 caption 卡(正文空)搜到时也有片段说明为什么匹配(ocr 审 S4 P3-4)。
+    const joined = (c.media ?? []).map((m) => m.caption ?? '').filter(Boolean).join(' ')
+    return bodySnippet({ body: joined }, query)
+  }
   return null
 }

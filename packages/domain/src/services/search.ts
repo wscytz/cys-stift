@@ -32,7 +32,7 @@ export interface SearchResult {
   card: Card
   score: number
   /** The "best" field containing a match, for snippet extraction. */
-  matchedField: 'title' | 'body' | 'tags' | 'link' | 'code' | 'quote'
+  matchedField: 'title' | 'body' | 'tags' | 'link' | 'code' | 'quote' | 'media'
 }
 
 export function searchCards(
@@ -87,10 +87,12 @@ export function searchCards(
         score += 1.0
         if (matchedField === 'body') matchedField = 'quote'
       }
-      // Media caption (R12): +1.0 per token。caption 是元数据搜索,不算核心命中字段
-      // (snippet 仍走 body;matchedField 保持 body 即可)。
+      // Media caption (R12): +1.0 per token。命中进 matchedField='media'(ocr 审
+      // S4 P3-4):纯 caption 卡正文为空,snippet 走 body 会返回 null → 搜到却
+      // 看不到为什么匹配 —— 与 link 的 R12 修法对齐。
       if (haystack.media?.includes(token)) {
         score += 1.0
+        if (matchedField === 'body') matchedField = 'media'
       }
     }
 

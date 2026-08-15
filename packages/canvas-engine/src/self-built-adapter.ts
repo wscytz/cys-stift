@@ -447,6 +447,17 @@ export class SelfBuiltAdapter implements CanvasHost {
    *    再 host.remove(视觉消失)。canvas-binding 的 removed 回写因 deletedAt 已设而跳过 removeFromCanvas。
    *  - all 模式:删一切(host.remove)
    */
+  /**
+   * 橡皮模式是否「挡住」该 kind 的擦除(card 模式挡非 card、text 模式挡非 text、
+   * all 恒不挡)。eraseAt(真删)与 eraserHitFiltered(web 层提示)共用同一判定,
+   * 防两份手抄漂移后「提示切全部但其实擦不掉 / 反之」(ocr 审 S4 P3-7)。
+   */
+  private eraserModeBlocks(kind: CanvasElement['kind']): boolean {
+    if (this.eraserMode === 'text' && kind !== 'text') return true
+    if (this.eraserMode === 'card' && kind !== 'card') return true
+    return false
+  }
+
   private eraseAt(p: { x: number; y: number }): string | null {
     // 橡皮用专属宽松命中(eraserHitTest):线类 16px 屏幕、bbox 类扩展 4px。
     // 比 hitTest(6px)宽松得多,细线/箭头在缩小视图下也能擦到(用户"删不掉"真因)。
@@ -454,8 +465,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     if (!id) return null
     const el = this.getElement(id)
     if (!el) return null
-    if (this.eraserMode === 'text' && el.kind !== 'text') return null
-    if (this.eraserMode === 'card' && el.kind !== 'card') return null
+    if (this.eraserModeBlocks(el.kind)) return null
     if (this.eraserMode === 'card' && el.kind === 'card') {
       this.onEraseCard?.(id)
     }
@@ -473,9 +483,7 @@ export class SelfBuiltAdapter implements CanvasHost {
     if (!id) return false
     const el = this.getElement(id)
     if (!el) return false
-    if (this.eraserMode === 'text' && el.kind !== 'text') return true
-    if (this.eraserMode === 'card' && el.kind !== 'card') return true
-    return false
+    return this.eraserModeBlocks(el.kind)
   }
 
   /**
@@ -1346,15 +1354,19 @@ export class SelfBuiltAdapter implements CanvasHost {
     }
     window.addEventListener('visibilitychange', this.visibilityHandler)
 
-    // 滚轮/触摸板:ctrlKey(pinch 或 ctrl+滚轮)→ zoom-to-cursor;否则 → pan。
+    // 滚轮/触摸板:ctrlKey(pinch 或 ctrl+滚轮)→ zoom;否则 → pan。
     this.wheelHandler = (e: WheelEvent) => {
       e.preventDefault()
       const rect = this.canvas.getBoundingClientRect()
+      // deltaMode 归一化到像素:Firefox/Windows 默认 DOM_DELTA_LINE(每格 ≈ 3),
+      // exp(-3×0.002)≈1.006 → 每格只缩 0.6%,用户感知「缩放坏了」。按行 ≈ 40px
+      // 折算后与 Chrome 像素模式手感一致(ocr 审 S4 P2-3)。page 模式罕见,同 40。
+      const k = e.deltaMode === 1 ? 40 : 1
       this.onWheel(
         e.clientX - rect.left,
         e.clientY - rect.top,
-        e.deltaX,
-        e.deltaY,
+        e.deltaX * k,
+        e.deltaY * k,
         e.ctrlKey,
       )
     }

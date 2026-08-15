@@ -60,8 +60,10 @@ function startStaticServer(port) {
 
 let BASE_URL = (process.argv.find((a) => a.startsWith('--base-url=')) ?? '').split('=')[1]
 let _staticServer
-if (WANT_BUILD && !existsSync(OUT_DIR)) {
-  console.log('▶ pnpm --filter web build(生成 out/)')
+if (WANT_BUILD) {
+  // --build = 显式「先 build 再 serve」:强制重建,即使 out/ 已存在
+  // (ocr 审 S4 P3-5:旧条件 !existsSync 会让陈旧产物静默假绿)。
+  console.log('▶ pnpm --filter web build(强制重建 out/)')
   const r = spawnSync('pnpm', ['--filter', 'web', 'build'], { stdio: 'inherit', encoding: 'utf8' })
   if (r.status !== 0) { console.error('✗ build 失败'); process.exit(1) }
 }
@@ -266,9 +268,13 @@ await runCase('G3 卡片详情:body 是 MarkdownEditor(toolbar+三态)', async (
   })
   assert(clicked, '应能点击到「编辑测试」卡')
   await sleep(800)
-  const hasEdit = await page.$('button.card-detail-edit, .cd__actions button')
-  // 进编辑态
-  await page.evaluate(() => { const b = [...document.querySelectorAll('.cd__actions button')].find((e) => (e.textContent ?? '').includes('编辑')); if (b) b.click() })
+  // 进编辑态(编辑入口缺失时,先在这里红,失败信息指向真原因而非下游 .md-editor)
+  const editBtn = await page.evaluate(() => {
+    const b = [...document.querySelectorAll('.cd__actions button')].find((e) => (e.textContent ?? '').includes('编辑'))
+    if (b) { b.click(); return true }
+    return false
+  })
+  assert(editBtn, '详情弹窗应有「编辑」按钮')
   await sleep(600)
   const mdEditor = await page.$('.md-editor')
   assert(mdEditor, '编辑态 body 应为 MarkdownEditor(.md-editor)')
@@ -365,7 +371,8 @@ await runCase('G7 AI 隐私:serializeCardsForAI 不含 deviceId/软删卡', asyn
     return { hasSecret: s.includes('机密正文XXX'), hasDevice: s.includes('seed-device-abc') }
   })
   assert(!leakedInDom.hasDevice, 'deviceId 不应出现在 /ask 页面')
-  return '轻验证通过(deviceId 不泄漏到 /ask);完整 allowlist 断言由 vitest 守卫(ai-context 反向测试)'
+  assert(!leakedInDom.hasSecret, '未配置 AI 时卡正文不应渲染进 /ask(context 面板泄漏回归)')
+  return '轻验证通过(deviceId/卡正文不泄漏到 /ask);完整 allowlist 断言由 vitest 守卫(ai-context 反向测试)'
 })
 
 // ── 汇总 ────────────────────────────────────────────────────────────────────

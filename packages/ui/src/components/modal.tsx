@@ -107,6 +107,10 @@ export function Modal({ open, onClose, title, children, closeLabel = 'Close', on
     if (!open || !onEscape) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
+      // IME 组合态(中日韩输入候选词)的 Escape 是「取消候选」,不是「关模态」
+      // —— 与 dsl-dialog / canvas adapter 的 Escape 守卫同款(ocr 审 S4 P2-1:
+      // 确认模态里有 autoFocus 输入框,拼音打字中按 Esc 曾直接关掉并清空确认词)。
+      if (e.isComposing) return
       const frame = frameRef.current
       if (!frame?.contains(document.activeElement)) return
       e.stopPropagation()

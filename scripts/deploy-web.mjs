@@ -83,7 +83,11 @@ if (NO_BUILD) {
     `WEB_DEPLOY_BASEPATH=${BASE_PATH} pnpm --filter web build`,
     `本地静态导出(子路径 ${BASE_PATH}, v${VERSION})`,
   )
-  // 校验产物确实带 basePath 前缀(防 basePath 没生效部署到根路径导致 404)。
+}
+// basePath 前缀校验对两条路径统一执行(ocr 审 S4 P2-2):--no-build 上传根路径
+// build 的陈旧产物时,HTML 200 但 /_next 资产 404 → 白屏,而最终 curl 只查首页
+// 查不出来。读 out/index.html 不依赖「刚构建」,提出 if 外。
+{
   const idx = readFileSync(resolve(ROOT, 'apps/web/out/index.html'), 'utf8')
   if (!idx.includes(`${BASE_PATH}/_next`)) {
     console.error(`✗ 产物未带 ${BASE_PATH} 前缀 —— 构建可能未走 basePath,中止部署`)

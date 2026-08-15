@@ -55,8 +55,10 @@ function startStaticServer(port) {
 
 let BASE_URL = (process.argv.find((a) => a.startsWith('--base-url=')) ?? '').split('=')[1]
 let _staticServer
-if (WANT_BUILD && !existsSync(OUT_DIR)) {
-  console.log('▶ pnpm --filter web build(生成 out/)')
+if (WANT_BUILD) {
+  // --build = 显式「先 build 再 serve」:强制重建,即使 out/ 已存在
+  // (ocr 审 S4 P3-5:旧条件 !existsSync 会让陈旧产物静默假绿)。
+  console.log('▶ pnpm --filter web build(强制重建 out/)')
   const r = spawnSync('pnpm', ['--filter', 'web', 'build'], { stdio: 'inherit', encoding: 'utf8' })
   if (r.status !== 0) { console.error('✗ build 失败'); process.exit(1) }
 }
