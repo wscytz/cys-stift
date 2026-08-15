@@ -38,6 +38,10 @@ vi.mock('@/lib/settings-store', () => ({
       captureShortcut: 'CommandOrControl+Shift+E',
       cardDisplayMode: 'compact',
       labs: {},
+      // useCapabilities 从 settings 派生 AI 状态(ocr 审 S3 P3-3)——mock 需含
+      // profiles + activeProfileId,否则能力清单渲染时 .find 崩。
+      profiles: [],
+      activeProfileId: null,
     },
     ready: true,
   }),

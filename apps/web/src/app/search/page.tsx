@@ -1,7 +1,6 @@
 'use client'
 
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Tag } from '@cys-stift/ui'
 import { PageHeader } from '@/features/page-header'
 import type { Card, CardId, SearchResult } from '@cys-stift/domain'
@@ -34,7 +33,6 @@ import {
  */
 export default function SearchPage() {
   const { t } = useI18n()
-  const router = useRouter()
   const { snap, service, ready } = useDb()
   const { snapshot: canvasesSnap } = useCanvases()
   // 跨画布 backlinks(只读):聚合全局边后过滤端点已软删的(G7 防泄露),传 CardDetailModal
@@ -51,11 +49,14 @@ export default function SearchPage() {
   // B-3「收敛找回」:筛选框架(状态 / tags any-match / 时间),让搜索成为找回的唯一主场。
   const [filter, setFilter] = useState<SearchFilter>(DEFAULT_SEARCH_FILTER)
   // R12:⌘K「在搜索页查看全部」带 ?q= 跳转 → 这里读 URL 预填输入框(找回不断链)。
+  // ocr 审 S3 P3-6:App Router 同 pathname 只变 query 的 router.push 不重挂载组件,
+  // 空依赖 effect 只跑一次 → 二次 ?q= 跳转输入框不更新。依赖 window.location.search
+  // 让每次 query 变化都重读(router.push 是原生导航,location 会变)。
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const q = params.get('q')
     if (q) setQuery(q)
-  }, [])
+  }, [window.location.search])
   // BUG-1 fix: detail 是 local state,跨 tab 软删/归档后 useDb re-render 但 detail 不清
   // → modal 残留幽灵卡。从 store 实时取卡 + 过滤软删,变 null 则 modal 自动卸载
   // (与 canvas/timeline/graph effectiveDetail 同口径)。

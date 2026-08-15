@@ -22,8 +22,10 @@ import { useMatchMedia } from '@/lib/use-match-media'
 import { useIsMac } from '@/lib/use-platform'
 import { settingsStore } from '@/lib/settings-store'
 
-/** R11:捕获按钮的快捷键 tooltip —— 按平台(⌘/Ctrl)+ 用户自定义快捷键显示。 */
-function captureComboHint(isMac: boolean): string {
+/** R11:捕获按钮的快捷键 tooltip —— 按平台(⌘/Ctrl)+ 用户自定义快捷键显示。
+ *  文案走 i18n(ocr 审 S3 P3-5:此前「随时记灵感」硬编码中文,英文用户看到
+ *  混合语言;现成 key capture.hintCombo 一直没用上)。 */
+function captureComboHint(isMac: boolean, t: (key: MessageKey, params?: Record<string, string | number | null | undefined>) => string): string {
   const sc = settingsStore.get().captureShortcut
   const mod = isMac ? '⌘' : 'Ctrl'
   const key =
@@ -31,7 +33,7 @@ function captureComboHint(isMac: boolean): string {
     : sc?.code === 'Period' ? '.'
     : sc?.code?.startsWith('Key') ? sc.code.slice(3)
     : sc?.code ?? 'E'
-  return `${mod}${sc?.shift ? '+⇧' : ''}+${key} 随时记灵感`
+  return t('capture.hintCombo', { combo: `${mod}${sc?.shift ? '+⇧' : ''}+${key}` })
 }
 
 /**
@@ -165,7 +167,7 @@ export function AppMenu() {
         onClick={onCaptureClick}
         // R11:捕获按钮恒带快捷键 tooltip(首次提示被过早关掉/从深链进入的用户
         // 也能从这里发现 ⌘⇧E/Ctrl+⇧E —— 不再一次性 dismiss 永久失学)。
-        title={captureComboHint(isMac)}
+        title={captureComboHint(isMac, t)}
       >
         {t('nav.capture')}
       </button>

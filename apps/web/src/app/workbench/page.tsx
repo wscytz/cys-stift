@@ -181,7 +181,7 @@ export default function WorkbenchPage() {
       </Modal>
 
       {/* R6 返回画布确认门:未保存编辑时确认再走(保存失败也不静默丢编辑)。 */}
-      <Modal open={confirmLeave} onClose={() => setConfirmLeave(false)} title={t('workbench.unsavedTitle')} closeLabel={t('common.close')}>
+      <Modal open={confirmLeave} onClose={() => setConfirmLeave(false)} onEscape={() => setConfirmLeave(false)} title={t('workbench.unsavedTitle')} closeLabel={t('common.close')}>
         <p>{t('workbench.unsavedBody')}</p>
         <div className="wb-page__confirm-actions">
           <Button variant="ghost" onClick={() => setConfirmLeave(false)}>{t('common.cancel')}</Button>

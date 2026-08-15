@@ -1,7 +1,6 @@
 import type {
   Card,
   CanvasId,
-  CanvasPosition,
   CreateCardInput,
 } from '@cys-stift/domain'
 // B-4:画布放置规划提到 features/canvas(未放置面板复用 collision-aware 排版),

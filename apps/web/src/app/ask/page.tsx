@@ -125,7 +125,15 @@ export default function AskPage() {
     if (lastAskCanvasRestored.current) return
     lastAskCanvasRestored.current = true
     const last = readLastAskCanvas()
-    if (last && last !== DEFAULT_CANVAS_ID) setTargetCanvasId(last)
+    // 成员校验(ocr 审 S3 P2):记忆的画布可能已被删除 —— /ask 页内「➕ 新画布」
+    // 创建后未发消息离开会被 sweep 硬删、或用户在 /canvas 正常删除。不校验则恢复
+    // 死 id:<select> 无匹配 option 渲染成空白,AI 改画布把卡产到死画布(孤儿卡,
+    // 不进 inbox 也不出现在任何画布)。死 id 一律回落 default。
+    if (
+      last &&
+      last !== DEFAULT_CANVAS_ID &&
+      canvasesSnap.canvases.some((c) => c.id === last)
+    ) setTargetCanvasId(last)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   // 目标画布变化即记忆,下次进 /ask 恢复上下文。
@@ -678,6 +686,7 @@ export default function AskPage() {
       <Modal
         open={confirmClear}
         onClose={() => setConfirmClear(false)}
+        onEscape={() => setConfirmClear(false)}
         title={t('ask.clearConfirmTitle')}
         closeLabel={t('common.cancel')}
       >

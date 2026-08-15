@@ -12,7 +12,8 @@
  * isAIReady / useLabEnabled(不新增门控机制)。
  */
 import { useLabEnabled } from '@/features/ai/labs-registry'
-import { getCurrentAI, isAIReady } from '@/features/ai/ai-settings-provider'
+import { isAIReady } from '@/features/ai/ai-settings-provider'
+import { useSettings } from '@/lib/settings-store'
 import type { MessageKey } from '@/lib/i18n/messages'
 
 export type CapabilityKind = 'core' | 'optional'
@@ -51,7 +52,13 @@ export interface CapabilityStatus {
 /** 各能力当前状态(派生自现有 gate:core 常开 / ai 用 isAIReady / lab 用 useLabEnabled)。 */
 export function useCapabilities(): { cap: CapabilityDef; status: CapabilityStatus }[] {
   const labEnabled = useLabEnabled('proposalCoauthorLab')
-  const aiReady = isAIReady(getCurrentAI())
+  // 从响应式 settings 派生而非 getCurrentAI() 模块缓存(ocr 审 S3 P3-3):
+  // _cachedAI 由 AIProviderSync 的 passive effect 更新,严格晚于同批 render →
+  // 渲染期读缓存滞后一个 settings 提交(配好 AI 后清单仍「未配置」,直到下次
+  // 无关重渲染才纠正)。从 settings 派生则与提交同批生效,无滞后。
+  const { settings } = useSettings()
+  const active = settings.profiles.find((p) => p.id === settings.activeProfileId) ?? null
+  const aiReady = isAIReady(active)
   return CAPABILITY_REGISTRY.map((cap) => {
     if (cap.id === 'ai') {
       return {

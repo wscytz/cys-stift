@@ -254,10 +254,13 @@ export async function clearWorkspace(): Promise<ImportResult> {
  * so the caller can show a hint.
  */
 export async function downloadExport(
-  opts?: { includeDeleted?: boolean },
+  opts?: { includeDeleted?: boolean; payload?: ExportPayload },
 ): Promise<number> {
   if (typeof window === 'undefined') return 0
-  const payload = await buildExportPayload(opts)
+  // ocr 审 S3 P3-1:允许调用方传入已构建 payload,避免与 buildExportPayload
+  // 各构建一次(大工作区 gap 数秒)且 toast 数字(payload A)与下载内容(payload B)
+  // 在两次构建间有 await 间隙时可不一致。
+  const payload = opts?.payload ?? (await buildExportPayload(opts))
   const json = JSON.stringify(payload, null, 2)
   const blob = new Blob([json], { type: 'application/json' })
   const stamp = payload.exportedAt.slice(0, 19).replace(/[:T]/g, '-')

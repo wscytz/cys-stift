@@ -201,7 +201,10 @@ export default function CanvasPage() {
     if (!placement) return
     const moved = service.moveToCanvas(card.id, placement.position)
     if (moved === false) {
-      pushToast({ kind: 'info', message: t('storage.quotaExceeded') })
+      // ocr 审 S3 P3-9:同一 diff 里 ask/search/graph/timeline 全用 error,
+      // canvas 未放置用 info —— 配额满(放置没成功)被降级成提示级,用户可能
+      // 以为放置成功只是没跳转。对齐其余四处用 error。
+      pushToast({ kind: 'error', message: t('storage.quotaExceeded') })
       return
     }
     if (adapter && canvasElRef.current) {

@@ -220,10 +220,11 @@ export default function SettingsPage() {
               setExporting(true)
               try {
                 const includeDeleted = settings.export?.includeDeleted ?? true
-                // R10:构建一次 payload 复用(原代码 downloadExport + buildExportPayload
-                // 各构建一次,大工作区 gap 数秒)。downloadExport 返回 bytes 且已触发下载。
+                // 构建一次 payload 复用(ocr 审 S3 P3-1):downloadExport 内部本就
+                // 会再 buildExportPayload 一次,双重构建 gap 数秒 + toast 数字
+                // 与下载内容可能在间隙间不一致。传 payload 复用同一份。
                 const payload = await buildExportPayload({ includeDeleted })
-                const bytes = await downloadExport({ includeDeleted })
+                const bytes = await downloadExport({ includeDeleted, payload })
                 const live = payload.cards.filter((c) => !c.archived && !c.deletedAt).length
                 pushToast({
                   kind: 'success',
@@ -544,6 +545,7 @@ export default function SettingsPage() {
       <Modal
         open={deleteCheckpointPending}
         onClose={() => setDeleteCheckpointPending(false)}
+        onEscape={() => setDeleteCheckpointPending(false)}
         title={t('settings.importCheckpointDeleteTitle')}
         closeLabel={t('common.close')}
       >
@@ -629,17 +631,19 @@ export default function SettingsPage() {
 .set__labs-status dd { margin: 0; color: var(--color-gray); font-size: var(--font-size-sm); line-height: 1.5; }
 .set__lab-item { display: flex; gap: var(--space-2); align-items: flex-start; }
 .set__lab-warn { display: block; margin-top: 2px; color: var(--color-red); }
-/* 能力清单区:dt 能力名 + kind 标签,dd 描述 + 状态 + 去开启锚点。 */
+/* 能力清单区:dt 能力名 + kind 标签,dd 描述 + 状态 + 去开启锚点。
+   JSX 是 <dl class="set__capabilities"> 直接子元素 div(ocr 审 S3 P3-4:此前写成
+   .set__capabilities dl 后代选择器,要求 dl 嵌套在 .set__capabilities 内——结构
+   不存在,双栏网格/分隔线/断点全是死规则)。 */
 .set__capabilities { margin: var(--space-2) 0 0; display: grid; gap: var(--space-2); }
-.set__capabilities dl { margin: 0; display: grid; gap: var(--space-2); }
-.set__capabilities dl > div { display: grid; grid-template-columns: minmax(160px, 0.4fr) minmax(0, 1fr); gap: var(--space-2); padding-top: var(--space-2); border-top: var(--border-hairline); }
+.set__capabilities > div { display: grid; grid-template-columns: minmax(160px, 0.4fr) minmax(0, 1fr); gap: var(--space-2); padding-top: var(--space-2); border-top: var(--border-hairline); }
 .set__capabilities dt { display: flex; align-items: baseline; gap: var(--space-1); font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); }
 .set__capabilities-kind { opacity: 0.6; }
 .set__capabilities dd { margin: 0; color: var(--color-gray); font-size: var(--font-size-sm); line-height: 1.5; display: flex; flex-direction: column; gap: 2px; }
 .set__capabilities-status { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; }
 .set__capabilities-status strong { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black); }
 .set__capabilities-hint { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; }
-@media (max-width: 560px) { .set__capabilities dl > div { grid-template-columns: 1fr; gap: var(--space-quarter); } }
+@media (max-width: 560px) { .set__capabilities > div { grid-template-columns: 1fr; gap: var(--space-quarter); } }
 @media (max-width: 560px) {
   .set__labs-status dl > div { grid-template-columns: 1fr; gap: var(--space-quarter); }
 }
