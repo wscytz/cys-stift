@@ -108,6 +108,12 @@ function isValidMessage(m: unknown): m is PersistedConversationMessage {
   return (
     (msg.role === 'user' || msg.role === 'assistant') &&
     typeof msg.content === 'string' &&
+    // dslBlocks 缺省或必须 string[](渲染端 dslBlocks?.map / parseDslStrict(b) 直接
+    // 调用字符串方法;毒化的 'not-array' / [42] 曾穿透校验炸 /ask + companion,
+    // adversarial R2-D7 P1)。正常写路径 extractDslBlocks 恒产 string[]。
+    (msg.dslBlocks === undefined ||
+      (Array.isArray(msg.dslBlocks) && msg.dslBlocks.every((b) => typeof b === 'string'))) &&
+    (msg.streaming === undefined || typeof msg.streaming === 'boolean') &&
     (msg.targetCanvasId === undefined || typeof msg.targetCanvasId === 'string') &&
     (msg.contextMeta === undefined || isValidContextMeta(msg.contextMeta))
   )

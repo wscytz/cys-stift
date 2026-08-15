@@ -129,8 +129,7 @@ describe('settingsStore — corrupt / invalid localStorage', () => {
     expect(store.get().theme).toBe('system') // rejected → default
   })
 
-  it('falls back to defaults when captureShortcut is malformed', () => {
-    window.localStorage.setItem(
+  it('salvages valid fields when captureShortcut is malformed (R2-D6 P2 fix)', () => {    window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
         settings: {
@@ -143,11 +142,12 @@ describe('settingsStore — corrupt / invalid localStorage', () => {
       }),
     )
     const s = store.get()
-    expect(s.theme).toBe('system') // whole object rejected → defaults
-    expect(s.captureShortcut.modKey).toBe('meta')
+    expect(s.captureShortcut.modKey).toBe('meta') // 坏字段回默认
+    expect(s.theme).toBe('light') // 合法字段保留(旧行为:整份回默认 = 数据丢失向量)
+    expect(s.locale).toBe('en')
   })
 
-  it('falls back to defaults when profiles contains an invalid profile', () => {
+  it('drops the bad profile but keeps valid fields (R2-D6 P2 fix)', () => {
     window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -160,12 +160,64 @@ describe('settingsStore — corrupt / invalid localStorage', () => {
         },
       }),
     )
-    // Bad profile → whole settings rejected.
-    expect(store.get().locale).toBe('zh') // default locale, not 'en'
+    const s = store.get()
+    expect(s.locale).toBe('en') // 合法字段保留
+    expect(s.profiles).toEqual([]) // 坏 profile 丢弃
+    expect(s.activeProfileId).toBe(null)
   })
 
-  it('accepts a valid v2 settings object (profiles empty + null active)', () => {
+  // 对抗测试 R2-D6 P3-1 + P2(修4):可选采样参数毒化 → 不进请求体。
+  // 修 4 逐字段挽救后,其余字段全合法的 profile 剥掉坏参数保留(apiKey 不丢),
+  // 毒参数不再原样透传(值被剥掉 = 不会进请求体)。
+  it.each([
+    ['temperature 字符串', { temperature: 'abc' }],
+    ['temperature 1e308(超表单契约 0-2)', { temperature: 1e308 }],
+    ['maxTokens 字符串', { maxTokens: '4096' }],
+    ['maxTokens 对象', { maxTokens: {} }],
+  ])('剥离 %s 的 profile,其余字段保留', (_label, extra) => {
     window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        settings: {
+          captureShortcut: { modKey: 'meta', shift: true, code: 'KeyE' },
+          theme: 'light',
+          locale: 'zh',
+          profiles: [{ id: 'p1', name: 'x', provider: 'openai', apiKey: 'k', baseUrl: 'https://a.com/v1', model: 'm', enabled: true, ...extra }],
+          activeProfileId: 'p1',
+        },
+      }),
+    )
+    const s = store.get()
+    expect(s.profiles).toHaveLength(1)
+    expect(s.profiles[0]?.apiKey).toBe('k')
+    expect(s.profiles[0]?.temperature).toBeUndefined()
+    expect(s.profiles[0]?.maxTokens).toBeUndefined()
+    // 毒参数不进内存(下次保存写的已是干净数据);LS 原字节不动
+    expect(s.profiles[0]).not.toHaveProperty('temperature')
+  })
+
+  it('接受 temperature/maxTokens 合法值与 null(NaN 序列化产物)/缺失', () => {
+    const base = { id: 'p1', name: 'x', provider: 'openai' as const, apiKey: 'k', baseUrl: 'https://a.com/v1', model: 'm', enabled: true }
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        settings: {
+          captureShortcut: { modKey: 'meta', shift: true, code: 'KeyE' },
+          theme: 'light',
+          locale: 'zh',
+          profiles: [
+            { ...base, temperature: 0.7 },
+            { ...base, id: 'p2', maxTokens: 4096 },
+            { ...base, id: 'p3', temperature: null, maxTokens: null },
+          ],
+          activeProfileId: 'p1',
+        },
+      }),
+    )
+    expect(store.get().profiles).toHaveLength(3)
+  })
+
+  it('accepts a valid v2 settings object (profiles empty + null active)', () => {    window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
         settings: {
@@ -182,6 +234,89 @@ describe('settingsStore — corrupt / invalid localStorage', () => {
     expect(s.locale).toBe('en')
     expect(s.profiles).toEqual([])
     expect(s.activeProfileId).toBeNull()
+  })
+})
+
+describe('settingsStore — 逐字段挽救(对抗测试 R2-D6 P2 修复)', () => {
+  const base = { id: 'p1', name: 'DeepSeek', provider: 'openai' as const, apiKey: 'sk-legit-key', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-v4-flash', enabled: true }
+
+  it('复现场景:合法 profile + theme:neon → apiKey 保留(不读时写盘)', () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        settings: {
+          captureShortcut: { modKey: 'meta', shift: true, code: 'KeyE' },
+          theme: 'neon', // 坏
+          locale: 'en', // 好
+          profiles: [base], // 好
+          activeProfileId: 'p1',
+          seenCaptureHint: true, // 好
+        },
+      }),
+    )
+    const s = store.get()
+    // 合法 apiKey 保住(旧行为:整份回默认 → 下次保存 key 永久丢失)
+    expect(s.profiles).toHaveLength(1)
+    expect(s.profiles[0]?.apiKey).toBe('sk-legit-key')
+    expect(s.activeProfileId).toBe('p1')
+    expect(s.theme).toBe('system') // 坏字段回默认
+    expect(s.locale).toBe('en')
+    expect(s.seenCaptureHint).toBe(true)
+    // 不读时写盘:LS 原字节不动(export/import 字节保真契约);清洗发生在下次保存
+    const raw = window.localStorage.getItem(STORAGE_KEY) ?? ''
+    expect(raw).toContain('neon')
+    expect(raw).toContain('sk-legit-key')
+  })
+
+  it('挽救后再保存:key 不丢(整条危害链闭合)', () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ settings: { theme: 'neon', locale: 'zh', profiles: [base], activeProfileId: 'p1' } }),
+    )
+    const s = store.get()
+    store.updateCardDisplayMode('auto')
+    const after = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+    expect(after.settings?.profiles?.[0]?.apiKey).toBe('sk-legit-key')
+    expect(s.profiles[0]?.apiKey).toBe('sk-legit-key')
+  })
+
+  it('只差可选采样参数非法的 profile:剥参数保留 apiKey', () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        settings: {
+          theme: 'light', locale: 'zh',
+          profiles: [{ ...base, temperature: 'abc' }],
+          activeProfileId: 'p1',
+        },
+      }),
+    )
+    const s = store.get()
+    expect(s.profiles).toHaveLength(1)
+    expect(s.profiles[0]?.apiKey).toBe('sk-legit-key')
+    expect(s.profiles[0]?.temperature).toBeUndefined()
+  })
+
+  it('active 指向被丢弃的坏 profile → 自动锚第一个救出的 profile', () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        settings: {
+          theme: 'light', locale: 'zh',
+          profiles: [{ id: 'bad', provider: 'evilcorp' }, base],
+          activeProfileId: 'bad',
+        },
+      }),
+    )
+    const s = store.get()
+    expect(s.profiles.map((p) => p.id)).toEqual(['p1'])
+    expect(s.activeProfileId).toBe('p1')
+  })
+
+  it('彻底坏(settings 非对象)→ 回默认且不抛', () => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings: 'garbage' }))
+    expect(() => store.get()).not.toThrow()
+    expect(store.get().profiles).toEqual([])
   })
 })
 

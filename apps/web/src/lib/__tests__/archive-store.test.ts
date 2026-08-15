@@ -169,3 +169,34 @@ describe('archive-store ensureReleaseRecord', () => {
     expect(archiveStore.listMeta().length).toBe(before)
   })
 })
+
+describe('archive-store index 毒化清洗(对抗测试 R2-D7 P2 修复)', () => {
+  it('entries 含 null/毒物 + lastAppVersion 旧版 → boot 不抛,坏项丢弃、release 档照常落', async () => {
+    const { archiveStore } = await import('../archive-store')
+    // 直接 seed 毒化 index(外部篡改/坏导入场景)
+    localStorage.setItem('cys-stift.archive-index.v1', JSON.stringify({
+      lastAppVersion: '0.9.0', nextVersion: 5, entries: [null, 42, 'x'],
+    }))
+    // boot gate:版本变化 → append release → applyRetention 读 entries。
+    // 修复前:null.trigger 抛 unhandled rejection;修复后:坏项已滤,正常落档。
+    await expect(
+      archiveStore.ensureReleaseRecord('1.0.0', vi.fn(async () => makePayload('r'))),
+    ).resolves.toBeUndefined()
+    const list = archiveStore.listMeta()
+    expect(list).toHaveLength(1)
+    expect(list[0]?.trigger).toBe('release')
+    expect(list[0]?.note).toBe('boot 0.9.0→1.0.0')
+  })
+
+  it('index 非 object / entries 非数组 → 整份回 empty,不抛', async () => {
+    const { archiveStore } = await import('../archive-store')
+    for (const bad of ['"str"', '42', '[]', '{"entries":"x"}', '{"lastAppVersion":9}']) {
+      localStorage.setItem('cys-stift.archive-index.v1', bad)
+      await expect(
+        archiveStore.ensureReleaseRecord('1.0.0', vi.fn(async () => makePayload('r'))),
+      ).resolves.toBeUndefined()
+    }
+    // 非 object / 坏标量 → 视为首启(prev=null,只记版本不落档)→ 无 entry
+    expect(archiveStore.listMeta()).toEqual([])
+  })
+})

@@ -95,10 +95,44 @@ function emptyIndex(): ArchiveIndex {
 }
 
 // ── localStorage helpers ────────────────────────────────────────────────────
+
+const KNOWN_TRIGGERS: ReadonlySet<string> = new Set<string>([
+  'release', 'ai-layout', 'ai-agent', 'cluster', 'dsl-apply', 'manual',
+])
+
+/**
+ * Index 结构清洗(对抗测试 R2-D7 P2 修复):loadIndex 此前对 parsed JSON 零校验,
+ * entries 含 null / 非 object 项时 applyRetention 的 `e.trigger` 直接抛
+ * `Cannot read properties of null` → 每页 boot unhandled rejection + release
+ * 存档静默失败。坏项丢弃、坏标量回默认,好 entries 保留。
+ */
+function sanitizeIndex(value: unknown): ArchiveIndex | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const o = value as Record<string, unknown>
+  const lastAppVersion =
+    typeof o.lastAppVersion === 'string' || o.lastAppVersion === null
+      ? (o.lastAppVersion as string | null)
+      : null
+  const nextVersion =
+    typeof o.nextVersion === 'number' && Number.isFinite(o.nextVersion) && o.nextVersion >= 1
+      ? o.nextVersion
+      : 1
+  const entries = Array.isArray(o.entries)
+    ? o.entries.filter(
+        (e): e is ArchiveEntryMeta =>
+          !!e && typeof e === 'object' &&
+          typeof (e as ArchiveEntryMeta).archiveVersion === 'number' &&
+          KNOWN_TRIGGERS.has(String((e as ArchiveEntryMeta).trigger)),
+      )
+    : []
+  return { lastAppVersion, nextVersion, entries }
+}
+
 function lsLoadIndex(): ArchiveIndex | null {
   try {
     const raw = window.localStorage.getItem(INDEX_LS)
-    return raw ? (JSON.parse(raw) as ArchiveIndex) : null
+    if (!raw) return null
+    return sanitizeIndex(JSON.parse(raw))
   } catch { return null }
 }
 function lsSaveIndex(idx: ArchiveIndex): boolean {
@@ -157,8 +191,12 @@ async function loadIndex(): Promise<ArchiveIndex> {
   if (typeof window === 'undefined') return _indexCache = emptyIndex()
   const fromOpfs = await opfsRead(INDEX_OPFS)
   if (fromOpfs) {
-    try { _indexCache = JSON.parse(fromOpfs) as ArchiveIndex; return _indexCache }
-    catch { /* 坏 JSON 落回退 */ }
+    try {
+      // sanitize:parsed JSON 不可信(entries 可能含 null/毒物),坏项丢弃防
+      // applyRetention 崩(R2-D7 P2)。
+      _indexCache = sanitizeIndex(JSON.parse(fromOpfs)) ?? emptyIndex()
+      return _indexCache
+    } catch { /* 坏 JSON 落回退 */ }
   }
   _indexCache = lsLoadIndex() ?? emptyIndex()
   return _indexCache

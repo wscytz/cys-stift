@@ -102,6 +102,29 @@ describe('saveConversation — 只持久化完整回合(对抗测试 B2 修复)'
   })
 })
 
+describe('loadConversation — dslBlocks 毒化过滤(对抗测试 R2-D7 P1 修复)', () => {
+  it.each([
+    ['字符串(渲染端 .map 崩)', 'not-array'],
+    ['数字元素(渲染端 parseDslStrict .split 崩)', [42]],
+    ['混 null/对象元素', ['ok', null, { a: 1 }]],
+  ])('dslBlocks=%j 的消息被过滤,不进渲染', (_label, dslBlocks) => {
+    const CID = 'cv-poison' as CanvasId
+    // 直接写 localStorage 模拟毒化(正常 saveConversation 恒产 string[],
+    // 毒化只能来自外部篡改/坏导入)
+    window.localStorage.setItem(
+      conversationKey(CID),
+      JSON.stringify([
+        { role: 'user', content: 'q' },
+        { role: 'assistant', content: 'poison', dslBlocks },
+        { role: 'assistant', content: 'clean', dslBlocks: ['```cys-dsl\nok\n```'] },
+      ]),
+    )
+    const loaded = loadConversation(CID)
+    expect(loaded).toHaveLength(2)
+    expect(loaded[1]!.dslBlocks).toEqual(['```cys-dsl\nok\n```'])
+  })
+})
+
 describe('saveConversation — cap 100', () => {
   it('keeps only the most recent 100 messages', () => {
     const CID = 'cv-cap' as CanvasId

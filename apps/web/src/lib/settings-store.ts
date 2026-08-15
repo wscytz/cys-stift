@@ -123,7 +123,17 @@ function isValidProfile(v: unknown): v is AIProfile {
     typeof o.apiKey === 'string' &&
     isSafeBaseUrl(o.baseUrl) &&
     isSafeModelId(o.model) &&
-    typeof o.enabled === 'boolean'
+    typeof o.enabled === 'boolean' &&
+    // 可选采样参数:缺失/null(NaN 经 JSON 序列化而来)视为未设置;存在就必须
+    // 是有限 number 且在表单契约范围内(ai-settings-panel 的 min/max:
+    // temperature 0-2 / maxTokens 1-8192)—— 毒化的 "abc"/1e308 曾原样进请求体
+    // → provider 400(对抗测试 R2-D6 P3-1)。
+    (o.temperature === undefined || o.temperature === null ||
+      (typeof o.temperature === 'number' && Number.isFinite(o.temperature) &&
+        o.temperature >= 0 && o.temperature <= 2)) &&
+    (o.maxTokens === undefined || o.maxTokens === null ||
+      (typeof o.maxTokens === 'number' && Number.isFinite(o.maxTokens) &&
+        o.maxTokens >= 1 && o.maxTokens <= 8192))
   )
 }
 
@@ -174,6 +184,66 @@ function isValid(v: unknown): v is Settings {
   return true
 }
 
+/**
+ * 逐字段挽救(对抗测试 R2-D6 P2 修复):整份 isValid 失败时,不再整份回默认——
+ * 那会让用户下一次保存把毒物里本可用的合法设置(含有效 profile 的 apiKey)
+ * 用默认值永久覆盖。改为逐字段抢救:
+ *   - 基础字段(captureShortcut/theme/locale/seenCaptureHint/export/labs/
+ *     aiSampleCapture/cardDisplayMode/aiIncludeCardContent):按各自形状校验,
+ *     坏的回默认、好的保留;
+ *   - profiles:逐 profile isValidProfile,坏的丢弃、好的保留;只差可选采样
+ *     参数(temperature/maxTokens)非法的 profile 剥掉参数后保留(key 不丢);
+ *   - activeProfileId:仍指向抢救后存在的 profile 则保留,否则 null。
+ * 返回值立即视为已迁移落盘(loadSettings 调用方持久化),localStorage 自愈,
+ * 用户下次保存写的已是干净数据。
+ */
+function salvageSettings(v: unknown): Settings {
+  const o = (v && typeof v === 'object' && !Array.isArray(v) ? v : {}) as Record<string, unknown>
+  const shortcut = o.captureShortcut
+  const shortcutOk =
+    !!shortcut && typeof shortcut === 'object' &&
+    ((shortcut as Record<string, unknown>).modKey === 'meta' || (shortcut as Record<string, unknown>).modKey === 'ctrl') &&
+    typeof (shortcut as Record<string, unknown>).shift === 'boolean' &&
+    typeof (shortcut as Record<string, unknown>).code === 'string' &&
+    ((shortcut as Record<string, unknown>).code as string).length > 0
+  const theme =
+    o.theme === 'light' || o.theme === 'dark' || o.theme === 'system' ? o.theme : DEFAULT_SETTINGS.theme
+  const profiles = (Array.isArray(o.profiles) ? o.profiles : []).flatMap((p): AIProfile[] => {
+    if (isValidProfile(p)) return [p]
+    // 只差可选采样参数非法(其余字段全合法)→ 剥参数保留,apiKey 不丢。
+    if (p && typeof p === 'object' && isValidProfile({ ...p, temperature: undefined, maxTokens: undefined })) {
+      const { ...rest } = p as Record<string, unknown>
+      delete rest.temperature
+      delete rest.maxTokens
+      return [rest as unknown as AIProfile]
+    }
+    return []
+  })
+  const activeProfileId =
+    typeof o.activeProfileId === 'string' && profiles.some((p) => p.id === o.activeProfileId)
+      ? o.activeProfileId
+      : null
+  return {
+    captureShortcut: shortcutOk ? (shortcut as Settings['captureShortcut']) : DEFAULT_SETTINGS.captureShortcut,
+    theme,
+    locale: o.locale === 'en' ? 'en' : DEFAULT_SETTINGS.locale,
+    profiles,
+    // 自动激活:若 active 丢了但救出了 profile,锚第一个(与 upsertProfile 的
+    // 「保存≠激活」修同一陷阱:救出的 key 若不激活,getCurrentAI 仍 null)。
+    activeProfileId: activeProfileId ?? profiles[0]?.id ?? null,
+    seenCaptureHint: typeof o.seenCaptureHint === 'boolean' ? o.seenCaptureHint : false,
+    export: {
+      includeDeleted:
+        !o.export || typeof o.export !== 'object' ? true :
+        (o.export as Record<string, unknown>).includeDeleted !== false,
+    },
+    labs: normalizeLabs(o.labs),
+    ...(o.aiSampleCapture === true ? { aiSampleCapture: true } : {}),
+    ...(o.cardDisplayMode === 'compact' || o.cardDisplayMode === 'auto' || o.cardDisplayMode === 'title' || o.cardDisplayMode === 'subtitle' ? { cardDisplayMode: o.cardDisplayMode } : {}),
+    ...(typeof o.aiIncludeCardContent === 'boolean' ? { aiIncludeCardContent: o.aiIncludeCardContent } : {}),
+  }
+}
+
 function loadSettings(): Settings {
   if (typeof window === 'undefined') return DEFAULT_SETTINGS
   try {
@@ -206,6 +276,13 @@ function loadSettings(): Settings {
             window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings: loaded }))
           }
           return loaded
+        }
+        // 整份 isValid 失败 → 逐字段挽救(R2-D6 P2):保住合法 profile 的 apiKey
+        // 等本可用字段,坏字段回默认。只挽救内存、不读时写盘 —— 下次保存写的
+        // 已是干净数据(key 不丢);读时重写 LS 会破坏「部分字段的旧 settings
+        // 经 export/import 字节保真往返」的既有契约。
+        if (parsed && typeof parsed === 'object' && 'settings' in parsed) {
+          return salvageSettings(parsed.settings)
         }
       } catch {
         // Corrupt v2 → try the legacy migration below, then fall back to defaults.
