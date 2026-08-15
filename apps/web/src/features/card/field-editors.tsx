@@ -10,7 +10,7 @@
  * title/body/media/tags 壳特化(渲染位置 / 形态各壳定,不进 registry)。body 两壳统一用
  * MarkdownEditor(B-1,2026-08-08),仅因两壳渲染位置不同而暂留壳特化,不再有 textarea 之分。
  */
-import type { ComponentType, ReactNode } from 'react'
+import { useRef, type ComponentType, type ReactNode } from 'react'
 import type { Card, MediaRef, UpdateCardPatch } from '@cys-stift/domain'
 import type { CardDraftField, FieldEditorProps } from './use-card-draft'
 import { CodeEditor, ListEditor, QuoteEditor, type DraftCode, type DraftLink, type DraftQuote } from './editors'
@@ -79,12 +79,20 @@ export function MediaFieldEditor({
   onRemoveAsset?: (id: MediaRef['assetId']) => void
 }) {
   const { t } = useI18n()
+  // ocr 审 S2 P2-1:onChange([...value, ref]) 里 value 是 render 快照 —— 多选
+  // 文件时 for 循环内每次 onChange 都基于同一快照,第 2+ 张的 onChange 覆盖前面
+  // (草稿只剩最后一张),而前几张 asset 已 attach 落库 → 孤儿二进制。用 ref 跟踪
+  // 最新 value,循环内同步更新。
+  const valueRef = useRef(value)
+  valueRef.current = value
   const handleFiles = async (files: FileList | null) => {
     if (!files) return
     for (const file of Array.from(files)) {
       try {
         const ref = await mediaStore.attach(file)
-        onChange([...value, ref])
+        const next = [...valueRef.current, ref]
+        valueRef.current = next
+        onChange(next)
         // R16:大文件(>500KB 建议上限,但 <5MB 能存)attach 成功时提示占空间,
         // 否则用户 attach 一张 4MB 图毫无警告,下次保存失败才懵("存满了不知道")。
         if (file.size > mediaStore.SOFT_LIMIT_BYTES) {

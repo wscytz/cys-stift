@@ -240,7 +240,10 @@ export function CompanionChat({
       })
     } catch (e) {
       if ((e as Error).name === 'AbortError') {
-        pushToast({ kind: 'info', message: t('ai.error', { error: 'cancelled' }) })
+        // ocr 审 S2 P2-2:切画布主动 abort 旧流时会走到这里,isRequestCurrent 已 false
+        // (切画布 effect 抬了 seq)——不该弹「已取消」(用户没取消,是切画布)。只在
+        // 仍是最新请求时提示。
+        if (isRequestCurrent()) pushToast({ kind: 'info', message: t('ai.error', { error: 'cancelled' }) })
       } else {
         pushToast({ kind: 'error', message: friendlyAIError((e as Error).message, t) })
       }
@@ -258,8 +261,13 @@ export function CompanionChat({
         return next
       })
     } finally {
-      setBusy(false)
-      abortRef.current = null
+      // ocr 审 S2 P2-2:旧请求(A 画布)的 finally 不能掐断新画布(B)在飞请求的
+      // busy 态 —— 无条件 setBusy(false) 让用户以为 B 已完成可再发(叠消息),
+      // 且清掉 abortRef 后后续切画布无法中止 B 的流。只在仍是最新请求时复位。
+      if (isRequestCurrent()) {
+        setBusy(false)
+        abortRef.current = null
+      }
     }
   }
 
