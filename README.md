@@ -21,7 +21,7 @@
 
 ## 下载
 
-最新版本为 [**v1.3.0-preview.2**](https://github.com/wscytz/cys-stift/releases/tag/v1.3.0-preview.2)(预览版)。桌面安装包和 `SHA256SUMS.txt` 均从该 Release 页面下载：
+最新版本为 [**v1.3.0-preview.3**](https://github.com/wscytz/cys-stift/releases/tag/v1.3.0-preview.3)(预览版)。桌面安装包和 `SHA256SUMS.txt` 均从该 Release 页面下载。也可以直接用[网页版](https://wscytz.com/cys-stift/app/)体验(同版本,数据留在浏览器本地):
 
 | 平台 | 文件 | 说明 |
 |---|---|---|
@@ -31,7 +31,7 @@
 
 > iPad/iOS 不做。Windows 安装包未经 Authenticode 签名，macOS 安装包为 ad-hoc 签名且未公证，系统可能显示“未知开发者/发布者”警告；安装前请先核对 Release 中的 SHA256。
 
-`v1.3.0-preview.2` 是 1.3.0 预览线的最新版:preview.1 为自 1.2.0 起一轮体验打磨(无障碍 / 画布手感 / 找回 / 导入导出 / 存储感知),preview.2 修复深度审核发现的 1 个数据完整性问题与 4 个质量问题。作为预览版,签名/公证、实机无障碍(VoiceOver)、真实系统 200% 缩放、外部用户研究与真实 provider 配额/拒绝演练不伪装成已完成,列为后续稳定版加固项。变更细节见 [Release notes](https://github.com/wscytz/cys-stift/releases) 与 [`docs/changelog.md`](docs/changelog.md)。
+`v1.3.0-preview.3` 是 1.3.0 预览线的最新版:preview.1 为自 1.2.0 起一轮体验打磨(无障碍 / 画布手感 / 找回 / 导入导出 / 存储感知),preview.2 修复深度审核发现的 1 个数据完整性问题与 4 个质量问题,preview.3 收录三轮对抗测试(13 维度约 120 场景)的全部修复。作为预览版,签名/公证、实机无障碍(VoiceOver)、真实系统 200% 缩放、外部用户研究与真实 provider 配额/拒绝演练不伪装成已完成,列为后续稳定版加固项。变更细节见 [Release notes](https://github.com/wscytz/cys-stift/releases) 与 [`docs/changelog.md`](docs/changelog.md)。
 
 ---
 
@@ -67,7 +67,7 @@
 
 ## 状态
 
-**v1.3.0-preview.2** — 最新版本(预览版),已在 GitHub Release 发布。核心闭环、恢复事务、cys-dsl v8 与跨平台构建流水线已就绪;preview.1 是自 1.2.0 起一轮体验打磨(无障碍 / 画布手感 / 找回 / 导入导出 / 存储感知),preview.2 修复深度审核发现的 1 个数据完整性问题 + 4 个质量问题(均配回归测试)。签名/公证、实机无障碍(VoiceOver)与真实 provider 证据继续作为后续稳定版加固工作。
+**v1.3.0-preview.3** — 最新版本(预览版),已在 GitHub Release 发布。核心闭环、恢复事务、cys-dsl v8 与跨平台构建流水线已就绪;preview.1 是自 1.2.0 起一轮体验打磨(无障碍 / 画布手感 / 找回 / 导入导出 / 存储感知),preview.2 修复深度审核发现的 1 个数据完整性问题 + 4 个质量问题,preview.3 收录三轮对抗测试(13 维度约 120 场景)的全部修复(坏数据防崩 / 双 tab 编辑一致性 / AI 错误分类 / 删画布数据清理等,均配回归测试)。签名/公证、实机无障碍(VoiceOver)与真实 provider 证据继续作为后续稳定版加固工作。
 
 DSL 的实现与内部稳定性验证已经具备，但“普通用户是否愿意学习并重复使用”仍是待外部研究验证的产品假设；README 和展示页不会把内部测试写成用户价值结论。
 
