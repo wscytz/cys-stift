@@ -322,7 +322,7 @@
 <header class="hero">
   <div class="wrap hero-grid">
     <div>
-      <div class="eyebrow reveal"><span class="dot"></span> 1.2.0 · 本地优先 · 开源</div>
+      <div class="eyebrow reveal"><span class="dot"></span> 1.3.0 · 本地优先 · 开源</div>
       <h1 class="title reveal">cy's <em>Stift.</em></h1>
       <p class="lede reveal">本地优先的灵感画布。捕获、整理、建立关系、搜索找回、继续编辑和完整恢复保持在同一条工作流里；<b>画布也能用文字安全读写</b>。</p>
       <div class="cta-row reveal">
@@ -331,15 +331,15 @@
         <a class="btn ghost" href="https://github.com/wscytz/cys-stift/blob/main/docs/user/README.md" target="_blank" rel="noopener">阅读用户指南 ↗</a>
       </div>
       <div class="meta-row reveal">
-        <span><b>Stable</b> · v1.2.0 已发布</span>
+        <span><b>Stable 1.2.0</b> · <b>Preview 1.3.0</b> 已发布</span>
         <span><b>Web</b> · 静态部署</span>
-        <span>数据 <b>默认留在本机</b></span>
+        <span>数据 <b>默认留在本机</b> · 无遥测</span>
         <span>AI <b>可选</b> · 支持 Ollama</span>
       </div>
     </div>
     <div class="poster reveal">
-      <img src="product-canvas.png" alt="cy's Stift 1.2.0 画布真实界面">
-      <span class="version-badge">1.2.0</span>
+      <img src="product-canvas.png" alt="cy's Stift 画布真实界面">
+      <span class="version-badge">1.3.0</span>
     </div>
   </div>
 </header>
@@ -500,7 +500,7 @@
         <div class="ico"><svg width="34" height="34" viewBox="0 0 34 34"><path d="M5 9h24M5 17h24M5 25h24" stroke="#0a0a0a" stroke-width="2.4" stroke-linecap="round"/><circle cx="11" cy="9" r="2.4" fill="#ffce00"/><circle cx="22" cy="17" r="2.4" fill="#d40000"/></svg></div>
         <div class="tag">02</div>
         <h3>DSL 安全编辑</h3>
-        <p>画布可以转成可读文本。修改先解析、预演并显示元素差异；确认后才应用，过期 revision 会被拒绝。</p>
+        <p>画布可以转成可读文本。修改先解析、预演并显示元素差异；确认后才应用，过期 revision 会被拒绝。v8 起卡片带结构化字段（标签 / 外链 / 代码块 / 引文）双向往返。</p>
       </div>
       <div class="feat">
         <div class="ico"><svg width="34" height="34" viewBox="0 0 34 34"><circle cx="17" cy="17" r="13" fill="none" stroke="#0a0a0a" stroke-width="2"/><path d="M17 7v10l7 4" stroke="#003f7f" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg></div>
@@ -575,6 +575,7 @@
       </div>
       <ul>
         <li><span class="k">存储</span> 当前 Web / Tauri 前端使用 localStorage + OPFS，默认无应用服务器。</li>
+        <li><span class="k">无遥测</span> 不内置任何遥测 / 崩溃上报 / 行为统计；数据不经云端,网络请求只发生在你配置 AI 时。</li>
         <li><span class="k">AI 隐私</span> 字段白名单：deviceId、媒体二进制、软删卡不进 prompt。</li>
         <li><span class="k">本地 AI</span> 可接 Ollama 纯本地模型,断网也能用。</li>
         <li><span class="k">恢复</span> 外部 JSON 自动脱敏；导入前 checkpoint 只留在本机。</li>
@@ -588,16 +589,19 @@
   <div class="wrap">
     <div class="sec-head reveal">
       <div class="sec-kicker">当前交付边界</div>
-      <h2>Web 1.2.0 已发布；桌面 1.2.0 同步发布。</h2>
-      <p class="sec-sub">Web 静态站已部署可体验；macOS(.dmg) 与 Windows(.exe) 桌面安装包已在 GitHub Release 发布。签名公证与 Android 包仍是开放项。</p>
+      <h2>Web 1.3.0 已发布；桌面安装包从 GitHub Release 下载。</h2>
+      <p class="sec-sub">Web 静态站已部署可体验；macOS(.dmg) 与 Windows(.exe NSIS) 安装包随 GitHub Release 发布。签名公证与 Android 包仍是开放项，安装前请核对发布页的 SHA256。</p>
     </div>
     <div class="plat reveal">
       <div class="p"><div class="name">Web</div><div class="note">静态文件 · 可部署</div></div>
-      <div class="p"><div class="name">macOS</div><div class="note">已构建 · 未签名公证</div></div>
+      <div class="p"><div class="name">macOS</div><div class="note">已构建 .dmg · 未签名公证</div></div>
       <div class="p"><div class="name">Windows</div><div class="note">CI 构建与安装包产出已验证 · 待人工安装验收</div></div>
       <div class="p"><div class="name">Android</div><div class="note">待当前包与实机验收</div></div>
     </div>
-    <div style="margin-top:30px"><a class="btn" href="https://github.com/wscytz/cys-stift/blob/main/docs/STATE.md" target="_blank" rel="noopener">查看当前验证状态 ↗</a></div>
+    <div style="margin-top:30px;display:flex;gap:12px;flex-wrap:wrap">
+      <a class="btn" href="https://github.com/wscytz/cys-stift/releases/latest" target="_blank" rel="noopener">GitHub Release 下载 .dmg / .exe ↗</a>
+      <a class="btn ghost" href="https://wscytz.com/cys-stift/app/" >网页版直接试用 →</a>
+    </div>
   </div>
 </section>
 
@@ -613,7 +617,7 @@
 
 <footer class="foot">
   <div class="wrap" style="display:flex;justify-content:space-between;width:100%;flex-wrap:wrap;gap:10px">
-    <span>cy's Stift · 1.2.0 · GPL-3.0</span>
+    <span>cy's Stift · 1.3.0 · GPL-3.0</span>
     <span>包豪斯 · 6 原色 · 8px 网格</span>
   </div>
 </footer>
