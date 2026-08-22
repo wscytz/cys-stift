@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-08-22 · 1.3.0 · 稳定版(= preview.3 + ocr 规则化审查修复)(tag v1.3.0)
+
+> preview.3 之后 main 上的增量:ocr 规则化审查(2026-08-15,`v1.1.4..HEAD` 79 文件,4 shard subagent + 主 agent 复现)发现无 P1,6 P2 + 18 P3 全修;配套 docs 与 gitignore。稳定版验证基线(2026-08-22 定版时复跑):全包 lint 0 错 / 全包 test 全绿(domain 87 + canvas-engine 586 + cys-dsl 405 + db 8 + web 1836)/ web build exit 0 / docs:links 通过。
+
+- **S1 导入返回守卫 / safeHref WHATWG 变体 / 字段级毒化**(commit `01e4a4e` 等)
+- **S2 媒体多选 attach 丢图 / companion busy 尾随**
+- **S3 ask 死画布恢复 / 能力清单滞后与 CSS / Modal Esc**
+- **S4 Modal IME 守卫 / Firefox 滚轮 deltaMode / 部署校验 / caption snippet**(commit `d52e198` 等)
+- 浏览器级回归 2/2(能力清单双栏、safeHref 未误杀);方法记入私有仓 `docs/research/2026-08-15-stable-path-and-check-methods.md`(十式漏洞模式)。
+- **桌面签名状态不变**:Windows 无 Authenticode、macOS ad-hoc 未公证,安装前核对 SHA256(CI Release 挂校验和)。
+- **已知待办**:真机手测(T4/T7/T9 实跑)仍待用户;不影响本版功能面。
+
 ## 2026-08-15 · 1.3.0-preview.3 · 对抗测试三轮修复(3 🔴 + 3 🟡 簇)(tag v1.3.0-preview.3)
 
 > 1.3.0-preview.2 发布后跑了三轮对抗测试(R1 存储/导入导出/AI/隐私、R2 设置/会话/DSL/归档、R3 大数据量/多画布/配额/AI 流式,共 13 维度约 120 场景,subagent 并行探索 + 主 agent 逐指控源码坐实 + 浏览器复现后才修)。本版含全部修复与回归测试;三轮未修项均为 P3 观察,留档不进版。
