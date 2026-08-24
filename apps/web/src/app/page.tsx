@@ -3,6 +3,8 @@
 /**
  * cy's Stift — Swiss Editorial home(v0.2 重绘;原 Phase 0/4/6/7 结构保留:
  * 捕获入口提示 / 快捷入口 / 继续工作区 / 大入口块 / 次级链接 / 页脚)。
+ * 展示结构对齐 PRD workspace_home:编辑式顶栏(crumb + 本地同步呼吸点)、
+ * hero 大日期锚点(display 级,编辑式不对称)、段落编号(01/02)。
  */
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -27,18 +29,21 @@ export default function HomePage() {
   const [desktop, setDesktop] = useState(false)
   // PRD workspace_home 的日期锚点:同样挂载后渲染(SSG 构建期日期会过期,且
   // toLocaleDateString 依赖运行时 ICU;首帧空串两侧一致,无水合错配)。
-  const [today, setToday] = useState('')
+  const [dateParts, setDateParts] = useState({ full: '', day: '', my: '' })
   useEffect(() => {
     setIsMac(detectIsMac())
     setDesktop(isDesktop())
-    setToday(
-      new Date().toLocaleDateString(locale === 'en' ? 'en-US' : 'zh-CN', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
+    const d = new Date()
+    setDateParts({
+      full: d.toLocaleDateString(locale === 'en' ? 'en-US' : 'zh-CN', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
       }),
-    )
+      day: String(d.getDate()),
+      my:
+        locale === 'en'
+          ? `${d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()} ${d.getFullYear()}`
+          : `${d.getFullYear()}年${d.getMonth() + 1}月`,
+    })
   }, [locale])
   const activeCanvas = canvasSnapshot.canvases.find((canvas) => canvas.id === canvasSnapshot.activeCanvasId)
   const activeCount = ready ? service.listOnCanvas(canvasSnapshot.activeCanvasId).length : 0
@@ -54,16 +59,32 @@ export default function HomePage() {
       <CaptureHint />
       <CaptureSampleHint />
       <section className="home__content">
-        <p className="home__eyebrow">
-          <StatusDot pulse />
-          {t('home.eyebrow')}
-        </p>
-        {/* 日期锚点(PRD workspace_home 的编辑式 display 元素;挂载后填充) */}
-        <p className="home__date">{today}</p>
-        <h1 className="home__title">
-          cy&rsquo;s <span className="home__title-accent">Stift</span>
-        </h1>
-        <p className="home__lede">{t('home.tagline')}</p>
+        {/* 编辑式顶栏(PRD topbar:左 crumb / 右 本地同步呼吸点) */}
+        <div className="home__topbar">
+          <span className="home__crumb">
+            {t('brand.name')} <span className="home__crumb-sep" aria-hidden="true">/</span> {t('home.topbar.index')}
+          </span>
+          <span className="home__sync">
+            <StatusDot pulse />
+            {t('home.topbar.sync')}
+          </span>
+        </div>
+
+        {/* hero:左 标题组 / 右 大日期锚点(编辑式不对称) */}
+        <div className="home__hero">
+          <div className="home__hero-left">
+            <p className="home__eyebrow">{t('home.eyebrow')}</p>
+            <h1 className="home__title">
+              cy&rsquo;s <span className="home__title-accent">Stift</span>
+            </h1>
+            <p className="home__lede">{t('home.tagline')}</p>
+          </div>
+          <div className="home__hero-date" role="group" aria-label={dateParts.full || undefined}>
+            <span className="home__hero-day">{dateParts.day}</span>
+            <span className="home__hero-my">{dateParts.my}</span>
+          </div>
+        </div>
+
         <div className="home__quick-actions">
           <button
             type="button"
@@ -83,7 +104,10 @@ export default function HomePage() {
         </div>
         <section className="home__continue" aria-labelledby="home-continue-title">
           <div className="home__section-head">
-            <h2 id="home-continue-title">{t('home.continue')}</h2>
+            <h2 id="home-continue-title">
+              <span className="home__secno" aria-hidden="true">01</span>
+              {t('home.continue')}
+            </h2>
             <Link href="/workbench">{t('home.openWorkbench')}</Link>
           </div>
           <div className="home__current">
@@ -112,6 +136,10 @@ export default function HomePage() {
           </div>
         </section>
         <nav className="home__nav" aria-label={t('nav.homeNav')}>
+          <p className="home__secno-row">
+            <span className="home__secno" aria-hidden="true">02</span>
+            <span className="home__secno-label">{t('nav.homeNav')}</span>
+          </p>
           <Link href="/canvas" className="home__nav-link home__nav-link--canvas">
             <span className="home__nav-arrow" aria-hidden="true">→</span>
             <span className="home__nav-label">{t('home.feature.canvas.title')}</span>
@@ -158,11 +186,17 @@ export default function HomePage() {
         .home__content > *:nth-child(3) { animation-delay: 200ms; }
         .home__content > *:nth-child(4) { animation-delay: 300ms; }
         .home__content > *:nth-child(n + 5) { animation-delay: 400ms; }
-        .home__content > .home__title {
+        /* hero 自身不入场(由内部子元素分段入场),避免双重位移 */
+        .home__hero { animation: none; }
+        .home__hero-left > * { animation: home-fade-up 600ms var(--ease-editorial) both; }
+        .home__hero-left > *:nth-child(2) { animation-delay: 100ms; }
+        .home__hero-left > *:nth-child(3) { animation-delay: 200ms; }
+        .home__hero-left > .home__title {
           animation:
-            home-fade-up 600ms var(--ease-editorial) 200ms both,
-            home-tracking-in 600ms var(--ease-editorial) 200ms both;
+            home-fade-up 600ms var(--ease-editorial) 100ms both,
+            home-tracking-in 600ms var(--ease-editorial) 100ms both;
         }
+        .home__hero-date { animation: home-fade-up 600ms var(--ease-editorial) 300ms both; }
         @keyframes home-fade-up {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
@@ -172,36 +206,63 @@ export default function HomePage() {
           to { letter-spacing: -0.03em; opacity: 1; }
         }
         @media (prefers-reduced-motion: reduce) {
-          .home__content > *, .home__content > .home__title { animation: none; }
+          .home, .home * { animation: none !important; }
         }
+
         .home__content {
-          padding: var(--space-8) var(--space-10);
+          padding: var(--space-4) var(--space-10) var(--space-8);
           max-width: 960px;
           display: flex;
           flex-direction: column;
           gap: var(--space-6);
         }
-        .home__eyebrow {
-          margin: 0;
+        /* 顶栏:crumb + 本地同步状态(PRD topbar 结构) */
+        .home__topbar {
+          height: var(--editorial-topbar-height);
           display: flex;
           align-items: center;
+          justify-content: space-between;
+          gap: var(--space-2);
+          border-bottom: var(--border-muted);
+        }
+        .home__crumb {
+          font-family: var(--font-display);
+          font-weight: 600;
+          font-size: var(--font-size-xs);
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: var(--color-on-surface);
+        }
+        .home__crumb-sep { color: var(--color-border-muted); padding: 0 var(--space-quarter); }
+        .home__sync {
+          display: inline-flex;
+          align-items: center;
           gap: var(--space-1);
+          padding: var(--space-quarter) var(--space-1);
+          border: var(--border-muted);
+          font-family: var(--font-mono);
+          font-size: var(--font-size-2xs);
+          letter-spacing: 0.05em;
+          color: var(--color-secondary);
+          white-space: nowrap;
+        }
+        /* hero:左标题组 / 右大日期(编辑式不对称,底边 1px 基线) */
+        .home__hero {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: var(--space-6);
+          align-items: end;
+          padding-bottom: var(--space-3);
+          border-bottom: var(--border-muted);
+        }
+        .home__eyebrow {
+          margin: 0 0 var(--space-2);
           font-family: var(--font-display);
           font-weight: 600;
           font-size: var(--font-size-xs);
           text-transform: uppercase;
           letter-spacing: 0.08em;
           color: var(--color-secondary);
-        }
-        .home__date {
-          margin: 0;
-          min-height: 1.4em; /* 挂载后填充日期,预留行高防跳动 */
-          font-family: var(--font-display);
-          font-weight: 500;
-          font-size: var(--font-size-lg);
-          text-transform: uppercase;
-          letter-spacing: 0.02em;
-          color: var(--color-on-surface);
         }
         .home__title {
           margin: 0;
@@ -213,11 +274,37 @@ export default function HomePage() {
         }
         .home__title-accent { color: var(--color-primary); }
         .home__lede {
-          margin: 0;
+          margin: var(--space-2) 0 0;
           font-family: var(--font-body);
           font-size: var(--font-size-lg);
           line-height: 1.6;
           color: var(--color-on-surface-variant);
+        }
+        .home__hero-date {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: var(--space-1);
+          padding-left: var(--space-6);
+          border-left: var(--border-muted);
+          text-align: right;
+        }
+        .home__hero-day {
+          font-family: var(--font-display);
+          font-weight: 500;
+          font-size: var(--font-size-4xl);
+          line-height: 0.9;
+          letter-spacing: -0.03em;
+          color: var(--color-on-surface);
+          font-variant-numeric: tabular-nums;
+        }
+        .home__hero-my {
+          font-family: var(--font-display);
+          font-weight: 600;
+          font-size: var(--font-size-xs);
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: var(--color-secondary);
         }
         .home__quick-actions { display: grid; grid-template-columns: minmax(0, 2fr) minmax(140px, 1fr); gap: var(--space-2); }
         .home__inbox-action {
@@ -251,6 +338,24 @@ export default function HomePage() {
         .home__current small, .home__recent small { color: var(--color-secondary); font-family: var(--font-mono); font-size: var(--font-size-2xs); }
         .home__recent ul { margin: 0; padding: 0; list-style: none; }
         .home__recent p { color: var(--color-secondary); }
+        /* 段落编号(PRD 编辑式编号锚,红色小号) */
+        .home__secno {
+          font-family: var(--font-mono);
+          font-size: var(--font-size-2xs);
+          font-weight: 500;
+          letter-spacing: 0.08em;
+          color: var(--color-accent);
+          margin-right: var(--space-2);
+        }
+        .home__secno-row { margin: 0; display: flex; align-items: baseline; }
+        .home__secno-label {
+          font-family: var(--font-display);
+          font-weight: 600;
+          font-size: var(--font-size-2xs);
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: var(--color-secondary);
+        }
         @media (max-width: 640px) { .home__continue { grid-template-columns: 1fr; } .home__section-head { grid-column: 1; } }
         .home__foot {
           margin-top: auto;
@@ -336,7 +441,9 @@ export default function HomePage() {
           text-align: right;
         }
         @media (max-width: 768px) {
-          .home__content { padding: var(--space-6) var(--space-3); gap: var(--space-4); }
+          .home__content { padding: var(--space-2) var(--space-3) var(--space-4); gap: var(--space-4); }
+          .home__hero { grid-template-columns: 1fr; }
+          .home__hero-date { align-items: flex-start; text-align: left; border-left: none; padding-left: 0; border-top: var(--border-muted); padding-top: var(--space-2); }
           .home__quick-actions { grid-template-columns: 1fr; }
           .home__capture-note { display: block; text-align: left; grid-column: 2; }
           .home__capture { grid-template-columns: 48px 1fr; }

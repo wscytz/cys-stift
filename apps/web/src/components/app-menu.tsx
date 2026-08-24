@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { CAPTURE_OPEN_EVENT } from '@/features/capture/capture-host'
@@ -142,6 +142,9 @@ export function AppMenu() {
   const [open, setOpen] = useState(false)
   // 默认 false(收起轨);挂载后读持久化偏好(SSG 首帧 = 客户端首帧,无水合错配)。
   const [pinned, setPinned] = useState(false)
+  // 取消钉住的即时反馈:unpin 时鼠标仍悬在栏上,:hover 会让它"看起来没收"。
+  // 抑制 hover 展开到鼠标离开侧栏为止 —— 按下即见收起,同一按钮就地切换。
+  const [suppressHover, setSuppressHover] = useState(false)
 
   useEffect(() => {
     let stored = false
@@ -154,17 +157,25 @@ export function AppMenu() {
     applySidebarWidth(stored)
   }, [])
 
-  const togglePinned = () => {
-    setPinned((p) => {
-      const next = !p
-      try {
-        localStorage.setItem(SIDEBAR_PINNED_KEY, next ? '1' : '0')
-      } catch {
-        // 私隐模式等 localStorage 不可写:仅本会话生效
-      }
-      applySidebarWidth(next)
-      return next
-    })
+  const togglePinned = (e?: ReactMouseEvent<HTMLButtonElement>) => {
+    // 注意:不要把副作用(setSuppressHover/localStorage)写进 setPinned 的 updater
+    // —— updater 在渲染期执行,副作用会被丢(updater 只该算下一个 state)。
+    const next = !pinned
+    try {
+      localStorage.setItem(SIDEBAR_PINNED_KEY, next ? '1' : '0')
+    } catch {
+      // 私隐模式等 localStorage 不可写:仅本会话生效
+    }
+    applySidebarWidth(next)
+    setPinned(next)
+    if (!next) {
+      // 点击即收的完整闭环:①抑制 :hover(鼠标还停在栏上)②blur 按钮 ——
+      // 否则焦点留在 pin 上,:focus-within 也会把栏撑在 280(实测踩过);
+      // 按钮即将随收起隐藏,留着焦点本就不对。键盘用户下一次 Tab 从头进
+      // 轨,链接聚焦照样展开(focus-within 不受抑制)。
+      setSuppressHover(true)
+      e?.currentTarget.blur()
+    }
   }
 
   // 审计 H1 + R2.3/2.4 + quota-silence fix:所有非 React store(db-client /
@@ -245,7 +256,11 @@ export function AppMenu() {
   const iconFor = (href: string) => href.replace(/^\//, '').split('/')[0] ?? ''
 
   return (
-    <nav className={`app-menu${pinned ? ' app-menu--pinned' : ' app-menu--rail'}`} aria-label="Primary">
+    <nav
+      className={`app-menu${pinned ? ' app-menu--pinned' : ' app-menu--rail'}${suppressHover ? ' app-menu--no-hover' : ''}`}
+      aria-label="Primary"
+      onMouseLeave={() => setSuppressHover(false)}
+    >
       <div className="app-menu__head">
         {isNarrow && (
           <button
@@ -275,6 +290,7 @@ export function AppMenu() {
           onClick={togglePinned}
         >
           {pinned ? '«' : '»'}
+
         </button>
       </div>
       <div
@@ -354,12 +370,15 @@ const styles = `
 .app-menu--pinned { width: var(--editorial-sidebar-width); }
 
 /* 悬停 / 键盘聚焦 → 展开(:focus-within 保证 Tab 进导航时焦点可见)。
-   展开是覆盖式 overlay:右边界线加重为墨线(零阴影规范内的线层级)。 */
-.app-menu--rail:hover,
+   展开是覆盖式 overlay:右边界线加重为墨线(零阴影规范内的线层级)。
+   --no-hover:刚取消钉住(unpin)时抑制 hover 展开(到 mouseleave)——
+   否则鼠标还停在栏上,「点了收起却没反应」。键盘聚焦不受抑制。 */
+.app-menu--rail:hover:not(.app-menu--no-hover),
 .app-menu--rail:focus-within {
   width: var(--editorial-sidebar-width);
   border-right: var(--border-hairline);
 }
+.app-menu--no-hover .app-menu__pin { color: var(--color-secondary); }
 
 /* 标签族(文字部分):收起隐藏、展开原地淡入。visibility 带 delay 收尾,
    防止隐形占位拦截点击;展开时立即恢复可见。 */

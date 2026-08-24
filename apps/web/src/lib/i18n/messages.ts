@@ -47,6 +47,8 @@ export const messages = {
 
   /* ── Home page ── */
   'home.eyebrow': { zh: '本地知识工作空间', en: 'Local knowledge workspace' },
+  'home.topbar.index': { zh: '索引', en: 'index' },
+  'home.topbar.sync': { zh: '本地同步', en: 'local · synced' },
   'home.privacy': { zh: '数据仅存本机 · 随时导出 JSON 备份', en: 'Data stays on your machine · export a JSON backup any time' },
   'home.title': { zh: 'cy\'s Stift', en: "cy's Stift" },
   'home.tagline': { zh: '你的灵感，在画布上生长。', en: 'Your inspiration, growing on the canvas.' },
