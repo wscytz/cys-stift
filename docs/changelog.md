@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-08-24 · 未发布(分支 feat/swiss-editorial-ui)· Swiss Editorial UI 重绘 + 动效二轮
+
+> 设计语言从 Bauhaus 6 色切换为 Swiss Editorial / Brutalist Minimalism(warm paper #fbf9f6 + 手术红 #b51b17 + 品牌红 #e03c31 + 石油蓝 #006480;全 0 圆角、零阴影、1px 线层级)。stable v1.3.0 已封存(stable/v1.3.0 分支 + tag),本分支在其上重绘。改动面:packages/ui + web 皮肤/壳 + canvas-engine 渲染兜底色;domain/db/desktop 零改动,用户设置存量(legacy 6 色名冻结为别名)与数据层无影响。PRD 来源 stitch_high_contrast_brutalist(demo 参考,落实按 app 节奏重定标;noise 胶片颗粒/scanLine 等 demo 道具有意不迁)。
+
+- **设计系统 v0.2**:token 全量换血(~50 色 + 编辑栅格 280px 侧栏/64px 顶栏/48px 行 + 150ms ease-out 交互 + 编辑曲线 cubic-bezier(0.16,1,0.3,1));三源镜像(tokens.css/tokens.ts/tailwind-preset.css)+ canvas-engine 兜底 hex 同步;组件库皮肤重绘(button/input/card/tag/toolbar/modal/tooltip,行为逻辑零改)。
+- **侧栏编辑式收张**:64px 图标轨默认收起,:hover/:focus-within 覆盖式展开 280px(width 收张非 translate,图标锚定轨心 13/13 精确 32px);pin 钮钉住常驻,「点击即收」闭环(hover 抑制 + blur);偏好 localStorage 持久化 + layout 内联脚本首帧设宽(零闪烁)。
+- **首页编辑式结构**:顶栏 crumb + 本地同步呼吸点、hero 大日期锚点(64px tabular-nums)、段落编号 01/02;完整入场编排(PRD fadeInUp 600ms + 100ms 步进 + 标题 letterSpacingIn)每会话首访播一次,之后 `.home--fast` 350ms 快速态(useIsoLayoutEffect paint 前翻类,无闪烁无水合错配)。
+- **路由动效分流(动效二轮)**:Next `<Link>` 是客户端导航,`@view-transition` 跨文档 VT 不触发 —— `RouteViewTransitions` 组件在 pushState/popstate 外包 `document.startViewTransition`,Chromium/新 Safari 走编辑式 VT(160/280ms),Firefox/旧 WebKit no-op 回落 page-enter(350ms);`data-vt-nav` 标记分流两态互斥。settle 双 rAF + 300ms 帽(防重载页 rAF 饥饿触发浏览器 4s 超时中止)+ finished 拒绝接住。
+- **动效二轮其余**:列表入场只播一次(`useListSteady`+`.list-steady`,修筛选/搜索按按键重放);display 标题 letterSpacingIn(400ms,ask 常驻 + 各空态);Canvas 页入场编排(面板阶梯上滑 + 画布面 scale 1.02→1 settle);图谱节点 fadeInNode(引擎 alpha 编排,已入场 id 跨 sim 重建不重播);共享元素过渡(home 画布名 ↔ canvas 切换器,current-canvas);筛选面 tactileFlash;按压反馈统一 scale(0.98)/100ms;breathe 换 ::before 环(纯合成器);动效 token 三源(--duration-enter/row/title/press/flash + --stagger-row/step)。
+- **测试衔接**:三组单测入常规套件 —— use-list-steady 时序契约、RouteViewTransitions 四路径(no-op/VT 触发置位/settle 帽/finished 拒绝 + 隐藏页直落)、motion token 三源同步守卫(漂移即红);浏览器级动效断言脚本 `scripts/_motion-audit.mjs`(17 项:VT 分流/守卫两态/快态/canvas 编排/VT 名/token)。
+- **资产**:favicon 三态重绘 + PWA manifest(theme #e03c31)+ 11 个自绘线描导航图标(currentColor 零 hex)。
+- **验证基线**:全包 lint 0 / 全包 test 绿(web 1846 = 1836 + 新 10)/ web build 0 警 / docs:links 过 / render-sweep 18 路由净 / 浏览器断言 17/17 / 线上 12 路由 200。已知取舍:VT 激活期 ~300ms 内点击会被冻结窗吞掉(浏览器 VT 通用行为);Tauri 安装器图标仍旧版;manifest start_url 取 "/"(子路径部署 PWA 安装 nit)。
+
 ## 2026-08-22 · 1.3.0 · 稳定版(= preview.3 + ocr 规则化审查修复)(tag v1.3.0)
 
 > preview.3 之后 main 上的增量:ocr 规则化审查(2026-08-15,`v1.1.4..HEAD` 79 文件,4 shard subagent + 主 agent 复现)发现无 P1,6 P2 + 18 P3 全修;配套 docs 与 gitignore。稳定版验证基线(2026-08-22 定版时复跑):全包 lint 0 错 / 全包 test 全绿(domain 87 + canvas-engine 586 + cys-dsl 405 + db 8 + web 1836)/ web build exit 0 / docs:links 通过。
