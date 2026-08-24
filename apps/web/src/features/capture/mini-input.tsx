@@ -357,11 +357,11 @@ const styles = `
 }
 .mi-frame {
   width: min(440px, calc(100vw - var(--space-6)));
-  background: var(--color-white);
-  /* 中性 hairline 边(对齐 Modal/搜索 frame);红只留 input/textarea 聚焦强调。 */
-  border: 1px solid color-mix(in srgb, var(--color-black) 12%, transparent);
+  background: var(--color-surface-white);
+  /* Swiss Editorial 浮层文档:surface-white + 1px 墨线,零阴影;
+     红只留 input/textarea 聚焦强调(capture = 主行动)。 */
+  border: var(--border-hairline);
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md);
   overflow: hidden;
 }
 .mi-body { padding: var(--space-3) var(--space-3) var(--space-2); }

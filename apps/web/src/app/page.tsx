@@ -18,17 +18,28 @@ import { workbenchStore } from '@/lib/workbench-store'
 import { StatusDot } from '@cys-stift/ui/status-dot'
 
 export default function HomePage() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const { snap, service, ready } = useDb()
   const { snapshot: canvasSnapshot } = useCanvases()
   // 平台检测放 useEffect(navigator/window 客户端才有)。pre-mount 默认 false,
   // 让 SSG 构建期 HTML 与客户端首帧一致 —— 否则 hydration mismatch,dev 弹错误遮罩。
   const [isMac, setIsMac] = useState(false)
   const [desktop, setDesktop] = useState(false)
+  // PRD workspace_home 的日期锚点:同样挂载后渲染(SSG 构建期日期会过期,且
+  // toLocaleDateString 依赖运行时 ICU;首帧空串两侧一致,无水合错配)。
+  const [today, setToday] = useState('')
   useEffect(() => {
     setIsMac(detectIsMac())
     setDesktop(isDesktop())
-  }, [])
+    setToday(
+      new Date().toLocaleDateString(locale === 'en' ? 'en-US' : 'zh-CN', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }),
+    )
+  }, [locale])
   const activeCanvas = canvasSnapshot.canvases.find((canvas) => canvas.id === canvasSnapshot.activeCanvasId)
   const activeCount = ready ? service.listOnCanvas(canvasSnapshot.activeCanvasId).length : 0
   const recentCards = useMemo(() => {
@@ -47,6 +58,8 @@ export default function HomePage() {
           <StatusDot pulse />
           {t('home.eyebrow')}
         </p>
+        {/* 日期锚点(PRD workspace_home 的编辑式 display 元素;挂载后填充) */}
+        <p className="home__date">{today}</p>
         <h1 className="home__title">
           cy&rsquo;s <span className="home__title-accent">Stift</span>
         </h1>
@@ -155,6 +168,16 @@ export default function HomePage() {
           text-transform: uppercase;
           letter-spacing: 0.08em;
           color: var(--color-secondary);
+        }
+        .home__date {
+          margin: 0;
+          min-height: 1.4em; /* 挂载后填充日期,预留行高防跳动 */
+          font-family: var(--font-display);
+          font-weight: 500;
+          font-size: var(--font-size-lg);
+          text-transform: uppercase;
+          letter-spacing: 0.02em;
+          color: var(--color-on-surface);
         }
         .home__title {
           margin: 0;

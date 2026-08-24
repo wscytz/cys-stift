@@ -46,6 +46,14 @@ const mono = localFont({
 export const metadata: Metadata = {
   title: "cy's Stift",
   description: '本地优先的灵感画布。你的灵感，在画布上生长。',
+  manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
 }
 
 // viewport:device-width + initialScale 1。不禁 pinch(保 WCAG 1.4.4 文字缩放无障碍);
