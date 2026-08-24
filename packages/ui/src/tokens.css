@@ -196,4 +196,8 @@
   /* ── Motion:150ms ease-out;页面切换走编辑式滑入/淡入 ───────────── */
   --duration-fast: 150ms;
   --ease-standard: ease-out;
+  /* PRD animated 稿:入场 fadeInUp 600ms cubic-bezier(0.16,1,0.3,1)。
+     应用内取 350ms(同曲线)——600ms 是 demo 首屏 hero 的节奏,路由切换太拖。 */
+  --ease-editorial: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-page: 350ms;
 }

@@ -1,11 +1,8 @@
 'use client'
 
 /**
- * cy's Stift — Phase 0 + Phase 4 + Phase 6 + Phase 7. A Bauhaus-styled
- * home page so we can verify tokens, fonts and the 8px grid are wired.
- * Phase 6 adds the capture entry hint (Cmd/Ctrl+Shift+E). The same entry is
- * clickable so first-time users do not need to discover the shortcut.
- * Phase 7 adds the Archive entry (blue region stripe).
+ * cy's Stift — Swiss Editorial home(v0.2 重绘;原 Phase 0/4/6/7 结构保留:
+ * 捕获入口提示 / 快捷入口 / 继续工作区 / 大入口块 / 次级链接 / 页脚)。
  */
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -18,6 +15,7 @@ import { CAPTURE_OPEN_EVENT } from '@/features/capture/capture-host'
 import { useDb } from '@/lib/db-client'
 import { useCanvases } from '@/lib/canvas-store'
 import { workbenchStore } from '@/lib/workbench-store'
+import { StatusDot } from '@cys-stift/ui/status-dot'
 
 export default function HomePage() {
   const { t } = useI18n()
@@ -44,9 +42,11 @@ export default function HomePage() {
     <main id="main" tabIndex={-1} className="home">
       <CaptureHint />
       <CaptureSampleHint />
-      <header className="home__bar" aria-hidden="true" />
       <section className="home__content">
-        <p className="home__eyebrow">{t('home.eyebrow')}</p>
+        <p className="home__eyebrow">
+          <StatusDot />
+          {t('home.eyebrow')}
+        </p>
         <h1 className="home__title">
           cy&rsquo;s <span className="home__title-accent">Stift</span>
         </h1>
@@ -135,14 +135,8 @@ export default function HomePage() {
         </footer>
       </section>
       <style>{`
-        .home {
-          min-height: 100vh;
-          display: grid;
-          grid-template-rows: 8px 1fr;
-        }
-        .home__bar {
-          background: var(--color-red);
-        }
+        /* Swiss Editorial home(编辑式:纸底、1px 线、display 锚点、零阴影) */
+        .home { min-height: 100vh; }
         .home__content {
           padding: var(--space-8) var(--space-10);
           max-width: 960px;
@@ -152,82 +146,102 @@ export default function HomePage() {
         }
         .home__eyebrow {
           margin: 0;
-          font-family: var(--font-mono);
-          font-size: var(--font-size-sm);
+          display: flex;
+          align-items: center;
+          gap: var(--space-1);
+          font-family: var(--font-display);
+          font-weight: 600;
+          font-size: var(--font-size-xs);
           text-transform: uppercase;
-          letter-spacing: 0.16em;
-          color: var(--color-gray);
+          letter-spacing: 0.08em;
+          color: var(--color-secondary);
         }
         .home__title {
           margin: 0;
           font-family: var(--font-display);
           font-weight: 500;
-          font-size: var(--font-size-3xl);
-          line-height: 1;
-          letter-spacing: -0.02em;
+          font-size: var(--font-size-4xl);
+          line-height: 1.1;
+          letter-spacing: -0.03em;
         }
-        .home__title-accent {
-          color: var(--color-red);
-        }
+        .home__title-accent { color: var(--color-primary); }
         .home__lede {
           margin: 0;
-          font-family: var(--font-display);
-          font-size: var(--font-size-xl);
-          color: var(--color-black-soft);
+          font-family: var(--font-body);
+          font-size: var(--font-size-lg);
+          line-height: 1.6;
+          color: var(--color-on-surface-variant);
         }
         .home__quick-actions { display: grid; grid-template-columns: minmax(0, 2fr) minmax(140px, 1fr); gap: var(--space-2); }
-        .home__inbox-action { display: flex; min-height: 72px; align-items: center; justify-content: center; gap: var(--space-2); border: var(--border-thick); color: var(--color-black); text-decoration: none; font-family: var(--font-display); font-size: var(--font-size-lg); }
-        .home__inbox-action:hover { background: var(--color-yellow); }
-        .home__inbox-action:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-        .home__continue { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: var(--space-3); border-top: var(--border-thick); padding-top: var(--space-3); }
+        .home__inbox-action {
+          display: flex; min-height: 72px; align-items: center; justify-content: center; gap: var(--space-2);
+          border: var(--border-hairline);
+          background: var(--color-surface);
+          color: var(--color-on-surface);
+          text-decoration: none;
+          font-family: var(--font-display);
+          font-size: var(--font-size-lg);
+          transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+        }
+        /* hover 反白(spec Buttons:Surface↔Text 反转) */
+        .home__inbox-action:hover { background: var(--color-on-surface); color: var(--color-surface); }
+        .home__inbox-action:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+        .home__continue { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: var(--space-3); border-top: var(--border-muted); padding-top: var(--space-3); }
         .home__section-head { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; }
-        .home__section-head h2 { margin: 0; font-family: var(--font-display); font-size: var(--font-size-xl); }
-        .home__section-head a { color: var(--color-black); font-family: var(--font-mono); font-size: var(--font-size-xs); }
-        .home__current, .home__recent { min-width: 0; }
-        .home__current > span, .home__recent > span { display: block; margin-bottom: var(--space-1); font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); text-transform: uppercase; }
-        .home__current a, .home__recent a { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: var(--space-2); color: var(--color-black); text-decoration: none; border-bottom: var(--border-hairline); }
-        .home__current small, .home__recent small { color: var(--color-gray); font-family: var(--font-mono); font-size: var(--font-size-xs); }
+        .home__section-head h2 { margin: 0; font-family: var(--font-display); font-size: var(--font-size-xl); font-weight: 500; letter-spacing: -0.01em; }
+        .home__section-head a { color: var(--color-on-surface); font-family: var(--font-display); font-weight: 600; font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; }
+        .home__current > span, .home__recent > span { display: block; margin-bottom: var(--space-1); font-family: var(--font-display); font-weight: 600; font-size: var(--font-size-2xs); color: var(--color-secondary); text-transform: uppercase; letter-spacing: 0.08em; }
+        /* 48px 行 + muted 底线 + 白 hover(Data Tables 行规范) */
+        .home__current a, .home__recent a {
+          display: flex; min-height: var(--editorial-row-height); align-items: center; justify-content: space-between; gap: var(--space-2);
+          color: var(--color-on-surface); text-decoration: none;
+          border-bottom: var(--border-muted);
+          padding: 0 var(--space-1);
+          margin: 0 calc(-1 * var(--space-1));
+          transition: background-color var(--duration-fast) var(--ease-standard);
+        }
+        .home__current a:hover, .home__recent a:hover { background: var(--color-surface-white); }
+        .home__current small, .home__recent small { color: var(--color-secondary); font-family: var(--font-mono); font-size: var(--font-size-2xs); }
         .home__recent ul { margin: 0; padding: 0; list-style: none; }
-        .home__recent p { color: var(--color-gray); }
+        .home__recent p { color: var(--color-secondary); }
         @media (max-width: 640px) { .home__continue { grid-template-columns: 1fr; } .home__section-head { grid-column: 1; } }
         .home__foot {
           margin-top: auto;
           padding-top: var(--space-8);
           display: flex;
+          gap: var(--space-2);
           justify-content: space-between;
           font-family: var(--font-mono);
-          font-size: var(--font-size-xs);
-          color: var(--color-gray);
-          border-top: var(--border-hairline);
+          font-size: var(--font-size-2xs);
+          letter-spacing: 0.05em;
+          color: var(--color-secondary);
+          border-top: var(--border-muted);
         }
-        /* Secondary text-link row: low-emphasis mono links to Search /
-           Trash / Settings so a user landing on / can reach them without
-           opening the AppMenu. Bauhaus-restrained: gray, hairline, mono. */
+        /* Secondary text-link row: low-emphasis links to Search / Trash / Settings
+           so a user landing on / can reach them without opening the sidebar. */
         .home__secondary {
           display: flex;
           align-items: center;
           gap: var(--space-2);
-          font-family: var(--font-mono);
+          font-family: var(--font-display);
+          font-weight: 600;
           font-size: var(--font-size-xs);
           text-transform: uppercase;
-          letter-spacing: 0.12em;
-          color: var(--color-gray);
+          letter-spacing: 0.08em;
+          color: var(--color-secondary);
         }
         .home__secondary-link {
-          color: var(--color-gray);
+          color: var(--color-secondary);
           text-decoration: none;
-          border-bottom: var(--border-hairline);
+          border-bottom: 1px solid transparent;
           padding-bottom: 1px;
-          transition: color 80ms ease-out;
+          transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
         }
-        .home__secondary-link:hover { color: var(--color-black); }
-.home__secondary-link:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-        .home__secondary-sep { color: var(--color-gray); }
+        .home__secondary-link:hover { color: var(--color-on-surface); border-bottom-color: var(--color-on-surface); }
+        .home__secondary-link--accent:hover { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+        .home__secondary-link:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+        .home__secondary-sep { color: var(--color-border-muted); }
         .home__nav { margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
-        .home__nav-link--canvas .home__nav-arrow { background: var(--color-black); }
-        .home__nav-link--canvas:hover { box-shadow: 4px 4px 0 0 var(--color-black); }
-        .home__nav-link--archive .home__nav-arrow { background: var(--color-blue); }
-        .home__nav-link--archive:hover { box-shadow: 4px 4px 0 0 var(--color-blue); }
         /* Capture hint card — decorative. The actual Mini Input is global
            and launches from anywhere via Cmd/Ctrl+Shift+E. We don't
            wire a click handler to this card to keep the capture flow
@@ -238,23 +252,23 @@ export default function HomePage() {
           align-items: center;
           gap: var(--space-3);
           padding: var(--space-3) var(--space-3);
-          background: var(--color-red);
-          color: var(--color-white);
-          border: var(--border-thick);
-          border-color: var(--color-black);
+          background: var(--color-primary);
+          color: var(--color-on-primary);
+          border: 1px solid var(--color-on-surface);
           border-radius: var(--radius-sm);
-          box-shadow: var(--shadow-md);
           cursor: pointer;
           text-align: left;
           font: inherit;
+          transition: background-color var(--duration-fast) var(--ease-standard);
         }
-        .home__capture:hover { box-shadow: 4px 4px 0 0 var(--color-black); }
-        .home__capture:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+        .home__capture:hover { background: var(--color-primary-container); }
+        .home__capture:active { background: var(--color-on-surface); }
+        .home__capture:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
         .home__capture-arrow {
           display: inline-flex; align-items: center; justify-content: center;
           width: 48px; height: 48px;
-          background: var(--color-white);
-          color: var(--color-red);
+          background: var(--color-surface);
+          color: var(--color-primary);
           font-family: var(--font-mono);
           font-size: var(--font-size-2xl);
           font-weight: 700;
@@ -264,13 +278,14 @@ export default function HomePage() {
           font-size: var(--font-size-2xl);
           font-weight: 500;
           letter-spacing: -0.01em;
-          color: var(--color-white);
+          color: var(--color-on-primary);
         }
         .home__capture-note {
-          font-family: var(--font-mono);
-          font-size: var(--font-size-xs);
+          font-family: var(--font-display);
+          font-weight: 600;
+          font-size: var(--font-size-2xs);
           text-transform: uppercase;
-          letter-spacing: 0.12em;
+          letter-spacing: 0.08em;
           text-align: right;
         }
         @media (max-width: 768px) {
@@ -279,35 +294,37 @@ export default function HomePage() {
           .home__capture-note { display: block; text-align: left; grid-column: 2; }
           .home__capture { grid-template-columns: 48px 1fr; }
         }
+        /* 大入口块(canvas/archive):1px 墨线 + 白 hover,箭头方块区域色 */
         .home__nav-link {
           display: grid;
           grid-template-columns: 48px auto 1fr;
           align-items: center;
           gap: var(--space-3);
           padding: var(--space-3) var(--space-3);
-          background: var(--color-white);
-          color: var(--color-black);
+          background: var(--color-surface);
+          color: var(--color-on-surface);
           text-decoration: none;
-          border: var(--border-thick);
+          border: var(--border-hairline);
           border-radius: var(--radius-sm);
-          box-shadow: var(--shadow-md);
-          transition: transform 80ms ease-out, box-shadow 80ms ease-out;
+          transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
         }
-        .home__nav-link:hover { box-shadow: 4px 4px 0 0 var(--color-red); }
-        .home__nav-link:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-        .home__nav-link:active { transform: translate(2px, 2px); box-shadow: var(--shadow-sm); }
+        .home__nav-link:hover { background: var(--color-surface-white); }
+        .home__nav-link:active { background: var(--color-surface-container); }
+        .home__nav-link:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
         .home__nav-arrow {
           display: inline-flex;
           align-items: center;
           justify-content: center;
           width: 48px;
           height: 48px;
-          background: var(--color-red);
-          color: var(--color-white);
+          background: var(--color-secondary);
+          color: var(--color-surface);
           font-family: var(--font-display);
           font-size: var(--font-size-2xl);
           line-height: 1;
         }
+        .home__nav-link--canvas .home__nav-arrow { background: var(--color-on-surface); }
+        .home__nav-link--archive .home__nav-arrow { background: var(--color-tertiary); }
         .home__nav-label {
           font-family: var(--font-display);
           font-size: var(--font-size-2xl);
@@ -315,11 +332,12 @@ export default function HomePage() {
           letter-spacing: -0.01em;
         }
         .home__nav-note {
-          font-family: var(--font-mono);
-          font-size: var(--font-size-xs);
+          font-family: var(--font-display);
+          font-weight: 600;
+          font-size: var(--font-size-2xs);
           text-transform: uppercase;
-          letter-spacing: 0.12em;
-          color: var(--color-gray);
+          letter-spacing: 0.08em;
+          color: var(--color-secondary);
           text-align: right;
         }
         @media (max-width: 768px) {

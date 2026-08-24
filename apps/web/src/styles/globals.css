@@ -41,6 +41,37 @@ body {
    basis 属正常)。 */
 body > main.page { flex: 1; min-height: 0; }
 
+/* ── Swiss Editorial 全局动效(v0.2)────────────────────────────────────────
+   1) 页面入场:编辑式上滑淡入(PRD animated 稿 fadeInUp 曲线,取 350ms ——
+      600ms 是 demo 首屏 hero 的节奏,路由切换太拖)。每路由的 main 随页面重挂载,
+      动画每次导航触发一次。transform 仅在动画期间存在,结束后无 containing-block
+      副作用(fixed 定位的 Modal/CaptureHost 不受影响)。
+   2) Same-document View Transitions:支持的引擎(Chromium WebView2 / 新 Safari)
+      路由切换自动获得编辑式过渡;不支持则静默无动画(渐进增强)。 */
+@view-transition { navigation: auto; }
+
+body > main {
+  animation: page-enter var(--duration-page) var(--ease-editorial);
+}
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body > main { animation: none; }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* ── 编辑式侧栏让位(≥1200:280px 固定左栏,主内容右移)─────────────────
+   <1200 保持 AppMenu 顶部条 + 抽屉形态(1200 = 既有可读性断点,见 app-menu.tsx)。 */
+@media (min-width: 1200px) {
+  body > main { margin-left: var(--editorial-sidebar-width); }
+}
+
 /* Bauhaus 滚动条(v0.39.1 跨平台适配):硬色块、无圆角、无渐变,贴合 6 原色气质。
    Mac 不复用系统 overlay 滚动条,Win 不用系统灰滚动条 —— 两端统一。
    Firefox 走 scrollbar-color/width(不支持 webkit 伪元素)。 */

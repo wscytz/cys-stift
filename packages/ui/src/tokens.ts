@@ -147,6 +147,9 @@ export const tokens = {
   motion: {
     fast: '150ms',
     ease: 'ease-out',
+    /** PRD animated 稿入场曲线;页面切换取 350ms(600ms 是 demo hero 节奏)。 */
+    editorial: 'cubic-bezier(0.16, 1, 0.3, 1)',
+    page: '350ms',
   },
 } as const
 

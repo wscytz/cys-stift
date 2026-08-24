@@ -37,13 +37,14 @@ function captureComboHint(isMac: boolean, t: (key: MessageKey, params?: Record<s
 }
 
 /**
- * AppMenu — global top menu bar.
+ * AppMenu — Swiss Editorial 全局侧栏(v0.2,PRD unified sidebar)。
  *
- * 响应式(v0.48):宽屏横向导航;窄于 1200px 收成 ☰ 汉堡抽屉
- * (entries 变竖向覆盖列表 + backdrop 点关闭),version/sep 藏。1200px 是内容
- * 宽度阈值:完整导航在 1024px 会把中文链接压成逐字竖排,比标准 bp-md 更窄的
- * 设备应优先保证可读和可点。useMatchMedia
- * 读断点,open state 控抽屉;路由切换 / 回桌面自动关。
+ * ≥1200:280px 固定左侧栏 —— 品牌头 / 分组导航(可见组标,sidebar-label 大写)/
+ * 底部固定 Capture 主行动。active = 2px 品牌红左线(Sidebar 规范)。
+ * <1200:64px 顶条(汉堡 + 品牌 + Capture)+ 左滑抽屉(1200 = 既有可读性断点:
+ * 完整导航在 1024px 会把中文链接压成逐字竖排,比标准 bp-md 更窄的设备应优先
+ * 保证可读和可点)。useMatchMedia 读断点,open state 控抽屉;路由切换 / 回
+ * 宽屏自动关。
  */
 export function AppMenu() {
   const pathname = usePathname() ?? '/'
@@ -83,7 +84,7 @@ export function AppMenu() {
     }
   }, [t])
 
-  // 路由切换关抽屉(点导航后)+ 回桌面关(防残留)。
+  // 路由切换关抽屉(点导航后)+ 回宽屏关(防残留)。
   useEffect(() => {
     setOpen(false)
   }, [pathname])
@@ -131,16 +132,23 @@ export function AppMenu() {
 
   return (
     <nav className="app-menu" aria-label="Primary">
-      <span className="app-menu__bar" aria-hidden="true" />
-      <Link href="/" className="app-menu__brand">
-        {t('brand.name')}
-      </Link>
-      {!isNarrow && (
-        <>
-          <span className="app-menu__version" aria-label="app version">v{VERSION}</span>
-          <span className="app-menu__sep" aria-hidden="true">/</span>
-        </>
-      )}
+      <div className="app-menu__head">
+        {isNarrow && (
+          <button
+            type="button"
+            className="app-menu__burger"
+            aria-expanded={open}
+            aria-label={open ? t('common.close') : t('common.menu')}
+            onClick={() => setOpen((o) => !o)}
+          >
+            {open ? '✕' : '☰'}
+          </button>
+        )}
+        <Link href="/" className="app-menu__brand">
+          {t('brand.name')}
+        </Link>
+        <span className="app-menu__version" aria-label="app version">v{VERSION}</span>
+      </div>
       <div
         className={`app-menu__entries${isNarrow && open ? ' app-menu__entries--open' : ''}`}
       >
@@ -160,28 +168,18 @@ export function AppMenu() {
           </div>
         ))}
       </div>
-      <span className="app-menu__spacer" />
-      <button
-        type="button"
-        className="app-menu__capture"
-        onClick={onCaptureClick}
-        // R11:捕获按钮恒带快捷键 tooltip(首次提示被过早关掉/从深链进入的用户
-        // 也能从这里发现 ⌘⇧E/Ctrl+⇧E —— 不再一次性 dismiss 永久失学)。
-        title={captureComboHint(isMac, t)}
-      >
-        {t('nav.capture')}
-      </button>
-      {isNarrow && (
+      <div className="app-menu__foot">
         <button
           type="button"
-          className="app-menu__burger"
-          aria-expanded={open}
-          aria-label={open ? t('common.close') : t('common.menu')}
-          onClick={() => setOpen((o) => !o)}
+          className="app-menu__capture"
+          onClick={onCaptureClick}
+          // R11:捕获按钮恒带快捷键 tooltip(首次提示被过早关掉/从深链进入的用户
+          // 也能从这里发现 ⌘⇧E/Ctrl+⇧E —— 不再一次性 dismiss 永久失学)。
+          title={captureComboHint(isMac, t)}
         >
-          {open ? '✕' : '☰'}
+          {t('nav.capture')}
         </button>
-      )}
+      </div>
       {isNarrow && open && (
         <button
           type="button"
@@ -197,92 +195,188 @@ export function AppMenu() {
 }
 
 const styles = `
+/* ── ≥1200:280px 固定左侧栏(编辑式 unified sidebar)─────────────────────
+   main 让位由 globals.css 的 body > main { margin-left } 承担。 */
 .app-menu {
-  position: sticky;
+  position: fixed;
   top: 0;
+  bottom: 0;
+  left: 0;
   z-index: 40;
+  display: flex;
+  flex-direction: column;
+  width: var(--editorial-sidebar-width);
+  background: var(--color-surface);
+  border-right: var(--border-muted);
+  font-family: var(--font-display);
+}
+.app-menu__head {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  background: var(--color-white);
-  border-bottom: var(--border-hairline);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-}
-.app-menu__bar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: var(--color-red);
+  height: var(--editorial-topbar-height);
+  padding: 0 var(--space-3);
+  border-bottom: var(--border-muted);
+  flex-shrink: 0;
 }
 .app-menu__brand {
+  font-family: var(--font-display);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--color-on-surface);
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-width: 44px;
   min-height: 44px;
-  font-family: var(--font-display);
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  color: var(--color-black);
-  text-decoration: none;
-  letter-spacing: -0.005em;
 }
-.app-menu__sep { color: var(--color-gray); }
+.app-menu__brand:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .app-menu__version {
   font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  color: var(--color-gray);
-  letter-spacing: 0.04em;
+  font-size: var(--font-size-2xs);
+  color: var(--color-secondary);
+  letter-spacing: 0.05em;
   user-select: none;
+  margin-left: auto;
 }
-.app-menu__entries { display: flex; gap: var(--space-1); }
-.app-menu__group { display: flex; align-items: center; gap: var(--space-1); border-left: 1px solid var(--color-gray-soft); padding-left: var(--space-1); }
-.app-menu__group:first-child { border-left: 0; padding-left: 0; }
-.app-menu__group-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* 导航主体:纵向分组,可见组标(ui-label-caps),48px 行 */
+.app-menu__entries {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+}
+.app-menu__group { display: flex; flex-direction: column; }
+.app-menu__group-label {
+  padding: 0 var(--space-3);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--font-size-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-secondary);
+}
 .app-menu__link {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  min-height: 44px;
+  min-height: var(--editorial-row-height);
+  padding: 0 var(--space-3) 0 calc(var(--space-3) - 2px);
+  border-left: 2px solid transparent;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: var(--font-size-sm);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--color-gray);
+  letter-spacing: 0.05em;
+  color: var(--color-secondary);
   text-decoration: none;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
 }
-.app-menu__link:hover { color: var(--color-black); background: var(--color-gray-soft); }
-.app-menu__link:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-.app-menu__link--active { color: var(--color-black); border-bottom: 2px solid var(--color-black); }
-.app-menu__spacer { flex: 1; }
+.app-menu__link:hover {
+  color: var(--color-on-surface);
+  background: var(--color-surface-container);
+}
+.app-menu__link:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+/* active = 2px 品牌红左线(Sidebar 规范:#e03c31)+ 墨字 + 纸白面 */
+.app-menu__link--active {
+  border-left-color: var(--color-accent);
+  background: var(--color-surface-white);
+  color: var(--color-on-surface);
+}
+
+/* 底部固定 Capture 主行动(红填充,唯一常驻红块) */
+.app-menu__foot {
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-2) var(--space-3);
+  border-top: var(--border-muted);
+}
 .app-menu__capture {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  width: 100%;
+  min-height: var(--editorial-row-height);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border: 1px solid var(--color-on-surface);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  background: var(--color-red);
-  color: var(--color-white);
-  border: var(--border-hairline);
-  border-color: var(--color-black);
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-sm);
+  letter-spacing: 0.08em;
   cursor: pointer;
-  min-width: 44px;
-  min-height: 44px;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
 }
-.app-menu__capture:hover { box-shadow: 2px 2px 0 0 var(--color-black); }
-.app-menu__capture:active { transform: translate(2px, 2px); box-shadow: none; }
-.app-menu__capture:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.app-menu__capture:hover { background: var(--color-primary-container); }
+.app-menu__capture:active { background: var(--color-on-surface); }
+.app-menu__capture:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* ── <1200:顶条 + 左滑抽屉 ─────────────────────────────────────────────
+   顶条占文档流(sticky),main 不让位;entries/foot 收进 fixed 抽屉。 */
+@media (max-width: 1199px) {
+  .app-menu {
+    position: sticky;
+    bottom: auto;
+    right: 0;
+    width: auto;
+    flex-direction: column;
+    border-right: none;
+    border-bottom: var(--border-muted);
+    background: var(--color-surface);
+  }
+  .app-menu__head {
+    height: var(--editorial-topbar-height);
+    border-bottom: none;
+  }
+  .app-menu__version { display: none; }
+  .app-menu__entries {
+    position: fixed;
+    top: var(--editorial-topbar-height);
+    bottom: 0;
+    left: 0;
+    width: var(--editorial-sidebar-width);
+    background: var(--color-surface);
+    border-right: var(--border-hairline);
+    transform: translateX(-100%);
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      transform var(--duration-fast) var(--ease-standard),
+      opacity var(--duration-fast) var(--ease-standard);
+    z-index: 40;
+  }
+  .app-menu__entries--open {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .app-menu__group { border-top: var(--border-muted); padding-top: var(--space-2); }
+  .app-menu__group:first-child { border-top: 0; padding-top: 0; }
+  .app-menu__foot {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: var(--editorial-sidebar-width);
+    background: var(--color-surface);
+    transform: translateX(-100%);
+    transition: transform var(--duration-fast) var(--ease-standard);
+    z-index: 40;
+  }
+  /* 抽屉开时底部 Capture 跟随滑入(entries 在前 foot 在后,~ 兄弟选择器) */
+  .app-menu__entries--open ~ .app-menu__foot { transform: translateX(0); }
+}
 
 /* 汉堡按钮(<1200 显;宽屏不 render) */
 .app-menu__burger {
   font-family: var(--font-mono);
   font-size: var(--font-size-base);
   background: transparent;
-  color: var(--color-black);
+  color: var(--color-on-surface);
   border: none;
   cursor: pointer;
   padding: 0 var(--space-1);
@@ -290,53 +384,18 @@ const styles = `
   min-width: 44px;
   min-height: 44px;
 }
-.app-menu__burger:hover { color: var(--color-red); }
-.app-menu__burger:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+.app-menu__burger:hover { color: var(--color-primary); }
+.app-menu__burger:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 /* 抽屉 backdrop(open 时 render;<1200) */
 .app-menu__backdrop {
   position: fixed;
   inset: 0;
+  top: var(--editorial-topbar-height);
   background: var(--color-scrim);
   border: none;
   padding: 0;
   cursor: default;
   z-index: 39;
-}
-
-/* <1200:entries 变竖向覆盖抽屉(--open 控显隐) */
-@media (max-width: 1199px) {
-  .app-menu__entries {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    flex-direction: column;
-    align-items: stretch;
-    background: var(--color-white);
-    border-bottom: var(--border-hairline);
-    box-shadow: 4px 4px 0 0 var(--color-black);
-    padding: var(--space-2) var(--space-4);
-    gap: var(--space-1);
-    transform: translateY(-8px);
-    opacity: 0;
-    pointer-events: none;
-    transition: transform 120ms ease-out, opacity 120ms ease-out;
-    z-index: 40;
-  }
-  .app-menu__entries--open {
-    transform: translateY(0);
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .app-menu__group { flex-direction: column; align-items: stretch; border-left: 0; border-top: 1px solid var(--color-gray-soft); padding: var(--space-1) 0 0; }
-  .app-menu__group:first-child { border-top: 0; }
-  .app-menu__group-label { position: static; width: auto; height: auto; overflow: visible; clip-path: none; padding: var(--space-1) var(--space-2) 0; color: var(--color-gray); font-size: 10px; text-transform: uppercase; }
-  /* 竖向抽屉里 active 用左条而非下划线 */
-  .app-menu__link--active {
-    border-bottom: none;
-    border-left: var(--space-quarter) solid var(--color-black);
-    padding-left: var(--space-2);
-  }
 }
 `

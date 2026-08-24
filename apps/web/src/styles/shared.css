@@ -1,30 +1,33 @@
 /**
- * Shared UI patterns — Bauhaus design language.
+ * Shared UI patterns — Swiss Editorial design language (v0.2 重绘;类名沿袭 Bauhaus
+ * 时期以保消费方零改动 —— .mono-label 现已是 display-caps 标签,语义=UI chrome 标签)。
  * Import this from globals.css to make patterns available app-wide.
  * Each pattern is documented with its intended use.
  *
  * Principles:
- *   - mono labels: uppercase, letter-spacing 0.12em (consistent across all UI chrome)
+ *   - UI labels (原 mono-label): Space Grotesk uppercase, letter-spacing 0.08em (ui-label-caps)
  *   - display titles: Space Grotesk, negative letter-spacing
- *   - callouts: hard offset shadow (no blur), Bauhaus primary colors only
+ *   - callouts: 1px 线定义,零阴影(warm paper / ink / surgical red)
+ *   - rows: 48px 行高,hover = surface-white 色调分层(Data Tables 规范)
  *   - spacing: 8px grid via var(--space-*)
  */
 
-/* ── 1. Mono label (all UI chrome: labels, crumbs, eyebrows, tags) ──────────── */
+/* ── 1. UI label (all UI chrome: labels, crumbs, eyebrows, tags) ──────────── */
 .mono-label {
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
+  font-weight: 600;
   font-size: var(--font-size-xs);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--color-gray);
+  letter-spacing: 0.08em;
+  color: var(--color-secondary);
 }
 .mono-label--wide {
-  letter-spacing: 0.14em;
+  letter-spacing: 0.1em;
   cursor: pointer;
   padding: var(--space-2);
 }
 .mono-label--dark {
-  color: var(--color-black-soft);
+  color: var(--color-on-surface-variant);
 }
 
 /* ── 2. Display title (page and section headings) ───────────────────────────── */
@@ -41,11 +44,12 @@
 
 /* ── 3. Eyebrow (above titles, small uppercase label) ───────────────────────── */
 .eyebrow {
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
+  font-weight: 600;
   font-size: var(--font-size-xs);
   text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: var(--color-gray);
+  letter-spacing: 0.08em;
+  color: var(--color-secondary);
   margin: 0;
 }
 
@@ -109,25 +113,25 @@
 
 /* ── 7. Crumb navigation (breadcrumb trail) ─────────────────────────────────── */
 .crumb {
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-size: var(--font-size-sm);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--color-gray);
+  letter-spacing: 0.05em;
+  color: var(--color-secondary);
 }
-.crumb--here { color: var(--color-black); }
-.crumb-sep { color: var(--color-gray); }
+.crumb--here { color: var(--color-on-surface); }
+.crumb-sep { color: var(--color-secondary); }
 .crumb-spacer { flex: 1; }
 
-/* ── 8. Divider ─────────────────────────────────────────────────────────────── */
+/* ── 8. Divider(1px 结构线,GridRule 的 CSS 类形态)───────────────────────── */
 .divider {
-  height: 1px;
-  background: var(--color-gray-soft);
+  height: var(--editorial-grid-line);
+  background: var(--color-border-muted);
   border: none;
   margin: 0;
 }
 
-/* ── 9. Bauhaus callout blocks ──────────────────────────────────────────────── */
+/* ── 9. Callout blocks(类名沿袭 bauhaus-;皮 = 1px 线 + 色调分层,零阴影)─── */
 .bauhaus-callout {
   padding: var(--space-2) var(--space-3);
   border: var(--border-hairline);
@@ -136,21 +140,21 @@
   line-height: 1.5;
 }
 .bauhaus-callout--warn {
-  background: var(--color-yellow);
-  border-color: var(--color-black);
+  background: var(--color-yellow-soft);
+  border-color: var(--color-on-surface);
 }
 .bauhaus-callout--inverted {
-  background: var(--color-black);
-  color: var(--color-white);
-  border-color: var(--color-black);
-  box-shadow: var(--shadow-md);
+  background: var(--color-on-surface);
+  color: var(--color-surface);
+  border-color: var(--color-on-surface);
 }
 .bauhaus-callout--inverted:hover {
-  box-shadow: 4px 4px 0 0 var(--color-red);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
 }
 .bauhaus-callout--muted {
-  background: var(--color-gray-soft);
-  color: var(--color-black-soft);
+  background: var(--color-surface-container-high);
+  color: var(--color-on-surface-variant);
 }
 
 /* ── 10. Action row (button group) ──────────────────────────────────────────── */
@@ -258,20 +262,22 @@
   position: relative;
   display: flex;
   text-align: left;
-  background: var(--color-white);
-  border: var(--border-hairline);
+  background: var(--color-surface);
+  border: var(--border-muted);
   border-radius: var(--radius-sm);
   cursor: pointer;
   overflow: hidden;
-  color: var(--color-black);
+  color: var(--color-on-surface);
   font-family: var(--font-body);
-  transition: transform 80ms ease-out, box-shadow 80ms ease-out, border-color 80ms ease-out;
-  box-shadow: var(--shadow-sm);
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
 }
 .tile { min-height: 160px; }
-.tile:hover, .row:hover { box-shadow: var(--shadow-md); }
+/* hover = surface-white 色调分层(Data Tables 规范:层级由纸/白对比表达,非阴影) */
+.tile:hover, .row:hover { background: var(--color-surface-white); border-color: var(--color-secondary); }
 .tile--disabled { cursor: default; }
-.tile--disabled:hover { box-shadow: var(--shadow-sm); }
+.tile--disabled:hover { background: var(--color-surface); border-color: var(--color-border-muted); }
 /* state via outline (no reflow). selected 先、pinned 后 → pinned 赢(统一,与 archive 注释一致)。 */
 .tile--selected { outline: 2px solid var(--color-blue); outline-offset: -1px; }
 .tile--pinned { outline: 2px solid var(--color-yellow); outline-offset: -1px; }
@@ -308,9 +314,10 @@
   color: inherit;
   font: inherit;
 }
-.tile__main:active { transform: translate(2px, 2px); box-shadow: none; }
-.tile__main:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
-.tile__bar { width: 8px; flex-shrink: 0; background: var(--color-red); }
+.tile__main:active { background: var(--color-surface-container); }
+.tile__main:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+/* 区域识别条:8px 色带 → 2px 垂直线(新语言的线层级) */
+.tile__bar { width: 2px; flex-shrink: 0; background: var(--color-red); }
 .tile--bar-blue .tile__bar { background: var(--color-blue); }
 .tile--pinned .tile__bar { background: var(--color-yellow); }
 .tile__body {
@@ -361,8 +368,8 @@
   color: var(--color-gray);
   margin-left: auto;
 }
-/* Row variant (timeline) */
-.row { min-height: 56px; }
+/* Row variant (timeline) — 48px 行高(Data Tables 规范) */
+.row { min-height: var(--editorial-row-height); }
 .row__title {
   margin: 0;
   font-family: var(--font-content);
