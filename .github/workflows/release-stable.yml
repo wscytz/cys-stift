@@ -139,13 +139,20 @@ jobs:
 
           # A failed upload may leave a draft behind. Make reruns idempotent:
           # replace all assets, then publish the same verified tag.
+          #
+          # notes 版本号注入:模板用 {{VERSION}} 占位,发版时替换为 tag 版本
+          # (防复发 —— v1.3.0 曾带着 1.1.4 模板文案直接发布,2026-08-24 修)。
+          version="${tag#v}"
+          sed -i.bak "s/{{VERSION}}/$version/g" .github/release-stable.md && rm -f .github/release-stable.md.bak
+          notes_file=.github/release-stable.md
+
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$tag" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
             gh release edit "$tag" \
               --repo "$GITHUB_REPOSITORY" \
               --verify-tag \
               --title "$title" \
-              --notes-file .github/release-stable.md \
+              --notes-file "$notes_file" \
               --draft=false \
               --prerelease=false \
               --latest
@@ -154,6 +161,6 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --verify-tag \
               --title "$title" \
-              --notes-file .github/release-stable.md \
+              --notes-file "$notes_file" \
               --latest
           fi
