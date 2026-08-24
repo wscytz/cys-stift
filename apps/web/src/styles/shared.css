@@ -272,6 +272,23 @@
   transition:
     background-color var(--duration-fast) var(--ease-standard),
     border-color var(--duration-fast) var(--ease-standard);
+  /* 入场(PRD the_vault 稿 fadeInRow:10px 上滑 + 行间 40ms 步进;仅挂载时播) */
+  animation: tile-in 300ms var(--ease-editorial) both;
+}
+.tile:nth-child(2), .row:nth-child(2) { animation-delay: 40ms; }
+.tile:nth-child(3), .row:nth-child(3) { animation-delay: 80ms; }
+.tile:nth-child(4), .row:nth-child(4) { animation-delay: 120ms; }
+.tile:nth-child(5), .row:nth-child(5) { animation-delay: 160ms; }
+.tile:nth-child(6), .row:nth-child(6) { animation-delay: 200ms; }
+.tile:nth-child(7), .row:nth-child(7) { animation-delay: 240ms; }
+.tile:nth-child(8), .row:nth-child(8) { animation-delay: 280ms; }
+.tile:nth-child(n + 9), .row:nth-child(n + 9) { animation-delay: 320ms; }
+@keyframes tile-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile, .row { animation: none; }
 }
 .tile { min-height: 160px; }
 /* hover = surface-white 色调分层(Data Tables 规范:层级由纸/白对比表达,非阴影) */

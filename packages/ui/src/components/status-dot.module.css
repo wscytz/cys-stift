@@ -15,8 +15,9 @@
   background: var(--color-secondary);
 }
 
-/* live 呼吸(PRD animated 稿:breathe 3s ease-in-out infinite)。
-   只动 opacity(合成器属性,零重排);reduced-motion 静态。 */
+/* live 呼吸(PRD animated 稿原版:s scale 1→1.15 + opacity + 扩散环)。
+   环色随 tone(currentColor 40% 透明),无裸 hex;transform/opacity/box-shadow
+   环走合成器,零重排;reduced-motion 静态。 */
 .pulse {
   animation: status-dot-breathe 3s ease-in-out infinite;
 }
@@ -25,9 +26,13 @@
   0%,
   100% {
     opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 40%, transparent);
   }
   50% {
-    opacity: 0.35;
+    opacity: 0.6;
+    transform: scale(1.15);
+    box-shadow: 0 0 0 4px transparent;
   }
 }
 

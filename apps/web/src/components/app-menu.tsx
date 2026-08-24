@@ -455,8 +455,8 @@ const styles = `
 }
 .app-menu__group { display: flex; flex-direction: column; }
 .app-menu__group-label {
-  /* 与 .app-menu__link-label 文字起点对齐(图标列宽 24 + gap 8) */
-  padding: 0 var(--space-3) 0 calc((var(--editorial-rail-width) - 24px) / 2 + 24px + var(--space-2));
+  /* 与 .app-menu__link-label 文字起点对齐:border2+padding18+图标24+gap16 = 60px */
+  padding: 0 var(--space-3) 0 calc((var(--editorial-rail-width) - 24px) / 2 - var(--space-quarter) + 24px + var(--space-2));
   font-family: var(--font-display);
   font-weight: 600;
   font-size: var(--font-size-2xs);
@@ -470,7 +470,9 @@ const styles = `
   align-items: center;
   gap: var(--space-2);
   min-height: var(--editorial-row-height);
-  padding: 0 var(--space-3) 0 calc((var(--editorial-rail-width) - 24px) / 2);
+  /* 左 padding 减 border-left 宽(2px,border-box 内收),保证图标中心 = 轨心 32px,
+     与品牌记号/Capture 加号严格成一条垂直线 */
+  padding: 0 var(--space-3) 0 calc((var(--editorial-rail-width) - 24px) / 2 - var(--space-quarter));
   border-left: 2px solid transparent;
   color: var(--color-secondary);
   text-decoration: none;
@@ -510,7 +512,9 @@ const styles = `
 /* 底部固定 Capture 主行动(红填充,唯一常驻红块);收起轨内只露 + 图标块 */
 .app-menu__foot {
   flex-shrink: 0;
-  padding: var(--space-2) var(--space-2) var(--space-3) var(--space-2);
+  /* 左右 space-1(8px):8(foot pad)+1(btn border)+11(btn padding)=20 →
+     图标中心 = 轨心 32px,与导航图标严格同轴 */
+  padding: var(--space-2) var(--space-1) var(--space-3) var(--space-1);
   border-top: var(--border-muted);
 }
 .app-menu__capture {
@@ -519,8 +523,8 @@ const styles = `
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  /* foot 自带 space-2 外边距;8+12=20px 让 + 图标中心与导航图标同心(32px) */
-  padding: 0 var(--space-2) 0 calc(var(--space-1) + var(--space-0.5));
+  /* foot 自带 space-2 外边距 + 按钮 1px 边框:8+1+11=20px → 图标中心 = 轨心 32px */
+  padding: 0 var(--space-2) 0 calc(var(--space-1) + var(--space-quarter) + 1px);
   background: var(--color-primary);
   color: var(--color-on-primary);
   border: 1px solid var(--color-on-surface);

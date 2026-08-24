@@ -150,6 +150,30 @@ export default function HomePage() {
       <style>{`
         /* Swiss Editorial home(编辑式:纸底、1px 线、display 锚点、零阴影) */
         .home { min-height: 100vh; }
+        /* 分段入场(PRD animated 稿:fadeInUp 600ms editorial 曲线,100ms 步进;
+           标题加 letterSpacingIn 0.1em→-0.03em)。关掉 globals 的 main 级入场防叠加。 */
+        .home { animation: none; }
+        .home__content > * { animation: home-fade-up 600ms var(--ease-editorial) both; }
+        .home__content > *:nth-child(2) { animation-delay: 100ms; }
+        .home__content > *:nth-child(3) { animation-delay: 200ms; }
+        .home__content > *:nth-child(4) { animation-delay: 300ms; }
+        .home__content > *:nth-child(n + 5) { animation-delay: 400ms; }
+        .home__content > .home__title {
+          animation:
+            home-fade-up 600ms var(--ease-editorial) 200ms both,
+            home-tracking-in 600ms var(--ease-editorial) 200ms both;
+        }
+        @keyframes home-fade-up {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes home-tracking-in {
+          from { letter-spacing: 0.1em; opacity: 0; }
+          to { letter-spacing: -0.03em; opacity: 1; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .home__content > *, .home__content > .home__title { animation: none; }
+        }
         .home__content {
           padding: var(--space-8) var(--space-10);
           max-width: 960px;
