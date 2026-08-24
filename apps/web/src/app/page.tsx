@@ -44,7 +44,7 @@ export default function HomePage() {
       <CaptureSampleHint />
       <section className="home__content">
         <p className="home__eyebrow">
-          <StatusDot />
+          <StatusDot pulse />
           {t('home.eyebrow')}
         </p>
         <h1 className="home__title">

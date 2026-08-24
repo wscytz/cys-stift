@@ -310,25 +310,26 @@ const styles = `
 }
 .md-embed--missing { color: var(--color-black-soft); font-style: italic; }
 .md-embed--cycle { color: var(--color-red); font-size: var(--font-size-xs); }
-/* 代码高亮 Bauhaus 语法主题(rehype-highlight 注入 hljs-* class)。
-   代码块 .md pre 始终黑底白字,故用黑底可读的亮色变体,只用 6 原色,避免 blue(#003f7f 黑底不可读)。 */
+/* 代码高亮 Swiss Editorial 语法主题(rehype-highlight 注入 hljs-* class)。
+   代码块 .md pre 始终墨底(--color-code-bg),故用 palette 的 fixed 亮色变体
+   (黑底可读):keyword=石油蓝亮、string=红亮、comment=中性灰亮。 */
 .md pre code.hljs { display: block; }
-.md pre .hljs { color: var(--color-white); }
+.md pre .hljs { color: var(--color-code-fg); }
 .md .hljs-keyword,
 .md .hljs-built_in,
 .md .hljs-literal,
-.md .hljs-number { color: var(--color-yellow); }
-.md .hljs-string { color: var(--color-red); }
-.md .hljs-comment { color: var(--color-gray-soft); font-style: italic; }
+.md .hljs-number { color: var(--color-tertiary-fixed-dim); }
+.md .hljs-string { color: var(--color-primary-fixed-dim); }
+.md .hljs-comment { color: var(--color-secondary-fixed-dim); font-style: italic; }
 .md .hljs-title,
 .md .hljs-title.function_,
-.md .hljs-section { color: var(--color-white); font-weight: 600; }
+.md .hljs-section { color: var(--color-code-fg); font-weight: 600; }
 .md .hljs-punctuation,
-.md .hljs-operator { color: var(--color-gray-soft); }
+.md .hljs-operator { color: var(--color-secondary-fixed-dim); }
 .md .hljs-attr,
 .md .hljs-variable,
 .md .hljs-property,
-.md .hljs-params { color: var(--color-white); }
+.md .hljs-params { color: var(--color-tertiary-fixed); }
 /* katex(remark-math + rehype-katex):颜色/字号继承 Bauhaus;display 居中。
    katex 自带完整渲染 CSS(顶部 import),这里只融入调色板。 */
 .md .katex { color: var(--color-black); font-size: 1.1em; }

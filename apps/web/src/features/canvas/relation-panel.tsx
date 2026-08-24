@@ -239,10 +239,9 @@ const styles = `
   align-items: center;
   gap: var(--space-0.5);
   padding: var(--space-0.5) var(--space-1);
-  background: var(--color-white);
-  border: 2px solid var(--color-black);
+  background: var(--color-surface-white);
+  border: var(--border-hairline);
   border-radius: var(--radius-sm);
-  box-shadow: 4px 4px 0 0 var(--color-black);
   font-family: var(--font-mono);
   white-space: nowrap;
 }

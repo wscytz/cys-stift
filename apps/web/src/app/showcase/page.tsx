@@ -122,18 +122,18 @@ export default function ShowcasePage() {
         .showcase h1 span { display: block; color: var(--color-red); }
         .showcase__lead { max-width: 640px; margin-bottom: var(--space-5); color: var(--color-black-soft); font-size: var(--font-size-lg); line-height: 1.6; }
         .showcase__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-        .showcase__primary, .showcase__secondary { min-height: 44px; display: inline-flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-3); border: var(--border-thick); text-decoration: none; font-family: var(--font-display); }
-        .showcase__primary { background: var(--color-red); color: var(--color-white); border-color: var(--color-black); box-shadow: var(--shadow-sm); }
-        .showcase__secondary { color: var(--color-black); }
-        .showcase__primary:hover, .showcase__secondary:hover { box-shadow: 4px 4px 0 0 var(--color-black); }
+        .showcase__primary, .showcase__secondary { min-height: 44px; display: inline-flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-3); border: var(--border-hairline); text-decoration: none; font-family: var(--font-display); }
+        .showcase__primary { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-on-surface); }
+        .showcase__secondary { color: var(--color-on-surface); }
+        .showcase__primary:hover, .showcase__secondary:hover { background: var(--color-on-surface); color: var(--color-surface); border-color: var(--color-on-surface); }
         .showcase__primary:focus-visible, .showcase__secondary:focus-visible, .showcase__nav a:focus-visible, .showcase__footer a:focus-visible, .showcase__steps a:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
         .showcase__stage { padding: var(--space-5) 0 var(--space-8); }
         .showcase__stage-head { display: flex; justify-content: space-between; align-items: end; gap: var(--space-4); margin-bottom: var(--space-3); }
         .showcase h2 { font-family: var(--font-display); font-size: var(--font-size-2xl); font-weight: 500; line-height: 1.15; }
         .showcase__stage-status { display: inline-flex; align-items: center; gap: var(--space-1); padding: var(--space-1) var(--space-2); border: var(--border-hairline); font-family: var(--font-mono); font-size: var(--font-size-xs); white-space: nowrap; }
-        .showcase__board { position: relative; min-height: 360px; overflow: hidden; border: var(--border-thick); background: var(--color-gray-soft); box-shadow: var(--shadow-md); }
+        .showcase__board { position: relative; min-height: 360px; overflow: hidden; border: var(--border-hairline); background: var(--color-surface-container); }
         .showcase__board-label { position: absolute; left: var(--space-3); top: var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
-        .showcase__node { position: absolute; width: 190px; min-height: 102px; display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-2); padding: var(--space-3); border: var(--border-thick); border-color: var(--color-black); box-shadow: 4px 4px 0 0 var(--color-black); }
+        .showcase__node { position: absolute; width: 190px; min-height: 102px; display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-2); padding: var(--space-3); border: var(--border-hairline); border-color: var(--color-on-surface); }
         .showcase__node span { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; }
         .showcase__node strong { font-family: var(--font-display); font-size: var(--font-size-lg); font-weight: 500; }
         .showcase__node--red { left: 12%; top: 31%; background: var(--color-red); color: var(--color-white); }
@@ -144,10 +144,10 @@ export default function ShowcasePage() {
         .showcase__connector--two { width: 260px; left: 57%; top: 36%; transform: rotate(28deg); }
         .showcase__board-tools { position: absolute; left: var(--space-3); right: var(--space-3); bottom: var(--space-3); display: flex; justify-content: flex-end; gap: var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-xs); }
         .showcase__board-tools span { display: inline-flex; align-items: center; gap: 4px; padding: var(--space-1) var(--space-2); background: var(--color-white); border: var(--border-hairline); }
-        .showcase__loop { padding: var(--space-8) 0; border-top: var(--border-thick); }
+        .showcase__loop { padding: var(--space-8) 0; border-top: var(--border-hairline); }
         .showcase__section-head { display: flex; justify-content: space-between; gap: var(--space-4); align-items: baseline; }
         .showcase__steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-        .showcase__steps li { min-height: 156px; display: flex; flex-direction: column; justify-content: space-between; padding: var(--space-3); border-top: var(--border-thick); }
+        .showcase__steps li { min-height: 156px; display: flex; flex-direction: column; justify-content: space-between; padding: var(--space-3); border-top: var(--border-hairline); }
         .showcase__step-number { color: var(--color-gray); font-family: var(--font-mono); font-size: var(--font-size-xs); }
         .showcase__steps a { min-height: 44px; display: inline-flex; align-items: center; gap: 4px; color: var(--color-black); font-family: var(--font-display); font-size: var(--font-size-lg); text-decoration: none; }
         .showcase__steps p { margin: var(--space-1) 0 0; color: var(--color-gray); font-size: var(--font-size-sm); }

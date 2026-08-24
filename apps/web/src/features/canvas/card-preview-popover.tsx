@@ -55,7 +55,7 @@ const styles = `
   max-height: 440px;
   overflow: auto;
   background: var(--color-white);
-  border: var(--border-thick);
+  border: var(--border-hairline);
   box-shadow: var(--shadow-md);
   font-family: var(--font-body);
   pointer-events: none; /* R9:纯只读速览,不拦截画布指针(否则盖住卡拖不动) */
@@ -94,7 +94,7 @@ const styles = `
   width: 100%;
   padding: var(--space-2) var(--space-3);
   border: 0;
-  border-top: var(--border-thick);
+  border-top: var(--border-hairline);
   background: var(--color-black);
   color: var(--color-white);
   font-family: var(--font-display);

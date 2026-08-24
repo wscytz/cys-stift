@@ -2036,7 +2036,7 @@ const styles = `
   flex: 0 0 auto;
   width: clamp(320px, 32vw, 460px);
   min-height: 0;
-  border-left: var(--border-thick);
+  border-left: var(--border-hairline);
   background: var(--color-white);
   overflow: hidden;
 }
@@ -2069,7 +2069,7 @@ const styles = `
   border-color: var(--color-black);
   border-radius: var(--radius-sm);
 }
-.cv-empty__cta:hover { box-shadow: 2px 2px 0 0 var(--color-black); }
+.cv-empty__cta:hover { background: var(--color-primary-container); }
 .cv-empty__cta:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tb-divider { width: 1px; height: 24px; background: var(--color-gray-soft); margin: 0 var(--space-2); flex: 0 0 auto; }
 /* ── 工具按钮(选/画/擦/文/连)— Bauhaus 设计语言统一 ──
@@ -2092,14 +2092,14 @@ const styles = `
 @keyframes cys-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .cv-rail__busy-spin { animation: none; } }
 .tb-tool__label { font-size: var(--font-size-xs); letter-spacing: 0; color: var(--color-gray); line-height: 1; }
-.tb-tool--active { background: var(--color-yellow); border-color: var(--color-black); color: var(--color-black); }
-.tb-tool--active .tb-tool__label { color: var(--color-black); }
+.tb-tool--active { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
+.tb-tool--active .tb-tool__label { color: var(--color-on-primary); }
 /* 橡皮子模式图标更小,命中区仍守 44×44。 */
 .tb-tool--sub { height: 44px; min-width: 44px; padding: 2px var(--space-0.5); }
 .tb-tool--sub .tb-tool__icon { font-size: var(--font-size-sm); }
 .tb-tool--sub .tb-tool__label { font-size: var(--font-size-xs); }
-.tb-tool:hover:not(:disabled):not(.tb-tool--active) { background: var(--color-gray-soft); border-color: var(--color-gray); }
-.tb-tool:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none; }
+.tb-tool:hover:not(:disabled):not(.tb-tool--active) { background: var(--color-surface-container); border-color: var(--color-secondary); }
+.tb-tool:active:not(:disabled) { background: var(--color-surface-container-high); }
 .tb-tool:disabled { opacity: 0.5; cursor: not-allowed; }
 .tb-tool:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tb-snap { display: inline-flex; align-items: center; justify-content: center; height: 44px; min-width: 44px; padding: 0 var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.16em; text-transform: uppercase; background: var(--color-white); color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
@@ -2107,8 +2107,8 @@ const styles = `
 .tb-snap--free { background: var(--color-white); color: var(--color-black); }
 /* P1 #6: 5 个工具按钮(↖✎⌫T⇄)补 hover,与 .tb-icon-btn 对齐;排除激活态
    (--snap 黑底)与 SnapToggle 的 --snap/--free 文字按钮,避免抢激活态视觉。 */
-.tb-snap:hover:not(:disabled):not(.tb-snap--snap):not(.tb-snap--free):not(.tb-snap--toggle) { background: var(--color-gray-soft); }
-.tb-snap:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none; }
+.tb-snap:hover:not(:disabled):not(.tb-snap--snap):not(.tb-snap--free):not(.tb-snap--toggle) { background: var(--color-surface-container); }
+.tb-snap:active:not(:disabled) { background: var(--color-surface-container-high); }
 .tb-snap:disabled { opacity: 0.5; cursor: not-allowed; }
 .tb-snap:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 /* SnapToggle 默认显示文字 label,glyph 隐藏;≤900px 反转(见响应式断点)。 */
@@ -2116,8 +2116,8 @@ const styles = `
 .tb-zoom { display: inline-flex; align-items: center; gap: 0; }
 .tb-icon-btn { display: inline-flex; align-items: center; justify-content: center; height: 44px; min-width: 44px; padding: 0 var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.12em; text-transform: uppercase; background: transparent; color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
 .tb-icon-btn--fit { padding: 0 var(--space-3); }
-.tb-icon-btn:hover { background: var(--color-black); color: var(--color-white); }
-.tb-icon-btn:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none; }
+.tb-icon-btn:hover { background: var(--color-on-surface); color: var(--color-surface); }
+.tb-icon-btn:active:not(:disabled) { background: var(--color-surface-container-high); color: var(--color-on-surface); }
 .tb-icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .tb-icon-btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 /* 对齐工具条:选中≥2 卡时出现。复用 .tb-icon-btn 视觉;组容器内联排布。 */
@@ -2164,10 +2164,9 @@ const styles = `
   overflow-y: auto;
   display: flex; flex-direction: column; align-items: center; gap: var(--space-1);
   padding: var(--space-1);
-  background: var(--color-white);
+  background: var(--color-surface-white);
   border: var(--border-hairline);
   border-radius: var(--radius-sm);
-  box-shadow: 2px 2px 0 0 var(--color-black);
   /* P2: 底部淡出蒙版 — rail 高时可滚但无视觉提示,加一条 ~18px 渐隐让用户读出
      「下方还有」。按钮 44px(窄窗 40px),蒙版远矮于按钮,不会切掉 hover 态。 */
   mask-image: linear-gradient(to bottom, black 0, black calc(100% - 18px), transparent 100%);
@@ -2177,16 +2176,19 @@ const styles = `
   width: 60px; min-height: 44px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   padding: var(--space-1) 0;
-  background: var(--color-white); color: var(--color-black);
+  background: var(--color-surface-white); color: var(--color-on-surface);
   /* 透明边框占位,hover/pressed 切换边框色时布局不跳动 */
-  border: 2px solid transparent; border-radius: var(--radius-sm); cursor: pointer;
-  transition: background 80ms ease-out, color 80ms ease-out, border-color 80ms ease-out, transform 60ms ease-out;
+  border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
 }
-/* 设计语言:hover=浅灰底(轻提示),active(按下)=黄底黑边+缩放(触感),
-   pressed(持续选中)=黄底黑边(Bauhaus 黄黑强调色,表示「这个开着/在用」)。 */
-.cv-rail__btn:hover:not(:disabled) { background: var(--color-gray-soft); }
-.cv-rail__btn:active:not(:disabled) { background: var(--color-yellow); border-color: var(--color-black); transform: translate(2px, 2px); box-shadow: none; }
-.cv-rail__btn--pressed { background: var(--color-yellow); border-color: var(--color-black); color: var(--color-black); }
+/* 设计语言:hover=容器灰底(轻提示),active(按下)=深容器灰(触感),
+   pressed(持续选中)=手术红底白字(表示「这个开着/在用」)。 */
+.cv-rail__btn:hover:not(:disabled) { background: var(--color-surface-container); }
+.cv-rail__btn:active:not(:disabled) { background: var(--color-surface-container-high); }
+.cv-rail__btn--pressed { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
 .cv-rail__btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .cv-rail__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: -2px; }
 .cv-rail__btn-icon { font-family: var(--font-mono); font-size: var(--font-size-base); line-height: 1; }
@@ -2200,17 +2202,16 @@ const styles = `
 .cv-rail__menu {
   position: fixed; z-index: 26;
   min-width: 168px; padding: var(--space-1);
-  background: var(--color-white); border: 2px solid var(--color-black); border-radius: var(--radius-sm);
-  box-shadow: 4px 4px 0 0 var(--color-black);
+  background: var(--color-surface-white); border: var(--border-hairline); border-radius: var(--radius-sm);
   display: flex; flex-direction: column; gap: 2px;
 }
 .cv-rail__menu-item {
   min-height: 44px; text-align: left; padding: var(--space-1) var(--space-2);
   background: transparent; border: 0; border-radius: var(--radius-sm);
-  font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black);
+  font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-on-surface);
   cursor: pointer; white-space: nowrap;
 }
-.cv-rail__menu-item:hover:not(:disabled) { background: var(--color-yellow); }
+.cv-rail__menu-item:hover:not(:disabled) { background: var(--color-surface-container); }
 .cv-rail__menu-item:disabled { opacity: 0.5; cursor: not-allowed; }
 .cv-rail__menu-item:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cv-ctx-backdrop { position: fixed; inset: 0; z-index: 99; cursor: default; }
@@ -2238,7 +2239,7 @@ const styles = `
   cursor: pointer; text-align: center; line-height: 1;
 }
 .cv-organize__seg:hover:not(.cv-organize__seg--active) { background: var(--color-gray-soft); }
-.cv-organize__seg--active { background: var(--color-yellow); border-color: var(--color-black); }
+.cv-organize__seg--active { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
 .cv-organize__seg:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cv-organize__range {
   width: 100%; height: 4px; background: var(--color-black); border-radius: 2px;
@@ -2256,13 +2257,13 @@ const styles = `
 .cv-organize__range:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cv-organize__apply {
   margin-top: 2px; padding: var(--space-1) var(--space-2); min-height: 44px;
-  background: var(--color-black); color: var(--color-white);
-  border: 2px solid var(--color-black); border-radius: var(--radius-sm);
+  background: var(--color-on-surface); color: var(--color-surface);
+  border: 1px solid var(--color-on-surface); border-radius: var(--radius-sm);
   font-family: var(--font-body); font-size: var(--font-size-sm); font-weight: 600;
   cursor: pointer; line-height: 1;
 }
-.cv-organize__apply:hover:not(:disabled) { box-shadow: 2px 2px 0 0 var(--color-red); }
-.cv-organize__apply:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none; }
+.cv-organize__apply:hover:not(:disabled) { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
+.cv-organize__apply:active:not(:disabled) { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
 .cv-organize__apply:disabled { opacity: 0.5; cursor: not-allowed; }
 .cv-organize__apply:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 

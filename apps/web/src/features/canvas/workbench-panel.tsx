@@ -416,7 +416,7 @@ const styles = `
   align-items: center;
   gap: var(--space-1);
   padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
-  border-bottom: var(--border-thick);
+  border-bottom: var(--border-hairline);
   background: var(--color-white);
   flex-shrink: 0;
 }
@@ -554,8 +554,8 @@ const styles = `
   position: absolute; right: var(--space-2); bottom: var(--space-2); z-index: 20;
   width: min(440px, calc(100% - var(--space-4)));
   max-height: calc(100% - var(--space-4)); overflow: auto;
-  background: var(--color-white); border: 2px solid var(--color-black);
-  box-shadow: 4px 4px 0 var(--color-black); padding: var(--space-2);
+  background: var(--color-surface-white); border: var(--border-hairline);
+  padding: var(--space-2);
   display: flex; flex-direction: column; gap: var(--space-2);
 }
 `

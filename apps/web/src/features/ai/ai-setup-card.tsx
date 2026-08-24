@@ -36,10 +36,10 @@ export function AiSetupCard({ onGoToSettings }: AiSetupCardProps) {
 
 const setupStyles = `
 .ai-setup {
-  background: var(--color-white); border: var(--border-thick); border-color: var(--color-black);
-  box-shadow: 4px 4px 0 var(--color-black); max-width: 360px; overflow: hidden;
+  background: var(--color-surface-white); border: var(--border-hairline); border-color: var(--color-on-surface);
+  max-width: 360px; overflow: hidden;
 }
-.ai-setup__stripe { height: 8px; background: var(--color-yellow); }
+.ai-setup__stripe { height: 2px; background: var(--color-accent); }
 .ai-setup__body { padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }
 .ai-setup__title { font-family: var(--font-display); font-size: var(--font-size-base); color: var(--color-black); margin: 0; }
 .ai-setup__lede { font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black-soft); margin: 0; }

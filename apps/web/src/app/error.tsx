@@ -82,7 +82,7 @@ export default function GlobalError({
   border: var(--border-hairline); padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm); cursor: pointer; text-decoration: none;
 }
-.err-boundary__btn:hover { box-shadow: 2px 2px 0 0 var(--color-red); }
+.err-boundary__btn:hover { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
 .err-boundary__btn--ghost { background: var(--color-white); color: var(--color-black); }
 `}</style>
     </main>

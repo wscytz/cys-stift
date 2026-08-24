@@ -89,8 +89,8 @@ export function AiActionMenu({ onPick }: AiActionMenuProps) {
 
 const menuStyles = `
 .ai-menu {
-  background: var(--color-white); border: var(--border-thick); border-color: var(--color-black);
-  box-shadow: 4px 4px 0 var(--color-black); padding: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); min-width: 200px;
+  background: var(--color-surface-white); border: var(--border-hairline); border-color: var(--color-on-surface);
+  padding: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); min-width: 200px;
 }
 .ai-menu__title { font-family: var(--font-display); font-size: var(--font-size-sm); color: var(--color-black); margin: 0 0 var(--space-1); }
 .ai-menu__item {
@@ -116,5 +116,5 @@ const menuStyles = `
   color: var(--color-white); cursor: pointer;
 }
 .ai-menu__instruction-apply:disabled { opacity: 0.55; cursor: not-allowed; }
-.ai-menu__instruction-apply:hover:not(:disabled) { box-shadow: 2px 2px 0 0 var(--color-red); }
+.ai-menu__instruction-apply:hover:not(:disabled) { background: var(--color-primary); border-color: var(--color-primary); }
 `

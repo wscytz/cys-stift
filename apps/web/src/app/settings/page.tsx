@@ -616,7 +616,7 @@ export default function SettingsPage() {
 .set__confirm-body { margin: 0 0 var(--space-3); font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black-soft); line-height: 1.5; }
 .set__confirm-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
 .set__import-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: var(--space-3) 0; }
-.set__mode { min-height: 88px; display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); text-align: left; padding: var(--space-2); border: var(--border-thick); background: var(--color-white); cursor: pointer; }
+.set__mode { min-height: 88px; display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); text-align: left; padding: var(--space-2); border: var(--border-hairline); background: var(--color-white); cursor: pointer; }
 .set__mode span { font-size: var(--font-size-xs); color: var(--color-gray); line-height: 1.4; }
 .set__mode--active { border-color: var(--color-blue); box-shadow: var(--space-quarter) var(--space-quarter) 0 var(--color-blue); }
 @media (max-width: 560px) { .set__import-modes { grid-template-columns: 1fr; } }

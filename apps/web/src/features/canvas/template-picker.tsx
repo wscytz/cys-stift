@@ -122,7 +122,7 @@ const styles = `
 }
 .tp__cell:hover:not(:disabled) { background: var(--color-gray-soft); border-color: var(--color-gray); }
 .tp__cell:active:not(:disabled) { transform: scale(0.96); }
-.tp__cell--active { background: var(--color-yellow); border-color: var(--color-black); }
+.tp__cell--active { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
 .tp__cell:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tp__preview { font-size: var(--font-size-xl); line-height: 1; }
 .tp__preview--blank { color: var(--color-gray); }

@@ -41,7 +41,7 @@ export function CaptureSampleHint() {
         <button type="button" className="capture-sample-hint__btn capture-sample-hint__btn--primary" onClick={acknowledge}>{t('samples.hint.ack')}</button>
       </div>
       <style>{`
-        .capture-sample-hint { position: fixed; left: 50%; bottom: var(--space-4); transform: translateX(-50%); z-index: 40; max-width: 480px; padding: var(--space-3); background: var(--color-white); border: 2px solid var(--color-black); border-radius: var(--radius-sm); box-shadow: 4px 4px 0 var(--color-black); }
+        .capture-sample-hint { position: fixed; left: 50%; bottom: var(--space-4); transform: translateX(-50%); z-index: 40; max-width: 480px; padding: var(--space-3); background: var(--color-surface-white); border: var(--border-hairline); border-radius: var(--radius-sm); }
         .capture-sample-hint__text { margin: 0 0 var(--space-2); font-family: var(--font-body); font-size: var(--font-size-sm); line-height: 1.5; color: var(--color-black); }
         .capture-sample-hint__actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
         .capture-sample-hint__btn { padding: var(--space-1) var(--space-2); border: var(--border-hairline); background: transparent; font-family: var(--font-mono); font-size: var(--font-size-xs); cursor: pointer; }

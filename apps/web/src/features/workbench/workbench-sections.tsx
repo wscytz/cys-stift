@@ -227,7 +227,7 @@ const styles = `
   cursor: pointer;
 }
 .wb__row:hover { background: var(--color-gray-soft); }
-.wb__row--active { background: var(--color-yellow-soft); box-shadow: inset 3px 0 0 var(--color-red); }
+.wb__row--active { background: var(--color-surface-white); box-shadow: inset 2px 0 0 var(--color-accent); }
 .wb__row:focus-visible { outline: 2px solid var(--color-red); outline-offset: -2px; }
 .wb__rb { width: 4px; height: 26px; flex-shrink: 0; }
 .wb__rowtext { min-width: 0; }

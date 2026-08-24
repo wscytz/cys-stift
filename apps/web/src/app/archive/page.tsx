@@ -416,8 +416,7 @@ const styles = `
   z-index: 30;
   display: inline-flex; align-items: center; gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  background: var(--color-white); border: 2px solid var(--color-black); border-radius: var(--radius-sm);
-  box-shadow: 4px 4px 0 0 var(--color-black);
+  background: var(--color-surface-white); border: var(--border-hairline); border-radius: var(--radius-sm);
   font-family: var(--font-mono); white-space: nowrap;
 }
 .batch-bar__count {

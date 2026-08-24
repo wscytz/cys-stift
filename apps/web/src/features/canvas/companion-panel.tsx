@@ -330,7 +330,7 @@ export function CanvasCompanionPanel({
                         border: `1px solid ${active ? 'var(--color-black)' : 'var(--color-gray)'}`,
                         borderRadius: 'var(--radius-sm)',
                         padding: 'var(--space-1)',
-                        background: active ? 'var(--color-yellow-soft)' : 'transparent',
+                        background: active ? 'var(--color-surface-container)' : 'transparent',
                       }}
                     >
                       <div

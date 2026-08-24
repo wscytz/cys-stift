@@ -270,7 +270,7 @@ const styles = `
 .tm { font-family: var(--font-body); }
 .tm__bar {
   display: flex; align-items: center; gap: var(--space-2);
-  padding: var(--space-2); border: var(--border-thick);
+  padding: var(--space-2); border: var(--border-hairline);
   background: var(--color-black); color: var(--color-white);
   margin-bottom: var(--space-2); flex-wrap: wrap;
 }
@@ -287,7 +287,7 @@ const styles = `
 }
 .tm__bar-btn--primary { background: var(--color-red); color: var(--color-white); border-color: var(--color-red); }
 .tm__bar-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.tm__table { border: var(--border-thick); background: var(--color-white); }
+.tm__table { border: var(--border-hairline); background: var(--color-white); }
 .tm__head, .tm__row {
   display: grid;
   grid-template-columns: 40px 44px 1fr 60px 96px;
@@ -317,7 +317,7 @@ const styles = `
 }
 .tm__popover {
   position: absolute; top: 24px; left: 0; z-index: 5;
-  background: var(--color-white); border: var(--border-thick);
+  background: var(--color-white); border: var(--border-hairline);
   box-shadow: var(--shadow-md); padding: var(--space-1);
   display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--space-quarter);
 }

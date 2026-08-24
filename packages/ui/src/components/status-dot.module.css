@@ -14,3 +14,25 @@
 .secondary {
   background: var(--color-secondary);
 }
+
+/* live 呼吸(PRD animated 稿:breathe 3s ease-in-out infinite)。
+   只动 opacity(合成器属性,零重排);reduced-motion 静态。 */
+.pulse {
+  animation: status-dot-breathe 3s ease-in-out infinite;
+}
+
+@keyframes status-dot-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse {
+    animation: none;
+  }
+}

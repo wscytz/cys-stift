@@ -239,7 +239,7 @@ const styles = `
 .wb-page__confirm-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-3); }
 .wb-page__empty {
   display: grid; place-items: center;
-  border: var(--border-thick); background: var(--color-white-soft);
+  border: var(--border-hairline); background: var(--color-white-soft);
   color: var(--color-gray); font-style: italic;
   padding: var(--space-4);
 }

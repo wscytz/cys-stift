@@ -45,7 +45,7 @@ export function CaptureHint() {
   display: flex; align-items: center; gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   background: var(--color-yellow); color: var(--color-black);
-  border: var(--border-thick); border-color: var(--color-black);
+  border: var(--border-hairline); border-color: var(--color-black);
   font-family: var(--font-mono); font-size: var(--font-size-sm);
 }
 .capture-hint__text { display: flex; flex: 1 1 auto; flex-direction: column; gap: 2px; line-height: 1.4; }

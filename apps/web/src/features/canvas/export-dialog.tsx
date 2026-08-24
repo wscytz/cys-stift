@@ -328,8 +328,8 @@ const styles = `
 .exp-seg__btn:last-child { border-right: 0; }
 .exp-seg__btn:hover:not(:disabled):not(.exp-seg__btn--active) { background: var(--color-gray-soft); }
 .exp-seg__btn:active:not(:disabled) { transform: scale(0.95); }
-/* 激活态:Bauhaus 黄底黑字(选中语义)。 */
-.exp-seg__btn--active { background: var(--color-yellow); color: var(--color-black); }
+/* 激活态:手术红底白字(选中语义)。 */
+.exp-seg__btn--active { background: var(--color-primary); color: var(--color-on-primary); }
 .exp-seg__btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .exp-seg__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: -2px; }
 
@@ -337,10 +337,9 @@ const styles = `
 .exp-cystift {
   margin: var(--space-3) 0;
   padding: var(--space-3);
-  background: var(--color-black);
-  color: var(--color-white);
+  background: var(--color-on-surface);
+  color: var(--color-surface);
   border-radius: var(--radius-sm);
-  box-shadow: 4px 4px 0 0 var(--color-red);
 }
 .exp-cystift__badge {
   font-family: var(--font-mono); font-size: var(--font-size-xs);
