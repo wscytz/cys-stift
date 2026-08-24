@@ -71,6 +71,15 @@ export default function RootLayout({
           // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{ __html: `document.documentElement.setAttribute('data-theme','light');` }}
         />
+        {/*
+         * 侧栏让位宽度首帧同步(v0.2):默认收起 64px 图标轨;用户钉住展开过则
+         * 280px。必须在首帧前设 --app-sidebar-w(inline script,零布局闪烁);
+         * AppMenu 挂载后接管读写(同一 localStorage key)。
+         */}
+        <script
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: `try{document.documentElement.style.setProperty('--app-sidebar-w',localStorage.getItem('cys-stift.sidebar-pinned')==='1'?'280px':'64px')}catch(e){}` }}
+        />
       </head>
       <body>
         <ErrorTrace />

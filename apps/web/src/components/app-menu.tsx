@@ -36,15 +36,98 @@ function captureComboHint(isMac: boolean, t: (key: MessageKey, params?: Record<s
   return t('capture.hintCombo', { combo: `${mod}${sc?.shift ? '+⇧' : ''}+${key}` })
 }
 
+/** 折叠钉住态的持久化 key。layout.tsx 的 inline script 用同名 key 在首帧前
+ *  设 --app-sidebar-w(零闪烁);此处读/写同一份。 */
+const SIDEBAR_PINNED_KEY = 'cys-stift.sidebar-pinned'
+
+function applySidebarWidth(pinned: boolean) {
+  document.documentElement.style.setProperty('--app-sidebar-w', pinned ? '280px' : '64px')
+}
+
+/* ── 导航图标(Swiss Editorial:24 viewBox、1.5px 线描、方角、currentColor,
+      复刻 PRD 侧栏的几何线稿风;无 hex,随 token 换色)────────────────── */
+function NavIcon({ id }: { id: string }) {
+  const common = {
+    width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none',
+    stroke: 'currentColor', strokeWidth: 1.5, 'aria-hidden': true as const,
+    focusable: 'false' as const,
+  }
+  switch (id) {
+    case 'canvas': // 画板:外框 + 内方(画布上的卡)
+      return (
+        <svg {...common}><rect x="4" y="4" width="13" height="13" /><rect x="8.5" y="8.5" width="4" height="4" /></svg>
+      )
+    case 'inbox': // 捕获队列:纸面横线组(未放置的条目)
+      return (
+        <svg {...common}><path d="M4.5 6.5h12M4.5 11h12M4.5 15.5h7" /></svg>
+      )
+    case 'workbench': // 工作台:台面 + 上架
+      return (
+        <svg {...common}><rect x="5" y="8" width="10" height="10" /><path d="M8 8V4.5h7.5V8" /></svg>
+      )
+    case 'ask': // 提问:框内一点(待答)
+      return (
+        <svg {...common}><rect x="4.5" y="4.5" width="12" height="12" /><circle cx="10.5" cy="10.5" r="1.4" fill="currentColor" stroke="none" /></svg>
+      )
+    case 'graph': // 网络:三节点连线
+      return (
+        <svg {...common}>
+          <path d="M7.5 7.5l6.5 1M7.5 7.5l2.5 6.5M14 8.5l-4 5.5" />
+          <circle cx="7.5" cy="7.5" r="1.6" fill="currentColor" stroke="none" />
+          <circle cx="14" cy="8.5" r="1.6" fill="currentColor" stroke="none" />
+          <circle cx="10" cy="14" r="1.6" fill="currentColor" stroke="none" />
+        </svg>
+      )
+    case 'search': // 找回:方镜 + 柄(方角放大镜)
+      return (
+        <svg {...common}><rect x="4.5" y="4.5" width="11" height="11" /><path d="M15.5 15.5L20 20" /></svg>
+      )
+    case 'archive': // 归档:盒 + 沿 + 中线
+      return (
+        <svg {...common}><path d="M5 6.5V4.5h11v2M4.5 6.5h12v10h-12z" /><path d="M9 11.5h3.5" /></svg>
+      )
+    case 'tags': // 标签:小方 + 引线
+      return (
+        <svg {...common}><rect x="4.5" y="4.5" width="8" height="8" /><path d="M12.5 12.5l4.5 4.5M17 17v-3M17 17h-3" /></svg>
+      )
+    case 'timeline': // 时间轴:竖轴 + 三点
+      return (
+        <svg {...common}>
+          <path d="M9.5 4.5v13" />
+          <circle cx="9.5" cy="6.5" r="1.6" fill="currentColor" stroke="none" />
+          <circle cx="9.5" cy="11" r="1.6" fill="currentColor" stroke="none" />
+          <circle cx="9.5" cy="15.5" r="1.6" fill="currentColor" stroke="none" />
+          <path d="M13 6.5h4M13 11h4M13 15.5h4" />
+        </svg>
+      )
+    case 'trash': // 回收:桶 + 沿 + 提手
+      return (
+        <svg {...common}><path d="M6 7.5h11v10H6z" /><path d="M4.5 7.5h14M9.5 7.5V5h4v2.5" /></svg>
+      )
+    case 'settings': // 设置:中方 + 四向齿线
+      return (
+        <svg {...common}><rect x="8" y="8" width="7" height="7" /><path d="M11.5 4.5v2M11.5 16.5v2M4.5 11.5h2M16.5 11.5h2" /></svg>
+      )
+    default:
+      return null
+  }
+}
+
 /**
  * AppMenu — Swiss Editorial 全局侧栏(v0.2,PRD unified sidebar)。
  *
- * ≥1200:280px 固定左侧栏 —— 品牌头 / 分组导航(可见组标,sidebar-label 大写)/
- * 底部固定 Capture 主行动。active = 2px 品牌红左线(Sidebar 规范)。
- * <1200:64px 顶条(汉堡 + 品牌 + Capture)+ 左滑抽屉(1200 = 既有可读性断点:
- * 完整导航在 1024px 会把中文链接压成逐字竖排,比标准 bp-md 更窄的设备应优先
- * 保证可读和可点)。useMatchMedia 读断点,open state 控抽屉;路由切换 / 回
- * 宽屏自动关。
+ * 折叠机制(用户需求:默认收起、移入展开、按钮可钉住):
+ *   - 默认 64px 图标轨(rail):品牌记号 + 图标导航 + 底部 Capture 加号块。
+ *   - 鼠标移入(:hover)或键盘聚焦(:focus-within,保证 Tab 可达)→ 280px
+ *     覆盖式展开(不推挤内容,150ms);移出即收。
+ *   - head 上的 pin 钮(«/»)钉住展开:常驻 280 并推挤内容(main margin 由
+ *     --app-sidebar-w 控制,layout inline script 首帧前按持久化偏好设好,
+ *     零闪烁);再点回收起。偏好 localStorage 持久化。
+ *   - <1200:64px 顶条(汉堡 + 品牌 + Capture)+ 左滑抽屉(1200 = 既有可读
+ *     性断点);rail/pin 机制仅在宽屏生效。useMatchMedia 读断点,open state
+ *     控抽屉;路由切换 / 回宽屏自动关。
+ *
+ * 配额订阅 / i18n 分组 IA / active 探测 / 捕获快捷键 tooltip 逻辑自 v0.1 起不变。
  */
 export function AppMenu() {
   const pathname = usePathname() ?? '/'
@@ -52,11 +135,37 @@ export function AppMenu() {
   const isNarrow = useMatchMedia('(max-width: 1199px)')
   const isMac = useIsMac()
   const [open, setOpen] = useState(false)
+  // 默认 false(收起轨);挂载后读持久化偏好(SSG 首帧 = 客户端首帧,无水合错配)。
+  const [pinned, setPinned] = useState(false)
+
+  useEffect(() => {
+    let stored = false
+    try {
+      stored = localStorage.getItem(SIDEBAR_PINNED_KEY) === '1'
+    } catch {
+      stored = false
+    }
+    setPinned(stored)
+    applySidebarWidth(stored)
+  }, [])
+
+  const togglePinned = () => {
+    setPinned((p) => {
+      const next = !p
+      try {
+        localStorage.setItem(SIDEBAR_PINNED_KEY, next ? '1' : '0')
+      } catch {
+        // 私隐模式等 localStorage 不可写:仅本会话生效
+      }
+      applySidebarWidth(next)
+      return next
+    })
+  }
 
   // 审计 H1 + R2.3/2.4 + quota-silence fix:所有非 React store(db-client /
   // media-store / canvas-freeform-store / canvas-store / settings-store /
   // canvas-view-store)都是非 React 模块,无法直接 pushToast。AppMenu 全局挂载
-  // 且是 'use client',这里订阅各 store 的配额写入失败事件并提示用户(防静默丢
+  // 且是 'use client',这里订阅各 store 的 配额写入失败事件并提示用户(防静默丢
   // 卡片/媒体/画布几何/画布列表/设置/画布视图)。
   useEffect(() => {
     const message = t('storage.quotaExceeded')
@@ -127,11 +236,11 @@ export function AppMenu() {
     ] },
   ]
   const entries = groups.flatMap((group) => group.entries)
-
   const activeKey = entries.find((e) => pathname.startsWith(e.href))?.key
+  const iconFor = (href: string) => href.replace(/^\//, '').split('/')[0] ?? ''
 
   return (
-    <nav className="app-menu" aria-label="Primary">
+    <nav className={`app-menu${pinned ? '' : ' app-menu--rail'}`} aria-label="Primary">
       <div className="app-menu__head">
         {isNarrow && (
           <button
@@ -145,9 +254,23 @@ export function AppMenu() {
           </button>
         )}
         <Link href="/" className="app-menu__brand">
-          {t('brand.name')}
+          {/* 品牌记号(收起轨里单独可见):墨斜杠 + 红点 */}
+          <svg className="app-menu__mark" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <line x1="6" y1="18" x2="18" y2="6" stroke="var(--color-on-surface)" strokeWidth="2" />
+            <circle cx="16" cy="8" r="2.5" fill="var(--color-accent)" />
+          </svg>
+          <span className="app-menu__brand-name">{t('brand.name')}</span>
         </Link>
         <span className="app-menu__version" aria-label="app version">v{VERSION}</span>
+        <button
+          type="button"
+          className="app-menu__pin"
+          aria-pressed={pinned}
+          title={pinned ? '⇤ 收起侧栏' : '⇥ 钉住展开'}
+          onClick={togglePinned}
+        >
+          {pinned ? '«' : '»'}
+        </button>
       </div>
       <div
         className={`app-menu__entries${isNarrow && open ? ' app-menu__entries--open' : ''}`}
@@ -162,7 +285,8 @@ export function AppMenu() {
                 className={`app-menu__link ${activeKey === e.key ? 'app-menu__link--active' : ''}`}
                 onClick={() => setOpen(false)}
               >
-                {t(e.key)}
+                <span className="app-menu__icon"><NavIcon id={iconFor(e.href)} /></span>
+                <span className="app-menu__link-label">{t(e.key)}</span>
               </Link>
             ))}
           </div>
@@ -177,7 +301,12 @@ export function AppMenu() {
           // 也能从这里发现 ⌘⇧E/Ctrl+⇧E —— 不再一次性 dismiss 永久失学)。
           title={captureComboHint(isMac, t)}
         >
-          {t('nav.capture')}
+          <span className="app-menu__icon app-menu__icon--capture" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M7.5 12h9M12 7.5v9" />
+            </svg>
+          </span>
+          <span className="app-menu__link-label">{t('nav.capture')}</span>
         </button>
       </div>
       {isNarrow && open && (
@@ -195,8 +324,10 @@ export function AppMenu() {
 }
 
 const styles = `
-/* ── ≥1200:280px 固定左侧栏(编辑式 unified sidebar)─────────────────────
-   main 让位由 globals.css 的 body > main { margin-left } 承担。 */
+/* ── ≥1200:侧栏 + 折叠轨机制 ────────────────────────────────────────────
+   容器恒 280px;收起(rail)时 translateX(-216px) 只露 64px 图标轨,
+   展开是覆盖式(不推挤内容;main 让位宽度 = --app-sidebar-w,
+   由 layout inline script 按 pin 偏好首帧设定,AppMenu 切换时更新)。 */
 .app-menu {
   position: fixed;
   top: 0;
@@ -209,26 +340,37 @@ const styles = `
   background: var(--color-surface);
   border-right: var(--border-muted);
   font-family: var(--font-display);
+  transition: transform var(--duration-fast) var(--ease-standard);
 }
+/* 收起轨:默认藏左 216px;hover / 键盘聚焦 → 展开(:focus-within 保证
+   Tab 进导航时焦点不在屏外)。展开时右侧边界线加重为墨线(overlay 需要
+   明确边界,零阴影规范内的线层级)。 */
+.app-menu--rail { transform: translateX(calc((var(--editorial-sidebar-width) - 64px) * -1)); }
+.app-menu--rail:hover,
+.app-menu--rail:focus-within { transform: translateX(0); border-right: var(--border-hairline); }
+
 .app-menu__head {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
   height: var(--editorial-topbar-height);
-  padding: 0 var(--space-3);
+  /* 左 padding 让品牌记号中心落在 64px 轨中心(= 32px),与导航图标同心 */
+  padding: 0 var(--space-1) 0 calc((64px - 24px) / 2);
   border-bottom: var(--border-muted);
   flex-shrink: 0;
 }
+.app-menu__mark { flex-shrink: 0; }
 .app-menu__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
   font-family: var(--font-display);
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-sm);
   font-weight: 500;
   letter-spacing: -0.005em;
   color: var(--color-on-surface);
   text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
 }
 .app-menu__brand:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .app-menu__version {
@@ -239,12 +381,32 @@ const styles = `
   user-select: none;
   margin-left: auto;
 }
+/* pin 钉住钮:44px 触达面积,双态字符 «/» */
+.app-menu__pin {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--color-secondary);
+  border: none;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+.app-menu__pin:hover { color: var(--color-on-surface); background: var(--color-surface-container); }
+.app-menu__pin:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.app-menu__pin[aria-pressed='true'] { color: var(--color-on-surface); }
 
 /* 导航主体:纵向分组,可见组标(ui-label-caps),48px 行 */
 .app-menu__entries {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -252,31 +414,45 @@ const styles = `
 }
 .app-menu__group { display: flex; flex-direction: column; }
 .app-menu__group-label {
-  padding: 0 var(--space-3);
+  /* 与 .app-menu__link-label 文字起点对齐(图标列宽 24 + gap 8) */
+  padding: 0 var(--space-3) 0 calc((64px - 24px) / 2 + 24px + var(--space-2));
   font-family: var(--font-display);
   font-weight: 600;
   font-size: var(--font-size-2xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--color-secondary);
+  white-space: nowrap;
 }
 .app-menu__link {
   display: flex;
   align-items: center;
+  gap: var(--space-2);
   min-height: var(--editorial-row-height);
-  padding: 0 var(--space-3) 0 calc(var(--space-3) - 2px);
+  padding: 0 var(--space-3) 0 calc((64px - 24px) / 2);
   border-left: 2px solid transparent;
+  color: var(--color-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+.app-menu__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.app-menu__link-label {
   font-family: var(--font-display);
   font-weight: 500;
   font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--color-secondary);
-  text-decoration: none;
-  transition:
-    color var(--duration-fast) var(--ease-standard),
-    background-color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard);
 }
 .app-menu__link:hover {
   color: var(--color-on-surface);
@@ -290,15 +466,20 @@ const styles = `
   color: var(--color-on-surface);
 }
 
-/* 底部固定 Capture 主行动(红填充,唯一常驻红块) */
+/* 底部固定 Capture 主行动(红填充,唯一常驻红块);收起轨内只露 + 图标块 */
 .app-menu__foot {
   flex-shrink: 0;
-  padding: var(--space-2) var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-3) var(--space-2);
   border-top: var(--border-muted);
 }
 .app-menu__capture {
   width: 100%;
   min-height: var(--editorial-row-height);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* foot 自带 space-2 外边距;8+12=20px 让 + 图标中心与导航图标同心(32px) */
+  padding: 0 var(--space-2) 0 calc(var(--space-1) + var(--space-0.5));
   background: var(--color-primary);
   color: var(--color-on-primary);
   border: 1px solid var(--color-on-surface);
@@ -307,6 +488,7 @@ const styles = `
   font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  white-space: nowrap;
   cursor: pointer;
   transition:
     background-color var(--duration-fast) var(--ease-standard),
@@ -316,14 +498,14 @@ const styles = `
 .app-menu__capture:active { background: var(--color-on-surface); }
 .app-menu__capture:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
-/* ── <1200:顶条 + 左滑抽屉 ─────────────────────────────────────────────
-   顶条占文档流(sticky),main 不让位;entries/foot 收进 fixed 抽屉。 */
+/* ── <1200:顶条 + 左滑抽屉(rail/pin 机制停用)────────────────────── */
 @media (max-width: 1199px) {
   .app-menu {
     position: sticky;
     bottom: auto;
     right: 0;
     width: auto;
+    transform: none;
     flex-direction: column;
     border-right: none;
     border-bottom: var(--border-muted);
@@ -332,8 +514,11 @@ const styles = `
   .app-menu__head {
     height: var(--editorial-topbar-height);
     border-bottom: none;
+    padding: 0 var(--space-2);
   }
-  .app-menu__version { display: none; }
+  .app-menu__brand { flex: 1; }
+  .app-menu__version,
+  .app-menu__pin { display: none; }
   .app-menu__entries {
     position: fixed;
     top: var(--editorial-topbar-height);
@@ -357,6 +542,7 @@ const styles = `
   }
   .app-menu__group { border-top: var(--border-muted); padding-top: var(--space-2); }
   .app-menu__group:first-child { border-top: 0; padding-top: 0; }
+  /* 抽屉开时底部 Capture 跟随滑入(entries 在前 foot 在后,~ 兄弟选择器) */
   .app-menu__foot {
     position: fixed;
     left: 0;
@@ -367,7 +553,6 @@ const styles = `
     transition: transform var(--duration-fast) var(--ease-standard);
     z-index: 40;
   }
-  /* 抽屉开时底部 Capture 跟随滑入(entries 在前 foot 在后,~ 兄弟选择器) */
   .app-menu__entries--open ~ .app-menu__foot { transform: translateX(0); }
 }
 
@@ -397,5 +582,12 @@ const styles = `
   padding: 0;
   cursor: default;
   z-index: 39;
+}
+
+/* 减少动效:侧栏位移瞬切(显隐本身保留) */
+@media (prefers-reduced-motion: reduce) {
+  .app-menu,
+  .app-menu__entries,
+  .app-menu__foot { transition: none; }
 }
 `

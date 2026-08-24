@@ -66,10 +66,13 @@ body > main {
   }
 }
 
-/* ── 编辑式侧栏让位(≥1200:280px 固定左栏,主内容右移)─────────────────
+/* ── 编辑式侧栏让位(≥1200)───────────────────────────────────────────────
+   宽度由 --app-sidebar-w 控制:默认收起 64px 图标轨,钉住展开 280px。
+   layout.tsx 的 inline script 在首帧前按 localStorage 偏好(pin)设好该变量
+   (零闪烁);AppMenu 切换 pin 时更新。悬停展开是覆盖式,不推挤内容。
    <1200 保持 AppMenu 顶部条 + 抽屉形态(1200 = 既有可读性断点,见 app-menu.tsx)。 */
 @media (min-width: 1200px) {
-  body > main { margin-left: var(--editorial-sidebar-width); }
+  body > main { margin-left: var(--app-sidebar-w, 64px); }
 }
 
 /* Bauhaus 滚动条(v0.39.1 跨平台适配):硬色块、无圆角、无渐变,贴合 6 原色气质。
