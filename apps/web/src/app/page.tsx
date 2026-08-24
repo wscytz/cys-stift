@@ -452,9 +452,8 @@ export default function HomePage() {
           transition: background-color var(--duration-fast) var(--ease-standard), transform var(--duration-press) var(--ease-standard);
         }
         .home__capture:hover { background: var(--color-primary-container); }
-        .home__capture:active { background: var(--color-on-surface); }
+        .home__capture:active { background: var(--color-on-surface); transform: scale(0.98); }
         .home__capture:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.home__capture:active { transform: scale(0.98); }
         .home__capture-arrow {
           display: inline-flex; align-items: center; justify-content: center;
           width: 48px; height: 48px;
@@ -502,9 +501,8 @@ export default function HomePage() {
           transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), transform var(--duration-press) var(--ease-standard);
         }
         .home__nav-link:hover { background: var(--color-surface-white); }
-        .home__nav-link:active { background: var(--color-surface-container); }
+        .home__nav-link:active { background: var(--color-surface-container); transform: scale(0.98); }
         .home__nav-link:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-        .home__nav-link:active { transform: scale(0.98); }
         .home__nav-arrow {
           display: inline-flex;
           align-items: center;

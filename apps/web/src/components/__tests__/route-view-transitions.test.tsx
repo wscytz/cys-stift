@@ -10,6 +10,10 @@
  *  3) settle 落定(rAF×2 或 300ms 帽)—— 回调 promise 必须能 resolve,
  *     否则浏览器按 4s 超时中止 VT;
  *  4) finished 拒绝(VT 被中止)不产生 unhandledrejection;页面隐藏直落。
+ *  5) 卸载还原:删实例自有 pushState(回落原型)、移除 popstate 监听;
+ *  6) 严格模式重挂载(挂载→卸载→再挂载)后仍单层包裹 —— reactStrictMode 开着,
+ *     无 cleanup 时 pushState 双层包裹,导航时嵌套 startViewTransition 被浏览器
+ *     skip、回调不执行,原生 pushState 永远不会被调(dev 下 URL 不更新)。
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import React, { act } from 'react'
@@ -31,7 +35,7 @@ const nativePushState = history.pushState.bind(history)
 afterEach(() => {
   vi.useRealTimers()
   vi.restoreAllMocks()
-  // 组件无 cleanup(layout 常驻设计):测试内手动还原全局面。
+  // 组件 cleanup 会还原 pushState;这里兜底再还原一次全局面(测试可能提前抛错)。
   history.pushState = nativePushState
   delete (document as unknown as Record<string, unknown>).startViewTransition
   document.documentElement.removeAttribute('data-vt-nav')
@@ -123,5 +127,34 @@ describe('RouteViewTransitions', () => {
     await new Promise((r) => setTimeout(r, 20))
     expect(onUnhandled).not.toHaveBeenCalled()
     process.off('unhandledRejection', onUnhandled)
+  })
+
+  it('卸载还原:自有 pushState 回落原型方法,popstate 监听移除', () => {
+    const started = stubStartViewTransition()
+    mountComponent()
+    expect(history.pushState).not.toBe(History.prototype.pushState)
+    act(() => root!.unmount())
+    root = null
+    // 实例自有属性被删,回落到原型上的原生方法
+    expect(history.pushState).toBe(History.prototype.pushState)
+    // popstate 监听已移除:再派发不启动 VT
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    expect(started.length).toBe(0)
+  })
+
+  it('严格模式重挂载后单层包裹:一次导航只启动一个 VT,回调内 URL 照常推进', () => {
+    const started = stubStartViewTransition()
+    mountComponent()
+    act(() => root!.unmount())
+    root = null
+    mountComponent()
+    act(() => history.pushState({}, '', '/strict-remount'))
+    // 双层包裹的回归指纹:一次 pushState 启动两个 VT(内层在真浏览器会被 skip,
+    // 真原生 pushState 永远不执行 —— dev 下应用内导航 URL 不更新)
+    expect(started.length).toBe(1)
+    act(() => {
+      void started[0]!.callback()
+    })
+    expect(location.pathname).toBe('/strict-remount')
   })
 })

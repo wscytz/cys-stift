@@ -12,7 +12,9 @@ import { useEffect } from 'react'
  * data-vt-nav 关掉 page-enter,避免双段。
  *
  * 不支持 startViewTransition 的引擎(Firefox/旧 WebKit)全程 no-op,
- * page-enter 继续兜底。layout 常驻,不卸载。
+ * page-enter 继续兜底。layout 常驻;cleanup 仍会还原补丁 —— reactStrictMode
+ * 开着,dev 挂载双调用若不还原,pushState 会被双层包裹(导航时嵌套 VT 被浏览器
+ * skip、回调不执行,原生 pushState 永远不会被调,URL 不更新)。
  *
  * 已知取舍(记录在案,不视为 bug):
  * - settle 用双 rAF 等 React 提交;路由 chunk 晚到时 VT 会多等一两帧旧画面
@@ -82,6 +84,15 @@ export function RouteViewTransitions() {
       if (!active) begin(() => {})
     }
     window.addEventListener('popstate', onPop, true)
+
+    // 还原补丁(严格模式重挂载/真实卸载都会走这里)。只在补丁仍归本 effect
+    // 实例时还原,不得撕掉后来者的补丁;删实例自有属性即回落原型上的原生方法。
+    return () => {
+      window.removeEventListener('popstate', onPop, true)
+      if (history.pushState === wrapped) {
+        delete (history as { pushState?: History['pushState'] }).pushState
+      }
+    }
   }, [])
   return null
 }

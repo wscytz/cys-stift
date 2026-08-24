@@ -290,7 +290,6 @@ export function AppMenu() {
           onClick={togglePinned}
         >
           {pinned ? '«' : '»'}
-
         </button>
       </div>
       <div
@@ -560,9 +559,8 @@ const styles = `
     color var(--duration-fast) var(--ease-standard),
     transform var(--duration-press) var(--ease-standard);
 }
-.app-menu__capture:active { transform: scale(0.98); }
+.app-menu__capture:active { background: var(--color-on-surface); transform: scale(0.98); }
 .app-menu__capture:hover { background: var(--color-primary-container); }
-.app-menu__capture:active { background: var(--color-on-surface); }
 .app-menu__capture:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 /* ── <1200:顶条 + 左滑抽屉(rail/pin 机制停用)────────────────────── */

@@ -16,7 +16,8 @@
 - **动效二轮其余**:列表入场只播一次(`useListSteady`+`.list-steady`,修筛选/搜索按按键重放);display 标题 letterSpacingIn(400ms,ask 常驻 + 各空态);Canvas 页入场编排(面板阶梯上滑 + 画布面 scale 1.02→1 settle);图谱节点 fadeInNode(引擎 alpha 编排,已入场 id 跨 sim 重建不重播);共享元素过渡(home 画布名 ↔ canvas 切换器,current-canvas);筛选面 tactileFlash;按压反馈统一 scale(0.98)/100ms;breathe 换 ::before 环(纯合成器);动效 token 三源(--duration-enter/row/title/press/flash + --stagger-row/step)。
 - **测试衔接**:三组单测入常规套件 —— use-list-steady 时序契约、RouteViewTransitions 四路径(no-op/VT 触发置位/settle 帽/finished 拒绝 + 隐藏页直落)、motion token 三源同步守卫(漂移即红);浏览器级动效断言脚本 `scripts/_motion-audit.mjs`(17 项:VT 分流/守卫两态/快态/canvas 编排/VT 名/token)。
 - **资产**:favicon 三态重绘 + PWA manifest(theme #e03c31)+ 11 个自绘线描导航图标(currentColor 零 hex)。
-- **验证基线**:全包 lint 0 / 全包 test 绿(web 1846 = 1836 + 新 10)/ web build 0 警 / docs:links 过 / render-sweep 18 路由净 / 浏览器断言 17/17 / 线上 12 路由 200。已知取舍:VT 激活期 ~300ms 内点击会被冻结窗吞掉(浏览器 VT 通用行为);Tauri 安装器图标仍旧版;manifest start_url 取 "/"(子路径部署 PWA 安装 nit)。
+- **ocr 规则化审查(分支二轮,`1bc80de..HEAD` 22 文件)**:发现 1 P2 + 1 P3 + 3 P4 全修 —— ① `RouteViewTransitions` effect 无 cleanup,而 `reactStrictMode: true` 开着:dev 双挂载把 pushState 双层包裹,导航时嵌套 `startViewTransition` 被浏览器 skip、回调不执行,原生 pushState 永远不会被调(**dev 下应用内导航 URL 不更新**;生产单次挂载无恙)→ 补 cleanup(自有属性回落原型 + 移除 popstate 监听)+ 两条契约测试(卸载还原 / 严格模式重挂载单层包裹);② shared.css `.tile:nth-child(2)` 裸 `40ms` → `calc(var(--stagger-row) * 1)`(同类上轮已修的字面量漏网);③ nit:节注释 15/16 排序、home/app-menu 三处重复 `:active` 选择器合并、app-menu 按钮空行。评估不违例:VT 160/280ms、cv-surface 500ms、graph 260/24ms(单点单用有出处注释,token 族只收多消费方值);workflow sed 版本注入面仅维护者可控 tag。
+- **验证基线**:全包 lint 0 / 全包 test 绿(web 1848 = 1836 + 新 12)/ web build 0 警 / docs:links 过 / render-sweep 18 路由净 / 浏览器断言 17/17 / 线上 12 路由 200。已知取舍:VT 激活期 ~300ms 内点击会被冻结窗吞掉(浏览器 VT 通用行为);Tauri 安装器图标仍旧版;manifest start_url 取 "/"(子路径部署 PWA 安装 nit)。
 
 ## 2026-08-22 · 1.3.0 · 稳定版(= preview.3 + ocr 规则化审查修复)(tag v1.3.0)
 
