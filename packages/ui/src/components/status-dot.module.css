@@ -1,5 +1,6 @@
 /* 6px 是 DESIGN.md 明文规格(Status Indicators),非 8px 网格值 —— 例外有出处。 */
 .dot {
+  position: relative;
   display: inline-block;
   width: 6px;
   height: 6px;
@@ -15,11 +16,20 @@
   background: var(--color-secondary);
 }
 
-/* live 呼吸(PRD animated 稿原版:s scale 1→1.15 + opacity + 扩散环)。
-   环色随 tone(currentColor 40% 透明),无裸 hex;transform/opacity/box-shadow
-   环走合成器,零重排;reduced-motion 静态。 */
+/* live 呼吸(PRD animated 稿:s 1→1.15 + opacity 0.6 + 扩散环)。
+   环用 ::before 的 transform/opacity 画(box-shadow 动画走重绘,这个走
+   合成器零重绘):环 = currentColor 40% 透明圆,从内切(dot 尺寸)扩到
+   0 透明。环色随 tone(currentColor),无裸 hex。 */
 .pulse {
   animation: status-dot-breathe 3s ease-in-out infinite;
+}
+.pulse::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  animation: status-dot-ring 3s ease-in-out infinite;
 }
 
 @keyframes status-dot-breathe {
@@ -27,17 +37,32 @@
   100% {
     opacity: 1;
     transform: scale(1);
-    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 40%, transparent);
   }
   50% {
     opacity: 0.6;
     transform: scale(1.15);
-    box-shadow: 0 0 0 4px transparent;
+  }
+}
+
+/* 环从 dot 尺寸扩到 ~2.3×(等效原 box-shadow 0→4px 扩散),透明度 40%→0。 */
+@keyframes status-dot-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(2.3);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pulse {
+  .pulse,
+  .pulse::before {
     animation: none;
   }
 }

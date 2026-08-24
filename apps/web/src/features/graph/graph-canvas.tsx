@@ -43,6 +43,12 @@ import { computeFitView } from './fit-view'
 const NODE_R = 10
 const EDGE_WIDTH = 1.5
 
+/* 节点入场(PRD the_network fadeInNode):首次出现的节点按序 alpha 淡入;
+   已入场过的 id 永不重播(筛选重组只给新出现的节点入场)。reduced-motion 跳过。 */
+const ENTER_MS = 260
+const ENTER_STAGGER_MS = 24
+const ENTER_STAGGER_MAX = 15
+
 /** 视图变换(高频,走 ref;zoom 另镜像到 state)。 */
 interface View {
   zoom: number
@@ -93,6 +99,10 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
   const [hover, setHover] = useState<string | null>(null)
   // zoom 镜像到 React state:供父组件读 + GraphZoomBar 显示。applyView 内同步。
   const [zoom, setZoomState] = useState(viewRef.current.zoom)
+  /** 节点入场编排:t0 = 本次 simulation 构建时刻;delays 只含本次新出现的 id。 */
+  const entranceRef = useRef<{ t0: number; delays: Map<string, number> }>({ t0: 0, delays: new Map() })
+  /** 已入场过的 id 跨 simulation 重建保留(筛选重组不重播)。 */
+  const enteredIdsRef = useRef<Set<string>>(new Set())
   // onZoomChange 闭包最新引用(避免 effect 依赖它导致事件监听重建)。
   const onZoomChangeRef = useRef(onZoomChange)
   useEffect(() => {
@@ -139,6 +149,15 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
       faded = true
     }
 
+    // 节点入场 alpha(本次新出现的 id 按序淡入;无延迟记录 = 恒 1)。
+    const entrance = entranceRef.current
+    const now = performance.now()
+    const nodeAlpha = (id: string): number => {
+      const d = entrance.delays.get(id)
+      if (d === undefined) return 1
+      return Math.min(1, Math.max(0, (now - entrance.t0 - d) / ENTER_MS))
+    }
+
     // screen = graph * zoom + pan
     const sx = (x: number) => x * view.zoom + view.panX
     const sy = (y: number) => y * view.zoom + view.panY
@@ -149,8 +168,10 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
       const b = byId.get(e.to)
       if (!a || !b) continue
       const dim = faded && !neighborIds.has(e.from) && !neighborIds.has(e.to)
+      const ea = Math.min(nodeAlpha(e.from), nodeAlpha(e.to))
+      if (ea <= 0) continue
       ctx.save()
-      ctx.globalAlpha = dim ? 0.12 : 1
+      ctx.globalAlpha = (dim ? 0.12 : 1) * ea
       ctx.strokeStyle = resolveColor(e.signature.color)
       ctx.lineWidth = EDGE_WIDTH
       if (e.signature.dash === 'dashed') ctx.setLineDash([6, 4])
@@ -190,7 +211,9 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
     // ── 节点(逆序不影响,逐个画)──
     for (const n of positioned) {
       const dim = faded && !neighborIds.has(n.id)
-      drawNode(ctx, n, view.zoom, sx(n.x), sy(n.y), n.id === hover, dim)
+      const alpha = nodeAlpha(n.id)
+      if (alpha <= 0) continue
+      drawNode(ctx, n, view.zoom, sx(n.x), sy(n.y), n.id === hover, dim, alpha)
     }
   }, [edges, hover])
 
@@ -300,6 +323,40 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
       initialPositions: graphViewStore.getAllPositions(),
     })
     handleRef.current = handle
+    // 入场编排:本次新出现的 id 按序给延迟(跨 sim 重建只给新 id);reduced-motion
+    // 直接全量入场。必须在下方首帧 render 之前就位。
+    const reducedMotion =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    let entranceEnd = 0
+    if (reducedMotion) {
+      for (const n of nodes) enteredIdsRef.current.add(n.id)
+      entranceRef.current = { t0: 0, delays: new Map() }
+    } else {
+      const t0 = performance.now()
+      const delays = new Map<string, number>()
+      let staggerIdx = 0
+      for (const n of nodes) {
+        if (enteredIdsRef.current.has(n.id)) continue
+        enteredIdsRef.current.add(n.id)
+        delays.set(n.id, Math.min(staggerIdx, ENTER_STAGGER_MAX) * ENTER_STAGGER_MS)
+        staggerIdx++
+      }
+      for (const d of delays.values()) entranceEnd = Math.max(entranceEnd, t0 + d + ENTER_MS)
+      entranceRef.current = { t0, delays }
+    }
+    let entranceRafId: number | null = null
+    if (entranceEnd > 0) {
+      // sim tick 会重绘,但坐标全从 store 恢复的静止态可能秒停 —— 入场窗口内用
+      // 独立 rAF 兜底驱动,窗口结束自停(卸载后 canvasRef 置 null 亦停)。
+      const entranceRaf = () => {
+        render()
+        if (performance.now() < entranceEnd && canvasRef.current) {
+          entranceRafId = requestAnimationFrame(entranceRaf)
+        }
+      }
+      entranceRafId = requestAnimationFrame(entranceRaf)
+    }
     let writeTickTimer: ReturnType<typeof setTimeout> | null = null
     handle.onTick(() => {
       render()
@@ -324,6 +381,7 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
       // 注意:不碰 handleRef.current —— 见上面 BUG-2a 注释。只 stop 捕获到的局部 handle。
       handle.stop()
       if (writeTickTimer) clearTimeout(writeTickTimer)
+      if (entranceRafId !== null) cancelAnimationFrame(entranceRafId)
     }
     // nodes/edges 是数组引用;父组件换实例即重建。render 闭包随 edges/hover 更新由 onTick 间接读到最新。
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -525,9 +583,10 @@ function drawNode(
   cy: number,
   isHover: boolean,
   dim: boolean,
+  alpha = 1,
 ): void {
   ctx.save()
-  ctx.globalAlpha = dim ? 0.2 : 1
+  ctx.globalAlpha = (dim ? 0.2 : 1) * alpha
   const fill = node.tagColor ? resolveColor(node.tagColor) : readToken('--color-black', '#1b1c1a')
   ctx.fillStyle = fill
   ctx.strokeStyle = node.archived ? readToken('--color-gray', '#5e5e5c') : fill
@@ -538,7 +597,7 @@ function drawNode(
   // v7 @href 端点标记:节点边缘 ● 表"有显式引用"(引用本身不画常驻线,区别于 arrow)。
   if (node.hrefTargets && node.hrefTargets.length > 0) {
     ctx.save()
-    ctx.globalAlpha = dim ? 0.3 : 1
+    ctx.globalAlpha = (dim ? 0.3 : 1) * alpha
     ctx.fillStyle = readToken('--color-gray', '#5e5e5c')
     ctx.beginPath()
     ctx.arc(cx + NODE_R * 0.7, cy - NODE_R * 0.7, 3, 0, Math.PI * 2)
@@ -561,7 +620,7 @@ function drawNode(
     const max = 10
     const title = node.title.length > max ? node.title.slice(0, max) + '…' : node.title
     ctx.save()
-    ctx.globalAlpha = dim ? 0.3 : 1
+    ctx.globalAlpha = (dim ? 0.3 : 1) * alpha
     ctx.fillStyle = readToken('--color-black', '#1b1c1a')
     ctx.font = '10px monospace'
     ctx.textAlign = 'center'

@@ -1,6 +1,7 @@
 /* Swiss Editorial button: 0 圆角、1px 墨线、hover 反白、active 红。
-   阴影禁用(DESIGN.md Elevation: zero shadows);按压物理位移是旧 Bauhaus
-   语言,v0.2 移除 —— 状态由色彩反转表达,不再由位移表达。 */
+   阴影禁用(DESIGN.md Elevation: zero shadows)。状态由色彩反转表达;
+   按压触感 = 100ms scale(0.98)(PRD canvas_studio btn-zoom 微交互,
+   区别于旧 Bauhaus 的 translate 位移)。 */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -17,7 +18,12 @@
   transition:
     background-color var(--duration-fast) var(--ease-standard),
     color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard);
+    border-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-press) var(--ease-standard);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .btn:focus-visible {
@@ -92,4 +98,9 @@
 .ghost:active:not(:disabled) {
   background: var(--color-surface-container-high);
   color: var(--color-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+  .btn:active:not(:disabled) { transform: none; }
 }

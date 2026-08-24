@@ -455,8 +455,9 @@ const styles = `
   font-family: var(--font-mono);
   font-size: var(--font-size-base);
   cursor: pointer;
-  transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+  transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), transform var(--duration-press) var(--ease-standard);
 }
+.app-menu__pin:active { transform: scale(0.9); }
 .app-menu__pin:hover { color: var(--color-on-surface); background: var(--color-surface-container); }
 .app-menu__pin:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
 .app-menu__pin[aria-pressed='true'] { color: var(--color-on-surface); }
@@ -556,8 +557,10 @@ const styles = `
   cursor: pointer;
   transition:
     background-color var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard);
+    color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-press) var(--ease-standard);
 }
+.app-menu__capture:active { transform: scale(0.98); }
 .app-menu__capture:hover { background: var(--color-primary-container); }
 .app-menu__capture:active { background: var(--color-on-surface); }
 .app-menu__capture:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
@@ -663,5 +666,6 @@ const styles = `
 /* 减少动效:宽高收张瞬切(显隐本身保留) */
 @media (prefers-reduced-motion: reduce) {
   .app-menu { transition: none; }
+  .app-menu__pin:active, .app-menu__capture:active { transform: none; }
 }
 `

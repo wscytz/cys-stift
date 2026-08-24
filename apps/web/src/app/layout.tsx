@@ -17,6 +17,7 @@ import { AIProviderSync } from '@/features/ai/ai-settings-provider'
 import { ArchiveReleaseGate } from '@/features/archive/archive-release-gate'
 import { SkipLink } from '@/components/skip-link'
 import { RouteFocus } from '@/components/route-focus'
+import { RouteViewTransitions } from '@/components/route-view-transitions'
 import { LegacyConversationMigrator } from '@/components/legacy-conversation-migrator'
 
 // 字体自托管(2026-07-06):next/font/google 在 build 时拉 fonts.googleapis.com,
@@ -94,6 +95,7 @@ export default function RootLayout({
         <I18nProvider>
           <SkipLink />
           <RouteFocus />
+          <RouteViewTransitions />
           <AppMenu />
           {children}
           <AIProviderSync />

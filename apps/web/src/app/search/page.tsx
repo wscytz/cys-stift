@@ -16,6 +16,7 @@ import { useGlobalEdges } from '@/features/graph/use-global-edges'
 import { liveEdgesOnly } from '@/features/graph/aggregate-edges'
 import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
 import { readableBodySnippet, snippetForResult } from './search-result'
+import { useListSteady } from '@/lib/use-list-steady'
 import { SearchFilters } from '@/features/search/search-filters'
 import {
   applySearchFilters,
@@ -33,6 +34,7 @@ import {
  */
 export default function SearchPage() {
   const { t } = useI18n()
+  const listSteady = useListSteady()
   const { snap, service, ready } = useDb()
   const { snapshot: canvasesSnap } = useCanvases()
   // 跨画布 backlinks(只读):聚合全局边后过滤端点已软删的(G7 防泄露),传 CardDetailModal
@@ -96,7 +98,7 @@ export default function SearchPage() {
   }, [filteredCards, deferred])
 
   return (
-    <main id="main" tabIndex={-1} className="page">
+    <main id="main" tabIndex={-1} className={`page${listSteady ? ' list-steady' : ''}`}>
       <div className="page-content page-content--wide">
         <PageHeader title={t('search.crumb')} />
         <input

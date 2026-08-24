@@ -201,4 +201,20 @@
      应用内取 350ms(同曲线)——600ms 是 demo 首屏 hero 的节奏,路由切换太拖。 */
   --ease-editorial: cubic-bezier(0.16, 1, 0.3, 1);
   --duration-page: 350ms;
+
+  /* 动效族(时长/步进单一真相源;消费面:home 编排/tile-in/触感反馈/VT)──
+     enter  hero 级编辑式入场(home 每会话首次完整编排,PRD 原速)
+     row    列表行/卡入场(tile-in)
+     title  display 标题字距入场(letterSpacingIn 32px 级)
+     press  按压反馈 scale(0.98)
+     flash  tactileFlash 点击闪现(PRD the_vault 原速 200ms)
+     stagger-row   列表行 nth-child 步进
+     stagger-step  区块级步进(home 分段) */
+  --duration-enter: 600ms;
+  --duration-row: 300ms;
+  --duration-title: 400ms;
+  --duration-press: 100ms;
+  --duration-flash: 200ms;
+  --stagger-row: 40ms;
+  --stagger-step: 100ms;
 }

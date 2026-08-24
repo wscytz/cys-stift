@@ -17,6 +17,7 @@ import { liveEdgesOnly } from '@/features/graph/aggregate-edges'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
 import { captureSinkRegistry } from '@/features/capture/capture-sink'
 import { getDeviceId } from '@/lib/device-id'
+import { useListSteady } from '@/lib/use-list-steady'
 import { pushToast } from '@/lib/toast-store'
 import { groupCardsByDay } from '@/lib/group-by-day'
 import { openCardFromOverview } from '@/features/card/card-reentry'
@@ -35,6 +36,7 @@ const DEVICE_ID = getDeviceId()
  */
 export default function TimelinePage() {
   const { t } = useI18n()
+  const listSteady = useListSteady()
   const router = useRouter()
   const { snap, service, ready } = useDb()
   // 跨画布 backlinks(只读):聚合全局边后过滤端点已软删的(G7 防泄露),传 CardDetailModal
@@ -102,7 +104,7 @@ export default function TimelinePage() {
     liveDetail && !liveDetail.deletedAt ? liveDetail : null
 
   return (
-    <main id="main" tabIndex={-1} className="page">
+    <main id="main" tabIndex={-1} className={`page${listSteady ? ' list-steady' : ''}`}>
       <div className="page-content page-content--wide">
         <PageHeader title={t('timeline.crumb')} />
         {!ready ? (

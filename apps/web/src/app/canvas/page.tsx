@@ -2008,6 +2008,27 @@ function RailButton({ label, short, icon, onClick, onKeyDown, disabled, busy, bu
 
 const styles = `
 .page { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--color-white); color: var(--color-black); }
+/* 入场编排(PRD canvas_studio 的 app 节奏版:面板 fadeSlideUp 阶梯 + 画布面
+   panZoomIn settle;demo 400ms/1.2s → 取 300ms/500ms)。Toolbar 是 CSS module
+   哈希类,页面样式用结构选择器 .page > header 定位(本样式块只随 canvas 路由
+   存在,不影响他页)。焦点模式退出时 chrome 重挂载会重播 —— 作为「chrome 回归」
+   效果保留。 */
+.page > header { animation: cv-chrome-in var(--duration-row) var(--ease-editorial) both; }
+.cv-dock__panel { animation: cv-chrome-in var(--duration-row) var(--ease-editorial) 50ms both; }
+.cv-rail { animation: cv-chrome-in var(--duration-row) var(--ease-editorial) 100ms both; }
+/* 画布面 settle:scale 1.02→1(引擎每事件重读 getBoundingClientRect,
+   动画期指针映射仍自洽);keyframes 只声明 from,结束回落自然态,
+   无常驻 containing-block 副作用。 */
+.cv-host { animation: cv-surface-in 500ms var(--ease-editorial) 100ms both; }
+@keyframes cv-chrome-in {
+  from { opacity: 0; transform: translateY(10px); }
+}
+@keyframes cv-surface-in {
+  from { opacity: 0; transform: scale(1.02); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page > header, .cv-dock__panel, .cv-rail, .cv-host { animation: none; }
+}
 /* 焦点模式:画布占满整个 page 高度(Toolbar 隐藏了),cv-host flex:1 撑开。 */
 .page--focus { }
 .page--focus .cv-host { flex: 1; }
@@ -2025,6 +2046,10 @@ const styles = `
 .cv-focus-exit:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 /* 根据当前工具显示不同光标 — 让用户知道正在用 select/freedraw/eraser/text/connect 哪种模式 */
 .cv-host { position: relative; flex: 1; min-height: 0; }
+/* 共享元素过渡搭档:首页 .home__current strong 同名(current-canvas),
+   路由切换时画布名 morph 到切换器位置。改名态(crename input)元素不在 →
+   退回整页 VT,不报错。 */
+.cselect { view-transition-name: current-canvas; }
 /* Canvas bitmap width/height attributes are renderer state, not layout input.
    Keep the bitmap out of normal flow so viewport changes cannot inflate the
    flex item's min-content height on each resize. */
@@ -2099,7 +2124,7 @@ const styles = `
 .tb-tool--sub .tb-tool__icon { font-size: var(--font-size-sm); }
 .tb-tool--sub .tb-tool__label { font-size: var(--font-size-xs); }
 .tb-tool:hover:not(:disabled):not(.tb-tool--active) { background: var(--color-surface-container); border-color: var(--color-secondary); }
-.tb-tool:active:not(:disabled) { background: var(--color-surface-container-high); }
+.tb-tool:active:not(:disabled) { background: var(--color-surface-container-high); transform: scale(0.98); }
 .tb-tool:disabled { opacity: 0.5; cursor: not-allowed; }
 .tb-tool:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tb-snap { display: inline-flex; align-items: center; justify-content: center; height: 44px; min-width: 44px; padding: 0 var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.16em; text-transform: uppercase; background: var(--color-white); color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
@@ -2108,7 +2133,7 @@ const styles = `
 /* P1 #6: 5 个工具按钮(↖✎⌫T⇄)补 hover,与 .tb-icon-btn 对齐;排除激活态
    (--snap 黑底)与 SnapToggle 的 --snap/--free 文字按钮,避免抢激活态视觉。 */
 .tb-snap:hover:not(:disabled):not(.tb-snap--snap):not(.tb-snap--free):not(.tb-snap--toggle) { background: var(--color-surface-container); }
-.tb-snap:active:not(:disabled) { background: var(--color-surface-container-high); }
+.tb-snap:active:not(:disabled) { background: var(--color-surface-container-high); transform: scale(0.98); }
 .tb-snap:disabled { opacity: 0.5; cursor: not-allowed; }
 .tb-snap:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 /* SnapToggle 默认显示文字 label,glyph 隐藏;≤900px 反转(见响应式断点)。 */
@@ -2117,7 +2142,7 @@ const styles = `
 .tb-icon-btn { display: inline-flex; align-items: center; justify-content: center; height: 44px; min-width: 44px; padding: 0 var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.12em; text-transform: uppercase; background: transparent; color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; }
 .tb-icon-btn--fit { padding: 0 var(--space-3); }
 .tb-icon-btn:hover { background: var(--color-on-surface); color: var(--color-surface); }
-.tb-icon-btn:active:not(:disabled) { background: var(--color-surface-container-high); color: var(--color-on-surface); }
+.tb-icon-btn:active:not(:disabled) { background: var(--color-surface-container-high); color: var(--color-on-surface); transform: scale(0.98); }
 .tb-icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .tb-icon-btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 /* 对齐工具条:选中≥2 卡时出现。复用 .tb-icon-btn 视觉;组容器内联排布。 */
@@ -2187,7 +2212,7 @@ const styles = `
 /* 设计语言:hover=容器灰底(轻提示),active(按下)=深容器灰(触感),
    pressed(持续选中)=手术红底白字(表示「这个开着/在用」)。 */
 .cv-rail__btn:hover:not(:disabled) { background: var(--color-surface-container); }
-.cv-rail__btn:active:not(:disabled) { background: var(--color-surface-container-high); }
+.cv-rail__btn:active:not(:disabled) { background: var(--color-surface-container-high); transform: scale(0.98); }
 .cv-rail__btn--pressed { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
 .cv-rail__btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .cv-rail__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: -2px; }
@@ -2263,7 +2288,7 @@ const styles = `
   cursor: pointer; line-height: 1;
 }
 .cv-organize__apply:hover:not(:disabled) { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
-.cv-organize__apply:active:not(:disabled) { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
+.cv-organize__apply:active:not(:disabled) { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); transform: scale(0.98); }
 .cv-organize__apply:disabled { opacity: 0.5; cursor: not-allowed; }
 .cv-organize__apply:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 

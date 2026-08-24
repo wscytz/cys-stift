@@ -107,4 +107,11 @@
   --ease-editorial: cubic-bezier(0.16, 1, 0.3, 1);
   --duration-fast: 150ms;
   --duration-page: 350ms;
+  --duration-enter: 600ms;
+  --duration-row: 300ms;
+  --duration-title: 400ms;
+  --duration-press: 100ms;
+  --duration-flash: 200ms;
+  --stagger-row: 40ms;
+  --stagger-step: 100ms;
 }

@@ -7,6 +7,7 @@ import { PageHeader } from '@/features/page-header'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
 import { mediaStore } from '@/lib/media-store'
+import { useListSteady } from '@/lib/use-list-steady'
 import { useI18n } from '@/lib/i18n'
 import { PageLoading } from '@/components/page-loading'
 import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
@@ -26,6 +27,7 @@ import { ArchiveCardTile } from '@/features/archive/archive-card-tile'
  */
 export default function TrashPage() {
   const { t } = useI18n()
+  const listSteady = useListSteady()
   const { snap, service, ready } = useDb()
   void snap // subscribe
   const [confirmHardDelete, setConfirmHardDelete] = useState<CardId | null>(null)
@@ -48,7 +50,7 @@ export default function TrashPage() {
     : null
 
   return (
-    <main id="main" tabIndex={-1} className="page">
+    <main id="main" tabIndex={-1} className={`page${listSteady ? ' list-steady' : ''}`}>
       <div className="page-content page-content--wide">
         <PageHeader title={t('trash.crumb')} />
         {!ready ? (

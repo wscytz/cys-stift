@@ -42,13 +42,36 @@ body {
 body > main.page { flex: 1; min-height: 0; }
 
 /* ── Swiss Editorial 全局动效(v0.2)────────────────────────────────────────
-   1) 页面入场:编辑式上滑淡入(PRD animated 稿 fadeInUp 曲线,取 350ms ——
-      600ms 是 demo 首屏 hero 的节奏,路由切换太拖)。每路由的 main 随页面重挂载,
-      动画每次导航触发一次。transform 仅在动画期间存在,结束后无 containing-block
-      副作用(fixed 定位的 Modal/CaptureHost 不受影响)。
-   2) Same-document View Transitions:支持的引擎(Chromium WebView2 / 新 Safari)
-      路由切换自动获得编辑式过渡;不支持则静默无动画(渐进增强)。 */
+   路由动效按引擎分流,同一时刻只有一段动画:
+   1) 支持同文档 View Transitions 的引擎(Chromium WebView2 / 新 Safari):
+      RouteViewTransitions 组件在 pushState/popstate 外启动 startViewTransition
+      (Next <Link> 是客户端导航,不触发 @view-transition 的跨文档 VT),并给 <html>
+      打 data-vt-nav —— 此后路由入场由下方编辑式 VT 承载,page-enter 关闭。
+      属性只置位不清除:若动画中途移除会重启 page-enter,变成连续两段运动。
+   2) 其余引擎(Firefox web):组件 no-op,main 的 page-enter 兜底(编辑式上滑
+      淡入,350ms —— PRD 600ms 是 demo 首屏 hero 节奏,路由切换太拖)。
+   @view-transition 保留给真正的跨文档导航(站外链入),同样吃下面的 VT 节奏。 */
 @view-transition { navigation: auto; }
+
+/* VT 的编辑式节奏(替换默认 ~250ms 线性 cross-fade)。new 端 280ms 故意短于
+   列表/标题入场(tile-in 300ms+步进、title-tracking 400ms)—— VT 激活时这些
+   入场还有大半没播,阶梯感在 cross-fade 结束后仍然可感。
+   reduced-motion 由下方 !important 块统一关闭(特异性无关)。 */
+::view-transition-old(root) {
+  animation: vt-page-out 160ms var(--ease-editorial) both;
+}
+::view-transition-new(root) {
+  animation: vt-page-in 280ms var(--ease-editorial) both;
+}
+@keyframes vt-page-out {
+  to { opacity: 0; }
+}
+@keyframes vt-page-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+/* 分流标记:RouteViewTransitions 在第一次 VT 启动前置位(此刻新 main 还没挂载,
+   不会带着 animation 挂载后又被关掉导致重启)。 */
+html[data-vt-nav] body > main { animation: none; }
 
 body > main {
   animation: page-enter var(--duration-page) var(--ease-editorial);

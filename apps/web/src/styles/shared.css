@@ -40,6 +40,16 @@
 }
 .display-title--lg {
   font-size: var(--font-size-2xl);
+  /* 标题字距入场(PRD the_vault letterSpacingIn 的 32px 级变体):home 64px hero
+     用 0.1em→-0.03em,display 级取收敛值 0.04em 起步。只声明 from 帧 —— to 落回
+     元素自然字距(-0.01em),both 停帧不会改排版。挂载时播一次。 */
+  animation: title-tracking-in var(--duration-title) var(--ease-editorial) both;
+}
+@keyframes title-tracking-in {
+  from { letter-spacing: 0.04em; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .display-title--lg { animation: none; }
 }
 
 /* ── 3. Eyebrow (above titles, small uppercase label) ───────────────────────── */
@@ -252,6 +262,20 @@
   }
 }
 
+/* ── 16. 触感反馈(PRD the_vault tactileFlash + canvas_studio btn-zoom)───────
+   点击瞬间 200ms 背景闪(surface-container-highest 起,落回元素自然底色 ——
+   只声明 from 帧)+ 100ms scale(0.98) 按压。各筛选面(tab/sf__seg-btn/
+   sf__tag/sf__clear)在自己的样式块里挂 :active;选中态颜色仍由 is-active 管。 */
+@keyframes tactile-flash {
+  from { background-color: var(--color-surface-container-highest); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tab:active, .sf__seg-btn:active, .sf__tag:active, .sf__clear:active {
+    animation: none;
+    transform: none;
+  }
+}
+
 /* ── 15. Card tile (inbox red bar / archive-family blue bar shared) ──────────
  * inbox .tile 默认 red bar;archive-family 加 .tile--bar-blue;
  * .tile--pinned bar→yellow 赢。结构:.tile 是 div,内含 .tile__select/
@@ -273,20 +297,23 @@
     background-color var(--duration-fast) var(--ease-standard),
     border-color var(--duration-fast) var(--ease-standard);
   /* 入场(PRD the_vault 稿 fadeInRow:10px 上滑 + 行间 40ms 步进;仅挂载时播) */
-  animation: tile-in 300ms var(--ease-editorial) both;
+  animation: tile-in var(--duration-row) var(--ease-editorial) both;
 }
 .tile:nth-child(2), .row:nth-child(2) { animation-delay: 40ms; }
-.tile:nth-child(3), .row:nth-child(3) { animation-delay: 80ms; }
-.tile:nth-child(4), .row:nth-child(4) { animation-delay: 120ms; }
-.tile:nth-child(5), .row:nth-child(5) { animation-delay: 160ms; }
-.tile:nth-child(6), .row:nth-child(6) { animation-delay: 200ms; }
-.tile:nth-child(7), .row:nth-child(7) { animation-delay: 240ms; }
-.tile:nth-child(8), .row:nth-child(8) { animation-delay: 280ms; }
-.tile:nth-child(n + 9), .row:nth-child(n + 9) { animation-delay: 320ms; }
+.tile:nth-child(3), .row:nth-child(3) { animation-delay: calc(var(--stagger-row) * 2); }
+.tile:nth-child(4), .row:nth-child(4) { animation-delay: calc(var(--stagger-row) * 3); }
+.tile:nth-child(5), .row:nth-child(5) { animation-delay: calc(var(--stagger-row) * 4); }
+.tile:nth-child(6), .row:nth-child(6) { animation-delay: calc(var(--stagger-row) * 5); }
+.tile:nth-child(7), .row:nth-child(7) { animation-delay: calc(var(--stagger-row) * 6); }
+.tile:nth-child(8), .row:nth-child(8) { animation-delay: calc(var(--stagger-row) * 7); }
+.tile:nth-child(n + 9), .row:nth-child(n + 9) { animation-delay: calc(var(--stagger-row) * 8); }
 @keyframes tile-in {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+/* 入场只播一次:页面挂载 700ms 后容器加 .list-steady(useListSteady hook),
+   筛选/搜索导致的重挂载不再重放入场(tile-in 终态=无位移,切换无跳变)。 */
+.list-steady .tile, .list-steady .row { animation: none; }
 @media (prefers-reduced-motion: reduce) {
   .tile, .row { animation: none; }
 }

@@ -151,6 +151,14 @@ export const tokens = {
     /** PRD animated 稿入场曲线;页面切换取 350ms(600ms 是 demo hero 节奏)。 */
     editorial: 'cubic-bezier(0.16, 1, 0.3, 1)',
     page: '350ms',
+    /** 动效族:hero 入场 / 列表行 / 标题字距 / 按压 / 点击闪现 / 两种步进。 */
+    enter: '600ms',
+    row: '300ms',
+    title: '400ms',
+    press: '100ms',
+    flash: '200ms',
+    staggerRow: '40ms',
+    staggerStep: '100ms',
   },
 } as const
 

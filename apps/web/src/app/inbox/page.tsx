@@ -20,6 +20,7 @@ import { PageLoading } from '@/components/page-loading'
 import { typeKeyOf } from '@/lib/type-label'
 import { markdownPreview } from '@/features/card/markdown-preview'
 import { getDeviceId } from '@/lib/device-id'
+import { useListSteady } from '@/lib/use-list-steady'
 import { pushToast } from '@/lib/toast-store'
 import {
   applyInboxCardPlacements,
@@ -37,6 +38,7 @@ const DEVICE_ID = getDeviceId()
 
 export default function InboxPage() {
   const { t } = useI18n()
+  const listSteady = useListSteady()
   const { snap, service, ready } = useDb()
   // 跨画布 backlinks(只读):聚合全局边后过滤端点已软删的(G7 防泄露),传 CardDetailModal
   // 显示「这张卡和谁有关系」。canEditRelations 不传(默认 false=只读,无 × 删除/+ 添加钮)。
@@ -272,7 +274,7 @@ export default function InboxPage() {
     liveDetail && !liveDetail.deletedAt ? liveDetail : null
 
   return (
-    <main id="main" tabIndex={-1} className="page">
+    <main id="main" tabIndex={-1} className={`page${listSteady ? ' list-steady' : ''}`}>
       <div
         className="page-content page-content--wide"
         role="tabpanel"
@@ -593,7 +595,9 @@ const styles = `
   color: var(--color-gray);
   cursor: pointer;
   border-bottom: 2px solid transparent;
+  transition: transform var(--duration-press) var(--ease-standard);
 }
+.tab:active { transform: scale(0.98); animation: tactile-flash var(--duration-flash) ease-out; }
 .tb-snap {
   display: inline-flex;
   align-items: center;
