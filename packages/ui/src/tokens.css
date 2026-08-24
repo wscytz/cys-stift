@@ -158,6 +158,7 @@
 
   /* ── Editorial grid(固定编辑栅格)────────────────────────────────── */
   --editorial-sidebar-width: 280px;
+  --editorial-rail-width: 64px;
   --editorial-topbar-height: 64px;
   --editorial-row-height: 48px;
   --editorial-margin: 32px;

@@ -86,7 +86,7 @@ export default function RootLayout({
          */}
         <script
           // eslint-disable-next-line react/no-danger
-          dangerouslySetInnerHTML={{ __html: `try{document.documentElement.style.setProperty('--app-sidebar-w',localStorage.getItem('cys-stift.sidebar-pinned')==='1'?'280px':'64px')}catch(e){}` }}
+          dangerouslySetInnerHTML={{ __html: `try{document.documentElement.style.setProperty('--app-sidebar-w',localStorage.getItem('cys-stift.sidebar-pinned')==='1'?'var(--editorial-sidebar-width)':'var(--editorial-rail-width)')}catch(e){}` }}
         />
       </head>
       <body>

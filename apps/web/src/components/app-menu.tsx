@@ -41,7 +41,11 @@ function captureComboHint(isMac: boolean, t: (key: MessageKey, params?: Record<s
 const SIDEBAR_PINNED_KEY = 'cys-stift.sidebar-pinned'
 
 function applySidebarWidth(pinned: boolean) {
-  document.documentElement.style.setProperty('--app-sidebar-w', pinned ? '280px' : '64px')
+  // 值引用 token(非字面量):宽度真相源 = tokens.css 的 --editorial-*-width
+  document.documentElement.style.setProperty(
+    '--app-sidebar-w',
+    pinned ? 'var(--editorial-sidebar-width)' : 'var(--editorial-rail-width)',
+  )
 }
 
 /* ── 导航图标(Swiss Editorial:24 viewBox、1.5px 线描、方角、currentColor,
@@ -338,7 +342,7 @@ const styles = `
   z-index: 40;
   display: flex;
   flex-direction: column;
-  width: 64px;
+  width: var(--editorial-rail-width);
   overflow: hidden;
   background: var(--color-surface);
   border-right: var(--border-muted);
@@ -390,7 +394,7 @@ const styles = `
   align-items: center;
   gap: var(--space-1);
   height: var(--editorial-topbar-height);
-  padding: 0 var(--space-1) 0 calc((64px - 24px) / 2);
+  padding: 0 var(--space-1) 0 calc((var(--editorial-rail-width) - 24px) / 2);
   border-bottom: var(--border-muted);
   flex-shrink: 0;
 }
@@ -452,7 +456,7 @@ const styles = `
 .app-menu__group { display: flex; flex-direction: column; }
 .app-menu__group-label {
   /* 与 .app-menu__link-label 文字起点对齐(图标列宽 24 + gap 8) */
-  padding: 0 var(--space-3) 0 calc((64px - 24px) / 2 + 24px + var(--space-2));
+  padding: 0 var(--space-3) 0 calc((var(--editorial-rail-width) - 24px) / 2 + 24px + var(--space-2));
   font-family: var(--font-display);
   font-weight: 600;
   font-size: var(--font-size-2xs);
@@ -466,7 +470,7 @@ const styles = `
   align-items: center;
   gap: var(--space-2);
   min-height: var(--editorial-row-height);
-  padding: 0 var(--space-3) 0 calc((64px - 24px) / 2);
+  padding: 0 var(--space-3) 0 calc((var(--editorial-rail-width) - 24px) / 2);
   border-left: 2px solid transparent;
   color: var(--color-secondary);
   text-decoration: none;

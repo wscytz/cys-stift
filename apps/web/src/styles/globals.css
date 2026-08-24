@@ -72,7 +72,7 @@ body > main {
    (零闪烁);AppMenu 切换 pin 时更新。悬停展开是覆盖式,不推挤内容。
    <1200 保持 AppMenu 顶部条 + 抽屉形态(1200 = 既有可读性断点,见 app-menu.tsx)。 */
 @media (min-width: 1200px) {
-  body > main { margin-left: var(--app-sidebar-w, 64px); }
+  body > main { margin-left: var(--app-sidebar-w, var(--editorial-rail-width, 64px)); }
 }
 
 /* Bauhaus 滚动条(v0.39.1 跨平台适配):硬色块、无圆角、无渐变,贴合 6 原色气质。

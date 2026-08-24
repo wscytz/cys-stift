@@ -139,6 +139,7 @@ export const tokens = {
   /** 固定编辑栅格。 */
   editorial: {
     sidebarWidth: '280px',
+    railWidth: '64px',
     topbarHeight: '64px',
     rowHeight: '48px',
     margin: '32px',
