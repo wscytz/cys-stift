@@ -116,16 +116,17 @@ function NavIcon({ id }: { id: string }) {
 /**
  * AppMenu — Swiss Editorial 全局侧栏(v0.2,PRD unified sidebar)。
  *
- * 折叠机制(用户需求:默认收起、移入展开、按钮可钉住):
- *   - 默认 64px 图标轨(rail):品牌记号 + 图标导航 + 底部 Capture 加号块。
- *   - 鼠标移入(:hover)或键盘聚焦(:focus-within,保证 Tab 可达)→ 280px
- *     覆盖式展开(不推挤内容,150ms);移出即收。
+ * 收起/展开机制(用户需求:默认收起、移入展开、按钮可钉住):
+ *   - 默认 64px 图标轨(rail):品牌记号 + 图标导航 + 底部 Capture 加号块;
+ *     图标锚定在轨中心(x=32),标签原地显隐 —— 是宽度收张(width 64↔280),
+ *     不是面板平移(旧 translate 方案收起态会露出被裁切的标签尾巴,已废弃)。
+ *   - 鼠标移入(:hover)或键盘聚焦(:focus-within,保证 Tab 可达)→ 展开到
+ *     280px(覆盖式,不推挤内容);移出即收。150ms。
  *   - head 上的 pin 钮(«/»)钉住展开:常驻 280 并推挤内容(main margin 由
  *     --app-sidebar-w 控制,layout inline script 首帧前按持久化偏好设好,
  *     零闪烁);再点回收起。偏好 localStorage 持久化。
  *   - <1200:64px 顶条(汉堡 + 品牌 + Capture)+ 左滑抽屉(1200 = 既有可读
- *     性断点);rail/pin 机制仅在宽屏生效。useMatchMedia 读断点,open state
- *     控抽屉;路由切换 / 回宽屏自动关。
+ *     性断点);rail/pin 机制仅在宽屏生效。
  *
  * 配额订阅 / i18n 分组 IA / active 探测 / 捕获快捷键 tooltip 逻辑自 v0.1 起不变。
  */
@@ -165,7 +166,7 @@ export function AppMenu() {
   // 审计 H1 + R2.3/2.4 + quota-silence fix:所有非 React store(db-client /
   // media-store / canvas-freeform-store / canvas-store / settings-store /
   // canvas-view-store)都是非 React 模块,无法直接 pushToast。AppMenu 全局挂载
-  // 且是 'use client',这里订阅各 store 的 配额写入失败事件并提示用户(防静默丢
+  // 且是 'use client',这里订阅各 store 的配额写入失败事件并提示用户(防静默丢
   // 卡片/媒体/画布几何/画布列表/设置/画布视图)。
   useEffect(() => {
     const message = t('storage.quotaExceeded')
@@ -240,7 +241,7 @@ export function AppMenu() {
   const iconFor = (href: string) => href.replace(/^\//, '').split('/')[0] ?? ''
 
   return (
-    <nav className={`app-menu${pinned ? '' : ' app-menu--rail'}`} aria-label="Primary">
+    <nav className={`app-menu${pinned ? ' app-menu--pinned' : ' app-menu--rail'}`} aria-label="Primary">
       <div className="app-menu__head">
         {isNarrow && (
           <button
@@ -324,10 +325,11 @@ export function AppMenu() {
 }
 
 const styles = `
-/* ── ≥1200:侧栏 + 折叠轨机制 ────────────────────────────────────────────
-   容器恒 280px;收起(rail)时 translateX(-216px) 只露 64px 图标轨,
-   展开是覆盖式(不推挤内容;main 让位宽度 = --app-sidebar-w,
-   由 layout inline script 按 pin 偏好首帧设定,AppMenu 切换时更新)。 */
+/* ── ≥1200:侧栏收起/展开(width 收张,非平移)────────────────────────────
+   图标锚定 64px 轨中心(x=32):head/links 的左 padding 恒 20px,图标恒在原位;
+   标签原地显隐(clip by overflow)。收起 64 ↔ 悬停/聚焦 280(覆盖式,不推挤);
+   钉住 = 常驻 280 并推挤内容(margin = --app-sidebar-w,layout inline script
+   按 pin 偏好首帧设定,AppMenu 切换时更新)。 */
 .app-menu {
   position: fixed;
   top: 0;
@@ -336,25 +338,58 @@ const styles = `
   z-index: 40;
   display: flex;
   flex-direction: column;
-  width: var(--editorial-sidebar-width);
+  width: 64px;
+  overflow: hidden;
   background: var(--color-surface);
   border-right: var(--border-muted);
   font-family: var(--font-display);
-  transition: transform var(--duration-fast) var(--ease-standard);
+  transition: width var(--duration-fast) var(--ease-standard);
 }
-/* 收起轨:默认藏左 216px;hover / 键盘聚焦 → 展开(:focus-within 保证
-   Tab 进导航时焦点不在屏外)。展开时右侧边界线加重为墨线(overlay 需要
-   明确边界,零阴影规范内的线层级)。 */
-.app-menu--rail { transform: translateX(calc((var(--editorial-sidebar-width) - 64px) * -1)); }
+
+/* 钉住态:常驻全宽 */
+.app-menu--pinned { width: var(--editorial-sidebar-width); }
+
+/* 悬停 / 键盘聚焦 → 展开(:focus-within 保证 Tab 进导航时焦点可见)。
+   展开是覆盖式 overlay:右边界线加重为墨线(零阴影规范内的线层级)。 */
 .app-menu--rail:hover,
-.app-menu--rail:focus-within { transform: translateX(0); border-right: var(--border-hairline); }
+.app-menu--rail:focus-within {
+  width: var(--editorial-sidebar-width);
+  border-right: var(--border-hairline);
+}
+
+/* 标签族(文字部分):收起隐藏、展开原地淡入。visibility 带 delay 收尾,
+   防止隐形占位拦截点击;展开时立即恢复可见。 */
+.app-menu--rail .app-menu__link-label,
+.app-menu--rail .app-menu__group-label,
+.app-menu--rail .app-menu__brand-name,
+.app-menu--rail .app-menu__version,
+.app-menu--rail .app-menu__pin {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--duration-fast) var(--ease-standard),
+    visibility 0s linear var(--duration-fast);
+}
+.app-menu--rail:hover .app-menu__link-label,
+.app-menu--rail:focus-within .app-menu__link-label,
+.app-menu--rail:hover .app-menu__group-label,
+.app-menu--rail:focus-within .app-menu__group-label,
+.app-menu--rail:hover .app-menu__brand-name,
+.app-menu--rail:focus-within .app-menu__brand-name,
+.app-menu--rail:hover .app-menu__version,
+.app-menu--rail:focus-within .app-menu__version,
+.app-menu--rail:hover .app-menu__pin,
+.app-menu--rail:focus-within .app-menu__pin {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity var(--duration-fast) var(--ease-standard) 50ms;
+}
 
 .app-menu__head {
   display: flex;
   align-items: center;
   gap: var(--space-1);
   height: var(--editorial-topbar-height);
-  /* 左 padding 让品牌记号中心落在 64px 轨中心(= 32px),与导航图标同心 */
   padding: 0 var(--space-1) 0 calc((64px - 24px) / 2);
   border-bottom: var(--border-muted);
   flex-shrink: 0;
@@ -371,6 +406,7 @@ const styles = `
   letter-spacing: -0.005em;
   color: var(--color-on-surface);
   text-decoration: none;
+  white-space: nowrap;
 }
 .app-menu__brand:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .app-menu__version {
@@ -380,6 +416,7 @@ const styles = `
   letter-spacing: 0.05em;
   user-select: none;
   margin-left: auto;
+  white-space: nowrap;
 }
 /* pin 钉住钮:44px 触达面积,双态字符 «/» */
 .app-menu__pin {
@@ -500,16 +537,27 @@ const styles = `
 
 /* ── <1200:顶条 + 左滑抽屉(rail/pin 机制停用)────────────────────── */
 @media (max-width: 1199px) {
-  .app-menu {
+  .app-menu,
+  .app-menu--rail,
+  .app-menu--pinned,
+  .app-menu--rail:hover,
+  .app-menu--rail:focus-within {
     position: sticky;
     bottom: auto;
     right: 0;
     width: auto;
-    transform: none;
+    overflow: visible;
     flex-direction: column;
     border-right: none;
     border-bottom: var(--border-muted);
     background: var(--color-surface);
+  }
+  /* 抽屉形态标签恒可见(顶条上品牌名也显示) */
+  .app-menu--rail .app-menu__link-label,
+  .app-menu--rail .app-menu__group-label,
+  .app-menu--rail .app-menu__brand-name {
+    opacity: 1;
+    visibility: visible;
   }
   .app-menu__head {
     height: var(--editorial-topbar-height);
@@ -554,6 +602,7 @@ const styles = `
     z-index: 40;
   }
   .app-menu__entries--open ~ .app-menu__foot { transform: translateX(0); }
+  .app-menu__capture { padding-left: var(--space-2); }
 }
 
 /* 汉堡按钮(<1200 显;宽屏不 render) */
@@ -584,10 +633,8 @@ const styles = `
   z-index: 39;
 }
 
-/* 减少动效:侧栏位移瞬切(显隐本身保留) */
+/* 减少动效:宽高收张瞬切(显隐本身保留) */
 @media (prefers-reduced-motion: reduce) {
-  .app-menu,
-  .app-menu__entries,
-  .app-menu__foot { transition: none; }
+  .app-menu { transition: none; }
 }
 `
