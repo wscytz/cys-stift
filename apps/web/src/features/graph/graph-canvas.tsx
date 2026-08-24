@@ -120,7 +120,7 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
     ctx.clearRect(0, 0, w, h)
-    ctx.fillStyle = readToken('--color-white', '#ffffff')
+    ctx.fillStyle = readToken('--color-white', '#fbf9f6')
     ctx.fillRect(0, 0, w, h)
 
     const view = viewRef.current
@@ -171,7 +171,7 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
       const hn = byId.get(hover)
       if (hn && hn.hrefTargets && hn.hrefTargets.length > 0) {
         ctx.save()
-        ctx.strokeStyle = readToken('--color-gray', '#666666')
+        ctx.strokeStyle = readToken('--color-gray', '#5e5e5c')
         ctx.lineWidth = 1
         ctx.setLineDash([2, 3])
         ctx.globalAlpha = 0.6
@@ -496,10 +496,10 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
  * 解析失败回退中性灰(YAGNI:不引额外映射表,readToken 已是项目标准)。
  */
 function resolveColor(raw: string | null | undefined): string {
-  if (!raw) return '#666666'
+  if (!raw) return '#5e5e5c'
   const m = /^var\((--[\w-]+)\)$/.exec(raw.trim())
   const name = m?.[1] ?? (raw.startsWith('--') ? raw : mapDslName(raw))
-  return readToken(name, '#666666')
+  return readToken(name, '#5e5e5c')
 }
 
 /** DSL/关系 color 名(6 原色口径)→ token 名。仅兜底裸名输入;var(...) 形式已剥壳。 */
@@ -528,9 +528,9 @@ function drawNode(
 ): void {
   ctx.save()
   ctx.globalAlpha = dim ? 0.2 : 1
-  const fill = node.tagColor ? resolveColor(node.tagColor) : readToken('--color-black', '#0a0a0a')
+  const fill = node.tagColor ? resolveColor(node.tagColor) : readToken('--color-black', '#1b1c1a')
   ctx.fillStyle = fill
-  ctx.strokeStyle = node.archived ? readToken('--color-gray', '#666666') : fill
+  ctx.strokeStyle = node.archived ? readToken('--color-gray', '#5e5e5c') : fill
   ctx.lineWidth = isHover ? 2.5 : 1
 
   drawShape(ctx, node.type, cx, cy)
@@ -539,7 +539,7 @@ function drawNode(
   if (node.hrefTargets && node.hrefTargets.length > 0) {
     ctx.save()
     ctx.globalAlpha = dim ? 0.3 : 1
-    ctx.fillStyle = readToken('--color-gray', '#666666')
+    ctx.fillStyle = readToken('--color-gray', '#5e5e5c')
     ctx.beginPath()
     ctx.arc(cx + NODE_R * 0.7, cy - NODE_R * 0.7, 3, 0, Math.PI * 2)
     ctx.fill()
@@ -550,7 +550,7 @@ function drawNode(
   if (isHover) {
     ctx.beginPath()
     ctx.arc(cx, cy, NODE_R + 4, 0, Math.PI * 2)
-    ctx.strokeStyle = readToken('--color-red', '#d40000')
+    ctx.strokeStyle = readToken('--color-red', '#b51b17')
     ctx.lineWidth = 1.5
     ctx.stroke()
   }
@@ -562,7 +562,7 @@ function drawNode(
     const title = node.title.length > max ? node.title.slice(0, max) + '…' : node.title
     ctx.save()
     ctx.globalAlpha = dim ? 0.3 : 1
-    ctx.fillStyle = readToken('--color-black', '#0a0a0a')
+    ctx.fillStyle = readToken('--color-black', '#1b1c1a')
     ctx.font = '10px monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'

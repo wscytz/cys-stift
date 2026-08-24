@@ -1,11 +1,13 @@
 /**
- * Bauhaus tokens — runtime CSS variables (spec §5.1).
- * Kept in sync with tokens.ts.
+ * Swiss Editorial tokens — runtime CSS variables (DESIGN.md · swiss_desktop_editorial).
+ * Kept in sync with tokens.ts AND tailwind-preset.css(三源;改一处改三处)。
  *
- * Light-only(2026-07-11 删 dark,原 spec §5.6):Bauhaus 白底黑字经典。历史曾支持
- * dark,但自研 canvas 引擎不响应主题切换重渲染(暗色下箭头不可见 + 切换竞态),已移除
- * 聚焦 light。旧 settingsStore.theme 仍接受 legacy 值,但 theme.ts resolveTheme 恒
- * light + 此处无 dark 变体(data-theme 恒 "light")。
+ * Light-only(沿袭 2026-07-11 决策):自研 canvas 引擎不响应主题切换重渲染,
+ * 聚焦 light。data-theme 恒 "light"。
+ *
+ * 语言:Brutalist Minimalism —— 0 圆角、零阴影、1px 线定义层级;
+ * Warm Paper 底 + 手术红强调 + 墨黑结构。旧 Bauhaus 6 色名保留为别名
+ * (region/用户设置持久化依赖这组名字),值重映射到新色板。
  */
 
 /* ── Responsive breakpoints(约定值;@media 不能用 var(),全仓 @media 统一这两个数字)──
@@ -15,66 +17,108 @@
 
 :root,
 [data-theme='light'] {
-  /* Color tokens */
-  --color-red: #d40000;
-  --color-red-soft: #ffe5e5;
-  --color-yellow: #ffce00;
-  --color-yellow-soft: #fff8dc;
-  --color-blue: #003f7f;
-  --color-blue-soft: #e0ebf5;
-  --color-black: #0a0a0a;
-  --color-black-soft: #2b2b2b;
-  --color-white: #fafafa;
-  --color-white-soft: #ffffff;
-  --color-gray: #666666;
-  --color-gray-soft: #d9d9d9;
+  /* ── Swiss Editorial palette(DESIGN.md colors 全量)────────────────── */
+  /* Primary — 手术红:高优交互态、活动焦点、错误。外科手术式使用。 */
+  --color-primary: #b51b17;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #d9372d;
+  --color-on-primary-container: #fffbff;
+  --color-primary-fixed: #ffdad5;
+  --color-primary-fixed-dim: #ffb4aa;
+  --color-on-primary-fixed: #410001;
+  --color-on-primary-fixed-variant: #930006;
+  --color-inverse-primary: #ffb4aa;
+  --color-surface-tint: #b91e19;
 
-  /* Canvas surface — 画布页底色(自研引擎读此 token,不写死蓝灰兜底)。
-     浅色=白,暗色=深灰白(与 page-bg 同),让卡片在两种主题下都正确分层。 */
-  --color-canvas: var(--color-white-soft);
+  /* Accent — 品牌红(icons/manifest/状态点用 #e03c31;交互 primary 用更深的
+     #b51b17 保对比度。两红并存是 PRD 原文如此,非笔误)。 */
+  --color-accent: #e03c31;
 
-  /* Shadows — hard offset, no blur */
-  --shadow-sm: 0 1px 0 0 currentColor;
-  --shadow-md: 2px 2px 0 0 currentColor;
-  --shadow-lg: 4px 4px 0 0 currentColor;
+  /* Secondary — 墨中性:正文辅助、非活动结构。 */
+  --color-secondary: #5e5e5c;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #e1dfdc;
+  --color-on-secondary-container: #626360;
+  --color-secondary-fixed: #e4e2df;
+  --color-secondary-fixed-dim: #c7c6c3;
+  --color-on-secondary-fixed: #1b1c1a;
+  --color-on-secondary-fixed-variant: #464744;
 
-  /* Surfaces — keep one extra off-page colour for both schemes. */
-  --color-page-bg: var(--color-white);
-  --color-page-fg: var(--color-black);
+  /* Tertiary — 石油蓝:数据/链接族。 */
+  --color-tertiary: #006480;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #007ea1;
+  --color-on-tertiary-container: #fbfdff;
+  --color-tertiary-fixed: #bce9ff;
+  --color-tertiary-fixed-dim: #74d2f9;
+  --color-on-tertiary-fixed: #001f2a;
+  --color-on-tertiary-fixed-variant: #004d64;
 
-  /* Scrim — semi-transparent overlay for modal/drawer backdrops (e.g. AppMenu
-     <1024 drawer). CSS-only (not a 7th primary; a derived surface alpha). */
-  --color-scrim: rgba(10, 10, 10, 0.25);
+  /* Error */
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  /* Surfaces — Warm Paper 阶梯;白(#ffffff)只留给文档/画布/浮层。 */
+  --color-surface: #fbf9f6;
+  --color-surface-dim: #dbdad7;
+  --color-surface-bright: #fbf9f6;
+  --color-surface-white: #ffffff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f5f3f0;
+  --color-surface-container: #efeeeb;
+  --color-surface-container-high: #eae8e5;
+  --color-surface-container-highest: #e4e2df;
+  --color-on-surface: #1b1c1a;
+  --color-on-surface-variant: #5b403c;
+  --color-surface-variant: #e4e2df;
+  --color-inverse-surface: #30312f;
+  --color-inverse-on-surface: #f2f0ed;
+  --color-outline: #8f706b;
+  --color-outline-variant: #e4beb9;
+  --color-border-muted: #dbdad7;
+  --color-background: #fbf9f6;
+  --color-on-background: #1b1c1a;
+
+  /* ── Legacy Bauhaus 别名(v0.1 消费面:region 色、用户设置持久化、
+     canvas 引擎取色、Tag/工具条)。名字不动,值映射新色板:
+       red→primary  yellow→outline(暖棕,canvas 组色需与红蓝黑可区分)
+       blue→tertiary  black→on-surface(墨)  white→surface(暖纸)
+       gray→secondary  *-soft→对应 fixed/tint 阶 ──────────────────────── */
+  --color-red: var(--color-primary);
+  --color-red-soft: var(--color-primary-fixed);
+  --color-yellow: var(--color-outline);
+  --color-yellow-soft: var(--color-outline-variant);
+  --color-blue: var(--color-tertiary);
+  --color-blue-soft: var(--color-tertiary-fixed);
+  --color-black: var(--color-on-surface);
+  --color-black-soft: var(--color-on-surface-variant);
+  --color-white: var(--color-surface);
+  --color-white-soft: var(--color-surface-white);
+  --color-gray: var(--color-secondary);
+  --color-gray-soft: var(--color-border-muted);
+
+  /* Canvas surface — 画布页底色(自研引擎读此 token;文档语义=纯白)。 */
+  --color-canvas: var(--color-surface-white);
+
+  /* Scrim — modal/drawer 背板(墨色半透明,非色板原色,派生 surface alpha)。 */
+  --color-scrim: rgba(27, 28, 26, 0.4);
+
+  /* page 兜底(= paper + ink) */
+  --color-page-bg: var(--color-surface);
+  --color-page-fg: var(--color-on-surface);
 }
 
-/* Dark variant removed (2026-07-11): light-only,见文件顶部说明。 */
-
 :root {
-  /* color-scheme: 让 WebView 的 native 控件(select/checkbox/滚动条/number spinner)
-     跟随明暗主题渲染。暗色下不再夹亮色系统控件(Windows WebView2 尤其出戏)。 */
+  /* color-scheme: WebView native 控件跟随明暗。light-only。 */
   color-scheme: light;
-  /* Color tokens */
-  --color-red: #d40000;
-  --color-red-soft: #ffe5e5;
-  --color-yellow: #ffce00;
-  --color-yellow-soft: #fff8dc;
-  --color-blue: #003f7f;
-  --color-blue-soft: #e0ebf5;
-  --color-black: #0a0a0a;
-  --color-black-soft: #2b2b2b;
-  --color-white: #fafafa;
-  --color-white-soft: #ffffff;
-  --color-gray: #666666;
-  --color-gray-soft: #d9d9d9;
-  --color-canvas: var(--color-white-soft);
 
-  /* Code block surface — 代码块语义=始终暗底,不跟主题翻转(dark mode 也不反相)。
-     light/dark 同值,派生自固定 hex(非 --color-black/white,避免翻转)。
-     hljs 语法高亮为暗底调的亮色变体,代码块始终暗底即正确,无需 dark 覆盖。 */
-  --color-code-bg: #0a0a0a;
-  --color-code-fg: #fafafa;
+  /* Code block surface — 代码块恒暗底,不跟主题翻转(派生自固定 hex)。 */
+  --color-code-bg: #1b1c1a;
+  --color-code-fg: #fbf9f6;
 
-  /* Typography */
+  /* ── Typography ─────────────────────────────────────────────────── */
   --font-display: 'Space Grotesk', system-ui, sans-serif;
   --font-body: Inter, system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
@@ -83,7 +127,8 @@
      平台差异。以后想全量自托管中文,把字体名插到链首即可,其余不动。 */
   --font-content: Inter, 'PingFang SC', 'Microsoft YaHei UI', system-ui, -apple-system, sans-serif;
 
-  /* Font scale */
+  /* Font scale(v0.1 消费面保留;2xs 为 metadata 11px 新增) */
+  --font-size-2xs: 11px;
   --font-size-xs: 12px;
   --font-size-sm: 14px;
   --font-size-base: 16px;
@@ -93,7 +138,32 @@
   --font-size-3xl: 48px;
   --font-size-4xl: 64px;
 
-  /* 8px grid — 主阶 8px,半阶 4px 收编 <8px 孤儿值(2px 边框/4px 间距) */
+  /* Type roles(DESIGN.md typography 逐条):size / line-height / tracking / weight */
+  --type-display-xl: 500 64px/1.1 var(--font-display);
+  --type-display-xl-tracking: -0.03em;
+  --type-display-lg: 500 48px/1.1 var(--font-display);
+  --type-display-lg-tracking: -0.02em;
+  --type-headline-lg: 500 32px/1.2 var(--font-display);
+  --type-headline-lg-tracking: -0.02em;
+  --type-ui-label-caps: 600 12px/1 var(--font-display);
+  --type-ui-label-caps-tracking: 0.08em;
+  --type-sidebar-label: 500 13px/1 var(--font-display);
+  --type-sidebar-label-tracking: 0.05em;
+  --type-body-lg: 400 16px/1.6 var(--font-body);
+  --type-body-lg-tracking: 0;
+  --type-body-sm: 400 14px/1.5 var(--font-body);
+  --type-body-sm-tracking: 0;
+  --type-metadata: 500 11px/1.2 var(--font-body);
+  --type-metadata-tracking: 0.05em;
+
+  /* ── Editorial grid(固定编辑栅格)────────────────────────────────── */
+  --editorial-sidebar-width: 280px;
+  --editorial-topbar-height: 64px;
+  --editorial-row-height: 48px;
+  --editorial-margin: 32px;
+  --editorial-grid-line: 1px;
+
+  /* ── 8px grid — 主阶 8px,半阶 4px(沿用)───────────────────────── */
   --space-0: 0;
   --space-quarter: 2px;
   --space-0.5: 4px;
@@ -108,16 +178,22 @@
   --space-12: 96px;
   --space-16: 128px;
 
-  /* Borders */
-  --border-hairline: 1px solid var(--color-black);
-  --border-thick: 2px solid var(--color-black);
+  /* ── Line hierarchy(1px 线替代阴影定义层级)────────────────────── */
+  --border-hairline: 1px solid var(--color-on-surface);
+  --border-thick: 2px solid var(--color-on-surface);
+  --border-muted: 1px solid var(--color-border-muted);
 
-  /* Radius */
-  --radius-sm: 2px;
-  --radius-md: 4px;
+  /* ── Radius:全 0(唯一例外=功能性状态点圆)─────────────────────── */
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-dot: 9999px;
 
-  /* Shadows — hard offset, no blur */
-  --shadow-sm: 0 1px 0 0 currentColor;
-  --shadow-md: 2px 2px 0 0 currentColor;
-  --shadow-lg: 4px 4px 0 0 currentColor;
+  /* ── Shadows:禁。token 保留只为兼容旧消费面,值恒 none。────────── */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+
+  /* ── Motion:150ms ease-out;页面切换走编辑式滑入/淡入 ───────────── */
+  --duration-fast: 150ms;
+  --ease-standard: ease-out;
 }

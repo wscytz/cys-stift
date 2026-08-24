@@ -1,0 +1,17 @@
+.motif {
+  display: block;
+}
+
+/* Swiss Editorial motif 取色:纸/墨/弱线/红,全走 token。 */
+.paper {
+  fill: var(--color-surface);
+}
+.inkStroke {
+  stroke: var(--color-on-surface);
+}
+.ruleLine {
+  stroke: var(--color-border-muted);
+}
+.dot {
+  fill: var(--color-accent);
+}

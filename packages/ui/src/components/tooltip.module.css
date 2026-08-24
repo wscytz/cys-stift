@@ -1,3 +1,5 @@
+/* Swiss Editorial tooltip:inverse 层(墨底纸字)、0 圆角、metadata 字号。
+   无阴影;150ms ease-out。 */
 .wrap {
   position: relative;
   display: inline-flex;
@@ -8,16 +10,18 @@
   bottom: calc(100% + var(--space-1));
   left: 50%;
   transform: translateX(-50%);
-  background: var(--color-black);
-  color: var(--color-white);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  padding: var(--space-0, 0) var(--space-1);
+  background: var(--color-inverse-surface);
+  color: var(--color-inverse-on-surface);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: var(--font-size-2xs);
+  letter-spacing: 0.05em;
+  padding: var(--space-quarter) var(--space-1);
   border-radius: var(--radius-sm);
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 200ms ease-out;
+  transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
 .wrap:hover .tip,

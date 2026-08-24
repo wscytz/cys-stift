@@ -89,7 +89,7 @@ export function CanvasOverviewModal({
     const proj = computeMinimapProjection(elements, { w: OVERVIEW_W, h: OVERVIEW_H })
 
     ctx.clearRect(0, 0, OVERVIEW_W, OVERVIEW_H)
-    ctx.fillStyle = readToken('--color-white', '#ffffff')
+    ctx.fillStyle = readToken('--color-white', '#fbf9f6')
     ctx.fillRect(0, 0, OVERVIEW_W, OVERVIEW_H)
 
     for (const el of elements) drawElementMark(ctx, el, proj, elements)
@@ -102,7 +102,7 @@ export function CanvasOverviewModal({
       const vw = vp.w * proj.scale
       const vh = vp.h * proj.scale
       ctx.save()
-      ctx.strokeStyle = readToken('--color-black', '#0a0a0a')
+      ctx.strokeStyle = readToken('--color-black', '#1b1c1a')
       ctx.lineWidth = 1.5
       ctx.setLineDash([5, 3])
       ctx.strokeRect(vx, vy, vw, vh)

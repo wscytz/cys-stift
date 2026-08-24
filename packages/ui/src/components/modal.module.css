@@ -1,7 +1,10 @@
+/* Swiss Editorial modal:浮层文档语义 = surface-white 底 + 1px 墨线 +
+   0 圆角 + 无阴影(层级由 scrim 色差与墨线表达)。行为层(focus trap /
+   max-height 钳制 / title 行固定)全部沿用 v0.1,只动皮。 */
 .backdrop {
   position: fixed;
   inset: 0;
-  background: color-mix(in srgb, var(--color-black) 50%, transparent);
+  background: var(--color-scrim);
   display: grid;
   place-items: center;
   padding: var(--space-4);
@@ -11,7 +14,7 @@
 }
 
 .frame {
-  background: var(--color-white);
+  background: var(--color-surface-white);
   border: var(--border-hairline);
   border-radius: var(--radius-sm);
   padding: var(--space-4);
@@ -24,7 +27,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  box-shadow: var(--shadow-md);
 }
 /* The frame is a focus container (tabIndex=-1 fallback when no focusable
    child exists). It carries no visible outline — focus indication is the
@@ -47,7 +49,7 @@
   font-family: var(--font-display);
   font-size: var(--font-size-xl);
   font-weight: 500;
-  color: var(--color-black);
+  color: var(--color-on-surface);
   min-width: 0;
   word-break: break-word;
 }
@@ -59,28 +61,31 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-white);
-  color: var(--color-black);
+  background: var(--color-surface-white);
+  color: var(--color-on-surface);
   border: var(--border-hairline);
   border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-size: var(--font-size-base);
   line-height: 1;
   cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
 }
 .closeBtn:hover {
-  background: var(--color-black);
-  color: var(--color-white);
+  background: var(--color-on-surface);
+  color: var(--color-surface);
 }
 .closeBtn:focus-visible {
-  outline: 2px solid var(--color-red);
+  outline: 2px solid var(--color-primary);
   outline-offset: -2px;
 }
 
 .body {
   font-family: var(--font-body);
   font-size: var(--font-size-base);
-  color: var(--color-black-soft);
+  color: var(--color-on-surface-variant);
   /* body 滚动:frame max-height 钳总高,title 行固定,这里吸收超出部分。 */
   overflow-y: auto;
   min-height: 0;

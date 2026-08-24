@@ -1,6 +1,9 @@
+/* Swiss Editorial card(DESIGN.md Components · Cards):
+   1px border-muted 定义、纸底、0 圆角、无阴影;与网格线拼接而非用内边距
+   分隔卡片。padding 保留给内容(规范禁的是"用 padding 分隔卡片")。 */
 .card {
-  background: var(--color-white);
-  border: var(--border-hairline);
+  background: var(--color-surface);
+  border: var(--border-muted);
   border-radius: var(--radius-sm);
   padding: var(--space-3);
   display: flex;
@@ -13,12 +16,12 @@
   font-family: var(--font-display);
   font-size: var(--font-size-lg);
   font-weight: 500;
-  color: var(--color-black);
+  color: var(--color-on-surface);
   letter-spacing: -0.01em;
 }
 
 .body {
   font-family: var(--font-body);
   font-size: var(--font-size-base);
-  color: var(--color-black-soft);
+  color: var(--color-on-surface-variant);
 }

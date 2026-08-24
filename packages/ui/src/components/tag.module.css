@@ -1,3 +1,5 @@
+/* Swiss Editorial tag:UI 标签角色(ui-label-caps,Space Grotesk 大写),
+   soft 底 + 1px 同色描边,0 圆角。 */
 .tag {
   display: inline-flex;
   align-items: center;
@@ -7,7 +9,8 @@
   color: var(--tag-color);
   border: 1px solid var(--tag-color);
   border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
+  font-weight: 600;
   font-size: var(--font-size-xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;

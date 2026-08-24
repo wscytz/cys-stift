@@ -428,7 +428,7 @@ describe('elementsToSvg — 卡正文行数按卡高派生(P1)+ 属性转义/hal
   it('P3:frame 标题 halo 走 token(不再字面量 fill="white")', () => {
     const stubResolver: TokenResolver = (name, fallback) => {
       const m: Record<string, string> = {
-        '--color-white': '#fafafa', '--color-blue': '#003f7f',
+        '--color-canvas': '#fafafa', '--color-blue': '#003f7f',
         '--font-mono': 'monospace',
       }
       return m[name] ?? fallback

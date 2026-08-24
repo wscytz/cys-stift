@@ -1,3 +1,6 @@
+/* Swiss Editorial input(DESIGN.md Components · Input Fields):
+   48px 高、1px border-muted 底线、focus 转墨线(非红 —— 红只留给错误/主行动)。
+   label = ui-label-caps 角色(Space Grotesk 大写)。 */
 .wrap {
   display: flex;
   flex-direction: column;
@@ -5,31 +8,32 @@
 }
 
 .label {
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
+  font-weight: 600;
   font-size: var(--font-size-xs);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--color-gray);
+  letter-spacing: 0.08em;
+  color: var(--color-secondary);
 }
 
 .input {
   appearance: none;
   background: transparent;
   border: 0;
-  border-bottom: var(--border-hairline);
+  border-bottom: var(--border-muted);
   padding: var(--space-1) 0;
   font-family: var(--font-body);
   font-size: var(--font-size-base);
-  color: var(--color-black);
+  color: var(--color-on-surface);
   outline: none;
-  min-height: 44px;
-  transition: border-color 200ms ease-out;
+  min-height: var(--editorial-row-height);
+  transition: border-color var(--duration-fast) var(--ease-standard);
 }
 
 .input:focus {
-  border-bottom-color: var(--color-red);
+  border-bottom-color: var(--color-on-surface);
 }
 
 .input::placeholder {
-  color: var(--color-gray);
+  color: var(--color-secondary);
 }

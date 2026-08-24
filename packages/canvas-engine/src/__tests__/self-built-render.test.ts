@@ -511,9 +511,9 @@ describe('tokenResolver 注入(引擎解耦)', () => {
       'transparent',
       echo,
     )
-    // 卡片分支用了 tokenResolver('--color-white'…) / ('--color-gray'…) → fillStyle 含 token 名
+    // 卡片分支用了 tokenResolver('--color-white'…) / ('--color-border-muted'…) → fillStyle 含 token 名
     expect(ctx._calls.some((c) => c === 'fillStyle=--color-white')).toBe(true)
-    expect(ctx._calls.some((c) => c === 'strokeStyle=--color-gray')).toBe(true)
+    expect(ctx._calls.some((c) => c === 'strokeStyle=--color-border-muted')).toBe(true)
   })
 
   it('drawSelectionOutlines 传 mock tokenResolver → 选中框 strokeStyle 含 token 名', () => {
@@ -521,8 +521,8 @@ describe('tokenResolver 注入(引擎解耦)', () => {
     const els = [{ id: 'c1', kind: 'card', x: 10, y: 20, w: 100, h: 60, rotation: 0 }] as unknown as CanvasElement[]
     drawSelectionOutlines(ctx, ['c1'], els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, echo)
     expect(ctx._calls.some((c) => c === 'strokeStyle=--color-blue')).toBe(true)
-    // handle 白填也来自 tokenResolver
-    expect(ctx._calls.some((c) => c === 'fillStyle=--color-white')).toBe(true)
+    // handle 白填也来自 tokenResolver(画布语义 = --color-canvas)
+    expect(ctx._calls.some((c) => c === 'fillStyle=--color-canvas')).toBe(true)
   })
 
   it('drawMarquee 传 mock tokenResolver → fill/stroke 含 token 名', () => {
@@ -540,7 +540,7 @@ describe('tokenResolver 注入(引擎解耦)', () => {
   it('默认 tokenResolver = domTokenResolver(不传参数行为不变)', () => {
     expect(domTokenResolver('--color-nonexistent-token', '#deadbe')).toBe('#deadbe') // jsdom 无此 CSS 变量 → fallback
     // 不传 tokenResolver 调 colorOf 也走默认 = domTokenResolver → jsdom 无 --color-blue 变量
-    // → 走 colorOf 内部定义的 fallback '#0a0a0a'(= --color-black token 值;注意:不是 #1d4ed8,那是 drawSelectionOutlines 的 fallback)。
-    expect(colorOf('blue')).toBe('#0a0a0a')
+    // → 走 colorOf 内部定义的 fallback '#1b1c1a'(= --color-black token 值;注意:不是 #006480,那是 drawSelectionOutlines 的 fallback)。
+    expect(colorOf('blue')).toBe('#1b1c1a')
   })
 })

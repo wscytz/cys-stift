@@ -122,10 +122,10 @@ function drawElement(
       const info = getCardInfo(el.id)
       // 卡片背景 + 边框
       ctx.beginPath()
-      ctx.roundRect(el.x, el.y, el.w, el.h, 4)
-      ctx.fillStyle = tokenResolver('--color-white', '#ffffff')
+      ctx.roundRect(el.x, el.y, el.w, el.h, 0)
+      ctx.fillStyle = tokenResolver('--color-white', '#fbf9f6')
       ctx.fill()
-      ctx.strokeStyle = tokenResolver('--color-gray', '#d9d9d9')
+      ctx.strokeStyle = tokenResolver('--color-border-muted', '#dbdad7')
       ctx.lineWidth = 1
       ctx.stroke()
       // v7 @group 组色带:同组 card 共享组色(左边条 5px);clip 到 card 圆角避免角溢出。
@@ -133,7 +133,7 @@ function drawElement(
       if (typeof groupName === 'string' && groupName !== '') {
         ctx.save()
         ctx.beginPath()
-        ctx.roundRect(el.x, el.y, el.w, el.h, 4)
+        ctx.roundRect(el.x, el.y, el.w, el.h, 0)
         ctx.clip()
         ctx.fillStyle = groupColorOf(groupName, tokenResolver)
         ctx.fillRect(el.x, el.y, 5, el.h)
@@ -143,29 +143,29 @@ function drawElement(
       const pad = 10
       ctx.textBaseline = 'top'
       if (!info) {
-        ctx.fillStyle = tokenResolver('--color-gray', '#666666')
+        ctx.fillStyle = tokenResolver('--color-gray', '#5e5e5c')
         ctx.font = `12px ${tokenResolver('--font-mono', 'monospace')}`
         ctx.fillText('(untitled)', el.x + pad, el.y + pad)
         break
       }
       // pinned ★ 右上
       if (info.pinned) {
-        ctx.fillStyle = tokenResolver('--color-yellow', '#eab308')
+        ctx.fillStyle = tokenResolver('--color-yellow', '#8f706b')
         ctx.font = `14px ${tokenResolver('--font-mono', 'monospace')}`
         ctx.fillText('★', el.x + el.w - 18, el.y + 6)
       }
       // 类型标(mono 灰 大写)
-      ctx.fillStyle = tokenResolver('--color-gray', '#666666')
+      ctx.fillStyle = tokenResolver('--color-gray', '#5e5e5c')
       ctx.font = `10px ${tokenResolver('--font-mono', 'monospace')}`
       ctx.fillText(info.type.toUpperCase(), el.x + pad, el.y + pad)
       // title(content 字体:用户卡片标题,带中文系统回退,Canvas ctx.font 按串内顺序回退)。
-      ctx.fillStyle = tokenResolver('--color-black', '#0a0a0a')
+      ctx.fillStyle = tokenResolver('--color-black', '#1b1c1a')
       ctx.font = `500 15px ${tokenResolver('--font-content', 'Inter, "PingFang SC", "Microsoft YaHei UI", sans-serif')}`
       ctx.fillText(info.title || '(untitled)', el.x + pad, el.y + pad + 16)
       // body(content 字体,按 cardMode 渲染:title=0 行 / subtitle=1 行副标题 / compact=3 / auto=全行截断)
       const displayBody = markdownPreview(info.body, Number.POSITIVE_INFINITY)
       if (displayBody && cardMode !== 'title') {
-        ctx.fillStyle = tokenResolver('--color-black-soft', '#475569')
+        ctx.fillStyle = tokenResolver('--color-black-soft', '#5b403c')
         ctx.font = `12px ${tokenResolver('--font-content', 'Inter, "PingFang SC", "Microsoft YaHei UI", sans-serif')}`
         if (cardMode === 'subtitle') {
           // 副标题:web 层 getCardInfo 算好的首 ## / 首行(plainPreview 剥 markdown)。
@@ -210,7 +210,7 @@ function drawElement(
         ctx.font = `11px ${tokenResolver('--font-mono', 'monospace')}`
         ctx.textBaseline = 'top'
         const tw = ctx.measureText(title).width
-        ctx.fillStyle = tokenResolver('--color-white', '#ffffff')
+        ctx.fillStyle = tokenResolver('--color-canvas', '#ffffff')
         ctx.globalAlpha = 0.85
         ctx.fillRect(el.x, el.y, tw + 12, 18)
         ctx.globalAlpha = 1
@@ -379,7 +379,7 @@ function drawTextWithHalo(
     const w = ctx.measureText(ln.length ? ln : ' ').width
     if (w > maxW) maxW = w
   }
-  ctx.fillStyle = tokenResolver('--color-white', '#ffffff')
+  ctx.fillStyle = tokenResolver('--color-canvas', '#ffffff')
   ctx.globalAlpha = alpha
   ctx.fillRect(x - padX, y - padY, Math.ceil(maxW) + padX * 2, lines.length * lineHeight + padY * 2)
   ctx.globalAlpha = 1
@@ -390,12 +390,14 @@ function drawTextWithHalo(
 }
 
 /**
- * 把 DSL/关系 color 名映射成设计 token(Bauhaus 6 原色,不写裸 hex)。
+ * 把 DSL/关系 color 名映射成设计 token(Swiss Editorial 色板,不写裸 hex —— 兜底
+ * hex 与 tokens.css 解析值同步)。
  *
- * 约束(packages/ui 铁律):6 原色 red/yellow/blue/black/white/gray,**不引第七色**。
- * 故这里**没有 green**(曾误映射 `green→--color-green`,但该 token 不存在且违反
- * 6 原色约束,已删)。`grey`/`gray` 都映射到 `--color-gray`(关系类型 related-to
- * 用 'grey',此前漏映射被回退成黑色——真 bug,此处修)。未知/缺省回退黑色 token。
+ * 约束(packages/ui 铁律):色名集合 red/yellow/blue/black/white/gray(legacy 别名,
+ * v0.2 起值映射新色板),**不引第七色**。故这里**没有 green**(曾误映射
+ * `green→--color-green`,但该 token 不存在且违反约束,已删)。`grey`/`gray` 都映射到
+ * `--color-gray`(关系类型 related-to 用 'grey',此前漏映射被回退成黑色——真 bug,
+ * 此处修)。未知/缺省回退黑色 token。
  */
 export function colorOf(c: string | undefined, tokenResolver: TokenResolver = domTokenResolver): string {
   const tokenFor: Record<string, string> = {
@@ -407,16 +409,16 @@ export function colorOf(c: string | undefined, tokenResolver: TokenResolver = do
     white: '--color-white',
     black: '--color-black',
   }
-  return tokenResolver(tokenFor[c ?? 'black'] ?? '--color-black', '#0a0a0a')
+  return tokenResolver(tokenFor[c ?? 'black'] ?? '--color-black', '#1b1c1a')
 }
 
-/** v7 @group 组色:组名 hash → Bauhaus 鲜明色 token(red/yellow/blue/black,避开白/灰在色带上不可见)。 */
+/** v7 @group 组色:组名 hash → 鲜明色 token(red/yellow/blue/black,避开白/灰在色带上不可见)。 */
 const GROUP_COLOR_TOKENS = ['--color-red', '--color-yellow', '--color-blue', '--color-black'] as const
 const GROUP_COLOR_FALLBACKS: Record<string, string> = {
-  '--color-red': '#d40000',
-  '--color-yellow': '#ffce00',
-  '--color-blue': '#003f7f',
-  '--color-black': '#0a0a0a',
+  '--color-red': '#b51b17',
+  '--color-yellow': '#8f706b',
+  '--color-blue': '#006480',
+  '--color-black': '#1b1c1a',
 }
 export function groupColorOf(name: string, tokenResolver: TokenResolver = domTokenResolver): string {
   let h = 0
@@ -450,7 +452,7 @@ export function drawSelectionOutlines(
   ctx.save()
   ctx.translate(view.panX, view.panY)
   ctx.scale(view.zoom, view.zoom)
-  ctx.strokeStyle = tokenResolver('--color-blue', '#1d4ed8')
+  ctx.strokeStyle = tokenResolver('--color-blue', '#006480')
   ctx.lineWidth = 1.5 / view.zoom
   ctx.setLineDash([6 / view.zoom, 4 / view.zoom])
   const hs = 3 / view.zoom // handle 半边长 → 6px 方块
@@ -467,9 +469,9 @@ export function drawSelectionOutlines(
         if (route === 'elbow') {
           // 折点手柄:方块(白填 + 蓝描),每个 elbow 一个。无折点时不画(退化直线段)。
           for (const ep of el.elbow ?? []) {
-            ctx.fillStyle = tokenResolver('--color-white', '#ffffff')
+            ctx.fillStyle = tokenResolver('--color-canvas', '#ffffff')
             ctx.fillRect(ep.x - hs, ep.y - hs, hs * 2, hs * 2)
-            ctx.strokeStyle = tokenResolver('--color-blue', '#1d4ed8')
+            ctx.strokeStyle = tokenResolver('--color-blue', '#006480')
             ctx.lineWidth = 1.5 / view.zoom
             ctx.strokeRect(ep.x - hs, ep.y - hs, hs * 2, hs * 2)
           }
@@ -484,11 +486,11 @@ export function drawSelectionOutlines(
             mx = (from.x + to.x) / 2
             my = (from.y + to.y) / 2
           }
-          ctx.fillStyle = tokenResolver('--color-blue', '#1d4ed8')
+          ctx.fillStyle = tokenResolver('--color-blue', '#006480')
           ctx.beginPath()
           ctx.arc(mx, my, 4 / view.zoom, 0, Math.PI * 2)
           ctx.fill()
-          ctx.strokeStyle = tokenResolver('--color-white', '#ffffff')
+          ctx.strokeStyle = tokenResolver('--color-canvas', '#ffffff')
           ctx.lineWidth = 1.5 / view.zoom
           ctx.stroke()
         }
@@ -509,7 +511,7 @@ export function drawSelectionOutlines(
       [b.x + b.w, b.y + b.h],
     ]
     ctx.setLineDash([])
-    ctx.fillStyle = tokenResolver('--color-white', '#ffffff')
+    ctx.fillStyle = tokenResolver('--color-canvas', '#ffffff')
     for (const [cx, cy] of corners) {
       ctx.fillRect(cx - hs, cy - hs, hs * 2, hs * 2)
       ctx.strokeRect(cx - hs, cy - hs, hs * 2, hs * 2)
@@ -530,11 +532,11 @@ export function drawMarquee(
   ctx.save()
   ctx.translate(view.panX, view.panY)
   ctx.scale(view.zoom, view.zoom)
-  ctx.fillStyle = tokenResolver('--color-blue', '#1d4ed8')
+  ctx.fillStyle = tokenResolver('--color-blue', '#006480')
   ctx.globalAlpha = 0.1
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h)
   ctx.globalAlpha = 1
-  ctx.strokeStyle = tokenResolver('--color-blue', '#1d4ed8')
+  ctx.strokeStyle = tokenResolver('--color-blue', '#006480')
   ctx.lineWidth = 1 / view.zoom
   ctx.setLineDash([4 / view.zoom, 4 / view.zoom])
   ctx.strokeRect(rect.x, rect.y, rect.w, rect.h)

@@ -1,0 +1,16 @@
+/* 6px 是 DESIGN.md 明文规格(Status Indicators),非 8px 网格值 —— 例外有出处。 */
+.dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-dot);
+  flex-shrink: 0;
+}
+
+.accent {
+  background: var(--color-accent);
+}
+
+.secondary {
+  background: var(--color-secondary);
+}

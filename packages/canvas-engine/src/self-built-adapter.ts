@@ -236,7 +236,7 @@ export class SelfBuiltAdapter implements CanvasHost {
       ctx.save()
       ctx.translate(this.view.panX, this.view.panY)
       ctx.scale(this.view.zoom, this.view.zoom)
-      ctx.strokeStyle = this.tokenResolver('--color-blue', '#1d4ed8')
+      ctx.strokeStyle = this.tokenResolver('--color-blue', '#006480')
       ctx.lineWidth = 1 / this.view.zoom
       ctx.globalAlpha = 0.4
       ctx.setLineDash([4 / this.view.zoom, 3 / this.view.zoom])
@@ -256,7 +256,7 @@ export class SelfBuiltAdapter implements CanvasHost {
         ctx.save()
         ctx.translate(this.view.panX, this.view.panY)
         ctx.scale(this.view.zoom, this.view.zoom)
-        ctx.strokeStyle = this.tokenResolver('--color-blue', '#1d4ed8')
+        ctx.strokeStyle = this.tokenResolver('--color-blue', '#006480')
         ctx.lineWidth = 2 / this.view.zoom
         ctx.beginPath()
         ctx.moveTo(from.x, from.y)
@@ -272,7 +272,7 @@ export class SelfBuiltAdapter implements CanvasHost {
           ctx.save()
           ctx.translate(this.view.panX, this.view.panY)
           ctx.scale(this.view.zoom, this.view.zoom)
-          ctx.strokeStyle = this.tokenResolver('--color-blue', '#1d4ed8')
+          ctx.strokeStyle = this.tokenResolver('--color-blue', '#006480')
           ctx.lineWidth = 3 / this.view.zoom
           ctx.strokeRect(b.x, b.y, b.w, b.h)
           ctx.restore()

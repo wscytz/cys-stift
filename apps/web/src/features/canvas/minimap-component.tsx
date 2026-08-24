@@ -81,7 +81,7 @@ export function Minimap({
 
     // 清空。
     ctx.clearRect(0, 0, MINIMAP_W, MINIMAP_H)
-    ctx.fillStyle = readToken('--color-white', '#ffffff')
+    ctx.fillStyle = readToken('--color-white', '#fbf9f6')
     ctx.fillRect(0, 0, MINIMAP_W, MINIMAP_H)
 
     // 画元素。
@@ -96,7 +96,7 @@ export function Minimap({
     const vw = vp.w * proj.scale
     const vh = vp.h * proj.scale
     ctx.save()
-    ctx.strokeStyle = readToken('--color-black', '#0a0a0a')
+    ctx.strokeStyle = readToken('--color-black', '#1b1c1a')
     ctx.lineWidth = 1
     ctx.setLineDash([3, 2])
     ctx.strokeRect(vx, vy, vw, vh)
@@ -381,9 +381,9 @@ export function drawElementMark(
     ctx.save()
     ctx.fillStyle = el.color
       ? colorOf(el.color)
-      : readToken('--color-gray-soft', '#e5e5e5')
+      : readToken('--color-gray-soft', '#dbdad7')
     ctx.fillRect(x, y, Math.max(w, 2), Math.max(h, 2))
-    ctx.strokeStyle = readToken('--color-black', '#0a0a0a')
+    ctx.strokeStyle = readToken('--color-black', '#1b1c1a')
     ctx.lineWidth = 0.5
     ctx.strokeRect(x, y, Math.max(w, 2), Math.max(h, 2))
     ctx.restore()

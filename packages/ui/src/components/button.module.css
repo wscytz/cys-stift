@@ -1,29 +1,27 @@
+/* Swiss Editorial button: 0 圆角、1px 墨线、hover 反白、active 红。
+   阴影禁用(DESIGN.md Elevation: zero shadows);按压物理位移是旧 Bauhaus
+   语言,v0.2 移除 —— 状态由色彩反转表达,不再由位移表达。 */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
+  min-height: var(--editorial-row-height);
   padding: 0 var(--space-3);
   border: var(--border-hairline);
   border-radius: var(--radius-sm);
-  background: var(--color-white);
-  color: var(--color-black);
+  background: var(--color-surface);
+  color: var(--color-on-surface);
   font-family: var(--font-display);
   font-size: var(--font-size-base);
   cursor: pointer;
   transition:
-    transform 80ms ease-out,
-    box-shadow 80ms ease-out;
-  box-shadow: var(--shadow-md);
-}
-
-.btn:active {
-  transform: translate(2px, 2px);
-  box-shadow: none;
+    background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
 }
 
 .btn:focus-visible {
-  outline: 2px solid var(--color-red);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -32,40 +30,66 @@
   cursor: not-allowed;
 }
 
-.primary {
-  background: var(--color-white);
-  color: var(--color-black);
+/* primary:纸底墨字;hover 反白(墨底纸字);active 红底。 */
+.primary:hover:not(:disabled) {
+  background: var(--color-on-surface);
+  color: var(--color-surface);
+}
+.primary:active:not(:disabled) {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
 }
 
+/* secondary:primary 的反相起始态;hover 反白回纸底;active 同红。 */
 .secondary {
-  background: var(--color-black);
-  color: var(--color-white);
+  background: var(--color-on-surface);
+  color: var(--color-surface);
+}
+.secondary:hover:not(:disabled) {
+  background: var(--color-surface);
+  color: var(--color-on-surface);
+}
+.secondary:active:not(:disabled) {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
 }
 
-/* v0.22.1-ux-polish-2: danger now reads as "warning / recoverable"
- * via red outline (vs Capture button which is a red-fill "primary
- * action"). The semantic separation keeps the user from mistaking a
- * soft-delete (recoverable from trash) for the product's main action.
- * 2px border (vs default 1px) bumps the visual weight so it still
- * reads as "important", just differently important from "primary". */
+/* v0.22.1-ux-polish-2 语义保留:danger 读作"警告/可恢复"(红描边),
+   与红填充的主行动(Capture)区分,避免把软删除当主操作。
+   2px 边框(vs 默认 1px)维持视觉权重 —— 这是新语言里唯一允许的 2px 按钮
+   边框,语义特例,非风格选择。 */
 .danger {
-  background: var(--color-white);
-  color: var(--color-red);
-  border-color: var(--color-red);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
   border-width: 2px;
   padding: 0 calc(var(--space-3) - 1px);
 }
-.danger:hover {
-  background: var(--color-red-soft);
-  color: var(--color-red);
+.danger:hover:not(:disabled) {
+  background: var(--color-primary-fixed);
+  color: var(--color-on-primary-fixed-variant);
+}
+.danger:active:not(:disabled) {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
 }
 .danger:focus-visible {
-  outline-color: var(--color-red);
+  outline-color: var(--color-primary);
 }
 
+/* ghost:无边框纯文本;hover 走容器灰阶(非反白,避免与实体按钮抢层级)。 */
 .ghost {
   background: transparent;
   border-color: transparent;
-  box-shadow: none;
   padding: 0 var(--space-2);
+}
+.ghost:hover:not(:disabled) {
+  background: var(--color-surface-container);
+}
+.ghost:active:not(:disabled) {
+  background: var(--color-surface-container-high);
+  color: var(--color-primary);
 }

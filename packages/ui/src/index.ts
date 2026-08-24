@@ -1,5 +1,5 @@
-// @cys-stift/ui — Bauhaus design system for cy's Stift
-// Phase 1: tokens + 7 core components. More land with each phase.
+// @cys-stift/ui — Swiss Editorial design system for cy's Stift
+// v0.2: Bauhaus→Swiss Editorial 重绘;BauhausMotif 保留为弃用别名。
 
 export * from './tokens'
 export { Button } from './components/button'
@@ -18,3 +18,9 @@ export { Tooltip } from './components/tooltip'
 export type { TooltipProps } from './components/tooltip'
 export { BauhausMotif } from './components/bauhaus-motif'
 export type { BauhausMotifProps, BauhausMotifVariant } from './components/bauhaus-motif'
+export { EditorialMotif } from './components/editorial-motif'
+export type { EditorialMotifProps, EditorialMotifVariant } from './components/editorial-motif'
+export { StatusDot } from './components/status-dot'
+export type { StatusDotProps } from './components/status-dot'
+export { GridRule } from './components/grid-rule'
+export type { GridRuleProps } from './components/grid-rule'

@@ -157,7 +157,7 @@ export function Thumb({ elements, label }: { elements: CanvasElement[]; label: s
     const s = Math.min(sx, sy)
     const ox = pad - minX * s, oy = pad - minY * s
     for (const el of elements) {
-      ctx.strokeStyle = el.kind === 'card' ? readToken('--color-black', '#0a0a0a') : el.kind === 'arrow' ? readToken('--color-red', '#d40000') : readToken('--color-gray', '#6b6b6b')
+      ctx.strokeStyle = el.kind === 'card' ? readToken('--color-black', '#1b1c1a') : el.kind === 'arrow' ? readToken('--color-red', '#b51b17') : readToken('--color-gray', '#5e5e5c')
       ctx.fillStyle = el.kind === 'card' ? readToken('--color-white-soft', '#ffffff') : 'transparent'
       ctx.lineWidth = 1
       if (el.kind === 'arrow' && el.from && el.to) {

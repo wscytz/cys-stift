@@ -1,0 +1,14 @@
+.rule {
+  background: var(--color-border-muted);
+  flex-shrink: 0;
+}
+
+.h {
+  width: 100%;
+  height: var(--editorial-grid-line);
+}
+
+.v {
+  width: var(--editorial-grid-line);
+  align-self: stretch;
+}

@@ -73,12 +73,12 @@ export function elementsToSvg(
   const layered = sortByLayer(elements)
 
   // 2. 颜色(tokenResolver 解析具体值;SVG 无 CSS 变量上下文)。
-  const bg = opts.background ? tokenResolver('--color-white', '#ffffff') : 'transparent'
-  const cardFill = tokenResolver('--color-white', '#ffffff')
-  const cardStroke = tokenResolver('--color-gray', '#d9d9d9')
-  const textCol = tokenResolver('--color-black', '#0a0a0a')
-  const grayCol = tokenResolver('--color-gray', '#666666')
-  const yellow = tokenResolver('--color-yellow', '#eab308')
+  const bg = opts.background ? tokenResolver('--color-canvas', '#ffffff') : 'transparent'
+  const cardFill = tokenResolver('--color-white', '#fbf9f6')
+  const cardStroke = tokenResolver('--color-border-muted', '#dbdad7')
+  const textCol = tokenResolver('--color-black', '#1b1c1a')
+  const grayCol = tokenResolver('--color-gray', '#5e5e5c')
+  const yellow = tokenResolver('--color-yellow', '#8f706b')
   // 字体名可能含双引号(如 "JetBrains Mono")→ 属性值须转义,否则劈开 font-family="…"。
   // esc 对单引号 / 无引号 token 是 no-op(不破生产),双引号 → &quot;。
   const fontBody = esc(tokenResolver('--font-body', 'Inter, sans-serif'))
@@ -117,11 +117,11 @@ function elementToSvg(
   switch (el.kind) {
     case 'card': {
       const info = getCardInfo(el.id)
-      const parts = [`<rect x="${x}" y="${y}" width="${el.w}" height="${el.h}" rx="4" fill="${c.cardFill}" stroke="${c.cardStroke}"/>`]
+      const parts = [`<rect x="${x}" y="${y}" width="${el.w}" height="${el.h}" rx="0" fill="${c.cardFill}" stroke="${c.cardStroke}"/>`]
       // v7 @group 组色带(左边条 5px,clip 到 card 圆角避免角溢出)。
       const groupName = el.meta?.group
       if (typeof groupName === 'string' && groupName !== '') {
-        parts.push(`<clipPath id="cg-${el.id}"><rect x="${x}" y="${y}" width="${el.w}" height="${el.h}" rx="4"/></clipPath><rect clip-path="url(#cg-${el.id})" x="${x}" y="${y}" width="5" height="${el.h}" fill="${groupColorOf(groupName, tokenResolver)}"/>`)
+        parts.push(`<clipPath id="cg-${el.id}"><rect x="${x}" y="${y}" width="${el.w}" height="${el.h}" rx="0"/></clipPath><rect clip-path="url(#cg-${el.id})" x="${x}" y="${y}" width="5" height="${el.h}" fill="${groupColorOf(groupName, tokenResolver)}"/>`)
       }
       if (info) {
         if (info.pinned) parts.push(`<text x="${x + el.w - 14}" y="${y + 16}" fill="${c.yellow}" font-family="${c.fontMono}" font-size="14">★</text>`)
@@ -156,7 +156,7 @@ function elementToSvg(
       const b = normalizeBox(el)
       const stroke = colorOf(el.color, tokenResolver)
       const title = el.text
-        ? `<rect x="${b.x + dx}" y="${b.y + dy}" width="${Math.min(el.text.length * 7 + 12, b.w)}" height="18" fill="${tokenResolver('--color-white', '#ffffff')}" fill-opacity="0.85"/><text x="${b.x + dx + 6}" y="${b.y + dy + 14}" font-family="${c.fontMono}" font-size="11" fill="${stroke}">${esc(el.text)}</text>`
+        ? `<rect x="${b.x + dx}" y="${b.y + dy}" width="${Math.min(el.text.length * 7 + 12, b.w)}" height="18" fill="${tokenResolver('--color-canvas', '#ffffff')}" fill-opacity="0.85"/><text x="${b.x + dx + 6}" y="${b.y + dy + 14}" font-family="${c.fontMono}" font-size="11" fill="${stroke}">${esc(el.text)}</text>`
         : ''
       return `<rect x="${b.x + dx}" y="${b.y + dy}" width="${b.w}" height="${b.h}" fill="${stroke}" fill-opacity="0.06" stroke="${stroke}" stroke-width="1.5" stroke-dasharray="8,4"/>${title}`
     }
@@ -184,7 +184,7 @@ function elementToSvg(
       // 半透明 halo 底条(与实时渲染 drawTextWithHalo 同源):标签压线/压笔画时可读。
       // SVG <text> y 是 baseline(首行 y+14),rect 从 y-3 起 height n*18+6 覆盖整块。
       const maxW = estimateTextWidth(el.text ?? '', 14)
-      const halo = `<rect x="${x - 6}" y="${y - 3}" width="${maxW + 12}" height="${lines.length * 18 + 6}" fill="${tokenResolver('--color-white', '#ffffff')}" fill-opacity="0.85"/>`
+      const halo = `<rect x="${x - 6}" y="${y - 3}" width="${maxW + 12}" height="${lines.length * 18 + 6}" fill="${tokenResolver('--color-canvas', '#ffffff')}" fill-opacity="0.85"/>`
       return halo + lines.map((ln, i) =>
         `<text x="${x}" y="${y + 14 + i * 18}" fill="${colorOf(el.color, tokenResolver)}" font-family="${c.fontBody}" font-size="14">${esc(ln)}</text>`,
       ).join('')
@@ -263,7 +263,7 @@ function elementToSvg(
         // 半透明 halo 底条(与实时渲染 drawTextWithHalo 同源):标签压在箭头线上时可读。
         // SVG <text> y 是 baseline(my),12px 字上升约 12 → rect 从 my-15 起 height 18 覆盖。
         const labelW = estimateTextWidth(el.text, 12)
-        segs.push(`<rect x="${mx - 6}" y="${my - 15}" width="${labelW + 12}" height="18" fill="${tokenResolver('--color-white', '#ffffff')}" fill-opacity="0.85"/>`)
+        segs.push(`<rect x="${mx - 6}" y="${my - 15}" width="${labelW + 12}" height="18" fill="${tokenResolver('--color-canvas', '#ffffff')}" fill-opacity="0.85"/>`)
         segs.push(`<text x="${mx}" y="${my}" fill="${stroke}" font-family="${c.fontBody}" font-size="12">${esc(el.text)}</text>`)
       }
       return segs.join('')
