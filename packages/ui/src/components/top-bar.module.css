@@ -1,0 +1,42 @@
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--editorial-topbar-height);
+  border-bottom: var(--border-muted);
+  background: var(--color-surface);
+  padding: 0 var(--space-1);
+}
+
+.crumb {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-secondary);
+  white-space: nowrap;
+}
+
+.crumbSep {
+  color: var(--color-border-muted);
+  padding: 0 var(--space-quarter);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}

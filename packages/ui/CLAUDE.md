@@ -28,6 +28,7 @@ src/
 ├── index.ts           barrel export
 └── components/        Button/Input/Card/Tag/Toolbar/Modal/Tooltip
                       + EditorialMotif/StatusDot/GridRule(v0.2 新)
+                      + Tabs/DataTable/TopBar(2026-08-25 补齐 DESIGN.md 七件套缺口)
                       + BauhausMotif(弃用别名,别新用)
 ```
 

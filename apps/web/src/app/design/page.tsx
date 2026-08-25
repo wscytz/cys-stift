@@ -10,6 +10,9 @@ import { EditorialMotif } from '@cys-stift/ui/editorial-motif'
 import { BauhausMotif } from '@cys-stift/ui/bauhaus-motif'
 import { StatusDot } from '@cys-stift/ui/status-dot'
 import { GridRule } from '@cys-stift/ui/grid-rule'
+import { DataTable, type DataTableColumn } from '@cys-stift/ui/data-table'
+import { TopBar } from '@cys-stift/ui/top-bar'
+import { TabsDemo } from './tabs-demo'
 import { tokens, palette, defaultRegionColor } from '@cys-stift/ui/tokens'
 
 export const metadata: Metadata = {
@@ -67,6 +70,9 @@ export default function DesignPage() {
             <li><a href="#motif">Motif</a></li>
             <li><a href="#statusdot">StatusDot</a></li>
             <li><a href="#gridrule">GridRule</a></li>
+            <li><a href="#tabs">Tabs</a></li>
+            <li><a href="#datatable">DataTable</a></li>
+            <li><a href="#topbar">TopBar</a></li>
           </ul>
         </aside>
 
@@ -366,6 +372,45 @@ export default function DesignPage() {
               </div>
             </Card>
           </section>
+          <section id="tabs" className="section">
+            <p className="section__eyebrow">component · tabs</p>
+            <h2 className="section__h2">Tabs</h2>
+            <Card>
+              <TabsDemo />
+              <p className="hint">48px row · uppercase display · active = 2px surgical-red underline · arrow keys.</p>
+            </Card>
+          </section>
+
+          <section id="datatable" className="section">
+            <p className="section__eyebrow">component · data table</p>
+            <h2 className="section__h2">DataTable</h2>
+            <Card>
+              <DataTable
+                ariaLabel="示例数据表"
+                rows={[
+                  { id: 'a', name: 'SEP:Plato', kind: 'link', updated: '08-24' },
+                  { id: 'b', name: '先秦诸子系年', kind: 'quote', updated: '08-22' },
+                  { id: 'c', name: '时间轴对照脚本', kind: 'code', updated: '08-19' },
+                ]}
+                rowKey={(r) => r.id}
+                columns={DATA_TABLE_COLUMNS}
+              />
+              <p className="hint">48px rows · 1px dividers · uppercase headers · hover = surface-white tint.</p>
+            </Card>
+          </section>
+
+          <section id="topbar" className="section">
+            <p className="section__eyebrow">component · top bar</p>
+            <h2 className="section__h2">TopBar</h2>
+            <Card>
+              <TopBar
+                crumb="cy's stift"
+                title="Inbox"
+                actions={<Tag color="red">3</Tag>}
+              />
+              <p className="hint">64px height · 1px bottom line · crumb + view title + global actions · text over icons.</p>
+            </Card>
+          </section>
         </article>
       </div>
 
@@ -373,6 +418,12 @@ export default function DesignPage() {
     </main>
   )
 }
+
+const DATA_TABLE_COLUMNS: Array<DataTableColumn<{ id: string; name: string; kind: string; updated: string }>> = [
+  { key: 'name', header: 'Title', render: (r) => r.name },
+  { key: 'kind', header: 'Type', render: (r) => r.kind, width: '90px' },
+  { key: 'updated', header: 'Updated', render: (r) => r.updated, width: '110px', align: 'right' },
+]
 
 function ModalExample() {
   // Static showcase. The real <Modal> is a client component (focus trap

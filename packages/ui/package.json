@@ -20,7 +20,10 @@
     "./bauhaus-motif": "./src/components/bauhaus-motif.tsx",
     "./editorial-motif": "./src/components/editorial-motif.tsx",
     "./status-dot": "./src/components/status-dot.tsx",
-    "./grid-rule": "./src/components/grid-rule.tsx"
+    "./grid-rule": "./src/components/grid-rule.tsx",
+    "./tabs": "./src/components/tabs.tsx",
+    "./data-table": "./src/components/data-table.tsx",
+    "./top-bar": "./src/components/top-bar.tsx"
   },
   "scripts": {
     "build": "tsc -b",
