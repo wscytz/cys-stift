@@ -5,7 +5,7 @@
 
 ---
 
-## 2026-08-24 · 未发布(分支 feat/swiss-editorial-ui)· Swiss Editorial UI 重绘 + 动效二轮
+## 2026-08-25 · 1.4.0 · Swiss Editorial UI 重绘 + 动效二轮(tag v1.4.0)
 
 > 设计语言从 Bauhaus 6 色切换为 Swiss Editorial / Brutalist Minimalism(warm paper #fbf9f6 + 手术红 #b51b17 + 品牌红 #e03c31 + 石油蓝 #006480;全 0 圆角、零阴影、1px 线层级)。stable v1.3.0 已封存(stable/v1.3.0 分支 + tag),本分支在其上重绘。改动面:packages/ui + web 皮肤/壳 + canvas-engine 渲染兜底色;domain/db/desktop 零改动,用户设置存量(legacy 6 色名冻结为别名)与数据层无影响。PRD 来源 stitch_high_contrast_brutalist(demo 参考,落实按 app 节奏重定标;noise 胶片颗粒/scanLine 等 demo 道具有意不迁)。
 
