@@ -27,7 +27,7 @@
 
 ## 2026-08-22 · 1.3.0 · 稳定版(= preview.3 + ocr 规则化审查修复)(tag v1.3.0)
 
-> preview.3 之后 main 上的增量:ocr 规则化审查(2026-08-15,`v1.1.4..HEAD` 79 文件,4 shard subagent + 主 agent 复现)发现无 P1,6 P2 + 18 P3 全修;配套 docs 与 gitignore。稳定版验证基线(2026-08-22 定版时复跑):全包 lint 0 错 / 全包 test 全绿(domain 87 + canvas-engine 586 + cys-dsl 405 + db 8 + web 1836)/ web build exit 0 / docs:links 通过。
+> preview.3 之后 main 上的增量:ocr 规则化审查(2026-08-15,`v1.1.4..HEAD` 79 文件,4 shard subagent + 主 agent 复现)发现无 P1,8 P2 + 18 P3 全修(4 个修复 commit);配套 docs 与 gitignore。稳定版验证基线(2026-08-22 定版时复跑):全包 lint 0 错 / 全包 test 全绿(domain 87 + canvas-engine 586 + cys-dsl 405 + db 8 + web 1836)/ web build exit 0 / docs:links 通过。
 
 - **S1 导入返回守卫 / safeHref WHATWG 变体 / 字段级毒化**(commit `01e4a4e` 等)
 - **S2 媒体多选 attach 丢图 / companion busy 尾随**

@@ -7,12 +7,12 @@
 
 ## 这是什么
 
-**cy's Stift** 是一个本地优先的灵感工具。用包豪斯式的克制与几何,帮你把一闪而过的想法接住、把散落的念头连成线、把反复出现的洞察沉淀为作品。
+**cy's Stift** 是一个本地优先的灵感工具。用 Swiss Editorial 式的克制与秩序(编辑栅格、1px 线层级、零装饰),帮你把一闪而过的想法接住、把散落的念头连成线、把反复出现的洞察沉淀为作品。
 
 **核心信念**
 
 1. **本地优先** —— 数据是用户的,不是云端的(本地 localStorage + OPFS,无 server,离线可用)。
-2. **形随功能** —— 包豪斯是约束,不是滤镜(6 原色 + 8px 网格,不写死 hex/px)。
+2. **形随功能** —— 设计系统是约束,不是滤镜(Swiss Editorial v0.2:token 化、全 0 圆角、零阴影;legacy 6 色名冻结为别名)。
 3. **特性即接口** —— 每个 feature 是可独立替换的"切片"。
 4. **数据可迁移** —— 本地数据随时可导出为开放格式(JSON + Markdown + DSL),不做锁定。
 5. **转义(画布 ↔ 文字 DSL 双向)** —— 整张画布能压成一段文字,文字也能在确认门后改画布;任何 AI(或任何人)读写一段文字就能提出画布编辑。这是核心卖点。
@@ -21,17 +21,17 @@
 
 ## 下载
 
-最新版本为 [**v1.3.0-preview.3**](https://github.com/wscytz/cys-stift/releases/tag/v1.3.0-preview.3)(预览版)。桌面安装包和 `SHA256SUMS.txt` 均从该 Release 页面下载。也可以直接用[网页版](https://wscytz.com/cys-stift/app/)体验(同版本,数据留在浏览器本地):
+最新版本为 [**v1.4.0**](https://github.com/wscytz/cys-stift/releases/tag/v1.4.0)(稳定版)。桌面安装包和 `SHA256SUMS.txt` 均从该 Release 页面下载。也可以直接用[网页版](https://wscytz.com/cys-stift/app/)体验(同版本,数据留在浏览器本地):
 
 | 平台 | 文件 | 说明 |
 |---|---|---|
 | **macOS**(Apple Silicon) | release 页面中的 `.dmg` | 拖到 Applications |
 | **Windows** x64 | release 页面中的 NSIS `.exe` | 需 WebView2(Win11 自带;Win10 可单独安装) |
-| **Android** | 本预览版不提供 | 不在本次预览版支持范围 |
+| **Android** | 本版本不提供 | 不在当前支持范围 |
 
 > iPad/iOS 不做。Windows 安装包未经 Authenticode 签名，macOS 安装包为 ad-hoc 签名且未公证，系统可能显示“未知开发者/发布者”警告；安装前请先核对 Release 中的 SHA256。
 
-`v1.3.0-preview.3` 是 1.3.0 预览线的最新版:preview.1 为自 1.2.0 起一轮体验打磨(无障碍 / 画布手感 / 找回 / 导入导出 / 存储感知),preview.2 修复深度审核发现的 1 个数据完整性问题与 4 个质量问题,preview.3 收录三轮对抗测试(13 维度约 120 场景)的全部修复。作为预览版,签名/公证、实机无障碍(VoiceOver)、真实系统 200% 缩放、外部用户研究与真实 provider 配额/拒绝演练不伪装成已完成,列为后续稳定版加固项。变更细节见 [Release notes](https://github.com/wscytz/cys-stift/releases) 与 [`docs/changelog.md`](docs/changelog.md)。
+`v1.4.0` 是当前稳定版:在 v1.3.0 功能核心(预览线三轮打磨 + 三轮对抗测试 + 规则化审查全修)之上,完成 **Swiss Editorial UI 重绘**(设计系统 v0.2:暖纸/手术红/墨/石油蓝,全 0 圆角、1px 线层级、零阴影)与动效体系(同文档 View Transitions 路由过渡、入场编排、触感反馈),改动面纯 UI 层——数据格式与用户设置完全兼容。签名/公证、实机无障碍(VoiceOver)、真实系统 200% 缩放、外部用户研究与真实 provider 配额/拒绝演练仍列为后续加固项;桌面安装器图标暂为旧一代。变更细节见 [Release notes](https://github.com/wscytz/cys-stift/releases) 与 [`docs/changelog.md`](docs/changelog.md);设计规范见 [`docs/design/swiss-editorial.md`](docs/design/swiss-editorial.md)。
 
 ---
 
@@ -45,7 +45,7 @@
 
 **工作台** —— per-card 深度编辑(`/workbench` 库页 + canvas 右栏编辑器);画布 hover 只读速览,双击或侧栏入口进入工作台。当前版本已移除旧的 focusEdit 专注编辑态,避免把独立工作台和画布焦点模式混为一谈。
 
-**Markdown 渲染** —— GFM(表格/任务列表/删除线)+ 代码高亮(Bauhaus 主题)+ **数学公式**(katex `$inline$`/`$$display$$`)+ 脚注 + 块引用 `((标题))` 嵌入(环检测)。
+**Markdown 渲染** —— GFM(表格/任务列表/删除线)+ 代码高亮(Swiss Editorial 色板)+ **数学公式**(katex `$inline$`/`$$display$$`)+ 脚注 + 块引用 `((标题))` 嵌入(环检测)。
 
 **全局图谱** —— `/graph` 跨画布语义三维签名力导向图(d3-force)+ 缩放条 + 触摸板手势(pinch 缩放/双指平移)。
 
@@ -67,7 +67,7 @@
 
 ## 状态
 
-**v1.3.0-preview.3** — 最新版本(预览版),已在 GitHub Release 发布。核心闭环、恢复事务、cys-dsl v8 与跨平台构建流水线已就绪;preview.1 是自 1.2.0 起一轮体验打磨(无障碍 / 画布手感 / 找回 / 导入导出 / 存储感知),preview.2 修复深度审核发现的 1 个数据完整性问题 + 4 个质量问题,preview.3 收录三轮对抗测试(13 维度约 120 场景)的全部修复(坏数据防崩 / 双 tab 编辑一致性 / AI 错误分类 / 删画布数据清理等,均配回归测试)。签名/公证、实机无障碍(VoiceOver)与真实 provider 证据继续作为后续稳定版加固工作。
+**v1.4.0** — 最新稳定版,已在 GitHub Release 发布。核心闭环、恢复事务、cys-dsl v8 与跨平台构建流水线就绪(1.3.0 定档),本版叠加 Swiss Editorial UI 重绘与动效体系(纯 UI 层,数据/设置兼容),并经两轮规则化审查全修。签名/公证、实机无障碍(VoiceOver)与真实 provider 证据继续作为后续稳定版加固工作;桌面安装器图标换代在列。
 
 DSL 的实现与内部稳定性验证已经具备，但“普通用户是否愿意学习并重复使用”仍是待外部研究验证的产品假设；README 和展示页不会把内部测试写成用户价值结论。
 
@@ -85,7 +85,7 @@ cys-stift/
 ├── packages/
 │   ├── canvas-engine/   自研 Canvas 2D 引擎(零业务依赖,框架无关 — 北极星:可剥离成独立包)
 │   ├── cys-dsl/         画布 ↔ 文字双向转义 DSL(Peggy 解析器 + sanitize + 序列化,核心卖点)
-│   ├── ui/              包豪斯设计系统(6 原色 + 8px 网格 + token)
+│   ├── ui/              Swiss Editorial 设计系统 v0.2(token 三源;规范见 docs/design/swiss-editorial.md)
 │   ├── db/              Drizzle ORM + SQLite schema
 │   └── domain/          纯 TS 核心领域模型(零依赖)
 ├── docs/                用户向与开发向教学文档(user / development / changelog)
