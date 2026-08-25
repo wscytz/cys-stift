@@ -5,6 +5,12 @@
 
 ---
 
+## 2026-08-25 · 未发布 · docs: Swiss Editorial 规范整合入仓
+
+- 新增 [`docs/design/swiss-editorial.md`](design/swiss-editorial.md):PRD `swiss_desktop_editorial/DESIGN.md` 规范原文(全量色/字/间距 token + 七件组件规格)+ **落地偏差注记 9 条**(页面切换节奏/动效族 token/legacy 6 色名冻结/64px 折叠轨/Input 标签上移开放项/两红并存等,均有出处)。token 权威源仍为 packages/ui 三源 + canvas-engine 兜底;本文是语义与出处。
+- `packages/ui/CLAUDE.md` 指向该文;私有 docs 仓 `design-system.md` 顶部加 v0.2 换代横幅(Bauhaus 部分转为历史档)。
+- 动因:docs-truth 守卫真值随设计换代(6cb393b)后,规范原文散在 PRD zip 里不可追溯——入仓即单一参考点,后续组件补齐按它对号。
+
 ## 2026-08-25 · 1.4.0 · Swiss Editorial UI 重绘 + 动效二轮(tag v1.4.0)
 
 > 设计语言从 Bauhaus 6 色切换为 Swiss Editorial / Brutalist Minimalism(warm paper #fbf9f6 + 手术红 #b51b17 + 品牌红 #e03c31 + 石油蓝 #006480;全 0 圆角、零阴影、1px 线层级)。stable v1.3.0 已封存(stable/v1.3.0 分支 + tag),本分支在其上重绘。改动面:packages/ui + web 皮肤/壳 + canvas-engine 渲染兜底色;domain/db/desktop 零改动,用户设置存量(legacy 6 色名冻结为别名)与数据层无影响。PRD 来源 stitch_high_contrast_brutalist(demo 参考,落实按 app 节奏重定标;noise 胶片颗粒/scanLine 等 demo 道具有意不迁)。

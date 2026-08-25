@@ -1,7 +1,7 @@
 # packages/ui — Swiss Editorial 设计系统
 
 > 编辑风 = 约束。这个包的纪律是**不让任何颜色/尺寸逃逸出 token 系统**。
-> v0.2 起语言从 Bauhaus 换为 Swiss Editorial(DESIGN.md · swiss_desktop_editorial);
+> v0.2 起语言从 Bauhaus 换为 Swiss Editorial;规范原文已整合入仓:[`docs/design/swiss-editorial.md`](../../docs/design/swiss-editorial.md)(含落地偏差注记);
 > 旧 6 色 token 名保留为别名(region 色 + 用户持久化设置 + canvas 引擎依赖名字)。
 
 ## 铁律
