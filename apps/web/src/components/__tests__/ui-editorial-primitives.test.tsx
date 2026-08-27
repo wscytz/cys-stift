@@ -59,13 +59,13 @@ describe('Tabs', () => {
   it('点击切换激活;ArrowRight 环绕到首项', () => {
     mount(<Harness />)
     const tabs = () => [...container!.querySelectorAll('[role="tab"]')] as HTMLButtonElement[]
-    act(() => tabs()[1].click())
-    expect(tabs()[1].getAttribute('aria-selected')).toBe('true')
+    act(() => tabs()[1]!.click())
+    expect(tabs()[1]!.getAttribute('aria-selected')).toBe('true')
     // 箭头:从「未读」右移到「置顶」,再右移环绕回「全部」
-    act(() => tabs()[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })))
-    expect(tabs()[2].getAttribute('aria-selected')).toBe('true')
-    act(() => tabs()[2].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })))
-    expect(tabs()[0].getAttribute('aria-selected')).toBe('true')
+    act(() => tabs()[1]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })))
+    expect(tabs()[2]!.getAttribute('aria-selected')).toBe('true')
+    act(() => tabs()[2]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })))
+    expect(tabs()[0]!.getAttribute('aria-selected')).toBe('true')
   })
 })
 
@@ -88,9 +88,9 @@ describe('DataTable', () => {
     expect(ths.every((t) => t.getAttribute('scope') === 'col')).toBe(true)
     const trs = [...container!.querySelectorAll('tbody tr')]
     expect(trs).toHaveLength(2)
-    expect(trs[0].textContent).toBe('Alpha3')
+    expect(trs[0]!.textContent).toBe('Alpha3')
     // 右对齐列带修饰类(CSS module 哈希前缀断言)
-    expect(trs[0].lastElementChild!.className).toMatch(/align-right/)
+    expect(trs[0]!.lastElementChild!.className).toMatch(/align-right/)
   })
 
   it('空态:一整行占位,colSpan 覆盖全部列', () => {

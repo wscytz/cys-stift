@@ -255,13 +255,12 @@ const styles = `
   border: 1px solid var(--color-black);
   border-radius: var(--radius-sm);
   color: var(--color-black);
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-size: var(--font-size-xs);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: background 80ms ease-out, color 80ms ease-out, transform 60ms ease-out;
-}
+  transition: background var(--duration-micro) ease-out, color var(--duration-micro) ease-out, transform var(--duration-press) ease-out; font-weight: 600; }
 .cv-freedraw__btn:hover {
   background: var(--color-black);
   color: var(--color-white);

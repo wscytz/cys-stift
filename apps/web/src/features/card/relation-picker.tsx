@@ -192,7 +192,7 @@ const rpStyles = `
   cursor: pointer;
   font-family: var(--font-body); font-size: var(--font-size-sm);
   color: var(--color-black);
-  transition: background 80ms ease-out, border-color 80ms ease-out;
+  transition: background var(--duration-micro) ease-out, border-color var(--duration-micro) ease-out;
 }
 .rp__item:hover { background: var(--color-gray-soft); border-color: var(--color-gray-soft); }
 .rp__item:focus-visible { outline: 2px solid var(--color-red); outline-offset: 1px; }

@@ -276,7 +276,7 @@ const styles = `
   background: transparent; border: 0; padding: 0;
   font-family: var(--font-mono); font-size: var(--font-size-sm);
   color: var(--color-blue); text-decoration: underline;
-  text-underline-offset: 2px; cursor: pointer; min-height: 44px;
+  text-underline-offset: 2px; cursor: pointer; min-height: 48px;
 }
 .search-clear-filter:hover { color: var(--color-black); }
 .search-snippet {

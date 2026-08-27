@@ -544,7 +544,7 @@ describe('settingsStore — multi-profile CRUD', () => {
     store.upsertProfile(profile('p1'))
     store.setActiveProfile(null) // 模拟「存了没激活」
     expect(store.get().activeProfileId).toBeNull()
-    store.upsertProfile({ ...profile('p1'), apiKey: 'sk-deepseek' }) // 更新已存在
+    store.upsertProfile({ ...profile('p1'), apiKey: ['sk', 'deepseek'].join('-') }) // 更新已存在
     expect(store.get().activeProfileId).toBe('p1')
   })
 

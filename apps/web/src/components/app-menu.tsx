@@ -46,6 +46,9 @@ function applySidebarWidth(pinned: boolean) {
     '--app-sidebar-w',
     pinned ? 'var(--editorial-sidebar-width)' : 'var(--editorial-rail-width)',
   )
+  // 水合前钉住态标记(layout inline script 首帧置位,见 styles 末尾规则):
+  // 防 pin 用户刷新时 SSR 的 64px 轨先渲染、水合后才撑到 280 的跳变。
+  document.documentElement.setAttribute('data-sidebar-pinned', pinned ? '1' : '0')
 }
 
 /* ── 导航图标(Swiss Editorial:24 viewBox、1.5px 线描、方角、currentColor,
@@ -155,6 +158,19 @@ export function AppMenu() {
     }
     setPinned(stored)
     applySidebarWidth(stored)
+  }, [])
+
+  // 跨标签同步:他页钉住/收起(storage 事件只在异页触发),本页即时跟随,
+  // 否则两页宽度各持一词、下一次写入互相覆盖。
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== SIDEBAR_PINNED_KEY) return
+      const next = e.newValue === '1'
+      setPinned(next)
+      applySidebarWidth(next)
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
   }, [])
 
   const togglePinned = (e?: ReactMouseEvent<HTMLButtonElement>) => {
@@ -407,6 +423,23 @@ const styles = `
   transition: opacity var(--duration-fast) var(--ease-standard) 50ms;
 }
 
+/* 水合前钉住态:layout inline script 首帧按持久化偏好给 <html> 打
+   data-sidebar-pinned,SSR 的 --rail 类在水合前即按钉住态渲染(280 + 标签可见)
+   —— 防 pin 用户刷新先见 64px 轨再跳 280。AppMenu 挂载后 --pinned 类接管,
+   applySidebarWidth 同步维护本属性(unpin 置 0,规则随之失效)。 */
+html[data-sidebar-pinned='1'] .app-menu--rail {
+  width: var(--editorial-sidebar-width);
+  border-right: var(--border-hairline);
+}
+html[data-sidebar-pinned='1'] .app-menu--rail .app-menu__link-label,
+html[data-sidebar-pinned='1'] .app-menu--rail .app-menu__group-label,
+html[data-sidebar-pinned='1'] .app-menu--rail .app-menu__brand-name,
+html[data-sidebar-pinned='1'] .app-menu--rail .app-menu__version,
+html[data-sidebar-pinned='1'] .app-menu--rail .app-menu__pin {
+  opacity: 1;
+  visibility: visible;
+}
+
 .app-menu__head {
   display: flex;
   align-items: center;
@@ -421,7 +454,7 @@ const styles = `
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  min-height: 44px;
+  min-height: 48px;
   font-family: var(--font-display);
   font-size: var(--font-size-sm);
   font-weight: 500;
@@ -643,8 +676,8 @@ const styles = `
   cursor: pointer;
   padding: 0 var(--space-1);
   line-height: 1;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 48px;
+  min-height: 48px;
 }
 .app-menu__burger:hover { color: var(--color-primary); }
 .app-menu__burger:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }

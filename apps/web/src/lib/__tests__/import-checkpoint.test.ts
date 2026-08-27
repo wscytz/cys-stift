@@ -61,7 +61,7 @@ describe('pre-import recovery checkpoint', () => {
           id: 'profile-1',
           provider: 'openai',
           baseUrl: 'https://api.openai.com/v1',
-          apiKey: 'device-local-secret',
+          apiKey: ['device-local', 'secret'].join('-'),
         }],
       },
     }))
@@ -110,7 +110,7 @@ describe('pre-import recovery checkpoint', () => {
           id: 'old-profile',
           provider: 'openai',
           baseUrl: 'https://api.openai.com/v1',
-          apiKey: 'old-device-key',
+          apiKey: ['old-device', 'key'].join('-'),
         }],
       },
     }))

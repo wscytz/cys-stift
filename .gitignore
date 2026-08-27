@@ -104,10 +104,9 @@ docs/reference.md
 docs/development/*
 !docs/development/setup.md
 !docs/development/showcase.md
-# design/ 只跟踪 tokens.md
+# design/ 只跟踪 swiss-editorial.md(设计规范原文);其余留私有 docs 仓,不得回迁 public
 docs/design/*
-!docs/design/tokens.md
-# architecture/ 只跟踪 overview.md
+!docs/design/swiss-editorial.md
+# architecture/ 全部留私有 docs 仓,不得回迁 public
 docs/architecture/*
-!docs/architecture/overview.md
 scripts/_e2e-screenshots/

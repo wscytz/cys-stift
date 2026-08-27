@@ -245,7 +245,6 @@ const styles = `
 .wb__minicard {
   position: absolute; width: 150px; height: 40px;
   background: var(--color-white); border: 1.5px solid var(--color-black);
-  box-shadow: var(--shadow-md); border-radius: 1px;
 }
 .wb__deck .wb__minicard:nth-child(1) { top: 16px; left: 10px; z-index: 1; }
 .wb__deck .wb__minicard:nth-child(2) { top: var(--space-1); left: var(--space-0.5); z-index: 2; }

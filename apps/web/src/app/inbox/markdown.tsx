@@ -35,7 +35,7 @@ import { safeHref } from '@/lib/safe-href'
  *   - sanitizeSchema 在 defaultSchema 上放行 GFM 的 table/del + 任务列表 checkbox
  *     input + GFM 注入的 className(task-list-item / contains-task-list),好让任务项
  *     去掉默认红方块项目符号。
- *   - rehype-highlight 代码高亮 + Bauhaus 语法主题(D1 收尾)。highlight 接在 sanitize
+ *   - rehype-highlight 代码高亮 + Swiss Editorial 语法主题(D1 收尾)。highlight 接在 sanitize
  *     之后跑,它注入的 hljs-* class 本不过 sanitize;但 defaultSchema 的
  *     attributes.span=null 会剥 span 的 class → 高亮 span 全丢。故 sanitizeSchema 显式
  *     放行 code/span 的 hljs-* className(前缀限白,非任意 class)。
@@ -73,7 +73,7 @@ export const sanitizeSchema = {
     ul: ['className'],
     li: ['className'],
     input: [['type', 'checkbox'], 'disabled', 'checked'],
-    // hljs-* class 前缀放行(highlight 注入 + Bauhaus 主题选择器依赖)。
+    // hljs-* class 前缀放行(highlight 注入 + 主题选择器依赖)。
     code: [...(defaultSchema.attributes?.code ?? []), ['className', /^hljs-/]],
     span: [['className', /^hljs-/], 'math'],   // +inline math class(remark-math);rehype-katex 在 sanitize 之后跑,其输出绕过 sanitize
     div: [...(defaultSchema.attributes?.div ?? []), 'math'],  // +block math class

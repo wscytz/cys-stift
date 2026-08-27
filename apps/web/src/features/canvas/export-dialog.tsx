@@ -318,13 +318,12 @@ const styles = `
 
 .exp-seg { display: inline-flex; border: var(--border-hairline); border-radius: var(--radius-sm); overflow: hidden; }
 .exp-seg__btn {
-  min-width: 44px; height: 32px; padding: 0 var(--space-2);
+  min-width: 48px; height: 32px; padding: 0 var(--space-2);
   background: var(--color-white); color: var(--color-black);
-  font-family: var(--font-mono); font-size: var(--font-size-xs);
-  letter-spacing: 0.1em; text-transform: uppercase;
+  font-family: var(--font-display); font-size: var(--font-size-xs);
+  letter-spacing: 0.08em; text-transform: uppercase;
   border: 0; border-right: var(--border-hairline); cursor: pointer;
-  transition: background 80ms ease-out, color 80ms ease-out, transform 60ms ease-out;
-}
+  transition: background var(--duration-micro) ease-out, color var(--duration-micro) ease-out, transform var(--duration-press) ease-out; font-weight: 600; }
 .exp-seg__btn:last-child { border-right: 0; }
 .exp-seg__btn:hover:not(:disabled):not(.exp-seg__btn--active) { background: var(--color-gray-soft); }
 .exp-seg__btn:active:not(:disabled) { transform: scale(0.95); }
@@ -342,11 +341,10 @@ const styles = `
   border-radius: var(--radius-sm);
 }
 .exp-cystift__badge {
-  font-family: var(--font-mono); font-size: var(--font-size-xs);
-  text-transform: uppercase; letter-spacing: 0.16em;
+  font-family: var(--font-display); font-size: var(--font-size-xs);
+  text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--color-yellow);
-  margin-bottom: var(--space-1);
-}
+  margin-bottom: var(--space-1); font-weight: 600; }
 .exp-cystift__hint {
   font-family: var(--font-body); font-size: var(--font-size-sm);
   line-height: 1.5; color: var(--color-white);

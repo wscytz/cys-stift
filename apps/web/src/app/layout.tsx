@@ -22,38 +22,47 @@ import { LegacyConversationMigrator } from '@/components/legacy-conversation-mig
 
 // 字体自托管(2026-07-06):next/font/google 在 build 时拉 fonts.googleapis.com,
 // 网络不稳(梯子/CDN)即 build 失败。cy's Stift 本地优先,不该 build 时依赖 CDN。
-// 三字体 variable ttf 落 apps/web/public/fonts/,走 next/font/local —— build 不
+// 三字体 variable 落 apps/web/public/fonts/,走 next/font/local —— build 不
 // 联网,产物字体内联进静态包,跨平台一致 + 离线可 build。
+// 子集化(2026-08-27):TTF 全量共 ~1.2MB(Inter 876KB)是 LCP 瓶颈 → pyftsubset
+// 转 woff2 + latin 子集(脚本 scripts/subset-fonts.sh,需 fonttools+brotli),
+// 共 ~168KB(-86%)。中文/超出 latin 的字形走系统回退(正文本就是系统字体渲染)。
 const display = localFont({
-  src: '../../public/fonts/SpaceGrotesk.ttf',
+  src: '../../public/fonts/SpaceGrotesk-latin.woff2',
   variable: '--font-space-grotesk',
   display: 'swap',
 })
 
 const body = localFont({
-  src: '../../public/fonts/Inter.ttf',
+  src: '../../public/fonts/Inter-latin.woff2',
   variable: '--font-inter',
   display: 'swap',
 })
 
-// 等宽自托管:JetBrains Mono 是 Bauhaus UI 的骨架(时间戳/标签/DSL/mono-label),
-// Windows 无此字体回退 Consolas 违和。variable ttf 本地,跨平台等宽一致。
+// 等宽自托管:JetBrains Mono 是时间戳/标签/DSL/mono-label 的骨架,
+// Windows 无此字体回退 Consolas 违和。variable 本地,跨平台等宽一致。
 const mono = localFont({
-  src: '../../public/fonts/JetBrainsMono.ttf',
+  src: '../../public/fonts/JetBrainsMono-latin.woff2',
   variable: '--font-jetbrains-mono',
   display: 'swap',
 })
 
+// 静态导出部署到子路径时(WEB_DEPLOY_BASEPATH,如 wscytz.com/cys-stift/app/),
+// Next 只给 <Link>/_next 资产自动加 basePath,metadata 里的绝对路径不会 ——
+// 曾致线上 manifest/icon 四连 404(2026-08-27 报告 P2)。build 时显式注入前缀;
+// dev/Tauri 不设 env → 根路径,行为不变。
+const assetBase = process.env.WEB_DEPLOY_BASEPATH ?? ''
+
 export const metadata: Metadata = {
   title: "cy's Stift",
   description: '本地优先的灵感画布。你的灵感，在画布上生长。',
-  manifest: '/manifest.json',
+  manifest: `${assetBase}/manifest.json`,
   icons: {
     icon: [
-      { url: '/icon.svg', type: 'image/svg+xml' },
-      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: `${assetBase}/icon.svg`, type: 'image/svg+xml' },
+      { url: `${assetBase}/icon-192.png`, sizes: '192x192', type: 'image/png' },
     ],
-    apple: '/apple-touch-icon.png',
+    apple: `${assetBase}/apple-touch-icon.png`,
   },
 }
 
@@ -87,7 +96,7 @@ export default function RootLayout({
          */}
         <script
           // eslint-disable-next-line react/no-danger
-          dangerouslySetInnerHTML={{ __html: `try{document.documentElement.style.setProperty('--app-sidebar-w',localStorage.getItem('cys-stift.sidebar-pinned')==='1'?'var(--editorial-sidebar-width)':'var(--editorial-rail-width)')}catch(e){}` }}
+          dangerouslySetInnerHTML={{ __html: `try{var __p=localStorage.getItem('cys-stift.sidebar-pinned')==='1';document.documentElement.style.setProperty('--app-sidebar-w',__p?'var(--editorial-sidebar-width)':'var(--editorial-rail-width)');document.documentElement.setAttribute('data-sidebar-pinned',__p?'1':'0')}catch(e){}` }}
         />
       </head>
       <body>

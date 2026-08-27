@@ -188,8 +188,8 @@
 .footnote__link {
   display: inline-flex;
   align-items: center;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 48px;
+  min-height: 48px;
   color: var(--color-blue);
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -227,8 +227,8 @@
   color: var(--color-black);
   border: none;
   cursor: pointer;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 48px;
+  min-height: 48px;
 }
 .cv-chrome-toggle:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 /* companion tab 按钮(选中态走 inline 动态值;此处只锚 :focus-visible)。 */
@@ -244,7 +244,7 @@
 }
 
 .cv-proposal-review button {
-  min-height: 44px;
+  min-height: 48px;
 }
 
 .cv-proposal-review button:focus-visible {
@@ -327,7 +327,7 @@
 .tile--pinned { outline: 2px solid var(--color-yellow); outline-offset: -1px; }
 .tile__pin {
   position: absolute; top: var(--space-1); right: var(--space-1); z-index: 2;
-  width: 44px; height: 44px;
+  width: 48px; height: 48px;
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--color-white); border: var(--border-hairline); border-radius: var(--radius-sm);
   font-size: var(--font-size-base); line-height: 1; color: var(--color-gray);
@@ -337,7 +337,7 @@
 .tile__pin:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .tile__select {
   position: absolute; top: var(--space-1); left: var(--space-1); z-index: 2;
-  width: 44px; height: 44px;
+  width: 48px; height: 48px;
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--color-white); border: var(--border-hairline); border-radius: var(--radius-sm);
   font-family: var(--font-mono); font-size: var(--font-size-base); line-height: 1;
@@ -372,7 +372,7 @@
   flex-direction: column;
   gap: var(--space-2);
 }
-/* tile 变体标题避让 44px 角标带。
+/* tile 变体标题避让 48px 角标带。
    仅 .tile 命中(特异性 0,2,0 > base 0,1,0);.row 变体的 .tile__body 无角标,保持默认 padding。 */
 .tile .tile__body { padding-top: calc(var(--space-6) + var(--space-1)); }
 .tile__title {

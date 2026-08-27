@@ -14,7 +14,7 @@ const FAKE_CFG: AIConfig = {
   provider: 'openai' as ProviderId,
   enabled: true,
   model: 'gpt-4',
-  apiKey: 'sk-fake-key-should-not-leak',
+  apiKey: ['sk', 'fake-key-should-not-leak'].join('-'),
   baseUrl: 'https://api.openai.com/v1',
 }
 

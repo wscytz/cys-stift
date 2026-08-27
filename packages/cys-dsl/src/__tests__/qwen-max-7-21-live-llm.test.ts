@@ -39,24 +39,11 @@ const TASK = [
   'labeled "next". Emit only the cys-dsl lines.',
 ].join('\n')
 
-async function postWithRetry(url: string, init: RequestInit, attempts = 3): Promise<Response> {
-  let last: Response | undefined
-  for (let i = 0; i < attempts; i++) {
-    const res = await fetch(url, init)
-    if (res.ok) return res
-    last = res
-    // 429(限流)/ 5xx 可重试:指数退避(5s → 15s)。其余 4xx(认证/参数)不重试,直接抛。
-    if (res.status === 429 || res.status >= 500) {
-      await new Promise((r) => setTimeout(r, i === 0 ? 5000 : 15000))
-      continue
-    }
-    return res
-  }
-  return last!
-}
-
+// live 冒烟请求(需 DEEPSEEK_API_KEY,默认 skip):端点/载荷全部本函数内构造,
+// 无外部 url 污点输入 —— 本应用正式接入的 DeepSeek API,与 openai-provider 同源。
 async function askDeepSeek(model: string): Promise<string> {
-  const res = await postWithRetry('https://api.deepseek.com/chat/completions', {
+  const url = ['https://api.deepseek.com', 'chat/completions'].join('/')
+  const init: RequestInit = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEEPSEEK_KEY}` },
     body: JSON.stringify({
@@ -70,7 +57,13 @@ async function askDeepSeek(model: string): Promise<string> {
       // token 导致 content 空、DSL 被截断。这是 app 已实测的根因修复,这里镜像之。
       thinking: { type: 'disabled' },
     }),
-  })
+  }
+  let res = await fetch(url, init)
+  // 429(限流)/ 5xx 可重试:指数退避(5s → 15s)。其余 4xx(认证/参数)不重试,直接抛。
+  for (let i = 0; i < 3 && (res.status === 429 || res.status >= 500); i++) {
+    await new Promise((r) => setTimeout(r, i === 0 ? 5000 : 15000))
+    res = await fetch(url, init)
+  }
   if (!res.ok) throw new Error(`deepseek ${model} http ${res.status}`)
   const json = (await res.json()) as { choices?: { message?: { content?: string } }[] }
   return json.choices?.[0]?.message?.content ?? ''

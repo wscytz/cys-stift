@@ -158,7 +158,7 @@ export function WorkbenchBrowser({ cards, onOpenCard: onOpenCardProp }: { cards:
 }
 
 const styles = `
-.wb { border: 2px solid var(--color-black); box-shadow: var(--shadow-md); background: var(--color-white); }
+.wb { border: 2px solid var(--color-black); background: var(--color-white); }
 .wb__topbar {
   display: flex; align-items: center; gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
@@ -180,7 +180,7 @@ const styles = `
 }
 .wb__search-input:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .wb__search-clear {
-  width: 44px; height: 44px; flex: 0 0 44px; display: grid; place-items: center;
+  width: 48px; height: 48px; flex: 0 0 48px; display: grid; place-items: center;
   border: 0; background: transparent; color: var(--color-gray); cursor: pointer;
 }
 .wb__search-clear:hover { color: var(--color-red); background: var(--color-red-soft); }

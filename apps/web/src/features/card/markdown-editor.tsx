@@ -222,8 +222,8 @@ const styles = `
   flex-wrap: wrap;
 }
 .md-editor__btn {
-  min-height: 44px;
-  min-width: 44px;
+  min-height: 48px;
+  min-width: 48px;
   padding: 0 var(--space-1);
   display: grid;
   place-items: center;

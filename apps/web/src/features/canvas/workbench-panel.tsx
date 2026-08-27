@@ -457,7 +457,7 @@ const styles = `
 }
 .wb-panel__done {
   padding: 0 var(--space-2);
-  min-height: 44px;
+  min-height: 48px;
   display: grid;
   place-items: center;
   border: 1.5px solid var(--color-black);
@@ -496,8 +496,8 @@ const styles = `
   cursor: pointer;
   border-radius: 1px;
 }
-.wb-panel__tag-remove { border: 0; background: transparent; cursor: pointer; font-size: inherit; padding: 0 var(--space-1); min-width: 44px; min-height: 44px; }
-.wb-panel__back { border: 1px solid var(--color-black); background: var(--color-white); min-height: 44px; padding: 0 var(--space-2); cursor: pointer; }
+.wb-panel__tag-remove { border: 0; background: transparent; cursor: pointer; font-size: inherit; padding: 0 var(--space-1); min-width: 48px; min-height: 48px; }
+.wb-panel__back { border: 1px solid var(--color-black); background: var(--color-white); min-height: 48px; padding: 0 var(--space-2); cursor: pointer; }
 .wb-panel__tag-chip:hover { opacity: 0.8; }
 .wb-panel__tag-input {
   flex: 1;
@@ -514,7 +514,7 @@ const styles = `
 @media (max-width: 1023px) {
   .wb-panel__head { flex-wrap: wrap; padding-top: var(--space-2); }
   .wb-panel__title { flex: 1 0 100%; width: 100%; padding: var(--space-1) 0; }
-  .wb-panel__done { min-height: 44px; }
+  .wb-panel__done { min-height: 48px; }
 }
 .wb-panel__fields {
   flex-shrink: 0;
@@ -529,9 +529,8 @@ const styles = `
 }
 .wb-panel__field { display: flex; flex-direction: column; gap: var(--space-1); }
 .wb-panel__field-label {
-  font-family: var(--font-mono); font-size: var(--font-size-xs);
-  text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-black-soft);
-}
+  font-family: var(--font-display); font-size: var(--font-size-xs);
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); font-weight: 600; }
 .wb-panel__body {
   flex: 1;
   min-height: 0;
@@ -542,7 +541,7 @@ const styles = `
 .wb-panel__body .md-editor { flex: 1; min-height: 0; }
 /* A3 — 工作台 AI 入口 + 浮层(absolute,不挤编辑器布局)。 */
 .wb-panel__ai-btn {
-  min-height: 44px; padding: 0 var(--space-2);
+  min-height: 48px; padding: 0 var(--space-2);
   border: 1.5px solid var(--color-black); background: var(--color-white);
   cursor: pointer; border-radius: 1px; font-size: var(--font-size-base); line-height: 1;
   flex-shrink: 0;

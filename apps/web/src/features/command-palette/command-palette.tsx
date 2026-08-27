@@ -343,10 +343,9 @@ const styles = `
 }
 .cmd__group { display: flex; flex-direction: column; gap: var(--space-1); }
 .cmd__group-label {
-  margin: 0; font-family: var(--font-mono);
+  margin: 0; font-family: var(--font-display);
   font-size: var(--font-size-xs); color: var(--color-gray);
-  text-transform: uppercase; letter-spacing: 0.05em;
-}
+  text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
 .cmd__items { list-style: none; margin: 0; padding: 0; }
 .cmd__item {
   width: 100%; display: flex; justify-content: space-between; align-items: baseline;

@@ -62,10 +62,20 @@ export function RouteViewTransitions() {
       // 置位必须先于 startViewTransition:新 main 在 VT 内挂载,带着
       // animation:none 挂载,不会被"先挂载再关闭"重启成第二段。
       document.documentElement.setAttribute('data-vt-nav', '')
-      const vt = svt.call(document, () => {
+      let vt: ReturnType<StartVT>
+      try {
+        vt = svt.call(document, () => {
+          apply()
+          return settle()
+        })
+      } catch {
+        // 同步抛错(引擎内部状态非法等):active 若不复位,后续导航会永久
+        // 走直落分支、静默降级无 VT。回滚标记位并直落应用变更。
+        active = false
+        document.documentElement.removeAttribute('data-vt-nav')
         apply()
-        return settle()
-      })
+        return
+      }
       // finished 在 VT 被中止(超时/打断)时 reject —— 必须接住,否则
       // unhandledrejection 冒泡成页面错误。
       vt.finished

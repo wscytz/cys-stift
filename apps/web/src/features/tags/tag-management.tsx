@@ -290,7 +290,7 @@ const styles = `
 .tm__table { border: var(--border-hairline); background: var(--color-white); }
 .tm__head, .tm__row {
   display: grid;
-  grid-template-columns: 40px 44px 1fr 60px 96px;
+  grid-template-columns: 40px 48px 1fr 60px 96px;
   align-items: center;
 }
 .tm__head {
@@ -318,7 +318,7 @@ const styles = `
 .tm__popover {
   position: absolute; top: 24px; left: 0; z-index: 5;
   background: var(--color-white); border: var(--border-hairline);
-  box-shadow: var(--shadow-md); padding: var(--space-1);
+  padding: var(--space-1);
   display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--space-quarter);
 }
 .tm__swatch-mini { width: 20px; height: 20px; border: var(--border-hairline); cursor: pointer; padding: 0; }

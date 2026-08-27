@@ -217,7 +217,7 @@ const styles = `
 .crumb-link {
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
+  min-height: 48px;
   padding: 0 var(--space-1);
   border: 0;
   background: transparent;

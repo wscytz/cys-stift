@@ -293,17 +293,17 @@ export function FieldViews({
 
 const feStyles = `
 .fe { display: flex; flex-direction: column; gap: var(--space-2); }
-.fe__label { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-black-soft); }
+.fe__label { font-family: var(--font-display); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); font-weight: 600; }
 `
 
 const mfeStyles = `
 .mfe { display: flex; flex-direction: column; gap: var(--space-2); }
-.mfe__label { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-black-soft); }
+.mfe__label { font-family: var(--font-display); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); font-weight: 600; }
 .mfe__file { font-family: var(--font-mono); font-size: var(--font-size-sm); margin-top: var(--space-1); }
 .mfe__list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .mfe__item { position: relative; display: inline-flex; }
 .mfe__thumb { width: 96px; height: 96px; object-fit: cover; border: var(--border-hairline); display: block; }
 .mfe__fallback { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black-soft); border: var(--border-hairline); padding: var(--space-1); }
-.mfe__remove { position: absolute; top: 0; right: 0; background: var(--color-white); border: var(--border-hairline); min-width: 44px; min-height: 44px; cursor: pointer; font-family: var(--font-mono); font-size: var(--font-size-sm); line-height: 1; }
+.mfe__remove { position: absolute; top: 0; right: 0; background: var(--color-white); border: var(--border-hairline); min-width: 48px; min-height: 48px; cursor: pointer; font-family: var(--font-mono); font-size: var(--font-size-sm); line-height: 1; }
 .mfe__remove:hover { background: var(--color-red); color: var(--color-white); }
 `

@@ -111,7 +111,7 @@ export function MinimapPreview({
     if (active) {
       const box = normalizeBox(active)
       ctx.save()
-      ctx.strokeStyle = readToken('--color-red', '#e53935')
+      ctx.strokeStyle = readToken('--color-red', '#b51b17')
       ctx.lineWidth = 3
       ctx.strokeRect(
         box.x * proj.scale + proj.offsetX - 2,
@@ -237,7 +237,7 @@ export function MinimapPreview({
     : { right: 'var(--space-2)', top: '184px', left: 'auto', bottom: 'auto' }
 
   if (collapsed) {
-    // 收起剩一个 44px 总览按钮。默认贴右下角(不贴右上)——右上角是 WorkbenchPanel
+    // 收起剩一个 48px 总览按钮。默认贴右下角(不贴右上)——右上角是 WorkbenchPanel
     // head 里「完成」钮的位置,zIndex:30 会把它挡住点不掉。右下浮在正文上不撞 chrome。
     const collapsedPositionStyle = positioned
       ? positionStyle
@@ -248,7 +248,7 @@ export function MinimapPreview({
         data-testid="mp-chip"
         style={{
           position: 'absolute', ...collapsedPositionStyle, zIndex: 30,
-          width: '44px', height: '44px',
+          width: '48px', height: '48px',
           background: 'var(--color-white)', border: '2px solid var(--color-black)',
           boxShadow: '4px 4px 0 0 var(--color-black)', borderRadius: 'var(--radius-sm)',
           display: 'grid', placeItems: 'center', cursor: 'pointer',

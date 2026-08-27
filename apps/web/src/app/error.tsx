@@ -76,12 +76,11 @@ export default function GlobalError({
 }
 .err-boundary__actions { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
 .err-boundary__btn {
-  font-family: var(--font-mono); font-size: var(--font-size-sm);
-  text-transform: uppercase; letter-spacing: 0.12em;
+  font-family: var(--font-display); font-size: var(--font-size-sm);
+  text-transform: uppercase; letter-spacing: 0.08em;
   background: var(--color-black); color: var(--color-white);
   border: var(--border-hairline); padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm); cursor: pointer; text-decoration: none;
-}
+  border-radius: var(--radius-sm); cursor: pointer; text-decoration: none; font-weight: 600; }
 .err-boundary__btn:hover { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
 .err-boundary__btn--ghost { background: var(--color-white); color: var(--color-black); }
 `}</style>

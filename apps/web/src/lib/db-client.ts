@@ -143,7 +143,9 @@ function persist(): boolean {
 // their own sync (or not — out of scope here).
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (e) => {
-    if (e.key === STORAGE_KEY && e.newValue && e.oldValue && e.newValue !== e.oldValue) {
+    // newValue 可为 null(他页清空了 key):必须照常 rehydrate 清掉本页缓存,
+    // 否则旧标签页下一笔写入会把已清空的数据整包「复活」。
+    if (e.key === STORAGE_KEY && e.newValue !== e.oldValue) {
       // Re-hydrate from the new value (only if hydration already happened;
       // a fresh tab still relies on its own first-mount hydrate).
       if (_hydrated) {

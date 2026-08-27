@@ -404,14 +404,14 @@ const panelStyles = `
 .aip__warn { margin: 0 var(--space-3) var(--space-3); padding: var(--space-2) var(--space-3); border: var(--border-hairline); border-color: var(--color-red); font-family: var(--font-mono); font-size: var(--font-size-xs); background: var(--color-white); color: var(--color-black); }
 .aip__state { margin: 0 var(--space-3) var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-xs); font-weight: 700; }
 .aip__row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin: 0 var(--space-3) var(--space-2); }
-.aip__label { flex: 0 0 140px; font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); }
+.aip__label { flex: 0 0 140px; font-family: var(--font-display); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); font-weight: 600; }
 .aip__input { flex: 1 1 auto; padding: var(--space-1) var(--space-2); border: var(--border-hairline); font-family: var(--font-mono); font-size: var(--font-size-sm); background: var(--color-white); color: var(--color-black); }
 .aip__input:focus-visible { outline: 2px solid var(--color-blue); outline-offset: 1px; }
 .aip__hint { flex: 0 0 100%; margin: 0 calc(140px + var(--space-2)) var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black-soft); line-height: 1.4; }
 .aip__keyWrap { display: flex; flex: 1 1 auto; gap: var(--space-1); }
 .aip__btnGhost { padding: var(--space-1) var(--space-2); border: var(--border-hairline); background: transparent; font-family: var(--font-mono); font-size: var(--font-size-xs); cursor: pointer; }
 .aip__profileRow { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: 0 var(--space-3) var(--space-3); }
-.aip__profileChip { display: inline-flex; align-items: center; min-height: 44px; gap: var(--space-1); padding: var(--space-1) var(--space-2); border: var(--border-hairline); border-color: var(--color-gray); background: var(--color-white); font-family: var(--font-body); font-size: var(--font-size-sm); cursor: pointer; }
+.aip__profileChip { display: inline-flex; align-items: center; min-height: 48px; gap: var(--space-1); padding: var(--space-1) var(--space-2); border: var(--border-hairline); border-color: var(--color-gray); background: var(--color-white); font-family: var(--font-body); font-size: var(--font-size-sm); cursor: pointer; }
 .aip__profileChip--selected { border-color: var(--color-on-surface); background: var(--color-surface-white); }
 .aip__profileChip--new { border-style: dashed; color: var(--color-gray); }
 .aip__profileName { font-family: var(--font-display); }
@@ -449,7 +449,7 @@ const panelStyles = `
   .aip__input { width: 100%; min-width: 0; box-sizing: border-box; }
   .aip__keyWrap { flex: 1 1 100%; min-width: 0; flex-direction: column; }
   .aip__hint { margin-left: 0; margin-right: 0; }
-  .aip__advancedToggle { min-height: 44px; margin-left: var(--space-1); margin-right: var(--space-1); }
+  .aip__advancedToggle { min-height: 48px; margin-left: var(--space-1); margin-right: var(--space-1); }
   .aip__confirmActions { flex-wrap: wrap; }
 }
 `

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, memo } from 'react'
 import Link from 'next/link'
 import { BauhausMotif, Button, Card as UICard, Modal, Tag } from '@cys-stift/ui'
 import { PageHeader } from '@/features/page-header'
@@ -71,6 +71,15 @@ export default function InboxPage() {
     })
   }, [])
   const clearSelection = useCallback(() => setSelected(new Set()), [])
+  // 卡片墙回调走 id 传参(非每行闭包)——配合 memo(CardTile),任一勾选/筛选
+  // 变化时未受影响的卡不重渲染(大列表交互 O(n)→O(1))。
+  const openCard = useCallback((card: Card) => setDetail(card), [])
+  const togglePin = useCallback(
+    (id: CardId, pinned: boolean) => {
+      void service.update(id, { pinned: !pinned })
+    },
+    [service]
+  )
   // Canvas list powers the explicit target picker; the active canvas is only
   // the initial suggestion and is never used as an invisible destination.
   const { snapshot: canvasesSnap } = useCanvases()
@@ -395,11 +404,9 @@ export default function InboxPage() {
                 <CardTile
                   card={card}
                   selected={selected.has(card.id)}
-                  onToggleSelect={() => toggleSelect(card.id)}
-                  onOpen={() => setDetail(card)}
-                  onTogglePin={() =>
-                    service.update(card.id, { pinned: !card.pinned })
-                  }
+                  onToggleSelect={toggleSelect}
+                  onOpen={openCard}
+                  onTogglePin={togglePin}
                 />
               </li>
             ))}
@@ -584,25 +591,24 @@ const styles = `
 .page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
 .tablist { display: inline-flex; }
 .tab {
-  min-height: 44px;
+  min-height: 48px;
   padding: 0 var(--space-2);
   background: transparent;
   border: 0;
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-size: var(--font-size-xs);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   color: var(--color-gray);
   cursor: pointer;
   border-bottom: 2px solid transparent;
-  transition: transform var(--duration-press) var(--ease-standard);
-}
+  transition: transform var(--duration-press) var(--ease-standard); font-weight: 600; }
 .tab:active { transform: scale(0.98); animation: tactile-flash var(--duration-flash) ease-out; }
 .tb-snap {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  min-height: 44px;
+  min-height: 48px;
   padding: 0 var(--space-2);
   border: var(--border-hairline);
   border-radius: var(--radius-sm);
@@ -642,23 +648,21 @@ const styles = `
   color: var(--color-black); padding: 0 var(--space-1);
 }
 .batch-bar__btn {
-  min-height: 44px; padding: 0 var(--space-2);
+  min-height: 48px; padding: 0 var(--space-2);
   display: inline-flex; align-items: center;
   background: transparent; border: 1px solid var(--color-black); border-radius: var(--radius-sm);
-  color: var(--color-black); font-family: var(--font-mono);
-  font-size: var(--font-size-xs); letter-spacing: 0.1em; text-transform: uppercase;
-  cursor: pointer; transition: background 80ms ease-out, color 80ms ease-out;
-}
+  color: var(--color-black); font-family: var(--font-display);
+  font-size: var(--font-size-xs); letter-spacing: 0.08em; text-transform: uppercase;
+  cursor: pointer; transition: background var(--duration-micro) ease-out, color var(--duration-micro) ease-out; font-weight: 600; }
 .batch-bar__btn:hover { background: var(--color-black); color: var(--color-white); }
 .batch-bar__btn--danger:hover { background: var(--color-red); border-color: var(--color-red); }
 .batch-bar__spacer { width: var(--space-3); }
 .batch-bar__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .batch-canvas-picker__label {
-  display: block; margin-bottom: var(--space-1); font-family: var(--font-mono);
-  font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0;
-}
+  display: block; margin-bottom: var(--space-1); font-family: var(--font-display);
+  font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0; font-weight: 600; }
 .batch-canvas-picker {
-  width: 100%; min-height: 44px; padding: 0 var(--space-1);
+  width: 100%; min-height: 48px; padding: 0 var(--space-1);
   border: var(--border-hairline); border-radius: var(--radius-sm);
   background: var(--color-white); color: var(--color-black); font: inherit;
 }
@@ -702,7 +706,8 @@ function pinFirst<T extends { pinned: boolean }>(cards: T[]): T[] {
   return [...pinned, ...rest]
 }
 
-function CardTile({
+// memo:卡片墙动辄数百卡,列表任一勾选/筛选重排时未变的卡靠 props 浅比较跳过重渲。
+const CardTile = memo(function CardTile({
   card,
   selected,
   onToggleSelect,
@@ -711,9 +716,9 @@ function CardTile({
 }: {
   card: Card
   selected: boolean
-  onToggleSelect: () => void
-  onOpen: () => void
-  onTogglePin: () => void
+  onToggleSelect: (id: string) => void
+  onOpen: (card: Card) => void
+  onTogglePin: (id: CardId, pinned: boolean) => void
 }) {
   const { t } = useI18n()
   // A — 卡片美化:body 预览放宽(140→200);note 是默认类型,red type chip 信息量为零且
@@ -729,7 +734,7 @@ function CardTile({
         className="tile__pin"
         onClick={(e) => {
           e.stopPropagation()
-          onTogglePin()
+          onTogglePin(card.id, card.pinned)
         }}
         aria-label={card.pinned ? t('card.detail.unpin') : t('card.detail.pin')}
         aria-pressed={card.pinned}
@@ -741,14 +746,14 @@ function CardTile({
         className="tile__select"
         onClick={(e) => {
           e.stopPropagation()
-          onToggleSelect()
+          onToggleSelect(card.id)
         }}
         aria-label={t('inbox.batch.select')}
         aria-pressed={selected}
       >
         {selected ? '✓' : ''}
       </button>
-      <button type="button" className="tile__main" onClick={onOpen}>
+      <button type="button" className="tile__main" onClick={() => onOpen(card)}>
         <div className="tile__bar" aria-hidden="true" />
         <div className="tile__body">
           <h3 className="tile__title">{card.title || t('card.untitled')}</h3>
@@ -777,7 +782,7 @@ function CardTile({
       </button>
     </div>
   )
-}
+})
 
 function EmptyState({ view }: { view: View }) {
   const { t } = useI18n()

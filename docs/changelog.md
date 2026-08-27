@@ -5,6 +5,24 @@
 
 ---
 
+## 2026-08-27 · 未发布 · web: 深度测试报告回收(性能 Top3 + 动效收敛 + 声线统一 + P2/P3 修复)
+
+> 依据 2026-08-27 用户侧测试报告(REPORT-cysstift)。
+
+- **性能 Top3**:①字体子集化 —— 三 variable TTF(共 ~1.2MB,Inter 876KB)转 latin woff2(共 ~168KB,-86%;脚本 `scripts/subset-fonts.sh`,中文走系统回退);②inbox 卡片墙 `CardTile` memo 化 + id 传参回调(消灭每行闭包,大列表勾选/筛选不再整列重渲);③新增根段 `app/loading.tsx`(此前 app 下 0 个 loading 态,弱网客户端导航白屏只靠 VT 遮盖)。
+- **动效收敛(三批全收)**:三源新增 `--duration-micro:80ms` / `--duration-vt-out:160ms` / `--duration-vt-in:280ms`(三源同步守卫自动覆盖);游离字面量清零 —— 80ms×11 处 → micro、transform 60ms×5 → press、canvas 500ms → page、VT 160/280 → vt-out/in。
+- **声线统一**:37 处功能页 mono 大写 UI 标签(按钮/选项卡/分节头/字段标签)改 Space Grotesk caps(12px/600/0.08em,spec ui-label-caps);mono 收缩回数据类元信息(时间戳/DSL/ID/按键/语言码)。
+- **交互行 48px**:全站 `min-height/min-width: 44px` 触达最小值提到 48px(基类 shared.css 一处生效多页 + canvas 工具栏/inbox/archive/settings/ask/search/workbench 等;app-menu pin 钮 44px 为 PRD 小方钮有意例外;showcase/dev 展示页缓)。
+- **零阴影破口收口**:settings 导入模式选中态蓝硬影改 2px 边框;画布 a11y 大纲面板 4px 墨影定性为焦点指示,spec(swiss-editorial.md)补豁免注记;顺带清 6 处 no-op `var(--shadow-md)` 死引用与 workbench 残留 1px 圆角。
+- **修复(R1)**:PWA/favicon 四引用子路径部署 404(metadata 显式带 `WEB_DEPLOY_BASEPATH` 前缀;manifest start_url/icons 改相对路径);钉住侧栏首绘错位(inline script 给 `<html>` 打 `data-sidebar-pinned`,CSS 水合前按钉住态渲染,pin 用户刷新不再 64→280 跳变;偏好跨标签 storage 同步);RouteViewTransitions 同步抛错时 active 永久卡死(try/catch 回滚);db-client 跨标签 storage 漏清空边界(防旧数据「复活」);capture 全局热键补排除 `<select>`;旧兜底 hex 对齐 v0.2(minimap #e53935→#b51b17、export-raster 白底→#fbf9f6)。
+- 验证:lint 7 包 0 错 / web 测试 1853 全绿 / build 0 警 24 页 / render-sweep 18 路由净 / motion-audit 17 项全过。
+
+## 2026-08-25 · 未发布 · ui: 补齐 DESIGN.md 组件缺口(Tabs / DataTable / TopBar)
+
+- `packages/ui` 新增三个组件并全量导出(子路径出口 `./tabs` / `./data-table` / `./top-bar` + barrel 与类型):**Tabs**(role=tablist,ArrowLeft/ArrowRight 漫游与环绕)、**DataTable**(真表格结构 thead `scope=col` + 列对齐 + 空态整行占位)、**TopBar**(crumb + 标题 + actions 槽位)。
+- `/design` 展示页接入三件演示;规范七件套演示面至此补齐(Sidebar 按偏差注记 #4 为 app 级 app-menu 实现,不另造 packages/ui 组件)。
+- web 测试 1848 → 1853(ui-editorial-primitives 冒烟 5 项)。
+
 ## 2026-08-25 · 未发布 · docs: Swiss Editorial 规范整合入仓
 
 - 新增 [`docs/design/swiss-editorial.md`](design/swiss-editorial.md):PRD `swiss_desktop_editorial/DESIGN.md` 规范原文(全量色/字/间距 token + 七件组件规格)+ **落地偏差注记 9 条**(页面切换节奏/动效族 token/legacy 6 色名冻结/64px 折叠轨/Input 标签上移开放项/两红并存等,均有出处)。token 权威源仍为 packages/ui 三源 + canvas-engine 兜底;本文是语义与出处。

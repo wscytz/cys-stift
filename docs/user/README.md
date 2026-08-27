@@ -13,7 +13,7 @@
 1. **捕获**(Capture)—— 任何位置按快捷键,3 秒把灵感落库
 2. **整理**(Inbox / Canvas / Workbench)—— inbox 编辑多媒介;canvas 把卡片摆开 + 加便签/标注/箭头连关系;工作台给单卡一个深度编辑空间
 3. **沉淀**(Archive / Export)—— 归档已沉淀的;随时导出开放格式 JSON
-4. **共享**(本地 app)—— 桌面端打包 `.app` / `.dmg`(mac)/ `.exe`(win),安卓 `.apk`;桌面全局快捷键后台也工作
+4. **共享**(本地 app)—— 桌面端打包 `.app` / `.dmg`(mac)/ `.exe`(win);桌面全局快捷键后台也工作
 
 ---
 
@@ -28,9 +28,9 @@
 - 输入标题 → `Enter` 展开 body → `⌘/Ctrl + Enter` 保存
 - `Esc` 关闭(草稿保留,下次打开恢复)
 
-### 菜单栏
+### 导航轨 Capture
 
-顶部菜单栏的 **Capture** 按钮 —— 同样打开 Mini Input(来源标记为 `menubar`)。
+宽屏(≥1200px)界面左侧是 64px 图标导航轨,**Capture 是轨底的红色「+」块** —— 同样打开 Mini Input(来源标记为 `menubar`)。轨道 hover / 键盘聚焦时覆盖式展开 280px 显示完整标签;pin 钮可钉住常驻展开,点击导航项后收回。窄屏(<1200px)导航退化为顶条 + 抽屉。
 
 ### 搜索快捷键
 
@@ -65,7 +65,7 @@
 2. **画布顶栏工具栏** → 选工具(选择/手绘/文本/连接/橡皮),点画布拖出；窄屏可横向滚动工具栏
 3. **键盘快捷键**:`v`/`p`/`t`/`c`/`e`(对应 5 个工具)
 
-### 工具栏(包豪斯)
+### 工具栏
 
 顶栏工具栏使用 5 个 SVG 线条图标(跨平台一致渲染):
 
@@ -150,7 +150,7 @@
 卡片 body 支持完整 Markdown 渲染(inbox 详情 / canvas 卡片 / 工作台编辑器预览三处一致):
 
 - **GFM**:表格 / 任务列表 checkbox / 删除线 / 自动链接
-- **代码高亮**:Bauhaus 语法主题(黑底白字代码块 + 彩色关键字)
+- **代码高亮**:Swiss Editorial 语法主题(墨底代码块:关键字亮石油蓝、字符串亮红、注释灰亮)
 - **数学公式**:`$inline$` 行内 + `$$display$$` 独立块(katex 渲染,字体本地打包不走 CDN)
 - **脚注**:`[^1]` 引用号 + 文末脚注区
 - **块引用**:`((标题))` 嵌入另一张卡的正文(环检测 + 找不到时显 missing 标记)
@@ -223,7 +223,7 @@
 - **本地存储仪表盘**:实时显示 localStorage 用量。**60% 黄 / 80% 红**警告 → 建议导出 JSON 备份。防"刷新全丢"的关键防线
 - **Capture shortcut**:改全局快捷键(桌面)
 - **Language**:中/英切换,实时刷新
-- **Appearance**:当前版本固定为 Bauhaus light；历史导入中的 dark/system 值会兼容读取,但不会切换主题
+- **主题**:恒为 Swiss Editorial light(暖纸底),设置页无主题选项;历史导入中的 dark/system 值会兼容读取,但不会切换主题
 - **AI provider**:OpenAI / Anthropic / DeepSeek / Ollama(本地)等多 provider + 多 profile
 - **实验室区**:当前含「可审计 AI 共编」(默认关闭,开启需确认门);Vision、自动整理/建卡/打标签和主动检索尚未接入,不会在后台修改或外发数据
 - **Data → Export JSON**:导出全部数据为开放格式 JSON(包含 cards / media / drafts / settings / canvases / freeform 几何)

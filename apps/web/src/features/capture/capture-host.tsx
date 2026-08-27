@@ -120,7 +120,9 @@ export function CaptureHost() {
       const t = e.target as HTMLElement | null
       if (t) {
         const tag = t.tagName
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || t.isContentEditable) return
+        // SELECT 一并排除:设置页承诺「输入框外」触发,下拉正在选值时不该被
+        // 全局热键抢走(与 file-drop-handler 的守卫对齐)。
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t.isContentEditable) return
       }
       e.preventDefault()
       setOpenKind('shortcut')

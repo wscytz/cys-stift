@@ -72,7 +72,7 @@ export function DiffDialog({
 .diff-group--added { border-left: var(--space-1) solid var(--color-blue); }
 .diff-group--removed { border-left: var(--space-1) solid var(--color-red); }
 .diff-group--changed { border-left: var(--space-1) solid var(--color-yellow); }
-.diff-group__title { margin: 0 0 var(--space-1); font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.1em; }
+.diff-group__title { margin: 0 0 var(--space-1); font-family: var(--font-display); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
 .diff-group__items { margin: 0; padding: 0; list-style: none; }
 .diff-group__item { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black-soft); padding: var(--space-1) 0; }
 `}</style>

@@ -191,16 +191,15 @@ const styles = `
   justify-content: flex-end;
 }
 .ai-popover__btn {
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-size: var(--font-size-xs);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   padding: var(--space-1) var(--space-2);
   border: var(--border-hairline);
   border-radius: var(--radius-sm);
   background: var(--color-white);
-  cursor: pointer;
-}
+  cursor: pointer; font-weight: 600; }
 .ai-popover__btn:hover:not(:disabled) { background: var(--color-on-surface); color: var(--color-surface); }
 .ai-popover__btn:active:not(:disabled) { background: var(--color-primary); color: var(--color-on-primary); }
 .ai-popover__btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }

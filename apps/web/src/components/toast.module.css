@@ -15,7 +15,6 @@
   color: var(--color-black);
   border: var(--border-thick);
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md);
   padding: var(--space-2) var(--space-3);
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);

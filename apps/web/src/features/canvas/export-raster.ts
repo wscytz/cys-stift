@@ -123,9 +123,10 @@ async function rasterizeSvg(
     if (!ctx) return null
     // jpeg has no alpha — fill white so transparent regions don't go black.
     // Color tracked via token so dark mode (where --color-white inverts)
-    // would still produce a legible background; fallback '#ffffff'.
+    // would still produce a legible background; fallback 与 token 值对齐(v0.2
+    // 起 --color-white = surface 暖纸白 #fbf9f6,非纯白)。
     if (background && format === 'jpeg') {
-      ctx.fillStyle = readToken('--color-white', '#ffffff')
+      ctx.fillStyle = readToken('--color-white', '#fbf9f6')
       ctx.fillRect(0, 0, canvas.width, canvas.height)
     }
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height)

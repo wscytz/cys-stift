@@ -300,8 +300,8 @@ export const editorStyles = `
 }
 .le__input:focus { border-bottom-color: var(--color-red); }
 .le__remove {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -318,17 +318,16 @@ export const editorStyles = `
   align-self: flex-start;
   background: transparent;
   border: 0;
-  min-height: 44px;
+  min-height: 48px;
   padding: 0 var(--space-1);
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-size: var(--font-size-xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--color-blue);
   cursor: pointer;
   text-decoration: underline;
-  text-underline-offset: 2px;
-}
+  text-underline-offset: 2px; font-weight: 600; }
 .le__code { display: flex; flex-direction: column; gap: var(--space-1); }
 .le__code-head { display: flex; gap: var(--space-1); align-items: center; }
 .le__lang {

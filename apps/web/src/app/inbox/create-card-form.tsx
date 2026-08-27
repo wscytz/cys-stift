@@ -387,18 +387,17 @@ const styles = `
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  min-height: 44px;
+  min-height: 48px;
   padding: 0 var(--space-2);
   background: var(--color-white);
   border: var(--border-hairline);
   border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-size: var(--font-size-xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--color-black);
-  cursor: pointer;
-}
+  cursor: pointer; font-weight: 600; }
 .ccf__toggle:hover { background: var(--color-red-soft); }
 .ccf__tags {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1);

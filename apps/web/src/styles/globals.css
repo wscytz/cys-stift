@@ -58,10 +58,10 @@ body > main.page { flex: 1; min-height: 0; }
    入场还有大半没播,阶梯感在 cross-fade 结束后仍然可感。
    reduced-motion 由下方 !important 块统一关闭(特异性无关)。 */
 ::view-transition-old(root) {
-  animation: vt-page-out 160ms var(--ease-editorial) both;
+  animation: vt-page-out var(--duration-vt-out) var(--ease-editorial) both;
 }
 ::view-transition-new(root) {
-  animation: vt-page-in 280ms var(--ease-editorial) both;
+  animation: vt-page-in var(--duration-vt-in) var(--ease-editorial) both;
 }
 @keyframes vt-page-out {
   to { opacity: 0; }
@@ -148,7 +148,7 @@ input[type='checkbox'] {
   display: inline-block;
   position: relative;
   flex-shrink: 0;
-  transition: background 80ms ease-out;
+  transition: background var(--duration-micro) ease-out;
 }
 input[type='checkbox']:hover { border-color: var(--color-gray); }
 input[type='checkbox']:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
@@ -178,7 +178,7 @@ select {
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   cursor: pointer;
-  min-height: 44px;
+  min-height: 48px;
   max-width: 100%;
   /* 自定义 ▾ 箭头:线性渐变画的 V 形,token 灰。 */
   background-image: linear-gradient(45deg, transparent 50%, var(--color-gray) 50%),
@@ -254,14 +254,13 @@ a {
   padding: var(--space-2) var(--space-3);
   background: var(--color-white);
   color: var(--color-black);
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-size: var(--font-size-sm);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-decoration: none;
   border: 2px solid var(--color-black);
-  border-left: 4px solid var(--color-red);
-}
+  border-left: 4px solid var(--color-red); font-weight: 600; }
 .skip-link:focus {
   left: var(--space-2);
   top: var(--space-2);
@@ -317,7 +316,7 @@ a {
 }
 .sr-only-focusable li { list-style: none; }
 .sr-only-focusable button {
-  min-height: 44px;
+  min-height: 48px;
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   color: var(--color-black);
@@ -343,6 +342,9 @@ a {
   padding: var(--space-1);
   background: var(--color-white);
   border: 2px solid var(--color-black);
+  /* 「零阴影」规范豁免点(已在 docs/design/swiss-editorial.md 注记):键盘用户
+     Tab 进画布大纲面板时,4px 墨色硬投影是唯一可感知的浮起指示(等价焦点环);
+     语义属 a11y 焦点指示而非装饰性阴影,非交互态视觉上不可见(见下方 :not 藏匿)。 */
   box-shadow: 4px 4px 0 0 var(--color-black);
 }
 .canvas-a11y-outline:not(:focus-within) {
@@ -364,7 +366,7 @@ a {
   gap: 2px;
 }
 .canvas-a11y-outline__option {
-  min-height: 44px;
+  min-height: 48px;
   padding: var(--space-1) var(--space-2);
   text-align: left;
   background: var(--color-white);

@@ -193,7 +193,7 @@ export function Thumb({ elements, label }: { elements: CanvasElement[]; label: s
 export const confirmStyles = `
 .ac { border: var(--border-hairline); border-radius: var(--radius-sm); padding: var(--space-2); margin: var(--space-2) 0; background: var(--color-white); max-width: 100%; box-sizing: border-box; min-width: 0; }
 .ac--error { border-color: var(--color-red); }
-.ac__title { margin: 0 0 var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); }
+.ac__title { margin: 0 0 var(--space-2); font-family: var(--font-display); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); font-weight: 600; }
 .ac__diff { display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-2); }
 .ac__group { padding: var(--space-1) var(--space-2); border-left: var(--space-quarter) solid var(--color-gray); }
 .ac__group--blue { border-left-color: var(--color-blue); }
@@ -206,7 +206,7 @@ export const confirmStyles = `
 .ac__thumbs { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); overflow-x: auto; flex-wrap: nowrap; min-width: 0; }
 .ac__thumb { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .ac__thumb-canvas { border: var(--border-hairline); background: var(--color-gray-soft); max-width: 100%; height: auto; display: block; flex-shrink: 0; }
-.ac__thumb-label { font-family: var(--font-mono); font-size: 10px; color: var(--color-gray); text-transform: uppercase; letter-spacing: 0.08em; }
+.ac__thumb-label { font-family: var(--font-display); font-size: 10px; color: var(--color-gray); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
 .ac__arrow { color: var(--color-gray); font-family: var(--font-mono); }
 .ac__edit { width: 100%; font-family: var(--font-mono); font-size: var(--font-size-xs); border: var(--border-hairline); padding: var(--space-1); border-radius: var(--radius-sm); resize: vertical; margin-bottom: var(--space-2); }
 .ac__actions { display: flex; gap: var(--space-1); flex-wrap: wrap; }

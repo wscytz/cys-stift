@@ -385,19 +385,18 @@ const styles = `
 .page { min-height: 100vh; background: var(--color-white); color: var(--color-black); }
 .tablist { display: inline-flex; }
 .tab {
-  min-height: 44px;
+  min-height: 48px;
   padding: 0 var(--space-2);
   background: transparent;
   border: 0;
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-size: var(--font-size-xs);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   color: var(--color-gray);
   cursor: pointer;
   border-bottom: 2px solid transparent;
-  transition: transform var(--duration-press) var(--ease-standard);
-}
+  transition: transform var(--duration-press) var(--ease-standard); font-weight: 600; }
 .tab:active { transform: scale(0.98); animation: tactile-flash var(--duration-flash) ease-out; }
 .tab--active { color: var(--color-black); border-bottom-color: var(--color-red); font-weight: 600; }
 .tab:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
@@ -428,13 +427,12 @@ const styles = `
   color: var(--color-black); padding: 0 var(--space-1);
 }
 .batch-bar__btn {
-  min-height: 44px; padding: 0 var(--space-2);
+  min-height: 48px; padding: 0 var(--space-2);
   display: inline-flex; align-items: center;
   background: transparent; border: 1px solid var(--color-black); border-radius: var(--radius-sm);
-  color: var(--color-black); font-family: var(--font-mono);
-  font-size: var(--font-size-xs); letter-spacing: 0.1em; text-transform: uppercase;
-  cursor: pointer; transition: background 80ms ease-out, color 80ms ease-out;
-}
+  color: var(--color-black); font-family: var(--font-display);
+  font-size: var(--font-size-xs); letter-spacing: 0.08em; text-transform: uppercase;
+  cursor: pointer; transition: background var(--duration-micro) ease-out, color var(--duration-micro) ease-out; font-weight: 600; }
 .batch-bar__btn:hover { background: var(--color-black); color: var(--color-white); }
 .batch-bar__btn--danger:hover { background: var(--color-red); border-color: var(--color-red); }
 .batch-bar__spacer { width: var(--space-3); }

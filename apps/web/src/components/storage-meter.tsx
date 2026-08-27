@@ -128,7 +128,7 @@ const styles = `
 }
 .sm > .mono-label {
   align-self: flex-start;
-  min-height: 44px;
+  min-height: 48px;
   padding-block: var(--space-1);
 }
 .sm__warn {

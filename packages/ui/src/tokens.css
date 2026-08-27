@@ -215,6 +215,11 @@
   --duration-title: 400ms;
   --duration-press: 100ms;
   --duration-flash: 200ms;
+  /* micro  悬停/底色微反馈(按钮 hover、行高亮;快于 press 的瞬态着色)
+     vt-out/vt-in  同文档 ViewTransition 旧页退场/新页进场(globals.css VT 键帧) */
+  --duration-micro: 80ms;
+  --duration-vt-out: 160ms;
+  --duration-vt-in: 280ms;
   --stagger-row: 40ms;
   --stagger-step: 100ms;
 }

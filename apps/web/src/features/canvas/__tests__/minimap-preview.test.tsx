@@ -80,7 +80,7 @@ describe('MinimapPreview', () => {
     act(() => { collapseBtn()!.click() })
     expect(canvas()).toBeNull()
     expect(chip()).not.toBeNull()
-    expect((chip() as HTMLElement).style.width).toBe('44px')
+    expect((chip() as HTMLElement).style.width).toBe('48px')
     unmount()
   })
 

@@ -105,9 +105,8 @@ const styles = `
 .tp { margin-top: var(--space-2); }
 .tp__label {
   margin: 0 0 var(--space-1) 0;
-  font-family: var(--font-mono); font-size: var(--font-size-xs);
-  text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-gray);
-}
+  font-family: var(--font-display); font-size: var(--font-size-xs);
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-gray); font-weight: 600; }
 .tp__grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   gap: var(--space-1);
@@ -118,7 +117,7 @@ const styles = `
   background: var(--color-white); color: var(--color-black);
   border: 2px solid var(--color-gray-soft); border-radius: var(--radius-sm);
   cursor: pointer; min-height: 72px;
-  transition: background 80ms ease-out, border-color 80ms ease-out, transform 60ms ease-out;
+  transition: background var(--duration-micro) ease-out, border-color var(--duration-micro) ease-out, transform var(--duration-press) ease-out;
 }
 .tp__cell:hover:not(:disabled) { background: var(--color-gray-soft); border-color: var(--color-gray); }
 .tp__cell:active:not(:disabled) { transform: scale(0.96); }

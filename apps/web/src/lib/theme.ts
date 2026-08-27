@@ -1,12 +1,12 @@
 'use client'
 
 /**
- * Theme application — Bauhaus light-only(2026-07-11 删 dark)。
+ * Theme application — light 单主题(2026-07-11 删 dark;v1.4.0 起为 Swiss Editorial light)。
  *
  * 历史曾支持 dark(spec §5.6),但自研 canvas 引擎不响应主题切换重渲染
  * (token 缓存清空靠 MutationObserver,与 adapter 的 RAF 重渲有时序竞态),
- * 导致暗色下箭头不可见 + 「有时候切不过去」。cy's Stift 是 Bauhaus 白底
- * 黑字经典,light 是主设计;dark 移除以聚焦 + 彻底消除渲染 bug。
+ * 导致暗色下箭头不可见 + 「有时候切不过去」。cy's Stift 主设计即亮底
+ * (light),dark 移除以聚焦 + 彻底消除渲染 bug。
  *
  * data-theme 恒 "light"。resolveTheme 保留签名但恒返 'light'(向后兼容
  * 旧 settings.theme='dark',无视它;tokens.css 的 dark 块也已删,即便

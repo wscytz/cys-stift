@@ -586,7 +586,7 @@ const styles = `
   .dsl-bridge__hint { width: 100%; margin-left: 0; }
   .dsl-guide { align-items: stretch; flex-direction: column; }
   .dsl-guide__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .dsl-example { min-height: 44px; }
+  .dsl-example { min-height: 48px; }
   .dsl-preview--stale { align-items: stretch; flex-direction: column; }
   .dsl-text { min-height: 200px; }
 }

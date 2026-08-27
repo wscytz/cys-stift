@@ -157,6 +157,10 @@ export const tokens = {
     title: '400ms',
     press: '100ms',
     flash: '200ms',
+    /** micro 悬停/底色微反馈;vt-out/vt-in 同文档 VT 退场/进场。 */
+    micro: '80ms',
+    vtOut: '160ms',
+    vtIn: '280ms',
     staggerRow: '40ms',
     staggerStep: '100ms',
   },

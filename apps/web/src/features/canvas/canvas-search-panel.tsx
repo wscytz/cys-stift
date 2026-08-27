@@ -144,7 +144,6 @@ const styles = `
   width: min(360px, calc(100vw - 96px));
   background: var(--color-white);
   border: var(--border-hairline);
-  box-shadow: var(--shadow-md);
   color: var(--color-black);
 }
 .cv-search__head { display: flex; align-items: center; gap: var(--space-1); padding: var(--space-1); border-bottom: var(--border-hairline); }

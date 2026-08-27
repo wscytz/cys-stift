@@ -96,14 +96,13 @@ const styles = `
   border-bottom: var(--border-hairline);
 }
 .cv-unplaced__title {
-  font-family: var(--font-mono); font-size: var(--font-size-xs);
-  letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-black);
-}
+  font-family: var(--font-display); font-size: var(--font-size-xs);
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-black); font-weight: 600; }
 .cv-unplaced__close {
   appearance: none; -webkit-appearance: none;
   background: transparent; border: 0; cursor: pointer;
   font-family: var(--font-mono); font-size: var(--font-size-sm);
-  min-width: 44px; min-height: 44px; color: var(--color-black);
+  min-width: 48px; min-height: 48px; color: var(--color-black);
 }
 .cv-unplaced__close:hover { background: var(--color-yellow); }
 .cv-unplaced__close:focus-visible { outline: 2px solid var(--color-red); outline-offset: 1px; }

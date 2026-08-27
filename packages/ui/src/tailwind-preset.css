@@ -112,6 +112,9 @@
   --duration-title: 400ms;
   --duration-press: 100ms;
   --duration-flash: 200ms;
+  --duration-micro: 80ms;
+  --duration-vt-out: 160ms;
+  --duration-vt-in: 280ms;
   --stagger-row: 40ms;
   --stagger-step: 100ms;
 }

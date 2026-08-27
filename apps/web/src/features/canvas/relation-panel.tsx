@@ -207,7 +207,7 @@ export function RelationPanel({
 /**
  * Panel position: midpoint between the arrow's from/to element centers (page
  * coords), translated to screen coords via the canvas rect + host view
- * (pan/zoom). Anchored above-center of that midpoint; panel height ≈ 44px,
+ * (pan/zoom). Anchored above-center of that midpoint; panel height ≈ 48px,
  * gap 12px. Returns null when the from/to elements can't be resolved or the
  * canvas rect is unavailable.
  */
@@ -261,13 +261,12 @@ const styles = `
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--color-black);
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-size: var(--font-size-xs);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: background 80ms ease-out, color 80ms ease-out, border-color 80ms ease-out, transform 60ms ease-out;
-}
+  transition: background var(--duration-micro) ease-out, color var(--duration-micro) ease-out, border-color var(--duration-micro) ease-out, transform var(--duration-press) ease-out; font-weight: 600; }
 .cv-relation__swatch {
   display: inline-block;
   width: 16px;

@@ -56,7 +56,6 @@ const styles = `
   overflow: auto;
   background: var(--color-white);
   border: var(--border-hairline);
-  box-shadow: var(--shadow-md);
   font-family: var(--font-body);
   pointer-events: none; /* R9:纯只读速览,不拦截画布指针(否则盖住卡拖不动) */
 }

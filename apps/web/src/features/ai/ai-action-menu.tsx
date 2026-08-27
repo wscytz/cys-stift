@@ -110,11 +110,10 @@ const menuStyles = `
 }
 .ai-menu__instruction-input:focus-visible { outline: 2px solid var(--color-blue); outline-offset: 1px; }
 .ai-menu__instruction-apply {
-  align-self: flex-end; font-family: var(--font-mono); font-size: var(--font-size-xs);
-  text-transform: uppercase; letter-spacing: 0.12em; padding: var(--space-1) var(--space-2);
+  align-self: flex-end; font-family: var(--font-display); font-size: var(--font-size-xs);
+  text-transform: uppercase; letter-spacing: 0.08em; padding: var(--space-1) var(--space-2);
   border: var(--border-hairline); border-radius: var(--radius-sm); background: var(--color-black);
-  color: var(--color-white); cursor: pointer;
-}
+  color: var(--color-white); cursor: pointer; font-weight: 600; }
 .ai-menu__instruction-apply:disabled { opacity: 0.55; cursor: not-allowed; }
 .ai-menu__instruction-apply:hover:not(:disabled) { background: var(--color-primary); border-color: var(--color-primary); }
 `

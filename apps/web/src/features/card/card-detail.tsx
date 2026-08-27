@@ -1044,7 +1044,7 @@ const styles = `
   font-family: var(--font-mono); font-size: var(--font-size-xs); line-height: 1.5;
 }
 .cd__field { display: flex; flex-direction: column; gap: var(--space-1); }
-.cd__label { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-black-soft); }
+.cd__label { font-family: var(--font-display); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); font-weight: 600; }
 .cd__body-editor { height: 320px; display: flex; flex-direction: column; }
 .cd__file { font-family: var(--font-mono); font-size: var(--font-size-sm); margin-top: var(--space-1); }
 .cd__actions {
@@ -1078,7 +1078,7 @@ const styles = `
 }
 .cd__translate-select:disabled { opacity: 0.5; cursor: not-allowed; }
 .cd__sec { display: flex; flex-direction: column; gap: var(--space-2); }
-.cd__sec-h { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.16em; color: var(--color-black-soft); }
+.cd__sec-h { margin: 0; font-family: var(--font-display); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); font-weight: 600; }
 .cd__sec-body { display: flex; flex-direction: column; gap: var(--space-2); }
 
 .cd__media-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); }
@@ -1090,12 +1090,12 @@ const styles = `
 .cd__links a:hover { color: var(--color-black); }
 /* BR-T5 — backlinks 区(与 canvas 版 card-detail-modal.tsx 对齐)。 */
 .cd__backlinks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
-.cd__backlink-btn { display: flex; align-items: center; gap: var(--space-1); width: 100%; text-align: left; padding: 4px var(--space-1); background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black); transition: background 80ms ease-out, border-color 80ms ease-out; }
+.cd__backlink-btn { display: flex; align-items: center; gap: var(--space-1); width: 100%; text-align: left; padding: 4px var(--space-1); background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black); transition: background var(--duration-micro) ease-out, border-color var(--duration-micro) ease-out; }
 .cd__backlink-btn:hover { background: var(--color-gray-soft); border-color: var(--color-gray-soft); }
 .cd__backlink-btn:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 .cd__backlink-dir { color: var(--color-black-soft); font-family: var(--font-mono); flex: 0 0 auto; }
 .cd__backlink-title { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cd__backlink-rel { flex: 0 0 auto; font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); }
+.cd__backlink-rel { flex: 0 0 auto; font-family: var(--font-display); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); font-weight: 600; }
 /* RB-T3 — backlinks 区的 × 删除按钮(default canvas 上的边可删)与「在画布上删除」
    提示(其它画布上的边不能在详情删)。× 复用 le__remove 的硬偏移风格,贴在 row 右侧。 */
 .cd__backlink-remove {
@@ -1130,7 +1130,7 @@ const styles = `
   text-align: left; padding: 4px var(--space-1);
   background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm);
   cursor: pointer; font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black);
-  transition: background 80ms ease-out, border-color 80ms ease-out;
+  transition: background var(--duration-micro) ease-out, border-color var(--duration-micro) ease-out;
 }
 .cd__suggest-main:hover { background: var(--color-gray-soft); border-color: var(--color-gray-soft); }
 .cd__suggest-main:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
@@ -1142,9 +1142,8 @@ const styles = `
 }
 .cd__suggest-type {
   flex: 0 0 auto;
-  font-family: var(--font-mono); font-size: var(--font-size-xs);
-  text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft);
-}
+  font-family: var(--font-display); font-size: var(--font-size-xs);
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-black-soft); font-weight: 600; }
 .cd__suggest-connect {
   flex: 0 0 auto;
   padding: 4px var(--space-2);
