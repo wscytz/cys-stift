@@ -5,6 +5,15 @@
 
 ---
 
+## 2026-08-27 · 未发布 · chore: 审计回收——扫描豁免留档 + motion-audit 竞态修复 + webroot 备份卫生
+
+> 08-27 深度测试报告回收的独立复审签收后,跟进三项发现。
+
+- 新增 `docs/security-scan-exemptions.md`:Mimosa 静态扫描误报的书面豁免记录(测试假凭据 fixture 四处、DeepSeek live 冒烟的固定端点请求、cys-dsl 污点链「mongo-sort-injection」)—— 替代"改代码躲扫描"的口头共识;真凭据一律走环境变量的约束不变。
+- `scripts/_motion-audit.mjs` 健壮性:静态端口 4177 → 内核临时端口(并行实例不再自撞);首测探针注入前显式 `waitForSelector('body main')`(修 headless 冷启动下 document.body 未就绪的连崩);复核连跑两次 17/17。
+- `.gitignore` 补 `.mimosa/`(hook 本地状态;曾混入提交需 amend 清理)。
+- 服务器卫生(不在仓内):webroot 的 17 个落地页备份文件(`index.html/og.png/product-*.bak-*`)移至 `/var/www/wscytz/backups/cys-stift/landing-baks/`,公网旧 URL 全部 404,线上落地页 200 不受影响。
+
 ## 2026-08-27 · 未发布 · web: 深度测试报告回收(性能 Top3 + 动效收敛 + 声线统一 + P2/P3 修复)
 
 > 依据 2026-08-27 用户侧测试报告(REPORT-cysstift)。
