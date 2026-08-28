@@ -21,7 +21,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useDb } from '@/lib/db-client'
+import { useDbService } from '@/lib/db-client'
 import type { TagRef } from '@cys-stift/domain'
 import { useSettings } from '@/lib/settings-store'
 import { MiniInput } from './mini-input'
@@ -38,7 +38,8 @@ export const CAPTURE_OPEN_EVENT = 'cys-stift:open-capture'
 
 export function CaptureHost() {
   const router = useRouter()
-  const { service } = useDb()
+  // 布局宿主不触发 db 水合(分段水合下会让页面段 #418),见 useDbService 注释。
+  const { service } = useDbService()
   const { t } = useI18n()
   const { settings, ready } = useSettings()
   const { snapshot } = useCanvases()

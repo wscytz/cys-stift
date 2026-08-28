@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-08-28 · 1.4.1 · fix: 全量审核回收 —— 字体接线(P1)+ 分段水合 #418 根因修复 + 门禁盲区 + 口径修正(本地 tag v1.4.1)
+
+> 08-28 全量审核(v1.4.0..ff2578e 五提交,3 subagent 分维度 + 逐项独立复核)回收:1 P1 + 6 P2 + 11 P3 全修。
+
+- **P1 字体实际生效**:next/font 生成族名与 token 字面量断裂(2026-07-06 自托管起),三 woff2 被 preload 但从未参与渲染,「子集化 -86%」的字节白拉、「跨平台一致」不成立。修法:token 三源 `--font-display/body/mono` 改 `var(--font-*, 字面量回退)` 接线(tokens.css / tailwind-preset.css / tokens.ts);否决手写 @font-face 方案(basePath 为构建期 env 条件注入,硬编码前缀破 dev/Tauri 双形态)。**修复后全站观感微调** —— 设计语言首次以真字体示人;干净机器(未装三字体)截图与量宽证据已重录。
+- 门禁:check-doc-links.mjs 改按 git 索引(`git ls-files`)判定目标存在性(gitignored 但本地存在的文件曾让死链假绿)+ 纳入 packages/ui/CLAUDE.md;motion-audit 转正(去 `_` 前缀 + `pnpm audit:motion` + acceptance-plan 发布清单落步 + Chrome 路径 env 化探测)+ 产物探活(缺失拒跑、陈旧告警,不再静默假通过)+ 新增**字体真渲染常驻断言**(量宽,接线断裂即红);render-sweep 端口改内核分配(消并行自撞);deploy-web 校验扩到 manifest/icon/woff2 引用 + verify-only 验 PWA 资产。
+- 组件:Tabs 补 WAI-ARIA 键盘契约(←/→/Home/End 焦点与选中同步移动 + roving tabindex)+ 可选 tabpanel 与 aria-controls/aria-labelledby 双向接线;demo 文案改与实现一致。
+- 数据:db-client 他页 `clear()`(storage `e.key === null`)路径补 rehydrate,旧数据不再「复活」(补回归测试);RouteViewTransitions 同步抛错 catch 落 console.error(不再静默吞)。
+- **分段水合 #418 根因修复**(e2e 全绿的前提,也是真用户每次带数据进列表页的整树客户端重建消失):08-27 新增的 `app/loading.tsx`(Suspense)使 App Router 分段水合 —— 壳层段先 hydrate、effect 先行 flush,显形两类潜伏缺陷:① 布局宿主(CaptureHost / FileDropHandler / SearchShortcut 挂载的 CommandPalette)的 `useDb`/`useCanvases` 在壳段装载 store;② 五个 store(db / canvas / settings / draft / canvas-view)的 `getServerSnapshot` 返回活缓存,后水合段拿到已装载数据、与 SSR 空态不一致。修复:布局宿主改用不触发水合的 `useDbService`(仓库全部变更操作前置懒水合守卫兜底写入安全)+ CommandPalette 打开时才装载 + 五 store `getServerSnapshot` 改恒定服务端快照;另修 search 页 effect deps 数组裸 `window.location.search` 的 SSR ReferenceError(`typeof window` 守卫)。
+- 资产:OFL-1.1 license 三份入 `apps/web/public/fonts/`(Inter / Space Grotesk / JetBrains Mono;此前公开仓再分发字体无许可文本)。
+- 口径:README「网页版(同版本)」→「跟随 main,可能领先 Release tag」;DeepSeek 不再列为独立 provider(README / user-README,ProviderId 实为 openai|anthropic|ollama);transliteration.md「Bauhaus 6 原色」改 legacy 冻结名口径;仓根 CLAUDE.md 设计语言三处对齐 Swiss Editorial + token 规则指回在仓规范;豁免档补登 glm-5.2 live 测试 + §1 fixture 清单补全(5 文件)+ §3 污点链归属改指 app 本地 intent-compiler / intent-validation。
+- 验证:lint 7 包 0 错 / test 全绿(domain 87 + canvas-engine 586 + cys-dsl 405 + db 8 + web 1856[+3])/ build 0 警 24 页(根路径 + `WEB_DEPLOY_BASEPATH` 子路径双形态,PWA/woff2 前缀链全验)/ docs:links 过(含 gitignored 假目标对抗用例,门必红)/ render-sweep 18 路由净 / motion-audit 19 项全过(含 2 项字体断言:display 347.1px / body 316.2px vs 系统栈 314.9px,修复前两侧恒等)/ e2e 三套件 **17/17**(e2e-ai 11 + e2e-data 4 + e2e-r18-canvas 2;修复前 12/17,失败全由既有 #418 判定污染)。
+- 测试面扩查(收尾加跑三套 puppeteer e2e):初跑 12/17,5 例 FAIL 判定全部由既有 React #418(水合不匹配)pageerror 触发而功能断言全过 —— stash 基线对照(本批改动全部暂存后重建复跑)红灯逐字一致,实证与本批无关。dev 模式抓组件栈定位根因后**已在本版修复**(见上「分段水合 #418 根因修复」),终态三套件 17/17;e2e 是否纳入常规门禁节奏待定。截图:scripts/_e2e-screenshots/。
+
 ## 2026-08-27 · 未发布 · chore: 审计回收——扫描豁免留档 + motion-audit 竞态修复 + webroot 备份卫生
 
 > 08-27 深度测试报告回收的独立复审签收后,跟进三项发现。
@@ -38,6 +52,8 @@
 - `packages/ui/CLAUDE.md` 指向该文;私有 docs 仓 `design-system.md` 顶部加 v0.2 换代横幅(Bauhaus 部分转为历史档)。
 - 动因:docs-truth 守卫真值随设计换代(6cb393b)后,规范原文散在 PRD zip 里不可追溯——入仓即单一参考点,后续组件补齐按它对号。
 
+> 更正(2026-08-28 全量审核):本条「新增 docs/design/swiss-editorial.md」归属有误 —— d1c27da 仅把规范原文写到本地工作区,当时 `.gitignore` 只放行 tokens.md 将其拦截,**首次入仓是 e8bce3e(2026-08-27)**;期间 README 与 packages/ui/CLAUDE.md 一直指向仓库里不存在的文件,本地能过是因为文件在磁盘上(docs:links 门当时用工作区 stat() 判存在,该盲区已修)。936e7f9、18ec632 入 main 时 CI 因该死链短暂红,过程如实记,不粉饰。
+
 ## 2026-08-25 · 1.4.0 · Swiss Editorial UI 重绘 + 动效二轮(tag v1.4.0)
 
 > 设计语言从 Bauhaus 6 色切换为 Swiss Editorial / Brutalist Minimalism(warm paper #fbf9f6 + 手术红 #b51b17 + 品牌红 #e03c31 + 石油蓝 #006480;全 0 圆角、零阴影、1px 线层级)。stable v1.3.0 已封存(stable/v1.3.0 分支 + tag),本分支在其上重绘。改动面:packages/ui + web 皮肤/壳 + canvas-engine 渲染兜底色;domain/db/desktop 零改动,用户设置存量(legacy 6 色名冻结为别名)与数据层无影响。PRD 来源 stitch_high_contrast_brutalist(demo 参考,落实按 app 节奏重定标;noise 胶片颗粒/scanLine 等 demo 道具有意不迁)。
@@ -55,6 +71,8 @@
 ## 2026-08-22 · 1.3.0 · 稳定版(= preview.3 + ocr 规则化审查修复)(tag v1.3.0)
 
 > preview.3 之后 main 上的增量:ocr 规则化审查(2026-08-15,`v1.1.4..HEAD` 79 文件,4 shard subagent + 主 agent 复现)发现无 P1,8 P2 + 18 P3 全修(4 个修复 commit);配套 docs 与 gitignore。稳定版验证基线(2026-08-22 定版时复跑):全包 lint 0 错 / 全包 test 全绿(domain 87 + canvas-engine 586 + cys-dsl 405 + db 8 + web 1836)/ web build exit 0 / docs:links 通过。
+>
+> 更正(2026-08-28 全量审核):「79 文件」按任何时点/差集口径均无法精确复原(实测 `v1.1.4..v1.3.0` 差集 109 文件,S1–S4 四修复 commit 合计 29 文件);原数作废,以本注记实测口径为准。
 
 - **S1 导入返回守卫 / safeHref WHATWG 变体 / 字段级毒化**(commit `01e4a4e` 等)
 - **S2 媒体多选 attach 丢图 / companion busy 尾随**

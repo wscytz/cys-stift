@@ -55,6 +55,7 @@ function serializeCards(cards: Card[]): string {
 // Module references reset per-test so the in-memory `_cards` cache is fresh.
 let rehydrateCards: typeof import('../db-client').rehydrateCards
 let resetDb: typeof import('../db-client').resetDb
+let dbTest: typeof import('../db-client').__test__
 
 beforeEach(async () => {
   vi.resetModules()
@@ -62,6 +63,7 @@ beforeEach(async () => {
   const mod = await import('../db-client')
   rehydrateCards = mod.rehydrateCards
   resetDb = mod.resetDb
+  dbTest = mod.__test__
 })
 
 afterEach(() => {
@@ -161,6 +163,25 @@ describe('rehydrateCards — content-signature stability (v0.37.0 regression gua
     const c = makeCard({ id: toCardId('ccc') }) // same length, different last id
     window.localStorage.setItem(STORAGE_KEY, serializeCards([a, c]))
     expect(() => rehydrateCards()).not.toThrow()
+  })
+})
+
+// ── cross-tab clear() (storage event with e.key === null) — 08-28 audit ─────
+// 他页 localStorage.clear() 触发的 storage 事件 key/oldValue/newValue 全 null。
+// 修复前监听器只认 e.key === STORAGE_KEY,clear 路径不触发 rehydrate —— 本页
+// 缓存留旧数据,下一笔写入把已清空的库整包「复活」。
+describe('db-client — cross-tab clear() (e.key === null) triggers rehydrate', () => {
+  it('clears the in-memory cache so stale data cannot revive on the next write', () => {
+    const a = makeCard({ id: toCardId('aaa') })
+    window.localStorage.setItem(STORAGE_KEY, serializeCards([a]))
+    rehydrateCards() // hydrate:cache 现持有 [a]
+    expect(dbTest.cardRepo.listAll()).toHaveLength(1)
+    // 模拟他页 clear():localStorage 已空,事件 key/oldValue/newValue 全 null。
+    window.localStorage.removeItem(STORAGE_KEY)
+    window.dispatchEvent(new StorageEvent('storage', { key: null, oldValue: null, newValue: null }))
+    // 修复后:缓存同步清空 —— 旧数据不能留着等下一笔写入复活。
+    expect(dbTest.cardRepo.listAll()).toHaveLength(0)
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull()
   })
 })
 

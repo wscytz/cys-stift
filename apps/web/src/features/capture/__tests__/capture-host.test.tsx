@@ -55,6 +55,8 @@ vi.mock('@/lib/settings-store', () => ({
 
 vi.mock('@/lib/db-client', () => ({
   useDb: () => ({ service: { create: vi.fn() } }),
+  // 布局宿主走 useDbService(不触发水合的变体),见 capture-host.tsx。
+  useDbService: () => ({ service: { create: vi.fn() } }),
 }))
 
 vi.mock('@/lib/canvas-store', () => ({

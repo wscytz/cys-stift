@@ -56,16 +56,49 @@ describe('Tabs', () => {
     expect(tabs.map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false', 'false'])
   })
 
-  it('点击切换激活;ArrowRight 环绕到首项', () => {
+  it('点击切换激活;ArrowRight 环绕到首项;焦点与 roving tabindex 跟随选中', () => {
     mount(<Harness />)
     const tabs = () => [...container!.querySelectorAll('[role="tab"]')] as HTMLButtonElement[]
     act(() => tabs()[1]!.click())
     expect(tabs()[1]!.getAttribute('aria-selected')).toBe('true')
-    // 箭头:从「未读」右移到「置顶」,再右移环绕回「全部」
+    expect(tabs()[1]!.tabIndex).toBe(0)
+    expect(tabs()[0]!.tabIndex).toBe(-1)
+    // 箭头:从「未读」右移到「置顶」,焦点同步移动;再右移环绕回「全部」
     act(() => tabs()[1]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })))
     expect(tabs()[2]!.getAttribute('aria-selected')).toBe('true')
+    expect(document.activeElement).toBe(tabs()[2])
     act(() => tabs()[2]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })))
     expect(tabs()[0]!.getAttribute('aria-selected')).toBe('true')
+    expect(document.activeElement).toBe(tabs()[0])
+    // Home/End:跳首/尾
+    act(() => tabs()[0]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true })))
+    expect(tabs()[2]!.getAttribute('aria-selected')).toBe('true')
+    expect(document.activeElement).toBe(tabs()[2])
+  })
+
+  it('传 children 时渲染 tabpanel 并双向接线 aria-controls/aria-labelledby', () => {
+    mount(
+      <Tabs
+        ariaLabel="视图"
+        tabs={[{ id: 'all', label: '全部' }, { id: 'unread', label: '未读' }]}
+        active="unread"
+        onChange={() => {}}
+      >
+        <p>面板内容</p>
+      </Tabs>,
+    )
+    const panel = container!.querySelector('[role="tabpanel"]')!
+    expect(panel.textContent).toBe('面板内容')
+    const tabs = [...container!.querySelectorAll('[role="tab"]')] as HTMLButtonElement[]
+    const activeTab = tabs.find((t) => t.getAttribute('aria-selected') === 'true')!
+    expect(panel.getAttribute('aria-labelledby')).toBe(activeTab.getAttribute('id'))
+    expect(activeTab.getAttribute('aria-controls')).toBe(panel.getAttribute('id'))
+  })
+
+  it('不传 children 时不渲染 tabpanel、tab 无 aria-controls(向后兼容)', () => {
+    mount(<Harness />)
+    expect(container!.querySelector('[role="tabpanel"]')).toBeNull()
+    expect(container!.querySelector('[aria-controls]')).toBeNull()
   })
 })
 

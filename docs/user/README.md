@@ -224,7 +224,7 @@
 - **Capture shortcut**:改全局快捷键(桌面)
 - **Language**:中/英切换,实时刷新
 - **主题**:恒为 Swiss Editorial light(暖纸底),设置页无主题选项;历史导入中的 dark/system 值会兼容读取,但不会切换主题
-- **AI provider**:OpenAI / Anthropic / DeepSeek / Ollama(本地)等多 provider + 多 profile
+- **AI provider**:OpenAI / Anthropic / Ollama(本地)三 provider + 多 profile;DeepSeek 等 OpenAI 兼容端点在设置里走 OpenAI 路径(自定义 baseUrl)
 - **实验室区**:当前含「可审计 AI 共编」(默认关闭,开启需确认门);Vision、自动整理/建卡/打标签和主动检索尚未接入,不会在后台修改或外发数据
 - **Data → Export JSON**:导出全部数据为开放格式 JSON(包含 cards / media / drafts / settings / canvases / freeform 几何)
 - **Data → Import JSON**:先预检并二次确认,可选择 Replace(清理备份中不存在的本地数据)或 Merge(按 ID 合并);写入前自动保存本机完整恢复点，完成后当前页面直接刷新各 store,不强制整页重载；成功恢复后恢复点才清理

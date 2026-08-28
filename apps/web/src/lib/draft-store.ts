@@ -107,7 +107,10 @@ export function rehydrateDrafts(): void {
 
 // Stable snapshot cache — only reallocate when _drafts reference changes,
 // mirroring the pattern in db-client.ts so useSyncExternalStore stays happy.
-let _cachedSnapshot: DraftMap = _drafts
+// SERVER_DRAFTS = 恒定服务端快照:分段水合下,后水合段必须与 SSR(无草稿)一致,
+// 此前返回活缓存会让壳层先行水合后页面段拿到已装载草稿 → React #418(08-28)。
+const SERVER_DRAFTS: DraftMap = {}
+let _cachedSnapshot: DraftMap = SERVER_DRAFTS
 function getSnapshot(): DraftMap {
   if (_cachedSnapshot !== _drafts) {
     _cachedSnapshot = _drafts
@@ -116,7 +119,7 @@ function getSnapshot(): DraftMap {
 }
 
 function getServerSnapshot(): DraftMap {
-  return _cachedSnapshot
+  return SERVER_DRAFTS
 }
 
 function subscribe(cb: () => void) {

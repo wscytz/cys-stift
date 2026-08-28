@@ -81,9 +81,10 @@
   --color-canvas: #ffffff;
 
   /* ── Type + grid ─────────────────────────────────────────────────── */
-  --font-display: 'Space Grotesk', system-ui, sans-serif;
-  --font-body: Inter, system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+  /* 镜像 tokens.css Typography:var() 首选 next/font webfont 变量,字面量回退。 */
+  --font-display: var(--font-space-grotesk, 'Space Grotesk'), system-ui, sans-serif;
+  --font-body: var(--font-inter, Inter), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains-mono, 'JetBrains Mono'), 'SF Mono', ui-monospace, monospace;
 
   /* 8px scale; gap Tailwind's default 0.25rem */
   --spacing: 0.5rem;

@@ -8,7 +8,8 @@ import path from 'node:path'
 import puppeteer from 'puppeteer-core'
 
 const ROOT = path.resolve('apps/web/out')
-const PORT = 4455
+// 端口 0 = 内核分配临时端口(与 motion-audit 同法):固定端口并行跑第二个实例
+// 会 EADDRINUSE 自撞,审计/CI 并发场景直接红。
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 
 const MIME = {
@@ -59,8 +60,8 @@ const server = createServer(async (req, res) => {
   }
 })
 
-await new Promise((r) => server.listen(PORT, r))
-const base = `http://localhost:${PORT}`
+await new Promise((r) => server.listen(0, r))
+const base = `http://localhost:${server.address().port}`
 
 const routes = [
   '/',

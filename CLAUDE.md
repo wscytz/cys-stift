@@ -5,7 +5,7 @@
 
 ## 一句话
 
-**cy's Stift** — 本地优先的灵感画布，包豪斯风格 UI。你的灵感，在画布上生长。
+**cy's Stift** — 本地优先的灵感画布，Swiss Editorial 风格 UI（v0.2，原 Bauhaus 皮已换代）。你的灵感，在画布上生长。
 
 ## 当前状态
 
@@ -24,7 +24,7 @@
 | 前端 | Next.js 15 App Router + React 19 + TS strict + Tailwind v4，**静态导出，无 server** |
 | 桌面 | Tauri v2 + Rust |
 | 数据 | better-sqlite3 + Drizzle（Node 路径）；浏览器侧 in-memory + localStorage（Phase 2.5 换 wa-sqlite + OPFS） |
-| 设计 | 6 原色 + 8px 网格 + Space Grotesk / Inter / JetBrains Mono |
+| 设计 | Swiss Editorial（warm paper + 手术红；legacy 6 色名冻结为别名）+ 8px 网格 + 编辑栅格 280/64/48px + Space Grotesk / Inter / JetBrains Mono |
 | 测试 | vitest（domain + db + canvas-engine + web）+ puppeteer-core（e2e / render-sweep） |
 
 ## 硬性禁止（任何模型、任何场景都适用）
@@ -48,7 +48,7 @@
 | 当前 phase 的实现计划 | 🔒 `docs/plans/`(私有) |
 | Ralph 任务指南 + compact/clear 规则 | 🔒 `docs/archive/ralph/README.md`(私有,已归档) |
 | 架构决策记录 | 🔒 `docs/adr/`(私有) |
-| 设计 token 规则 | 🔒 `docs/design/tokens.md`(私有) |
+| 设计 token 规则 | `docs/design/swiss-editorial.md`（在仓，规范原文 + 落地偏差注记；token 真值在 packages/ui 三源） |
 | 跨模型记忆 | 🔒 `docs/decisions/INDEX.md`(私有) |
 | 阶段变更历史 | `docs/changelog.md` |
 | 开发环境搭建 | `docs/development/setup.md` |

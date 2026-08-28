@@ -17,8 +17,9 @@ export function TabsDemo() {
         ]}
         active={view}
         onChange={setView}
-      />
-      <p className="hint">active: {view} · 左右箭头可切换(激活即聚焦目标)</p>
+      >
+        <p className="hint">active: {view} · ←/→ 切换(焦点与选中同步移动)、Home/End 跳首/尾</p>
+      </Tabs>
     </div>
   )
 }

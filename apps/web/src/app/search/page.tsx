@@ -54,11 +54,14 @@ export default function SearchPage() {
   // ocr 审 S3 P3-6:App Router 同 pathname 只变 query 的 router.push 不重挂载组件,
   // 空依赖 effect 只跑一次 → 二次 ?q= 跳转输入框不更新。依赖 window.location.search
   // 让每次 query 变化都重读(router.push 是原生导航,location 会变)。
+  // 08-28 修正:deps 数组在渲染期求值,SSR 时 window 未定义曾让服务端渲染直接
+  // 抛 ReferenceError(#418 的 HTML mismatch 来源)—— 加 typeof window 守卫:
+  // 服务端恒 ''(退化为首跑一次),客户端仍逐次 query 变化重读。
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const q = params.get('q')
     if (q) setQuery(q)
-  }, [window.location.search])
+  }, [typeof window === 'undefined' ? '' : window.location.search])
   // BUG-1 fix: detail 是 local state,跨 tab 软删/归档后 useDb re-render 但 detail 不清
   // → modal 残留幽灵卡。从 store 实时取卡 + 过滤软删,变 null 则 modal 自动卸载
   // (与 canvas/timeline/graph effectiveDetail 同口径)。

@@ -209,13 +209,17 @@ function persist(): boolean {
 }
 
 let _cached: CanvasesSnapshot = _snap
+// 恒定服务端快照:分段水合下,后水合段的水合渲染必须与 SSR(seedFresh 默认画布)
+// 一致。此前 getServerSnapshot 返回活缓存 _cached —— 壳层段(CaptureHost 的
+// useCanvases)effect 先行水合后,页面段会拿到已装载数据 → React #418(08-28)。
+const SERVER_SNAPSHOT: CanvasesSnapshot = seedFresh()
 export function getSnapshot(): CanvasesSnapshot {
   if (_cached !== _snap) _cached = _snap
   return _cached
 }
 
 function getServerSnapshot(): CanvasesSnapshot {
-  return _cached
+  return SERVER_SNAPSHOT
 }
 
 /**

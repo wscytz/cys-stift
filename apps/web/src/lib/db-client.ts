@@ -145,7 +145,10 @@ if (typeof window !== 'undefined') {
   window.addEventListener('storage', (e) => {
     // newValue 可为 null(他页清空了 key):必须照常 rehydrate 清掉本页缓存,
     // 否则旧标签页下一笔写入会把已清空的数据整包「复活」。
-    if (e.key === STORAGE_KEY && e.newValue !== e.oldValue) {
+    // e.key === null 是他页 localStorage.clear() 的 clear 事件(key/old/new 全
+    // null)—— 本 key 同样被清,必须一并 rehydrate,否则同样复活(08-28 审计)。
+    const clearedAll = e.key === null
+    if ((clearedAll || e.key === STORAGE_KEY) && (clearedAll || e.newValue !== e.oldValue)) {
       // Re-hydrate from the new value (only if hydration already happened;
       // a fresh tab still relies on its own first-mount hydrate).
       if (_hydrated) {
@@ -202,6 +205,9 @@ function hydrateOnce() {
 
 const cardRepo = {
   insert(card: Card) {
+    // 懒水合守卫:布局宿主走 useDbService(不触发水合),任何写入路径到达时若
+    // 尚未水合,先装载 —— 否则空 _cards 上 insert 会整包覆盖 localStorage。
+    if (!_hydrated) hydrateOnce()
     const prev = _cards
     _cards = [..._cards, card]
     if (!persist()) {
@@ -214,6 +220,7 @@ const cardRepo = {
     }
   },
   update(card: Card) {
+    if (!_hydrated) hydrateOnce()
     const prev = _cards
     _cards = _cards.map((c) => (c.id === card.id ? card : c))
     if (!persist()) {
@@ -225,6 +232,7 @@ const cardRepo = {
     }
   },
   delete(id: CardId) {
+    if (!_hydrated) hydrateOnce()
     const prev = _cards
     _cards = _cards.filter((c) => c.id !== id)
     if (!persist()) {
@@ -248,6 +256,7 @@ const cardRepo = {
     return _cards
   },
   replaceAll(cards: Card[]) {
+    if (!_hydrated) hydrateOnce()
     const prev = _cards
     _cards = [...cards]
     if (!persist()) {
@@ -257,6 +266,7 @@ const cardRepo = {
     }
   },
   applyBatch(changes: Array<{ id: CardId; expected: Card | null; next: Card | null }>) {
+    if (!_hydrated) hydrateOnce()
     const byId = new Map(_cards.map((card) => [String(card.id), card]))
     const same = (a: Card | null, b: Card | null) => JSON.stringify(a) === JSON.stringify(b)
     for (const change of changes) if (!same(byId.get(String(change.id)) ?? null, change.expected)) return false
@@ -273,7 +283,12 @@ const cardRepo = {
 // useSyncExternalStore will throw. We cache the snapshot and only allocate a
 // new one when the array reference changes.
 
-let _cachedSnapshot: Snapshot = { cards: _cards }
+// 恒定服务端快照:分段水合下,后水合段(页面段)的水合渲染必须与 SSR(空库)
+// 一致。此前 getServerSnapshot 返回活缓存 _cachedSnapshot —— 壳层段 effect 先行
+// 水合后,后水合段会拿到已装载数据 → React #418(08-28 e2e 抓到)。水合完成后
+// React 自动经 getSnapshot 重读并重渲,数据照常到位,不需要任何人手动补救。
+const SERVER_SNAPSHOT: Snapshot = { cards: [] }
+let _cachedSnapshot: Snapshot = SERVER_SNAPSHOT
 function getSnapshot(): Snapshot {
   // The array reference is the source of truth — when _cards is replaced, we
   // also replace the snapshot object so React knows to re-render.
@@ -284,7 +299,7 @@ function getSnapshot(): Snapshot {
 }
 
 function getServerSnapshot(): Snapshot {
-  return _cachedSnapshot // same stable empty ref on the server
+  return SERVER_SNAPSHOT
 }
 
 function subscribe(cb: () => void) {
@@ -307,6 +322,23 @@ export function useDb() {
   const snap = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
   const service = useMemo(() => new CardService(cardRepo), [])
   return { snap, service, repo: cardRepo, ready }
+}
+
+/**
+ * useDbService — 布局层宿主专用(CaptureHost / FileDropHandler 等只写不渲染
+ * 卡片数据的组件):取命令式 service,但**不触发 hydrateOnce**。
+ *
+ * 为什么不能直接用 useDb:App Router 分段水合下(loading.tsx 的 Suspense 让
+ * 页面段独立水合),布局段先 hydrate、其 effect 先行 flush —— 若在布局段水合
+ * db(08-28 前 CaptureHost 的行为),页面段的水合渲染会经 service.listX() 直读
+ * 已装载的单例 _cards,与 SSR 空态不一致 → React #418(整树客户端重建,每次
+ * 进页双倍渲染)。页面数据照旧走 useDb(其 effect 在页面段水合后才跑,水合
+ * 首帧恒空、与 SSR 一致)。写入安全:仓库层全部变更操作有前置 hydrateOnce 守卫。
+ */
+export function useDbService() {
+  const snap = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+  const service = useMemo(() => new CardService(cardRepo), [])
+  return { snap, service }
 }
 
 export function resetDb() {

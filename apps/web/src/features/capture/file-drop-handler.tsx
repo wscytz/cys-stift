@@ -15,7 +15,7 @@ import { restoreFromFile } from '@/features/canvas/cystift-payload'
 import type { CardService, CaptureInput, CaptureSource } from '@cys-stift/domain'
 import { pushToast } from '@/lib/toast-store'
 import { useI18n } from '@/lib/i18n'
-import { useDb } from '@/lib/db-client'
+import { useDbService } from '@/lib/db-client'
 import { getDeviceId } from '@/lib/device-id'
 import type { MessageKey } from '@/lib/i18n/messages'
 
@@ -118,7 +118,8 @@ function captureAndToast(
 
 export function FileDropHandler() {
   const { t } = useI18n()
-  const { service } = useDb()
+  // 布局宿主不触发 db 水合(分段水合下会让页面段 #418),见 useDbService 注释。
+  const { service } = useDbService()
   useEffect(() => {
     // H1 fix: 注册 FileCaptureSink 处理 'drag-drop' 和 'paste' 两种 source.kind。
     // 否则 captureSinkRegistry.submit 落到 fallback(service.fromCapture),

@@ -71,7 +71,15 @@ if (VERIFY_ONLY) {
     if (!ok) bad++
     console.log(`  ${ok ? '✓' : '✗'} ${code}  ${r || '(首页)'}/`)
   }
-  console.log(bad === 0 ? '\n✅ 线上全部 200' : `\n❌ ${bad} 个路由非 200`)
+  // PWA 关键资产也验(路由 200 不代表 manifest/icon 在)。
+  const assets = ['manifest.json', 'icon.svg', 'apple-touch-icon.png']
+  for (const a of assets) {
+    const code = spawnSync(`curl -s -o /dev/null -w '%{http_code}' '${URL}/${a}'`, { shell: true, cwd: ROOT, encoding: 'utf8' }).stdout.trim()
+    const ok = code === '200'
+    if (!ok) bad++
+    console.log(`  ${ok ? '✓' : '✗'} ${code}  ${a}`)
+  }
+  console.log(bad === 0 ? '\n✅ 线上全部 200' : `\n❌ ${bad} 个路由/资产非 200`)
   process.exit(bad === 0 ? 0 : 1)
 }
 
@@ -91,6 +99,22 @@ if (NO_BUILD) {
   const idx = readFileSync(resolve(ROOT, 'apps/web/out/index.html'), 'utf8')
   if (!idx.includes(`${BASE_PATH}/_next`)) {
     console.error(`✗ 产物未带 ${BASE_PATH} 前缀 —— 构建可能未走 basePath,中止部署`)
+    process.exit(1)
+  }
+  // PWA/字体链一并列门(08-28 审计):旧产物可能 HTML 200 但 manifest/icon 缺
+  // 引用、woff2 preload 缺失 —— 首页 curl 查不出,PWA 静默断链。
+  const needLinks = [
+    `${BASE_PATH}/manifest.json`,
+    `${BASE_PATH}/icon.svg`,
+    `${BASE_PATH}/apple-touch-icon.png`,
+  ]
+  const missing = needLinks.filter((l) => !idx.includes(l))
+  if (missing.length > 0) {
+    console.error(`✗ 产物 index.html 缺 PWA 引用:${missing.join(', ')} —— 产物陈旧或不完整,中止部署`)
+    process.exit(1)
+  }
+  if (!idx.includes('.woff2')) {
+    console.error('✗ 产物 index.html 无 woff2 preload —— 字体资产缺失(陈旧产物?),中止部署')
     process.exit(1)
   }
 }

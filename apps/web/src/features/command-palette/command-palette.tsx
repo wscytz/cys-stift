@@ -15,7 +15,7 @@ import { useRouter } from 'next/navigation'
 import { Modal } from '@cys-stift/ui'
 import type { Card } from '@cys-stift/domain'
 import { searchCards } from '@cys-stift/domain'
-import { useDb } from '@/lib/db-client'
+import { useDbService, rehydrateCards } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
 import { CardDetailModal } from '@/features/card/card-detail'
 import { readableBodySnippet } from '@/app/search/search-result'
@@ -49,7 +49,15 @@ const MAX_CARDS = 8
 
 export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const { t } = useI18n()
-  const { snap, service, ready } = useDb()
+  // 布局宿主(SearchShortcut 挂载)不触发 db 水合(分段水合下会让页面段 #418),
+  // 打开时才装载一次 —— 见 useDbService 注释。
+  const { snap, service } = useDbService()
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    rehydrateCards()
+    setReady(true)
+  }, [open])
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [detail, setDetail] = useState<Card | null>(null)

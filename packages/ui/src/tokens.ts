@@ -87,9 +87,11 @@ export const tokens = {
     // canvas 是 surface 色(非 6 原色),不进色板;CSS 变量 --color-canvas 在 tokens.css 定义
   },
   font: {
-    display: '"Space Grotesk", system-ui, sans-serif',
-    body: 'Inter, system-ui, -apple-system, sans-serif',
-    mono: '"JetBrains Mono", "SF Mono", ui-monospace, monospace',
+    // 镜像 tokens.css 的 var() 接线(next/font webfont 变量首选,字面量回退)。
+    // 本块当前无运行时消费方,真值以 tokens.css 为准(canvas 走 domTokenResolver)。
+    display: 'var(--font-space-grotesk, "Space Grotesk"), system-ui, sans-serif',
+    body: 'var(--font-inter, Inter), system-ui, -apple-system, sans-serif',
+    mono: 'var(--font-jetbrains-mono, "JetBrains Mono"), "SF Mono", ui-monospace, monospace',
   },
   fontSize: {
     '2xs': '11px',

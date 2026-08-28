@@ -169,7 +169,10 @@ function persist(): boolean {
 }
 
 // Stable snapshot cache — only reallocate when _views changes.
-let _cachedSnapshot: ViewMap = _views
+// SERVER_VIEWS = 恒定服务端快照:分段水合下,后水合段必须与 SSR(空 view 表)
+// 一致,此前返回活缓存会让壳层先行水合后页面段拿到已装载视图 → React #418(08-28)。
+const SERVER_VIEWS: ViewMap = {}
+let _cachedSnapshot: ViewMap = SERVER_VIEWS
 export function getSnapshot(): ViewMap {
   if (_cachedSnapshot !== _views) {
     _cachedSnapshot = _views
@@ -178,7 +181,7 @@ export function getSnapshot(): ViewMap {
 }
 
 function getServerSnapshot(): ViewMap {
-  return _cachedSnapshot
+  return SERVER_VIEWS
 }
 
 /**

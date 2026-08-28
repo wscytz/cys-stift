@@ -430,12 +430,17 @@ if (typeof window !== 'undefined') {
 }
 
 let _cached: Settings = _settings
+// 恒定服务端快照(= DEFAULT_SETTINGS):分段水合下,后水合段的水合渲染必须与
+// SSR(默认设置)一致 —— 此前返回活缓存,壳层段(AppMenu/CaptureHost 的
+// useSettings)effect 先行水合后,页面段会拿到已装载设置(locale/theme 差异是
+// 文本级 #418)。
+const SERVER_SETTINGS: Settings = DEFAULT_SETTINGS
 function getSnapshot(): Settings {
   if (_cached !== _settings) _cached = _settings
   return _cached
 }
 function getServerSnapshot(): Settings {
-  return _cached
+  return SERVER_SETTINGS
 }
 function subscribe(cb: () => void) {
   _subscribers.add(cb)

@@ -119,9 +119,13 @@
   --color-code-fg: #fbf9f6;
 
   /* ── Typography ─────────────────────────────────────────────────── */
-  --font-display: 'Space Grotesk', system-ui, sans-serif;
-  --font-body: Inter, system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+  /* 设计字体接线:var() 首选 next/font 注入的 webfont 变量(定义在 <html> 的
+     __variable_* class 上),回退字面量保底 —— 无 next/font 的消费环境退化为系统
+     字体。族名曾断裂(2026-07-06 自托管起 @font-face 内部名与这里的字面量配不上,
+     字体下载了但从未参与渲染),2026-08-28 起经此接线真正生效。 */
+  --font-display: var(--font-space-grotesk, 'Space Grotesk'), system-ui, sans-serif;
+  --font-body: var(--font-inter, Inter), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains-mono, 'JetBrains Mono'), 'SF Mono', ui-monospace, monospace;
   /* 用户输入内容(卡片 title/body、Markdown)用系统字体,显式回退链保证每平台都挑
      能看的。与 --font-body(设计字体,UI chrome 用)区分:产品脸一致,用户内容接受
      平台差异。以后想全量自托管中文,把字体名插到链首即可,其余不动。 */

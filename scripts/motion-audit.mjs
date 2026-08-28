@@ -2,13 +2,39 @@
 // 动效专项浏览器断言(2026-08-24 动效轮):
 // VT 触发器 / list-steady 守卫 / home 快态 / canvas 入场 / 共享元素 VT 名 / press token。
 import { createServer } from 'node:http'
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { extname, join, normalize } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import puppeteer from 'puppeteer-core'
 
 const ROOT = process.cwd()
 const OUT = join(ROOT, 'apps/web/out')
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+// Chrome 路径:CHROME_PATH env 优先,否则按平台常见位置探测(不再硬编码 macOS)。
+const CHROME_CANDIDATES = [
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/Applications/Chromium.app/Contents/MacOS/Chromium',
+  '/usr/bin/google-chrome',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+]
+const CHROME = process.env.CHROME_PATH ?? CHROME_CANDIDATES.find((p) => existsSync(p))
+if (!CHROME) {
+  console.error('✗ 未找到 Chrome/Chromium:设 CHROME_PATH 环境变量后重试。')
+  process.exit(2)
+}
+
+// 产物探活(08-28 审计):对缺失/陈旧产物静默跑 = 假通过通道。缺失直接退非零;
+// 陈旧(产物早于本脚本,断言集可能比产物新)至少告警。
+const idxStat = await stat(join(OUT, 'index.html')).catch(() => null)
+if (!idxStat) {
+  console.error(`✗ 静态产物不存在:${join(OUT, 'index.html')}\n  请先 build(pnpm --filter web build)再跑动效审计。`)
+  process.exit(2)
+}
+const selfStat = await stat(fileURLToPath(import.meta.url))
+if (idxStat.mtimeMs < selfStat.mtimeMs) {
+  console.warn('⚠ 产物 mtime 早于本脚本 —— 断言集可能比产物新;断言失败时先重新 build 再判。')
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -97,6 +123,28 @@ let v = await page.evaluate(() => {
 })
 check('首次直载:page-enter 生效', v.name === 'page-enter', `animation=${v.name}`)
 check('首次直载:无 data-vt-nav(尚无客户端导航)', v.vtAttr === false)
+
+// 0.5) 字体真渲染常驻断言(2026-08-28 P1 门):族名接线断裂时页面无声回退系统
+// 字体 —— 无 404、无报错、preload 照常 200,唯一可靠抓法是量宽:webfont 与纯
+// 系统栈对同一字符串的渲染宽必不同(相等 ⇒ 字体没在渲染,子集化字节白拉)。
+await page.evaluate(() => document.fonts.ready)
+const fontW = await page.evaluate(() => {
+  const mk = (ff) => {
+    const s = document.createElement('span')
+    s.textContent = 'Hamburgefonstiv 0123'
+    s.style.cssText =
+      'position:absolute;visibility:hidden;white-space:nowrap;font-size:32px;font-family:' + ff
+    document.body.appendChild(s)
+    const w = s.getBoundingClientRect().width
+    s.remove()
+    return w
+  }
+  return { display: mk('var(--font-display)'), body: mk('var(--font-body)'), sys: mk('system-ui') }
+})
+check('字体真渲染:display 栈宽 ≠ 纯系统栈(接线未断)',
+  Math.abs(fontW.display - fontW.sys) > 0.5, `display=${fontW.display} sys=${fontW.sys}`)
+check('字体真渲染:body 栈宽 ≠ 纯系统栈(接线未断)',
+  Math.abs(fontW.body - fontW.sys) > 0.5, `body=${fontW.body} sys=${fontW.sys}`)
 
 // 1) VT 触发器:点击侧栏 Link 到 /archive(客户端导航)
 await page.evaluate(() => (window.__alive = 1))

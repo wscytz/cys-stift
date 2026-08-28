@@ -101,7 +101,7 @@
 
 **内容转义**:`@title/@content/@text/@label/@code/@quote` 使用引号字符串;`\"` 表示引号、`\\` 表示反斜杠、`\n` 表示换行、反引号前加 `\` 表示字面反引号(v8:防代码里的三反引号提前闭合 AI 的 markdown 围栏)。`@title` 最长 200 字符,`@content`/`@code` 代码体/`@quote` 引文最长 8000 字符。
 
-**颜色**:固定 Bauhaus 6 原色 + grey(`red`/`yellow`/`blue`/`black`/`white`/`gray`/`grey`)。越界色(如 green)不匹配 → 回退默认色(而非静默变黑)。
+**颜色**:固定六色名 + grey(`red`/`yellow`/`blue`/`black`/`white`/`gray`/`grey`)。色名是 Bauhaus 时代冻结的 legacy 别名(v0.2 换代 Swiss Editorial 后值映射新 palette:red→primary、yellow→outline、blue→tertiary、black→on-surface、white→surface、gray→secondary),DSL 契约不变。越界色(如 green)不匹配 → 回退默认色(而非静默变黑)。
 
 **注释**:`#` 开头的行在 graceful/strict 两种 parser 中都被跳过;非注释散文在 strict AI 模式中会报错。
 

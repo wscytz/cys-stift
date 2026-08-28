@@ -68,9 +68,11 @@ export function RouteViewTransitions() {
           apply()
           return settle()
         })
-      } catch {
+      } catch (e) {
         // 同步抛错(引擎内部状态非法等):active 若不复位,后续导航会永久
-        // 走直落分支、静默降级无 VT。回滚标记位并直落应用变更。
+        // 走直落分支、静默降级无 VT。回滚标记位并直落应用变更;错误必须落
+        // console —— 静默吞掉时引擎异常完全不可观测。
+        console.error('[route-vt] startViewTransition 同步抛错,降级直切:', e)
         active = false
         document.documentElement.removeAttribute('data-vt-nav')
         apply()
