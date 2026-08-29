@@ -19,6 +19,18 @@
 - 验证:lint 7 包 0 错 / test 全绿(domain 87 + canvas-engine 586 + cys-dsl 405 + db 8 + web 1856[+3])/ build 0 警 24 页(根路径 + `WEB_DEPLOY_BASEPATH` 子路径双形态,PWA/woff2 前缀链全验)/ docs:links 过(含 gitignored 假目标对抗用例,门必红)/ render-sweep 18 路由净 / motion-audit 19 项全过(含 2 项字体断言:display 347.1px / body 316.2px vs 系统栈 314.9px,修复前两侧恒等)/ e2e 三套件 **17/17**(e2e-ai 11 + e2e-data 4 + e2e-r18-canvas 2;修复前 12/17,失败全由既有 #418 判定污染)。
 - 测试面扩查(收尾加跑三套 puppeteer e2e):初跑 12/17,5 例 FAIL 判定全部由既有 React #418(水合不匹配)pageerror 触发而功能断言全过 —— stash 基线对照(本批改动全部暂存后重建复跑)红灯逐字一致,实证与本批无关。dev 模式抓组件栈定位根因后**已在本版修复**(见上「分段水合 #418 根因修复」),终态三套件 17/17;e2e 是否纳入常规门禁节奏待定。截图:scripts/_e2e-screenshots/。
 
+## 2026-08-29 · 1.4.2 · fix: 重新探索审回收 —— P1×2(DSL 往返截断 / AI 确认门七字段)+ P2×8 + 复审补丁(本地 tag v1.4.2)
+
+> 08-29「全项目重新探索审」(323 个运行时源文件中 234 个近三轮未覆盖,4 维度 subagent + 主 agent 逐条复核:28 认 / 3 部分 / 1 不认 / 1 待核)回收。本批修 P1×2 + P2×8 + P3×5;复审补 P2-4 数值校验与测试基线。未修遗留见文末如实记账。
+
+- **P1-1 DSL 往返静默截断**:serialize 侧超长字段不 emit(parse 得 undefined,写回守卫自然放过),列表类字段两侧同界截断;附 8 个 round-trip 对称性契约测试(`dsl-overlong-guard.test.ts`)。DSL_VERSION 不 bump(属性可选,格式兼容)。代价已登记:超长正文在 DSL 文本里不可见。
+- **P1-2 AI 确认门七字段**:v8 结构化字段(type/tags/links/code/quotes)进确认门摘要(计数/枚举级);v8-only op 不再"无变更禁用 Apply";live 路径 contentUndo 扩到全部七字段(此前 AI 可静默覆盖 tags/code/quotes/type/links 且无恢复路径)。
+- **P2**:①对话 v1→v2 迁移写失败不再删 v1(保守 keepV1 + 下次 boot 幂等重试);②settings 读时迁移写盘失败不再吞掉已读合法值(配额满不再经 DEFAULT 抹掉全部 AI profile/apiKey);③markdown 远程图片改「点击加载」占位 + no-referrer(堵 prompt injection 的静默外发 beacon);④Tauri single-instance 插件(Windows 双开 last-writer-wins);⑤import `canvases:[null]` 逐元素干净 reject + checkpoint 恢复/清空路径补 catch;⑥硬删媒体引用感知(`removeMediaIfUnreferenced`,trash 硬删 + 详情保存两路径,.cystift 同机恢复的共享引用不再被弄坏);⑦新建 AI profile 输入框不再被「启用」勾选禁用。
+- **复审补丁(主 agent)**:P2-4 canvasPosition 数值有限性校验(与 freeform finiteGeometry 同口径,`1e400`→Infinity 清定位回 inbox;只查 x/y/w/h,z 为 13 位时间戳不进 1e7 上限)+ 回归测试;i18n 首帧措辞修正(文本仍闪一帧如实记);3 个测试期望随 locale 检测新契约更新(钉 navigator.language,防环境漂移)。
+- **P3**:graph-view-store 恒定服务端快照(#418 修复模式补漏,该店有消费者非纯 latent);详情弹窗动作集统一;回收站保留策略透明化文案(不自动清理如实告知);rotation 不序列化登记为已知限制。
+- 验证:lint 7 包 0 错 / test 全绿(domain 87 + canvas-engine 586 + cys-dsl 413[+8] + db 8 + web 1873[+17])/ build 0 警 24 页 / e2e 17/17 / render-sweep 18 净 / motion-audit 全过。
+- **未修遗留(记账,后续批次)**:P2-8「Bug7 卸载提交」出处未定位(待补文件/commit 号);P2-9 .cystift id 字符集校验(低危);P3:dsl-dialog 每键全量 parse、引擎宿主 DOM 耦合、undo 6 秒 toast、ask RAG 含归档卡、apiKey 长度界、archive 幽灵索引、proposal 跨 tab 锁粒度、packages/db 死代码、media getAsset 全量 parse、workbench 空态死样式类、BauhausMotif/archive tablist 收敛、graph 筛空态文案、capabilities 平台字段、dev chunk 进产物。
+
 ## 2026-08-27 · 未发布 · chore: 审计回收——扫描豁免留档 + motion-audit 竞态修复 + webroot 备份卫生
 
 > 08-27 深度测试报告回收的独立复审签收后,跟进三项发现。

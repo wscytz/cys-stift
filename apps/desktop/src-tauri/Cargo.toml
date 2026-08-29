@@ -1,6 +1,6 @@
 [package]
 name = "cys-stift"
-version = "1.4.1"
+version = "1.4.2"
 description = "cy's Stift — local-first inspiration canvas"
 authors = ["cy"]
 edition = "2021"
@@ -23,6 +23,13 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
+# 单实例守卫(2026-08-29 P2-5):Windows 双击 exe 两次开两实例,各自捕获卡片
+# 后保存时 last-writer-wins 整份覆写 localStorage → 先保存一方的写入静默消失
+# (storage 事件不跨 OS 进程)。第二个实例唤起已有窗口后退出,标准解。
+# 桌面专属(mobile 无双开概念),单独 cfg(desktop) 段。
+[target.'cfg(desktop)'.dependencies]
+tauri-plugin-single-instance = "2"
 
 # Android 无 native-tls 后端,Tauri 的间接依赖 reqwest 走 rustls,且 reqwest 默认
 # rustls-no-provider(无 crypto provider)。启动建 reqwest Client 会 panic

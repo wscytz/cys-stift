@@ -278,7 +278,7 @@ export function AISettingsPanel() {
               className="aip__input"
               value={draft.name}
               onChange={(e) => update({ name: e.target.value })}
-              disabled={!draft.enabled && editingId === null ? false : !draft.enabled}
+              disabled={editingId !== null && !draft.enabled}
               autoComplete="off"
               spellCheck={false}
             />
@@ -309,7 +309,7 @@ export function AISettingsPanel() {
                   aria-checked={selected}
                   className={`aip__providerCard${selected ? ' aip__providerCard--selected' : ''}`}
                   onClick={() => onProviderChange(p)}
-                  disabled={!draft.enabled}
+                  disabled={editingId !== null && !draft.enabled}
                 >
                   <span className={`aip__accent aip__accent--${d.accent}`} aria-hidden="true" />
                   <span className="aip__providerName">{d.displayName}</span>
@@ -322,34 +322,34 @@ export function AISettingsPanel() {
 
           <div className="aip__row">
             <label className="aip__label" htmlFor="ai-baseurl">{t('settings.aiBaseUrl')}</label>
-            <input id="ai-baseurl" type="url" className="aip__input" value={draft.baseUrl} onChange={(e) => update({ baseUrl: e.target.value })} placeholder={def.baseUrl} disabled={!draft.enabled} autoComplete="off" spellCheck={false} />
+            <input id="ai-baseurl" type="url" className="aip__input" value={draft.baseUrl} onChange={(e) => update({ baseUrl: e.target.value })} placeholder={def.baseUrl} disabled={editingId !== null && !draft.enabled} autoComplete="off" spellCheck={false} />
           </div>
           <div className="aip__row">
             <label className="aip__label" htmlFor="ai-model">{t('settings.aiModel')}</label>
-            <input id="ai-model" type="text" className="aip__input" value={draft.model} onChange={(e) => update({ model: e.target.value })} placeholder={def.model} disabled={!draft.enabled} autoComplete="off" spellCheck={false} />
+            <input id="ai-model" type="text" className="aip__input" value={draft.model} onChange={(e) => update({ model: e.target.value })} placeholder={def.model} disabled={editingId !== null && !draft.enabled} autoComplete="off" spellCheck={false} />
           </div>
           {def.needsKey && (
             <div className="aip__row">
               <label className="aip__label" htmlFor="ai-apikey">{t('settings.aiApiKey')}</label>
               <div className="aip__keyWrap">
-                <input id="ai-apikey" type={showKey ? 'text' : 'password'} className="aip__input" value={draft.apiKey} onChange={(e) => update({ apiKey: e.target.value })} placeholder={draft.provider === 'openai' ? 'sk-...' : 'sk-ant-...'} disabled={!draft.enabled} autoComplete="off" spellCheck={false} />
-                <button type="button" className="aip__btnGhost" onClick={() => setShowKey((s) => !s)} disabled={!draft.enabled}>{showKey ? t('settings.aiHideKey') : t('settings.aiShowKey')}</button>
+                <input id="ai-apikey" type={showKey ? 'text' : 'password'} className="aip__input" value={draft.apiKey} onChange={(e) => update({ apiKey: e.target.value })} placeholder={draft.provider === 'openai' ? 'sk-...' : 'sk-ant-...'} disabled={editingId !== null && !draft.enabled} autoComplete="off" spellCheck={false} />
+                <button type="button" className="aip__btnGhost" onClick={() => setShowKey((s) => !s)} disabled={editingId !== null && !draft.enabled}>{showKey ? t('settings.aiHideKey') : t('settings.aiShowKey')}</button>
               </div>
             </div>
           )}
 
-          <button type="button" className="aip__advancedToggle" data-testid="ai-advanced-toggle" aria-expanded={showAdvanced} onClick={() => setShowAdvanced((s) => !s)} disabled={!draft.enabled}>
+          <button type="button" className="aip__advancedToggle" data-testid="ai-advanced-toggle" aria-expanded={showAdvanced} onClick={() => setShowAdvanced((s) => !s)} disabled={editingId !== null && !draft.enabled}>
             {showAdvanced ? '▾' : '▸'} {t('settings.aiAdvanced')}
           </button>
           {showAdvanced && (
             <div className="aip__advanced" data-testid="ai-advanced">
               <div className="aip__row">
                 <label className="aip__label" htmlFor="ai-temperature">{t('settings.aiTemperature')}</label>
-                <input id="ai-temperature" type="number" min={0} max={2} step={0.1} className="aip__input" value={draft.temperature ?? ''} onChange={(e) => update({ temperature: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="0.3 / 0.7" disabled={!draft.enabled} />
+                <input id="ai-temperature" type="number" min={0} max={2} step={0.1} className="aip__input" value={draft.temperature ?? ''} onChange={(e) => update({ temperature: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="0.3 / 0.7" disabled={editingId !== null && !draft.enabled} />
               </div>
               <div className="aip__row">
                 <label className="aip__label" htmlFor="ai-maxtokens">{t('settings.aiMaxTokens')}</label>
-                <input id="ai-maxtokens" type="number" min={1} max={8192} step={1} className="aip__input" value={draft.maxTokens ?? ''} onChange={(e) => update({ maxTokens: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="4096" disabled={!draft.enabled} />
+                <input id="ai-maxtokens" type="number" min={1} max={8192} step={1} className="aip__input" value={draft.maxTokens ?? ''} onChange={(e) => update({ maxTokens: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="4096" disabled={editingId !== null && !draft.enabled} />
                 <p className="aip__hint">{t('settings.ai.maxTokensHint')}</p>
               </div>
             </div>

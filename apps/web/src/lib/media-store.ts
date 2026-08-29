@@ -177,6 +177,31 @@ export const mediaStore = {
 }
 
 /**
+ * 引用感知删除(2026-08-29 P2-7):仅当没有任何**存活卡**再引用该 asset 时才删。
+ *
+ * 为什么:.cystift 同机恢复会原样复制 MediaRef(assetId 不变)→ 两张卡共享同一资产;
+ * 此前 trash 硬删 / card-detail 保存时删都无条件 remove → 弄坏另一张卡的图
+ * (资产二进制删了不可恢复,导出也只带悬空引用)。应用内无卡片克隆,共享引用
+ * 只来自 .cystift 恢复与媒体导入 merge,但「数据不丢」契约按所有路径兑现。
+ *
+ * callers 注入 listAll(而非本模块直读 db-client):media-store 保持零 store 依赖
+ * (db-client import 本模块方向的循环也能躲开);测试传 mock 数组即可。
+ * 软删卡(trash 里的)不算引用:它们恢复时引用仍在,但硬删一张共享卡的对手卡
+ * 已在 trash 的场景,用户显式清空回收站时该资产自然随之释放(那路径走
+ * trash 页逐卡硬删,同样经过本守卫 —— 对手卡此时也被硬删,引用集为空,放行)。
+ */
+export function removeMediaIfUnreferenced(
+  id: MediaAssetId,
+  listAll: () => Array<{ media?: MediaRef[] | null; deletedAt?: unknown }>,
+): void {
+  const stillReferenced = listAll().some(
+    (card) => Array.isArray(card.media) && card.media.some((m) => m.assetId === id),
+  )
+  if (stillReferenced) return // 有卡还在用:保留资产(孤儿风险 < 弄坏活卡)
+  mediaStore.remove(id)
+}
+
+/**
  * v0.23.2-hardening: serialise writes through a promise chain so the
  * `loadAssets → mutate → saveAssets` block in attach() / remove() runs
  * atomically with respect to itself. Without this, two concurrent

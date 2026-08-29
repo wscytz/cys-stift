@@ -153,6 +153,12 @@ export default function SettingsPage() {
       if (result.ok && result.checkpointCleared !== false) {
         setRestorePending(false)
       }
+    } catch (err) {
+      // 2026-08-29 P2-6:此前只有 finally 无 catch —— restoreImportCheckpoint 内部
+      // 任何裸抛(如毒化 checkpoint 的字段访问)直接 unhandled rejection,恢复按钮
+      // 静默无效。与 handleImportFile 的 catch 同口径:错误可见,流程不崩。
+      console.error('[settings] restore checkpoint failed', err)
+      setImportResult({ ok: false, cards: 0, mediaAssets: 0, error: err instanceof Error ? err.message : String(err) })
     } finally {
       setRestoring(false)
     }
@@ -167,6 +173,10 @@ export default function SettingsPage() {
       setImportResult(result)
       refreshCheckpointMeta()
       if (result.ok) setClearPending(false)
+    } catch (err) {
+      // 2026-08-29 P2-6:与 confirmRestore 同口径(clearWorkspace 复用 import replace 路径)。
+      console.error('[settings] clear workspace failed', err)
+      setImportResult({ ok: false, cards: 0, mediaAssets: 0, error: err instanceof Error ? err.message : String(err) })
     } finally {
       setClearing(false)
     }

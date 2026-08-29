@@ -8,6 +8,11 @@ import { I18nProvider } from '@/lib/i18n'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
+// P3-16(2026-08-29)后:I18nProvider 挂载会应用 settingsStore 的 locale,而首启
+// locale 跟随 navigator.language(jsdom 默认 en-US)→ 本文件的中文文案断言随环境漂。
+// 显式钉 zh:被测对象是面板的审查/决策语义,不是 i18n。
+Object.defineProperty(window.navigator, 'language', { value: 'zh', configurable: true })
+
 const payload: ProposalPayloadV1 = {
   kind: 'cys-proposal-payload', version: 1, task: 'plan-structure-audit', summary: '', findings: [{
     findingId: 'finding', kind: 'orphan-step', title: 'Potential missing handoff', explanation: 'The selected step is disconnected.',

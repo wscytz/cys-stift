@@ -54,7 +54,7 @@ import { CARD_FIELDS } from './field-registry'
 import { FieldEditors, FieldViews, FieldSection as Section, MediaFieldEditor } from './field-editors'
 import { MarkdownEditor } from './markdown-editor'
 import { MarkdownBody } from '@/app/inbox/markdown'
-import { mediaStore } from '@/lib/media-store'
+import { mediaStore, removeMediaIfUnreferenced } from '@/lib/media-store'
 import {
   isSafeFileDataUrl,
   isSafeImageDataUrl,
@@ -413,7 +413,12 @@ export function CardDetailModal({
       } as unknown as CardDetailSavePatch)
       if (ok) {
         // 提交成功才真正删媒体二进制(点 × 时只从草稿移除 + 记 id;取消/失败不删)。
-        for (const id of removedAssetIds.current) mediaStore.remove(id)
+        // 2026-08-29 P2-7:引用感知 —— onSave 已把本卡的 media 列表更新(被移除的
+        // assetId 不在本卡了),再扫全库确认无**其他**卡引用才删(.cystift 同机
+        // 恢复的共享引用防弄坏对手卡)。
+        for (const id of removedAssetIds.current) {
+          removeMediaIfUnreferenced(id, () => service.listAll())
+        }
         removedAssetIds.current.clear()
         setMode('view')
         // R7:保存成功给反馈,对齐 workbench 的「已保存」(否则用户对编辑是否落盘没信心)。

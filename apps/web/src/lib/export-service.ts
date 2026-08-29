@@ -880,12 +880,36 @@ export async function importFromJson(
   // 非设计约束)。修法:payload 带 canvases 时,校验每张卡的 canvasId;指向不存在画布的
   // 清掉 canvasPosition(回 inbox,可见可找回),而非 reject 整体导入(更友好,不丢数据)。
   // payload 不带 canvases(旧 JSON)→ 无法校验,保留原样(向后兼容)。
+  //
+  // 2026-08-29 P2-6:数组元素非对象(如 `[null]`)此前在 `.map((c) => c.id)` 裸抛
+  // TypeError —— 该段在下方 try 之外,主导入被 catch 兜住显示裸错误,checkpoint
+  // 恢复路径(settings 页)无 catch 直接 unhandled rejection。此处逐元素拒绝。
   if (payload.canvases && Array.isArray(payload.canvases.canvases)) {
+    for (let i = 0; i < payload.canvases.canvases.length; i++) {
+      const c = payload.canvases.canvases[i]
+      if (!isObject(c) || typeof (c as { id?: unknown }).id !== 'string') {
+        return {
+          ok: false,
+          cards: 0,
+          mediaAssets: 0,
+          error: `canvases.canvases[${i}] is not an object with a string id`,
+        }
+      }
+    }
     const validCanvasIds = new Set(payload.canvases.canvases.map((c) => c.id))
     for (let i = 0; i < payload.cards.length; i++) {
-      const card = payload.cards[i] as Card & { canvasPosition?: { canvasId?: unknown } }
+      const card = payload.cards[i] as Card & {
+        canvasPosition?: { canvasId?: unknown; x?: unknown; y?: unknown; w?: unknown; h?: unknown }
+      }
       const cp = card.canvasPosition
-      if (cp && (typeof cp.canvasId !== 'string' || !validCanvasIds.has(cp.canvasId))) {
+      if (!cp) continue
+      // 2026-08-29 P2-4:数值有限性此前零校验 —— JSON 里 `1e400` parse 成
+      // Infinity 直达画布引擎,与 freeform 路径(validateFreeformElements 的
+      // finiteGeometry)不对称。同口径:有限 + |v| ≤ 1e7;只查 x/y/w/h(z 是
+      // 13 位毫秒时间戳,天然超出 1e7,不得进此上限)。越界处置与悬空引用同
+      // 策略:清 canvasPosition 回 inbox(不丢卡,丢定位),不 reject 整体导入。
+      const badGeometry = [cp.x, cp.y, cp.w, cp.h].some((v) => !finiteGeometry(v))
+      if (typeof cp.canvasId !== 'string' || !validCanvasIds.has(cp.canvasId) || badGeometry) {
         delete card.canvasPosition
       }
     }

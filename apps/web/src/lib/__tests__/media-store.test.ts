@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mediaStore, onQuotaExceeded, type MediaAssetData } from '../media-store'
+import { mediaStore, onQuotaExceeded, removeMediaIfUnreferenced, type MediaAssetData } from '../media-store'
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -150,5 +150,54 @@ describe('mediaStore.attach — quota failure', () => {
     unsub()
     restoreSetItem()
     vi.unstubAllGlobals()
+  })
+})
+
+// ── 2026-08-29 P2-7:引用感知删除(removeMediaIfUnreferenced)─────────────────
+// .cystift 同机恢复原样复制 MediaRef → 两卡共享 assetId;此前硬删/保存删无条件
+// remove → 弄坏对手卡的图。守卫:有存活卡引用(排除自己)→ 保留;无引用 → 删。
+describe('removeMediaIfUnreferenced — P2-7 共享引用守卫', () => {
+  // remove 是 enqueueWrite 异步落盘;断言前 flush 微任务。
+  const flush = () => new Promise((r) => setTimeout(r, 20))
+
+  it('无其他卡引用 → 删除(原行为,孤儿清理不回归)', async () => {
+    const a = fakeAsset('solo')
+    injectAsset(a)
+    removeMediaIfUnreferenced('ma-solo' as never, () => [
+      { id: 'c-other', media: [] },
+    ])
+    await flush()
+    expect(mediaStore.getAsset('ma-solo' as never)).toBeNull()
+  })
+
+  it('另一张活卡还在引用 → 保留(.cystift 共享恢复场景)', async () => {
+    const a = fakeAsset('shared')
+    injectAsset(a)
+    removeMediaIfUnreferenced('ma-shared' as never, () => [
+      { id: 'c-doomed', media: [{ assetId: 'ma-shared' as never, order: 0, kind: 'image' as const }] },
+      { id: 'c-survivor', media: [{ assetId: 'ma-shared' as never, order: 0, kind: 'image' as const }] },
+    ])
+    await flush()
+    expect(mediaStore.getAsset('ma-shared' as never)).not.toBeNull()
+  })
+
+  it('调用方排除自己(trash 硬删路径:filter 掉本卡后无引用 → 删)', async () => {
+    const a = fakeAsset('mine')
+    injectAsset(a)
+    removeMediaIfUnreferenced('ma-mine' as never, () => [
+      { id: 'c-doomed', media: [{ assetId: 'ma-mine' as never, order: 0, kind: 'image' as const }] },
+    ].filter((c) => c.id !== 'c-doomed'))
+    await flush()
+    expect(mediaStore.getAsset('ma-mine' as never)).toBeNull()
+  })
+
+  it('软删卡(在 trash)也算引用 → 保留(恢复时图还在)', async () => {
+    const a = fakeAsset('softdel')
+    injectAsset(a)
+    removeMediaIfUnreferenced('ma-softdel' as never, () => [
+      { id: 'c-softdeleted', media: [{ assetId: 'ma-softdel' as never, order: 0, kind: 'image' as const }], deletedAt: '2026-01-01' },
+    ])
+    await flush()
+    expect(mediaStore.getAsset('ma-softdel' as never)).not.toBeNull()
   })
 })

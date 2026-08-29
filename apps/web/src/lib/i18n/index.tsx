@@ -28,18 +28,14 @@ export function useI18n(): I18nCtx {
 }
 
 /**
- * Load initial locale from:
- *   1. settingsStore (persisted user preference)
- *   2. document.documentElement.lang (inline script set this)
- *   3. Fallback: 'zh'
+ * 浏览器语言检测(2026-08-29 P3-16,与 layout.tsx 首帧 inline script 同规则):
+ * navigator.language 以 en 开头 → 'en',否则 'zh'。无 navigator(极端环境)回 'zh'。
+ * 用于无持久化用户选择时的首启语言。
  */
-function loadLocale(): Locale {
-  if (typeof window === 'undefined') return 'zh'
-  const stored = settingsStore.get().locale
-  if (stored === 'zh' || stored === 'en') return stored
-  const lang = document.documentElement.lang
-  if (lang === 'en') return 'en'
-  return 'zh'
+function detectLocale(): Locale {
+  if (typeof navigator === 'undefined') return 'zh'
+  const lang = (navigator.language || 'zh').toLowerCase()
+  return lang.indexOf('en') === 0 ? 'en' : 'zh'
 }
 
 /**
@@ -52,9 +48,10 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   // SSR always renders 'zh'. On client mount, useEffect syncs the real
   // persisted locale. This avoids every hydration mismatch because SSR
   // HTML and client first-render both say 'zh'; the real locale takes
-  // over a tick later. No user-visible flash: the inline <script> in
-  // <head> already set <html lang> correctly for the first paint, and
-  // React suppresses the re-render warning for the RTL attribute.
+  // over a tick later (hydration-safe by design).
+  // 2026-08-29 P3-16 复核措辞修正:head inline script 只把 <html lang>
+  // 属性(字体/读屏)在首帧改对;UI **字符串**仍会闪一帧 zh 才切 en ——
+  // 零文本闪需要 cookie/SSR 语言方案,复杂度不成比例,有意不做。
   const [locale, setLocale] = useState<Locale>('zh')
 
   const doSetLocale = useCallback((l: Locale) => {
@@ -108,7 +105,15 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       }
     }
     const stored = settingsStore.get().locale
-    if (stored === 'zh' || stored === 'en') apply(stored)
+    // P3-16(2026-08-29):无持久化用户选择时按浏览器语言检测,不强制 zh ——
+    // 与 layout 首帧 inline script 同规则,英文浏览器用户首启即 en。
+    // 注意:检测值只用于本会话展示,**不写回 settings**(用户没选过,不替他选;
+    // 一旦用户在设置页切换,持久化值从此接管)。
+    if (stored === 'zh' || stored === 'en') {
+      apply(stored)
+    } else {
+      apply(detectLocale())
+    }
     const unsub = settingsStore.subscribe(() => {
       const l = settingsStore.get().locale
       if (l === 'zh' || l === 'en') apply(l)

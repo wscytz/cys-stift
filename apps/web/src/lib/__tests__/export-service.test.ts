@@ -1718,4 +1718,77 @@ describe('importFromJson — canvases 字段级畸形不炸返回路径(ocr 审 
     // 数据确实导入成功
     expect(result.cards).toBe(1)
   })
+
+  // 2026-08-29 P2-6:数组含非对象元素([null])此前在 canvasId 一致性校验的
+  // `.map((c) => c.id)` 裸抛 TypeError —— 该段在导入 try 之外,dryRun 与最终导入
+  // 都执行;checkpoint 恢复路径无 catch → unhandled rejection。现在逐元素拒绝。
+  it('canvases: {canvases: [null]} → 干净 reject(不抛 TypeError)(P2-6)', async () => {
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      cards: [{ id: 'c-null-el', title: 't', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z' }],
+      canvases: { canvases: [null] },
+    })
+    // dryRun:干净 reject,不抛
+    const dry = await mod.importFromJson(json, { mode: 'replace', dryRun: true })
+    expect(dry.ok).toBe(false)
+    expect(dry.error).toMatch(/canvases\.canvases\[0\]/)
+    // 最终导入:同样干净 reject
+    const result = await mod.importFromJson(json, { mode: 'replace' })
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/canvases\.canvases\[0\]/)
+  })
+
+  it('canvases 元素缺 string id(如 {name:"x"})→ 同样干净 reject(P2-6)', async () => {
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      cards: [],
+      canvases: { canvases: [{ name: 'no-id' }] },
+    })
+    const dry = await mod.importFromJson(json, { mode: 'replace', dryRun: true })
+    expect(dry.ok).toBe(false)
+    expect(dry.error).toMatch(/canvases\.canvases\[0\]/)
+  })
+})
+
+describe('importFromJson — canvasPosition 数值校验(P2-4,与 freeform finiteGeometry 同口径)', () => {
+  it('x=1e400(Infinity)→ 导入 ok、该卡 canvasPosition 清掉回 inbox;正常坐标保留', async () => {
+    const json = JSON.stringify({
+      version: mod.EXPORT_FORMAT_VERSION,
+      exportedAt: 'x',
+      app: 'a',
+      cards: [
+        {
+          id: 'c-bad-geo', title: 't', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z',
+          canvasPosition: { canvasId: 'cv-1', x: 1e400, y: 0, w: 100, h: 80, z: 1 },
+        },
+        {
+          id: 'c-good-geo', title: 't2', body: 'b', capturedAt: '2026-06-20T00:00:00.000Z',
+          canvasPosition: { canvasId: 'cv-1', x: 10, y: 10, w: 100, h: 80, z: 2 },
+        },
+      ],
+      canvases: {
+        canvases: [{
+          id: 'cv-1', workspaceId: 'ws', name: '画布一', view: { zoom: 1, panX: 0, panY: 0 },
+          createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+        }],
+        activeCanvasId: 'cv-1',
+      },
+    })
+    const result = await mod.importFromJson(json, { mode: 'replace' })
+    expect(result.ok).toBe(true)
+    const stored = JSON.parse(window.localStorage.getItem('cys-stift.cards.v1') ?? '{}') as {
+      cards?: Array<{ id: string; canvasPosition?: unknown }>
+    }
+    const bad = stored.cards?.find((c) => c.id === 'c-bad-geo')
+    const good = stored.cards?.find((c) => c.id === 'c-good-geo')
+    // 非有限坐标:定位清掉(卡回 inbox),数据本体不丢
+    expect(bad).toBeTruthy()
+    expect(bad?.canvasPosition).toBeUndefined()
+    // 正常坐标原样保留
+    expect(good?.canvasPosition).toBeDefined()
+  })
 })

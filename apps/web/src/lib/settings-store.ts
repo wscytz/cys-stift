@@ -274,7 +274,17 @@ function loadSettings(): Settings {
             migrated = true
           }
           if (migrated) {
-            window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings: loaded }))
+            // 2026-08-29 P2-2:读时迁移写盘**失败(配额满)不能吞掉已读出的合法
+            // settings**。此前 setItem 抛 → 进下方 catch → 落 salvage/v1 分支 →
+            // 最终 return DEFAULT_SETTINGS → 内存 settings 变默认值,用户下一次
+            // update* 把默认值+patch 落盘 → **全部 AI profile/apiKey 永久丢失**。
+            // 修:迁移写盘包独立 try,失败只意味着「下次启动会再迁一次」(幂等),
+            // 内存值照常返回 —— 与 salvageSettings 的「读时不写盘」契约同口径。
+            try {
+              window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings: loaded }))
+            } catch {
+              // 配额满/隐私模式:静默,内存值已是迁移后的干净形态。
+            }
           }
           return loaded
         }
@@ -323,10 +333,22 @@ function loadSettings(): Settings {
         // v1 corrupt → 走默认
       }
     }
-    return DEFAULT_SETTINGS
+    // 全新用户(无 v2 无 v1)。2026-08-29 P3-16:locale 按浏览器语言检测,而非
+    // 强制 zh —— 英文浏览器用户首启即 en。只影响内存首启值,不写盘(用户没选过,
+    // 不替他选);一旦用户在设置页切换,持久化值从此接管。DEFAULT_SETTINGS 保持
+    // locale:'zh' 不动(它是类型默认与导出/快照的稳定参照,不掺运行时检测)。
+    return { ...DEFAULT_SETTINGS, locale: detectBrowserLocale() }
   } catch {
     return DEFAULT_SETTINGS
   }
+}
+
+/** 浏览器语言检测(i18n 首启与 layout 首帧 script 同规则):navigator.language
+ *  以 en 开头 → 'en',否则 'zh'。SSR/无 navigator → 'zh'。 */
+function detectBrowserLocale(): 'zh' | 'en' {
+  if (typeof navigator === 'undefined') return 'zh'
+  const lang = (navigator.language || 'zh').toLowerCase()
+  return lang.indexOf('en') === 0 ? 'en' : 'zh'
 }
 
 /** v1 migration 用:旧 AIConfig 形状判定(无 id/name)。 */

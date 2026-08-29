@@ -152,6 +152,23 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
+            // 单实例守卫(2026-08-29 P2-5):第二个实例启动时唤起已有窗口后退出。
+            // 不加的话 Windows 双开两实例,localStorage 是 last-writer-wins 整份覆写,
+            // 后保存的一方抹掉先保存一方的全部写入(storage 事件不跨 OS 进程,无感知)。
+            // 官方推荐 Builder 链首插件;链式 .plugin() 前不能挂 cfg 属性,故在
+            // setup 里经 handle().plugin() 注册(等价初始化路径,mobile 不进)。
+            // 回调 show+focus:用户双击 exe 的意图是"打开应用",唤起既有窗口。
+            #[cfg(desktop)]
+            if let Err(e) = app.handle().plugin(tauri_plugin_single_instance::init(
+                |app, _args, _cwd| {
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                },
+            )) {
+                eprintln!("[single-instance] plugin load failed: {e}");
+            }
             #[cfg(desktop)]
             {
                 use tauri_plugin_global_shortcut::ShortcutState;

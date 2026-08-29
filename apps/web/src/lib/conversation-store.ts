@@ -296,7 +296,11 @@ export function migrateAllLegacyConversations(): number {
 
   // 3. 对每个 canvasId:若 v2 空 → migrateLegacy + save;若 v2 已有 → 跳过(幂等)。
   //    成功 parsed 时传 opts.askGlobal 复用(parse 一次);坏 JSON 时退化到自取路径。
+  //    2026-08-29 P2-1:saveConversation 返回 false(配额满,未写盘)时该画布**不迁**,
+  //    v1 key 保留在 pendingKeys 里等下次 boot 重试 —— 此前无条件删 v1,写失败时
+  //    对话历史永久丢失(save 的 catch 静默,删除先于任何用户感知)。
   let migratedCount = 0
+  const failedCids = new Set<string>()
   for (const cid of canvasIds) {
     const v2Key = conversationKey(cid as CanvasId)
     if (window.localStorage.getItem(v2Key)) continue // v2 已有(lazy 已迁 / 用户新对话)
@@ -305,25 +309,37 @@ export function migrateAllLegacyConversations(): number {
       askGlobalItems !== undefined ? { askGlobal: askGlobalItems } : undefined,
     )
     if (msgs.length > 0) {
-      saveConversation(cid as CanvasId, msgs)
-      migratedCount++
+      const saved = saveConversation(cid as CanvasId, msgs)
+      if (saved) {
+        migratedCount++
+      } else {
+        // 写失败(配额满):保留 v1 来源。companion v1 key 的归属画布难逐 key 精确
+        // 对应(ask 全局消息会分摊到多画布),保守策略:任一画布写失败 → **全部**
+        // v1 key 保留,下次 boot 幂等重试(已迁画布的 v2 存在 → 步骤 3 跳过,只重试失败者)。
+        failedCids.add(cid)
+      }
     }
   }
+  const keepV1 = failedCids.size > 0
 
   // 4. 删除所有 v1 key(companion per-canvas + ask global)。v1 已全量迁入 v2
   //    (或 v2 已有更新数据),v1 是 stale 子集,删除安全。
-  for (const key of companionOldKeys) {
-    try {
-      window.localStorage.removeItem(key)
-    } catch {
-      /* 隐私模式等 —— 跳过 */
+  //    keepV1(2026-08-29 P2-1):有画布写失败时全保 —— 删除不可逆,残留 v1 只是
+  //    stale(下次 boot 重试;export 双读不受影响),删了就是数据丢失。
+  if (!keepV1) {
+    for (const key of companionOldKeys) {
+      try {
+        window.localStorage.removeItem(key)
+      } catch {
+        /* 隐私模式等 —— 跳过 */
+      }
     }
-  }
-  if (hasAskGlobal) {
-    try {
-      window.localStorage.removeItem(ASK_OLD_KEY)
-    } catch {
-      /* 同上 */
+    if (hasAskGlobal) {
+      try {
+        window.localStorage.removeItem(ASK_OLD_KEY)
+      } catch {
+        /* 同上 */
+      }
     }
   }
 

@@ -20,7 +20,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@cys-stift/ui'
-import type { CanvasId, CardId, CardService, ColorToken, CardType, TagRef, LinkPreview, CodeBlock, Quote } from '@cys-stift/domain'
+import type { CanvasId, CardId, Card, CardService, ColorToken, CardType, TagRef, LinkPreview, CodeBlock, Quote } from '@cys-stift/domain'
 import { InMemoryCanvasHost, type CanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
 import { parseDslStrictWithDiagnostics } from '@cys-stift/dsl'
 import type { DslOp, SanitizeDiagnostic } from '@cys-stift/dsl'
@@ -171,11 +171,73 @@ export function makeOnCardUpdate(service: CardService): CardUpdateHandler {
 }
 
 /**
- * 从 DSL ops + 当前 CardService 算出内容变更(@title/@content)。几何 diff 看不到内容
- * (CanvasElement 无 title/body),这条独立 diff 让确认门展示"内容将怎么改",并让纯内容
- * 编辑(无 @pos)也能 apply —— 否则 totalChanges(几何)===0 会把 Apply 按钮误禁用,
- * AI 的内容改动永远落不了地(这就是"改不来内容"的根因)。建卡(create)带内容时只展
- * 示将写入的 after,无 before。
+ * v8 结构化字段的确认门摘要(cardType/tags/links/code/quotes)。逐字段:DSL op 提供
+ * → after 摘要;现有卡提供 → before 摘要。两摘要一致的字段不进列表(无变化不打扰)。
+ * 文本内容用计数/枚举而非全文(理由见 ContentChange.structured 注释)。
+ */
+function structuredSummary(
+  op: DslOp & { type: 'card' },
+  current: Card | undefined,
+): ContentChange['structured'] {
+  const out: NonNullable<ContentChange['structured']> = []
+  // @type:枚举 token,直接展示。
+  if ('cardType' in op && op.cardType !== undefined) {
+    if (!current || current.type !== op.cardType) {
+      out.push({ field: 'type', before: current?.type, after: op.cardType })
+    }
+  }
+  // @tags:值列表(截 5 个展示)。
+  if ('tags' in op && op.tags !== undefined) {
+    const fmt = (values: string[]) => {
+      const head = values.slice(0, 5).join(', ')
+      return `${values.length} tag${values.length === 1 ? '' : 's'}${head ? `: ${head}` : ''}`
+    }
+    const before = current?.tags?.map((t: TagRef) => t.value) ?? []
+    if (JSON.stringify(before) !== JSON.stringify(op.tags)) {
+      out.push({ field: 'tags', before: before.length ? fmt(before) : undefined, after: fmt(op.tags) })
+    }
+  }
+  // @links:URL 列表(截 3 个)。
+  if ('links' in op && op.links !== undefined) {
+    const fmt = (urls: string[]) => {
+      const head = urls.slice(0, 3).join(', ')
+      return `${urls.length} link${urls.length === 1 ? '' : 's'}${head ? `: ${head}` : ''}`
+    }
+    const before = current?.links?.map((l: LinkPreview) => l.url) ?? []
+    if (JSON.stringify(before) !== JSON.stringify(op.links)) {
+      out.push({ field: 'links', before: before.length ? fmt(before) : undefined, after: fmt(op.links) })
+    }
+  }
+  // @code:块数 + 语言枚举。
+  if ('code' in op && op.code !== undefined) {
+    const fmt = (blocks: { language?: string }[]) =>
+      `${blocks.length} block${blocks.length === 1 ? '' : 's'} (${blocks.map((b: { language?: string }) => b.language || 'plain').join(', ')})`
+    const before: CodeBlock[] = current?.codeSnippets ?? []
+    if (before.length !== op.code.length || JSON.stringify(before.map((b: CodeBlock) => ({ language: b.language, code: b.code }))) !== JSON.stringify(op.code)) {
+      out.push({ field: 'code', before: before.length ? fmt(before) : undefined, after: fmt(op.code) })
+    }
+  }
+  // @quote:条数 + 首条署名。
+  if ('quotes' in op && op.quotes !== undefined) {
+    const fmt = (quotes: { attribution?: string }[]) =>
+      `${quotes.length} quote${quotes.length === 1 ? '' : 's'}${quotes[0]?.attribution ? ` (first by ${quotes[0].attribution})` : ''}`
+    const before = current?.quotes ?? []
+    if (before.length !== op.quotes.length || JSON.stringify(before.map((q: Quote) => ({ text: q.text, attribution: q.attribution }))) !== JSON.stringify(op.quotes)) {
+      out.push({ field: 'quote', before: before.length ? fmt(before) : undefined, after: fmt(op.quotes) })
+    }
+  }
+  return out.length > 0 ? out : undefined
+}
+
+/**
+ * 从 DSL ops + 当前 CardService 算出内容变更(@title/@content + v8 结构化字段)。几何 diff
+ * 看不到内容(CanvasElement 无 title/body),这条独立 diff 让确认门展示"内容将怎么改",并让
+ * 纯内容编辑(无 @pos)也能 apply —— 否则 totalChanges(几何)===0 会把 Apply 按钮误禁用,
+ * AI 的内容改动永远落不了地(这就是"改不来内容"的根因)。建卡(create)带内容时只展示
+ * 将写入的 after,无 before。
+ * 2026-08-29 P1-2:v8-only op(只改 @type/@tags/@links/@code/@quote,不动 title/content)
+ * 此前被 `op.title === undefined && op.content === undefined` 早退掉 → 确认门显示"无变更"
+ * 且 Apply 禁用,AI 的结构化字段编辑永远落不了地。现在结构化字段同样进 diff。
  */
 export function computeContentDiff(
   ops: readonly DslOp[],
@@ -184,7 +246,12 @@ export function computeContentDiff(
   const out: ContentChange[] = []
   for (const op of ops) {
     if (op.type !== 'card') continue
-    if (op.title === undefined && op.content === undefined) continue
+    const hasV8 = 'cardType' in op && op.cardType !== undefined
+      || 'tags' in op && op.tags !== undefined
+      || 'links' in op && op.links !== undefined
+      || 'code' in op && op.code !== undefined
+      || 'quotes' in op && op.quotes !== undefined
+    if (op.title === undefined && op.content === undefined && !hasV8) continue
     const created = !!op.create
     const current = created ? undefined : (service.get(op.cardId as CardId) ?? undefined)
     const title: ContentChange['title'] =
@@ -199,9 +266,35 @@ export function computeContentDiff(
         : created
           ? { after: op.content }
           : { before: current?.body, after: op.content }
-    out.push({ cardId: String(op.cardId), created, title, body })
+    const structured = created
+      ? structuredSummaryNewCard(op)
+      : structuredSummary(op, current)
+    out.push({ cardId: String(op.cardId), created, title, body, structured })
   }
   return out
+}
+
+/** 建卡 op 的结构化摘要(无 before,只展示 after)。 */
+function structuredSummaryNewCard(op: DslOp & { type: 'card' }): ContentChange['structured'] {
+  const out: NonNullable<ContentChange['structured']> = []
+  if ('cardType' in op && op.cardType !== undefined && op.cardType !== 'note') {
+    out.push({ field: 'type', after: op.cardType })
+  }
+  if ('tags' in op && op.tags !== undefined && op.tags.length > 0) {
+    const head = op.tags.slice(0, 5).join(', ')
+    out.push({ field: 'tags', after: `${op.tags.length} tags: ${head}` })
+  }
+  if ('links' in op && op.links !== undefined && op.links.length > 0) {
+    const head = op.links.slice(0, 3).join(', ')
+    out.push({ field: 'links', after: `${op.links.length} links: ${head}` })
+  }
+  if ('code' in op && op.code !== undefined && op.code.length > 0) {
+    out.push({ field: 'code', after: `${op.code.length} blocks (${op.code.map((b) => b.language || 'plain').join(', ')})` })
+  }
+  if ('quotes' in op && op.quotes !== undefined && op.quotes.length > 0) {
+    out.push({ field: 'quote', after: `${op.quotes.length} quotes` })
+  }
+  return out.length > 0 ? out : undefined
 }
 
 export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApplied, onRejected, onRegenerateDsl, sampleContext }: Props) {
@@ -331,12 +424,37 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
         const creator = makeOnCardCreate(targetCanvasId, service)
         // 修 BUG2:makeOnCardUpdate 的 service.update 在 host.batch 之外,host undo 栈
         // 只记几何 → Ctrl+Z 只回几何、正文永久驻留。捕获 content 目标卡的 before
-        // title/body,apply 后暴露一次性 undo 回滚正文(几何仍走 host 的 Ctrl+Z)。
-        const contentBefore = new Map<CardId, { title: string; body: string }>()
+        // **全部可写字段**(title/body + v8 五字段,2026-08-29 P1-2 扩:此前只存
+        // title/body,v8 字段被 AI 覆盖后无任何恢复路径),apply 后暴露一次性 undo
+        // 回滚内容(几何仍走 host 的 Ctrl+Z)。
+        const contentBefore = new Map<CardId, {
+          title: string; body: string
+          type?: CardType; tags?: TagRef[]; links?: LinkPreview[]; codeSnippets?: CodeBlock[]; quotes?: Quote[]
+        }>()
         for (const op of preview.ops) {
-          if (op.type === 'card' && !op.create && (op.title !== undefined || op.content !== undefined)) {
-            const cur = service.get(op.cardId as CardId)
-            if (cur) contentBefore.set(op.cardId as CardId, { title: cur.title, body: cur.body })
+          if (op.type !== 'card' && op.type !== 'free') continue
+          const touched =
+            (op.type === 'card' && (
+              op.title !== undefined || op.content !== undefined
+              || ('cardType' in op && op.cardType !== undefined)
+              || ('tags' in op && op.tags !== undefined)
+              || ('links' in op && op.links !== undefined)
+              || ('code' in op && op.code !== undefined)
+              || ('quotes' in op && op.quotes !== undefined)
+            ))
+          if (!touched) continue
+          const cardOp = op as DslOp & { type: 'card' }
+          const cur = service.get(cardOp.cardId as CardId)
+          if (cur) {
+            contentBefore.set(cardOp.cardId as CardId, {
+              title: cur.title,
+              body: cur.body,
+              ...(cur.type !== undefined ? { type: cur.type } : {}),
+              ...(cur.tags !== undefined ? { tags: cur.tags } : {}),
+              ...(cur.links !== undefined ? { links: cur.links } : {}),
+              ...(cur.codeSnippets !== undefined ? { codeSnippets: cur.codeSnippets } : {}),
+              ...(cur.quotes !== undefined ? { quotes: cur.quotes } : {}),
+            })
           }
         }
         const r = applyLayout(liveHost, preview.ops, undefined, creator.onCardCreate, makeOnCardUpdate(service))
@@ -345,9 +463,17 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
             ? async (): Promise<boolean> => {
                 for (const [id, before] of contentBefore) {
                   const cur = service.get(id)
-                  if (cur && (cur.title !== before.title || cur.body !== before.body)) {
-                    service.update(id, { title: before.title, body: before.body })
-                  }
+                  if (!cur) continue
+                  const patch: { title?: string; body?: string; type?: CardType; tags?: TagRef[]; links?: LinkPreview[]; codeSnippets?: CodeBlock[]; quotes?: Quote[] } = {}
+                  if (cur.title !== before.title) patch.title = before.title
+                  if (cur.body !== before.body) patch.body = before.body
+                  if (cur.type !== before.type) patch.type = before.type
+                  if (JSON.stringify(cur.tags) !== JSON.stringify(before.tags)) patch.tags = before.tags
+                  if (JSON.stringify(cur.links) !== JSON.stringify(before.links)) patch.links = before.links
+                  if (JSON.stringify(cur.codeSnippets) !== JSON.stringify(before.codeSnippets)) patch.codeSnippets = before.codeSnippets
+                  if (JSON.stringify(cur.quotes) !== JSON.stringify(before.quotes)) patch.quotes = before.quotes
+                  if (Object.keys(patch).length === 0) continue
+                  service.update(id, patch)
                 }
                 return true
               }

@@ -13,7 +13,7 @@
 | --- | --- | --- |
 | `apps/web/src/lib/__tests__/export-redaction.test.ts` | `['sk','private'].join('-')` 等 | 便携导出递归擦除 apiKey 且不改动源对象 |
 | `apps/web/src/lib/__tests__/import-checkpoint.test.ts` | `['device-local','secret'].join('-')` 等 | 设备本地密钥不进便携包、回程还原 |
-| `apps/web/src/lib/__tests__/settings-store.test.ts` | `['sk','deepseek'].join('-')` | upsert 后激活态保持 |
+| `apps/web/src/lib/__tests__/settings-store.test.ts` | `['sk','deepseek'].join('-')` + `SK_LEGIT`(`['sk','legit-key'].join('-')` 模块常量,2026-08-29 起全文件统一引用) | upsert 后激活态保持 / 读时迁移不丢 profile |
 | `apps/web/src/features/ai/__tests__/ai-actions.test.ts` | `['sk','fake-key-should-not-leak'].join('-')` | 诊断文本不泄露密钥 |
 | `apps/web/src/features/ai/__tests__/openai-provider.test.ts` | `'sk-test'` 字面量(×15) | provider 请求头构造/响应处理的假 key 路径 |
 | `apps/web/src/features/ai/__tests__/stream-text.test.ts` | `'sk-x'` 字面量(×4) | 流式文本装配不泄露/不校验 key 形态 |

@@ -6,7 +6,7 @@ import { BauhausMotif, Button, Card as UICard, Modal, Tag } from '@cys-stift/ui'
 import { PageHeader } from '@/features/page-header'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
-import { mediaStore } from '@/lib/media-store'
+import { removeMediaIfUnreferenced } from '@/lib/media-store'
 import { useListSteady } from '@/lib/use-list-steady'
 import { useI18n } from '@/lib/i18n'
 import { PageLoading } from '@/components/page-loading'
@@ -62,6 +62,9 @@ export default function TrashPage() {
             <div className="ph-meta">
               <Tag color="gray">{trashed.length}</Tag>
             </div>
+            {/* P3-17(2026-08-29):保留策略透明化 —— 回收站不自动清理,媒体持续占
+                配额且随导出带上;明示用户,别让"删了怎么空间没回来"成为隐知识。 */}
+            <p className="empty__lede trash__retention">{t('trash.retentionNote')}</p>
             <ul className="grid">
               {trashed.map((card) => (
                 <li key={card.id}>
@@ -125,8 +128,13 @@ export default function TrashPage() {
                 onClick={() => {
                   // 清理 media 资源:硬删后 card record 没了,但其 media[].assetId 资源会孤立
                   // 残留 localStorage/OPFS 持续占配额(每次导出还被带上)。删 card 前先释放。
+                  // 2026-08-29 P2-7:引用感知 —— .cystift 同机恢复会共享 assetId,
+                  // 另一张活卡还在用时不删(防弄坏它的图)。判引用时排除本卡
+                  // (此刻它还在 listAll 里,自己不算自己的引用)。
                   for (const m of confirmingCard.media ?? []) {
-                    mediaStore.remove(m.assetId)
+                    removeMediaIfUnreferenced(m.assetId, () =>
+                      service.listAll().filter((c) => c.id !== confirmingCard.id),
+                    )
                   }
                   service.hardDelete(confirmingCard.id)
                   setConfirmHardDelete(null)

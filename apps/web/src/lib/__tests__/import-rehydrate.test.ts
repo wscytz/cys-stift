@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CanvasId } from '@cys-stift/domain'
 
+// P3-16(2026-08-29)后:settingsStore 首启 locale 跟随 navigator.language
+// (jsdom 默认 en-US)→ 本文件多个断言锚定 zh 契约会随环境漂。这里显式钉 zh
+// —— 被测对象是导入/迁移语义,不是 i18n 检测;显式播种 locale 的用例不受影响。
+Object.defineProperty(window.navigator, 'language', { value: 'zh', configurable: true })
+
 const CANVAS_ID = 'canvas-imported'
 const CARD_ID = 'card-imported'
 

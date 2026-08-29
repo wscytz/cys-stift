@@ -1,5 +1,6 @@
 'use client'
 
+import React, { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
@@ -7,7 +8,7 @@ import rehypeHighlight from 'rehype-highlight'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import { useI18n } from '@/lib/i18n'
-import { safeHref } from '@/lib/safe-href'
+import { safeHref, isSafeImageDataUrl } from '@/lib/safe-href'
 
 /**
  * Markdown body renderer (spec §1.4 + §5.3).
@@ -120,10 +121,38 @@ function MarkdownBlock({ source }: { source: string }) {
             {children}
           </a>
         ),
+        // P2-3(2026-08-29):markdown 远程图片 = 隐蔽外发渠道 —— RAG 预注入的卡内容
+        // 可被 prompt injection 指使模型把已读内容编码进图片 URL(外发 beacon:
+        // 打开卡片即 GET,泄 IP/内容/阅读时机),确认界面只显原始文本看不出。
+        // defaultSchema 放行 img 的 http/https src,无 CSP 兜底 → 此处组件级拦截:
+        // data: 安全图(应用自己的媒体)直出;远程图降级为「点击加载」占位
+        // (显式用户动作才发起请求,加载后也只在本机渲染,不再静默外发)。
+        img: MarkdownImg,
       }}
     >
       {source}
     </ReactMarkdown>
+  )
+}
+
+/** markdown <img> 门禁组件:远程图点击才加载(见上方 P2-3 注释)。 */
+function MarkdownImg({ src, alt, ...rest }: React.ComponentProps<'img'>) {
+  const [loadRemote, setLoadRemote] = useState(false)
+  const isSafeData = typeof src === 'string' && isSafeImageDataUrl(src)
+  if (isSafeData) return <img src={src} alt={alt} {...rest} />
+  if (loadRemote && typeof src === 'string') {
+    return <img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" {...rest} />
+  }
+  return (
+    <button
+      type="button"
+      className="md__img-gate"
+      onClick={() => setLoadRemote(true)}
+      title={typeof src === 'string' ? src : undefined}
+    >
+      {(alt || '') + ' '}
+      [远程图片 · 点击加载]
+    </button>
   )
 }
 
@@ -310,6 +339,19 @@ const styles = `
 }
 .md-embed--missing { color: var(--color-black-soft); font-style: italic; }
 .md-embed--cycle { color: var(--color-red); font-size: var(--font-size-xs); }
+/* P2-3:远程图片门禁占位(点击才发起请求,防 markdown 注入图片的静默外发)。 */
+.md__img-gate {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-gray);
+  background: var(--color-gray-soft);
+  border: var(--border-hairline);
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+  text-align: left;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 /* 代码高亮 Swiss Editorial 语法主题(rehype-highlight 注入 hljs-* class)。
    代码块 .md pre 始终墨底(--color-code-bg),故用 palette 的 fixed 亮色变体
    (黑底可读):keyword=石油蓝亮、string=红亮、comment=中性灰亮。 */

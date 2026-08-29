@@ -332,6 +332,59 @@ describe('computeContentDiff — 内容 diff 纯函数(几何 diff 看不到 @ti
     const ops = parseDsl('[rect #r1] @pos(0,0) @size(10,10)\n[arrow #c1→#c2]')
     expect(computeContentDiff(ops, service)).toHaveLength(0)
   })
+
+  // ── 2026-08-29 P1-2:v8 结构化字段进确认门 diff ─────────────────────────────
+  it('v8-only op(只改 @tags/@code,不动 title/content)→ 进 diff(此前被早退 → "无变更" + Apply 禁用)', () => {
+    const service = {
+      get: (id: string) =>
+        id === 'c1'
+          ? { id, title: 't', body: 'b', tags: [{ value: 'old' }], codeSnippets: [] }
+          : null,
+    } as unknown as CardService
+    const ops = parseDsl('[card #c1] @tags(a;b) @code(ts,"x=1")')
+    const diff = computeContentDiff(ops, service)
+    expect(diff).toHaveLength(1)
+    expect(diff[0]!.structured).toBeDefined()
+    const fields = diff[0]!.structured!.map((s) => s.field)
+    expect(fields).toContain('tags')
+    expect(fields).toContain('code')
+    const tags = diff[0]!.structured!.find((s) => s.field === 'tags')!
+    expect(tags.before).toContain('old')
+    expect(tags.after).toContain('a')
+  })
+
+  it('混合 op(@title + @tags)→ title 进 title 字段,tags 进 structured(确认门两处都能看到)', () => {
+    const service = {
+      get: () => ({ id: 'c1', title: '旧', body: 'b', tags: [] }),
+    } as unknown as CardService
+    const ops = parseDsl('[card #c1] @title("新") @tags(x)')
+    const diff = computeContentDiff(ops, service)
+    expect(diff).toHaveLength(1)
+    expect(diff[0]!.title).toMatchObject({ before: '旧', after: '新' })
+    expect(diff[0]!.structured!.map((s) => s.field)).toContain('tags')
+  })
+
+  it('v8 字段值与当前一致 → structured 无该项(无变化不打扰)', () => {
+    const service = {
+      get: () => ({ id: 'c1', title: 't', body: 'b', tags: [{ value: 'a' }], type: 'note' }),
+    } as unknown as CardService
+    const ops = parseDsl('[card #c1] @tags(a)')
+    const diff = computeContentDiff(ops, service)
+    // tags 无变化;但 op 只有 tags → structured 为空/undefined,整个 diff 项还在
+    // (title/body 均无 → push 了一项但三项全空;组件层由 showTitle/showBody/structured 判断)
+    expect(diff).toHaveLength(1)
+    expect(diff[0]!.structured).toBeUndefined()
+  })
+
+  it('create op 带 @tags/@code → structured 只展 after', () => {
+    const service = { get: () => null } as unknown as CardService
+    const ops = parseDsl('[card #new create] @pos(0,0) @tags(a;b) @code(py,"print(1)")')
+    const diff = computeContentDiff(ops, service)
+    expect(diff[0]!.structured).toBeDefined()
+    const tags = diff[0]!.structured!.find((s) => s.field === 'tags')!
+    expect(tags.after).toContain('2 tags')
+    expect(tags.before).toBeUndefined()
+  })
 })
 
 // ───────────────────────────────────────────────────────────────────

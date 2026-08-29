@@ -129,13 +129,18 @@ function persist(): boolean {
   return saveState(_state)
 }
 
+// 恒定服务端快照:分段水合下,后水合段必须与 SSR(默认视图 + 空位置表)一致。
+// 此前返回活缓存 _cachedSnapshot —— 08-28 #418 修复只覆盖了 db/canvas/settings/
+// draft/canvas-view 五店,本店漏网(graph-canvas 在消费);壳层段先行 hydrate 后,
+// 后水合段拿到已装载视图 → 与 SSR 不一致 → React #418 整树重建。同法修(2026-08-29)。
+const SERVER_STATE: GraphState = { view: DEFAULT_VIEW, positions: {} }
 let _cachedSnapshot: GraphState = _state
 function getSnapshot(): GraphState {
   if (_cachedSnapshot !== _state) _cachedSnapshot = _state
   return _cachedSnapshot
 }
 function getServerSnapshot(): GraphState {
-  return _cachedSnapshot
+  return SERVER_STATE
 }
 export function subscribe(cb: () => void) {
   _subscribers.add(cb)

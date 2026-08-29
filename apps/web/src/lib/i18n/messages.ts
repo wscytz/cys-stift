@@ -736,6 +736,7 @@ export const messages = {
   'trash.deleteForeverBtn': { zh: '永久删除', en: 'Delete forever' },
   'trash.deleteForeverConfirm': { zh: '请输入"删除"以确认永久删除（不可撤销）。', en: 'Type "delete" to confirm permanent deletion (cannot be undone).' },
   'trash.deleteForeverTypePlaceholder': { zh: '删除', en: 'delete' },
+  'trash.retentionNote': { zh: '回收站不自动清理：软删卡片（含其图片等媒体）会一直占用本地存储并在导出中带上；空间紧张时在这里逐张永久删除即可释放。', en: 'Trash never auto-clears: soft-deleted cards (and their media) keep occupying local storage and ride along in exports. Permanently delete items here to reclaim space.' },
 
   /* ── Settings ── */
   'settings.crumb': { zh: '设置', en: 'settings' },

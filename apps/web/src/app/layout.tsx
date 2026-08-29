@@ -90,6 +90,18 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: `document.documentElement.setAttribute('data-theme','light');` }}
         />
         {/*
+         * 语言首帧同步(2026-08-29 P3-16):读持久化 locale(cys-stift.settings.v2
+         * 的 settings.locale);无用户选择时按浏览器语言自动检测(navigator.language
+         * 以 en 开头 → en)。必须在首帧前改 <html lang> —— React SSR 恒渲染 zh-CN,
+         * I18nProvider 的 mount effect 一帧后才切,此前 en 用户每次冷载先闪一帧中文
+         * 再翻转(且 i18n/index.tsx 注释一直声称存在此 script,实无,顺手对齐)。
+         * <html> 带 suppressHydrationWarning,lang 属性差异不炸水合。
+         */}
+        <script
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: `try{var __s=localStorage.getItem('cys-stift.settings.v2');var __l=null;if(__s){try{var __o=JSON.parse(__s);var __v=__o&&__o.settings&&__o.settings.locale;if(__v==='zh'||__v==='en')__l=__v}catch(e){}}if(!__l){__l=(navigator.language||'zh').toLowerCase().indexOf('en')===0?'en':'zh'}document.documentElement.lang=__l==='en'?'en':'zh-CN'}catch(e){}` }}
+        />
+        {/*
          * 侧栏让位宽度首帧同步(v0.2):默认收起 64px 图标轨;用户钉住展开过则
          * 280px。必须在首帧前设 --app-sidebar-w(inline script,零布局闪烁);
          * AppMenu 挂载后接管读写(同一 localStorage key)。

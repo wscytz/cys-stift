@@ -15,10 +15,15 @@
  * not in DSL_KINDS. freedraw is program-managed (R2 store + renderer): point sequence
  * is heavy / low-value / privacy-sensitive, so it stays out of the text format entirely.
  * Canonical single source: ./dsl-grammar.ts (DSL_KINDS / DSL_COLORS / DSL_GRAMMAR_REFERENCE).
+ *
+ * 已知限制(2026-08-29 审计登记):rotation 不序列化 —— DSL 文本路径只往返
+ * x/y/w/h。当前渲染器不消费 rotation(self-built-render 零引用)、无任何 UI 手柄
+ * 产出非零值,DB 路径(canvas-binding)保留字段;若将来引入旋转手柄,须同步在
+ * grammar 加 @rotation 指令(加法,bump DSL_VERSION),否则 DSL Apply 会把旋转归零。
  */
 import type { CanvasElement } from '@cys-stift/canvas-engine'
 import type { CardType, TagRef, LinkPreview, CodeBlock, Quote } from '@cys-stift/domain'
-import { DSL_KINDS } from './dsl-grammar'
+import { DSL_KINDS, DSL_MAX_TEXT_LEN, DSL_MAX_CONTENT_LEN, DSL_MAX_HREF_TARGETS, DSL_MAX_TAG_COUNT, DSL_MAX_LINK_COUNT, DSL_MAX_CODE_BLOCKS, DSL_MAX_QUOTES } from './dsl-grammar'
 
 /**
  * v8:card 行可注入的卡片内容/结构化字段(消费者从 CardService 读,经 resolve 回调传入)。
@@ -82,8 +87,13 @@ export function serializeElement(
     case 'card': {
       // v5:可选 @title/@content;v8:可选 @type/@tags/@links/@code/@quote(消费者注入)。
       // 缺省几何-only(round-trip 与 v4 等价)。
-      const titleAttr = content?.title ? ` @title("${escapeQuoted(content.title)}")` : ''
-      const contentAttr = content?.content ? ` @content("${escapeQuoted(content.content)}")` : ''
+      // 超长防护(2026-08-29 P1):parser 对 @title/@content 静默截断(DoS 防护,保留)。
+      // serialize 侧若照常 emit 超长值,DSL 编辑器 Apply 会把**截断后的值**写回
+      // Card.body → 数据尾部永久丢失。故超长字段此处**不 emit**(parse 后为
+      // undefined,所有写回路径的 `!== undefined` 守卫自然跳过)——数据保住,
+      // 截断防护不动。text/frame text 同理走 textAttr helper。
+      const titleAttr = quotedAttr('title', content?.title, DSL_MAX_TEXT_LEN)
+      const contentAttr = quotedAttr('content', content?.content, DSL_MAX_CONTENT_LEN)
       return `[card #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}${titleAttr}${contentAttr}${metaGroup(e)}${metaHref(e)}${metaType(content)}${metaTags(content)}${metaLinks(content)}${metaCode(content)}${metaQuote(content)}`
     }
     case 'rect':
@@ -91,13 +101,13 @@ export function serializeElement(
     case 'frame':
       return (
         `[frame #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})` +
-        ` @text("${escapeQuoted(e.text ?? '')}")` +
+        quotedAttr('text', e.text ?? '', DSL_MAX_TEXT_LEN) +
         color +
         metaGroup(e)
       )
     case 'text':
       return (
-        `[text #${e.id}] ${pos} @text("${escapeQuoted(e.text ?? '')}")` + color + metaGroup(e) + metaCompute(e)
+        `[text #${e.id}] ${pos}${quotedAttr('text', e.text ?? '', DSL_MAX_TEXT_LEN)}${color}${metaGroup(e)}${metaCompute(e)}`
       )
     case 'arrow': {
       // Shared relation signature (label/color/dash/arrowhead/route).
@@ -112,7 +122,7 @@ export function serializeElement(
           ? ` @elbow(${e.elbow.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(';')})`
           : ''
       const sig =
-        (e.text ? ` @label("${escapeQuoted(e.text)}")` : '') +
+        quotedAttr('label', e.text ?? undefined, DSL_MAX_TEXT_LEN) +
         color +
         (e.dash ? ` @dash(${e.dash})` : '') +
         (e.arrowhead ? ` @arrowhead(${e.arrowhead})` : '') +
@@ -150,26 +160,41 @@ function escapeQuoted(s: string): string {
     .replace(/`/g, '\\`')
 }
 
-/** v7:读 element.meta.group(语义分组名)。非字符串 / 空 → 不 emit。 */
+/** 带长度上限的引号属性 emit(2026-08-29 P1):值为空/undefined → '';超上限 → ''
+ *  (**不 emit**,防 parser 静默截断后经 Apply 写回毁数据,见 serializeElement card case 注释);
+ *  正常值 → ` @name("escaped")`。 */
+function quotedAttr(name: string, value: string | undefined, max: number): string {
+  if (typeof value !== 'string' || value === '' || value.length > max) return ''
+  return ` @${name}("${escapeQuoted(value)}")`
+}
+
+/** v7:读 element.meta.group(语义分组名)。非字符串 / 空 → 不 emit。
+ *  超长(>DSL_MAX_TEXT_LEN)不 emit:parse 侧 truncate 会截断(见 quotedAttr 注释)。 */
 function metaGroup(e: CanvasElement): string {
   const g = e.meta?.group
-  return typeof g === 'string' && g !== '' ? ` @group("${escapeQuoted(g)}")` : ''
+  return quotedAttr('group', typeof g === 'string' ? g : undefined, DSL_MAX_TEXT_LEN)
 }
 
 /** v7:读 element.meta.href(卡片显式语义引用目标 id 列表)。非数组 / 空 → 不 emit。
- *  emit 形如 ` @href(#a;#b)`(每个 id 补 `#`,`;` 分隔),是 parseHref 的逆。 */
+ *  emit 形如 ` @href(#a;#b)`(每个 id 补 `#`,`;` 分隔),是 parseHref 的逆。
+ *  超上限(>DSL_MAX_HREF_TARGETS)截到上限——parse 侧同样截断,**两侧同界**,
+ *  round-trip 稳定(与文本字段不同:截尾丢的是列表项,parse 后仍可写回稳定子集,
+ *  不会造成「serialize 全量 → parse 截断 → 写回」的不对称丢失)。 */
 function metaHref(e: CanvasElement): string {
   const h = e.meta?.href
   if (!Array.isArray(h)) return ''
-  const ids = h.filter((x): x is string => typeof x === 'string' && x !== '')
+  const ids = h
+    .filter((x): x is string => typeof x === 'string' && x !== '')
+    .slice(0, DSL_MAX_HREF_TARGETS)
   if (ids.length === 0) return ''
   return ` @href(${ids.map((id) => '#' + id).join(';')})`
 }
 
-/** v7:读 element.meta.compute(text 元素安全公式原文)。非字符串 / 空 → 不 emit。 */
+/** v7:读 element.meta.compute(text 元素安全公式原文)。非字符串 / 空 → 不 emit。
+ *  超长不 emit(同 metaGroup 理由)。 */
 function metaCompute(e: CanvasElement): string {
   const c = e.meta?.compute
-  return typeof c === 'string' && c !== '' ? ` @compute("${escapeQuoted(c)}")` : ''
+  return quotedAttr('compute', typeof c === 'string' ? c : undefined, DSL_MAX_TEXT_LEN)
 }
 
 /** v8:读注入的卡片 type(语义类型)。缺省 / 空 → 不 emit。CardType 枚举值(note|image|link|code|quote)
@@ -194,30 +219,36 @@ function encodeListValue(v: string): string {
 }
 
 /** v8:读注入的卡片 tags。value 过滤空 → 各 encodeListValue(防 `;` 分隔符碰撞 + `)` 提前闭合)→ `;` 连接。
- *  无有效 tag → 不 emit。是 parseTagList 的逆。 */
+ *  无有效 tag → 不 emit。是 parseTagList 的逆。
+ *  超数防护(2026-08-29 P1):截到 DSL_MAX_TAG_COUNT —— 与 parse 侧同界,round-trip 稳定。 */
 function metaTags(c: CardDslContent | undefined): string {
   const values = (c?.tags ?? [])
     .map((t) => (typeof t?.value === 'string' ? t.value.trim() : ''))
     .filter((v) => v !== '')
+    .slice(0, DSL_MAX_TAG_COUNT)
   return values.length > 0 ? ` @tags(${values.map(encodeListValue).join(';')})` : ''
 }
 
 /** v8:读注入的卡片 links(仅 URL,见 CardDslContent 说明)。url 过滤空 → 各 encodeListValue
  *  (URL 含 `;`/`=`/`&` 会撞分隔符;含 `)` 如 Wikipedia 消歧义页会提前闭合)→ `;` 连接。
- *  无有效 url → 不 emit。是 parseLinkList 的逆。 */
+ *  无有效 url → 不 emit。是 parseLinkList 的逆。超数防护同 metaTags(DSL_MAX_LINK_COUNT)。 */
 function metaLinks(c: CardDslContent | undefined): string {
   const urls = (c?.links ?? [])
     .map((l) => (typeof l?.url === 'string' ? l.url.trim() : ''))
     .filter((u) => u !== '')
+    .slice(0, DSL_MAX_LINK_COUNT)
   return urls.length > 0 ? ` @links(${urls.map(encodeListValue).join(';')})` : ''
 }
 
 /** v8:读注入的卡片 codeSnippets。每个 emit 一条 ` @code(lang,"code"[,"caption"])`(可重复指令)。
  *  lang 收窄到 grammar codeLang 字符集(越界字符丢弃,防破坏指令;空语言合法)。code/caption 走
- *  escapeQuoted(多行/引号/反引号)。是 fold code 累积的逆。 */
+ *  escapeQuoted(多行/引号/反引号)。是 fold code 累积的逆。
+ *  超长防护(2026-08-29 P1):code 超 DSL_MAX_CONTENT_LEN / 块数超 DSL_MAX_CODE_BLOCKS
+ *  的条目不 emit —— parse 侧会截断/截数,照常 emit 会经 Apply 写回截断值(同 quotedAttr 理由)。 */
 function metaCode(c: CardDslContent | undefined): string {
   return (c?.codeSnippets ?? [])
-    .filter((b) => typeof b?.code === 'string' && b.code !== '')
+    .filter((b) => typeof b?.code === 'string' && b.code !== '' && b.code.length <= DSL_MAX_CONTENT_LEN)
+    .slice(0, DSL_MAX_CODE_BLOCKS)
     .map((b) => {
       const lang = (typeof b.language === 'string' ? b.language : '').replace(/[^a-zA-Z0-9_+#.-]/g, '')
       const caption = typeof b.caption === 'string' && b.caption !== '' ? `,"${escapeQuoted(b.caption)}"` : ''
@@ -228,10 +259,12 @@ function metaCode(c: CardDslContent | undefined): string {
 
 /** v8:读注入的卡片 quotes。每个 emit 一条 ` @quote("text"[,"attribution"[,"sourceUrl"]])`(可重复)。
  *  arity:有 sourceUrl → 三参(attribution 缺省补空串占位);否则有 attribution → 两参;否则一参。
- *  各值走 escapeQuoted。是 fold quote 累积的逆(空串占位 parse 侧归一 undefined)。 */
+ *  各值走 escapeQuoted。是 fold quote 累积的逆(空串占位 parse 侧归一 undefined)。
+ *  超长/超数防护同 metaCode(2026-08-29 P1)。 */
 function metaQuote(c: CardDslContent | undefined): string {
   return (c?.quotes ?? [])
-    .filter((q) => typeof q?.text === 'string' && q.text !== '')
+    .filter((q) => typeof q?.text === 'string' && q.text !== '' && q.text.length <= DSL_MAX_CONTENT_LEN)
+    .slice(0, DSL_MAX_QUOTES)
     .map((q) => {
       const text = `"${escapeQuoted(q.text)}"`
       const by = typeof q.attribution === 'string' ? q.attribution : ''

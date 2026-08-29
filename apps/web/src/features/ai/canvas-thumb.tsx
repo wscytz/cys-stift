@@ -28,12 +28,19 @@ export interface ContentFieldChange {
  * 卡片内容变更项。DSL `@title`/`@content` 改动几何 diff 看不见(CanvasElement 无内容字段),
  * 用这条独立的 content diff 让用户在确认门看到"正文/标题将怎么改"。`created` 标记建卡
  * (无 before,只展示将写入的内容)。
+ *
+ * 2026-08-29 P1-2:补 v8 结构化字段(type/tags/links/codeSnippets/quotes)。此前确认门
+ * 只展示 title/body 但 apply 实际写全部 7 字段 —— 用户确认时看不到结构化字段将被覆盖。
+ * 结构化字段用**摘要**(标签数/块数/URL 数等)而非全文展示:它们本来就是结构化的,
+ * 摘要足以让用户知道"有东西要被改",全文展开反而淹没 title/body 主体。
  */
 export interface ContentChange {
   cardId: string
   created: boolean
   title?: ContentFieldChange
   body?: ContentFieldChange
+  /** v8 结构化字段摘要 before/after(如 "3 tags: a, b, c" / "2 blocks (ts, py)")。 */
+  structured?: { field: string; before?: string; after?: string }[]
 }
 
 export interface AgentContentDiffLabels {
@@ -45,7 +52,8 @@ export interface AgentContentDiffLabels {
 }
 
 /**
- * 专门的对话内容修改预览 —— 区别于几何缩略图。逐卡展示标题/正文的 before(划掉)→ after。
+ * 专门的对话内容修改预览 —— 区别于几何缩略图。逐卡展示标题/正文的 before(划掉)→ after,
+ * 以及 v8 结构化字段(type/tags/links/code/quote)的摘要变化。
  * 纯内容编辑(@title/@content 无 @pos)时这是确认门的主体视图(几何缩略图那栏会隐藏)。
  */
 export function AgentContentDiff({
@@ -61,7 +69,8 @@ export function AgentContentDiff({
       {changes.map((c) => {
         const showTitle = !!c.title && (c.title.before !== undefined || c.title.after !== undefined)
         const showBody = !!c.body && (c.body.before !== undefined || c.body.after !== undefined)
-        if (!showTitle && !showBody) return null
+        const structured = c.structured ?? []
+        if (!showTitle && !showBody && structured.length === 0) return null
         return (
           <div className="ac__content-card" key={c.cardId}>
             <p className="ac__content-id">
@@ -86,6 +95,16 @@ export function AgentContentDiff({
                 emptyMark={labels.emptyMark}
               />
             )}
+            {structured.map((s) => (
+              <ContentRow
+                key={s.field}
+                field={s.field}
+                before={s.before}
+                after={s.after}
+                created={c.created}
+                emptyMark={labels.emptyMark}
+              />
+            ))}
           </div>
         )
       })}

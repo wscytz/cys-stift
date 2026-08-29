@@ -455,6 +455,45 @@ describe('migrateAllLegacyConversations — 全量迁移 v1 → v2 + 删旧 key'
     expect(window.localStorage.getItem('cys-stift.ask-chat.v1')).toBeNull()
   })
 
+  // ── 2026-08-29 P2-1:saveConversation 配额失败 → v1 保留(防对话历史丢失) ────
+  it('quota failure on save → v1 keys are KEPT for next-boot retry (P2-1)', () => {
+    window.localStorage.setItem(
+      'cys-stift.companion-chat.quota-keep.v1',
+      JSON.stringify([{ role: 'user', content: 'precious' }]),
+    )
+    // 模拟配额满:setItem 抛 QuotaExceededError → saveConversation 返回 false
+    const originalSet = Storage.prototype.setItem
+    Storage.prototype.setItem = vi.fn(() => {
+      throw new DOMException('full', 'QuotaExceededError')
+    })
+    let count: number
+    try {
+      count = migrateAllLegacyConversations()
+    } finally {
+      Storage.prototype.setItem = originalSet
+    }
+    expect(count).toBe(0) // 无成功迁移
+    // 关键断言:v1 未删 —— 旧实现无条件删,配额满时对话历史永久丢失
+    expect(window.localStorage.getItem('cys-stift.companion-chat.quota-keep.v1')).not.toBeNull()
+  })
+
+  it('quota failure then retry after space freed → migration completes and v1 removed (P2-1 幂等续)', () => {
+    window.localStorage.setItem(
+      'cys-stift.companion-chat.retry-ok.v1',
+      JSON.stringify([{ role: 'user', content: 'retry-me' }]),
+    )
+    const originalSet = Storage.prototype.setItem
+    Storage.prototype.setItem = vi.fn(() => {
+      throw new DOMException('full', 'QuotaExceededError')
+    })
+    migrateAllLegacyConversations() // 第一次:失败,v1 保留
+    Storage.prototype.setItem = originalSet
+    const count = migrateAllLegacyConversations() // 第二次:空间恢复,成功
+    expect(count).toBe(1)
+    expect(loadConversation('retry-ok' as CanvasId).map((m) => m.content)).toEqual(['retry-me'])
+    expect(window.localStorage.getItem('cys-stift.companion-chat.retry-ok.v1')).toBeNull()
+  })
+
   // 性能:多 canvas 时 ASK_OLD_KEY 应只 parse 一次(预 parse 复用),不应 N canvas = N 次
   // parse 同一份 JSON。boot 一次性 + μs 级,但工程上避免重复读。
   it('reads ASK_OLD_KEY minimally across N canvases (parse once, not per-canvas)', () => {
