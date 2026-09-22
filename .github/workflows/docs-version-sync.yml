@@ -24,9 +24,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout public code (version truth)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           # 本 workflow 只跑 node 脚本,不装依赖;setup-node@v5.4+ 检测到 packageManager
@@ -50,7 +50,7 @@ jobs:
 
       - name: Checkout private docs repo
         if: steps.check-token.outputs.has_token == 'true'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: wscytz/cys-stift-docs
           path: cys-stift-docs

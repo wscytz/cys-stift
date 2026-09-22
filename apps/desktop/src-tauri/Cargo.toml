@@ -27,8 +27,12 @@ serde_json = "1.0"
 # 单实例守卫(2026-08-29 P2-5):Windows 双击 exe 两次开两实例,各自捕获卡片
 # 后保存时 last-writer-wins 整份覆写 localStorage → 先保存一方的写入静默消失
 # (storage 事件不跨 OS 进程)。第二个实例唤起已有窗口后退出,标准解。
-# 桌面专属(mobile 无双开概念),单独 cfg(desktop) 段。
-[target.'cfg(desktop)'.dependencies]
+# 桌面专属(mobile 无双开概念)。⚠️不能用 cfg(desktop):"desktop"/"mobile" 是
+# tauri-build 的 build.rs 在编译期注入给 rustc 的自定义 cfg,Cargo 解析依赖表
+# 时不认识它,该段在任何平台都求值为 false → 依赖不进图 → lib.rs 的
+# #[cfg(desktop)] 引用未链接 crate → E0433(1.4.2 Windows CI 实栽)。Cargo 只认
+# rustc 目标自带 cfg,故用官方插件文档推荐的三元组门。
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-single-instance = "2"
 
 # Android 无 native-tls 后端,Tauri 的间接依赖 reqwest 走 rustls,且 reqwest 默认
