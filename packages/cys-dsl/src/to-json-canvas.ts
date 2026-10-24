@@ -1,14 +1,14 @@
 /**
  * to-json-canvas — cys-dsl ops → JSON Canvas 1.0(jsoncanvas.org)适配器。
  *
- * 用途(执行意向书 Step 2「顺手」):让陌生画布用户把 .cys 一键转成他们已在用的格式
+ * 用途(执行意向书 Step 2「顺手」):让陌生画布用户把 .sift 一键转成他们已在用的格式
  * (Obsidian .canvas / React Flow / Excalidraw 生态均支持 JSON Canvas 导入)。
  *
  * 映射(v0.1,明确取舍):
  * - card  → node(type:'text'),title 落 node.text;
  * - free text → node(type:'text');
  * - 关系箭头(from/to)→ edge,label 落 edge.label;
- * - rect / frame → 跳过(JSON Canvas 无对应语义,数据仍在 .cys 源);
+ * - rect / frame → 跳过(JSON Canvas 无对应语义,数据仍在 .sift 源);
  * - 自由箭头(freeArrow)/ keepExistingPos 卡(无独立几何,独立转换无现有画布可沿用)→ 跳过;
  * - 其余 cys 字段(color/content/@type/@tags/@links/@code/@quote/@group/@href/compute/
  *   dash/arrowhead/curve/route/elbow/wikilink)整体落节点的 `cys` 附加属性 —— JSON Canvas
@@ -121,7 +121,7 @@ export function toJsonCanvas(ops: DslOp[]): { canvas: JsonCanvasFile; skipped: S
       skipped.push({
         opIndex,
         op: op.shape,
-        reason: `JSON Canvas 无 ${op.shape} 语义(v0.1 不映射;源 .cys 中保留)`,
+        reason: `JSON Canvas 无 ${op.shape} 语义(v0.1 不映射;源 .sift 中保留)`,
       })
       return
     }

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * cys-dsl CLI — .cys 文件的 validate / render / roundtrip(执行意向书 Step 1 第 3 件)。
+ * cys-dsl CLI — .sift 文件的 validate / render / roundtrip(执行意向书 Step 1 第 3 件)。
  *
  * - validate   语法(parse)→ 卫生(sanitize)→ 关系式求解(solve)全链检查,报诊断;
  * - render     转 JSON Canvas 1.0(Obsidian .canvas / React Flow 等通用格式)到 stdout;
@@ -10,7 +10,7 @@
  *
  * 结构:纯函数核心(validateText / renderText / roundtripText)进测试与库;
  * 本文件**不进公开 barrel**(node:fs 不许进 web bundle)。
- * 运行:`pnpm --filter @cys-stift/dsl cli <命令> <file.cys>`(tsx,devDep)。
+ * 运行:`pnpm --filter @cys-stift/dsl cli <命令> <file.sift>`(tsx,devDep)。
  */
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
@@ -30,7 +30,7 @@ import type { CanvasElement } from './types'
 
 const USAGE = `cys-dsl — cy's Stift 画布 DSL(v${DSL_VERSION})命令行
 
-用法:cys-dsl <命令> <file.cys>
+用法:cys-dsl <命令> <file.sift>
 命令:
   validate   语法 / 卫生 / 关系式求解全链检查(诊断报告)
   render     转 JSON Canvas 1.0 到 stdout(Obsidian .canvas 等通用格式)
