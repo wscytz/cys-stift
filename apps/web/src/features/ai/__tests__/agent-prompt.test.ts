@@ -29,8 +29,8 @@ function card(id: string, title: string, body = ''): Card {
 }
 
 describe('AGENT_SYSTEM_PROMPT', () => {
-  it('含 cys-dsl v8 输出契约 + 内容能力 + 引用格式 + 能力分诊', () => {
-    expect(AGENT_SYSTEM_PROMPT).toContain('cys-dsl grammar v8')
+  it('含 cys-dsl v9 输出契约 + 内容能力 + 引用格式 + 能力分诊', () => {
+    expect(AGENT_SYSTEM_PROMPT).toContain('cys-dsl grammar v9')
     expect(AGENT_SYSTEM_PROMPT).toContain('[card #id]')
     expect(AGENT_SYSTEM_PROMPT).toContain('UPDATE')
     expect(AGENT_SYSTEM_PROMPT).toContain('create')
@@ -86,10 +86,10 @@ describe('buildAgentUserPrompt', () => {
     expect(p).not.toContain('Relevant cards')
   })
 
-  it('含目标画布快照(可选,前言版本串钉 v8)', () => {
+  it('含目标画布快照(可选,前言版本串钉 v9)', () => {
     const p = buildAgentUserPrompt('对齐', [], '[card #c1] @pos(100,100)')
     expect(p).toContain('Target canvas current state')
-    expect(p).toContain('use cys-dsl v8 rules')
+    expect(p).toContain('use cys-dsl v9 rules')
     expect(p).toContain('[card #c1] @pos(100,100)')
   })
 

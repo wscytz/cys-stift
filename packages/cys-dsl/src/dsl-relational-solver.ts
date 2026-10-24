@@ -11,6 +11,8 @@
  * - 单遍顺序求解:rel op anchor 到**已处理**元素(同批更早 op 的绝对坐标已知,或画布已有的 card)
  * - right-of #X:x = X.x + X.w + gap;y = X.y
  * - below    #X:y = X.y + X.h + gap;x = X.x
+ * - v9 组级相对锚:right-of @G = 贴组 G 当前已解成员包围盒右缘(y=bbox.minY);
+ *   below @G = 贴 bbox 下缘(x=bbox.minX)。bbox lazy 求值、顺序敏感(组员先写)。
  * - anchor 不存在(前向引用 / 指向幽灵 id)→ diagnostic(op 保留占位坐标,apply 自己 skip/create)
  * - 环检测:单遍天然防环(anchor 必须已在 geom,前向引用直接 diagnostic)
  * - 默认 card 尺寸 240×120(op.w/h undefined + 非 existing 时);existing card 用其真实 w/h
@@ -22,12 +24,33 @@ import type { DslOp, DslCardOp } from './dsl-parser'
 import type { SanitizeDiagnostic } from './dsl-sanitize'
 import { DSL_MAX_COORD } from './dsl-sanitize'
 
-/** 已知几何(anchor 查找用)。来自画布现有 card 或同批更早 op。 */
+/** 已知几何(anchor 查找用)。来自画布现有 card 或同批更早 op。
+ *  v9:group 为可选组名(v9 组级相对锚用;web 侧由 element.meta.group 填充)。 */
 export interface ExistingGeom {
   x: number
   y: number
   w: number
   h: number
+  group?: string
+}
+
+/** v9 组级相对锚:求某组**当前已入 geom**成员的包围盒(lazy,求值顺序敏感——
+ *  同批更早的 rel 落点也计入,更晚的不回溯;组内无人 → undefined,由调用方产 diagnostic)。 */
+function groupBBox(geom: Map<string, ExistingGeom>, group: string): ExistingGeom | undefined {
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  let found = false
+  for (const g of geom.values()) {
+    if (g.group !== group) continue
+    found = true
+    if (g.x < minX) minX = g.x
+    if (g.y < minY) minY = g.y
+    if (g.x + g.w > maxX) maxX = g.x + g.w
+    if (g.y + g.h > maxY) maxY = g.y + g.h
+  }
+  return found ? { x: minX, y: minY, w: maxX - minX, h: maxY - minY } : undefined
 }
 
 /** card 默认尺寸(与 apply-layout applyCardOp 一致:op.w ?? 240 / op.h ?? 120)。 */
@@ -75,23 +98,28 @@ export function solveRelational(
     const h = op.h ?? exist?.h ?? DEFAULT_CARD_H
 
     if (op.rel) {
-      const anchor = geom.get(op.rel.anchor)
-      if (!anchor) {
-        // anchor 不存在(前向引用 / 幽灵 id)→ diagnostic,op 保留占位坐标
+      // v9:anchor 双形态 —— #id(单卡 geom 条目)/ @组名(组包围盒,lazy 求当前已解成员)
+      const isGroup = op.rel.anchorGroup === true
+      const anchorRect = isGroup ? groupBBox(geom, op.rel.anchor) : geom.get(op.rel.anchor)
+      if (!anchorRect) {
+        // anchor 不存在(前向引用 / 幽灵 id / 组锚无成员)→ diagnostic,op 保留占位坐标
         diagnostics.push({
           opIndex: idx,
-          message: `relational card #${cardId} 的 anchor #${op.rel.anchor} 不存在(画布/同批更早均无)`,
+          message: isGroup
+            ? `relational card #${cardId} 的组锚 @${op.rel.anchor} 无已解成员(组不存在,或组员都在本卡之后——组锚按书写顺序解)`
+            : `relational card #${cardId} 的 anchor #${op.rel.anchor} 不存在(画布/同批更早均无)`,
         })
         // 标 broken:下游 anchor 到本卡的 rel 也会得链式 diagnostic(否则静默解析到占位)
         brokenAnchors.add(cardId)
         // 剥离 rel,保留占位 x/y(apply 自己 create/skip)
         const { rel: _rel, ...rest } = op
         out.push({ ...rest, w, h })
-        geom.set(cardId, { x: op.x, y: op.y, w, h })
+        geom.set(cardId, { x: op.x, y: op.y, w, h, group: op.group })
         continue
       }
       // 传递性断链:anchor 存在但本身是 broken 占位 → 本卡也判 broken + diagnostic(链式传播)
-      if (brokenAnchors.has(op.rel.anchor)) {
+      // (仅卡锚;组锚无 broken 概念——组内成员各自携带自己的诊断)
+      if (!isGroup && brokenAnchors.has(op.rel.anchor)) {
         diagnostics.push({
           opIndex: idx,
           message: `relational card #${cardId} 的 anchor #${op.rel.anchor} 上游 anchor 缺失(链式占位,坐标可能不符预期)`,
@@ -99,8 +127,10 @@ export function solveRelational(
         brokenAnchors.add(cardId)
       }
       const gap = op.rel.gap
-      const ax = op.rel.dir === 'right-of' ? anchor.x + anchor.w + gap : anchor.x
-      const ay = op.rel.dir === 'below' ? anchor.y + anchor.h + gap : anchor.y
+      // 统一放置公式(组锚即包围盒矩形):right-of → (a.x+a.w+gap, a.y 顶对齐);
+      // below → (a.x 左对齐, a.y+a.h+gap)。组右=贴 bbox 右缘、组下=贴 bbox 下缘。
+      const ax = op.rel.dir === 'right-of' ? anchorRect.x + anchorRect.w + gap : anchorRect.x
+      const ay = op.rel.dir === 'below' ? anchorRect.y + anchorRect.h + gap : anchorRect.y
       // 碰撞避让:沿关系轴(below→y / right-of→x)推开已置 card,消除参照系碰撞
       const { x, y } = resolveCollision(
         ax,
@@ -114,7 +144,7 @@ export function solveRelational(
       )
       const { rel: _rel, ...rest } = op
       out.push({ ...rest, x, y, w, h })
-      geom.set(cardId, { x, y, w, h })
+      geom.set(cardId, { x, y, w, h, group: op.group })
       continue
     }
 
@@ -122,9 +152,9 @@ export function solveRelational(
     // v5(E) keepExistingPos:op.x/y 是 parser 占位 (0,0),必须沿用 existing 真实坐标,
     // 否则下游 rel anchor 到本卡会锚到 (0,0) 飞画布左上角。
     if (op.keepExistingPos === true && exist) {
-      geom.set(cardId, { x: exist.x, y: exist.y, w, h })
+      geom.set(cardId, { x: exist.x, y: exist.y, w, h, group: op.group })
     } else {
-      geom.set(cardId, { x: op.x, y: op.y, w, h })
+      geom.set(cardId, { x: op.x, y: op.y, w, h, group: op.group })
     }
     out.push(op)
   }

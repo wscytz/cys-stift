@@ -775,11 +775,14 @@ function buildExistingGeometry(host: CanvasHost): Map<string, ExistingGeom> {
   const geometry = new Map<string, ExistingGeom>()
   for (const element of host.getElements()) {
     if (element.kind === 'card') {
+      // v9 组级相对锚:card meta.group 进 geom,rel 可 @组名 锚到画布既有分组
+      const group = typeof element.meta?.group === 'string' ? element.meta.group : undefined
       geometry.set(element.id, {
         x: element.x,
         y: element.y,
         w: element.w,
         h: element.h,
+        ...(group !== undefined ? { group } : {}),
       })
     }
   }

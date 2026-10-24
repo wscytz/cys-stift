@@ -11,7 +11,7 @@
  * bump 规则:增删指令种类 / 增删属性 / 改颜色枚举 → bump DSL_VERSION。
  * 纯改 prompt 措辞、改 parser 正则细节(不动语法)→ 不 bump。
  */
-export const DSL_VERSION = 8
+export const DSL_VERSION = 9
 
 /**
  * `@text("...")` / `@label("...")` / `@title("...")` 值的最大字符数(int 级)。
@@ -171,6 +171,11 @@ export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one eleme
   #   [card #id] right-of #anchor @gap(20)   # right of anchor, same row (x=anchor.x+w+gap; y=anchor.y)
   #   [card #id] below #anchor @gap(20)      # below anchor, same column (y=anchor.y+h+gap; x=anchor.x)
   #   (@gap defaults to 20 and is limited to 0..2000; anchor must be placed earlier or already exist)
+  #   Group anchors (v9): anchor a card to a whole GROUP's bounding box with @groupname:
+  #   [card #id] right-of @methods @gap(30)  # right of the methods group (x=bbox.maxX+gap; y=bbox.minY)
+  #   [card #id] below @axes @gap(30)        # below the axes group (y=bbox.maxY+gap; x=bbox.minX)
+  #     The bbox covers group members resolved SO FAR (write group members before their group anchor;
+  #     a group with no members yet → diagnostic). Group names are simple ids (letters/digits/_:-).
   [rect #id] @pos(x, y) @size(w, h) @color(c) [@group("…")]
   [text #id] @pos(x, y) @text("...") @color(c) [@group("…")] [@compute("…")]
   #   @compute("expr") (v7, text only): a SAFE formula evaluated into the text's displayed value.

@@ -100,8 +100,8 @@ describe('glm-5.2 AI 样本 —— 真实风格 DSL 文档被 strict parser 零�
     expect((ops[0] as { color?: string }).color).toBe('grey')
   })
 
-  it('grammar 版本号 v8(锁定 AI 样本所依据的当前语法版)', () => {
-    expect(DSL_VERSION).toBe(8)
+  it('grammar 版本号 v9(锁定 AI 样本所依据的当前语法版)', () => {
+    expect(DSL_VERSION).toBe(9)
   })
 
   it('所有 AI 样本经 sanitize 后 ops 数量不变(无数据丢失)', () => {

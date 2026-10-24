@@ -48,8 +48,11 @@ export type DslCardOp = {
   /** B工程 pilot:关系式坐标。有 rel 时 x/y 是占位(0,0),求解器 solveRelational 填真值。
    *  right-of #anchor:x = anchor.x + anchor.w + gap;y = anchor.y
    *  below    #anchor:y = anchor.y + anchor.h + gap;x = anchor.x
+   *  v9 组级相对锚:anchorGroup=true 时 anchor 是组名(语法 `right-of @组名`),
+   *  锚定该组当前已解成员的包围盒(lazy,顺序敏感,见 solveRelational):
+   *  right-of @g:x = bbox.maxX + gap;y = bbox.minY。below @g:y = bbox.maxY + gap;x = bbox.minX。
    *  仅 AI 输入路径;serializeCanvas 永不 emit rel(rel 解决后画布存绝对坐标)。 */
-  rel?: { dir: 'right-of' | 'below'; anchor: string; gap: number }
+  rel?: { dir: 'right-of' | 'below'; anchor: string; gap: number; anchorGroup?: boolean }
   /** v5(E):无 @pos 的"纯属性/内容编辑"标志。无 @pos(且非 create、非 rel)但携带
    *  title/content/color/size 之一时置真 —— apply 时(planCard)沿用现有卡几何,只更那些字段;
    *  x/y 为占位(0,0),apply 期忽略。serializeCanvas 永不 emit(始终绝对坐标)→ 输入专用。 */
@@ -182,7 +185,7 @@ type DirectiveTuple =
   | ['route', string]
   | ['curve', string, string]
   | ['elbow', string]
-  | ['rel', string, string]
+  | ['rel', string, string] // v2 参数:'#id 或 v9 '@组名(带 @ 前缀,case 'rel' 剥)
   | ['gap', string]
   | ['create', true]
   | ['from', string]
@@ -336,7 +339,7 @@ interface Folded {
   route?: string
   curve?: { cx: number; cy: number }
   elbow?: { x: number; y: number }[]
-  rel?: { dir: string; anchor: string }
+  rel?: { dir: string; anchor: string; anchorGroup?: boolean }
   gap?: number
   create?: boolean
   from?: string
@@ -371,7 +374,16 @@ function fold(ds: unknown[]): Folded {
       case 'route': if (!a.route) a.route = validEnum(String(v1), ['straight', 'curve', 'elbow']); break
       case 'curve': if (!a.curve) a.curve = { cx: finiteNum(String(v1)), cy: finiteNum(String(v2)) }; break
       case 'elbow': if (!a.elbow) a.elbow = parseElbow(String(v1)); break
-      case 'rel': if (!a.rel) a.rel = { dir: String(v1), anchor: String(v2) }; break
+      case 'rel': {
+        if (!a.rel) {
+          // v9:'@组名'(groupRef 带 '@' 前缀)→ anchorGroup:true,anchor 存组名
+          const anchor = String(v2)
+          a.rel = anchor.startsWith('@')
+            ? { dir: String(v1), anchor: anchor.slice(1), anchorGroup: true }
+            : { dir: String(v1), anchor }
+        }
+        break
+      }
       case 'gap': if (a.gap === undefined) a.gap = finiteNum(String(v1)); break
       case 'create': if (!a.create) a.create = true; break
       case 'from': if (!a.from) a.from = String(v1); break
@@ -450,8 +462,8 @@ function buildCard(ds: unknown[]): BuildResult {
       h: d.size?.h,
       color: d.color,
       rel: {
+        ...d.rel, // v9:保留 anchorGroup(组锚)
         dir: d.rel.dir as 'right-of' | 'below',
-        anchor: d.rel.anchor,
         gap: d.gap ?? 20,
       },
     }

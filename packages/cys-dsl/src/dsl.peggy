@@ -67,9 +67,13 @@ sizeDir
 colorDir
   = '@color(' c:$([^)]+) ')' { return ['color', c] }
 
-// relation 关键字后必接 #id(防散文里的 below 误命中)
+// relation 关键字后必接 #id 或 @组名(防散文里的 below 误命中)
 relationDir
-  = dir:$('right-of' / 'below') sp anchor:idRef { return ['rel', dir, anchor] }
+  = dir:$('right-of' / 'below') sp anchor:(idRef / groupRef) { return ['rel', dir, anchor] }
+
+// v9:组级相对锚。'@'+组名(与 idRef 同字符集;含空格的引用组名不适用,需经组员 id 锚定)
+groupRef
+  = '@' g:$idChars { return '@' + g }
 
 gapDir
   = '@gap(' g:$num ')' { return ['gap', g] }
