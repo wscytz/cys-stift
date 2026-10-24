@@ -64,40 +64,62 @@ function hex(color?: string): string {
   return (color !== undefined && COLOR_HEX[color]) || INK
 }
 
-/** 粗宽估算:CJK/全角 1em,其余 0.55em。预览级够用,不追像素。 */
-function textWidth(s: string, fontSize: number): number {
-  let w = 0
-  for (const ch of s) w += ch.charCodeAt(0) > 0x2e7f ? fontSize : fontSize * 0.55
-  return w
-}
-
-/** 贪心逐字换行(中文无空格也适用);超 maxLines 末行截 … 。 */
+/** 贪心折行:分词 token(CJK 单字 / 英数连串 / 空白 / 其它标点),英文单词不拦腰断;
+ *  单 token 超行宽按字强拆;超 maxLines 末行截 …。 */
 function wrapLines(s: string, maxW: number, fontSize: number, maxLines: number): string[] {
+  const charPx = (ch: string) => (ch.charCodeAt(0) > 0x2e7f ? fontSize : fontSize * 0.55)
+  const tokens = s.match(/[　-鿿-￯]|[A-Za-z0-9]+|\s+|[^A-Za-z0-9\s　-鿿＀-￯]/g) ?? [s]
   const out: string[] = []
   let line = ''
+  let w = 0
   let truncated = false
-  for (const ch of s) {
-    if (ch === '\n') {
-      out.push(line)
+  for (const tok of tokens) {
+    // 显式换行:含 \n 的空白 token 直接断行(首段并入当前行)
+    if (/\s/.test(tok) && tok.includes('\n')) {
+      const head = tok.replace(/\n[\s\S]*$/, '')
+      if (head) line += head
+      if (line.trim()) out.push(line.trimEnd())
       line = ''
+      w = 0
       if (out.length === maxLines) {
         truncated = true
         break
       }
       continue
     }
-    if (textWidth(line + ch, fontSize) > maxW) {
-      out.push(line)
-      line = ch
+    const tw = [...tok].reduce((a, c) => a + charPx(c), 0)
+    if (w + tw > maxW && line.trim()) {
+      out.push(line.trimEnd())
+      line = ''
+      w = 0
       if (out.length === maxLines) {
         truncated = true
         break
       }
+      if (/^\s+$/.test(tok)) continue
+    }
+    if (tw > maxW && !line.trim()) {
+      for (const ch of tok) {
+        const cw = charPx(ch)
+        if (w + cw > maxW && line) {
+          out.push(line)
+          line = ''
+          w = 0
+          if (out.length === maxLines) {
+            truncated = true
+            break
+          }
+        }
+        line += ch
+        w += cw
+      }
+      if (truncated) break
     } else {
-      line += ch
+      line += tok
+      w += tw
     }
   }
-  if (!truncated && line) out.push(line)
+  if (!truncated && line.trim()) out.push(line.trimEnd())
   if (truncated) out[out.length - 1] = out[out.length - 1]!.replace(/.$/, '') + '…'
   return out
 }
