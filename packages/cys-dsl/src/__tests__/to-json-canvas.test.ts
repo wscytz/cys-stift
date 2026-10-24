@@ -93,3 +93,48 @@ describe('toJsonCanvas(solver 集成 + 跳过留痕)', () => {
     expect(skipped[0]!.reason).toContain('#box')
   })
 })
+
+describe('toJsonCanvas(spec 合规防线)', () => {
+  it('小数坐标取整(spec:x/y/width/height 为 integer)', () => {
+    const { ops } = parseDslWithDiagnostics('[card #a] @pos(10.5,20.25) @size(240.5,120.7)')
+    const { canvas } = toJsonCanvas(ops)
+    expect(canvas.nodes[0]).toMatchObject({ x: 11, y: 20, width: 241, height: 121 })
+  })
+
+  it('无 @title 卡也带 required text(空串)', () => {
+    const { ops } = parseDslWithDiagnostics('[card #a] @pos(0,0)')
+    const { canvas } = toJsonCanvas(ops)
+    expect(canvas.nodes[0]!.text).toBe('')
+  })
+
+  it('显式 id 重复 → 仅首个进转换并留痕;边端点解析到首节点', () => {
+    const text = [
+      '[card #a] @pos(0,0) @title("first")',
+      '[card #a] @pos(500,500) @title("dup")',
+      '[text #a] @pos(900,900) @text("dup2")',
+      '[arrow #r] from #a to #a',
+    ].join('\n')
+    const { ops } = parseDslWithDiagnostics(text)
+    const { canvas, skipped } = toJsonCanvas(ops)
+    expect(canvas.nodes).toHaveLength(1)
+    expect(canvas.nodes[0]!.text).toBe('first')
+    expect(skipped.map((s) => s.op)).toEqual(['card', 'text'])
+    expect(skipped[0]!.reason).toContain('重复')
+    // 边仍解析到首节点(端点 id 存在)
+    expect(canvas.edges).toHaveLength(1)
+  })
+
+  it('兜底边 id 撞显式 id → 静默改名(边 id 无引用语义)', () => {
+    const text = [
+      '[card #a] @pos(0,0)',
+      '[card #b] @pos(300,0)',
+      '[card #c] @pos(600,0)',
+      '[arrow #e4] from #a to #b', // opIndex 3,显式占 e4
+      '[arrow] from #b to #c', // opIndex 4,兜底候选 e4 → 撞 → 改名 e4-2
+    ].join('\n')
+    const { ops } = parseDslWithDiagnostics(text)
+    const { canvas, skipped } = toJsonCanvas(ops)
+    expect(skipped).toEqual([])
+    expect(canvas.edges.map((e) => e.id)).toEqual(['e4', 'e4-2'])
+  })
+})

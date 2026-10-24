@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { renderText, roundtripText, validateText } from '../cli'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { main, renderText, roundtripText, validateText } from '../cli'
 
 /** v8 全特性样本:几何 + 关系式 + 结构化字段 + 箭头签名 + 自由元素。 */
 const SAMPLE = [
@@ -18,11 +21,51 @@ describe('cli:validateText', () => {
     expect(r.stdout).toContain('✓')
   })
 
-  it('语法错误行 → exit 1 + 原行号报告', () => {
+  it('语法错误行 → exit 1 + 原行号报告(诊断走 stderr)', () => {
     const r = validateText(`${SAMPLE}\n[freedraw #x] @pos(1,1)`)
     expect(r.code).toBe(1)
-    expect(r.stdout).toContain('行6')
-    expect(r.stdout).toContain('freedraw')
+    expect(r.stderr).toContain('行6')
+    expect(r.stderr).toContain('freedraw')
+    expect(r.stderr).toContain('✗')
+  })
+
+  it('警告(断锚)不阻断:⚠ 进 stderr,措辞为"语法通过;N 条警告"', () => {
+    const r = validateText('[card #a create] right-of #ghost')
+    expect(r.code).toBe(0)
+    expect(r.stderr).toContain('⚠')
+    expect(r.stdout).toContain('1 条警告')
+    expect(r.stdout).toContain('语法通过')
+    expect(r.stdout).not.toContain('均通过')
+  })
+})
+
+describe('cli:main flag 解析', () => {
+  it('render --svg → SVG 进 stdout;未知 flag / validate 带 --svg → exit 2', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cys-dsl-cli-'))
+    const file = join(dir, 'ok.sift')
+    writeFileSync(file, '[card #a create] @pos(0,0) @title("起")\n[card #b create] right-of #a\n[arrow #e1] from #a to #b\n')
+    const out: string[] = []
+    const err: string[] = []
+    const origOut = process.stdout.write
+    const origErr = process.stderr.write
+    process.stdout.write = ((s: string | Uint8Array) => {
+      out.push(String(s))
+      return true
+    }) as typeof process.stdout.write
+    process.stderr.write = ((s: string | Uint8Array) => {
+      err.push(String(s))
+      return true
+    }) as typeof process.stderr.write
+    try {
+      expect(main(['render', file, '--svg'])).toBe(0)
+      expect(out.join('')).toContain('<svg xmlns="http://www.w3.org/2000/svg"')
+      expect(main(['render', file, '--json'])).toBe(2)
+      expect(err.join('')).toContain('用法')
+      expect(main(['validate', file, '--svg'])).toBe(2)
+    } finally {
+      process.stdout.write = origOut
+      process.stderr.write = origErr
+    }
   })
 })
 

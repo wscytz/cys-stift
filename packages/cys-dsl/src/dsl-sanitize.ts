@@ -26,6 +26,7 @@ import {
   DSL_MAX_CODE_BLOCKS,
   DSL_MAX_QUOTES,
   DSL_CARD_TYPES,
+  DSL_RESERVED_GROUP_ANCHOR_WORDS,
   truncateDslText,
 } from './dsl-grammar'
 
@@ -101,15 +102,29 @@ function sanitizeCard(
   // 一样属于输入边界,不能等 solve 后才处理。
   let rel = op.rel
   if (op.rel) {
-    const gap = Number.isFinite(op.rel.gap)
-      ? Math.min(DSL_MAX_GAP, Math.max(0, op.rel.gap))
-      : 0
-    if (gap !== op.rel.gap) {
+    // v9:锚位裸名与内建指令同名(grammar 故意放行以保精确报错,见 dsl.peggy groupRef)→
+    // 诊断 + 剥 rel。引号形式 @"gap" 是显式意图,不受此限。
+    if (
+      op.rel.anchorGroup === true &&
+      op.rel.anchorQuoted !== true &&
+      (DSL_RESERVED_GROUP_ANCHOR_WORDS as readonly string[]).includes(op.rel.anchor)
+    ) {
       diagnostics.push({
         opIndex: idx,
-        message: `card #${op.cardId} 的 gap 已限制到 0..${DSL_MAX_GAP}`,
+        message: `card #${op.cardId} 的组锚 @${op.rel.anchor} 与内建指令同名,已剥除——组名避开指令词;确有同名组用 @"${op.rel.anchor}" 引用;组间距写在锚后(如 right-of @组名 @gap(30))`,
       })
-      rel = { ...op.rel, gap }
+      rel = undefined
+    } else {
+      const gap = Number.isFinite(op.rel.gap)
+        ? Math.min(DSL_MAX_GAP, Math.max(0, op.rel.gap))
+        : 0
+      if (gap !== op.rel.gap) {
+        diagnostics.push({
+          opIndex: idx,
+          message: `card #${op.cardId} 的 gap 已限制到 0..${DSL_MAX_GAP}`,
+        })
+        rel = { ...op.rel, gap }
+      }
     }
   }
   // case 6:size 修正 + case 5:坐标钳位 + v5:title/content 截断

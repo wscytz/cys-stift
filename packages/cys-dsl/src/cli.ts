@@ -19,6 +19,7 @@ import { parseDslWithDiagnostics, type DslOp } from './dsl-parser'
 import { sanitizeDslOps } from './dsl-sanitize'
 import { solveRelational } from './dsl-relational-solver'
 import { serializeCanvas, type CardDslContent } from './canvas-dsl'
+import { toSvg } from './to-svg'
 import {
   toJsonCanvas,
   JSON_CANVAS_DEFAULT_CARD_W,
@@ -33,9 +34,9 @@ const USAGE = `cys-dsl — cy's Stift 画布 DSL(v${DSL_VERSION})命令行
 用法:cys-dsl <命令> <file.sift>
 命令:
   validate   语法 / 卫生 / 关系式求解全链检查(诊断报告)
-  render     转 JSON Canvas 1.0 到 stdout(Obsidian .canvas 等通用格式)
+  render     转 JSON Canvas 1.0 到 stdout(Obsidian .canvas 等通用格式);--svg 转 SVG
   roundtrip  DSL→元素→DSL 双往返签名比对(转义保真检查)
-退出码:0 = 干净;1 = 有诊断 / 往返发散;2 = 用法或文件错误
+退出码:0 = 干净(警告不阻断);1 = 有诊断 / 往返发散;2 = 用法或文件错误
 `
 
 /** CLI 结果:stdout(报告/JSON)与 stderr(警告)分流,code 即进程退出码。 */
@@ -59,29 +60,48 @@ function parseWarnings(parsed: { errors: { line: number; text: string; message: 
 export function validateText(text: string): CliResult {
   const { parsed, sanitized, solved } = pipeline(text)
   const lines: string[] = [`cys-dsl v${DSL_VERSION} · validate`]
+  const errors: string[] = []
   let code: 0 | 1 = 0
   for (const w of parseWarnings(parsed)) {
     code = 1
-    lines.push(`✗ ${w}`)
+    errors.push(`✗ ${w}`)
   }
-  for (const d of sanitized.diagnostics) lines.push(`⚠ sanitize op#${d.opIndex}:${d.message}`)
-  for (const d of solved.diagnostics) lines.push(`⚠ solve op#${d.opIndex}:${d.message}`)
+  for (const d of sanitized.diagnostics) errors.push(`⚠ sanitize op#${d.opIndex}:${d.message}`)
+  for (const d of solved.diagnostics) errors.push(`⚠ solve op#${d.opIndex}:${d.message}`)
   if (code === 0) {
     const cards = solved.ops.filter((o) => o.type === 'card').length
     const free = solved.ops.filter((o) => o.type === 'free').length
     const arrows = solved.ops.filter((o) => o.type === 'arrow').length
-    lines.push(`✓ ${solved.ops.length} op(card ${cards} / free ${free} / arrow ${arrows})——语法、卫生检查与关系式求解均通过`)
+    const warns = sanitized.diagnostics.length + solved.diagnostics.length
+    lines.push(
+      warns > 0
+        ? `✓ ${solved.ops.length} op(card ${cards} / free ${free} / arrow ${arrows})——语法通过;${warns} 条警告见 stderr,不阻断`
+        : `✓ ${solved.ops.length} op(card ${cards} / free ${free} / arrow ${arrows})——语法、卫生检查与关系式求解均通过`,
+    )
   }
-  return { code, stdout: lines.join('\n') + '\n', stderr: '' }
+  return {
+    code,
+    stdout: lines.join('\n') + '\n',
+    stderr: errors.length > 0 ? errors.join('\n') + '\n' : '',
+  }
 }
 
-// ---------- render(JSON Canvas 1.0)----------
+// ---------- render(JSON Canvas 1.0 / SVG)----------
 
-export function renderText(text: string): CliResult {
+export function renderText(text: string, opts?: { svg?: boolean }): CliResult {
   const { parsed, sanitized, solved } = pipeline(text)
   const stderrLines = parseWarnings(parsed)
   for (const d of sanitized.diagnostics) stderrLines.push(`sanitize op#${d.opIndex}:${d.message}`)
   for (const d of solved.diagnostics) stderrLines.push(`solve op#${d.opIndex}:${d.message}`)
+  if (opts?.svg === true) {
+    const { svg, skipped } = toSvg(solved.ops)
+    for (const s of skipped) stderrLines.push(`跳过 op#${s.opIndex} ${s.op}:${s.reason}`)
+    return {
+      code: parsed.errors.length > 0 ? 1 : 0,
+      stdout: svg,
+      stderr: stderrLines.length > 0 ? stderrLines.join('\n') + '\n' : '',
+    }
+  }
   const { canvas, skipped } = toJsonCanvas(solved.ops)
   for (const s of skipped) stderrLines.push(`跳过 op#${s.opIndex} ${s.op}:${s.reason}`)
   return {
@@ -341,6 +361,13 @@ export function main(argv: readonly string[]): number {
     process.stderr.write(USAGE)
     return 2
   }
+  // flag 解析:目前仅 render 认 --svg;其余 flag 一律用法错误(不静默吞)
+  const rest = argv.slice(2)
+  const unknownFlag = rest.find((f) => f.startsWith('--') && f !== '--svg')
+  if (unknownFlag !== undefined || (rest.includes('--svg') && cmd !== 'render')) {
+    process.stderr.write(USAGE)
+    return 2
+  }
   let text: string
   try {
     text = readFileSync(file, 'utf8')
@@ -348,13 +375,21 @@ export function main(argv: readonly string[]): number {
     process.stderr.write(`cys-dsl:读不到文件:${file}\n`)
     return 2
   }
-  const result = cmd === 'validate' ? validateText(text) : cmd === 'render' ? renderText(text) : roundtripText(text)
+  const result =
+    cmd === 'validate'
+      ? validateText(text)
+      : cmd === 'render'
+        ? renderText(text, { svg: rest.includes('--svg') })
+        : roundtripText(text)
   if (result.stdout) process.stdout.write(result.stdout)
   if (result.stderr) process.stderr.write(result.stderr)
   return result.code
 }
 
-/* 直接执行时才跑 main(被 import / 测试时不触发)。 */
+/* 直接执行时才跑 main(被 import / 测试时不触发)。
+ * 用 process.exitCode 而非 process.exit:后者不等 stdout 管道 flush,>64KiB 输出
+ * (大画布 render)在 `| jq` 等管道下会静默截断且仍 exit 0。exitCode 让 Node 在
+ * 写队列排空后自然退出。 */
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exit(main(process.argv.slice(2)))
+  process.exitCode = main(process.argv.slice(2))
 }

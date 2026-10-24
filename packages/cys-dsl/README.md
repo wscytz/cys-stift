@@ -4,31 +4,41 @@ cys-dsl — cy's Stift 画布的**双向文字表示(转义)**。整张画布能
 
 ## 是什么
 
-cys-dsl **v7** 文法:**5 种元素**(`card`/`rect`/`frame`/`text`/`arrow`)、6 Bauhaus 色、关系式放置(`right-of`/`below` + `@gap`)、箭头签名(label/color/dash/arrowhead/route/wikilink)、**卡片内容 `@title`(短)/`@content`(长 markdown,`\n` 转义多行)**,以及三条语义 directive:**`@group("名")`**(语义分组,meta.group)、**`@href(#a;#b)`**(卡片显式引用,meta.href id 列表)、**`@compute("公式")`**(安全公式,仅 text,只引用元素几何 `#id.x|y|w|h`;手写 tokenizer + 递归下降,禁裸 eval,不碰卡片内容)。v5 引入内容;v6 将 `freedraw` 移出 DSL;v7 加语义层(group/href/compute)。
+cys-dsl **v9** 文法:**5 种元素**(`card`/`rect`/`frame`/`text`/`arrow`)、6 色名(legacy 枚举冻结)、**关系式放置**(`right-of`/`below #锚` + `@gap`;v9 起 `@组名` 组级相对锚——锚定组包围盒,支持 `@"含空格名"` 与中文裸名)、箭头签名(label/color/dash/arrowhead/route/wikilink)、**卡片内容 `@title`(短)/`@content`(长 markdown,`\n` 转义多行)**,以及语义 directive:**`@group("名")`**(v7,语义分组)、**`@href(#a;#b)`**(v7,显式引用)、**`@compute("公式")`**(v7,安全公式,仅 text)、**`@type/@tags/@links/@code/@quote`**(v8,卡片结构化字段)。v5 内容;v6 freedraw 出 DSL;v9 组级相对锚(锚位三形态与保留字防线见 `DSL_GRAMMAR_REFERENCE`)。
 
 ## public API
 
-- **grammar**:`DSL_VERSION`、`DSL_KINDS`、`DSL_COLORS`、`DSL_COLOR_ALIASES`、`DSL_GRAMMAR_REFERENCE`、`DSL_MAX_TEXT_LEN`、`DSL_MAX_CONTENT_LEN`、`truncateDslText`(代理对安全截断,parser/sanitize 共用)
+- **grammar**:`DSL_VERSION`、`DSL_KINDS`、`DSL_COLORS`、`DSL_COLOR_ALIASES`、`DSL_GRAMMAR_REFERENCE`、`DSL_RESERVED_GROUP_ANCHOR_WORDS`(v9 组锚保留字)、`DSL_MAX_TEXT_LEN`、`DSL_MAX_CONTENT_LEN`、`truncateDslText`(代理对安全截断)
 - **serialize**:`serializeCanvas`、`serializeCanvasReadable`、`serializeElement`
 - **parse**:`parseDsl`、`parseDslWithDiagnostics`、`parseDslStrictWithDiagnostics`(Peggy 语法驱动)
 - **sanitize**:`sanitizeDslOps`(opt-in 修正层,防 LLM 产非法值不崩)
+- **solve**:`solveRelational` + `ExistingGeom`/`SolveResult`(关系式 → 绝对坐标;组锚、碰撞避让、断链诊断)
+- **adapter**:`toJsonCanvas`(→ JSON Canvas 1.0;integer 坐标、id 去重、跳过留痕)+ `JsonCanvasFile/Node/Edge/SkippedOp` 类型
+- **svg**:`toSvg`(零依赖预览级 SVG,CLI `render --svg` 的底层)
+- **types**:`CanvasElement` 等边界类型(与 canvas-engine/domain 结构兼容,`types-compat.test.ts` 钉住)
 
 ## 用法
 
 ```ts
-import { serializeCanvas, parseDsl, sanitizeDslOps, DSL_GRAMMAR_REFERENCE } from '@cys-stift/dsl'
+import { serializeCanvas, parseDsl, sanitizeDslOps, solveRelational, DSL_GRAMMAR_REFERENCE } from '@cys-stift/dsl'
 
 const text  = serializeCanvas(elements)     // 画布 → 文本
 const ops   = parseDsl(text)                // 文本 → ops
 const clean = sanitizeDslOps(ops, ctx)      // 修正非法值(永不抛错)
+const solved = solveRelational(clean.ops)   // 关系式 → 绝对坐标
 ```
+
+## CLI
+
+`pnpm --filter @cys-stift/dsl cli` 或 `tsx src/cli.ts <命令> <file.sift>`(npm 发布后为 `npx`;后缀 `.sift` 为约定,任意文本文件可读):
+
+- `validate` — 语法/卫生/求解全链检查;诊断走 stderr,警告不阻断(exit 0)/ 语法错 exit 1 / 用法错 exit 2。
+- `render` — 默认输出 JSON Canvas 1.0(Obsidian `.canvas` 直接可开);`--svg` 输出预览级 SVG。
+- `roundtrip` — DSL→元素→DSL 双往返签名比对(转义保真)。
 
 ## 依赖
 
-- `@cys-stift/canvas-engine`(`CanvasElement` 类型)
-- `@cys-stift/domain`(`CardId` 类型)
-
-纯逻辑、框架无关,可独立于 `apps/web` 复用。
+**零运行时依赖**(2026-10-24 剥离定案):src/ 只 import 包内模块与 Node 内建(cli.ts 的 `node:fs`/`node:url`,不进 barrel)。原 `@cys-stift/canvas-engine`/`@cys-stift/domain` 类型依赖已改为包内 `types.ts` 边界副本 + 结构兼容测试(`types-compat.test.ts`);二者仅作为 devDep 供测试比对。框架无关,可独立于本 monorepo 复用。
 
 ## 文法治理
 

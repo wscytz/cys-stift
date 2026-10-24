@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { DslCardOp, DslOp } from '../dsl-parser'
 import { parseDsl } from '../dsl-parser'
+import { sanitizeDslOps } from '../dsl-sanitize'
 import { solveRelational, type ExistingGeom } from '../dsl-relational-solver'
 
 /** v9 组级相对锚:right-of/below @组名 = 以该组已解成员包围盒为锚。 */
@@ -16,6 +17,32 @@ describe('v9 组级相对锚 · parse', () => {
   it('#id 卡锚不受影响(回归)', () => {
     const ops = parseDsl('[card #n create] right-of #c0')
     expect(card(ops[0]).rel).toEqual({ dir: 'right-of', anchor: 'c0', gap: 20 })
+  })
+
+  it('引号组锚 @\"Q3 规划\" → anchorQuoted:true,转义处理', () => {
+    const ops = parseDsl('[card #n create] right-of @"Q3 规划"')
+    expect(card(ops[0]).rel).toMatchObject({ dir: 'right-of', anchor: 'Q3 规划', anchorGroup: true, anchorQuoted: true })
+  })
+
+  it('CJK 裸名组锚可解析', () => {
+    const ops = parseDsl('[card #n create] right-of @数据模型')
+    expect(card(ops[0]).rel).toMatchObject({ dir: 'right-of', anchor: '数据模型', anchorGroup: true })
+  })
+})
+
+describe('v9 组级相对锚 · sanitize 保留字防线', () => {
+  it('锚位裸名撞指令词 → 诊断 + 剥 rel(不静默吞)', () => {
+    const { ops, diagnostics } = sanitizeDslOps(parseDsl('[card #n create] right-of @gap(50)'))
+    expect(diagnostics).toHaveLength(1)
+    expect(diagnostics[0]!.message).toContain('@gap 与内建指令同名')
+    const n = card(ops.find((o) => o.type === 'card' && o.cardId === 'n'))
+    expect(n.rel).toBeUndefined()
+  })
+
+  it('引号形式 @\"gap\" 是显式意图,不受保留字限制', () => {
+    const { ops, diagnostics } = sanitizeDslOps(parseDsl('[card #n create] right-of @"gap"'))
+    expect(diagnostics).toEqual([])
+    expect(card(ops[0]).rel).toMatchObject({ anchor: 'gap', anchorGroup: true, anchorQuoted: true })
   })
 })
 
@@ -113,5 +140,67 @@ describe('v9 组级相对锚 · solve', () => {
     const n = card(out.find((o) => o.type === 'card' && o.cardId === 'n'))
     expect(n.x).toBe(120)
     expect(n.y).toBe(500)
+  })
+
+  it('断链占位卡即使声明了同组名,也不把组 bbox 拖向原点', () => {
+    const { ops: out, diagnostics } = solveRelational(
+      parseDsl(
+        [
+          '[card #b create] right-of #nowhere @group("g")',
+          '[card #m create] @pos(500,500) @size(100,80) @group("g")',
+          '[card #n create] right-of @g @gap(20)',
+        ].join('\n'),
+      ),
+    )
+    // #b 断链占位 (0,0) 带 group g —— 不进 bbox;#n 锚到 m 真实位置
+    expect(diagnostics.some((d) => d.message.includes('#nowhere'))).toBe(true)
+    const n = card(out.find((o) => o.type === 'card' && o.cardId === 'n'))
+    expect(n.x).toBe(620)
+    expect(n.y).toBe(500)
+  })
+
+  it('组锚失败的占位卡同样不污染后续组 bbox', () => {
+    const { ops: out } = solveRelational(
+      parseDsl(
+        [
+          '[card #z create] right-of @ghost @gap(20) @group("g")',
+          '[card #m create] @pos(500,500) @size(100,80) @group("g")',
+          '[card #n create] below @g @gap(20)',
+        ].join('\n'),
+      ),
+    )
+    const n = card(out.find((o) => o.type === 'card' && o.cardId === 'n'))
+    expect(n.x).toBe(500)
+    expect(n.y).toBe(600)
+  })
+
+  it('更新既有组员不带 @group 时沿用组名(与 web apply 语义一致)', () => {
+    const existing = new Map<string, ExistingGeom>([
+      ['a', { x: 0, y: 0, w: 100, h: 80, group: 'old' }],
+    ])
+    const { ops: out, diagnostics } = solveRelational(
+      parseDsl(['[card #a] @pos(600,600) @size(100,80)', '[card #n create] right-of @old @gap(20)'].join('\n')),
+      existing,
+    )
+    expect(diagnostics).toEqual([])
+    const n = card(out.find((o) => o.type === 'card' && o.cardId === 'n'))
+    expect(n.x).toBe(720)
+    expect(n.y).toBe(600)
+  })
+
+  it('中文组名 + 引号组名端到端可锚', () => {
+    const { ops: out, diagnostics } = solveRelational(
+      parseDsl(
+        [
+          '[card #m create] @pos(0,0) @size(100,80) @group("Q3 规划")',
+          '[card #n1 create] right-of @"Q3 规划" @gap(30)',
+          '[card #k create] @pos(0,300) @size(100,80) @group("数据模型")',
+          '[card #n2 create] below @数据模型 @gap(20)',
+        ].join('\n'),
+      ),
+    )
+    expect(diagnostics).toEqual([])
+    expect(card(out.find((o) => o.type === 'card' && o.cardId === 'n1')).x).toBe(130)
+    expect(card(out.find((o) => o.type === 'card' && o.cardId === 'n2')).y).toBe(400)
   })
 })

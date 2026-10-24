@@ -14,6 +14,41 @@
 export const DSL_VERSION = 9
 
 /**
+ * v9 组锚保留字:锚位裸名 `@词` 与内建指令同名时,sanitize 产诊断并剥 rel
+ * (防"组名漏写/误吞指令"静默成错误组锚)。引号形式 `@"gap"` 是显式意图,不受此限。
+ * 与指令清单手动同步——新增指令时补这里。
+ */
+export const DSL_RESERVED_GROUP_ANCHOR_WORDS: readonly string[] = [
+  'pos',
+  'size',
+  'color',
+  'title',
+  'content',
+  'type',
+  'tags',
+  'links',
+  'code',
+  'quote',
+  'group',
+  'href',
+  'compute',
+  'gap',
+  'create',
+  'from',
+  'to',
+  'arrowhead',
+  'route',
+  'curve',
+  'elbow',
+  'wikilink',
+  'dash',
+  'label',
+  'text',
+  'right-of',
+  'below',
+]
+
+/**
  * `@text("...")` / `@label("...")` / `@title("...")` 值的最大字符数(int 级)。
  *
  * 防护:AI 输出不可信,可能产超长文本(幻觉 / 错误重复 / token 失控)→ 渲染溢出 / 存储
@@ -174,8 +209,13 @@ export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one eleme
   #   Group anchors (v9): anchor a card to a whole GROUP's bounding box with @groupname:
   #   [card #id] right-of @methods @gap(30)  # right of the methods group (x=bbox.maxX+gap; y=bbox.minY)
   #   [card #id] below @axes @gap(30)        # below the axes group (y=bbox.maxY+gap; x=bbox.minX)
-  #     The bbox covers group members resolved SO FAR (write group members before their group anchor;
-  #     a group with no members yet → diagnostic). Group names are simple ids (letters/digits/_:-).
+  #     Anchor forms: @name (simple name: letters/digits/_:/-/CJK), @"any name" (spaces etc.),
+  #     or anchor a member #id. A group declared as @group("Q3 规划") is anchored via
+  #     @"Q3 规划" or via one of its member ids. A bare @word that collides with a built-in
+  #     directive (e.g. @gap/@pos) is REJECTED with a diagnostic — put @gap(n) AFTER the
+  #     anchor, never at the anchor slot. The bbox covers group members resolved SO FAR
+  #     (write group members before their group anchor; a group with no members yet →
+  #     diagnostic).
   [rect #id] @pos(x, y) @size(w, h) @color(c) [@group("…")]
   [text #id] @pos(x, y) @text("...") @color(c) [@group("…")] [@compute("…")]
   #   @compute("expr") (v7, text only): a SAFE formula evaluated into the text's displayed value.

@@ -2,7 +2,7 @@
  * DSL Parser — parses AI output (or pasted/edited DSL) for canvas layout.
  *
  * 架构(正则 → PEG 升级,2026-07):
- *   dsl.peggy(Peggy 语法,结构 tokenizer)—— pnpm gen:dsl → dsl-parser.gen.js
+ *   dsl.peggy(Peggy 语法,结构 tokenizer)—— `pnpm --filter @cys-stift/dsl gen` → dsl-parser.gen.js
  *   本文件(TS 包装层)—— 按行调用生成 parser,做语义 coercion:
  *     Number / finite 守卫 / escape unescape / 颜色枚举校验 / elbow 拆分 / DSL_MAX_TEXT_LEN 截断
  *   永不抛错 + 坐标恒有限 + byte-equal round-trip 契约不变(见 dsl-* 测试)。
@@ -48,11 +48,17 @@ export type DslCardOp = {
   /** B工程 pilot:关系式坐标。有 rel 时 x/y 是占位(0,0),求解器 solveRelational 填真值。
    *  right-of #anchor:x = anchor.x + anchor.w + gap;y = anchor.y
    *  below    #anchor:y = anchor.y + anchor.h + gap;x = anchor.x
-   *  v9 组级相对锚:anchorGroup=true 时 anchor 是组名(语法 `right-of @组名`),
-   *  锚定该组当前已解成员的包围盒(lazy,顺序敏感,见 solveRelational):
-   *  right-of @g:x = bbox.maxX + gap;y = bbox.minY。below @g:y = bbox.maxY + gap;x = bbox.minX。
+   *  v9 组级相对锚:anchorGroup=true 时 anchor 是组名(锚位三形态:@裸名 / @"含空格名" /
+   *  或退回 #组员id)。anchorQuoted 标记引号形式(保留字检查豁免)。锚位裸名撞保留指令词由
+   *  sanitize 产诊断并剥 rel。组锚语义(lazy 组包围盒、顺序敏感)见 solveRelational。
    *  仅 AI 输入路径;serializeCanvas 永不 emit rel(rel 解决后画布存绝对坐标)。 */
-  rel?: { dir: 'right-of' | 'below'; anchor: string; gap: number; anchorGroup?: boolean }
+  rel?: {
+    dir: 'right-of' | 'below'
+    anchor: string
+    gap: number
+    anchorGroup?: boolean
+    anchorQuoted?: boolean
+  }
   /** v5(E):无 @pos 的"纯属性/内容编辑"标志。无 @pos(且非 create、非 rel)但携带
    *  title/content/color/size 之一时置真 —— apply 时(planCard)沿用现有卡几何,只更那些字段;
    *  x/y 为占位(0,0),apply 期忽略。serializeCanvas 永不 emit(始终绝对坐标)→ 输入专用。 */
@@ -339,7 +345,7 @@ interface Folded {
   route?: string
   curve?: { cx: number; cy: number }
   elbow?: { x: number; y: number }[]
-  rel?: { dir: string; anchor: string; anchorGroup?: boolean }
+  rel?: { dir: string; anchor: string; anchorGroup?: boolean; anchorQuoted?: boolean }
   gap?: number
   create?: boolean
   from?: string
@@ -376,11 +382,21 @@ function fold(ds: unknown[]): Folded {
       case 'elbow': if (!a.elbow) a.elbow = parseElbow(String(v1)); break
       case 'rel': {
         if (!a.rel) {
-          // v9:'@组名'(groupRef 带 '@' 前缀)→ anchorGroup:true,anchor 存组名
+          // v9:锚位三形态 —— '#id'(卡锚)/ '@裸名'(组锚,CJK 可)/ '@Q引号名'(组锚,任意名)。
+          // 保留指令词裸名 grammar 故意放行,由 sanitize 产诊断并剥 rel(保精确报错)。
           const anchor = String(v2)
-          a.rel = anchor.startsWith('@')
-            ? { dir: String(v1), anchor: anchor.slice(1), anchorGroup: true }
-            : { dir: String(v1), anchor }
+          if (anchor.startsWith('@Q')) {
+            a.rel = {
+              dir: String(v1),
+              anchor: unescapeQuoted(anchor.slice(2)),
+              anchorGroup: true,
+              anchorQuoted: true,
+            }
+          } else if (anchor.startsWith('@')) {
+            a.rel = { dir: String(v1), anchor: anchor.slice(1), anchorGroup: true }
+          } else {
+            a.rel = { dir: String(v1), anchor }
+          }
         }
         break
       }

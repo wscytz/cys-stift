@@ -10,7 +10,7 @@
 // directive* 末尾的 skipChunk 消费"未知非空白串",让后续已知 directive 仍能被找到 ——
 // 等价旧正则的整行任意位置提取(如 from #card:1 中 from 截到 #card 后,skipChunk 吃 :1,to 仍命中)。
 //
-// 改本文件后跑:`pnpm --filter @cys-stift/cys-dsl gen` 重生 dsl-parser.gen.js。
+// 改本文件后跑:`pnpm --filter @cys-stift/dsl gen` 重生 dsl-parser.gen.js。
 // 可接受语言与旧正则 parser 等价(契约见 dsl-parser/robustness/e2e-roundtrip/sync 测试)。
 
 Line
@@ -71,9 +71,17 @@ colorDir
 relationDir
   = dir:$('right-of' / 'below') sp anchor:(idRef / groupRef) { return ['rel', dir, anchor] }
 
-// v9:组级相对锚。'@'+组名(与 idRef 同字符集;含空格的引用组名不适用,需经组员 id 锚定)
+// v9:组级相对锚。锚位三形态:
+//   @bareName   裸名 = #id 字符集 + CJK 统一表意文字(中文组名主流用法)
+//   @"任意名"   引号形式,任意非引号字符(含空格);parser 侧 unescapeQuoted
+//   与内建指令同名的裸词(@gap/@pos/…)也会在此命中,由 sanitize 层产诊断并剥 rel
+//   (grammar 故意放行以保住精确报错——若在此拒绝,行会落 skipChunk 静默吞掉)。
 groupRef
-  = '@' g:$idChars { return '@' + g }
+  = '@' '"' g:$([^"]*) '"' { return '@Q' + g }
+  / '@' g:$bareGroupName { return '@' + g }
+
+bareGroupName
+  = $([a-zA-Z0-9_:-] / [一-鿿])+
 
 gapDir
   = '@gap(' g:$num ')' { return ['gap', g] }

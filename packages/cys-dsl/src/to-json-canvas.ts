@@ -84,6 +84,25 @@ export function toJsonCanvas(ops: DslOp[]): { canvas: JsonCanvasFile; skipped: S
     if (Object.keys(cys).length > 0) node_or_edge.cys = cys
   }
 
+  // id 全局唯一(JSON Canvas spec:node/edge id 各自 unique)。显式重复 → 跳过留痕
+  // (保首个,后续引用边仍解析到首节点);兜底生成 id 撞车 → 静默改名(边 id 无引用语义)。
+  const usedIds = new Set<string>()
+  function claimId(candidate: string, explicit: boolean, opIndex: number, opKind: string): string | null {
+    if (!usedIds.has(candidate)) {
+      usedIds.add(candidate)
+      return candidate
+    }
+    if (explicit) {
+      skipped.push({ opIndex, op: opKind, reason: `id ${candidate} 与更早元素重复,仅首个进转换` })
+      return null
+    }
+    let n = 2
+    while (usedIds.has(`${candidate}-${n}`)) n++
+    const renamed = `${candidate}-${n}`
+    usedIds.add(renamed)
+    return renamed
+  }
+
   function addCard(op: DslCardOp, opIndex: number): void {
     if (op.keepExistingPos === true) {
       skipped.push({
@@ -93,15 +112,19 @@ export function toJsonCanvas(ops: DslOp[]): { canvas: JsonCanvasFile; skipped: S
       })
       return
     }
+    const id = claimId(op.cardId, true, opIndex, 'card')
+    if (id === null) return
+    // spec:x/y/width/height 为 required integer —— solver/parse 可产小数,此处取整。
+    // text 型节点 text 为 required —— 无 @title 时落空串。
     const node: JsonCanvasNode = {
-      id: op.cardId,
+      id,
       type: 'text',
-      x: op.x,
-      y: op.y,
-      width: op.w ?? JSON_CANVAS_DEFAULT_CARD_W,
-      height: op.h ?? JSON_CANVAS_DEFAULT_CARD_H,
+      x: Math.round(op.x),
+      y: Math.round(op.y),
+      width: Math.round(op.w ?? JSON_CANVAS_DEFAULT_CARD_W),
+      height: Math.round(op.h ?? JSON_CANVAS_DEFAULT_CARD_H),
+      text: op.title ?? '',
     }
-    if (op.title !== undefined) node.text = op.title
     pushCys(node, {
       ...(op.color !== undefined ? { color: op.color } : {}),
       ...(op.content !== undefined ? { content: op.content } : {}),
@@ -125,15 +148,17 @@ export function toJsonCanvas(ops: DslOp[]): { canvas: JsonCanvasFile; skipped: S
       })
       return
     }
+    const id = claimId(op.id ?? `n${opIndex}`, op.id !== undefined, opIndex, op.shape)
+    if (id === null) return
     const node: JsonCanvasNode = {
-      id: op.id ?? `n${opIndex}`,
+      id,
       type: 'text',
-      x: op.x,
-      y: op.y,
-      width: op.w ?? JSON_CANVAS_DEFAULT_TEXT_W,
-      height: op.h ?? JSON_CANVAS_DEFAULT_TEXT_H,
+      x: Math.round(op.x),
+      y: Math.round(op.y),
+      width: Math.round(op.w ?? JSON_CANVAS_DEFAULT_TEXT_W),
+      height: Math.round(op.h ?? JSON_CANVAS_DEFAULT_TEXT_H),
+      text: op.text ?? '',
     }
-    if (op.text !== undefined) node.text = op.text
     pushCys(node, {
       ...(op.color !== undefined ? { color: op.color } : {}),
       ...(op.group !== undefined ? { group: op.group } : {}),
@@ -152,7 +177,9 @@ export function toJsonCanvas(ops: DslOp[]): { canvas: JsonCanvasFile; skipped: S
       })
       return
     }
-    const edge: JsonCanvasEdge = { id: op.id ?? `e${opIndex}`, fromNode: op.from, toNode: op.to }
+    const edgeId = claimId(op.id ?? `e${opIndex}`, op.id !== undefined, opIndex, 'arrow')
+    if (edgeId === null) return
+    const edge: JsonCanvasEdge = { id: edgeId, fromNode: op.from, toNode: op.to }
     if (op.label !== undefined) edge.label = op.label
     pushCys(edge, {
       ...(op.color !== undefined ? { color: op.color } : {}),
