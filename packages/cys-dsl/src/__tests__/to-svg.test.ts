@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { parseDsl } from '../dsl-parser'
 import { sanitizeDslOps } from '../dsl-sanitize'
 import { solveRelational } from '../dsl-relational-solver'
-import { toSvg } from '../to-svg'
+import { toSvg, routeAround } from '../to-svg'
 
 /** CLI render --svg 的底层:ops → 独立 SVG(预览级)。 */
 function solve(text: string) {
@@ -95,5 +95,176 @@ describe('toSvg', () => {
     const long = '很长的内容'.repeat(50)
     const { svg } = toSvg(solve(`[card #a create] @pos(0,0) @content("${long}")`))
     expect(svg).toContain('…')
+  })
+})
+
+describe('自动避障(routeAround + 默认路由)', () => {
+  // 三卡一排,中间是障碍;绕行路径的任何一段都不许穿过中间卡内域
+  const obstacle = { x: 300, y: 0, w: 240, h: 110 }
+  const noHit = (pts: { x: number; y: number }[]): boolean => {
+    for (let i = 0; i < pts.length - 1; i++) {
+      // 与 toSvg 内部同口径:内缩 2px 后做线段相交测试
+      const r = { x: obstacle.x + 2, y: obstacle.y + 2, w: obstacle.w - 4, h: obstacle.h - 4 }
+      const a = pts[i]!
+      const b = pts[i + 1]!
+      const dx = b.x - a.x
+      const dy = b.y - a.y
+      let t0 = 0
+      let t1 = 1
+      let miss = false
+      for (const [p, q] of [
+        [-dx, a.x - r.x],
+        [dx, r.x + r.w - a.x],
+        [-dy, a.y - r.y],
+        [dy, r.y + r.h - a.y],
+      ] as Array<[number, number]>) {
+        if (p === 0) {
+          if (q < 0) miss = true
+        } else {
+          const t = q / p
+          if (p < 0) {
+            if (t > t1) miss = true
+            if (t > t0) t0 = t
+          } else {
+            if (t < t0) miss = true
+            if (t < t1) t1 = t
+          }
+        }
+        if (miss) break
+      }
+      if (!miss && t1 - t0 > 0.01) return false
+    }
+    return true
+  }
+
+  it('直连穿卡 → 绕行整条路径(端点重贴边);直连不穿卡 → null', () => {
+    const src = { x: 0, y: 0, w: 240, h: 110 }
+    const dst = { x: 600, y: 0, w: 240, h: 110 }
+    // 穿障碍的对角线 → 有绕行且全程不穿,首末端点贴在源/目标边界上(哪条边由最短路决定)
+    const detour = routeAround({ x: 240, y: 90 }, { x: 600, y: 20 }, src, dst, [src, obstacle, dst])
+    expect(detour).not.toBeNull()
+    expect(noHit(detour!)).toBe(true)
+    const onBorder = (p: { x: number; y: number }, r: { x: number; y: number; w: number; h: number }): boolean =>
+      ((Math.abs(p.x - r.x) < 0.5 || Math.abs(p.x - (r.x + r.w)) < 0.5) && p.y >= r.y - 0.5 && p.y <= r.y + r.h + 0.5) ||
+      ((Math.abs(p.y - r.y) < 0.5 || Math.abs(p.y - (r.y + r.h)) < 0.5) && p.x >= r.x - 0.5 && p.x <= r.x + r.w + 0.5)
+    expect(onBorder(detour![0]!, src)).toBe(true)
+    expect(onBorder(detour![detour!.length - 1]!, dst)).toBe(true)
+    // 不穿任何障碍的斜线(从源右缘绕过障碍左下角到目标顶边) → null(不画蛇添足)
+    const clear = routeAround({ x: 240, y: 55 }, { x: 370, y: 200 }, { x: 0, y: 0, w: 240, h: 110 }, { x: 300, y: 200, w: 240, h: 110 }, [
+      { x: 0, y: 0, w: 240, h: 110 },
+      { x: 300, y: 0, w: 240, h: 110 },
+      { x: 300, y: 200, w: 240, h: 110 },
+    ])
+    expect(clear).toBeNull()
+  })
+
+  it('直连擦两簇障碍、包围盒走廊全撞墙时,障碍间隙走廊救场(回归:demo 喂出需求箭头)', () => {
+    // 左列 s2→e1 的直连线同时擦到头顶的 s1 和右列的 e2:包围盒横跨两列,
+    // 外扩走廊全撞墙;唯一活路是两列之间的间隙走廊(x≈270)
+    const s0 = { x: 0, y: 0, w: 240, h: 110 }
+    const s1 = { x: 0, y: 126, w: 240, h: 120 }
+    const s2 = { x: 0, y: 262, w: 240, h: 120 }
+    const e1 = { x: 300, y: 0, w: 240, h: 120 }
+    const e2 = { x: 300, y: 136, w: 240, h: 120 }
+    const e3 = { x: 300, y: 272, w: 240, h: 120 }
+    const detour = routeAround({ x: 188.7, y: 262 }, { x: 351.3, y: 120 }, s2, e1, [s0, s1, s2, e1, e2, e3])
+    expect(detour).not.toBeNull()
+    const rects = [s0, s1, s2, e1, e2, e3].map((r) => ({ x: r.x + 2, y: r.y + 2, w: r.w - 4, h: r.h - 4 }))
+    for (let i = 0; i < detour!.length - 1; i++) {
+      for (const r of rects) {
+        const a = detour![i]!
+        const b = detour![i + 1]!
+        const dx = b.x - a.x
+        const dy = b.y - a.y
+        let t0 = 0
+        let t1 = 1
+        let miss = false
+        for (const [p, q] of [
+          [-dx, a.x - r.x],
+          [dx, r.x + r.w - a.x],
+          [-dy, a.y - r.y],
+          [dy, r.y + r.h - a.y],
+        ] as Array<[number, number]>) {
+          if (p === 0) {
+            if (q < 0) miss = true
+          } else {
+            const t = q / p
+            if (p < 0) {
+              if (t > t1) miss = true
+              if (t > t0) t0 = t
+            } else {
+              if (t < t0) miss = true
+              if (t < t1) t1 = t
+            }
+          }
+          if (miss) break
+        }
+        expect(miss || t1 - t0 <= 0.01).toBe(true)
+      }
+    }
+  })
+
+  it('默认路由避障生效;显式 straight/curve 不干预', () => {
+    const ops = solve(
+      [
+        '[card #a create] @pos(0,0) @size(200,100)',
+        '[card #m create] @pos(400,0) @size(200,100)',
+        '[card #b create] @pos(800,0) @size(200,100)',
+        '[arrow #e1] from #a to #b',
+        '[arrow #e2] from #a to #b @route(straight)',
+      ].join('\n'),
+    )
+    const { svg } = toSvg(ops)
+    // e1 绕行:路径多于一个 L;e2 显式直线:恰一个 L
+    const paths = [...svg.matchAll(/<path d="([^"]+)"/g)].map((m) => m[1]!)
+    expect(paths).toHaveLength(2)
+    const detoured = paths.filter((d) => (d.match(/L /g) ?? []).length > 1)
+    const straight = paths.filter((d) => (d.match(/L /g) ?? []).length === 1)
+    expect(detoured).toHaveLength(1)
+    expect(straight).toHaveLength(1)
+  })
+
+  it('绕行不撞进别的障碍(上下夹击时仍能找到走廊)', () => {
+    const src = { x: 0, y: 100, w: 100, h: 100 }
+    const dst = { x: 500, y: 100, w: 100, h: 100 }
+    const up = { x: 250, y: 0, w: 100, h: 80 }
+    const down = { x: 250, y: 220, w: 100, h: 80 }
+    const mid = { x: 250, y: 110, w: 100, h: 80 }
+    const detour = routeAround({ x: 100, y: 150 }, { x: 500, y: 150 }, src, dst, [src, mid, up, down, dst])
+    expect(detour).not.toBeNull()
+    const all = [src, mid, up, down, dst].map((r) => ({ x: r.x + 2, y: r.y + 2, w: r.w - 4, h: r.h - 4 }))
+    for (let i = 0; i < detour!.length - 1; i++) {
+      for (const r of all) {
+        // 与 segHitsRect 同口径的复查:绕行段不穿任何内缩障碍
+        const a = detour![i]!
+        const b = detour![i + 1]!
+        const dx = b.x - a.x
+        const dy = b.y - a.y
+        let t0 = 0
+        let t1 = 1
+        let miss = false
+        for (const [p, q] of [
+          [-dx, a.x - r.x],
+          [dx, r.x + r.w - a.x],
+          [-dy, a.y - r.y],
+          [dy, r.y + r.h - a.y],
+        ] as Array<[number, number]>) {
+          if (p === 0) {
+            if (q < 0) miss = true
+          } else {
+            const t = q / p
+            if (p < 0) {
+              if (t > t1) miss = true
+              if (t > t0) t0 = t
+            } else {
+              if (t < t0) miss = true
+              if (t < t1) t1 = t
+            }
+          }
+          if (miss) break
+        }
+        expect(miss || t1 - t0 <= 0.01).toBe(true)
+      }
+    }
   })
 })

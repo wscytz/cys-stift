@@ -10,6 +10,8 @@
  * - @compute 不在此求值(CLI pipeline 只 parse→sanitize→solve):text 只有 compute 无 text 时
  *   渲染公式原文前缀 '='。
  * - 关系箭头端点按 id 解析到卡/自由元素几何,贴边交点连线;端点缺失 → 跳过并留原因。
+ * - 默认路由自动避障:直连段穿过卡/矩形时自动绕行走廊(L/Z 形候选,端点重贴边,全清才采纳);
+ *   显式 route/curve/elbow 不干预。frame 是容器、text 无边界,都不算障碍。
  * - 路由 straight/curve/elbow 都画;arrowhead arrow=开口 V / triangle=实心三角 / none=无线帽。
  */
 import type { DslOp } from './dsl-parser'
@@ -150,6 +152,145 @@ function arrowHead(tip: Pt, from: Pt, kind: 'arrow' | 'triangle', color: string)
   return `<polyline points="${w1.x},${w1.y} ${tip.x},${tip.y} ${w2.x},${w2.y}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round"/>`
 }
 
+/** 线段与矩形内域是否相交(Liang-Barsky;相交段要有实长,贴边擦过不算)。 */
+function segHitsRect(a: Pt, b: Pt, r: Rect): boolean {
+  let t0 = 0
+  let t1 = 1
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const edges: Array<[number, number]> = [
+    [-dx, a.x - r.x],
+    [dx, r.x + r.w - a.x],
+    [-dy, a.y - r.y],
+    [dy, r.y + r.h - a.y],
+  ]
+  for (const [p, q] of edges) {
+    if (p === 0) {
+      if (q < 0) return false
+    } else {
+      const t = q / p
+      if (p < 0) {
+        if (t > t1) return false
+        if (t > t0) t0 = t
+      } else {
+        if (t < t0) return false
+        if (t < t1) t1 = t
+      }
+    }
+  }
+  return t1 - t0 > 0.01
+}
+
+function inRect(p: Pt, r: Rect): boolean {
+  return p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h
+}
+
+function polyClear(pts: Pt[], rects: Rect[]): boolean {
+  for (let i = 0; i < pts.length - 1; i++) {
+    for (const r of rects) if (segHitsRect(pts[i]!, pts[i + 1]!, r)) return false
+  }
+  for (const p of pts) {
+    for (const r of rects) if (inRect(p, r)) return false
+  }
+  return true
+}
+
+function polyLen(pts: Pt[]): number {
+  let len = 0
+  for (let i = 0; i < pts.length - 1; i++) {
+    len += Math.hypot(pts[i + 1]!.x - pts[i]!.x, pts[i + 1]!.y - pts[i]!.y)
+  }
+  return len
+}
+
+/** 折线中点(按弧长走一半;label 锚点用)。 */
+function polyMid(pts: Pt[]): Pt {
+  const half = polyLen(pts) / 2
+  let acc = 0
+  for (let i = 0; i < pts.length - 1; i++) {
+    const seg = Math.hypot(pts[i + 1]!.x - pts[i]!.x, pts[i + 1]!.y - pts[i]!.y)
+    if (acc + seg >= half && seg > 0) {
+      const t = (half - acc) / seg
+      return { x: pts[i]!.x + (pts[i + 1]!.x - pts[i]!.x) * t, y: pts[i]!.y + (pts[i + 1]!.y - pts[i]!.y) * t }
+    }
+    acc += seg
+  }
+  return pts[pts.length - 1]!
+}
+
+/** 一轴上障碍区间并集的空隙中点(空隙 ≥ minGap 才算可行走廊)。 */
+function corridors(rects: Rect[], axis: 'x' | 'y', minGap: number): number[] {
+  const ivals = rects
+    .map((r) => (axis === 'x' ? [r.x, r.x + r.w] : [r.y, r.y + r.h]))
+    .sort((a, b) => a[0]! - b[0]!)
+  const merged: Array<[number, number]> = []
+  for (const iv of ivals) {
+    const last = merged[merged.length - 1]
+    if (last && iv[0]! <= last[1]) last[1] = Math.max(last[1], iv[1]!)
+    else merged.push([iv[0]!, iv[1]!])
+  }
+  const mids: number[] = []
+  for (let i = 0; i < merged.length - 1; i++) {
+    const start = merged[i]![1]
+    const end = merged[i + 1]![0]
+    if (end - start >= minGap) mids.push((start + end) / 2)
+  }
+  return mids
+}
+
+/**
+ * 默认路由自动避障:直连段穿过障碍时,生成绕行路标再整段验证。候选三族:
+ * L 形 2 个 / 命中包围盒外扩 Z 形 4 个 / 障碍间隙走廊 Z 形(两轴各若干——
+ * 直连线同时擦到两簇障碍时,包围盒外扩走廊会全撞墙,列间走廊才是活路)。
+ * 每个候选都把端点按新方向重新贴边(borderPoint),返回**整条路径**(含新端点)——
+ * 调用方直接用,不再拼原端点(否则末端沿卡边滑行,箭头顺着边飘)。
+ * 全部候选撞墙则退回 null(直连,诚实降级不硬凑)。margin=走廊与障碍的间距。
+ */
+export function routeAround(
+  p1: Pt,
+  p2: Pt,
+  src: Rect,
+  dst: Rect,
+  obstacles: Rect[],
+  margin = 16,
+): Pt[] | null {
+  // 内缩 2px:贴边端点(恰在原边界上)落进内缩矩形之外,不误报穿越
+  const rects = obstacles
+    .filter((r) => r.w > 12 && r.h > 12)
+    .map((r) => ({ x: r.x + 2, y: r.y + 2, w: r.w - 4, h: r.h - 4 }))
+  if (rects.length === 0) return null
+  const hits = rects.filter((r) => segHitsRect(p1, p2, r))
+  if (hits.length === 0) return null
+  const minX = Math.min(...hits.map((r) => r.x))
+  const minY = Math.min(...hits.map((r) => r.y))
+  const maxX = Math.max(...hits.map((r) => r.x + r.w))
+  const maxY = Math.max(...hits.map((r) => r.y + r.h))
+  const cands: Pt[][] = [
+    [{ x: p2.x, y: p1.y }],
+    [{ x: p1.x, y: p2.y }],
+    [{ x: p1.x, y: minY - margin }, { x: p2.x, y: minY - margin }],
+    [{ x: p1.x, y: maxY + margin }, { x: p2.x, y: maxY + margin }],
+    [{ x: minX - margin, y: p1.y }, { x: minX - margin, y: p2.y }],
+    [{ x: maxX + margin, y: p1.y }, { x: maxX + margin, y: p2.y }],
+  ]
+  for (const c of corridors(rects, 'x', 8)) cands.push([{ x: c, y: p1.y }, { x: c, y: p2.y }])
+  for (const c of corridors(rects, 'y', 8)) cands.push([{ x: p1.x, y: c }, { x: p2.x, y: c }])
+  let best: Pt[] | null = null
+  let bestScore = Infinity
+  for (const w of cands) {
+    const head = w[0]!
+    const tail = w[w.length - 1]!
+    const path = [borderPoint(src, head.x, head.y), ...w, borderPoint(dst, tail.x, tail.y)]
+    if (!polyClear(path, rects)) continue
+    const score = polyLen(path) + w.length * 8
+    if (score < bestScore) {
+      bestScore = score
+      best = path
+    }
+  }
+  return best
+}
+
 function dashAttr(dash?: string): string {
   if (dash === 'dashed') return ' stroke-dasharray="8 6"'
   if (dash === 'dotted') return ' stroke-dasharray="2 5"'
@@ -171,19 +312,24 @@ export function toSvg(ops: DslOp[]): { svg: string; skipped: SvgSkip[] } {
     if (r.y + r.h > maxY) maxY = r.y + r.h
   }
 
-  // 第一遍:登记几何(箭头端点解析用)
+  // 第一遍:登记几何(箭头端点解析用);卡 + rect 同时登记为避障障碍(frame 是容器、text 无边界,不算)
   const geom = new Map<string, Rect>()
+  const obstacles: Rect[] = []
   for (const op of ops) {
     if (op.type === 'card') {
-      geom.set(String(op.cardId), { x: op.x, y: op.y, w: op.w ?? CARD_DEFAULT_W, h: op.h ?? CARD_DEFAULT_H })
+      const r = { x: op.x, y: op.y, w: op.w ?? CARD_DEFAULT_W, h: op.h ?? CARD_DEFAULT_H }
+      geom.set(String(op.cardId), r)
+      obstacles.push(r)
     } else if (op.type === 'free' && op.id) {
       const isText = op.shape === 'text'
-      geom.set(op.id, {
+      const r = {
         x: op.x,
         y: op.y,
         w: op.w ?? (isText ? TEXT_DEFAULT_W : CARD_DEFAULT_W),
         h: op.h ?? (isText ? TEXT_DEFAULT_H : CARD_DEFAULT_H),
-      })
+      }
+      geom.set(op.id, r)
+      if (op.shape === 'rect') obstacles.push(r)
     }
   }
 
@@ -255,6 +401,8 @@ export function toSvg(ops: DslOp[]): { svg: string; skipped: SvgSkip[] } {
     let p1: Pt | undefined
     let p2: Pt | undefined
     let mid: Pt[] = []
+    let srcRect: Rect | undefined
+    let dstRect: Rect | undefined
     if (op.freeArrow === true) {
       p1 = { x: op.x ?? 0, y: op.y ?? 0 }
       p2 = { x: (op.x ?? 0) + (op.w ?? 0), y: (op.y ?? 0) + (op.h ?? 0) }
@@ -269,37 +417,49 @@ export function toSvg(ops: DslOp[]): { svg: string; skipped: SvgSkip[] } {
         })
         continue
       }
+      srcRect = src
+      dstRect = dst
       p1 = borderPoint(src, dst.x + dst.w / 2, dst.y + dst.h / 2)
       p2 = borderPoint(dst, src.x + src.w / 2, src.y + src.h / 2)
-      if (op.route === 'elbow' && op.elbow !== undefined) mid = op.elbow
+      if (op.route === 'elbow' && op.elbow !== undefined) {
+        mid = op.elbow
+      } else if (op.route === undefined && op.curve === undefined) {
+        // 默认路由自动避障:直连段穿过障碍才绕行;显式 route/curve 交给作者意图。
+        // 返回整条重贴边路径,端点一并替换(箭头方向跟着新末端走,不沿卡边滑)
+        const detour = routeAround(p1, p2, src, dst, obstacles)
+        if (detour) {
+          p1 = detour[0]!
+          p2 = detour[detour.length - 1]!
+          mid = detour.slice(1, -1)
+        }
+      }
     }
     const route = op.route ?? (op.curve !== undefined ? 'curve' : 'straight')
-    grow({ x: Math.min(p1!.x, p2!.x), y: Math.min(p1!.y, p2!.y), w: Math.abs(p2!.x - p1!.x), h: Math.abs(p2!.y - p1!.y) })
     let d: string
     let headFrom: Pt
+    let labelAnchor: Pt
     if (route === 'curve') {
       const c = op.curve ?? { cx: (p1!.x + p2!.x) / 2, cy: (p1!.y + p2!.y) / 2 - 40 }
       d = `M ${p1!.x} ${p1!.y} Q ${c.cx} ${c.cy} ${p2!.x} ${p2!.y}`
       headFrom = { x: c.cx, y: c.cy }
+      labelAnchor = { x: (p1!.x + p2!.x) / 2, y: (p1!.y + p2!.y) / 2 }
+      grow({ x: p1!.x, y: p1!.y, w: 0, h: 0 })
+      grow({ x: p2!.x, y: p2!.y, w: 0, h: 0 })
       grow({ x: c.cx, y: c.cy, w: 0, h: 0 })
-    } else if (route === 'elbow' && mid.length > 0) {
+    } else {
       const pts = [p1!, ...mid, p2!]
       d = `M ${pts.map((p) => `${p.x} ${p.y}`).join(' L ')}`
       headFrom = pts[pts.length - 2]!
-      for (const p of mid) grow({ x: p.x, y: p.y, w: 0, h: 0 })
-    } else {
-      d = `M ${p1!.x} ${p1!.y} L ${p2!.x} ${p2!.y}`
-      headFrom = p1!
+      labelAnchor = polyMid(pts)
+      for (const p of pts) grow({ x: p.x, y: p.y, w: 0, h: 0 })
     }
     arrowBodies.push(`<path d="${d}" fill="none" stroke="${color}" stroke-width="2"${dashAttr(op.dash)}/>`)
     if (op.arrowhead !== 'none') {
       arrowBodies.push(arrowHead(p2!, headFrom, op.arrowhead ?? 'arrow', color))
     }
     if (op.label !== undefined) {
-      const mx = (p1!.x + p2!.x) / 2
-      const my = (p1!.y + p2!.y) / 2
       arrowBodies.push(
-        `<text x="${mx}" y="${my - 6}" font-family="${FONT}" font-size="11" fill="${INK}" text-anchor="middle" stroke="${SURFACE}" stroke-width="3" paint-order="stroke">${esc(op.label)}</text>`,
+        `<text x="${labelAnchor.x}" y="${labelAnchor.y - 6}" font-family="${FONT}" font-size="11" fill="${INK}" text-anchor="middle" stroke="${SURFACE}" stroke-width="3" paint-order="stroke">${esc(op.label)}</text>`,
       )
     }
   }
