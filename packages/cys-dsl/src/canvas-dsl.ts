@@ -21,8 +21,7 @@
  * 产出非零值,DB 路径(canvas-binding)保留字段;若将来引入旋转手柄,须同步在
  * grammar 加 @rotation 指令(加法,bump DSL_VERSION),否则 DSL Apply 会把旋转归零。
  */
-import type { CanvasElement } from '@cys-stift/canvas-engine'
-import type { CardType, TagRef, LinkPreview, CodeBlock, Quote } from '@cys-stift/domain'
+import type { CanvasElement, CardType, TagRef, LinkPreview, CodeBlock, Quote } from './types'
 import { DSL_KINDS, DSL_MAX_TEXT_LEN, DSL_MAX_CONTENT_LEN, DSL_MAX_HREF_TARGETS, DSL_MAX_TAG_COUNT, DSL_MAX_LINK_COUNT, DSL_MAX_CODE_BLOCKS, DSL_MAX_QUOTES } from './dsl-grammar'
 
 /**

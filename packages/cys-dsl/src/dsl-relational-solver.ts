@@ -1,8 +1,11 @@
-'use client'
-
 /**
- * Relational solver(B工程 pilot)—— 解析后、apply 前,把 relational card op
+ * dsl-relational-solver — 解析后、apply 前,把 relational card op
  * (`right-of`/`below #anchor`)解成绝对坐标 op。纯函数,永不抛错。
+ *
+ * 【 provenance 】原 apps/web/src/features/ai/relational-solver.ts(B 工程 pilot),
+ * 2026-10-24 引擎剥离(execution-intent 第 1 步)入包:解算器是 DSL 语义的一半,
+ * 应与 parser 同住,任何宿主(web / CLI / 外部项目)都能把文字解成坐标。
+ * 原文件删除,web 侧消费改走本包 barrel。
  *
  * 设计(见 cys-derivative/paper/experiment/b-relational-dsl-pilot-design.md):
  * - 单遍顺序求解:rel op anchor 到**已处理**元素(同批更早 op 的绝对坐标已知,或画布已有的 card)
@@ -15,9 +18,9 @@
  * 与 sanitize 协作:applyLayout 入口先 sanitize(修正 size/coord/id)再 solve(rel → 绝对)。
  * diagnostic 复用 SanitizeDiagnostic 形态,apply-layout 合并透出。
  */
-import type { DslOp, DslCardOp } from '@cys-stift/dsl'
-import type { SanitizeDiagnostic } from '@cys-stift/dsl'
-import { DSL_MAX_COORD } from '@cys-stift/dsl'
+import type { DslOp, DslCardOp } from './dsl-parser'
+import type { SanitizeDiagnostic } from './dsl-sanitize'
+import { DSL_MAX_COORD } from './dsl-sanitize'
 
 /** 已知几何(anchor 查找用)。来自画布现有 card 或同批更早 op。 */
 export interface ExistingGeom {

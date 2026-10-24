@@ -12,7 +12,7 @@
  * 内的 skipChunk 吃未知残余 → 复刻旧正则的任意位置/任意顺序容错。
  */
 
-import type { CardId, CardType, CodeBlock, Quote } from '@cys-stift/domain'
+import type { CardId, CardType, CodeBlock, Quote } from './types'
 import {
   DSL_COLORS,
   DSL_COLOR_ALIASES,

@@ -5,8 +5,7 @@ import type { CardType, CodeBlock, Quote } from '@cys-stift/domain'
 import type { DslArrowOp, DslCardOp, DslFreeOp, DslOp } from '@cys-stift/dsl'
 import { sanitizeDslOps, evalCompute, evalComputeDetail, formatComputeNumber } from '@cys-stift/dsl'
 import type { SanitizeCtx, SanitizeDiagnostic, ComputeResolver } from '@cys-stift/dsl'
-import { solveRelational } from '../ai/relational-solver'
-import type { ExistingGeom } from '../ai/relational-solver'
+import { solveRelational, type ExistingGeom } from '@cys-stift/dsl'
 
 function uid(prefix: string): string {
   const rand =

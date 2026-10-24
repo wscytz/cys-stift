@@ -4,7 +4,7 @@ import { serializeCanvas } from '@cys-stift/dsl'
 import { DSL_VERSION } from '@cys-stift/dsl'
 import { parseDsl } from '@cys-stift/dsl'
 import { sanitizeDslOps } from '@cys-stift/dsl'
-import { solveRelational } from '../relational-solver'
+import { solveRelational } from '@cys-stift/dsl'
 import { applyLayout, buildApplyPlan } from '../../canvas/apply-layout'
 
 describe('cys-dsl v8 stability contract', () => {

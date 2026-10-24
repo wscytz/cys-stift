@@ -14,11 +14,9 @@
     "test": "vitest run",
     "gen": "peggy src/dsl.peggy -o src/dsl-parser.gen.js --format es"
   },
-  "dependencies": {
-    "@cys-stift/canvas-engine": "workspace:*",
-    "@cys-stift/domain": "workspace:*"
-  },
   "devDependencies": {
+    "@cys-stift/canvas-engine": "workspace:*",
+    "@cys-stift/domain": "workspace:*",
     "peggy": "^5.1.0",
     "typescript": "5.6.3",
     "vitest": "2.1.5"
