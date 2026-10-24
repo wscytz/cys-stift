@@ -239,9 +239,10 @@ function corridors(rects: Rect[], axis: 'x' | 'y', minGap: number): number[] {
 }
 
 /**
- * 默认路由自动避障:直连段穿过障碍时,生成绕行路标再整段验证。候选三族:
+ * 默认路由自动避障:直连段穿过障碍时,生成绕行路标再整段验证。候选四族:
  * L 形 2 个 / 命中包围盒外扩 Z 形 4 个 / 障碍间隙走廊 Z 形(两轴各若干——
- * 直连线同时擦到两簇障碍时,包围盒外扩走廊会全撞墙,列间走廊才是活路)。
+ * 直连线同时擦到两簇障碍时,包围盒外扩走廊会全撞墙,列间走廊才是活路)/
+ * 全部障碍外包盒四向兜底(前面全灭时宁可绕远不可穿模)。
  * 每个候选都把端点按新方向重新贴边(borderPoint),返回**整条路径**(含新端点)——
  * 调用方直接用,不再拼原端点(否则末端沿卡边滑行,箭头顺着边飘)。
  * 全部候选撞墙则退回 null(直连,诚实降级不硬凑)。margin=走廊与障碍的间距。
@@ -275,6 +276,18 @@ export function routeAround(
   ]
   for (const c of corridors(rects, 'x', 8)) cands.push([{ x: c, y: p1.y }, { x: c, y: p2.y }])
   for (const c of corridors(rects, 'y', 8)) cands.push([{ x: p1.x, y: c }, { x: p2.x, y: c }])
+  // 兜底族:绕开全部障碍的外包盒四向——前几族全灭时宁可绕远不可穿模
+  // (长度天然最大,只在短候选都失败时胜出;源/目标被围死才算真无解)
+  const gMinX = Math.min(...rects.map((r) => r.x))
+  const gMinY = Math.min(...rects.map((r) => r.y))
+  const gMaxX = Math.max(...rects.map((r) => r.x + r.w))
+  const gMaxY = Math.max(...rects.map((r) => r.y + r.h))
+  cands.push(
+    [{ x: p1.x, y: gMinY - margin }, { x: p2.x, y: gMinY - margin }],
+    [{ x: p1.x, y: gMaxY + margin }, { x: p2.x, y: gMaxY + margin }],
+    [{ x: gMinX - margin, y: p1.y }, { x: gMinX - margin, y: p2.y }],
+    [{ x: gMaxX + margin, y: p1.y }, { x: gMaxX + margin, y: p2.y }],
+  )
   let best: Pt[] | null = null
   let bestScore = Infinity
   for (const w of cands) {
