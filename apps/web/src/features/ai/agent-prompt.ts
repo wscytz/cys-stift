@@ -91,7 +91,7 @@ export function buildAgentUserPrompt(
   // 不直接带 card body;内容检索仍由上方 RAG allowlist 提供)。
   if (canvasSnapshot?.trim()) {
     parts.push(
-      `\n[Target canvas current state — reuse #id to UPDATE; use cys-dsl v6 rules]\n${canvasSnapshot.trim()}`,
+      `\n[Target canvas current state — reuse #id to UPDATE; use cys-dsl v8 rules]\n${canvasSnapshot.trim()}`,
     )
   }
 

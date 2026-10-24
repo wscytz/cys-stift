@@ -86,9 +86,10 @@ describe('buildAgentUserPrompt', () => {
     expect(p).not.toContain('Relevant cards')
   })
 
-  it('含目标画布快照(可选)', () => {
+  it('含目标画布快照(可选,前言版本串钉 v8)', () => {
     const p = buildAgentUserPrompt('对齐', [], '[card #c1] @pos(100,100)')
     expect(p).toContain('Target canvas current state')
+    expect(p).toContain('use cys-dsl v8 rules')
     expect(p).toContain('[card #c1] @pos(100,100)')
   })
 

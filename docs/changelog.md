@@ -5,7 +5,7 @@
 
 ---
 
-## 2026-08-28 · 1.4.1 · fix: 全量审核回收 —— 字体接线(P1)+ 分段水合 #418 根因修复 + 门禁盲区 + 口径修正(本地 tag v1.4.1)
+## 2026-08-28 · 1.4.1 · fix: 全量审核回收 —— 字体接线(P1)+ 分段水合 #418 根因修复 + 门禁盲区 + 口径修正(tag v1.4.1 · 2026-10-24 发布)
 
 > 08-28 全量审核(v1.4.0..ff2578e 五提交,3 subagent 分维度 + 逐项独立复核)回收:1 P1 + 6 P2 + 11 P3 全修。
 
@@ -19,7 +19,7 @@
 - 验证:lint 7 包 0 错 / test 全绿(domain 87 + canvas-engine 586 + cys-dsl 405 + db 8 + web 1856[+3])/ build 0 警 24 页(根路径 + `WEB_DEPLOY_BASEPATH` 子路径双形态,PWA/woff2 前缀链全验)/ docs:links 过(含 gitignored 假目标对抗用例,门必红)/ render-sweep 18 路由净 / motion-audit 19 项全过(含 2 项字体断言:display 347.1px / body 316.2px vs 系统栈 314.9px,修复前两侧恒等)/ e2e 三套件 **17/17**(e2e-ai 11 + e2e-data 4 + e2e-r18-canvas 2;修复前 12/17,失败全由既有 #418 判定污染)。
 - 测试面扩查(收尾加跑三套 puppeteer e2e):初跑 12/17,5 例 FAIL 判定全部由既有 React #418(水合不匹配)pageerror 触发而功能断言全过 —— stash 基线对照(本批改动全部暂存后重建复跑)红灯逐字一致,实证与本批无关。dev 模式抓组件栈定位根因后**已在本版修复**(见上「分段水合 #418 根因修复」),终态三套件 17/17;e2e 是否纳入常规门禁节奏待定。截图:scripts/_e2e-screenshots/。
 
-## 2026-08-29 · 1.4.2 · fix: 重新探索审回收 —— P1×2(DSL 往返截断 / AI 确认门七字段)+ P2×8 + 复审补丁(本地 tag v1.4.2)
+## 2026-08-29 · 1.4.2 · fix: 重新探索审回收 —— P1×2(DSL 往返截断 / AI 确认门七字段)+ P2×8 + 复审补丁(tag v1.4.2 · 2026-10-24 发布)
 
 > 08-29「全项目重新探索审」(323 个运行时源文件中 234 个近三轮未覆盖,4 维度 subagent + 主 agent 逐条复核:28 认 / 3 部分 / 1 不认 / 1 待核)回收。本批修 P1×2 + P2×8 + P3×5;复审补 P2-4 数值校验与测试基线。未修遗留见文末如实记账。
 
@@ -30,6 +30,7 @@
 - **P3**:graph-view-store 恒定服务端快照(#418 修复模式补漏,该店有消费者非纯 latent);详情弹窗动作集统一;回收站保留策略透明化文案(不自动清理如实告知);rotation 不序列化登记为已知限制。
 - 验证:lint 7 包 0 错 / test 全绿(domain 87 + canvas-engine 586 + cys-dsl 413[+8] + db 8 + web 1873[+17])/ build 0 警 24 页 / e2e 17/17 / render-sweep 18 净 / motion-audit 全过。
 - **未修遗留(记账,后续批次)**:P2-8「Bug7 卸载提交」出处未定位(待补文件/commit 号);P2-9 .cystift id 字符集校验(低危);P3:dsl-dialog 每键全量 parse、引擎宿主 DOM 耦合、undo 6 秒 toast、ask RAG 含归档卡、apiKey 长度界、archive 幽灵索引、proposal 跨 tab 锁粒度、packages/db 死代码、media getAsset 全量 parse、workbench 空态死样式类、BauhausMotif/archive tablist 收敛、graph 筛空态文案、capabilities 平台字段、dev chunk 进产物。
+- **发布随附(2026-10-24 清场)**:agent-prompt 画布快照前言版本串 v6→v8(此前 prompt 向模型谎报语法版本,配测试钉住);stable-release 模板去 1.4.0 专属文案、改版本无关口径(细节指 changelog)。v1.4.2 tag 重指向发布时点 HEAD(原 tag 未推远端,重指不产生历史分叉,含 6ca5733 的 CI desktop 依赖门修复);v1.4.1 / v1.4.2 双 Release 由 CI 出双平台安装包 + SHA256SUMS。
 
 ## 2026-08-27 · 未发布 · chore: 审计回收——扫描豁免留档 + motion-audit 竞态修复 + webroot 备份卫生
 
