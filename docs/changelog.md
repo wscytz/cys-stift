@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-10-24 · 1.4.3 · feat: 内核独立化第一步 —— cys-dsl v9 组级相对锚 + CLI 三件套(.sift)+ SVG 渲染器自动避障(tag v1.4.3 · 2026-10-24 发布)
+
+> cys-dsl 内核独立化第一步:把画布的文本内核剥成零运行时依赖的独立工具——任何人/AI 都能用 CLI 校验、渲染、往返。应用壳行为不变;实验与过程记录在私有仓。
+
+- **cys-dsl v9 组级相对锚**:`right-of/below @组名` 以该组已解成员包围盒为锚,组间距 `@gap(n)` 可控;组名支持中文与引号形式 `@"名"`;与内建指令同名的裸组锚由 sanitize 剥除并产诊断(引号形式豁免)。web 侧分组同锚(apply-layout 组语义对齐),画布 AI 提示词升 v9。
+- **CLI 三件套**(`packages/cys-dsl`):`validate`(语法检查,退出码 0/1/2)/ `render`(默认 JSON Canvas,`--svg` 出独立 SVG)/ `roundtrip`(文字→图→文字无损校验)。文件后缀定案 `.sift`。
+- **to-json-canvas 适配器**:cys-dsl → JSON Canvas 1.0(Obsidian 等工具可直接打开);结构化字段落 `cys` 命名空间;id 去重、integer 坐标、text 必填等 spec 合规,跳过必留原因。
+- **零依赖 SVG 渲染器**(`render --svg`):默认路由**自动避障**——直连段穿过卡/矩形时自动绕行走廊;候选四族(L 形 / 命中包围盒外扩 Z / 障碍间隙走廊 / 全部障碍外包盒四向兜底)整段验证按长度取优,生成路径不穿卡;显式 route/curve/elbow 不干预,源/目标被围死才退直连。文本分词折行(英文整词换行,不拦腰断)。
+- **修复(P1)**:CLI `render` 管道截断——`process.exit` 不等 stdout flush,输出超 64KiB 被静默截半且 exit 0;改 `process.exitCode`(1000 卡 234KB 实测完整)。
+- 验证:cys-dsl 480 tests 过 + 2 跳(live 无凭据)/ lint 0;全量门由 CI stable-release verify job 执行(lint / test / build / docs:links / 版本对齐)。
+
 ## 2026-08-28 · 1.4.1 · fix: 全量审核回收 —— 字体接线(P1)+ 分段水合 #418 根因修复 + 门禁盲区 + 口径修正(tag v1.4.1 · 2026-10-24 发布)
 
 > 08-28 全量审核(v1.4.0..ff2578e 五提交,3 subagent 分维度 + 逐项独立复核)回收:1 P1 + 6 P2 + 11 P3 全修。
