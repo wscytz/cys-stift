@@ -59,7 +59,9 @@ describe('toSvg', () => {
     )
     expect(skipped).toEqual([])
     expect(svg).toContain('Q 250 -60')
-    expect(svg).toContain('L 250 340 L 250 380')
+    // elbow 折点保留,转角圆角化:两个折点各切一次角(半径 8)
+    expect(svg).toContain('Q 250 340 250 348')
+    expect(svg).toContain('Q 250 380 257.7')
     expect(svg).toContain('stroke-dasharray="8 6"')
     expect(svg).toContain('<polygon')
     expect(svg).toContain('弯')
@@ -215,5 +217,45 @@ describe('自动避障(routeAround + 默认路由)', () => {
     const detour = routeAround({ x: 100, y: 50 }, { x: 600, y: 50 }, src, dst, [src, wall, dst])
     expect(detour).not.toBeNull()
     expectClear(detour!, [src, wall, dst])
+  })
+
+  it('route=elbow 无折点:同行直连、错位走正交 Z(圆角)、有障碍走避障', () => {
+    const svgOf = (body: string): { d: string[]; q: number } => {
+      const { svg } = toSvg(solve(body))
+      return { d: [...svg.matchAll(/<path d="([^"]+)"/g)].map((m) => m[1]!), q: (svg.match(/Q /g) ?? []).length }
+    }
+    // 同行对齐:无需转折,直连(无圆角)
+    const aligned = svgOf(
+      '[card #a create] @pos(0,0) @size(200,100)\n[card #b create] @pos(600,0) @size(200,100)\n[arrow #e] from #a to #b @route(elbow)',
+    )
+    expect(aligned.q).toBe(0)
+    expect((aligned.d[0]!.match(/ L /g) ?? []).length).toBe(1)
+    // 错位:主方向中线 Z,两个圆角
+    const staggered = svgOf(
+      '[card #a create] @pos(0,0) @size(200,100)\n[card #b create] @pos(600,300) @size(200,100)\n[arrow #e] from #a to #b @route(elbow)',
+    )
+    expect(staggered.q).toBe(2)
+    expect(staggered.d[0]).toContain(' 400 ') // 中线 x=400 垂直段
+    // 有障碍:避障绕行(多于一个 L + 圆角)
+    const blocked = svgOf(
+      [
+        '[card #a create] @pos(0,0) @size(200,100)',
+        '[card #m create] @pos(400,0) @size(200,100)',
+        '[card #b create] @pos(800,0) @size(200,100)',
+        '[arrow #e] from #a to #b @route(elbow)',
+      ].join('\n'),
+    )
+    expect((blocked.d[0]!.match(/ L /g) ?? []).length).toBeGreaterThan(1)
+    expect(blocked.q).toBeGreaterThanOrEqual(1)
+  })
+
+  it('默认路由(直线)不产生圆角 Q;标签锚在弧长中点', () => {
+    const { svg } = toSvg(
+      solve(
+        '[card #a create] @pos(0,0) @size(200,100)\n[card #b create] @pos(600,0) @size(200,100)\n[arrow #e] from #a to #b @label("标")',
+      ),
+    )
+    expect((svg.match(/Q /g) ?? []).length).toBe(0)
+    expect(svg).toContain('标')
   })
 })

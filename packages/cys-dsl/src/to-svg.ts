@@ -11,7 +11,8 @@
  *   渲染公式原文前缀 '='。
  * - 关系箭头端点按 id 解析到卡/自由元素几何,贴边交点连线;端点缺失 → 跳过并留原因。
  * - 默认路由自动避障:直连段穿过卡/矩形时自动绕行走廊(L/Z 形候选,端点重贴边,全清才采纳);
- *   显式 route/curve/elbow 不干预。frame 是容器、text 无边界,都不算障碍。
+ *   显式 route/curve/elbow 不干预。route=elbow 未给折点 = 正交自动路由(中线 Z / 避障绕行)。
+ *   frame 是容器、text 无边界,都不算障碍。折线转角圆角化(渲染层美化,不改几何)。
  * - 路由 straight/curve/elbow 都画;arrowhead arrow=开口 V / triangle=实心三角 / none=无线帽。
  */
 import type { DslOp } from './dsl-parser'
@@ -238,6 +239,39 @@ function corridors(rects: Rect[], axis: 'x' | 'y', minGap: number): number[] {
   return mids
 }
 
+/** 正交路由的无障碍缺省折点:按主方向取中线 Z;已对齐则直连(空)。 */
+function midZWaypoints(p1: Pt, p2: Pt): Pt[] {
+  if (p1.y === p2.y || p1.x === p2.x) return []
+  if (Math.abs(p2.x - p1.x) >= Math.abs(p2.y - p1.y)) {
+    const mx = (p1.x + p2.x) / 2
+    return [{ x: mx, y: p1.y }, { x: mx, y: p2.y }]
+  }
+  const my = (p1.y + p2.y) / 2
+  return [{ x: p1.x, y: my }, { x: p2.x, y: my }]
+}
+
+/** 折线路径转圆角路径:每个内点用二次贝塞尔切角(半径 ≤8 且 ≤两侧半段长;
+ *  相邻重复点先去重)。端点与首末线段方向不变,箭头朝向不受影响;点数 <3 原样直连。 */
+function roundedPolyPath(pts: Pt[]): string {
+  const uniq = pts.filter((p, i) => i === 0 || p.x !== pts[i - 1]!.x || p.y !== pts[i - 1]!.y)
+  if (uniq.length < 3) return `M ${uniq.map((p) => `${p.x} ${p.y}`).join(' L ')}`
+  const R = 8
+  let d = `M ${uniq[0]!.x} ${uniq[0]!.y}`
+  for (let i = 1; i < uniq.length - 1; i++) {
+    const prev = uniq[i - 1]!
+    const cur = uniq[i]!
+    const next = uniq[i + 1]!
+    const lin = Math.hypot(cur.x - prev.x, cur.y - prev.y)
+    const lout = Math.hypot(next.x - cur.x, next.y - cur.y)
+    const r = Math.min(R, lin / 2, lout / 2)
+    const inPt = { x: cur.x - ((cur.x - prev.x) / lin) * r, y: cur.y - ((cur.y - prev.y) / lin) * r }
+    const outPt = { x: cur.x + ((next.x - cur.x) / lout) * r, y: cur.y + ((next.y - cur.y) / lout) * r }
+    d += ` L ${inPt.x} ${inPt.y} Q ${cur.x} ${cur.y} ${outPt.x} ${outPt.y}`
+  }
+  d += ` L ${uniq[uniq.length - 1]!.x} ${uniq[uniq.length - 1]!.y}`
+  return d
+}
+
 /**
  * 默认路由自动避障:直连段穿过障碍时,生成绕行路标再整段验证。候选四族:
  * L 形 2 个 / 命中包围盒外扩 Z 形 4 个 / 障碍间隙走廊 Z 形(两轴各若干——
@@ -436,6 +470,16 @@ export function toSvg(ops: DslOp[]): { svg: string; skipped: SvgSkip[] } {
       p2 = borderPoint(dst, src.x + src.w / 2, src.y + src.h / 2)
       if (op.route === 'elbow' && op.elbow !== undefined) {
         mid = op.elbow
+      } else if (op.route === 'elbow') {
+        // route=elbow 未给折点:正交自动路由——有障碍用避障绕行,无障碍按主方向
+        // 中线 Z(已对齐则直连);端点向折点方向重贴边
+        const detour = routeAround(p1, p2, src, dst, obstacles)
+        const w = detour ? detour.slice(1, -1) : midZWaypoints(p1, p2)
+        if (w.length > 0) {
+          p1 = borderPoint(src, w[0]!.x, w[0]!.y)
+          p2 = borderPoint(dst, w[w.length - 1]!.x, w[w.length - 1]!.y)
+          mid = w
+        }
       } else if (op.route === undefined && op.curve === undefined) {
         // 默认路由自动避障:直连段穿过障碍才绕行;显式 route/curve 交给作者意图。
         // 返回整条重贴边路径,端点一并替换(箭头方向跟着新末端走,不沿卡边滑)
@@ -461,7 +505,7 @@ export function toSvg(ops: DslOp[]): { svg: string; skipped: SvgSkip[] } {
       grow({ x: c.cx, y: c.cy, w: 0, h: 0 })
     } else {
       const pts = [p1!, ...mid, p2!]
-      d = `M ${pts.map((p) => `${p.x} ${p.y}`).join(' L ')}`
+      d = roundedPolyPath(pts)
       headFrom = pts[pts.length - 2]!
       labelAnchor = polyMid(pts)
       for (const p of pts) grow({ x: p.x, y: p.y, w: 0, h: 0 })
