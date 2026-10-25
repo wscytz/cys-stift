@@ -33,7 +33,7 @@ const solved = solveRelational(clean.ops)   // 关系式 → 绝对坐标
 `pnpm --filter @cys-stift/dsl cli` 或 `tsx src/cli.ts <命令> <file.sift>`(npm 发布后为 `npx`;后缀 `.sift` 为约定,任意文本文件可读):
 
 - `validate` — 语法/卫生/求解全链检查;诊断走 stderr,警告不阻断(exit 0)/ 语法错 exit 1 / 用法错 exit 2。
-- `render` — 默认输出 JSON Canvas 1.0(Obsidian `.canvas` 直接可开);`--svg` 输出预览级 SVG。SVG 侧:默认路由**自动避障**(直连穿卡即绕行走廊,生成路径不穿卡;显式 `@route/@curve/@elbow` 不干预;源/目标被围死才退直连);`@route(elbow)` 未给折点 = 正交自动路由;折线转角圆角化。
+- `render` — 默认输出 JSON Canvas 1.0(Obsidian `.canvas` 直接可开);`--svg` 输出预览级 SVG。SVG 侧:默认路由**自动避障**(正交可见图 + 方向状态 A* 求解器规划,free 模式叠视线拉直;生成路径不穿卡;显式 `@route/@curve/@elbow` 不干预;源/目标被围死退启发式兜底);`@route(elbow)` 未给折点 = 正交自动路由(求解器,严格水平/垂直);折线转角圆角化。求解器参数可调(`RoutingConfig`:安全边距/折代价 λ/量化步长等,见 `src/routing.ts`)。
 - `roundtrip` — DSL→元素→DSL 双往返签名比对(转义保真)。
 
 ## 依赖

@@ -16,6 +16,7 @@
  * - 路由 straight/curve/elbow 都画;arrowhead arrow=开口 V / triangle=实心三角 / none=无线帽。
  */
 import type { DslOp } from './dsl-parser'
+import { planRoute } from './routing'
 
 /** legacy 6 色名 → 设计 token 实值(浅色主题)。grey 是 gray 的冻结别名。 */
 const COLOR_HEX: Record<string, string> = {
@@ -471,23 +472,38 @@ export function toSvg(ops: DslOp[]): { svg: string; skipped: SvgSkip[] } {
       if (op.route === 'elbow' && op.elbow !== undefined) {
         mid = op.elbow
       } else if (op.route === 'elbow') {
-        // route=elbow 未给折点:正交自动路由——有障碍用避障绕行,无障碍按主方向
-        // 中线 Z(已对齐则直连);端点向折点方向重贴边
-        const detour = routeAround(p1, p2, src, dst, obstacles)
-        const w = detour ? detour.slice(1, -1) : midZWaypoints(p1, p2)
-        if (w.length > 0) {
-          p1 = borderPoint(src, w[0]!.x, w[0]!.y)
-          p2 = borderPoint(dst, w[w.length - 1]!.x, w[w.length - 1]!.y)
-          mid = w
+        // route=elbow 未给折点:正交自动路由——求解器(A* 正交可见图)优先,
+        // 无解退启发式绕行,再退主方向中线 Z(已对齐则直连);端点随路径重贴边
+        const planned = planRoute(p1!, p2!, src, dst, obstacles, 'orthogonal')
+        if (planned && planned.length >= 2) {
+          p1 = planned[0]!
+          p2 = planned[planned.length - 1]!
+          mid = planned.slice(1, -1)
+        } else {
+          const detour = routeAround(p1!, p2!, src, dst, obstacles)
+          const w = detour ? detour.slice(1, -1) : midZWaypoints(p1!, p2!)
+          if (w.length > 0) {
+            p1 = borderPoint(src, w[0]!.x, w[0]!.y)
+            p2 = borderPoint(dst, w[w.length - 1]!.x, w[w.length - 1]!.y)
+            mid = w
+          }
         }
       } else if (op.route === undefined && op.curve === undefined) {
-        // 默认路由自动避障:直连段穿过障碍才绕行;显式 route/curve 交给作者意图。
+        // 默认路由自动避障:求解器规划(free 模式直连已清返回 null=保持直连),
+        // null 且确有障碍挡路时退启发式候选族;显式 route/curve 交给作者意图。
         // 返回整条重贴边路径,端点一并替换(箭头方向跟着新末端走,不沿卡边滑)
-        const detour = routeAround(p1, p2, src, dst, obstacles)
-        if (detour) {
-          p1 = detour[0]!
-          p2 = detour[detour.length - 1]!
-          mid = detour.slice(1, -1)
+        const planned = planRoute(p1!, p2!, src, dst, obstacles, 'free')
+        if (planned && planned.length >= 2) {
+          p1 = planned[0]!
+          p2 = planned[planned.length - 1]!
+          mid = planned.slice(1, -1)
+        } else {
+          const detour = routeAround(p1!, p2!, src, dst, obstacles)
+          if (detour) {
+            p1 = detour[0]!
+            p2 = detour[detour.length - 1]!
+            mid = detour.slice(1, -1)
+          }
         }
       }
     }
