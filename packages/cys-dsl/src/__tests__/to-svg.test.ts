@@ -230,13 +230,13 @@ describe('自动避障(routeAround + 默认路由)', () => {
     )
     expect(aligned.q).toBe(0)
     expect((aligned.d[0]!.match(/ L /g) ?? []).length).toBe(1)
-    // 错位:正交 Z 形(等长路径的取舍由求解器代价定,不钉死具体走廊坐标),
-    // 两个圆角;Z = 3 段折线(圆角只切角不增段,严格轴对齐在 routing.test 钉)
+    // 错位:正交绕行,最少折数(1 折 L 形即最优——求解器启发修正后,2 折 Z 的
+    // 旧期望是启发误价的产物);一个圆角;L = 2 段折线(严格轴对齐在 routing.test 钉)
     const staggered = svgOf(
       '[card #a create] @pos(0,0) @size(200,100)\n[card #b create] @pos(600,300) @size(200,100)\n[arrow #e] from #a to #b @route(elbow)',
     )
-    expect(staggered.q).toBe(2)
-    expect((staggered.d[0]!.match(/ L /g) ?? []).length).toBe(3)
+    expect(staggered.q).toBe(1)
+    expect((staggered.d[0]!.match(/ L /g) ?? []).length).toBe(2)
     // 有障碍:避障绕行(多于一个 L + 圆角)
     const blocked = svgOf(
       [

@@ -143,6 +143,30 @@ describe('planRoute(走廊增强稀疏正交可见图 + 方向状态 A*)', () =>
     expect(pathCrosses(path!, [obstacle])).toBe(false)
   })
 
+  it('启发回归:错位卡(无障碍)最优为 1 折 L(688),2 折 Z(696)是旧启发误价的产物', () => {
+    // 历史:mb/terminalBend 分支计折对「一弯两用」重复计折 → h 虚高 λ,
+    // 688 最优解(起点/终点端口各拐一次)全程被抬价,696 的 Z 解抢先出堆。
+    // 修后启发 = 方向集下界(对齐轴一弯两用只计一折,终态含转身折),此处钉死。
+    const src = { x: 0, y: 0, w: 200, h: 100 }
+    const dst = { x: 600, y: 300, w: 200, h: 100 }
+    const path = planRoute({ x: 200, y: 50 }, { x: 600, y: 350 }, src, dst, [], 'orthogonal')!
+    expect(path).not.toBeNull()
+    let len = 0
+    let bends = 0
+    for (let i = 0; i < path.length - 1; i++) {
+      len += Math.abs(path[i + 1]!.x - path[i]!.x) + Math.abs(path[i + 1]!.y - path[i]!.y)
+      if (i > 0) {
+        const d1x = Math.sign(path[i]!.x - path[i - 1]!.x)
+        const d1y = Math.sign(path[i]!.y - path[i - 1]!.y)
+        const d2x = Math.sign(path[i + 1]!.x - path[i]!.x)
+        const d2y = Math.sign(path[i + 1]!.y - path[i]!.y)
+        if (d1x !== d2x || d1y !== d2y) bends++
+      }
+    }
+    // 曼哈顿下界 660(单调路径必达)+ 最少 1 折:总代价恰为理论最优 688
+    expect(len).toBe(660)
+    expect(bends).toBe(1)
+  })
   it('已知最优:上下全封死时走障碍边 ± margin 的窄走廊,4 点 3 段', () => {
     const src = { x: 0, y: 0, w: 100, h: 60 }
     const dst = { x: 500, y: 0, w: 100, h: 60 }

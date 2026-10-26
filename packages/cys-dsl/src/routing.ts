@@ -10,8 +10,9 @@
  *
  * 管线:活跃障碍过滤 → 端口候选(四边投影点,引出段探针验合法)→ 局部视野内建
  * 坐标轴(障碍外扩边 + 间隙中线 + 端口/引出/源目中线坐标)→ 网格节点/邻接边遮挡
- * 剔除 → 多源多汇方向状态 A*(字典序破平局,确定性)→ 共线合并 → free 模式视线
- * 拉直(带 12px 安全边距的贪心 LOS 合并)→ 端点重贴边 + 量化(0.5px)+ 全路径终验。
+ * 剔除 → 多源多汇方向状态 A*(可采纳启发 = 方向集下界,终态精确;破平局按
+ * f/折数/中线偏/节点/方向字典序,确定性)→ 共线合并 → free 模式视线拉直(带
+ * 12px 安全边距的贪心 LOS 合并)→ 端点重贴边 + 量化(0.5px)+ 全路径终验。
  * 同输入同输出(无随机、无时间依赖)。
  */
 
@@ -294,11 +295,15 @@ interface HeapItem {
   f: number
   g: number
   bends: number
+  /** 节点到源目理想线的垂距(美观键:等代价路径偏向中线走廊) */
+  bias: number
   u: number
   dir: Dir
 }
 
-/** 二叉堆,比较器按 (⌊f·100⌋, bends, u, dir) 字典序——确定性破平局。 */
+/** 二叉堆,比较器按 (⌊f·100⌋, bends, bias, u, dir) 字典序——确定性破平局。
+ *  bias 只在 (f, bends) 全等时生效,不影响最优性,仅让等代价赛跑先探索
+ *  贴近源目中线的走廊(避免选中贴卡外扩走廊这类几何正确但难看的解)。 */
 class Heap {
   private a: HeapItem[] = []
 
@@ -307,7 +312,15 @@ class Heap {
     const B = this.a[j]!
     const fa = Math.floor(A.f * 100)
     const fb = Math.floor(B.f * 100)
-    return fa !== fb ? fa < fb : A.bends !== B.bends ? A.bends < B.bends : A.u !== B.u ? A.u < B.u : A.dir < B.dir
+    return fa !== fb
+      ? fa < fb
+      : A.bends !== B.bends
+        ? A.bends < B.bends
+        : A.bias !== B.bias
+          ? A.bias < B.bias
+          : A.u !== B.u
+            ? A.u < B.u
+            : A.dir < B.dir
   }
 
   push(it: HeapItem): void {
@@ -371,6 +384,15 @@ export function planRoute(
   const g = buildGraph(act, src, dst, [...sPorts, ...tPorts], cfg)
   const W = g.xs.length
   const H = g.ys.length
+  // 美观偏好看:节点到源目中心连线的垂距(无符号,上下对称场景自动落回 u 键)
+  const lineDx = dstCenter.x - srcCenter.x
+  const lineDy = dstCenter.y - srcCenter.y
+  const lineLen = Math.hypot(lineDx, lineDy) || 1
+  const biasOf = (u: number): number => {
+    const bx = g.xs[u % W]! - srcCenter.x
+    const by = g.ys[Math.floor(u / W)]! - srcCenter.y
+    return Math.abs(bx * lineDy - by * lineDx) / lineLen
+  }
   const nodeIndexOf = (p: RoutingPoint): number => {
     const x = q(p.x, cfg.quant)
     const y = q(p.y, cfg.quant)
@@ -399,8 +421,13 @@ export function planRoute(
     .filter((s): s is NonNullable<typeof s> => s !== null)
   if (starts.length === 0 || ends.length === 0) return null
 
-  // 可采纳启发:到任一目标引出点的曼哈顿距离 + 必要折数(途中 + 入汇转向)× λ + 引出段。
-  // 终态处 h = 精确剩余成本 → 首个出堆终态即全路径最优。
+  // 可采纳启发(方向集下界):从当前状态到目标引出点,路径必须为
+  // 「朝目标的水平向 / 垂直向 / 入汇向」各跑至少一段正长程(净位移为零长程
+  // 凑不出),折数 ≥ |方向集| − 1,起始方向已在集合内再省 1。该下界对每条边、
+  // 每种入汇永不高估;终态 dx=dy=0 → h = 精确剩余 → 首个出堆终态即全路径最优。
+  // (前一版按 mb/terminalBend 分支计折,「一弯两用」——末弯同时完成对齐与
+  // 入汇——会被重复计一折,h 虚高 λ:实测交错 elbow 场景 688 最优解全程被
+  // 抬价,696 解抢先出堆。下界必须全域不高估,不能只修末弯分支。)
   const hFn = (u: number, dir: Dir): number => {
     const ux = g.xs[u % W]!
     const uy = g.ys[Math.floor(u / W)]!
@@ -408,19 +435,18 @@ export function planRoute(
     for (const e of ends) {
       const dx = Math.abs(ux - e.stub.x)
       const dy = Math.abs(uy - e.stub.y)
-      let mb: number
-      if (dx < 1e-6 && dy < 1e-6) {
-        mb = 0
-      } else if (dx < 1e-6 || dy < 1e-6) {
-        const [dvx, dvy] = NORMALS[dir]!
-        const toward = dx < 1e-6 ? Math.sign(e.stub.y - uy) : Math.sign(e.stub.x - ux)
-        const cur = dx < 1e-6 ? dvy! : dvx!
-        mb = cur === toward ? 0 : 1
-      } else {
-        mb = 1
-      }
-      const terminalBend = dir !== OPP(e.port.dir) ? 1 : 0
-      const cand = dx + dy + (mb + terminalBend) * cfg.bendPenalty + cfg.minStub
+      const entry = OPP(e.port.dir)
+      // 方向集 bitmask:N=1 E=2 S=4 W=8(入汇向必占一位,与朝向位去重)
+      let mask = 1 << entry
+      if (dx > 1e-6) mask |= e.stub.x > ux ? 2 : 8
+      if (dy > 1e-6) mask |= e.stub.y > uy ? 4 : 1
+      let cnt = 0
+      for (let m = mask; m; m &= m - 1) cnt++
+      // dir 不在方向集 → 首个正长程段必转向,再 +1。钳 0 防 cnt=1 且 dir∉集合
+      // 之外的退化;终态(dir 对齐/不对齐)由此精确报价——此前两版(分支计折、
+      // 纯 cnt−1)分别在一弯两用与终态转身上高估/低估 λ,都会让错误终态抢跑。
+      const bendsLb = Math.max(0, cnt - 1 + ((mask >> dir) & 1 ? 0 : 1))
+      const cand = dx + dy + bendsLb * cfg.bendPenalty + cfg.minStub
       if (cand < best) best = cand
     }
     return best === Infinity ? 0 : best
@@ -438,7 +464,7 @@ export function planRoute(
       dist[key] = cfg.minStub
       bendsArr[key] = 0
       parent[key] = -1
-      heap.push({ f: cfg.minStub + hFn(s.u, s.port.dir), g: cfg.minStub, bends: 0, u: s.u, dir: s.port.dir })
+      heap.push({ f: cfg.minStub + hFn(s.u, s.port.dir), g: cfg.minStub, bends: 0, bias: biasOf(s.u), u: s.u, dir: s.port.dir })
     }
   }
   let goalKey = -1
@@ -499,7 +525,7 @@ export function planRoute(
         dist[nkey] = ng
         parent[nkey] = key
         bendsArr[nkey] = bendsArr[key]! + (bend > 0 ? 1 : 0)
-        heap.push({ f: ng + hFn(v, nd as Dir), g: ng, bends: bendsArr[nkey]!, u: v, dir: nd as Dir })
+        heap.push({ f: ng + hFn(v, nd as Dir), g: ng, bends: bendsArr[nkey]!, bias: biasOf(v), u: v, dir: nd as Dir })
       }
     }
   }
