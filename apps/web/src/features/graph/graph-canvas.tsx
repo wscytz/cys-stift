@@ -554,7 +554,7 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
  * 解析失败回退中性灰(YAGNI:不引额外映射表,readToken 已是项目标准)。
  */
 function resolveColor(raw: string | null | undefined): string {
-  if (!raw) return '#5e5e5c'
+  if (!raw) return readToken('--color-gray', '#5e5e5c') // 空输入同走 token(主题切换可传导)
   const m = /^var\((--[\w-]+)\)$/.exec(raw.trim())
   const name = m?.[1] ?? (raw.startsWith('--') ? raw : mapDslName(raw))
   return readToken(name, '#5e5e5c')
