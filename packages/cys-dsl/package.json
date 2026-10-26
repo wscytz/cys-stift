@@ -13,7 +13,8 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "gen": "peggy src/dsl.peggy -o src/dsl-parser.gen.js --format es",
-    "cli": "tsx src/cli.ts"
+    "cli": "tsx src/cli.ts",
+    "debug:page": "tsc -b && node debug/build-debug-page.mjs"
   },
   "devDependencies": {
     "@cys-stift/canvas-engine": "workspace:*",

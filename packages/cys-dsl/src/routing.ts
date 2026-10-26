@@ -360,6 +360,96 @@ class Heap {
   }
 }
 
+/** 前置管线(planRoute 与 debugRoute 共享,保证调试视图与求解严格同源)。 */
+interface Prepared {
+  act: RoutingRect[]
+  sPorts: Port[]
+  tPorts: Port[]
+  srcCenter: RoutingPoint
+  dstCenter: RoutingPoint
+  g: Graph
+  W: number
+  H: number
+  starts: Array<{ port: Port; stub: RoutingPoint; u: number }>
+  ends: Array<{ port: Port; stub: RoutingPoint; u: number }>
+}
+
+function prepare(
+  p1: RoutingPoint,
+  p2: RoutingPoint,
+  src: RoutingRect,
+  dst: RoutingRect,
+  obstacles: RoutingRect[],
+  cfg: RoutingConfig,
+): Prepared {
+  const act = activeObstacles(obstacles, p1, p2, cfg.hitEpsilon)
+  const dstCenter = { x: dst.x + dst.w / 2, y: dst.y + dst.h / 2 }
+  const srcCenter = { x: src.x + src.w / 2, y: src.y + src.h / 2 }
+  const sPorts = candidatePorts(src, dstCenter).filter((p) => portUsable(p, act, cfg.minStub))
+  const tPorts = candidatePorts(dst, srcCenter).filter((p) => portUsable(p, act, cfg.minStub))
+  const g = buildGraph(act, src, dst, [...sPorts, ...tPorts], cfg)
+  const W = g.xs.length
+  const H = g.ys.length
+  const nodeIndexOf = (p: RoutingPoint): number => {
+    const x = q(p.x, cfg.quant)
+    const y = q(p.y, cfg.quant)
+    const ix = g.xs.indexOf(x)
+    const iy = g.ys.indexOf(y)
+    return ix < 0 || iy < 0 ? -1 : iy * W + ix
+  }
+  const ends = tPorts
+    .map((p): { port: Port; stub: RoutingPoint; u: number } | null => {
+      const stub = stubOf(p, cfg.minStub)
+      const u = nodeIndexOf(stub)
+      return u >= 0 && !g.blocked[u] ? { port: p, stub, u } : null
+    })
+    .filter((e): e is NonNullable<typeof e> => e !== null)
+  const starts = sPorts
+    .map((p): { port: Port; stub: RoutingPoint; u: number } | null => {
+      const stub = stubOf(p, cfg.minStub)
+      const u = nodeIndexOf(stub)
+      return u >= 0 && !g.blocked[u] ? { port: p, stub, u } : null
+    })
+    .filter((s): s is NonNullable<typeof s> => s !== null)
+  return { act, sPorts, tPorts, srcCenter, dstCenter, g, W, H, starts, ends }
+}
+
+/** 调试内省:重走 planRoute 的前置管线(活跃障碍/候选端口/局部视野/图轴集),
+ *  **不跑 A\***——供调试台可视化解构中间结构,与 planRoute 严格同源(同一
+ *  prepare)。free 直连短路不在此判定(调试态即使可直连也出结构)。
+ *  `viewBox` 与图轴同基准;端口/引出点为坐标序列,dir = 外法线(N0 E1 S2 W3)。 */
+export interface RoutingDebug {
+  active: RoutingRect[]
+  view: RoutingRect
+  xs: number[]
+  ys: number[]
+  sPorts: Array<{ pt: RoutingPoint; dir: number }>
+  tPorts: Array<{ pt: RoutingPoint; dir: number }>
+  starts: RoutingPoint[]
+  ends: RoutingPoint[]
+}
+
+export function debugRoute(
+  p1: RoutingPoint,
+  p2: RoutingPoint,
+  src: RoutingRect,
+  dst: RoutingRect,
+  obstacles: RoutingRect[],
+  cfg: RoutingConfig = DEFAULT_ROUTING,
+): RoutingDebug {
+  const P = prepare(p1, p2, src, dst, obstacles, cfg)
+  return {
+    active: P.act,
+    view: viewBox(src, dst, P.act, cfg),
+    xs: P.g.xs,
+    ys: P.g.ys,
+    sPorts: P.sPorts.map((p) => ({ pt: p.pt, dir: p.dir as number })),
+    tPorts: P.tPorts.map((p) => ({ pt: p.pt, dir: p.dir as number })),
+    starts: P.starts.map((s) => s.stub),
+    ends: P.ends.map((e) => e.stub),
+  }
+}
+
 /**
  * 主入口:规划从 src 贴边到 dst 贴边的绕障路径(整条,含端点)。
  * free 模式直连已清 → 返回 null(调用方保持原直连);无解 → null(调用方退兜底)。
@@ -376,14 +466,12 @@ export function planRoute(
 ): RoutingPoint[] | null {
   const act = activeObstacles(obstacles, p1, p2, cfg.hitEpsilon)
   if (mode === 'free' && segClear(p1, p2, act)) return null // V1 直连短路
-  const dstCenter = { x: dst.x + dst.w / 2, y: dst.y + dst.h / 2 }
-  const srcCenter = { x: src.x + src.w / 2, y: src.y + src.h / 2 }
-  const sPorts = candidatePorts(src, dstCenter).filter((p) => portUsable(p, act, cfg.minStub))
-  const tPorts = candidatePorts(dst, srcCenter).filter((p) => portUsable(p, act, cfg.minStub))
-  if (sPorts.length === 0 || tPorts.length === 0) return null
-  const g = buildGraph(act, src, dst, [...sPorts, ...tPorts], cfg)
-  const W = g.xs.length
-  const H = g.ys.length
+  const P = prepare(p1, p2, src, dst, obstacles, cfg)
+  const { starts, ends, srcCenter, dstCenter } = P
+  if (P.sPorts.length === 0 || P.tPorts.length === 0) return null
+  const g = P.g
+  const W = P.W
+  const H = P.H
   // 美观偏好看:节点到源目中心连线的垂距(无符号,上下对称场景自动落回 u 键)
   const lineDx = dstCenter.x - srcCenter.x
   const lineDy = dstCenter.y - srcCenter.y
@@ -393,32 +481,6 @@ export function planRoute(
     const by = g.ys[Math.floor(u / W)]! - srcCenter.y
     return Math.abs(bx * lineDy - by * lineDx) / lineLen
   }
-  const nodeIndexOf = (p: RoutingPoint): number => {
-    const x = q(p.x, cfg.quant)
-    const y = q(p.y, cfg.quant)
-    const ix = g.xs.indexOf(x)
-    const iy = g.ys.indexOf(y)
-    return ix < 0 || iy < 0 ? -1 : iy * W + ix
-  }
-  interface End {
-    port: Port
-    stub: RoutingPoint
-    u: number
-  }
-  const ends = tPorts
-    .map((p): End | null => {
-      const stub = stubOf(p, cfg.minStub)
-      const u = nodeIndexOf(stub)
-      return u >= 0 && !g.blocked[u] ? { port: p, stub, u } : null
-    })
-    .filter((e): e is End => e !== null)
-  const starts = sPorts
-    .map((p): { port: Port; stub: RoutingPoint; u: number } | null => {
-      const stub = stubOf(p, cfg.minStub)
-      const u = nodeIndexOf(stub)
-      return u >= 0 && !g.blocked[u] ? { port: p, stub, u } : null
-    })
-    .filter((s): s is NonNullable<typeof s> => s !== null)
   if (starts.length === 0 || ends.length === 0) return null
 
   // 可采纳启发(方向集下界):从当前状态到目标引出点,路径必须为
@@ -468,7 +530,7 @@ export function planRoute(
     }
   }
   let goalKey = -1
-  let goalEnd: End | null = null
+  let goalEnd: (typeof ends)[number] | null = null
   while (heap.size > 0) {
     const it = heap.pop()!
     const key = it.u * 4 + it.dir

@@ -114,3 +114,6 @@ scripts/_e2e-screenshots/
 # Mimosa 安全扫描器的本地会话状态(hook 每次运行都会重写;曾因 git add -A
 # 混入提交需 amend 清理 —— 忽略之,防复发)
 .mimosa/
+
+# 内核调试台生成物(模板+生成器是源,pnpm --filter @cys-stift/dsl debug:page 重建)
+packages/cys-dsl/debug/index.html

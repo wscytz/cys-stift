@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { planRoute, DEFAULT_ROUTING } from '../routing'
+import { planRoute, DEFAULT_ROUTING, debugRoute } from '../routing'
 import type { RoutingPoint, RoutingRect } from '../routing'
 
 /** 确定性伪随机(mulberry32):同种子同场景,测试可复现。 */
@@ -167,6 +167,24 @@ describe('planRoute(走廊增强稀疏正交可见图 + 方向状态 A*)', () =>
     expect(len).toBe(660)
     expect(bends).toBe(1)
   })
+  it('debugRoute 内省:与 planRoute 同源(路径坐标全落轴集,端口非空)', () => {
+    const src = { x: 0, y: 0, w: 200, h: 100 }
+    const dst = { x: 600, y: 300, w: 200, h: 100 }
+    const obs = [{ x: 552, y: 150, w: 64, h: 100 }]
+    const p1 = { x: 200, y: 50 }
+    const p2 = { x: 600, y: 350 }
+    const path = planRoute(p1, p2, src, dst, obs, 'orthogonal')!
+    const dbg = debugRoute(p1, p2, src, dst, obs)
+    expect(dbg.sPorts.length).toBeGreaterThan(0)
+    expect(dbg.tPorts.length).toBeGreaterThan(0)
+    expect(dbg.starts.length).toBeGreaterThan(0)
+    expect(dbg.ends.length).toBeGreaterThan(0)
+    // 同源性:路径每个点(端口/引出/图节点)坐标必来自轴集
+    for (const pt of path) {
+      expect(dbg.xs.includes(pt.x) || dbg.ys.includes(pt.y)).toBe(true)
+    }
+  })
+
   it('已知最优:上下全封死时走障碍边 ± margin 的窄走廊,4 点 3 段', () => {
     const src = { x: 0, y: 0, w: 100, h: 60 }
     const dst = { x: 500, y: 0, w: 100, h: 60 }
