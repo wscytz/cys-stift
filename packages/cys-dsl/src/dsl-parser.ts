@@ -630,9 +630,12 @@ function buildOp(r: LineResult): BuildResult {
 export function parseDslWithDiagnostics(dslText: string): {
   ops: DslOp[]
   errors: DslDiagnostic[]
+  /** 错误型残余软信号(全角标点/未知 @指令/拼错关系词)。恢复型残余(如 #id:1 的 :1)不告警。 */
+  warnings: DslDiagnostic[]
 } {
   const ops: DslOp[] = []
   const errors: DslDiagnostic[] = []
+  const warnings: DslDiagnostic[] = []
 
   const rawLines = dslText.split('\n')
   for (let i = 0; i < rawLines.length; i++) {
@@ -656,12 +659,53 @@ export function parseDslWithDiagnostics(dslText: string): {
         break
       }
       ops.push(built.op)
+      // 自然语言体验:skipChunk 吞掉的残余分两类 —— 恢复型(:1、] 等,设计内静默)与
+      // 错误型(@pos（0，0）全角 / @siez 拼写 / leftof 关系词,以前完全静默,卡悄悄丢坐标)。
+      // 错误型记 warning(不是 error:元素在,数据没丢)。
+      if (result !== null && result.kind !== 'unknown' && Array.isArray(result.ds)) {
+        const hasResidue = result.ds.some((e) => e === null)
+        if (hasResidue) {
+          const hint = classifyResidue(line)
+          if (hint) warnings.push({ line: lineNo, text: line, message: hint })
+        }
+      }
     } else {
       errors.push({ line: lineNo, text: line, message: built.diag })
     }
   }
 
-  return { ops, errors }
+  return { ops, errors, warnings }
+}
+
+/** grammar 全部 @指令名(与 dsl.peggy 各 Dir 规则对齐;dsl-sync 测试锁漂移)。 */
+const AT_DIRECTIVES: ReadonlySet<string> = new Set([
+  'pos', 'size', 'color', 'label', 'text', 'title', 'content', 'dash', 'arrowhead',
+  'curve', 'route', 'elbow', 'gap', 'from', 'to', 'wikilink', 'group', 'href',
+  'compute', 'type', 'tags', 'links', 'code', 'quote',
+])
+const REL_KEYWORDS: ReadonlySet<string> = new Set(['right-of', 'below'])
+
+/**
+ * 残余分类:错误型 → 一句话可操作 hint;恢复型 → null(静默)。
+ * 只看引号外内容(@title("中文（字面）") 不误报);纯启发式,warning 通道不阻塞。
+ */
+function classifyResidue(line: string): string | null {
+  const outsideQuotes = line.replace(/"(?:[^"\\]|\\.)*"/g, '')
+  if (/[（）｛｝【】「」：；，。、]/.test(outsideQuotes)) {
+    return 'full-width punctuation （），: outside quotes — use ASCII ( ) , : (全角标点请用半角)'
+  }
+  for (const m of outsideQuotes.matchAll(/@([a-zA-Z-]+)/g)) {
+    if (!AT_DIRECTIVES.has(m[1]!)) {
+      return `unknown @${m[1]} directive — known: @pos @size @title …(见语法参考)`
+    }
+  }
+  for (const w of outsideQuotes.split(/[\s()\[\]]+/).filter(Boolean)) {
+    // 方向词开头但不是合法关系词(leftof / left_of / aboves…)→ 反方向用 right-of 表达
+    if (/^(left|right|above|below)/i.test(w) && !REL_KEYWORDS.has(w.toLowerCase()) && !w.startsWith('#')) {
+      return `unknown relation "${w}" — relations are right-of / below (opposite direction: swap operands)`
+    }
+  }
+  return null
 }
 
 /**

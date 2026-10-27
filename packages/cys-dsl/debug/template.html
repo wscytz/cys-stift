@@ -359,7 +359,13 @@ document.getElementById('b-export').addEventListener('click', () => { sceneJson.
 document.getElementById('b-import').addEventListener('click', () => {
   try {
     const j = JSON.parse(sceneJson.value)
-    if (typeof j.cfg === 'object') Object.assign(cfg, j.cfg)
+    // cfg 数值守卫:JSON 无法表达 NaN 但能表达 1e999(→Infinity)与字符串;内核 normalizeCfg
+    // 会兜非法值,这里同步守滑杆 UI 不被塞进怪值
+    if (typeof j.cfg === 'object' && j.cfg !== null) {
+      for (const [k, v] of Object.entries(j.cfg)) {
+        if (typeof v === 'number' && Number.isFinite(v)) cfg[k] = v
+      }
+    }
     applyScene({ src: j.src, dst: j.dst, obs: j.obs ?? [], mode: j.mode ?? 'orthogonal' })
     for (const [id, key] of [['p-bend', 'bendPenalty'], ['p-uturn', 'uturnPenalty'], ['p-margin', 'margin'], ['p-stub', 'minStub'], ['p-gap', 'minGap']])
     { document.getElementById(id).value = cfg[key]; document.getElementById(id.replace('p-', 'o-')).textContent = cfg[key] }
@@ -465,10 +471,12 @@ function runDsl() {
   const arrows = c.ops.filter((o) => o.type === 'arrow').length
   document.getElementById('dsl-stats').innerHTML =
     `<span>耗时 <b>${ms}ms</b></span><span>卡 <b>${cards}</b></span><span>箭头 <b>${arrows}</b></span>` +
-    `<span>解析错 <b>${a.errors.length}</b></span><span>sanitize 诊断 <b>${b.diagnostics.length}</b></span>` +
+    `<span>解析错 <b>${a.errors.length}</b></span><span>提示 <b>${a.warnings.length}</b></span>` +
+    `<span>sanitize 诊断 <b>${b.diagnostics.length}</b></span>` +
     `<span>solve 诊断 <b>${c.diagnostics.length}</b></span><span>toSvg 跳过 <b>${skipped.length}</b></span>`
   const diags = []
   for (const e of a.errors) diags.push(`<div class="e">L${e.line ?? '?'} ${esc(e.message ?? JSON.stringify(e))}</div>`)
+  for (const w of a.warnings) diags.push(`<div class="w">ℹ L${w.line ?? '?'} ${esc(w.message ?? JSON.stringify(w))}</div>`)
   for (const d of [...b.diagnostics, ...c.diagnostics]) diags.push(`<div class="w">${esc(d.message ?? JSON.stringify(d))}</div>`)
   for (const s of skipped) diags.push(`<div class="w">toSvg 跳过:${esc(s.reason ?? JSON.stringify(s))}</div>`)
   document.getElementById('dsl-diag').innerHTML = diags.join('') || '<div style="color:var(--ok)">无诊断</div>'

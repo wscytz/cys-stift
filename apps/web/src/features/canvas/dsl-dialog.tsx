@@ -133,11 +133,12 @@ export function DslDialog({
   // 实时预览:用户输入时即重新 parse,给出"待应用 N 条 / M 行无效"计数,
   // 不必等点 Apply。只在有可说之事时渲染(ok 或 warn),其余不渲染。
   const preview = useMemo(() => {
-    const { ops, errors: parseErrors } = parseDslWithDiagnostics(text)
+    const { ops, errors: parseErrors, warnings: parseWarnings } = parseDslWithDiagnostics(text)
     if (!base || ops.length === 0) {
       return {
         ops,
         errors: parseErrors,
+        warnings: parseWarnings,
         opCount: ops.length,
         errCount: parseErrors.length,
         diff: null as ReturnType<typeof diffCanvasSnapshots> | null,
@@ -155,6 +156,7 @@ export function DslDialog({
     return {
       ops,
       errors: parseErrors,
+      warnings: parseWarnings,
       opCount: ops.length,
       errCount: parseErrors.length,
       diff: diffCanvasSnapshots(before, after),
@@ -466,6 +468,22 @@ export function DslDialog({
           </ul>
         </div>
       )}
+      {preview.warnings.length > 0 && (
+        <div className="dsl-errors dsl-errors--soft">
+          <p className="dsl-errors__title dsl-errors__title--soft">
+            {t('canvas.dslPreviewHints', { n: String(preview.warnings.length) })}
+          </p>
+          <ul className="dsl-errors__list">
+            {preview.warnings.map((w, i) => (
+              <li key={i} className="dsl-errors__item">
+                <span className="dsl-errors__line">{t('canvas.dslErrorLine', { line: String(w.line) })}</span>
+                {w.text && <code className="dsl-errors__source">{w.text}</code>}
+                <span className="dsl-errors__msg">{w.message}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="dsl-actions">
         <Button variant="ghost" onClick={copy}>{t('canvas.dslCopy')}</Button>
         <Button
@@ -556,6 +574,13 @@ const styles = `
   border-left: var(--space-1) solid var(--color-red);
   border-radius: var(--radius-sm);
 }
+/* 提示(全角标点/拼写手误):元素已保留,琥珀弱化,别和错误一个视觉权重 */
+.dsl-errors--soft {
+  background: transparent;
+  border-left-color: var(--color-yellow, #b8860b);
+  opacity: 0.85;
+}
+.dsl-errors__title--soft { color: var(--color-yellow, #b8860b); }
 .dsl-errors__title {
   margin: 0 0 var(--space-1);
   font-family: var(--font-body);

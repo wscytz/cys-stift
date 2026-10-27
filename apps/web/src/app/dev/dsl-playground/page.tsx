@@ -33,6 +33,7 @@ export default function DslPlaygroundPage() {
 
   const [text, setText] = useState(DEFAULT_DSL)
   const [parseErrors, setParseErrors] = useState<DslDiagnostic[]>([])
+  const [parseWarnings, setParseWarnings] = useState<DslDiagnostic[]>([])
   const [result, setResult] = useState<ApplyResult | null>(null)
   const [showGrammar, setShowGrammar] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -42,7 +43,7 @@ export default function DslPlaygroundPage() {
   const computeAndApply = useCallback((dsl: string) => {
     const adapter = adapterRef.current
     if (!adapter) return
-    const { ops, errors } = parseDslWithDiagnostics(dsl)
+    const { ops, errors, warnings } = parseDslWithDiagnostics(dsl)
     const info = new Map<string, CardInfo>()
     const scratch = new InMemoryCanvasHost()
     const onCardCreate = (p: CardCreateParams) => {
@@ -71,6 +72,7 @@ export default function DslPlaygroundPage() {
       // applyLayout/sanitize 契约永不抛,但守一下 playground 主循环不死。
       console.error('[dsl-playground] apply threw', err)
       setParseErrors(errors)
+      setParseWarnings(warnings)
       setResult(null)
       return
     }
@@ -82,6 +84,7 @@ export default function DslPlaygroundPage() {
       for (const e of els) adapter.upsert(e)
     })
     setParseErrors(errors)
+    setParseWarnings(warnings)
     setResult(res)
   }, [])
 
@@ -179,7 +182,7 @@ export default function DslPlaygroundPage() {
             maxLength={200000}
             placeholder="每行一个元素:[card #id create] @pos(x,y) @size(w,h) @color(red) @title(&quot;…&quot;)"
           />
-          <Diagnostics errors={parseErrors} result={result} skippedOps={skippedOps} />
+          <Diagnostics errors={parseErrors} warnings={parseWarnings} result={result} skippedOps={skippedOps} />
           <p className="pg-limit-note">ℹ v8 内容字段(@tags/@links/@code/@quote)能 parse + roundtrip,但卡面暂只显 title/content/type——写入后诊断面板会计数,画面无变化属正常。</p>
         </section>
 
@@ -200,10 +203,12 @@ export default function DslPlaygroundPage() {
 
 function Diagnostics({
   errors,
+  warnings,
   result,
   skippedOps,
 }: {
   errors: DslDiagnostic[]
+  warnings: DslDiagnostic[]
   result: ApplyResult | null
   skippedOps: ApplyResult['opResults']
 }) {
@@ -226,6 +231,16 @@ function Diagnostics({
             <li key={`p${i}`} className="pg-err">
               <span className="pg-err-line">L{e.line}</span>
               <span className="pg-err-msg">{e.message}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {warnings.length > 0 && (
+        <ul className="pg-err-list">
+          {warnings.map((w, i) => (
+            <li key={`w${i}`} className="pg-err pg-err--soft">
+              <span className="pg-err-line">L{w.line}</span>
+              <span className="pg-err-msg">ℹ {w.message}</span>
             </li>
           ))}
         </ul>
@@ -287,6 +302,7 @@ const styles = `
 .pg-diag-sum { margin:0 0 var(--space-1); font-family:var(--font-mono); font-size:var(--font-size-xs); color:var(--color-black-soft); }
 .pg-diag-sum b { color:var(--color-black); }
 .pg-diag-warn { color:var(--color-red); }
+.pg-err--soft { opacity:.75; }
 .pg-diag-ok { margin:0; font-family:var(--font-mono); font-size:var(--font-size-xs); color:var(--color-gray); }
 .pg-limit-note { margin:var(--space-1) 0 0; padding:var(--space-1) var(--space-2); font-family:var(--font-mono); font-size:var(--font-size-xs); line-height:1.5; color:var(--color-black-soft); background:var(--color-yellow-soft); border-left:3px solid var(--color-yellow); border-radius:var(--radius-sm); }
 .pg-err-list { list-style:none; margin:0; padding:0; }

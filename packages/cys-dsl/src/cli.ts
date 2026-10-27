@@ -66,6 +66,10 @@ export function validateText(text: string): CliResult {
     code = 1
     errors.push(`✗ ${w}`)
   }
+  // 软信号(全角标点/拼写手误):不影响 exit code,只提示 —— 元素已保留,可修可不修
+  for (const w of parsed.warnings) {
+    errors.push(`ℹ 行${w.line}:${w.message}(源:${w.text})`)
+  }
   for (const d of sanitized.diagnostics) errors.push(`⚠ sanitize op#${d.opIndex}:${d.message}`)
   for (const d of solved.diagnostics) errors.push(`⚠ solve op#${d.opIndex}:${d.message}`)
   if (code === 0) {

@@ -360,6 +360,7 @@ export const messages = {
   'canvas.dslAllInvalid': { zh: '全部 {n} 行都无法识别,未应用任何改动', en: 'All {n} line(s) were invalid — nothing applied' },
   'canvas.dslPreviewOk': { zh: '{n} 条指令待应用', en: '{n} directive(s) ready to apply' },
   'canvas.dslPreviewIssues': { zh: '{ok} 条有效 · {bad} 条无效', en: '{ok} valid · {bad} invalid' },
+  'canvas.dslPreviewHints': { zh: '{n} 条提示(全角标点/拼写手误),元素已保留', en: '{n} hint(s) — full-width punctuation or spelling; elements kept' },
   'canvas.dslPreviewChanges': { zh: '实际变化:新增 {added} · 删除 {removed} · 修改 {changed}', en: 'Actual changes: {added} added · {removed} removed · {changed} changed' },
   'canvas.dslPreviewNoChanges': { zh: '当前文本不会改变画布', en: 'This text would not change the canvas' },
   'canvas.dslPreviewStale': { zh: '画布已在编辑期间变化。旧文本不会应用；可载入最新画布后继续。', en: 'The canvas changed while you were editing. The stale text cannot be applied; load the latest canvas to continue.' },

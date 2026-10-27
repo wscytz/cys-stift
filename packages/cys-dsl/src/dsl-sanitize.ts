@@ -295,14 +295,30 @@ export function sanitizeDslOps(ops: DslOp[], ctx?: SanitizeCtx): SanitizeResult 
   }
 
   let i = 0
+  // 重复 id 探测(card/free 同名空间):下游 geom 按 id 覆盖 → 后者静默覆盖前者。
+  // 以前零信号(两个 #c1 无声合并);现记 diagnostic,不丢数据(保守策略不变)。
+  const seenIds = new Set<string>()
   for (const op of src) {
     const idx = i++
     try {
       switch (op.type) {
         case 'card':
+          if (op.cardId != null) {
+            const id = String(op.cardId)
+            if (seenIds.has(id)) {
+              diagnostics.push({ opIndex: idx, message: `duplicate element id #${id} — later op overrides earlier` })
+            }
+            seenIds.add(id)
+          }
           out.push(sanitizeCard(op, idx, ctx, diagnostics))
           break
         case 'free':
+          if (op.id != null) {
+            if (seenIds.has(op.id)) {
+              diagnostics.push({ opIndex: idx, message: `duplicate element id #${op.id} — later op overrides earlier` })
+            }
+            seenIds.add(op.id)
+          }
           out.push(sanitizeFree(op, idx, ctx, diagnostics))
           break
         case 'arrow':

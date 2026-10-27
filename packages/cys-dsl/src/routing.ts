@@ -68,6 +68,28 @@ const OPP = (d: Dir): Dir => ((d + 2) % 4) as Dir
 
 const q = (v: number, step: number): number => Math.round(v / step) * step
 
+const finiteRect = (r: RoutingRect): boolean =>
+  Number.isFinite(r.x) && Number.isFinite(r.y) && Number.isFinite(r.w) && Number.isFinite(r.h)
+
+/**
+ * 敌意 cfg 归一(对抗性契约):非有限/越界参数回退默认,不让 quant=0 / 负 penalty
+ * 之类把 NaN 带进路径或扭曲代价语义。调用方(scene JSON 导入、实验滑杆)传什么都不会炸。
+ */
+function normalizeCfg(cfg: RoutingConfig): RoutingConfig {
+  const d = DEFAULT_ROUTING
+  const fin = (v: number, min: number, fb: number): number => (Number.isFinite(v) && v >= min ? v : fb)
+  return {
+    margin: fin(cfg.margin, 0, d.margin),
+    hitEpsilon: fin(cfg.hitEpsilon, 0, d.hitEpsilon),
+    minGap: fin(cfg.minGap, 0, d.minGap),
+    bendPenalty: fin(cfg.bendPenalty, 0, d.bendPenalty),
+    uturnPenalty: fin(cfg.uturnPenalty, 0, d.uturnPenalty),
+    minStub: fin(cfg.minStub, 0, d.minStub),
+    quant: fin(cfg.quant, 1e-6, d.quant),
+    localPad: fin(cfg.localPad, 0, d.localPad),
+  }
+}
+
 function inset(r: RoutingRect, e: number): RoutingRect {
   return { x: r.x + e, y: r.y + e, w: r.w - 2 * e, h: r.h - 2 * e }
 }
@@ -437,6 +459,8 @@ export function debugRoute(
   obstacles: RoutingRect[],
   cfg: RoutingConfig = DEFAULT_ROUTING,
 ): RoutingDebug {
+  cfg = normalizeCfg(cfg)
+  obstacles = obstacles.filter(finiteRect) // 非有限障碍不可推理 → 丢弃(与 planRoute 同规)
   const P = prepare(p1, p2, src, dst, obstacles, cfg)
   return {
     active: P.act,
@@ -464,6 +488,16 @@ export function planRoute(
   mode: 'free' | 'orthogonal' = 'free',
   cfg: RoutingConfig = DEFAULT_ROUTING,
 ): RoutingPoint[] | null {
+  cfg = normalizeCfg(cfg)
+  // 敌意几何契约:坐标非有限 → 无解(null),不产 NaN 路径;非有限障碍不可推理 → 丢弃
+  if (
+    ![p1.x, p1.y, p2.x, p2.y].every(Number.isFinite) ||
+    !finiteRect(src) ||
+    !finiteRect(dst)
+  ) {
+    return null
+  }
+  obstacles = obstacles.filter(finiteRect)
   const act = activeObstacles(obstacles, p1, p2, cfg.hitEpsilon)
   if (mode === 'free' && segClear(p1, p2, act)) return null // V1 直连短路
   const P = prepare(p1, p2, src, dst, obstacles, cfg)

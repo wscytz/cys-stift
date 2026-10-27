@@ -363,9 +363,18 @@ export function toSvg(ops: DslOp[]): { svg: string; skipped: SvgSkip[] } {
   // 第一遍:登记几何(箭头端点解析用);卡 + rect 同时登记为避障障碍(frame 是容器、text 无边界,不算)
   const geom = new Map<string, Rect>()
   const obstacles: Rect[] = []
-  for (const op of ops) {
+  // 对抗性契约:坐标非有限(NaN/Infinity,可经 JSON 1e999 / 上游数值 bug 进入)→ 记 skipped
+  // 不登记 —— 绝不让 "NaN"/"Infinity" 字面量落进 svg 属性毒化 viewBox 与整个渲染
+  const finiteRect = (r: Rect): boolean =>
+    Number.isFinite(r.x) && Number.isFinite(r.y) && Number.isFinite(r.w) && Number.isFinite(r.h)
+  for (let i = 0; i < ops.length; i++) {
+    const op = ops[i]!
     if (op.type === 'card') {
       const r = { x: op.x, y: op.y, w: op.w ?? CARD_DEFAULT_W, h: op.h ?? CARD_DEFAULT_H }
+      if (!finiteRect(r)) {
+        skipped.push({ opIndex: i, op: `card ${op.cardId}`, reason: '坐标含 NaN/Infinity,不渲染' })
+        continue
+      }
       geom.set(String(op.cardId), r)
       obstacles.push(r)
     } else if (op.type === 'free' && op.id) {
@@ -375,6 +384,10 @@ export function toSvg(ops: DslOp[]): { svg: string; skipped: SvgSkip[] } {
         y: op.y,
         w: op.w ?? (isText ? TEXT_DEFAULT_W : CARD_DEFAULT_W),
         h: op.h ?? (isText ? TEXT_DEFAULT_H : CARD_DEFAULT_H),
+      }
+      if (!finiteRect(r)) {
+        skipped.push({ opIndex: i, op: `free ${op.id}`, reason: '坐标含 NaN/Infinity,不渲染' })
+        continue
       }
       geom.set(op.id, r)
       if (op.shape === 'rect') obstacles.push(r)
@@ -388,7 +401,8 @@ export function toSvg(ops: DslOp[]): { svg: string; skipped: SvgSkip[] } {
   for (let i = 0; i < ops.length; i++) {
     const op = ops[i]!
     if (op.type === 'card') {
-      const r = geom.get(String(op.cardId))!
+      const r = geom.get(String(op.cardId))
+      if (!r) continue // 首遍判非有限已记 skipped
       grow(r)
       const stroke = hex(op.color === 'white' ? 'black' : op.color) // 白卡白描边不可见 → 墨描边
       nodeBodies.push(
@@ -411,11 +425,19 @@ export function toSvg(ops: DslOp[]): { svg: string; skipped: SvgSkip[] } {
       continue
     }
     if (op.type === 'free') {
-      const r = geom.get(op.id ?? `anon-${i}`) ?? {
-        x: op.x,
-        y: op.y,
-        w: op.w ?? (op.shape === 'text' ? TEXT_DEFAULT_W : CARD_DEFAULT_W),
-        h: op.h ?? (op.shape === 'text' ? TEXT_DEFAULT_H : CARD_DEFAULT_H),
+      let r: Rect | undefined = op.id != null ? geom.get(op.id) : undefined
+      if (op.id != null && !r) continue // 首遍判非有限已记 skipped(避免二次入 skipped)
+      if (!r) {
+        r = {
+          x: op.x,
+          y: op.y,
+          w: op.w ?? (op.shape === 'text' ? TEXT_DEFAULT_W : CARD_DEFAULT_W),
+          h: op.h ?? (op.shape === 'text' ? TEXT_DEFAULT_H : CARD_DEFAULT_H),
+        }
+        if (!finiteRect(r)) {
+          skipped.push({ opIndex: i, op: `free ${i}`, reason: '坐标含 NaN/Infinity,不渲染' })
+          continue
+        }
       }
       grow(r)
       if (op.shape === 'text') {
@@ -454,6 +476,10 @@ export function toSvg(ops: DslOp[]): { svg: string; skipped: SvgSkip[] } {
     if (op.freeArrow === true) {
       p1 = { x: op.x ?? 0, y: op.y ?? 0 }
       p2 = { x: (op.x ?? 0) + (op.w ?? 0), y: (op.y ?? 0) + (op.h ?? 0) }
+      if (![p1.x, p1.y, p2.x, p2.y].every(Number.isFinite)) {
+        skipped.push({ opIndex: i, op: `arrow ${op.id ?? ''}`.trim(), reason: '坐标含 NaN/Infinity,不渲染' })
+        continue
+      }
     } else {
       const src = geom.get(op.from)
       const dst = geom.get(op.to)
