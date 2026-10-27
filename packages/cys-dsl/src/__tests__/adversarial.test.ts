@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { parseDslWithDiagnostics, parseDslStrictWithDiagnostics } from '../dsl-parser'
+import {
+  parseDslWithDiagnostics,
+  parseDslStrictWithDiagnostics,
+  AT_DIRECTIVES,
+  BARE_KEYWORDS,
+} from '../dsl-parser'
+import { DSL_RESERVED_GROUP_ANCHOR_WORDS } from '../dsl-grammar'
 import { sanitizeDslOps } from '../dsl-sanitize'
 import { solveRelational } from '../dsl-relational-solver'
 import { toSvg } from '../to-svg'
@@ -176,6 +182,53 @@ describe('数值层:NaN/Infinity 绝不落 svg 字面量', () => {
 
   it('全管线敌意坐标:手写 DSL 数值经 finiteNum 守卫本就有限;直塞 op 才可能 NaN → 通道兜住', () => {
     expect(pipelineHasNaN('[card #c1] @pos(1e999,0) @size(100,80)')).toBe(false)
+  })
+})
+
+describe('语法事实同步:grammar 保留词 ↔ warnings 已知指令集(双向闭合锁)', () => {
+  // 教训来源:AT_DIRECTIVES 初版把裸词 from/to 误收为 @ 指令(实际 fromDir='from' sp id,
+  // 不带 @),用户误写 @from(#a) 会被当已知指令静默放过。此组锁死三类语法事实:
+  // 集合闭合 / @指令行为 / 裸词行为,grammar 改动时这里先炸。
+
+  it('闭合:AT_DIRECTIVES ∪ BARE_KEYWORDS === DSL_RESERVED_GROUP_ANCHOR_WORDS(双向无差集)', () => {
+    const union = new Set([...AT_DIRECTIVES, ...BARE_KEYWORDS])
+    expect(union.size).toBe(DSL_RESERVED_GROUP_ANCHOR_WORDS.length)
+    for (const w of DSL_RESERVED_GROUP_ANCHOR_WORDS) {
+      expect(union.has(w), `保留词 ${w} 不在 AT∪BARE`).toBe(true)
+    }
+    for (const w of union) {
+      expect(DSL_RESERVED_GROUP_ANCHOR_WORDS.includes(w), `AT∪BARE 的 ${w} 不在保留词表`).toBe(true)
+    }
+  })
+
+  it('正例:每个 @指令(AT_DIRECTIVES)都不触发 unknown-@ 告警', () => {
+    for (const w of AT_DIRECTIVES) {
+      // 尾部 @size 锚定:让 @w(x) 落在行中(行尾 junk 由 grammar `.*` 兜尾容忍,不进 skipChunk)
+      const p = parseDslWithDiagnostics(`[card #c] @${w}(x) @size(50,50)`)
+      const bad = p.warnings.filter((w2) => w2.message.includes(`unknown @${w}`))
+      expect(bad, `@${w} 被误报 unknown`).toEqual([])
+    }
+  })
+
+  it('负例:裸词误加 @(@from/@to/@create)→ 触发 unknown-@ 告警(锁「它们不带 @」)', () => {
+    for (const w of ['from', 'to', 'create']) {
+      const p = parseDslWithDiagnostics(`[card #c] @${w}(x) @size(50,50)`)
+      expect(p.warnings.some((w2) => w2.message.includes(`unknown @${w}`)), `@${w} 应报 unknown`).toBe(true)
+    }
+  })
+
+  it('行尾残余散文由 grammar `.*` 兜尾容忍 → 静默(设计内,不与 warnings 混)', () => {
+    const p = parseDslWithDiagnostics('[card #c] @pos(0,0) @size(50,50) 随便什么尾巴 junk]]')
+    expect(p.warnings).toEqual([])
+    expect(p.errors).toEqual([])
+    expect(p.ops).toHaveLength(1)
+  })
+
+  it('负例:left-of 不是本语言关系词 → unknown relation 告警(hint 只指向 right-of/below)', () => {
+    const p = parseDslWithDiagnostics('[card #a] @pos(0,0) @size(50,50)\n[card #b] left-of #a @size(50,50)')
+    expect(p.warnings).toHaveLength(1)
+    expect(p.warnings[0]!.message).toContain('unknown relation "left-of"')
+    expect(p.warnings[0]!.message).toContain('right-of')
   })
 })
 

@@ -677,12 +677,16 @@ export function parseDslWithDiagnostics(dslText: string): {
   return { ops, errors, warnings }
 }
 
-/** grammar 全部 @指令名(与 dsl.peggy 各 Dir 规则对齐;dsl-sync 测试锁漂移)。 */
-const AT_DIRECTIVES: ReadonlySet<string> = new Set([
+/** grammar 全部 @指令名(来源:dsl.peggy 逐条 Dir 规则的 '@' 字面量,实测 22 个)。
+ *  注意 from/to/create/关系词是**裸词**(fromDir='from' sp id 等,不带 @);
+ *  adversarial.test.ts 与 DSL_RESERVED_GROUP_ANCHOR_WORDS 做双向闭合锁,漂移即炸。 */
+export const AT_DIRECTIVES: ReadonlySet<string> = new Set([
   'pos', 'size', 'color', 'label', 'text', 'title', 'content', 'dash', 'arrowhead',
-  'curve', 'route', 'elbow', 'gap', 'from', 'to', 'wikilink', 'group', 'href',
+  'curve', 'route', 'elbow', 'gap', 'wikilink', 'group', 'href',
   'compute', 'type', 'tags', 'links', 'code', 'quote',
 ])
+/** 保留词表里的裸关键词(非 @ 指令):createDir / relationDir / fromDir / toDir。 */
+export const BARE_KEYWORDS: ReadonlySet<string> = new Set(['create', 'right-of', 'below', 'from', 'to'])
 const REL_KEYWORDS: ReadonlySet<string> = new Set(['right-of', 'below'])
 
 /**
