@@ -16,10 +16,12 @@ const pkgRoot = resolve(here, '..')
 const dist = join(pkgRoot, 'dist')
 
 // dsl-parser.gen.js 是 checked-in 的 peggy 产物(裸 .js,tsc 不拷贝)→ dist 天然缺它;
-// 包本体走源码消费(main 指向 src),此处为浏览器闭包补齐,使 dist 自洽
+// 包本体走源码消费(main 指向 src),此处为浏览器闭包补齐,使 dist 自洽。
+// 无条件覆盖:gen 变更后 tsc -b 不会重写旧拷贝,条件拷贝会让页面吃陈旧 grammar
+// (2026-10-29 实测:skipChunk 语义化后页面提示恒 0,即此坑)。
 const genSrc = join(pkgRoot, 'src', 'dsl-parser.gen.js')
 const genDist = join(dist, 'dsl-parser.gen.js')
-if (existsSync(genSrc) && !existsSync(genDist)) copyFileSync(genSrc, genDist)
+if (existsSync(genSrc)) copyFileSync(genSrc, genDist)
 
 // ——— 导入解析 ———
 // tsc ESM 产物只有静态 import/export-from;匹配 `from './x'` 与副作用 `import './x'`。

@@ -206,7 +206,9 @@ type DirectiveTuple =
   | ['code', string, string, string | null]
   | ['quote', string, string | null, string | null]
 
-/** directive* 收集的元组列表(null = skipChunk 消费的未知残余,过滤掉)。 */
+/** directive* 收集的元组列表。null = skipChunk 消费的 `]`(头闭合,每行常客,设计内静默);
+ *  string = skipChunk 消费的真 junk 原文(2026-10-29 起 grammar 返回文本,graceful 产精确
+ *  warning / strict 报 unknown residual;fold 侧非元组一律跳过)。 */
 type LineResult =
   | null // prose / 注释 / 围栏 / 空(静默 skip)
   | { kind: 'unknown' } // [ 开头但非已知 kind → unrecognized([freedraw] 也落此:freedraw 已出 DSL)
@@ -361,7 +363,7 @@ interface Folded {
   quotes?: Quote[]
 }
 
-function fold(ds: unknown[]): Folded {
+function fold(ds: unknown[], warns?: string[]): Folded {
   const a: Folded = {}
   for (const d of ds) {
     if (!Array.isArray(d)) continue // null(skipChunk)/非元组 → 跳过
@@ -406,7 +408,17 @@ function fold(ds: unknown[]): Folded {
       case 'to': if (!a.to) a.to = String(v1); break
       case 'wikilink': if (!a.wikilink) a.wikilink = true; break
       case 'group': if (a.group === undefined) a.group = truncate(unescapeQuoted(String(v1))); break
-      case 'href': if (!a.href) a.href = parseHref(String(v1)); break
+      case 'href': {
+        if (!a.href) {
+          const raw = String(v1)
+          a.href = parseHref(raw)
+          // 超限截断信号(2026-10-29):此前 30→20 静默,数据丢失无信号
+          if (a.href && warns && raw.split(';').filter((s) => s.trim() !== '').length > a.href.length) {
+            warns.push(`@href truncated to ${DSL_MAX_HREF_TARGETS} targets (多余的 ${DSL_MAX_HREF_TARGETS} 之后的条目被截断)`)
+          }
+        }
+        break
+      }
       case 'compute': if (a.compute === undefined) a.compute = truncate(unescapeQuoted(String(v1))); break
       case 'type': {
         if (a.cardType === undefined) {
@@ -415,8 +427,26 @@ function fold(ds: unknown[]): Folded {
         }
         break
       }
-      case 'tags': if (a.tags === undefined) a.tags = parseTagList(String(v1)); break
-      case 'links': if (a.links === undefined) a.links = parseLinkList(String(v1)); break
+      case 'tags': {
+        if (!a.tags) {
+          const raw = String(v1)
+          a.tags = parseTagList(raw)
+          if (a.tags && warns && raw.split(';').filter((s) => s.trim() !== '').length > a.tags.length) {
+            warns.push(`@tags truncated to ${DSL_MAX_TAG_COUNT} entries`)
+          }
+        }
+        break
+      }
+      case 'links': {
+        if (!a.links) {
+          const raw = String(v1)
+          a.links = parseLinkList(raw)
+          if (a.links && warns && raw.split(';').filter((s) => s.trim() !== '').length > a.links.length) {
+            warns.push(`@links truncated to ${DSL_MAX_LINK_COUNT} entries`)
+          }
+        }
+        break
+      }
       case 'code': {
         // 可重复指令 → 累积成数组(非首遇优先);截断到 DSL_MAX_CODE_BLOCKS。code 走 long 级截断。
         if (a.code === undefined) a.code = []
@@ -428,6 +458,8 @@ function fold(ds: unknown[]): Folded {
             code,
             ...(caption ? { caption } : {}),
           })
+        } else if (warns && !warns.some((w) => w.includes('@code'))) {
+          warns.push(`@code truncated to ${DSL_MAX_CODE_BLOCKS} blocks (第 ${DSL_MAX_CODE_BLOCKS + 1} 块起被截断)`)
         }
         break
       }
@@ -443,6 +475,8 @@ function fold(ds: unknown[]): Folded {
             ...(attribution ? { attribution } : {}),
             ...(sourceUrl ? { sourceUrl } : {}),
           })
+        } else if (warns && !warns.some((w) => w.includes('@quote'))) {
+          warns.push(`@quote truncated to ${DSL_MAX_QUOTES} entries (第 ${DSL_MAX_QUOTES + 1} 条起被截断)`)
         }
         break
       }
@@ -453,7 +487,7 @@ function fold(ds: unknown[]): Folded {
 
 // ── build:结构 → DslOp 或 diagnostic ──────────────────────────────────────────
 
-type BuildResult = { op: DslOp } | { diag: string } | null
+type BuildResult = { op: DslOp; warns?: string[] } | { diag: string } | null
 
 /** v8:把 fold 出的结构化字段(type/tags/links/code/quotes)拷到 card op —— 镜像 title/content/group/href
  *  的 if-set(缺省不带,apply 侧"缺省不改")。三个 buildCard 分支共用,消除重复。 */
@@ -466,7 +500,8 @@ function applyCardFieldsV8(op: DslCardOp, d: Folded): void {
 }
 
 function buildCard(ds: unknown[]): BuildResult {
-  const d = fold(ds)
+  const warns: string[] = []
+  const d = fold(ds, warns)
   if (d.id === undefined) return { diag: 'missing #id' }
   if (d.rel) {
     const op: DslCardOp = {
@@ -489,7 +524,7 @@ function buildCard(ds: unknown[]): BuildResult {
     if (d.group !== undefined) op.group = d.group
     if (d.href !== undefined) op.href = d.href
     applyCardFieldsV8(op, d)
-    return { op }
+    return warns.length ? { op, warns } : { op }
   }
   if (d.pos) {
     const op: DslCardOp = {
@@ -507,7 +542,7 @@ function buildCard(ds: unknown[]): BuildResult {
     if (d.group !== undefined) op.group = d.group
     if (d.href !== undefined) op.href = d.href
     applyCardFieldsV8(op, d)
-    return { op }
+    return warns.length ? { op, warns } : { op }
   }
   // v5(E):无 @pos 的非 create 卡片行,若携带 title/content/color/size 之一 = "纯属性/内容编辑"
   // (几何沿用现有卡,由 planCard 处理)。x/y 占位(0,0);裸行(无任何字段)与 create 仍 missing @pos。
@@ -659,15 +694,19 @@ export function parseDslWithDiagnostics(dslText: string): {
         break
       }
       ops.push(built.op)
-      // 自然语言体验:skipChunk 吞掉的残余分两类 —— 恢复型(:1、] 等,设计内静默)与
-      // 错误型(@pos（0，0）全角 / @siez 拼写 / leftof 关系词,以前完全静默,卡悄悄丢坐标)。
-      // 错误型记 warning(不是 error:元素在,数据没丢)。
+      // 自然语言体验(2026-10-29 精确化):skipChunk 的 null 是 `]`(每行常客,设计内静默);
+      // string 才是真 junk 原文。junk 存在才分类;@词/关系词检查只看 junk——旧整行 @ 正则
+      // 会把合法裸组锚 @g/@methods 误报成 unknown @(v9 文档形态!),junk 视角根除。
       if (result !== null && result.kind !== 'unknown' && Array.isArray(result.ds)) {
-        const hasResidue = result.ds.some((e) => e === null)
-        if (hasResidue) {
-          const hint = classifyResidue(line)
+        const junk = result.ds.filter((e): e is string => typeof e === 'string')
+        if (junk.length > 0) {
+          const hint = classifyResidue(junk, line)
           if (hint) warnings.push({ line: lineNo, text: line, message: hint })
         }
+      }
+      // 可重复指令/列表超限截断信号(30→8 之类此前零信号)
+      if ('warns' in built && built.warns) {
+        for (const w of built.warns) warnings.push({ line: lineNo, text: line, message: w })
       }
     } else {
       errors.push({ line: lineNo, text: line, message: built.diag })
@@ -690,20 +729,22 @@ export const BARE_KEYWORDS: ReadonlySet<string> = new Set(['create', 'right-of',
 const REL_KEYWORDS: ReadonlySet<string> = new Set(['right-of', 'below'])
 
 /**
- * 残余分类:错误型 → 一句话可操作 hint;恢复型 → null(静默)。
- * 只看引号外内容(@title("中文（字面）") 不误报);纯启发式,warning 通道不阻塞。
+ * junk 分类(2026-10-29 起 junk 是 skipChunk 返回的原文数组):错误型 → 一句话可操作
+ * hint;恢复型(:1 等)→ null(静默)。@词与关系词检查只看 junk(锚位的合法 @组名
+ * 已被 grammar 消费,不会出现在 junk 里);全角/中文方位词看引号外的整行。
  */
-function classifyResidue(line: string): string | null {
+function classifyResidue(junk: string[], line: string): string | null {
   const outsideQuotes = line.replace(/"(?:[^"\\]|\\.)*"/g, '')
   if (/[（）｛｝【】「」：；，。、]/.test(outsideQuotes)) {
     return 'full-width punctuation （），: outside quotes — use ASCII ( ) , : (全角标点请用半角)'
   }
-  for (const m of outsideQuotes.matchAll(/@([a-zA-Z-]+)/g)) {
+  const joined = junk.join(' ')
+  for (const m of joined.matchAll(/@([a-zA-Z][a-zA-Z0-9_-]*)/g)) {
     if (!AT_DIRECTIVES.has(m[1]!)) {
       return `unknown @${m[1]} directive — known: @pos @size @title …(见语法参考)`
     }
   }
-  for (const w of outsideQuotes.split(/[\s()\[\]]+/).filter(Boolean)) {
+  for (const w of joined.split(/\s+/).filter(Boolean)) {
     // 方向词开头但不是合法关系词(leftof / left_of / aboves…)→ 反方向用 right-of 表达
     if (/^(left|right|above|below)/i.test(w) && !REL_KEYWORDS.has(w.toLowerCase()) && !w.startsWith('#')) {
       return `unknown relation "${w}" — relations are right-of / below (opposite direction: swap operands)`
@@ -768,7 +809,10 @@ export function parseDslStrictWithDiagnostics(dslText: string): {
       : new RegExp(`^\\[${result.kind}\\s+#[a-zA-Z0-9_:-]+(?:\\s+create)?\\]`).test(line)
     const allowedClosingChunk = line.startsWith('[arrow]') ? 0 : 1
     const unknownChunks = result.ds.filter((entry) => entry === null).length
-    if (!headerClosed || unknownChunks > allowedClosingChunk) {
+    // 2026-10-29:skipChunk 语义化后,junk 原文以 string 落 ds(null 只剩 `]` 工件)——
+    // strict 的"未知残余"判定同步看 string(null 是 ] 豁免,allowedClosingChunk 管它)
+    const junkChunks = result.ds.filter((entry) => typeof entry === 'string').length
+    if (!headerClosed || unknownChunks > allowedClosingChunk || junkChunks > 0) {
       errors.push({ line: lineNo, text: line, message: 'unknown residual text' })
       continue
     }

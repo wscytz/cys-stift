@@ -8,6 +8,7 @@ import {
 import { DSL_RESERVED_GROUP_ANCHOR_WORDS } from '../dsl-grammar'
 import { sanitizeDslOps } from '../dsl-sanitize'
 import { solveRelational } from '../dsl-relational-solver'
+import { serializeCanvas } from '../canvas-dsl'
 import { toSvg } from '../to-svg'
 import { planRoute, DEFAULT_ROUTING, debugRoute } from '../routing'
 
@@ -238,6 +239,109 @@ describe('语法事实同步:grammar 保留词 ↔ warnings 已知指令集(双�
     expect(p.warnings).toHaveLength(1)
     expect(p.warnings[0]!.message).toContain('unknown relation "left-of"')
     expect(p.warnings[0]!.message).toContain('right-of')
+  })
+})
+
+describe('语义与规模对抗(2026-10-29 轮)', () => {
+  it('裸 ASCII 组锚(v9 文档形态 @methods)→ 零告警 + rel 在(junk 语义化后的核心回归钉)', () => {
+    const p = parseDslWithDiagnostics('[card #a] @pos(0,0) @size(100,80) @group("methods")\n[card #b] right-of @methods @gap(30) @size(100,80)')
+    expect(p.warnings).toEqual([])
+    expect((p.ops[1] as { rel?: unknown }).rel).toBeDefined()
+  })
+
+  it('引号组锚转义名与 @group 创建名解析一致(@"a\\"b" 命中组,a\\"b 成员可锚)', () => {
+    const dsl = '[card #a] @pos(0,0) @size(100,80) @group("a\\"b")\n[card #b] right-of @"a\\"b" @gap(20) @size(100,80)'
+    const p = parseDslWithDiagnostics(dsl)
+    expect(p.errors).toEqual([])
+    const v = solveRelational(sanitizeDslOps(p.ops).ops)
+    expect(v.diagnostics).toEqual([])
+    expect(v.ops).toHaveLength(2)
+  })
+
+  it('自锚(同 id 重复声明 + right-of 自己)→ 重复 id 诊断,坐标有限,不炸', () => {
+    const dsl = '[card #a] @pos(0,0) @size(100,80)\n[card #a] right-of #a @gap(20) @size(100,80)'
+    const p = parseDslWithDiagnostics(dsl)
+    const s = sanitizeDslOps(p.ops)
+    expect(s.diagnostics.some((d) => d.message.includes('duplicate'))).toBe(true)
+    const { svg } = toSvg(s.ops)
+    expect(/NaN|Infinity/.test(svg)).toBe(false)
+  })
+
+  it('1000 长关系链 → 终止,越界钳制有逐卡诊断(不静默),svg 有限', () => {
+    const chain = ['[card #c0] @pos(0,0) @size(100,80)']
+    for (let i = 1; i < 1000; i++) chain.push(`[card #c${i}] right-of #c${i - 1} @gap(10) @size(100,80)`)
+    const p = parseDslWithDiagnostics(chain.join('\n'))
+    expect(p.ops).toHaveLength(1000)
+    const v = solveRelational(sanitizeDslOps(p.ops).ops)
+    expect(v.diagnostics.some((d) => d.message.includes('+/-10000'))).toBe(true)
+    const { svg } = toSvg(v.ops)
+    expect(/NaN|Infinity/.test(svg)).toBe(false)
+  })
+
+  it('可重复指令超限:30 @code 保留 8 + 截断 warning;99 @href 保留 20 + warning;50 @tags 保留 20 + warning', () => {
+    const codes = Array.from({ length: 30 }, (_, i) => `@code(js,"x=${i}")`).join(' ')
+    const p1 = parseDslWithDiagnostics(`[card #a] @pos(0,0) @size(300,200) ${codes}`)
+    expect(((p1.ops[0] as { code?: unknown[] }).code ?? []).length).toBe(8)
+    expect(p1.warnings.some((w) => w.message.includes('@code truncated'))).toBe(true)
+
+    const hrefs = Array.from({ length: 99 }, (_, i) => `#t${i}`).join(';')
+    const p2 = parseDslWithDiagnostics(`[card #a] @pos(0,0) @size(200,100) @href(${hrefs})`)
+    expect(((p2.ops[0] as { href?: string[] }).href ?? []).length).toBe(20)
+    expect(p2.warnings.some((w) => w.message.includes('@href truncated'))).toBe(true)
+
+    const tags = Array.from({ length: 50 }, (_, i) => `t${i}`).join(';')
+    const p3 = parseDslWithDiagnostics(`[card #a] @pos(0,0) @size(200,100) @tags(${tags})`)
+    expect(((p3.ops[0] as { tags?: string[] }).tags ?? []).length).toBe(20)
+    expect(p3.warnings.some((w) => w.message.includes('@tags truncated'))).toBe(true)
+  })
+
+  it('CJK 元素 id → 明确 error(missing #id),行被拒不炸', () => {
+    const p = parseDslWithDiagnostics('[card #中文] @pos(0,0) @size(100,80)')
+    expect(p.ops).toHaveLength(0)
+    expect(p.errors[0]!.message).toBe('missing #id')
+  })
+
+  it('组锚先于成员 → solve 诊断按文档措辞(组锚按书写顺序解)', () => {
+    const dsl = '[card #b] right-of @后来组 @gap(20) @size(100,80)\n[card #a] @pos(0,0) @size(100,80) @group("后来组")'
+    const v = solveRelational(sanitizeDslOps(parseDslWithDiagnostics(dsl).ops).ops)
+    expect(v.diagnostics.some((d) => d.message.includes('无已解成员'))).toBe(true)
+  })
+
+  it('roundtrip 敌意内容:引号/反斜杠/换行/emoji/全角/伪装 DSL 行 → 转义无损 + 序列化幂等', () => {
+    const hostile = new Map<string, { title: string; content: string }>([
+      ['h1', { title: '引号"反斜\\换行\nemoji😀全角（１）', content: '正文"q"\n#comment\n[card #fake] @pos(9,9)' }],
+    ])
+    const ser1 = serializeCanvas(
+      [{ id: 'h1', kind: 'card', x: 0, y: 0, w: 200, h: 100, rotation: 0 }],
+      (id) => hostile.get(id),
+    )
+    const p = parseDslWithDiagnostics(ser1)
+    expect(p.errors).toEqual([])
+    expect(p.warnings).toEqual([])
+    const ser2 = serializeCanvas(
+      [{ id: 'h1', kind: 'card', x: 0, y: 0, w: 200, h: 100, rotation: 0 }],
+      (id) => hostile.get(id),
+    )
+    expect(ser2).toBe(ser1)
+  })
+
+  it('20 万字 content 单 token → toSvg 秒内(wrapLines 线性),svg 干净', () => {
+    const t0 = Date.now()
+    const { svg, skipped } = toSvg(
+      parseDslWithDiagnostics(`[card #b] @pos(0,0) @size(200,100) @content("${'x'.repeat(200_000)}")`).ops,
+    )
+    expect(Date.now() - t0).toBeLessThan(1000)
+    expect(skipped).toHaveLength(0)
+    expect(/NaN|Infinity/.test(svg)).toBe(false)
+  })
+
+  it('1001 卡 → 上限诊断落在第 1001 行,ops 恰 1000', () => {
+    const many = Array.from({ length: 1001 }, (_, i) => `[card #m${i}] @pos(${i * 10},0) @size(50,40)`).join('\n')
+    const p = parseDslWithDiagnostics(many)
+    expect(p.ops).toHaveLength(1000)
+    expect(p.errors).toHaveLength(1)
+    expect(p.errors[0]!.line).toBe(1001)
+    expect(p.errors[0]!.message).toContain('上限 1000')
   })
 })
 

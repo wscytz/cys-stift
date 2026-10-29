@@ -77,7 +77,7 @@ relationDir
 //   与内建指令同名的裸词(@gap/@pos/…)也会在此命中,由 sanitize 层产诊断并剥 rel
 //   (grammar 故意放行以保住精确报错——若在此拒绝,行会落 skipChunk 静默吞掉)。
 groupRef
-  = '@' '"' g:$([^"]*) '"' { return '@Q' + g }
+  = '@' '"' g:$(('\\' . / [^"])*) '"' { return '@Q' + g }
   / '@' g:$bareGroupName { return '@' + g }
 
 bareGroupName
@@ -194,10 +194,13 @@ idChars
 idChar
   = [a-zA-Z0-9_:-]
 
-// skipChunk:消费一个非空白串(未知指令残余 / ] 等),返回 null(被 directive* 收集后 TS 过滤)。
-// 用 [^ \t] 而非 [^\s]:行已按 \n 切(Peggy 行级解析),内部只剩空格/制表符作分隔。
+// skipChunk:消费一个非空白串。返回值三态(2026-10-29 语义化):
+//   `]`(头闭合括号,每行恰一,恢复机制的常客)→ null(与旧行为一致,ds 里不可见为 junk)
+//   其余 junk → 返回原文 Text(graceful 据此产精确 warning;strict 据此报 unknown residual)
+// 旧行为一律返回 null 的后果:hasResidue 对每条元素行都为真(] 必被吃),
+// warnings 只能靠整行文本猜测 → 裸组锚 @g/@methods 被误报 unknown @。
 skipChunk
-  = [^ \t]+ { return null }
+  = t:$[^ \t]+ { return t === ']' ? null : t }
 
 ws
   = [ \t]*
