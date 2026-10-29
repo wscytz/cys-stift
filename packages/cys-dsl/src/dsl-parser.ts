@@ -709,6 +709,10 @@ function classifyResidue(line: string): string | null {
       return `unknown relation "${w}" — relations are right-of / below (opposite direction: swap operands)`
     }
   }
+  // 中文方位词(在#a左边/往右侧/上方…)→ 同类 hint(引号内不误报;行尾 .* 兜尾本就静默)
+  if (/[上下左右][边面方侧]/.test(outsideQuotes)) {
+    return 'CJK direction word — relational forms are right-of / below, anchor first (中文方位词请用 right-of/below,锚在前)'
+  }
   return null
 }
 

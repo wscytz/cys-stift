@@ -453,6 +453,13 @@ const SAMPLES = [
 [card #a] @title("A 改名") @color(yellow)
 [text #t] @pos(0,200) @text("文本节点")
 [text #s] @pos(260,200) @compute("#a.w + 100")` },
+  { name: '手误样例(warnings 演示)', src:
+`[card #c1] @title("测试") @pos（0，0） @size(100，80)
+[card #c2] leftof #c1 @size(50,50)
+[card #c3] 在#c1右边 @size(50,50)
+[card #c4] @pos(0,0) @siez(50,50)
+[card #c5] @pos(0,0) @size(50,50) 从#c1左边来
+[arrow #ok] from #c1 to #c5` },
 ]
 const dslIn = document.getElementById('dsl-in')
 const sampleSel = document.getElementById('dsl-sample')

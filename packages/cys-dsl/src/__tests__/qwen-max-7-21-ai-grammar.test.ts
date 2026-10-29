@@ -58,8 +58,11 @@ const AI_SAMPLES: { name: string; dsl: string; minOps: number }[] = [
 describe('qwen-max-7-21-ai-grammar · AI 输出零诊断可解析', () => {
   for (const s of AI_SAMPLES) {
     it(`${s.name}:parseDslWithDiagnostics 零错误 + ≥${s.minOps} ops`, () => {
-      const { ops, errors } = parseDslWithDiagnostics(s.dsl)
+      const { ops, errors, warnings } = parseDslWithDiagnostics(s.dsl)
       expect(errors).toEqual([])
+      // 零噪声性质(2026-10-29):真实 LLM 语料不得触发任何 warning——
+      // classifyResidue 未来改动若在合法 AI 输出上误报,这里先炸
+      expect(warnings).toEqual([])
       expect(ops.length).toBeGreaterThanOrEqual(s.minOps)
     })
 

@@ -91,6 +91,15 @@ describe('自然语言体验:warnings 通道(手误有信号,恢复型残余静�
     expect(p.warnings[0]!.message).toContain('right-of')
   })
 
+  it('中文方位词(在#a左边)→ warning 指向 right-of/below;引号内方位词不误报', () => {
+    const p = parseDslWithDiagnostics('[card #a] @pos(0,0) @size(100,80)\n[card #b] 在#a左边 @size(100,80)')
+    expect(p.ops).toHaveLength(2)
+    expect(p.warnings).toHaveLength(1)
+    expect(p.warnings[0]!.message).toContain('right-of')
+    const clean = parseDslWithDiagnostics('[card #c] @title("放在左边就好") @pos(0,0) @size(100,80)')
+    expect(clean.warnings).toEqual([])
+  })
+
   it('拼错 @指令 @siez → warning 点名 unknown @siez', () => {
     const p = parseDslWithDiagnostics('[card #c1] @pos(0,0) @siez(100,80)')
     expect(p.warnings).toHaveLength(1)
