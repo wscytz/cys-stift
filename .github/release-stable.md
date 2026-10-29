@@ -2,7 +2,7 @@
 
 cy's Stift {{VERSION}} is a stable release of the local-first idea canvas. Capture -> Inbox -> Canvas -> Workbench -> Export: capture, organizing, deep editing, and recovery all stay fully on your machine. The app sends nothing to a server and collects no usage telemetry.
 
-The 1.4.x stable line carries the 1.3.0 feature core plus the **Swiss Editorial redesign** (design system v0.2: warm paper / surgical red / ink / petrol blue, zero radius, 1px line hierarchy, 280/64/48 editorial grid) and the full **motion pass**, followed by successive hardening batches — font wiring, segmented-hydration root fix, DSL round-trip truncation guard, the seven-field AI confirm gate, desktop single-instance, and import/media hardening. Per-version details live in [`docs/changelog.md`](https://github.com/wscytz/cys-stift/blob/main/docs/changelog.md). Release baseline re-verified at tagging: lint clean, full test suite green, web build exit 0, docs link check passing.
+This 1.5.0 stable release carries the 1.3.0 feature core, the **Swiss Editorial redesign** (design system v0.2: warm paper / surgical red / ink / petrol blue, zero radius, 1px line hierarchy, 280/64/48 editorial grid) and the full **motion pass**, followed by successive hardening batches — font wiring, segmented-hydration root fix, DSL round-trip truncation guard, the seven-field AI confirm gate, desktop single-instance, and import/media hardening — and, new in 1.5.0, a **routing solver** for automatic obstacle-avoiding arrows and **DSL authoring hints** that flag common mistakes without blocking. Per-version details live in [`docs/changelog.md`](https://github.com/wscytz/cys-stift/blob/main/docs/changelog.md). Release baseline re-verified at tagging: lint clean, full test suite green, web build exit 0, docs link check passing.
 
 ## Downloads
 
@@ -14,6 +14,7 @@ The 1.4.x stable line carries the 1.3.0 feature core plus the **Swiss Editorial 
 ## Highlights
 
 - **Swiss Editorial UI:** editorial sidebar with 64px collapsed icon rail (hover/focus overlay expand, pin to keep), editorial home (topbar crumb + sync dot, large date anchor, section numbering), re-skinned toolbar / modals / lists / settings, and a consistent motion system driven by shared timing tokens mirrored across three sources.
+- **Automatic obstacle-avoiding arrows:** arrow routing is now solved globally (sparse orthogonal visibility graph + direction-state A*) instead of picking from heuristic candidates — paths never cross cards, stay deterministic byte-for-byte, and are verified against a dense-grid reference (worst gap 0.7px over 60 paired scenes).
 - **Structured canvas cards:** the canvas can be written as plain text (DSL). Cards carry `@type` / `@tags` / `@links` / `@code` / `@quote` as structured fields — multiple code blocks and quotes per card round-trip cleanly. The canvas stays fully text-editable and diff-friendly.
 - **Capture -> Inbox -> Canvas:** quick capture, reversible batch actions, an infinite canvas with arrows, freeform, and outline/minimap.
 - **Workbench:** Source / Split / Preview Markdown (code highlighting, math, footnotes).
@@ -38,7 +39,7 @@ The macOS app is ad-hoc signed for artifact integrity but not notarized with an 
 
 ## Stable scope
 
-"Stable" means the data format (1.1-compatible), core workflow, cys-dsl v8 contract, recovery behavior, automated test baseline, and release build pipeline are frozen for compatible maintenance. It does not claim platform certification or third-party AI reliability.
+"Stable" means the data format (1.1-compatible), core workflow, cys-dsl v9 contract, recovery behavior, automated test baseline, and release build pipeline are frozen for compatible maintenance. It does not claim platform certification or third-party AI reliability.
 
 - macOS Developer ID signing/notarization and Windows Authenticode signing are not present.
 - VoiceOver, real operating-system 200% scaling, installation upgrades on a representative device matrix, and real-provider quota/refusal testing remain post-release hardening work.
