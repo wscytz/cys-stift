@@ -14,6 +14,17 @@ const config: NextConfig = {
   // Keep trailing slash on for friendlier static hosting / file:// usage.
   trailingSlash: true,
   reactStrictMode: true,
+  // cys-dsl 源码按 TS 惯例写 `.js` 后缀相对导入(Node ESM 直跑 dist 需要,2026-11-01
+  // npm 就绪化引入)。webpack 需显式映射回 .ts:CI 干净环境不自动做,本地 .next
+  // 缓存曾把这点罩成假绿(build-cache 教训)——验证构建必须清缓存。
+  webpack: (config) => {
+    config.resolve.extensionAlias = {
+      '.js': ['.ts', '.tsx', '.js'],
+      '.mjs': ['.mts', '.mjs'],
+      '.cjs': ['.cts', '.cjs'],
+    }
+    return config
+  },
 }
 
 export default config
