@@ -4,13 +4,13 @@ import {
   parseDslStrictWithDiagnostics,
   AT_DIRECTIVES,
   BARE_KEYWORDS,
-} from '../dsl-parser'
-import { DSL_RESERVED_GROUP_ANCHOR_WORDS } from '../dsl-grammar'
-import { sanitizeDslOps } from '../dsl-sanitize'
-import { solveRelational } from '../dsl-relational-solver'
-import { serializeCanvas } from '../canvas-dsl'
-import { toSvg } from '../to-svg'
-import { planRoute, DEFAULT_ROUTING, debugRoute } from '../routing'
+} from '../dsl-parser.js'
+import { DSL_RESERVED_GROUP_ANCHOR_WORDS } from '../dsl-grammar.js'
+import { sanitizeDslOps } from '../dsl-sanitize.js'
+import { solveRelational } from '../dsl-relational-solver.js'
+import { serializeCanvas } from '../canvas-dsl.js'
+import { toSvg } from '../to-svg.js'
+import { planRoute, DEFAULT_ROUTING, debugRoute } from '../routing.js'
 
 /**
  * 对抗性维护轮(2026-10-27)—— 与 glm-5.2 健壮性测试互补:

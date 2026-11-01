@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { serializeCanvas } from '../canvas-dsl'
-import { parseDsl } from '../dsl-parser'
+import { serializeCanvas } from '../canvas-dsl.js'
+import { parseDsl } from '../dsl-parser.js'
 import type { CanvasElement } from '@cys-stift/canvas-engine'
 
 /**

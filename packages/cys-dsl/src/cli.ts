@@ -14,20 +14,20 @@
  */
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-import { DSL_VERSION } from './dsl-grammar'
-import { parseDslWithDiagnostics, type DslOp } from './dsl-parser'
-import { sanitizeDslOps } from './dsl-sanitize'
-import { solveRelational } from './dsl-relational-solver'
-import { serializeCanvas, type CardDslContent } from './canvas-dsl'
-import { toSvg } from './to-svg'
+import { DSL_VERSION } from './dsl-grammar.js'
+import { parseDslWithDiagnostics, type DslOp } from './dsl-parser.js'
+import { sanitizeDslOps } from './dsl-sanitize.js'
+import { solveRelational } from './dsl-relational-solver.js'
+import { serializeCanvas, type CardDslContent } from './canvas-dsl.js'
+import { toSvg } from './to-svg.js'
 import {
   toJsonCanvas,
   JSON_CANVAS_DEFAULT_CARD_W,
   JSON_CANVAS_DEFAULT_CARD_H,
   JSON_CANVAS_DEFAULT_TEXT_W,
   JSON_CANVAS_DEFAULT_TEXT_H,
-} from './to-json-canvas'
-import type { CanvasElement } from './types'
+} from './to-json-canvas.js'
+import type { CanvasElement } from './types.js'
 
 const USAGE = `cys-dsl — cy's Stift 画布 DSL(v${DSL_VERSION})命令行
 

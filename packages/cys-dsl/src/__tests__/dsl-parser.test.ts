@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { parseDsl, parseDslStrictWithDiagnostics, parseDslWithDiagnostics, type DslOp } from '../dsl-parser'
-import { DSL_MAX_TEXT_LEN } from '../dsl-grammar'
+import { parseDsl, parseDslStrictWithDiagnostics, parseDslWithDiagnostics, type DslOp } from '../dsl-parser.js'
+import { DSL_MAX_TEXT_LEN } from '../dsl-grammar.js'
 
 describe('parseDsl', () => {
   it('parses a card positioning directive', () => {

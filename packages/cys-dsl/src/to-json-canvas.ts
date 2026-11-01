@@ -21,7 +21,7 @@
  * 纯函数、零依赖(与包整体纪律一致);本模块进公开 barrel,cli.ts 不进(避免 node:fs
  * 进 web bundle)。
  */
-import type { DslArrowOp, DslCardOp, DslFreeOp, DslOp } from './dsl-parser'
+import type { DslArrowOp, DslCardOp, DslFreeOp, DslOp } from './dsl-parser.js'
 
 /** 与 apply-layout / relational-solver 一致的缺省卡尺寸。 */
 export const JSON_CANVAS_DEFAULT_CARD_W = 240

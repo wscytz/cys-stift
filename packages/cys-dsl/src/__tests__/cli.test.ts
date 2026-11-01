@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { main, renderText, roundtripText, validateText } from '../cli'
+import { main, renderText, roundtripText, validateText } from '../cli.js'
 
 /** v8 全特性样本:几何 + 关系式 + 结构化字段 + 箭头签名 + 自由元素。 */
 const SAMPLE = [

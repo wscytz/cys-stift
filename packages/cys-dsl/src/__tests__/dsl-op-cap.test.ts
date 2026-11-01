@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { parseDslWithDiagnostics, parseDslStrictWithDiagnostics } from '../dsl-parser'
-import { DSL_MAX_OPS } from '../dsl-grammar'
+import { parseDslWithDiagnostics, parseDslStrictWithDiagnostics } from '../dsl-parser.js'
+import { DSL_MAX_OPS } from '../dsl-grammar.js'
 
 /**
  * DSL_MAX_OPS — parse 层 DoS 防御:单块 DSL 的元素总数上限。

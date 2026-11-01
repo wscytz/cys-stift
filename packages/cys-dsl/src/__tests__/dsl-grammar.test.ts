@@ -6,11 +6,11 @@ import {
   DSL_COLOR_ALIASES,
   DSL_GRAMMAR_REFERENCE,
   truncateDslText,
-} from '../dsl-grammar'
-import { parseDslWithDiagnostics, AT_DIRECTIVES } from '../dsl-parser'
-import { sanitizeDslOps } from '../dsl-sanitize'
-import { solveRelational } from '../dsl-relational-solver'
-import { toSvg } from '../to-svg'
+} from '../dsl-grammar.js'
+import { parseDslWithDiagnostics, AT_DIRECTIVES } from '../dsl-parser.js'
+import { sanitizeDslOps } from '../dsl-sanitize.js'
+import { solveRelational } from '../dsl-relational-solver.js'
+import { toSvg } from '../to-svg.js'
 
 describe('dsl-grammar', () => {
   it('DSL_VERSION is a positive integer (grammar version, independent of app version)', () => {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { CanvasElement } from '@cys-stift/canvas-engine'
-import { serializeCanvas } from '../canvas-dsl'
-import { parseDsl, parseDslWithDiagnostics } from '../dsl-parser'
-import { DSL_MAX_CONTENT_LEN } from '../dsl-grammar'
+import { serializeCanvas } from '../canvas-dsl.js'
+import { parseDsl, parseDslWithDiagnostics } from '../dsl-parser.js'
+import { DSL_MAX_CONTENT_LEN } from '../dsl-grammar.js'
 
 /**
  * glm-5.2 独立交叉验证 —— v5 卡片内容(@title 短 / @content 长 markdown)专项。

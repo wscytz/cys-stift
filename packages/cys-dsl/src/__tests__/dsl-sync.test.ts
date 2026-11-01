@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { DSL_KINDS, DSL_COLORS, DSL_COLOR_ALIASES } from '../dsl-grammar'
-import { parseDslWithDiagnostics } from '../dsl-parser'
+import { DSL_KINDS, DSL_COLORS, DSL_COLOR_ALIASES } from '../dsl-grammar.js'
+import { parseDslWithDiagnostics } from '../dsl-parser.js'
 
 /** parser 对每个 DSL_KINDS 都「认识」并产 1 op(freedraw 已出 DSL,不在此;[freedraw] 现 unrecognized,见 dsl-parser 测试)。 */
 describe('parser recognizes every DSL_KINDS', () => {

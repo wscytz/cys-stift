@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { parseDsl, parseDslStrictWithDiagnostics, parseDslWithDiagnostics } from '../dsl-parser'
-import { sanitizeDslOps } from '../dsl-sanitize'
-import { DSL_VERSION } from '../dsl-grammar'
+import { parseDsl, parseDslStrictWithDiagnostics, parseDslWithDiagnostics } from '../dsl-parser.js'
+import { sanitizeDslOps } from '../dsl-sanitize.js'
+import { DSL_VERSION } from '../dsl-grammar.js'
 
 /**
  * glm-5.2 独立交叉验证 —— 转义核心卖点之二:**AI 可驱动(真实 LLM 输出可被零诊断接受)**。

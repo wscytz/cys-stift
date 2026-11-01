@@ -12,7 +12,7 @@
  * 内的 skipChunk 吃未知残余 → 复刻旧正则的任意位置/任意顺序容错。
  */
 
-import type { CardId, CardType, CodeBlock, Quote } from './types'
+import type { CardId, CardType, CodeBlock, Quote } from './types.js'
 import {
   DSL_COLORS,
   DSL_COLOR_ALIASES,
@@ -26,7 +26,7 @@ import {
   DSL_MAX_OPS,
   DSL_CARD_TYPES,
   truncateDslText,
-} from './dsl-grammar'
+} from './dsl-grammar.js'
 // Peggy 生成;类型垫片见 dsl-parser.gen.d.ts
 import { parse as parseLine } from './dsl-parser.gen.js'
 

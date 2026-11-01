@@ -16,7 +16,7 @@
  * 当前实现:case 6(非法 size)+ case 1/11(card 不存在 diagnostic)+ case 7(arrow 端点 diagnostic)
  *              + case 3(free op 跨 kind 告警)。
  */
-import type { DslOp, DslCardOp, DslFreeOp, DslArrowOp } from './dsl-parser'
+import type { DslOp, DslCardOp, DslFreeOp, DslArrowOp } from './dsl-parser.js'
 import {
   DSL_MAX_TEXT_LEN,
   DSL_MAX_CONTENT_LEN,
@@ -28,7 +28,7 @@ import {
   DSL_CARD_TYPES,
   DSL_RESERVED_GROUP_ANCHOR_WORDS,
   truncateDslText,
-} from './dsl-grammar'
+} from './dsl-grammar.js'
 
 /** Sanitize 诊断:亮给用户/AI 看(让 AgentConfirmCard/dsl-dialog 把"引用了不存在的卡 #X"反馈出来)。 */
 export type SanitizeDiagnostic = {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { evalCompute, formatComputeNumber, type ComputeResolver } from '../dsl-compute'
+import { evalCompute, formatComputeNumber, type ComputeResolver } from '../dsl-compute.js'
 
 /** 测试几何池:a=10×20@(0,0), b=30×40@(5,5)。 */
 const geom: Record<string, { x: number; y: number; w: number; h: number }> = {

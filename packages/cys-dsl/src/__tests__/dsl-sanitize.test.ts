@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CardId } from '@cys-stift/domain'
-import type { DslOp } from '../dsl-parser'
-import { sanitizeDslOps } from '../dsl-sanitize'
+import type { DslOp } from '../dsl-parser.js'
+import { sanitizeDslOps } from '../dsl-sanitize.js'
 
 /**
  * DSL sanitize 层测试(case 6: 非法 size 修正)。

@@ -15,12 +15,12 @@
  * freedraw 不在 DSL(程序自管 R2 + 渲染)。详细见仓库 README。
  * 注意:cli.ts(node:fs)不进 barrel——CLI 经 `pnpm --filter @cys-stift/dsl cli` 跑。
  */
-export * from './dsl-grammar'
-export * from './canvas-dsl'
-export * from './dsl-parser'
-export * from './dsl-sanitize'
-export * from './dsl-compute'
-export * from './dsl-relational-solver'
-export * from './to-json-canvas'
-export * from './to-svg'
-export * from './types'
+export * from './dsl-grammar.js'
+export * from './canvas-dsl.js'
+export * from './dsl-parser.js'
+export * from './dsl-sanitize.js'
+export * from './dsl-compute.js'
+export * from './dsl-relational-solver.js'
+export * from './to-json-canvas.js'
+export * from './to-svg.js'
+export * from './types.js'

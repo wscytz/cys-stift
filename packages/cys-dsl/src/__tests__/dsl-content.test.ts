@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { CanvasElement } from '@cys-stift/canvas-engine'
-import { parseDsl, parseDslWithDiagnostics } from '../dsl-parser'
-import { serializeCanvas } from '../canvas-dsl'
-import { sanitizeDslOps } from '../dsl-sanitize'
-import { DSL_MAX_CONTENT_LEN, DSL_MAX_TEXT_LEN } from '../dsl-grammar'
+import { parseDsl, parseDslWithDiagnostics } from '../dsl-parser.js'
+import { serializeCanvas } from '../canvas-dsl.js'
+import { sanitizeDslOps } from '../dsl-sanitize.js'
+import { DSL_MAX_CONTENT_LEN, DSL_MAX_TEXT_LEN } from '../dsl-grammar.js'
 
 /**
  * v5 @title/@content 专项(Slice A:parse 侧)。

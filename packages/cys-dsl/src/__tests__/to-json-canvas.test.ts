@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { parseDslWithDiagnostics } from '../dsl-parser'
-import { sanitizeDslOps } from '../dsl-sanitize'
-import { solveRelational } from '../dsl-relational-solver'
-import { toJsonCanvas } from '../to-json-canvas'
+import { parseDslWithDiagnostics } from '../dsl-parser.js'
+import { sanitizeDslOps } from '../dsl-sanitize.js'
+import { solveRelational } from '../dsl-relational-solver.js'
+import { toJsonCanvas } from '../to-json-canvas.js'
 
 describe('toJsonCanvas(card → node)', () => {
   it('全结构化字段落 cys 命名空间;title 上 node.text', () => {
@@ -32,7 +32,7 @@ describe('toJsonCanvas(card → node)', () => {
   })
 
   it('无 @size 时用缺省卡尺寸 240×120(与 apply/solver 同源)', async () => {
-    const { JSON_CANVAS_DEFAULT_CARD_W, JSON_CANVAS_DEFAULT_CARD_H } = await import('../to-json-canvas')
+    const { JSON_CANVAS_DEFAULT_CARD_W, JSON_CANVAS_DEFAULT_CARD_H } = await import('../to-json-canvas.js')
     const { ops } = parseDslWithDiagnostics('[card #a] @pos(0,0)')
     const { canvas } = toJsonCanvas(ops)
     expect(canvas.nodes[0]!.width).toBe(JSON_CANVAS_DEFAULT_CARD_W)

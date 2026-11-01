@@ -9,9 +9,9 @@ import {
   DSL_MAX_CONTENT_LEN,
   DSL_GRAMMAR_REFERENCE,
   truncateDslText,
-} from '../dsl-grammar'
-import { serializeCanvas } from '../canvas-dsl'
-import { parseDsl } from '../dsl-parser'
+} from '../dsl-grammar.js'
+import { serializeCanvas } from '../canvas-dsl.js'
+import { parseDsl } from '../dsl-parser.js'
 
 /**
  * glm-5.2 独立交叉验证 —— 锁定不变量与设计契约。

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { parseDsl, parseDslWithDiagnostics } from '../dsl-parser'
-import { sanitizeDslOps } from '../dsl-sanitize'
-import { DSL_MAX_CONTENT_LEN, DSL_MAX_TEXT_LEN } from '../dsl-grammar'
-import type { DslOp } from '../dsl-parser'
+import { parseDsl, parseDslWithDiagnostics } from '../dsl-parser.js'
+import { sanitizeDslOps } from '../dsl-sanitize.js'
+import { DSL_MAX_CONTENT_LEN, DSL_MAX_TEXT_LEN } from '../dsl-grammar.js'
+import type { DslOp } from '../dsl-parser.js'
 
 /**
  * glm-5.2 独立交叉验证 —— 转义核心卖点之三:**健壮性(脏输入不崩)**。

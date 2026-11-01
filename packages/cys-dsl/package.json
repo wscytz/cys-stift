@@ -9,12 +9,32 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -p tsconfig.build.json && cp src/dsl-parser.gen.js src/dsl-parser.gen.d.ts dist/",
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "gen": "peggy src/dsl.peggy -o src/dsl-parser.gen.js --format es",
     "cli": "tsx src/cli.ts",
-    "debug:page": "tsc -b && node debug/build-debug-page.mjs"
+    "debug:page": "tsc -p tsconfig.build.json && node debug/build-debug-page.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "bin": {
+      "cys-dsl": "./dist/cli.js"
+    }
   },
   "devDependencies": {
     "@cys-stift/canvas-engine": "workspace:*",

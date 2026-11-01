@@ -15,8 +15,8 @@
  *   frame 是容器、text 无边界,都不算障碍。折线转角圆角化(渲染层美化,不改几何)。
  * - 路由 straight/curve/elbow 都画;arrowhead arrow=开口 V / triangle=实心三角 / none=无线帽。
  */
-import type { DslOp } from './dsl-parser'
-import { planRoute } from './routing'
+import type { DslOp } from './dsl-parser.js'
+import { planRoute } from './routing.js'
 
 /** legacy 6 色名 → 设计 token 实值(浅色主题)。grey 是 gray 的冻结别名。 */
 const COLOR_HEX: Record<string, string> = {

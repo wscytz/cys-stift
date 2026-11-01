@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { planRoute, DEFAULT_ROUTING, debugRoute } from '../routing'
-import type { RoutingPoint, RoutingRect } from '../routing'
+import { planRoute, DEFAULT_ROUTING, debugRoute } from '../routing.js'
+import type { RoutingPoint, RoutingRect } from '../routing.js'
 
 /** 确定性伪随机(mulberry32):同种子同场景,测试可复现。 */
 function mulberry32(seed: number): () => number {

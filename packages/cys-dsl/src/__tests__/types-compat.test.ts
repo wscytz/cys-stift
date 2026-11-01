@@ -22,7 +22,7 @@ import type {
   LinkPreview,
   CodeBlock,
   Quote,
-} from '../types'
+} from '../types.js'
 
 /**
  * 边界类型同步断言(编译期)。

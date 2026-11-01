@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { parseDslWithDiagnostics } from '../dsl-parser'
-import { DSL_GRAMMAR_REFERENCE } from '../dsl-grammar'
+import { parseDslWithDiagnostics } from '../dsl-parser.js'
+import { DSL_GRAMMAR_REFERENCE } from '../dsl-grammar.js'
 
 /**
  * qwen-max-7-21 · 预期能力测试 ③「AI 可驱动 · 实测」(live,env 门控)

@@ -12,9 +12,9 @@
  * round-trip 稳定,不适用「跳过」。
  */
 import { describe, expect, it } from 'vitest'
-import { serializeCanvas } from '../canvas-dsl'
-import { parseDsl } from '../dsl-parser'
-import { DSL_MAX_TEXT_LEN, DSL_MAX_CONTENT_LEN } from '../dsl-grammar'
+import { serializeCanvas } from '../canvas-dsl.js'
+import { parseDsl } from '../dsl-parser.js'
+import { DSL_MAX_TEXT_LEN, DSL_MAX_CONTENT_LEN } from '../dsl-grammar.js'
 import type { CanvasElement } from '@cys-stift/canvas-engine'
 
 describe('serialize 侧超长防护 — 文本字段不 emit(防 Apply 写回截断值)', () => {

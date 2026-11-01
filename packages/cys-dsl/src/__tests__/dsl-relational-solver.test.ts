@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { DslOp } from '../dsl-parser'
-import { parseDsl } from '../dsl-parser'
-import { solveRelational } from '../dsl-relational-solver'
+import type { DslOp } from '../dsl-parser.js'
+import { parseDsl } from '../dsl-parser.js'
+import { solveRelational } from '../dsl-relational-solver.js'
 
 /**
  * B工程:relational solver 测试。

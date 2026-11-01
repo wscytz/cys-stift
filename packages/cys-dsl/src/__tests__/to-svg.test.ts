@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { parseDsl } from '../dsl-parser'
-import { sanitizeDslOps } from '../dsl-sanitize'
-import { solveRelational } from '../dsl-relational-solver'
-import { toSvg, routeAround } from '../to-svg'
+import { parseDsl } from '../dsl-parser.js'
+import { sanitizeDslOps } from '../dsl-sanitize.js'
+import { solveRelational } from '../dsl-relational-solver.js'
+import { toSvg, routeAround } from '../to-svg.js'
 
 /** CLI render --svg 的底层:ops → 独立 SVG(预览级)。 */
 function solve(text: string) {

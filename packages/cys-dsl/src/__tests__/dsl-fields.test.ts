@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { CanvasElement } from '@cys-stift/canvas-engine'
-import { parseDsl, parseDslStrictWithDiagnostics, type DslCardOp } from '../dsl-parser'
-import { serializeCanvas, type CardDslContent } from '../canvas-dsl'
-import { sanitizeDslOps } from '../dsl-sanitize'
+import { parseDsl, parseDslStrictWithDiagnostics, type DslCardOp } from '../dsl-parser.js'
+import { serializeCanvas, type CardDslContent } from '../canvas-dsl.js'
+import { sanitizeDslOps } from '../dsl-sanitize.js'
 import {
   DSL_MAX_CONTENT_LEN,
   DSL_MAX_TAG_COUNT,
   DSL_MAX_LINK_COUNT,
   DSL_MAX_CODE_BLOCKS,
   DSL_MAX_QUOTES,
-} from '../dsl-grammar'
+} from '../dsl-grammar.js'
 
 /**
  * v8 卡片结构化字段专项:@type/@tags/@links/@code/@quote(media 排除)。

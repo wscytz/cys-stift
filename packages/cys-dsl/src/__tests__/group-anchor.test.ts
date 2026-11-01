@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { DslCardOp, DslOp } from '../dsl-parser'
-import { parseDsl } from '../dsl-parser'
-import { sanitizeDslOps } from '../dsl-sanitize'
-import { solveRelational, type ExistingGeom } from '../dsl-relational-solver'
+import type { DslCardOp, DslOp } from '../dsl-parser.js'
+import { parseDsl } from '../dsl-parser.js'
+import { sanitizeDslOps } from '../dsl-sanitize.js'
+import { solveRelational, type ExistingGeom } from '../dsl-relational-solver.js'
 
 /** v9 组级相对锚:right-of/below @组名 = 以该组已解成员包围盒为锚。 */
 

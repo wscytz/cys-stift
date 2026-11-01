@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { parseDsl, parseDslWithDiagnostics } from '../dsl-parser'
-import { sanitizeDslOps } from '../dsl-sanitize'
-import { DSL_GRAMMAR_REFERENCE } from '../dsl-grammar'
+import { parseDsl, parseDslWithDiagnostics } from '../dsl-parser.js'
+import { sanitizeDslOps } from '../dsl-sanitize.js'
+import { DSL_GRAMMAR_REFERENCE } from '../dsl-grammar.js'
 
 /**
  * qwen-max-7-21 · 预期能力测试 ②「AI 可驱动 · 文法侧」

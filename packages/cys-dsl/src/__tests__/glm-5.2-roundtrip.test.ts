@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CanvasElement } from '@cys-stift/canvas-engine'
-import { serializeCanvas, serializeCanvasReadable, serializeElement } from '../canvas-dsl'
-import { parseDsl } from '../dsl-parser'
+import { serializeCanvas, serializeCanvasReadable, serializeElement } from '../canvas-dsl.js'
+import { parseDsl } from '../dsl-parser.js'
 
 /**
  * glm-5.2 独立交叉验证 —— 转义核心卖点之一:**完整文字化(无损往返)**。
@@ -183,7 +183,7 @@ describe('glm-5.2 round-trip —— 完整文字化承诺', () => {
 
 /** 测试辅助:把 DslOp 粗略还原成 CanvasElement(用于幂等性二次 serialize)。
  *  只覆盖 round-trip 测试里出现的 kind,字段映射对齐 serializeElement 的读取。 */
-function opToElement(op: import('../dsl-parser').DslOp): CanvasElement {
+function opToElement(op: import('../dsl-parser.js').DslOp): CanvasElement {
   const base = { rotation: 0 } as CanvasElement
   switch (op.type) {
     case 'card':

@@ -20,9 +20,9 @@
  * 与 sanitize 协作:applyLayout 入口先 sanitize(修正 size/coord/id)再 solve(rel → 绝对)。
  * diagnostic 复用 SanitizeDiagnostic 形态,apply-layout 合并透出。
  */
-import type { DslOp, DslCardOp } from './dsl-parser'
-import type { SanitizeDiagnostic } from './dsl-sanitize'
-import { DSL_MAX_COORD } from './dsl-sanitize'
+import type { DslOp, DslCardOp } from './dsl-parser.js'
+import type { SanitizeDiagnostic } from './dsl-sanitize.js'
+import { DSL_MAX_COORD } from './dsl-sanitize.js'
 
 /** 已知几何(anchor 查找用)。来自画布现有 card 或同批更早 op。
  *  v9:group 为可选组名(v9 组级相对锚用;web 侧由 element.meta.group 填充)。 */
