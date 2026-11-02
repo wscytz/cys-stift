@@ -1,7 +1,6 @@
 {
   "name": "@wscytz/dsl",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.1.1",
   "description": "Bidirectional text<->canvas description language: relational layout solved by an engine (group anchors, collision avoidance), structured card fields, zero runtime dependencies.",
   "license": "Apache-2.0",
   "keywords": [

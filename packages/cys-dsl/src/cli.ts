@@ -12,7 +12,7 @@
  * 本文件**不进公开 barrel**(node:fs 不许进 web bundle)。
  * 运行:`pnpm --filter @wscytz/dsl cli <命令> <file.sift>`(tsx,devDep)。
  */
-import { readFileSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { DSL_VERSION } from './dsl-grammar.js'
 import { parseDslWithDiagnostics, type DslOp } from './dsl-parser.js'
@@ -390,10 +390,19 @@ export function main(argv: readonly string[]): number {
   return result.code
 }
 
-/* 直接执行时才跑 main(被 import / 测试时不触发)。
+/* 直接执行时才跑 main(被 import / 测试时不触发)。npm/npx 经 node_modules/.bin
+ * 符号链接启动,argv[1] 是链接路径而 import.meta.url 是真实路径,直接比对必失配
+ * (bin 静默空转 exit 0,已实锤)——argv[1] 先过 realpath 再比。
  * 用 process.exitCode 而非 process.exit:后者不等 stdout 管道 flush,>64KiB 输出
  * (大画布 render)在 `| jq` 等管道下会静默截断且仍 exit 0。exitCode 让 Node 在
  * 写队列排空后自然退出。 */
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+const argvReal = (() => {
+  try {
+    return realpathSync(process.argv[1] ?? '')
+  } catch {
+    return ''
+  }
+})()
+if (argvReal && import.meta.url === pathToFileURL(argvReal).href) {
   process.exitCode = main(process.argv.slice(2))
 }
