@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-11-02 · @wscytz/dsl 0.1.1 · feat: DSL 内核以独立 npm 包发布
+
+> 画布文字内核(cys-dsl v9)从 monorepo 剥离为可独立安装的 npm 包:任何 Node ≥20 的项目或 AI 助手可 `npm i @wscytz/dsl`,用 CLI 与 API 校验、求解、渲染 `.sift` 文本。应用版本仍为 1.5.0,行为不变。
+
+- **包内容**:零运行时依赖 ESM + `.d.ts`——`parseDsl` / `evalCompute`(关系式求解)/ `solveRelational`(组级相对锚)/ `routeAround`(箭头自动避障)/ `toSvg` / `toJsonCanvas` / sanitize 与语法提示通道,39 个具名导出。
+- **CLI**:`cys-dsl <validate|render|roundtrip> <file.sift>`;`render` 默认出 JSON Canvas 1.0,`--svg` 出独立 SVG。
+- **License 由 GPL-3.0-or-later 改为 Apache-2.0**:放宽采用面,仓库 LICENSE 全文同步替换。
+- **fix(0.1.1)**:npm/npx 经 `node_modules/.bin` 符号链接启动时直跑守卫失配(argv[1] 是链接路径,`import.meta.url` 是真实路径,比对不中导致 main 不执行),CLI 静默空转 exit 0;argv[1] 过 `realpathSync` 再比对修复。该缺陷仅影响包安装形态(0.1.0),源码仓内直跑不受影响。
+- 验证:CI 干净环境全绿(cys-dsl 533 tests + 2 跳 / lint 0 / web build exit 0,run 41376252656);registry `latest=0.1.1`;干净目录 `npm i @wscytz/dsl` 后 `.bin` 路径 --help / validate / render --svg 实跑全过。
+
 ## 2026-10-29 · 1.5.0 · feat: 走线求解器 + DSL 手误提示 + 内核调试台(tag v1.5.0 · 2026-10-29 发布)
 
 > 本版本把画布文字内核的可靠性与可调试性向前推:箭头自动避障从启发候选升级为全局求解,DSL 对常见手误给出可操作提示,敌意输入全面硬化。应用壳行为不变;实验与过程记录在私有仓。
