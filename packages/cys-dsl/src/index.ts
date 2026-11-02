@@ -1,5 +1,5 @@
 /**
- * @cys-stift/dsl — cys-dsl 文本格式包(画布的双向文字表示 / 转义)。
+ * @wscytz/dsl — cys-dsl 文本格式包(画布的双向文字表示 / 转义)。
  *
  * 公开 API:grammar 单一源(DSL_VERSION / KINDS / COLORS / GRAMMAR_REFERENCE)+
  * serializer(serializeCanvas / serializeCanvasReadable / serializeElement)+
@@ -13,7 +13,7 @@
  * 原依赖 canvas-engine/domain 仅为类型,已由 types.ts 结构性复制替代,devDependencies 保留
  * 供 compat 测试比对)。纯逻辑,框架无关。
  * freedraw 不在 DSL(程序自管 R2 + 渲染)。详细见仓库 README。
- * 注意:cli.ts(node:fs)不进 barrel——CLI 经 `pnpm --filter @cys-stift/dsl cli` 跑。
+ * 注意:cli.ts(node:fs)不进 barrel——CLI 经 `pnpm --filter @wscytz/dsl cli` 跑。
  */
 export * from './dsl-grammar.js'
 export * from './canvas-dsl.js'

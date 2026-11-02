@@ -21,7 +21,7 @@
 import type { CanvasId, CardId, CardService } from '@cys-stift/domain'
 import type { CanvasHost, CanvasElement } from '@cys-stift/canvas-engine'
 import { classifyFreedraw, recognizeShape, freedrawPointsOf } from '@cys-stift/canvas-engine'
-import { serializeElement } from '@cys-stift/dsl'
+import { serializeElement } from '@wscytz/dsl'
 
 // ── Shape interfaces ─────────────────────────────────────────────────────────
 

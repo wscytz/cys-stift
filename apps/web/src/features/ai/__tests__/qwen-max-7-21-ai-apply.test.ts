@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseDslWithDiagnostics } from '@cys-stift/dsl'
+import { parseDslWithDiagnostics } from '@wscytz/dsl'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
 import { applyLayout } from '../../canvas/apply-layout'
 

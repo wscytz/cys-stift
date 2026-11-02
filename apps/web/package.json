@@ -14,7 +14,7 @@
   "dependencies": {
     "@cys-stift/canvas-engine": "workspace:*",
     "@cys-stift/domain": "workspace:*",
-    "@cys-stift/dsl": "workspace:*",
+    "@wscytz/dsl": "workspace:*",
     "@cys-stift/ui": "workspace:*",
     "@tauri-apps/plugin-dialog": "2",
     "@tauri-apps/plugin-fs": "2",

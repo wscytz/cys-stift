@@ -10,7 +10,7 @@
 // directive* 末尾的 skipChunk 消费"未知非空白串",让后续已知 directive 仍能被找到 ——
 // 等价旧正则的整行任意位置提取(如 from #card:1 中 from 截到 #card 后,skipChunk 吃 :1,to 仍命中)。
 //
-// 改本文件后跑:`pnpm --filter @cys-stift/dsl gen` 重生 dsl-parser.gen.js。
+// 改本文件后跑:`pnpm --filter @wscytz/dsl gen` 重生 dsl-parser.gen.js。
 // 可接受语言与旧正则 parser 等价(契约见 dsl-parser/robustness/e2e-roundtrip/sync 测试)。
 
 Line

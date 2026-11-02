@@ -12,7 +12,7 @@ import {
   normalizeAIFinishReason,
   type AIFinishReason,
 } from './types'
-import type { DslDiagnostic } from '@cys-stift/dsl'
+import type { DslDiagnostic } from '@wscytz/dsl'
 
 export interface RetryMessage {
   role: 'user' | 'assistant'

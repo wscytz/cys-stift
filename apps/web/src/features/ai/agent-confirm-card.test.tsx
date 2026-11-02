@@ -94,7 +94,7 @@ import {
   makeOnCardUpdate,
   computeContentDiff,
 } from '@/features/ai/agent-confirm-card'
-import { parseDsl } from '@cys-stift/dsl'
+import { parseDsl } from '@wscytz/dsl'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true

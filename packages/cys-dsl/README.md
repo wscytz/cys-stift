@@ -1,4 +1,4 @@
-# @cys-stift/dsl
+# @wscytz/dsl
 
 cys-dsl — cy's Stift 画布的**双向文字表示(转义)**。整张画布能压成一段文本,文本也能重建/改画布;任何 AI 或外部工具读写一段文本就能操作画布。
 
@@ -20,7 +20,7 @@ cys-dsl **v9** 文法:**5 种元素**(`card`/`rect`/`frame`/`text`/`arrow`)、6 
 ## 用法
 
 ```ts
-import { serializeCanvas, parseDsl, sanitizeDslOps, solveRelational, DSL_GRAMMAR_REFERENCE } from '@cys-stift/dsl'
+import { serializeCanvas, parseDsl, sanitizeDslOps, solveRelational, DSL_GRAMMAR_REFERENCE } from '@wscytz/dsl'
 
 const text  = serializeCanvas(elements)     // 画布 → 文本
 const ops   = parseDsl(text)                // 文本 → ops
@@ -30,7 +30,7 @@ const solved = solveRelational(clean.ops)   // 关系式 → 绝对坐标
 
 ## CLI
 
-`pnpm --filter @cys-stift/dsl cli` 或 `tsx src/cli.ts <命令> <file.sift>`(npm 发布后为 `npx`;后缀 `.sift` 为约定,任意文本文件可读):
+`pnpm --filter @wscytz/dsl cli` 或 `tsx src/cli.ts <命令> <file.sift>`(npm 发布后为 `npx`;后缀 `.sift` 为约定,任意文本文件可读):
 
 - `validate` — 语法/卫生/求解全链检查;诊断走 stderr,警告不阻断(exit 0)/ 语法错 exit 1 / 用法错 exit 2。
 - `render` — 默认输出 JSON Canvas 1.0(Obsidian `.canvas` 直接可开);`--svg` 输出预览级 SVG。SVG 侧:默认路由**自动避障**(正交可见图 + 方向状态 A* 求解器规划,free 模式叠视线拉直;生成路径不穿卡;显式 `@route/@curve/@elbow` 不干预;源/目标被围死退启发式兜底);`@route(elbow)` 未给折点 = 正交自动路由(求解器,严格水平/垂直);折线转角圆角化。求解器参数可调(`RoutingConfig`:安全边距/折代价 λ/量化步长等,见 `src/routing.ts`)。
@@ -43,7 +43,7 @@ const solved = solveRelational(clean.ops)   // 关系式 → 绝对坐标
 ## 文法治理
 
 - 增删指令种类 / 属性 / 颜色枚举 → bump `DSL_VERSION`(`dsl-grammar.ts`)。
-- 改 Peggy 语法后跑 `pnpm --filter @cys-stift/dsl gen` 重新生成 parser。
+- 改 Peggy 语法后跑 `pnpm --filter @wscytz/dsl gen` 重新生成 parser。
 - round-trip 契约由 `__tests__/` 守护(roundtrip / v4-stability / robustness)。
 
 ## 不变量
@@ -73,7 +73,7 @@ v5 的卡片内容(`@title`/`@content`)在格式层、apply 层、`/ask` 落库�
 - `qwen-max-7-21-ai-grammar`:AI 可驱动·文法侧——真实风格 LLM 输出样本零诊断可解析 + sanitize 不抛。
 - `qwen-max-7-21-ai-apply`(在 `apps/web`):AI 可驱动·应用侧——AI 重排 DSL 经 `applyLayout` 真结构化画布。
 - `qwen-max-7-21-live-llm`:**live 实测**(env 门控,默认跳过)——真调 LLM(DeepSeek `deepseek-chat` / `deepseek-reasoner`,或 GLM 兜底)只凭语法参考产出合法 DSL。启用:
-  `CYS_DSL_LIVE_LLM=1 DEEPSEEK_API_KEY=… pnpm --filter @cys-stift/dsl test qwen-max-7-21-live-llm`。
+  `CYS_DSL_LIVE_LLM=1 DEEPSEEK_API_KEY=… pnpm --filter @wscytz/dsl test qwen-max-7-21-live-llm`。
   prompt 仅含合成画布;key 只进 auth header,不入日志/提交。
 
 ## 相关

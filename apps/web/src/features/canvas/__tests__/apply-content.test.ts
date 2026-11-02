@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { applyLayout } from '../apply-layout'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
-import { parseDsl } from '@cys-stift/dsl'
+import { parseDsl } from '@wscytz/dsl'
 import type { CardCreateParams, CardUpdateContent } from '../apply-layout'
 
 /**

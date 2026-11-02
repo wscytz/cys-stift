@@ -26,8 +26,8 @@ import { canvasFreeformStore } from '@/lib/canvas-freeform-store'
 import { v8ToDomainFields, sameTagValues, sameLinkUrls } from './v8-fields'
 import { loadCardsIntoEditor, cardToElement, elementToCardPosition } from './canvas-binding'
 import { applyLayout, type ApplyOpResult } from './apply-layout'
-import type { SanitizeDiagnostic } from '@cys-stift/dsl'
-import type { DslOp } from '@cys-stift/dsl'
+import type { SanitizeDiagnostic } from '@wscytz/dsl'
+import type { DslOp } from '@wscytz/dsl'
 import { freeformElementsOf } from './canvas-freeform-binding'
 
 /**

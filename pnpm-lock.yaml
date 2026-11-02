@@ -42,9 +42,6 @@ importers:
       '@cys-stift/domain':
         specifier: workspace:*
         version: link:../../packages/domain
-      '@cys-stift/dsl':
-        specifier: workspace:*
-        version: link:../../packages/cys-dsl
       '@cys-stift/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -54,6 +51,9 @@ importers:
       '@tauri-apps/plugin-fs':
         specifier: '2'
         version: 2.5.1
+      '@wscytz/dsl':
+        specifier: workspace:*
+        version: link:../../packages/cys-dsl
       d3-force:
         specifier: ^3.0.0
         version: 3.0.0

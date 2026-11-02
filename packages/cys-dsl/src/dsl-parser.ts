@@ -2,7 +2,7 @@
  * DSL Parser — parses AI output (or pasted/edited DSL) for canvas layout.
  *
  * 架构(正则 → PEG 升级,2026-07):
- *   dsl.peggy(Peggy 语法,结构 tokenizer)—— `pnpm --filter @cys-stift/dsl gen` → dsl-parser.gen.js
+ *   dsl.peggy(Peggy 语法,结构 tokenizer)—— `pnpm --filter @wscytz/dsl gen` → dsl-parser.gen.js
  *   本文件(TS 包装层)—— 按行调用生成 parser,做语义 coercion:
  *     Number / finite 守卫 / escape unescape / 颜色枚举校验 / elbow 拆分 / DSL_MAX_TEXT_LEN 截断
  *   永不抛错 + 坐标恒有限 + byte-equal round-trip 契约不变(见 dsl-* 测试)。

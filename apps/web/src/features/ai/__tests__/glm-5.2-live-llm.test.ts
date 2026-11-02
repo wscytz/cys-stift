@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseDsl, sanitizeDslOps, DSL_GRAMMAR_REFERENCE } from '@cys-stift/dsl'
+import { parseDsl, sanitizeDslOps, DSL_GRAMMAR_REFERENCE } from '@wscytz/dsl'
 
 /**
  * glm-5.2 独立交叉验证(live LLM,默认跳过)—— 真实模型输出可被吃下。

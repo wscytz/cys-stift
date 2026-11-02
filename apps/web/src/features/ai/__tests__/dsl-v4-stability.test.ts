@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
-import { serializeCanvas } from '@cys-stift/dsl'
-import { DSL_VERSION } from '@cys-stift/dsl'
-import { parseDsl } from '@cys-stift/dsl'
-import { sanitizeDslOps } from '@cys-stift/dsl'
-import { solveRelational } from '@cys-stift/dsl'
+import { serializeCanvas } from '@wscytz/dsl'
+import { DSL_VERSION } from '@wscytz/dsl'
+import { parseDsl } from '@wscytz/dsl'
+import { sanitizeDslOps } from '@wscytz/dsl'
+import { solveRelational } from '@wscytz/dsl'
 import { applyLayout, buildApplyPlan } from '../../canvas/apply-layout'
 
 describe('cys-dsl v9 stability contract', () => {

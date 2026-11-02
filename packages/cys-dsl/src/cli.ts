@@ -10,7 +10,7 @@
  *
  * 结构:纯函数核心(validateText / renderText / roundtripText)进测试与库;
  * 本文件**不进公开 barrel**(node:fs 不许进 web bundle)。
- * 运行:`pnpm --filter @cys-stift/dsl cli <命令> <file.sift>`(tsx,devDep)。
+ * 运行:`pnpm --filter @wscytz/dsl cli <命令> <file.sift>`(tsx,devDep)。
  */
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'

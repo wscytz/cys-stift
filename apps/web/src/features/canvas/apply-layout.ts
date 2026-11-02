@@ -2,10 +2,10 @@
 
 import type { CanvasElement, CanvasHost } from '@cys-stift/canvas-engine'
 import type { CardType, CodeBlock, Quote } from '@cys-stift/domain'
-import type { DslArrowOp, DslCardOp, DslFreeOp, DslOp } from '@cys-stift/dsl'
-import { sanitizeDslOps, evalCompute, evalComputeDetail, formatComputeNumber } from '@cys-stift/dsl'
-import type { SanitizeCtx, SanitizeDiagnostic, ComputeResolver } from '@cys-stift/dsl'
-import { solveRelational, type ExistingGeom } from '@cys-stift/dsl'
+import type { DslArrowOp, DslCardOp, DslFreeOp, DslOp } from '@wscytz/dsl'
+import { sanitizeDslOps, evalCompute, evalComputeDetail, formatComputeNumber } from '@wscytz/dsl'
+import type { SanitizeCtx, SanitizeDiagnostic, ComputeResolver } from '@wscytz/dsl'
+import { solveRelational, type ExistingGeom } from '@wscytz/dsl'
 
 function uid(prefix: string): string {
   const rand =

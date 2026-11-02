@@ -6,7 +6,7 @@
  * 左写 cys-dsl 文本 → 防抖 → parse + 在 scratch InMemoryCanvasHost 上 applyLayout →
  * 把元素集同步进 SelfBuiltAdapter(状态+渲染一体)→ 右侧画布出图 + 诊断面板。
  *
- * 它是 @cys-stift/dsl 的"真实第二消费者":纯 DSL/内存,无 CardService/无存储。
+ * 它是 @wscytz/dsl 的"真实第二消费者":纯 DSL/内存,无 CardService/无存储。
  * 卡片内容(title/body/type)经 onCardCreate/onCardUpdate 回调填进 cardInfoRef Map,
  * 渲染器 getCardInfo 读它。范式取自 dsl-dialog.tsx 的 preview(无持久化 apply)。
  *
@@ -17,8 +17,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SelfBuiltAdapter, InMemoryCanvasHost, unionBounds } from '@cys-stift/canvas-engine'
 import type { CardInfo } from '@cys-stift/canvas-engine'
-import { parseDslWithDiagnostics, DSL_GRAMMAR_REFERENCE, DSL_VERSION } from '@cys-stift/dsl'
-import type { DslDiagnostic } from '@cys-stift/dsl'
+import { parseDslWithDiagnostics, DSL_GRAMMAR_REFERENCE, DSL_VERSION } from '@wscytz/dsl'
+import type { DslDiagnostic } from '@wscytz/dsl'
 import { applyLayout } from '@/features/canvas/apply-layout'
 import type { ApplyResult, CardCreateParams, CardUpdateContent } from '@/features/canvas/apply-layout'
 import { useDebouncedCallback } from '@/lib/use-debounced-callback'

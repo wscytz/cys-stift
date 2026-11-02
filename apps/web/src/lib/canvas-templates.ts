@@ -17,7 +17,7 @@
  * (window guard). No quota/rollback dance here — a failed save just doesn't
  * persist; templates are convenience, not source-of-truth data.
  */
-import { serializeCanvasReadable } from '@cys-stift/dsl'
+import { serializeCanvasReadable } from '@wscytz/dsl'
 import type { CanvasElement } from '@cys-stift/canvas-engine'
 
 const KEY = 'cys-stift.canvas-templates.v1'

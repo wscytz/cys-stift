@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { retryUntilValid, buildDslCorrection, retryFailureMessageKey, isTerminalRetryFailure } from '../retry-until-valid'
-import type { DslDiagnostic } from '@cys-stift/dsl'
+import type { DslDiagnostic } from '@wscytz/dsl'
 
 const ERR = (line: number, text: string, message: string): DslDiagnostic => ({ line, text, message })
 

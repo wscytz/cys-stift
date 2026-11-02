@@ -35,7 +35,7 @@ import { friendlyAIError } from '@/features/ai/friendly-error'
 import { isAIReady } from '@/features/ai/ai-settings-provider'
 import { streamText } from '@/features/ai/stream-text'
 import { retryFailureMessageKey, retryUntilValid, buildDslCorrection } from '@/features/ai/retry-until-valid'
-import { parseDslStrictWithDiagnostics } from '@cys-stift/dsl'
+import { parseDslStrictWithDiagnostics } from '@wscytz/dsl'
 import { snapshotCanvas, formatCanvasSnapshot } from '@/features/ai/canvas-snapshot'
 import {
   AGENT_SYSTEM_PROMPT,

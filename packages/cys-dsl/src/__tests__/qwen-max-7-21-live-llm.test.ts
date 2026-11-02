@@ -11,7 +11,7 @@ import { DSL_GRAMMAR_REFERENCE } from '../dsl-grammar.js'
  * 模型:DeepSeek 两款 `deepseek-v4-flash`(快)/ `deepseek-v4-pro`(强,需 `thinking:disabled`)。
  *
  * 默认**跳过**(不进 pnpm test / CI,避免网络依赖与抖动)。启用:
- *   CYS_DSL_LIVE_LLM=1 DEEPSEEK_API_KEY=… pnpm --filter @cys-stift/dsl test qwen-max-7-21-live-llm
+ *   CYS_DSL_LIVE_LLM=1 DEEPSEEK_API_KEY=… pnpm --filter @wscytz/dsl test qwen-max-7-21-live-llm
  *
  * 隐私:prompt 只含**合成**画布(3 张假卡)+ 语法参考,不含任何真实用户内容;
  * key 只进 auth header,绝不入日志 / 断言 / 提交。
