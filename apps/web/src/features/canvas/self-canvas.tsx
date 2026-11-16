@@ -103,12 +103,20 @@ export function SelfCanvas({
   const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(null)
   const [accessibleAdapter, setAccessibleAdapter] = useState<SelfBuiltAdapter | null>(null)
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // hide 防抖:离开卡/浮层不立即消失(免"一闪而过"),延迟 400ms;再进入卡或浮层则取消。
+  // hide 防抖:离开卡不立即消失(免"一闪而过"),延迟 200ms 后卸载;期间回进卡则取消。
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cancelHide = () => { if (hideTimer.current) { clearTimeout(hideTimer.current); hideTimer.current = null } }
   const scheduleHide = () => {
     if (hideTimer.current) clearTimeout(hideTimer.current)
-    hideTimer.current = setTimeout(() => { setHoveredCardId(null); setPopoverPos(null) }, 400)
+    hideTimer.current = setTimeout(() => { setHoveredCardId(null); setPopoverPos(null) }, 200)
+  }
+  // 彻底撤速览(交互开始/切工具/视图变化时):清双 timer + 状态归零。
+  // 此前切到非 select 工具后 pointermove 早退、无人清状态 → 浮层无限期滞留。
+  const clearHover = () => {
+    if (hoverTimer.current) { clearTimeout(hoverTimer.current); hoverTimer.current = null }
+    cancelHide()
+    setHoveredCardId(null)
+    setPopoverPos(null)
   }
   // Bug 7: mirror the in-progress edit state into refs so an unmount cleanup
   // (canvas switch) can commit the latest typed text. `commitEdit` reads
@@ -175,6 +183,9 @@ export function SelfCanvas({
     const unbindView = adapter.onViewChange(() => {
       // #16 编辑中文本 textarea 跟随 view:即时 tick 重渲染重算 left/top(非编辑期 no-op)。
       if (editRef.current) setEditViewTick((n) => n + 1)
+      // pan/zoom 时撤速览:popoverPos 是显示时刻的一次性屏幕坐标,视图一变即与卡脱钩,
+      // 留着只会"赖在原地";移回卡上会重新防抖弹出。
+      clearHover()
       if (viewTimer) clearTimeout(viewTimer)
       viewTimer = setTimeout(() => {
         const v = adapter.getView()
@@ -210,13 +221,18 @@ export function SelfCanvas({
     }
   }, [canvasId, service, adapterRef])
 
-  // hover 只读速览:pointermove 命中卡(select 模式)→ 300ms 防抖设 hoveredCardId → 渲染 popover。
+  // hover 只读速览:pointermove 命中卡(select 模式)→ 500ms 防抖设 hoveredCardId → 渲染 popover。
   // 移出/换卡 → 清旧 timer 重设。长按/触屏留 backlog(本期桌面 hover)。
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const adapter = adapterInner.current
     const canvas = innerCanvasRef.current
     if (!adapter || !canvas) return
-    if (adapter.getTool() !== 'select') return
+    // 仅 select 模式且无按键按下才考虑速览:e.buttons≠0 = 拖卡/框选/平移进行中,
+    // 浮层是干扰。此前只挡非 select 工具,按住拖拽划过卡照样弹("太敏感"主因);顺带撤在场浮层。
+    if (adapter.getTool() !== 'select' || e.buttons !== 0) {
+      if (hoveredCardId !== null || hoverTimer.current || hideTimer.current) clearHover()
+      return
+    }
     const rect = canvas.getBoundingClientRect()
     const p = screenToPage(adapter.getView(), e.clientX - rect.left, e.clientY - rect.top)
     const els = adapter.getElements()
@@ -228,10 +244,13 @@ export function SelfCanvas({
         break
       }
     }
+    // 在卡上(新进或停留)→ 取消任何待隐藏。此前 cancelHide 藏在下方 hitId 变化分支内:
+    // 400ms 宽限内回进同一张卡时 hitId===hoveredCardId 整块跳过 → 隐藏定时器照发,
+    // 浮层在指针仍在卡上时消失、微动又重弹(闪烁回环)。
+    if (hitId) cancelHide()
     if (hitId !== hoveredCardId) {
       if (hoverTimer.current) clearTimeout(hoverTimer.current)
       if (hitId) {
-        cancelHide() // 进入卡 → 取消任何待隐藏
         const el = adapter.getElement(hitId)
         const view = adapter.getView()
         if (el) {
@@ -239,13 +258,15 @@ export function SelfCanvas({
           hoverTimer.current = setTimeout(() => {
             setHoveredCardId(id)
             setPopoverPos({ x: el.x * view.zoom + view.panX, y: el.y * view.zoom + view.panY })
-          }, 300)
+          }, 500)
         }
       } else {
         scheduleHide() // 离开卡 → 延迟隐藏(不再瞬移消失)
       }
     }
   }
+  // 按下即撤速览:开始拖/框选/平移不挡视线;松开后指针仍在卡上时,后续 move 重新防抖弹出。
+  const onPointerDown = () => clearHover()
   const onPointerLeave = () => {
     if (hoverTimer.current) clearTimeout(hoverTimer.current)
     scheduleHide()
@@ -348,6 +369,13 @@ export function SelfCanvas({
     }
   }, [tool])
 
+  // 切工具即撤速览:非 select 工具下 pointermove 早退,不主动清会无限期滞留
+  // ("保留时间太长"主犯)。
+  useEffect(() => {
+    clearHover()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clearHover 读 ref + 稳定 setState
+  }, [tool])
+
   // Text 工具下点击 canvas:在落点放浮动 textarea。
   const onCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (tool !== 'text') return
@@ -446,6 +474,9 @@ export function SelfCanvas({
       if (editRef.current && !committedRef.current) {
         commitEdit(true)
       }
+      // 撤速览双 timer:unmount 后回调里的 setState 无意义,timer 泄漏也应防。
+      if (hoverTimer.current) clearTimeout(hoverTimer.current)
+      if (hideTimer.current) clearTimeout(hideTimer.current)
     }
   }, [])
 
@@ -455,6 +486,7 @@ export function SelfCanvas({
         ref={innerCanvasRef}
         onClick={onCanvasClick}
         onDoubleClick={onDoubleClick}
+        onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerLeave={onPointerLeave}
         onKeyDown={(e) => {
