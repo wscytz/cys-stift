@@ -107,6 +107,7 @@ export function DslDialog({
   canvasName,
   onCardCreate,
   onCardUpdate,
+  onCardRemove,
   initialText,
 }: {
   open: boolean
@@ -117,6 +118,8 @@ export function DslDialog({
   onCardCreate?: CardCreateHandler
   /** v5:card-update 带 @title/@content 时写回 CardService。 */
   onCardUpdate?: CardUpdateHandler
+  /** v10:[card #id delete] 时把卡移出画布(DB 侧);先 DB 后 host.remove。 */
+  onCardRemove?: (cardId: string) => void
   /** Text supplied by the paste bridge; it is reviewed before being applied. */
   initialText?: string
 }) {
@@ -248,7 +251,7 @@ export function DslDialog({
       return
     }
 
-    const { applied, skipped, failed, newlyApplied } = applyLayout(host, ops, appliedHashes, onCardCreate, onCardUpdate)
+    const { applied, skipped, failed, newlyApplied } = applyLayout(host, ops, appliedHashes, onCardCreate, onCardUpdate, onCardRemove)
     // 合并【本次新应用】的 op hash 到现有集合 —— 部分失败时保留已应用行的 hash,
     // 重复 Apply 会跳过它们(planFree 命中已应用 hash 走 update 不造副本),防造无 #id
     // freeform 副本。全部成功时下方 else-if 分支会重序列化文本(画布即文本)并清空 hash。

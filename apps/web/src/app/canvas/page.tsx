@@ -816,6 +816,14 @@ ${formatted}`
     }
   }, [service])
 
+  // v10:[card #id delete] → 卡移出画布(canvasPosition 清除,卡本体保留在 inbox 可恢复)。
+  // 抛错 → commitApplyPlan 计 failed 且不执行 host.remove(防 DB/host 漂移)。
+  const onCardRemove = useCallback((cardId: string) => {
+    const current = service.get(cardId as CardId)
+    if (!current) throw new Error(`card ${cardId} no longer exists`)
+    service.removeFromCanvas(cardId as CardId)
+  }, [service])
+
   // BUG-B + BUG-A:把"疑似 DSL 文本 → 审核"抽成组件级回调,paste 监听和右键菜单(T6)共用。
   // 放宽检测:任何含 `[` 开头的行都算疑似 DSL(不再只认 5 种 kind)。
   // 整段疑似但 parse 出 0 ops → pasteDslNoneParsed(不静默);纯文本无 `[` 行 → 不打扰。
@@ -1643,6 +1651,7 @@ ${formatted}`
         canvasName={activeCanvas?.name ?? ''}
         onCardCreate={onCardCreate}
         onCardUpdate={onCardUpdate}
+        onCardRemove={onCardRemove}
         initialText={dslSeedText ?? undefined}
       />
 

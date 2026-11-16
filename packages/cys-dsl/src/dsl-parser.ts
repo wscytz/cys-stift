@@ -41,6 +41,10 @@ export type DslCardOp = {
   h?: number
   color?: string
   create?: boolean
+  /** v10:删除指令([card #id delete])。置真时行内其余字段被 sanitize 剥除(产 warning),
+   *  apply 层删除目标元素;卡删除由引擎级联清挂接箭头,DB 侧经 onCardRemove 移出画布(卡本体保留)。
+   *  serializeCanvas 永不 emit(serialize 只输出存在的元素)→ 输入专用。 */
+  delete?: boolean
   /** v5:卡片标题(短,≤DSL_MAX_TEXT_LEN)。serialize 由消费者注入;DSL apply 写回 Card.title。 */
   title?: string
   /** v5:卡片正文 markdown(长,≤DSL_MAX_CONTENT_LEN)。serialize 由消费者注入;DSL apply 写回 Card.body。 */
@@ -95,6 +99,8 @@ export type DslFreeOp =
       color?: string
       /** v7:语义分组名。落 element.meta.group。 */
       group?: string
+      /** v10:删除指令([rect #id delete])。置真时行内其余字段被 sanitize 剥除;apply 层删除该元素。 */
+      delete?: boolean
     }
   | {
       type: 'free'
@@ -112,6 +118,8 @@ export type DslFreeOp =
       /** v7:安全公式原文(仅 text 元素)。apply 时用受限递归下降求值器算(禁裸 eval),
        *  只引用元素几何 #id.x/y/w/h,结果写 element.text,原式存 element.meta.compute。 */
       compute?: string
+      /** v10:删除指令([text #id delete])。置真时行内其余字段被 sanitize 剥除;apply 层删除该元素。 */
+      delete?: boolean
     }
   | {
       type: 'free'
@@ -126,6 +134,8 @@ export type DslFreeOp =
       color?: string
       /** v7:语义分组名。落 element.meta.group。 */
       group?: string
+      /** v10:删除指令([frame #id delete])。置真时行内其余字段被 sanitize 剥除;apply 层删除该元素。 */
+      delete?: boolean
     }
 
 export type DslArrowOp = {
@@ -161,6 +171,8 @@ export type DslArrowOp = {
    *  区分自动建(wikilink)箭头与手动 references 箭头,让标记在 DSL round-trip 中存活。
    *  应用时(applyArrowOp)→ host 元素 meta.wikilink=true。 */
   wikilink?: boolean
+  /** v10:删除指令([arrow #id delete])。置真时行内其余字段被 sanitize 剥除;apply 层删除该箭头。 */
+  delete?: boolean
 }
 
 export type DslOp = DslCardOp | DslFreeOp | DslArrowOp
@@ -194,6 +206,7 @@ type DirectiveTuple =
   | ['rel', string, string] // v2 参数:'#id 或 v9 '@组名(带 @ 前缀,case 'rel' 剥)
   | ['gap', string]
   | ['create', true]
+  | ['delete', true]
   | ['from', string]
   | ['to', string]
   | ['wikilink', true]
@@ -350,6 +363,7 @@ interface Folded {
   rel?: { dir: string; anchor: string; anchorGroup?: boolean; anchorQuoted?: boolean }
   gap?: number
   create?: boolean
+  delete?: boolean
   from?: string
   to?: string
   wikilink?: boolean
@@ -404,6 +418,7 @@ function fold(ds: unknown[], warns?: string[]): Folded {
       }
       case 'gap': if (a.gap === undefined) a.gap = finiteNum(String(v1)); break
       case 'create': if (!a.create) a.create = true; break
+      case 'delete': if (!a.delete) a.delete = true; break
       case 'from': if (!a.from) a.from = String(v1); break
       case 'to': if (!a.to) a.to = String(v1); break
       case 'wikilink': if (!a.wikilink) a.wikilink = true; break
@@ -503,6 +518,11 @@ function buildCard(ds: unknown[]): BuildResult {
   const warns: string[] = []
   const d = fold(ds, warns)
   if (d.id === undefined) return { diag: 'missing #id' }
+  // v10:删除行只认 id——提前返回,不进几何/内容组装(行内杂指令由 sanitize 剥除并产 warning)。
+  if (d.delete) {
+    const op: DslCardOp = { type: 'card', cardId: d.id as CardId, x: 0, y: 0, delete: true }
+    return warns.length ? { op, warns } : { op }
+  }
   if (d.rel) {
     const op: DslCardOp = {
       type: 'card',
@@ -586,6 +606,11 @@ function buildArrow(ds: unknown[]): BuildResult {
     elbow: d.elbow,
     wikilink: d.wikilink || undefined,
   }
+  // v10:删除行只认 id(提前返回,不进 from/to 或自由箭头组装)。
+  if (d.delete) {
+    if (d.id === undefined) return { diag: 'missing #id' }
+    return { op: { type: 'arrow', from: '', to: '', id: d.id, delete: true } }
+  }
   if (d.from && d.to) {
     const op: DslArrowOp = {
       type: 'arrow',
@@ -615,6 +640,11 @@ function buildArrow(ds: unknown[]): BuildResult {
 function buildFree(kind: 'rect' | 'text' | 'frame', ds: unknown[]): BuildResult {
   const d = fold(ds)
   if (d.id === undefined) return { diag: 'missing #id' }
+  // v10:删除行只认 id(提前返回,不进几何组装)。
+  if (d.delete) {
+    const base = { type: 'free' as const, shape: kind, id: d.id, x: 0, y: 0, delete: true }
+    return { op: base as DslFreeOp }
+  }
   if (!d.pos) return { diag: 'missing @pos' }
   if (kind === 'rect') {
     const op: DslFreeOp = {
@@ -724,8 +754,8 @@ export const AT_DIRECTIVES: ReadonlySet<string> = new Set([
   'curve', 'route', 'elbow', 'gap', 'wikilink', 'group', 'href',
   'compute', 'type', 'tags', 'links', 'code', 'quote',
 ])
-/** 保留词表里的裸关键词(非 @ 指令):createDir / relationDir / fromDir / toDir。 */
-export const BARE_KEYWORDS: ReadonlySet<string> = new Set(['create', 'right-of', 'below', 'from', 'to'])
+/** 保留词表里的裸关键词(非 @ 指令):createDir / deleteDir / relationDir / fromDir / toDir。 */
+export const BARE_KEYWORDS: ReadonlySet<string> = new Set(['create', 'delete', 'right-of', 'below', 'from', 'to'])
 const REL_KEYWORDS: ReadonlySet<string> = new Set(['right-of', 'below'])
 
 /**

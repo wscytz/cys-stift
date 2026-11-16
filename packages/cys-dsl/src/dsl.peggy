@@ -16,19 +16,19 @@
 Line
   = cardLine / arrowLine / rectLine / textLine / frameLine / bracketUnknown / prose
 
-// ── card:`[card ` 提交;#id / right-of|below #anchor / create 都是 directive ──
+// ── card:`[card ` 提交;#id / right-of|below #anchor / create|delete 都是 directive ──
 cardLine
   = '[' 'card' sp ds:cardDir* .* { return { kind: 'card', ds: ds } }
 
 cardDir
-  = ws d:(idDir / posDir / sizeDir / colorDir / relationDir / gapDir / createDir / titleDir / contentDir / groupDir / hrefDir / typeDir / tagsDir / linksDir / codeDir / quoteDir / skipChunk) { return d }
+  = ws d:(idDir / posDir / sizeDir / colorDir / relationDir / gapDir / createDir / deleteDir / titleDir / contentDir / groupDir / hrefDir / typeDir / tagsDir / linksDir / codeDir / quoteDir / skipChunk) { return d }
 
 // ── arrow:`[arrow ` 或 `[arrow]` 提交;#id 可省([arrow]);relation(from/to) vs free(pos/size) ──
 arrowLine
   = '[' 'arrow' (sp / ']') ds:arrowDir* .* { return { kind: 'arrow', ds: ds } }
 
 arrowDir
-  = ws d:(idDir / fromDir / toDir / posDir / sizeDir / colorDir / labelDir / dashDir / arrowheadDir / curveDir / routeDir / elbowDir / wikilinkDir / skipChunk) { return d }
+  = ws d:(idDir / fromDir / toDir / posDir / sizeDir / colorDir / labelDir / dashDir / arrowheadDir / curveDir / routeDir / elbowDir / wikilinkDir / deleteDir / skipChunk) { return d }
 
 // ── rect / text / frame:共享 freeDir(id/pos/size/color/text)──
 rectLine
@@ -41,7 +41,7 @@ frameLine
   = '[' 'frame' sp ds:freeDir* .* { return { kind: 'frame', ds: ds } }
 
 freeDir
-  = ws d:(idDir / posDir / sizeDir / colorDir / textDir / groupDir / computeDir / skipChunk) { return d }
+  = ws d:(idDir / posDir / sizeDir / colorDir / textDir / groupDir / computeDir / deleteDir / skipChunk) { return d }
 
 // ── [ 开头但非已知 kind(或已知 kind 缺空格如 [card])→ unrecognized diagnostic ──
 // 注:freedraw 已移出 DSL([freedraw] 落到这里 → unrecognized);程序自管(R2 + 渲染)。
@@ -89,6 +89,12 @@ gapDir
 // create 词边界(防 created/createFoo 误命中)
 createDir
   = 'create' !idChar { return ['create', true] }
+
+// v10: 删除指令(词边界镜像 createDir,防 deleted/deleteFoo 误命中)。五种 kind 行均可携带:
+//   [card #id delete] / [arrow #id delete] / [rect #id delete] / [text #id delete] / [frame #id delete]
+// 行内其它指令被 sanitize 剥除并产 warning(删除行只认 id)。卡删除由引擎级联清挂接箭头。
+deleteDir
+  = 'delete' !idChar { return ['delete', true] }
 
 fromDir
   = 'from' sp id:idRef { return ['from', id] }

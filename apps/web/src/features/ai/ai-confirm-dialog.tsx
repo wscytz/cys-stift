@@ -21,6 +21,7 @@ import type { CanvasId, CardService } from '@cys-stift/domain'
 import { InMemoryCanvasHost, type CanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
 import { parseDslStrictWithDiagnostics } from '@wscytz/dsl'
 import { applyLayout } from '@/features/canvas/apply-layout'
+import { makeOnCardRemove } from './agent-confirm-card'
 import { applyClusters, type CardCluster } from './cluster'
 import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
 import { summarizeMovement } from '@/features/canvas/layout-movement'
@@ -251,7 +252,8 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
           return m
         }
         const before = snapPositions()
-        const { applied } = applyLayout(props.liveHost, preview.ops)
+        // v10:latent dsl 分支同样接删除(makeOnCardRemove 复用 agent-confirm-card 实现)。
+        const { applied } = applyLayout(props.liveHost, preview.ops, undefined, undefined, undefined, makeOnCardRemove(props.service))
         if (applied > 0) {
           void buildArchivePayload()
             .then((p) => archiveStore.append('ai-layout', `AI 重排 ${applied} 张`, p, VERSION))

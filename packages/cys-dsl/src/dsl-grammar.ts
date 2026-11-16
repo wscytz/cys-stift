@@ -11,7 +11,7 @@
  * bump 规则:增删指令种类 / 增删属性 / 改颜色枚举 → bump DSL_VERSION。
  * 纯改 prompt 措辞、改 parser 正则细节(不动语法)→ 不 bump。
  */
-export const DSL_VERSION = 9
+export const DSL_VERSION = 10
 
 /**
  * v9 组锚保留字:锚位裸名 `@词` 与内建指令同名时,sanitize 产诊断并剥 rel
@@ -34,6 +34,7 @@ export const DSL_RESERVED_GROUP_ANCHOR_WORDS: readonly string[] = [
   'compute',
   'gap',
   'create',
+  'delete',
   'from',
   'to',
   'arrowhead',
@@ -225,6 +226,10 @@ export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one eleme
   [frame #id] @pos(x, y) @size(w, h) @text("title") @color(c) [@group("…")]   # themed group/section container
   [arrow #id] from #a to #b @label("...") @color(c) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none) [@wikilink]
   [arrow #id] @pos(x, y) @size(w, h) @color(c)   # free arrow (no from/to)
+  # delete (v10): remove an element from the canvas — [card #id delete] / [arrow #id delete] /
+  #   [rect #id delete] / [text #id delete] / [frame #id delete]. The delete line carries ONLY
+  #   the id; deleting a card also removes its attached arrows. Omitting a line NEVER deletes
+  #   anything (this is a patch language, not a full rewrite).
   # arrow route (optional, to bend or elbow around obstacles):
   #   @route(curve) @curve(cx,cy)                 # smooth quadratic curve via one control point
   #   @route(elbow) @elbow(x,y;x,y)               # 1-2 corner points (semicolon-separated)
@@ -233,6 +238,7 @@ export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one eleme
   #   (meta.wikilink===true); distinguishes auto-built wikilink arrows from
   #   manual references arrows so the marker survives DSL round-trip.
 Rules: card updates are the default; explicit create persists a new card before its host element (title/content optional).
+  To DELETE an element, emit an explicit delete line — [card #id delete]; omitting a line does NOT delete it.
   @title/@content (v5) update an existing card's title/body; "" clears it, omit to leave unchanged.
   @type/@tags/@links/@code/@quote (v8) update an existing card's structured fields the same way (omit to leave unchanged).
   To edit an EXISTING card's content/color/size WITHOUT moving it, omit @pos (geometry is kept):

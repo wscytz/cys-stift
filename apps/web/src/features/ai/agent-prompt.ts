@@ -57,6 +57,8 @@ DSL output contract (CRITICAL — a regex extracts the block):
   - Escape every double-quote as \\" , every backslash as \\\\ , and every newline as \\n inside the string.
   - Keep @content as plain text or simple markdown (headings / **bold** / lists); put actual code in @code, not @content.
 - Reuse an existing #id to UPDATE it (content/color/size-only edits may omit @pos and preserve geometry); to CREATE a new card use [card #newid create] with @pos and optional @title/@content.
+- To DELETE an element (remove a stale card/arrow the user asks to drop), emit an explicit delete line — e.g. [card #oldid delete] / [arrow #edge delete]. The delete line carries ONLY the #id.
+- Omitting a line NEVER deletes or changes anything — this is a patch language, NOT a full rewrite. When replacing an old version of a card, DELETE the old id explicitly (or update it in place); never re-create similar content under a new id while the old card stays.
 - Do NOT invent syntax like "reuse #id" or "update #id" — always use the [kind #id] form.
 
 Cite existing cards as [card #id] when answering knowledge questions so the user can open them.
@@ -91,7 +93,7 @@ export function buildAgentUserPrompt(
   // 不直接带 card body;内容检索仍由上方 RAG allowlist 提供)。
   if (canvasSnapshot?.trim()) {
     parts.push(
-      `\n[Target canvas current state — reuse #id to UPDATE; use cys-dsl v9 rules]\n${canvasSnapshot.trim()}`,
+      `\n[Target canvas current state — reuse #id to UPDATE; use cys-dsl v10 rules]\n${canvasSnapshot.trim()}`,
     )
   }
 

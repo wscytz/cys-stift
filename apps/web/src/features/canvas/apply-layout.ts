@@ -70,7 +70,7 @@ export interface ApplyOpResult {
   reason?: string
 }
 
-type PlannedMutation = 'card-create' | 'card-update' | 'freeform'
+type PlannedMutation = 'card-create' | 'card-update' | 'freeform' | 'card-delete' | 'freeform-delete'
 
 export interface ApplyPlanItem {
   opIndex: number
@@ -83,6 +83,8 @@ export interface ApplyPlanItem {
   cardCreate?: CardCreateParams
   /** v5:card-update 带 @title/@content 时携带;commit 时经 onCardUpdate 写回 CardService。 */
   cardUpdateContent?: CardUpdateContent
+  /** v10:delete 行携带;commit 时经 onCardRemove(card)+host.remove 执行删除。 */
+  deletedId?: string
   dependencies: string[]
 }
 
@@ -102,6 +104,8 @@ export interface ApplyResult {
   failed: number
   cardsCreated: number
   cardsUpdated: number
+  /** v10:card-delete 计入 applied(镜像 cardsCreated),单列供报告/测试断言。 */
+  cardsDeleted: number
   freeformChanged: number
   newlyApplied: string[]
   opResults: ApplyOpResult[]
@@ -144,6 +148,9 @@ export function buildApplyPlan(
     items.push(item)
     if (item.disposition === 'ready' && item.element) {
       shadow.set(item.element.id, item.element)
+    } else if (item.disposition === 'ready' && item.deletedId) {
+      // v10:delete 从 shadow 摘除,后续 op 看到"删除后的世界"(再 create 同 id = 复活,合法)。
+      shadow.delete(item.deletedId)
     } else if (
       item.reason?.includes('id conflict') &&
       !diagnostics.some(
@@ -189,15 +196,39 @@ export function commitApplyPlan(
   appliedHashes?: Set<string>,
   onCardCreate?: CardCreateHandler,
   onCardUpdate?: CardUpdateHandler,
+  onCardRemove?: (cardId: string) => void,
 ): ApplyResult {
   const report = emptyReport(plan.items.length)
   const failedElementIds = new Set<string>()
 
   const commit = () => {
     for (const item of plan.items) {
-      if (item.disposition === 'skipped' || !item.element || !item.mutation) {
+      if (item.disposition === 'skipped' || !item.mutation) {
         report.skipped++
         report.opResults.push(opResult(item, 'skipped', item.reason ?? 'operation is not applicable'))
+        continue
+      }
+
+      // v10:delete 行——先 DB(onCardRemove)后 host.remove(镜像 card-create 的 persist 先行:
+      // DB 是卡的真源,先摘 host 会被 snap 同步复活)。host.remove 级联清挂接箭头。
+      if (item.mutation === 'card-delete' || item.mutation === 'freeform-delete') {
+        const id = item.deletedId!
+        try {
+          if (item.mutation === 'card-delete' && onCardRemove) onCardRemove(id)
+          host.remove(id)
+        } catch (error) {
+          report.failed++
+          report.opResults.push(opResult(item, 'failed', errorReason(error)))
+          continue
+        }
+        report.applied++
+        if (item.mutation === 'card-delete') report.cardsDeleted++
+        else report.freeformChanged++
+        report.opResults.push(opResult(item, 'applied'))
+        if (appliedHashes) {
+          appliedHashes.add(item.hash)
+          report.newlyApplied.push(item.hash)
+        }
         continue
       }
 
@@ -209,6 +240,14 @@ export function commitApplyPlan(
         report.opResults.push(
           opResult(item, 'skipped', `dependency #${missingDependency} was not committed`),
         )
+        continue
+      }
+
+      // delete 分支已 continue;此处必有 element(create/update/freeform)。防御性守卫,
+      // 同时让后续 failedElementIds.add(item.element.id) 收窄为非空。
+      if (!item.element) {
+        report.skipped++
+        report.opResults.push(opResult(item, 'skipped', 'mutation has no element'))
         continue
       }
 
@@ -283,9 +322,10 @@ export function applyLayout(
   appliedHashes?: Set<string>,
   onCardCreate?: CardCreateHandler,
   onCardUpdate?: CardUpdateHandler,
+  onCardRemove?: (cardId: string) => void,
 ): ApplyResult {
   const plan = buildApplyPlan(host, ops, appliedHashes)
-  return commitApplyPlan(host, plan, appliedHashes, onCardCreate, onCardUpdate)
+  return commitApplyPlan(host, plan, appliedHashes, onCardCreate, onCardUpdate, onCardRemove)
 }
 
 function emptyReport(total: number): ApplyResult {
@@ -296,6 +336,7 @@ function emptyReport(total: number): ApplyResult {
     failed: 0,
     cardsCreated: 0,
     cardsUpdated: 0,
+    cardsDeleted: 0,
     freeformChanged: 0,
     newlyApplied: [],
     opResults: [],
@@ -357,6 +398,25 @@ function skippedItem(
     hash,
     disposition: 'skipped',
     reason,
+    dependencies: [],
+  }
+}
+
+/** v10:delete 行的计划项——无 element(删除不产几何),携带 deletedId 供 commit 执行。 */
+function deleteItem(
+  opIndex: number,
+  op: DslOp,
+  hash: string,
+  deletedId: string,
+  mutation: 'card-delete' | 'freeform-delete',
+): ApplyPlanItem {
+  return {
+    opIndex,
+    op,
+    hash,
+    disposition: 'ready',
+    mutation,
+    deletedId,
     dependencies: [],
   }
 }
@@ -457,6 +517,15 @@ function planCard(
 ): ApplyPlanItem {
   const id = String(op.cardId)
   const existing = shadow.get(id)
+  // v10:删除行。目标存在 → card-delete(引擎 host.remove 级联清挂接箭头,DB 侧经 onCardRemove
+  // 移出画布,卡本体保留可恢复);不存在/跨 kind → skip(sanitize 已产信息性 diagnostic)。
+  if (op.delete) {
+    if (!existing) return skippedItem(opIndex, op, hash, `delete card #${id} does not exist`)
+    if (existing.kind !== 'card') {
+      return skippedItem(opIndex, op, hash, `delete card #${id} id conflict with existing ${existing.kind}`)
+    }
+    return deleteItem(opIndex, op, hash, id, 'card-delete')
+  }
   if (!existing) {
     if (!op.create) return skippedItem(opIndex, op, hash, `card #${id} does not exist`)
     const x = finiteRound(op.x, 0)
@@ -537,6 +606,12 @@ function planFree(
   opIndex: number,
   hash: string,
 ): ApplyPlanItem {
+  // v10:删除行。id 存在(任意 kind 均可删——free op 只认 id)→ freeform-delete;不存在 → skip。
+  if (op.delete) {
+    const target = op.id ? shadow.get(op.id) : undefined
+    if (!target) return skippedItem(opIndex, op, hash, `delete ${op.shape} #${op.id ?? ''} does not exist`)
+    return deleteItem(opIndex, op, hash, target.id, 'freeform-delete')
+  }
   const x = finiteRound(op.x, 0)
   const y = finiteRound(op.y, 0)
   // v7 @compute 求值器:把 `#id.field` 解析成 shadow 里元素的几何(含本批已规划的)。
@@ -626,6 +701,16 @@ function planArrow(
   opIndex: number,
   hash: string,
 ): ApplyPlanItem {
+  // v10:删除行。#id 存在(须是 arrow)→ freeform-delete;无 id/不存在 → skip。
+  // 注意 [arrow] 语法 id 可省,delete 无目标即无意义。
+  if (op.delete) {
+    const target = op.id ? shadow.get(op.id) : undefined
+    if (!target) return skippedItem(opIndex, op, hash, `delete arrow #${op.id ?? ''} does not exist`)
+    if (target.kind !== 'arrow') {
+      return skippedItem(opIndex, op, hash, `delete arrow #${op.id} id conflict with existing ${target.kind}`)
+    }
+    return deleteItem(opIndex, op, hash, target.id, 'freeform-delete')
+  }
   const existing = op.id ? shadow.get(op.id) : undefined
   if (existing && existing.kind !== 'arrow') {
     return skippedItem(

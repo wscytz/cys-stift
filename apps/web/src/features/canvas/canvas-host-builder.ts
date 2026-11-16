@@ -143,6 +143,12 @@ export async function applyOpsAndPersist(
         reason: err instanceof Error ? err.message : String(err),
       }
     }
+  }, undefined, (cardId) => {
+    // v10:[card #id delete] 移出画布(canvasPosition 清除,卡本体保留)。
+    // 回滚由 restoreNow 的 touchedExistingCardIds 循环天然覆盖(delete op 会进该集合)。
+    const current = service.get(cardId as CardId)
+    if (!current) throw new Error(`card not found: ${cardId}`)
+    service.removeFromCanvas(cardId as CardId)
   })
   const cardsCreated = result.cardsCreated
   const cardsFailed = result.opResults.filter(

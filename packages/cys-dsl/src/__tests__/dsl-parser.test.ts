@@ -692,3 +692,43 @@ describe('parseDsl — v7 directives (@group / @href / @compute)', () => {
     expect(ops).toHaveLength(2)
   })
 })
+
+describe('v10 delete 指令', () => {
+  it('[card #id delete] 解析为 delete op(x/y 占位)', () => {
+    const ops = parseDsl('[card #old delete]')
+    expect(ops).toHaveLength(1)
+    expect(ops[0]).toMatchObject({ type: 'card', cardId: 'old', delete: true })
+  })
+
+  it('五种 kind 行均可携带 delete;行内杂指令被 parser 忽略(剥除归 sanitize)', () => {
+    const ops = parseDsl(
+      '[card #a delete]\n[arrow #e delete]\n[rect #r delete]\n[text #t delete]\n[frame #f delete]',
+    )
+    expect(ops).toHaveLength(5)
+    expect(ops.map((o) => (o as { shape?: string }).shape ?? o.type)).toEqual(
+      ['card', 'arrow', 'rect', 'text', 'frame'],
+    )
+    for (const op of ops) expect((op as { delete?: boolean }).delete).toBe(true)
+  })
+
+  it('[card #old delete] @pos(5,5) @title("x") → delete 优先,几何/内容字段不进 op', () => {
+    const ops = parseDsl('[card #old delete] @pos(5,5) @title("x")')
+    expect(ops).toHaveLength(1)
+    const op = ops[0] as { delete?: boolean; title?: string; x: number }
+    expect(op.delete).toBe(true)
+    expect(op.title).toBeUndefined()
+    expect(op.x).toBe(0)
+  })
+
+  it('词边界:deleted / deleteFoo 不命中 delete 指令', () => {
+    const ops = parseDsl('[card #a] @pos(0,0) @title("deleted stuff")')
+    expect(ops).toHaveLength(1)
+    expect((ops[0] as { delete?: boolean }).delete).toBeUndefined()
+  })
+
+  it('[arrow delete] 无 #id → missing #id 诊断(不静默)', () => {
+    const { ops, errors } = parseDslStrictWithDiagnostics('[arrow delete]')
+    expect(ops).toHaveLength(0)
+    expect(errors.length).toBeGreaterThan(0)
+  })
+})

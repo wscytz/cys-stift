@@ -83,6 +83,34 @@ function sanitizeCard(
   ctx: SanitizeCtx | undefined,
   diagnostics: SanitizeDiagnostic[],
 ): DslCardOp {
+  // v10:删除行只认 id——剥除其余字段(防"删除+改属性"矛盾语义,产 warning);提前返回,
+  // 不走 create/几何/内容清洗。目标不存在仅提示(apply planOp 会 skip,与 case 1+11 同哲学)。
+  if (op.delete) {
+    const extra: string[] = []
+    if (op.rel !== undefined) extra.push('right-of/below')
+    if (op.w !== undefined || op.h !== undefined) extra.push('@size')
+    if (op.color !== undefined) extra.push('@color')
+    if (op.title !== undefined) extra.push('@title')
+    if (op.content !== undefined) extra.push('@content')
+    if (op.group !== undefined) extra.push('@group')
+    if (op.href !== undefined) extra.push('@href')
+    if (op.cardType !== undefined) extra.push('@type')
+    if (op.tags !== undefined) extra.push('@tags')
+    if (op.links !== undefined) extra.push('@links')
+    if (op.code !== undefined) extra.push('@code')
+    if (op.quotes !== undefined) extra.push('@quote')
+    if (op.create) extra.push('create')
+    if (extra.length > 0) {
+      diagnostics.push({
+        opIndex: idx,
+        message: `delete 行只认 #id,已忽略其余指令(${extra.join(', ')})`,
+      })
+    }
+    if (ctx?.existingCardIds !== undefined && !ctx.existingCardIds.has(String(op.cardId))) {
+      diagnostics.push({ opIndex: idx, message: `delete card #${op.cardId} 不存在于画布(该行将跳过)` })
+    }
+    return { type: 'card', cardId: op.cardId, x: 0, y: 0, delete: true }
+  }
   // case 1+11:无 create flag + id 不在 existingCardIds → diagnostic
   // (apply 会 skip,sanitize 额外提示让用户/AI 知道"引用了不存在的卡,想新建加 create")
   if (ctx?.existingCardIds !== undefined && !op.create && !ctx.existingCardIds.has(String(op.cardId))) {
@@ -201,6 +229,25 @@ function sanitizeFree(
   ctx: SanitizeCtx | undefined,
   diagnostics: SanitizeDiagnostic[],
 ): DslFreeOp {
+  // v10:删除行只认 id(镜像 sanitizeCard 的 delete 分支;提前返回)。
+  if (op.delete) {
+    const extra: string[] = []
+    if (op.w !== undefined || op.h !== undefined) extra.push('@size')
+    if (op.color !== undefined) extra.push('@color')
+    if ('text' in op && op.text !== undefined) extra.push('@text')
+    if (op.group !== undefined) extra.push('@group')
+    if ('compute' in op && op.compute !== undefined) extra.push('@compute')
+    if (extra.length > 0) {
+      diagnostics.push({
+        opIndex: idx,
+        message: `delete 行只认 #id,已忽略其余指令(${extra.join(', ')})`,
+      })
+    }
+    if (op.id && ctx?.existingFreeKinds !== undefined && !ctx.existingFreeKinds.has(op.id)) {
+      diagnostics.push({ opIndex: idx, message: `delete ${op.shape} #${op.id} 不存在于画布(该行将跳过)` })
+    }
+    return { ...op, w: undefined, h: undefined, color: undefined, group: undefined, ...('text' in op ? { text: undefined } : {}), ...('compute' in op ? { compute: undefined } : {}) } as DslFreeOp
+  }
   // case 3:跨 kind 告警(op shape ≠ host 已有同 id 元素的 kind)
   // applyFreeOp update 路径有 kind 守卫 → 不命中 → create 路径 mint uid(不覆盖,安全);
   // sanitize 额外产 diagnostic 让用户/AI 知道 id 被复用了。
@@ -232,6 +279,31 @@ function sanitizeArrow(
   existingIds: Set<string> | undefined,
   diagnostics: SanitizeDiagnostic[],
 ): DslArrowOp {
+  // v10:删除行只认 id(镜像 sanitizeCard;from/to 占位 '' 不报,用户真写了才报)。提前返回。
+  if (op.delete) {
+    const extra: string[] = []
+    if (op.from !== '') extra.push('from')
+    if (op.to !== '') extra.push('to')
+    if (op.label !== undefined) extra.push('@label')
+    if (op.color !== undefined) extra.push('@color')
+    if (op.dash !== undefined) extra.push('@dash')
+    if (op.arrowhead !== undefined) extra.push('@arrowhead')
+    if (op.curve !== undefined) extra.push('@curve')
+    if (op.route !== undefined) extra.push('@route')
+    if (op.elbow !== undefined) extra.push('@elbow')
+    if (op.wikilink) extra.push('@wikilink')
+    if (op.x !== undefined || op.y !== undefined || op.w !== undefined || op.h !== undefined) extra.push('@pos/@size')
+    if (extra.length > 0) {
+      diagnostics.push({
+        opIndex: idx,
+        message: `delete 行只认 #id,已忽略其余指令(${extra.join(', ')})`,
+      })
+    }
+    if (op.id && existingIds !== undefined && !existingIds.has(op.id)) {
+      diagnostics.push({ opIndex: idx, message: `delete arrow #${op.id} 不存在于画布(该行将跳过)` })
+    }
+    return { type: 'arrow', from: '', to: '', ...(op.id ? { id: op.id } : {}), delete: true }
+  }
   const isFreeArrow = op.freeArrow || (!op.from && !op.to)
   if (!isFreeArrow && existingIds !== undefined) {
     if (op.from && !existingIds.has(op.from)) {

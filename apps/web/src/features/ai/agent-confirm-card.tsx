@@ -171,6 +171,18 @@ export function makeOnCardUpdate(service: CardService): CardUpdateHandler {
 }
 
 /**
+ * v10: [card #id delete] 把卡移出画布(DB 侧 canvasPosition 清除,卡本体保留在 inbox 可恢复)
+ * —— live 路径专用。写失败抛错 → applyLayout 计入 failed 且不执行 host.remove(防 DB/host 漂移)。
+ */
+export function makeOnCardRemove(service: CardService): (cardId: string) => void {
+  return (cardId) => {
+    const current = service.get(cardId as CardId)
+    if (!current) throw new Error(`card not found: ${cardId}`)
+    service.removeFromCanvas(cardId as CardId)
+  }
+}
+
+/**
  * v8 结构化字段的确认门摘要(cardType/tags/links/code/quotes)。逐字段:DSL op 提供
  * → after 摘要;现有卡提供 → before 摘要。两摘要一致的字段不进列表(无变化不打扰)。
  * 文本内容用计数/枚举而非全文(理由见 ContentChange.structured 注释)。
@@ -457,9 +469,17 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
             })
           }
         }
-        const r = applyLayout(liveHost, preview.ops, undefined, creator.onCardCreate, makeOnCardUpdate(service))
+        // v10:delete op 记录被删卡的 canvasPosition,undo 时恢复(卡回画布原位)。
+        const removedBefore = new Map<CardId, NonNullable<Card['canvasPosition']>>()
+        for (const op of preview.ops) {
+          if (op.type === 'card' && (op as DslOp & { type: 'card' }).delete) {
+            const cur = service.get((op as DslOp & { type: 'card'; delete?: boolean }).cardId as CardId)
+            if (cur?.canvasPosition) removedBefore.set(cur.id, cur.canvasPosition)
+          }
+        }
+        const r = applyLayout(liveHost, preview.ops, undefined, creator.onCardCreate, makeOnCardUpdate(service), makeOnCardRemove(service))
         const contentUndo =
-          contentBefore.size > 0
+          contentBefore.size > 0 || removedBefore.size > 0
             ? async (): Promise<boolean> => {
                 for (const [id, before] of contentBefore) {
                   const cur = service.get(id)
@@ -474,6 +494,11 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
                   if (JSON.stringify(cur.quotes) !== JSON.stringify(before.quotes)) patch.quotes = before.quotes
                   if (Object.keys(patch).length === 0) continue
                   service.update(id, patch)
+                }
+                // v10:被删卡恢复画布原位(卡本体在 DB 从未丢,只是 canvasPosition 被清)。
+                for (const [id, position] of removedBefore) {
+                  const cur = service.get(id)
+                  if (cur && !cur.canvasPosition) service.moveToCanvas(id, position)
                 }
                 return true
               }

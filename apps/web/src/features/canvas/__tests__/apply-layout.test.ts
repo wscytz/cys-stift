@@ -998,3 +998,64 @@ describe('applyLayout — v7 directives (@group / @href / @compute)', () => {
     expect(rectsAfter2).toBe(rectsAfter1) // 关键:不复制
   })
 })
+
+describe('applyLayout — v10 delete 指令', () => {
+  it('[card #id delete] 删卡 + 级联清挂接箭头 + cardsDeleted 计数', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'a', 0, 0)
+    seedCard(host, 'b', 300, 0)
+    // 关系箭头 a→b(delete a 后应级联消失)
+    host.upsert({ id: 'e', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b' })
+    const removed: string[] = []
+    const report = applyLayout(host, parseDsl('[card #a delete]'), undefined, undefined, undefined, (id) => { removed.push(id) })
+    expect(report.applied).toBe(1)
+    expect(report.cardsDeleted).toBe(1)
+    expect(host.getElement('a')).toBeUndefined()
+    expect(host.getElement('e')).toBeUndefined() // 引擎级联
+    expect(host.getElement('b')).toBeDefined()
+    expect(removed).toEqual(['a']) // DB 侧回调收到
+  })
+
+  it('delete 不存在的目标 → skip(不炸不静默,report 有 reason)', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'a')
+    const report = applyLayout(host, parseDsl('[card #ghost delete]'))
+    expect(report.skipped).toBe(1)
+    expect(report.applied).toBe(0)
+    expect(report.opResults[0]?.reason).toContain('does not exist')
+    expect(host.getElement('a')).toBeDefined()
+  })
+
+  it('onCardRemove 抛错 → failed 且不执行 host.remove(DB 真源守卫)', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'a')
+    const report = applyLayout(host, parseDsl('[card #a delete]'), undefined, undefined, undefined, () => {
+      throw new Error('db write failed')
+    })
+    expect(report.failed).toBe(1)
+    expect(report.applied).toBe(0)
+    expect(host.getElement('a')).toBeDefined() // host 未动
+  })
+
+  it('[arrow #e delete] / [rect #r delete] 删 free 元素(freeform-delete)', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'a', 0, 0)
+    seedCard(host, 'b', 300, 0)
+    host.upsert({ id: 'e', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b' })
+    host.upsert({ id: 'r', kind: 'rect', x: 10, y: 10, w: 50, h: 50, rotation: 0 })
+    const report = applyLayout(host, parseDsl('[arrow #e delete]\n[rect #r delete]'))
+    expect(report.applied).toBe(2)
+    expect(report.freeformChanged).toBe(2)
+    expect(host.getElement('e')).toBeUndefined()
+    expect(host.getElement('r')).toBeUndefined()
+    expect(host.getElement('a')).toBeDefined()
+  })
+
+  it('同批 create 后 delete 同 id → 复活后删除(净效果不存在,无冲突)', () => {
+    const host = new InMemoryCanvasHost()
+    const report = applyLayout(host, parseDsl('[card #n create] @pos(0,0) @title("x")\n[card #n delete]'))
+    // shadow 语义:create 后 delete —— 两 op 均 ready,净效果元素不存在
+    expect(report.applied).toBe(2)
+    expect(host.getElement('n')).toBeUndefined()
+  })
+})
