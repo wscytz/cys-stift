@@ -98,6 +98,15 @@ export interface IntentCanvasElement {
   to?: string
   dash?: 'solid' | 'dashed' | 'dotted'
   arrowhead?: 'arrow' | 'triangle' | 'none'
+  /** 箭头路由形态(straight/curve/elbow)。透传保真:此前快照往返裁掉它,AI 触碰过的箭头弯折永久变直线。 */
+  route?: 'straight' | 'curve' | 'elbow'
+  /** 二次贝塞尔控制点(route='curve')。 */
+  curve?: { cx: number; cy: number }
+  /** 折线折点(route='elbow')。 */
+  elbow?: { x: number; y: number }[]
+  /** 附加元数据:card 的 group/href、text 的 compute、freedraw 的点序列等。
+   *  透传保真:此前被剥掉 → 组级锚解析失败、freedraw 点序列毁灭(拖拽/缩放永久失效)。 */
+  meta?: Record<string, unknown>
 }
 
 export interface IntentSnapshot {

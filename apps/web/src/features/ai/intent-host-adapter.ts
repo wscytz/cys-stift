@@ -19,6 +19,13 @@ export function toIntentElement(element: CanvasElement): IntentCanvasElement | n
     ...(element.to ? { to: element.to } : {}),
     ...(element.dash ? { dash: element.dash } : {}),
     ...(element.arrowhead ? { arrowhead: element.arrowhead } : {}),
+    // 路由/元数据透传(深拷贝嵌套可变部分,防快照与 host 共享引用):
+    // 此前裁掉 → AI 触碰过的元素丢失 meta(group/href/compute/freedraw 点序列)与弯折形态,
+    // 后续组级锚解析失败、箭头变直线、笔迹拖拽/缩放永久失效。
+    ...(element.route ? { route: element.route } : {}),
+    ...(element.curve ? { curve: { ...element.curve } } : {}),
+    ...(element.elbow ? { elbow: element.elbow.map((p) => ({ ...p })) } : {}),
+    ...(element.meta ? { meta: { ...element.meta } } : {}),
   }
 }
 
@@ -141,10 +148,14 @@ export function makeIntentCommitPort(args: {
       return { ok: true as const }
     },
     apply: (actions) => {
+      // echo 写入(echoing 保持默认 true):让 AI 变更进 undo 栈(batch 合并为一步)+ 触发
+      // onUserChange(面板刷新 / freeform 删除索引收录 / DB debounce 回写)。
+      // 此前 applyWithoutEcho 导致事件面集体失明——undo 一步跳回 AI 前(整表替换=布局全没)、
+      // Minimap/Outline/Companion 等全部陈旧、AI 新建箭头删除后不落盘(重载复活)。
+      // persist 已单独落库,echo 的 debounce 回写值与之一致,无冲突;restore() 保持
+      // applyWithoutEcho 不变——错误补偿本就要"当什么都没发生",不入栈不发声是故意的。
       host.batch(() => {
-        host.applyWithoutEcho(() => {
-          for (const action of actions) host.upsert(toCanvasElement(action.next))
-        })
+        for (const action of actions) host.upsert(toCanvasElement(action.next))
       })
     },
     compensate: () => restore(),
