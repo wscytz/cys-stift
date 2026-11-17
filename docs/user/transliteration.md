@@ -106,6 +106,10 @@
 
 # 关系箭头(三维语义签名:线型 + 箭头头 + 颜色)
 [arrow #<id>] from #<a> to #<b> @label("<标签>") @color(<c>) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none)
+
+# 箭头路由(可选;省略 @route 即直线)与 wikilink 标记
+[arrow #<id>] from #<a> to #<b> @route(curve) @curve(<cx>,<cy>)
+[arrow #<id>] from #<a> to #<b> @route(elbow) @elbow(<x>,<y>;<x>,<y>) @wikilink
 ```
 
 **freedraw 不在 DSL**:手绘由程序的本地存储 + canvas-engine 渲染负责;`serializeCanvas` 不输出 freedraw,`[freedraw #id]` 输入会报 `unrecognized directive`。AI 的单向画布快照仍可看到本地计算的 shape 描述符,但不是 DSL 往返的一部分。
