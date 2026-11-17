@@ -82,20 +82,38 @@ export function resolveExportShapes(
 
 // ── host adapter (CanvasElement[]; 零 tldraw) ──────────────────────────────────
 
-import type { CanvasElement, CanvasHost } from '@cys-stift/canvas-engine'
+import { arrowEndpoints, type CanvasElement, type CanvasHost } from '@cys-stift/canvas-engine'
+
+/**
+ * 该元素在导出视图中是否真的会产生可见几何(2026-11-17 对抗审查)。
+ *  - 空 text(纯空白)渲染为空,却会把原点/原位并进 bounds → 大片空白导出;
+ *  - 悬空箭头(端点不在导出集合中)渲染为空,选区只含它时曾导出 1×1 空白并报成功。
+ *    endpoints 用同一批导出元素解析:选区单独选箭头(两端卡不在选区)按「不可见」
+ *    处理,让上层走空导出错误而不是静默给一张空白图。
+ */
+function rendersInExport(el: CanvasElement, exported: CanvasElement[]): boolean {
+  if (el.kind === 'text') return !!(el.text ?? '').trim()
+  if (el.kind === 'arrow') {
+    const { from, to } = arrowEndpoints(el, exported)
+    return !!(from && to)
+  }
+  return true
+}
 
 /**
  * 解析要导出的元素(scope=selection 用 host.getSelectedIds;diagram/page 用全部)。
  * 替代旧的 resolveExportShapes(editor)(tldraw)。新导出层用本函数。
+ * 过滤掉在导出集合中不可见的元素(空 text / 悬空箭头),避免空白图与原点污染。
  */
 export function resolveExportElements(
   host: CanvasHost,
   scope: ExportScope,
 ): CanvasElement[] {
   const all = host.getElements()
+  let source = all
   if (scope === 'selection') {
     const sel = new Set(host.getSelectedIds())
-    if (sel.size > 0) return all.filter((e) => sel.has(e.id))
+    if (sel.size > 0) source = all.filter((e) => sel.has(e.id))
   }
-  return all
+  return source.filter((e) => rendersInExport(e, source))
 }

@@ -5,7 +5,7 @@ import { colorOf, groupColorOf, domTokenResolver, wrapText, CARD_TITLE_AREA, CAR
 import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments, arrowHeadAngle, autoElbowPath, cardObstacles, arrowPathPoints } from './self-built-arrow'
 import { unionBounds, expandBounds, normalizeBox, type Bounds } from './bounds'
 import { freedrawPointsOf } from './self-built-freedraw'
-import { buildSmoothPath } from './smooth-path'
+import { buildSmoothPath, smoothBezierSegments } from './smooth-path'
 import { markdownPreview } from './markdown-preview'
 
 /** SVG 无 ctx.measureText:用字符宽度估算量宽,委托 wrapText 词界换行后截 maxLines。
@@ -31,7 +31,9 @@ function estimateTextWidth(text: string, fontSize: number): number {
     let w = 0
     for (const ch of line) {
       const code = ch.codePointAt(0) ?? 0
-      w += code >= 0x1100 ? fontSize : Math.round(fontSize * 0.58)
+      // Latin 0.8(原 0.58):实测 12px Inter 大写平均 8.03px、W=11.16、M=10.58,
+      // 0.58 会低估 30%+,长 Latin/emoji 标签与卡片正文右缘被裁(2026-11-17 对抗审查)。
+      w += code >= 0x1100 ? fontSize : Math.round(fontSize * 0.8)
     }
     if (w > max) max = w
   }
@@ -104,13 +106,21 @@ function arrowGeometryBounds(el: CanvasElement, elements: CanvasElement[]): Boun
     if (ctrlPage) {
       mx = 0.25 * from.x + 0.5 * ctrlPage.x + 0.25 * to.x
       my = 0.25 * from.y + 0.5 * ctrlPage.y + 0.25 * to.y
+    } else if (route === 'straight') {
+      // 直线 pts=[from,to]:floor(len/2)=1 取到的是 to,而渲染的 label 在
+      // (from+to)/2(见 elementToSvg straight 分支)——左向/左上长标签会整段溢出
+      // (2026-11-17 对抗审查 X-2,实测 41 汉字标签溢出 78px)。
+      mx = (from.x + to.x) / 2
+      my = (from.y + to.y) / 2
     } else {
       const mid = pts[Math.floor(pts.length / 2)]!
       mx = mid.x
       my = mid.y
     }
     const labelW = estimateTextWidth(el.text, 12)
-    all.push({ x: mx - 6, y: my - 15 }, { x: mx + labelW + 6, y: my + 3 })
+    // 与实时渲染 drawTextWithHalo(textBaseline='top')对齐:文字占 my..my+12,
+    // halo my-3..my+15;旧 my-15..my+3 是 SVG alphabetic baseline 版本(整体偏上 12px)。
+    all.push({ x: mx - 6, y: my - 3 }, { x: mx + labelW + 6, y: my + 15 })
   }
   return ptsToBounds(all)
 }
@@ -139,7 +149,51 @@ export function elementsToSvg(
       if (b) boxes.push(b)
       continue
     }
+    if (e.kind === 'freedraw') {
+      // 2026-11-17 对抗审查 X-3:渲染是 Catmull-Rom 贝塞尔,控制点可远在点列
+      // bbox 之外(发卡弯实测鼓出 125px)。控制点多边形包含整条曲线(凸包性质),
+      // 用它做保守 bounds,宁可略宽不裁切。单点渲染为 r=2 圆点,补圆外框。
+      const pts = freedrawPointsOf(e) ?? []
+      if (pts.length === 1) {
+        boxes.push({ x: pts[0]![0] - 2, y: pts[0]![1] - 2, w: 4, h: 4 })
+        continue
+      }
+      if (pts.length >= 2) {
+        const ctrlPts: { x: number; y: number }[] = []
+        for (const seg of smoothBezierSegments(pts)) {
+          ctrlPts.push(
+            { x: seg.p0[0], y: seg.p0[1] },
+            { x: seg.cp1[0], y: seg.cp1[1] },
+            { x: seg.cp2[0], y: seg.cp2[1] },
+            { x: seg.p1[0], y: seg.p1[1] },
+          )
+        }
+        const b = ptsToBounds(ctrlPts)
+        if (b) boxes.push(b)
+        continue
+      }
+      boxes.push(normalizeBox(e))
+      continue
+    }
+    if (e.kind === 'text' && !(e.text ?? '').trim()) {
+      // 空 text 渲染为空,却会把 (0,0,100,40) 并进 bounds → 大片空白导出
+      // (2026-11-17 对抗审查 X-7)。不渲染就不计 bounds。
+      continue
+    }
     boxes.push(normalizeBox(e))
+  }
+  // 卡片/分区标题可能超出元素矩形(渲染无裁剪),bounds 需覆盖标题实际宽度
+  // (2026-11-17 对抗审查 X-4:frame 的「标题限宽在框内」只截了 halo,没截 text)。
+  for (const e of elements) {
+    if (e.kind === 'card') {
+      const info = getCardInfo(e.id)
+      if (!info?.title) continue
+      const titleW = estimateTextWidth(info.title, 15)
+      boxes.push({ x: e.x + 10, y: e.y + 18, w: titleW, h: 18 })
+    } else if (e.kind === 'frame' && e.text) {
+      const titleW = estimateTextWidth(e.text, 11)
+      boxes.push({ x: e.x + 6, y: e.y, w: titleW, h: 18 })
+    }
   }
   const raw = unionBounds(boxes) ?? { x: 0, y: 0, w: 1, h: 1 }
   const expanded = expandBounds(raw, opts.border)
@@ -341,8 +395,11 @@ function elementToSvg(
         // 半透明 halo 底条(与实时渲染 drawTextWithHalo 同源):标签压在箭头线上时可读。
         // SVG <text> y 是 baseline(my),12px 字上升约 12 → rect 从 my-15 起 height 18 覆盖。
         const labelW = estimateTextWidth(el.text, 12)
-        segs.push(`<rect x="${mx - 6}" y="${my - 15}" width="${labelW + 12}" height="18" fill="${tokenResolver('--color-canvas', '#ffffff')}" fill-opacity="0.85"/>`)
-        segs.push(`<text x="${mx}" y="${my}" fill="${stroke}" font-family="${c.fontBody}" font-size="12">${esc(el.text)}</text>`)
+        // 与实时渲染 drawTextWithHalo(textBaseline='top')对齐:SVG 的 y 是
+        // alphabetic baseline,my+12 → 文字顶边落在 my,halo 覆盖 my-3..my+15
+        // (旧版整体偏上 12px,2026-11-17 对抗审查 X-12)。
+        segs.push(`<rect x="${mx - 6}" y="${my - 3}" width="${labelW + 12}" height="18" fill="${tokenResolver('--color-canvas', '#ffffff')}" fill-opacity="0.85"/>`)
+        segs.push(`<text x="${mx}" y="${my + 12}" fill="${stroke}" font-family="${c.fontBody}" font-size="12">${esc(el.text)}</text>`)
       }
       return segs.join('')
     }

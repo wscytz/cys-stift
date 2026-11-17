@@ -331,6 +331,10 @@ export const messages = {
     zh: '导出图片失败:画布为空,或内容超出图片尺寸上限——可尝试降低倍率或缩小导出范围。',
     en: 'Image export failed: the canvas is empty, or content exceeds the image size limit — try a lower scale or a smaller range.',
   },
+  'canvas.exportScaleAdjusted': {
+    zh: '画布尺寸超出浏览器图片上限,已按 {scale}× 导出。',
+    en: 'Canvas exceeds the browser image limit — exported at {scale}×.',
+  },
   'canvas.cystiftRestored': { zh: '已从文件恢复画布「{name}」', en: 'Restored canvas "{name}" from file' },
   'canvas.cystiftNotFound': { zh: '此文件不是 .cystift 导出,按普通文件创建卡片。', en: 'Not a .cystift export — created a card from the file instead.' },
 

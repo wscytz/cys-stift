@@ -41,6 +41,22 @@ export interface CanvasImageExportOptions {
   quality?: number
   /** Embed the .cystift payload in the PNG tEXt chunk (PNG only; default true). */
   embedCystift?: boolean
+  /** 自动降倍率时回调(UI 用来告知用户实际分辨率,2026-11-17 对抗审查)。 */
+  onScaleAdjusted?: (appliedScale: number) => void
+}
+
+/** 浏览器 canvas 上限(2026-11-17 对抗审查 X-8)。Chrome 桌面单边 65535、
+ *  面积 16384²;iOS Safari 面积仅 4096²(WebKit MaxCanvasArea=4096*4096)。
+ *  旧实现统一 16384 单边:对桌面过严(20000×1000 本可导出),对 iOS 又漏面积。 */
+function canvasLimits(): { maxEdge: number; maxArea: number } {
+  const nav = typeof navigator !== 'undefined' ? navigator : undefined
+  const ua = nav?.userAgent ?? ''
+  const iOS =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (nav?.platform === 'MacIntel' && (nav?.maxTouchPoints ?? 0) > 1)
+  return iOS
+    ? { maxEdge: 4096, maxArea: 4096 * 4096 }
+    : { maxEdge: 65535, maxArea: 16384 * 16384 }
 }
 
 export async function exportCanvasImage(
@@ -61,11 +77,12 @@ export async function exportCanvasImage(
   } = opts
 
   // Prepare SVG at logical scale 1 (cystift disabled — it goes in the PNG).
+  // jpeg 无 alpha:强制不透明底,避免透明状态泄漏成黑底(2026-11-17 对抗审查 X-5)。
   const prepared = await exportCanvasSvg(host, service, canvasId, canvasName, {
     scope,
     scale: 1,
     border,
-    background,
+    background: format === 'jpeg' ? true : background,
     embedFonts: true,
     embedImages: true,
     embedCystift: false,
@@ -74,22 +91,22 @@ export async function exportCanvasImage(
 
   // 浏览器 canvas 尺寸守卫:超限后 drawImage 静默不画 / toBlob 返回 null → 导出空白
   // (2026-11-16 用户报"导出画面不全"的放大失败面:bounds 虚大 × 高 scale 极易超限)。
-  // 单边上限 16384(Chrome/Safari),面积兜底 16384²;超限自动降 scale(逻辑尺寸不变,
-  // 位图分辨率降档)。降档后仍超限(超大画布 × 1 倍)→ rasterizeSvg 内部拦截返回 null。
-  const MAX_EDGE = 16384
-  const MAX_AREA = MAX_EDGE * MAX_EDGE
+  // 平台分档见 canvasLimits();超限自动降 scale(逻辑尺寸不变,位图分辨率降档),
+  // 并回调告知 UI,不再静默降级。降档后仍超限 → rasterizeSvg 内部拦截返回 null。
+  const { maxEdge, maxArea } = canvasLimits()
   let effectiveScale = scale
   if (
-    prepared.width * effectiveScale > MAX_EDGE ||
-    prepared.height * effectiveScale > MAX_EDGE ||
-    prepared.width * prepared.height * effectiveScale * effectiveScale > MAX_AREA
+    prepared.width * effectiveScale > maxEdge ||
+    prepared.height * effectiveScale > maxEdge ||
+    prepared.width * prepared.height * effectiveScale * effectiveScale > maxArea
   ) {
-    const byEdge = Math.min(MAX_EDGE / prepared.width, MAX_EDGE / prepared.height)
-    const byArea = Math.sqrt(MAX_AREA / (prepared.width * prepared.height))
+    const byEdge = Math.min(maxEdge / prepared.width, maxEdge / prepared.height)
+    const byArea = Math.sqrt(maxArea / (prepared.width * prepared.height))
     effectiveScale = Math.max(1, Math.floor(Math.min(scale, byEdge, byArea)))
     console.warn(
       `[export-raster] raster ${Math.round(prepared.width * scale)}×${Math.round(prepared.height * scale)} over browser canvas limit — scale ${scale} → ${effectiveScale}`,
     )
+    opts.onScaleAdjusted?.(effectiveScale)
   }
 
   // 自研光栅化:SVG string → Image → canvas → blob(替代 tldraw getSvgAsImage)。
@@ -130,11 +147,10 @@ async function rasterizeSvg(
   try {
     // 兜底守卫(调用方已 clamp scale;此处拦 1 倍仍超限的极端画布):
     // 超浏览器 canvas 上限的赋值会让 drawImage 静默不画,宁失败不空白。
-    const MAX_EDGE = 16384
-    const MAX_AREA = MAX_EDGE * MAX_EDGE
+    const { maxEdge, maxArea } = canvasLimits()
     const pw = Math.round(w * scale)
     const ph = Math.round(h * scale)
-    if (pw > MAX_EDGE || ph > MAX_EDGE || pw * ph > MAX_AREA) {
+    if (pw > maxEdge || ph > maxEdge || pw * ph > maxArea) {
       console.warn(`[export-raster] raster ${pw}×${ph} over browser canvas limit — aborting instead of silently blank`)
       return null
     }
@@ -155,7 +171,9 @@ async function rasterizeSvg(
     // Color tracked via token so dark mode (where --color-white inverts)
     // would still produce a legible background; fallback 与 token 值对齐(v0.2
     // 起 --color-white = surface 暖纸白 #fbf9f6,非纯白)。
-    if (background && format === 'jpeg') {
+    // 2026-11-17 对抗审查:不再依赖 background 参数——jpeg 必须无条件填底,
+    // 否则「先选 PNG 透明再切 JPEG」的残留状态会导出黑底。
+    if (format === 'jpeg') {
       ctx.fillStyle = readToken('--color-white', '#fbf9f6')
       ctx.fillRect(0, 0, canvas.width, canvas.height)
     }

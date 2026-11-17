@@ -259,6 +259,17 @@ describe('applyLayout', () => {
     expect(el).toMatchObject({ kind: 'text', x: 10, y: 20, text: 'hi', color: 'red' })
   })
 
+  it('长文本 text op 的 w/h 按内容测量(不再固定 100×40,2026-11-17 对抗审查 X-1)', () => {
+    const host = new InMemoryCanvasHost()
+    const text = '这是一段很长很长很长很长的文本内容' // 17 汉字
+    applyLayout(host, [{ type: 'free', shape: 'text', x: 0, y: 0, text }])
+
+    const el = host.getElements().find((e) => e.kind === 'text')!
+    // jsdom 无 canvas ctx → 字符估算 CJK 14px/字 ≈ 238,远大于旧默认 100。
+    expect(el.w).toBeGreaterThan(200)
+    expect(el.h).toBe(18)
+  })
+
   // ── free arrow — DSL symmetry fix 4 (自由箭头 apply) ──
 
   it('creates a free arrow from bbox op (no from/to)', () => {

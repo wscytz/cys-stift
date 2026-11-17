@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest'
+import { InMemoryCanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
 import {
   unionBounds,
   expandBounds,
   getSafeFileName,
   resolveExportShapes,
+  resolveExportElements,
 } from '../export-bounds'
 
 describe('unionBounds', () => {
@@ -89,6 +91,42 @@ describe('getSafeFileName', () => {
   })
   it('trims trailing dots and spaces', () => {
     expect(getSafeFileName('name..  ')).toBe('name')
+  })
+})
+
+describe('resolveExportElements(2026-11-17 对抗审查)', () => {
+  const card = (id: string, x: number): CanvasElement => ({
+    id, kind: 'card', x, y: 0, w: 100, h: 80, rotation: 0,
+  })
+  const arrow = (id: string, from: string, to: string): CanvasElement => ({
+    id, kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from, to,
+  })
+
+  it('选区只含悬空箭头 → 过滤为空(上层报错,不再导出 1×1 空白图)', () => {
+    const host = new InMemoryCanvasHost()
+    host.applyWithoutEcho(() => host.upsert(arrow('a1', 'ghost-1', 'ghost-2')))
+    host.setSelectedIds(['a1'])
+    expect(resolveExportElements(host, 'selection')).toEqual([])
+  })
+
+  it('空 text 不进入导出(不把原点并进 bounds)', () => {
+    const host = new InMemoryCanvasHost()
+    host.applyWithoutEcho(() => {
+      host.upsert(card('c1', 0))
+      host.upsert({ id: 't-empty', kind: 'text', x: 5000, y: 0, w: 100, h: 40, rotation: 0, text: '   ' })
+    })
+    expect(resolveExportElements(host, 'diagram').map((e) => e.id)).toEqual(['c1'])
+  })
+
+  it('选区同时含箭头与端点卡时箭头保留', () => {
+    const host = new InMemoryCanvasHost()
+    host.applyWithoutEcho(() => {
+      host.upsert(card('c1', 0))
+      host.upsert(card('c2', 200))
+      host.upsert(arrow('a1', 'c1', 'c2'))
+    })
+    host.setSelectedIds(['c1', 'c2', 'a1'])
+    expect(resolveExportElements(host, 'selection').map((e) => e.id).sort()).toEqual(['a1', 'c1', 'c2'])
   })
 })
 

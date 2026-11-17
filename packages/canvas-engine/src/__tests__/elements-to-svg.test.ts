@@ -480,8 +480,63 @@ describe('elementsToSvg — 箭头真实几何参与 bounds(2026-11-16 导出截
         meta: { crossCanvas: true } },
     ]
     const r = elementsToSvg(els, view, () => null, { background: true, border: 16 }, domTokenResolver)
-    // portal 点 x = 0+240/2+120 = 240(from 卡右边框外);card 右缘 240 → 并集右缘含 portal。
-    expect(r.width).toBeGreaterThanOrEqual(240 + 16)
+    // portal 点 x = 0+240/2+120 = 240;∪ 箭头头/外延后右缘 ≈360,border 16 → 宽 ≈392。
+    // 旧断言 >=256 太松:仅卡片+border 已是 272,portal 完全漏算也能过(对抗审查 X-14)。
+    expect(r.width).toBeGreaterThan(380)
+  })
+
+  it('直线箭头左向长 label → bounds 覆盖标签右缘(标签中点不是终点)', () => {
+    const label = '标'.repeat(41) // 12px CJK ≈ 12/字 → 492px
+    const els: CanvasElement[] = [
+      { id: 'a', kind: 'card', x: 0, y: 100, w: 240, h: 120, rotation: 0 },
+      { id: 'b', kind: 'card', x: 440, y: 100, w: 240, h: 120, rotation: 0 },
+      { id: 'e', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'b', to: 'a', text: label },
+    ]
+    const r = elementsToSvg(els, view, () => null, { background: false, border: 0 }, domTokenResolver)
+    // 渲染 label 在 (from+to)/2 ≈ 340,右缘 ≈ 340+492+6 = 838 > 卡右缘 680。
+    // 旧实现取 pts[floor(len/2)] = to(240),只到 738 —— 左向长标签被裁(对抗审查 X-2)。
+    expect(r.width).toBeGreaterThan(800)
+  })
+
+  it('freedraw Catmull-Rom 鼓出参与 bounds(发卡弯不被裁)', () => {
+    const els: CanvasElement[] = [
+      {
+        id: 'f', kind: 'freedraw', x: 0, y: 0, w: 1000, h: 10, rotation: 0,
+        meta: { points: [[0, 0], [1000, 0], [1000, 10], [0, 10]] },
+      },
+    ]
+    const r = elementsToSvg(els, view, () => null, { background: false, border: 0 }, domTokenResolver)
+    // 控制点最大 x = 1000+(1000-0)/6 ≈ 1166.7;旧 bounds 按点列 bbox 1000 → 裁掉 ~167px。
+    expect(r.width).toBeGreaterThan(1100)
+  })
+
+  it('空 text 元素不把原点并进 bounds(大片空白不复发)', () => {
+    const els: CanvasElement[] = [
+      { id: 'c', kind: 'card', x: 5000, y: 5000, w: 240, h: 120, rotation: 0 },
+      { id: 't', kind: 'text', x: 0, y: 0, w: 100, h: 40, rotation: 0, text: '   ' },
+    ]
+    const r = elementsToSvg(els, view, () => null, { background: false, border: 0 }, domTokenResolver)
+    expect(r.width).toBe(240)
+    expect(r.height).toBe(120)
+  })
+
+  it('卡片长标题超出卡宽 → bounds 右扩(标题不被裁)', () => {
+    const els: CanvasElement[] = [
+      { id: 'c', kind: 'card', x: 0, y: 0, w: 200, h: 120, rotation: 0 },
+    ]
+    const info = { title: '标'.repeat(25), body: '', type: 'note', pinned: false }
+    const r = elementsToSvg(els, view, (id) => (id === 'c' ? info : null), { background: false, border: 0 }, domTokenResolver)
+    // 标题 15px CJK ≈ 375px,从 x+10 起 → 右缘 ≈ 385 > 卡宽 200。
+    expect(r.width).toBeGreaterThan(380)
+  })
+
+  it('分区 frame 长标题超出框宽 → bounds 右扩(标题不被裁)', () => {
+    const els: CanvasElement[] = [
+      { id: 'f', kind: 'frame', x: 0, y: 0, w: 100, h: 80, rotation: 0, text: '标'.repeat(22) },
+    ]
+    const r = elementsToSvg(els, view, () => null, { background: false, border: 0 }, domTokenResolver)
+    // 标题 11px CJK ≈ 242px,从 x+6 起 → 右缘 ≈ 248 > 框宽 100。
+    expect(r.width).toBeGreaterThan(240)
   })
 
   it('悬空引用箭头(端点缺失、非 portal)不炸、不产生 NaN 尺寸', () => {

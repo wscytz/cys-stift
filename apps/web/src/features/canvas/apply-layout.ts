@@ -1,6 +1,6 @@
 'use client'
 
-import type { CanvasElement, CanvasHost } from '@cys-stift/canvas-engine'
+import { measureText, type CanvasElement, type CanvasHost } from '@cys-stift/canvas-engine'
 import type { CardType, CodeBlock, Quote } from '@cys-stift/domain'
 import type { DslArrowOp, DslCardOp, DslFreeOp, DslOp } from '@wscytz/dsl'
 import { sanitizeDslOps, evalCompute, evalComputeDetail, formatComputeNumber } from '@wscytz/dsl'
@@ -13,6 +13,43 @@ function uid(prefix: string): string {
       ? crypto.randomUUID()
       : Math.random().toString(36).slice(2)
   return `${prefix}-${rand}`
+}
+
+/** DSL/AI 新建 text 的真实度量(2026-11-17 对抗审查 X-1):此前固定 100×40,
+ *  长文本导出按旧宽裁切(19 汉字实测右缘超出约 150px)。与 R9 编辑路径同源
+ *  14px / 行高 18;测试/SSR 无 canvas ctx(jsdom 未装 canvas)时退化为字符估算
+ *  (CJK 14px、latin 8px)。ctx 模块级缓存,避免每条 text 创建都建 canvas。 */
+let applyMeasureCtx: CanvasRenderingContext2D | null | undefined
+function measureTextForApply(text: string): { w: number; h: number } {
+  const lines = text.split('\n')
+  if (typeof document !== 'undefined') {
+    try {
+      if (applyMeasureCtx === undefined) {
+        applyMeasureCtx = document.createElement('canvas').getContext('2d')
+      }
+      if (applyMeasureCtx) {
+        const size =
+          getComputedStyle(document.documentElement).getPropertyValue('--font-size-sm').trim() ||
+          '14px'
+        const family =
+          getComputedStyle(document.documentElement).getPropertyValue('--font-body').trim() ||
+          'Inter, sans-serif'
+        return measureText(text, applyMeasureCtx, `${size} ${family}`, 18)
+      }
+    } catch {
+      /* fall through to estimate */
+    }
+  }
+  let maxW = 0
+  for (const line of lines) {
+    let w = 0
+    for (const ch of line) {
+      const code = ch.codePointAt(0) ?? 0
+      w += code >= 0x1100 ? 14 : 8
+    }
+    if (w > maxW) maxW = w
+  }
+  return { w: Math.max(1, Math.ceil(maxW)), h: Math.max(18, lines.length * 18) }
 }
 
 export interface CardCreateParams {
@@ -668,15 +705,17 @@ function planFree(
       break
     case 'text': {
       const computedText = resolveComputedText(op, undefined, resolver)
+      const text = 'text' in computedText ? computedText.text : (op.text ?? '')
+      const measured = text.trim() ? measureTextForApply(text) : { w: 100, h: 40 }
       element = {
         id,
         kind: 'text',
         x,
         y,
-        w: op.w ?? 100,
-        h: op.h ?? 40,
+        w: op.w ?? measured.w,
+        h: op.h ?? measured.h,
         rotation: 0,
-        text: 'text' in computedText ? computedText.text : (op.text ?? ''),
+        text,
         ...(op.color ? { color: op.color } : {}),
         ...(createMeta ? { meta: createMeta } : {}),
       }

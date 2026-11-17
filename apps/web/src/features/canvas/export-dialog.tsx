@@ -130,8 +130,14 @@ export function ExportDialog({
           scope: effectiveScope,
           scale,
           border,
-          background: opaque,
+          // jpeg 无 alpha:强制不透明底,避免「先选 PNG 透明再切 JPEG」残留状态导出黑底。
+          background: format === 'jpeg' ? true : opaque,
           format,
+          onScaleAdjusted: (applied) =>
+            pushToast({
+              kind: 'info',
+              message: t('canvas.exportScaleAdjusted', { scale: String(applied) }),
+            }),
         })
         if (!blob) {
           // 图片分支的 null 有两种成因:画布为空,或光栅化超尺寸守卫拦截
