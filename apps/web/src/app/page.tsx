@@ -15,7 +15,7 @@ import { CaptureHint } from '@/features/capture/capture-hint'
 import { CaptureSampleHint } from '@/components/capture-sample-hint'
 import { CAPTURE_OPEN_EVENT } from '@/features/capture/capture-host'
 import { useDb } from '@/lib/db-client'
-import { useCanvases } from '@/lib/canvas-store'
+import { DEFAULT_CANVAS_NAME, useCanvases } from '@/lib/canvas-store'
 import { workbenchStore } from '@/lib/workbench-store'
 import { StatusDot } from '@cys-stift/ui/status-dot'
 
@@ -135,7 +135,7 @@ export default function HomePage() {
           <div className="home__current">
             <span>{t('home.currentCanvas')}</span>
             <Link href="/canvas">
-              <strong>{activeCanvas?.name ?? t('nav.canvas')}</strong>
+              <strong>{activeCanvas ? (activeCanvas.name === DEFAULT_CANVAS_NAME ? t('canvas.defaultName') : activeCanvas.name) : t('nav.canvas')}</strong>
               <small>{t('home.canvasCardCount', { n: String(activeCount) })}</small>
             </Link>
           </div>
@@ -188,7 +188,7 @@ export default function HomePage() {
           <span>{t('home.eyebrow')}</span>
           {/* R11:首启隐私承诺 —— 数据仅存本机 + 可导出 JSON,指向 settings 数据区。
               此前完整说明埋在 /settings,隐私敏感用户第一天看不到会不安全感。 */}
-          <Link href="/settings#data" className="home__privacy">
+          <Link href="/settings/#settings-data" className="home__privacy">
             {t('home.privacy')}
           </Link>
           {/* Version:单一可信源 = root package.json "version",由

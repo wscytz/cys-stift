@@ -323,6 +323,9 @@ if (
           </div>
         </div>
         <div className="mi-actions">
+          {title.trim().length === 0 && body.trim().length > 0 && (
+            <span className="mi-hint" role="status">{t('capture.titleRequired')}</span>
+          )}
           <strong className="mi-hint mi-hint--primary" data-testid="mini-submit-hint">
             {isMacVal ? '⌘↩' : 'Ctrl+Enter'} {t('card.detail.save')} · esc {t('card.detail.cancel')}
           </strong>

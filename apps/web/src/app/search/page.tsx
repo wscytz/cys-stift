@@ -1,6 +1,7 @@
 'use client'
 
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Tag } from '@cys-stift/ui'
 import { PageHeader } from '@/features/page-header'
 import type { Card, CardId, SearchResult } from '@cys-stift/domain'
@@ -114,10 +115,22 @@ export default function SearchPage() {
           onChange={(e) => setQuery(e.target.value)}
         />
 
-        <SearchFilters filter={filter} onChange={setFilter} tags={tagOptions} />
+        {!(ready && liveCards.length === 0) && (
+          <SearchFilters filter={filter} onChange={setFilter} tags={tagOptions} />
+        )}
 
         {!ready ? (
           <PageLoading />
+        ) : liveCards.length === 0 ? (
+          <div className="page-empty">
+            <h2 className="display-title display-title--lg">
+              {t('search.emptyLibrary.title')}
+            </h2>
+            <p className="empty__lede">{t('search.emptyLibrary.lede')}</p>
+            <Link href="/inbox" className="empty__cta">
+              {t('search.emptyLibrary.cta')}
+            </Link>
+          </div>
         ) : !showResults ? (
           <p className="search-hint">{t('search.empty')}</p>
         ) : results.length === 0 ? (
@@ -125,7 +138,14 @@ export default function SearchPage() {
             {/* R12:筛选激活时文案不归咎 query(否则用户以为词错/卡没存,实际是筛选在收缩)。 */}
             {query.trim() !== '' ? (
               isDefaultSearchFilter(filter)
-                ? <p className="search-hint">{t('search.noMatch', { q: query })}</p>
+                ? (
+                  <>
+                    <p className="search-hint">{t('search.noMatch', { q: query })}</p>
+                    <button type="button" className="search-clear-filter" onClick={() => setQuery('')}>
+                      {t('search.clearQuery')}
+                    </button>
+                  </>
+                )
                 : (
                   <>
                     <p className="search-hint">{t('search.noMatchWithFilter', { q: query })}</p>

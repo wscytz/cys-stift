@@ -139,12 +139,13 @@ function ContentRow({
   )
 }
 
-export function DiffGroup({ color, label, items }: { color: 'blue' | 'red' | 'yellow'; label: string; items: string[] }) {
+export function DiffGroup({ color, label, items, moreLabel }: { color: 'blue' | 'red' | 'yellow'; label: string; items: string[]; moreLabel?: string }) {
   return (
     <section className={`ac__group ac__group--${color}`}>
       <p className="ac__group-label">{label}</p>
       <ul className="ac__group-items">
         {items.slice(0, 8).map((it, i) => <li key={i}>{it}</li>)}
+        {items.length > 8 && <li className="ac__group-more">{moreLabel ?? `+${items.length - 8}`}</li>}
       </ul>
     </section>
   )
@@ -221,6 +222,8 @@ export const confirmStyles = `
 .ac__group-label { margin: 0 0 2px; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black-soft); }
 .ac__group-items { margin: 0; padding: 0 0 0 var(--space-2); list-style: none; }
 .ac__group-items li { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
+.ac__group-more { margin-top: 2px; color: var(--color-black-soft); }
+.ac__subtitle { margin: 0 0 var(--space-2); font-family: var(--font-body); font-size: var(--font-size-xs); color: var(--color-gray); line-height: 1.5; }
 .ac__nochange { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
 .ac__thumbs { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); overflow-x: auto; flex-wrap: nowrap; min-width: 0; }
 .ac__thumb { display: flex; flex-direction: column; align-items: center; gap: 2px; }

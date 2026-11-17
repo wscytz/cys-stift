@@ -363,34 +363,34 @@ export function DslDialog({
     <Modal open={open} onClose={requestClose} title={t('canvas.dslTitle')} closeLabel={t('common.close')}>
       <p className="dsl-lede">{t('canvas.dslLede')}</p>
       <div className="dsl-bridge" role="note">
-        <span className="dsl-bridge__label">Canvas</span>
+        <span className="dsl-bridge__label">{t('canvas.dslBridgeCanvas')}</span>
         <span aria-hidden="true">↔</span>
-        <span className="dsl-bridge__label">Text DSL</span>
+        <span className="dsl-bridge__label">{t('canvas.dslBridgeText')}</span>
         <span className="dsl-bridge__hint">{t('canvas.dslBridgeHint')}</span>
       </div>
-      <section className="dsl-guide" aria-labelledby="dsl-guide-title">
-        <div>
-          <p id="dsl-guide-title" className="dsl-guide__title">{t('canvas.dslGuideTitle')}</p>
-          {selectedCards.length === 2 ? (
+      {/* 选择式关系生成只在「刚好选两张」时出现:模态打开后无法再改画布选择,
+          常驻一排永远禁用的按钮只会让人以为功能坏了。 */}
+      {selectedCards.length === 2 && (
+        <section className="dsl-guide" aria-labelledby="dsl-guide-title">
+          <div>
+            <p id="dsl-guide-title" className="dsl-guide__title">{t('canvas.dslGuideTitle')}</p>
             <p className="dsl-guide__selection">
               {t('canvas.dslGuideSelection', {
                 target: service.get(selectedCards[1]!.id as CardId)?.title || `#${selectedCards[1]!.id}`,
                 anchor: service.get(selectedCards[0]!.id as CardId)?.title || `#${selectedCards[0]!.id}`,
               })}
             </p>
-          ) : (
-            <p className="dsl-guide__selection">{t('canvas.dslGuideHint')}</p>
-          )}
-        </div>
-        <div className="dsl-guide__actions">
-          <Button variant="ghost" onClick={() => arrangeSelected('right-of')} disabled={selectedCards.length !== 2}>
-            {t('canvas.dslGuideRight')}
-          </Button>
-          <Button variant="ghost" onClick={() => arrangeSelected('below')} disabled={selectedCards.length !== 2}>
-            {t('canvas.dslGuideBelow')}
-          </Button>
-        </div>
-      </section>
+          </div>
+          <div className="dsl-guide__actions">
+            <Button variant="ghost" onClick={() => arrangeSelected('right-of')}>
+              {t('canvas.dslGuideRight')}
+            </Button>
+            <Button variant="ghost" onClick={() => arrangeSelected('below')}>
+              {t('canvas.dslGuideBelow')}
+            </Button>
+          </div>
+        </section>
+      )}
       <div className="dsl-examples" aria-label={t('canvas.dslExamples')}>
         <span className="dsl-examples__label">{t('canvas.dslExamples')}</span>
         {(Object.keys(DSL_EXAMPLES) as (keyof typeof DSL_EXAMPLES)[]).map((key) => (

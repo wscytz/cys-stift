@@ -57,6 +57,7 @@ import { decodeIntentJson } from '@/features/ai/intent-validation'
 import { compileIntent } from '@/features/ai/intent-compiler'
 import { intentSnapshotFromHost } from '@/features/ai/intent-host-adapter'
 import { SaveStatusBadge } from '@/features/canvas/save-status-badge'
+import { useIsMac } from '@/lib/use-platform'
 import { TemplatePicker, type TemplateChoice } from '@/features/canvas/template-picker'
 import { allTemplates, saveCustomTemplate, addCustomTemplate } from '@/lib/canvas-templates'
 import { streamText } from '@/features/ai/stream-text'
@@ -83,7 +84,7 @@ import {
 } from '@/features/canvas/canvas-binding'
 import { planInboxCanvasPlacements } from '@/features/canvas/canvas-placement'
 import { CanvasUnplacedPanel } from '@/features/canvas/unplaced-panel'
-import { canvasStore, useCanvases, getSnapshot as getCanvasesSnapshot } from '@/lib/canvas-store'
+import { DEFAULT_CANVAS_NAME, canvasStore, useCanvases, getSnapshot as getCanvasesSnapshot } from '@/lib/canvas-store'
 import { canvasViewStore } from '@/lib/canvas-view-store'
 
 /**
@@ -413,6 +414,12 @@ export default function CanvasPage() {
 
   const handleAILayout = useCallback(async () => {
     if (aiConfirm) return
+    // 空画布没有可排的卡:别让用户先配 AI、等模型、再看到「无变化」。
+    const before = handle.current.adapter
+    if (before && snapshotCanvas(before, service, activeCanvasId).cards.length === 0) {
+      pushToast({ kind: 'info', message: t('canvas.aiLayoutTooFew') })
+      return
+    }
     await runAI('layout', async (ready, signal) => {
       const adapter = handle.current.adapter
       if (!adapter) return
@@ -1748,7 +1755,7 @@ function CanvasSwitcher({
   return (
     <>
       <select className="cselect" value={activeId} onChange={(e) => onSwitch(e.target.value as CanvasId)} title={t('canvas.switchTitle')} aria-label={t('canvas.switchTitle')}>
-        {canvases.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+        {canvases.map((c) => (<option key={c.id} value={c.id}>{c.name === DEFAULT_CANVAS_NAME ? t('canvas.defaultName') : c.name}</option>))}
       </select>
       <button type="button" className="cselect-edit" onClick={onStartRename} title={t('canvas.renameTitle')} aria-label={t('canvas.renameTitle')}>✎</button>
     </>
@@ -1892,6 +1899,7 @@ function CanvasSideRail({
   onShortcuts: () => void
 }) {
   const { t } = useI18n()
+  const isMac = useIsMac()
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const exportInitialFocus = useRef<'first' | 'last'>('first')
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
@@ -1916,9 +1924,13 @@ function CanvasSideRail({
   }
   return (
     <nav className="cv-rail" aria-label={t('canvas.sideRail')}>
-      <RailButton label={t('canvas.undo')} short={t('canvas.rail.undo')} onClick={onUndo} disabled={!adapterReady || !canUndo} icon="undo" />
-      <RailButton label={t('canvas.redo')} short={t('canvas.rail.redo')} onClick={onRedo} disabled={!adapterReady || !canRedo} icon="redo" />
+      <RailButton label={`${t('canvas.undo')} (${isMac ? '⌘Z' : 'Ctrl+Z'})`} short={t('canvas.rail.undo')} onClick={onUndo} disabled={!adapterReady || !canUndo} icon="undo" />
+      <RailButton label={`${t('canvas.redo')} (${isMac ? '⇧⌘Z' : 'Ctrl+Shift+Z'})`} short={t('canvas.rail.redo')} onClick={onRedo} disabled={!adapterReady || !canRedo} icon="redo" />
       <span className="cv-rail__sep" aria-hidden="true" />
+      <RailButton label={t('canvas.dslTitleHint')} short={t('canvas.rail.dsl')} disabled={!adapterReady} onClick={onDsl} icon="dsl" />
+      <div className="cv-rail__group">
+        <RailButton label={t('canvas.export')} short={t('canvas.rail.export')} disabled={!adapterReady} onClick={() => { exportInitialFocus.current = 'first'; setWfMenuOpen(false); setExportMenuOpen((o) => !o) }} expanded={exportMenuOpen} controls="canvas-export-menu" hasPopup onKeyDown={(event) => menuTriggerKeyDown(event, exportInitialFocus, () => { setWfMenuOpen(false); setExportMenuOpen(true) })} icon="export" buttonRef={exportTriggerRef} />
+      </div>
       <span className="cv-rail__sep" aria-hidden="true" />
       <div className="cv-rail__group">
         <RailButton label={t('ai.workflow.title')} short={t('canvas.rail.aiWorkflow')} disabled={!adapterReady || aiBusy !== null} busy={aiBusy !== null} ariaBusy={aiBusy !== null} busyTitle={t('canvas.aiRunning')} onClick={() => { wfInitialFocus.current = 'first'; setExportMenuOpen(false); setWfMenuOpen((o) => !o) }} expanded={wfMenuOpen} controls="canvas-workflow-menu" hasPopup onKeyDown={(event) => menuTriggerKeyDown(event, wfInitialFocus, () => { setExportMenuOpen(false); setWfMenuOpen(true) })} icon="workflow" buttonRef={wfTriggerRef} />
@@ -1930,13 +1942,6 @@ function CanvasSideRail({
       <RailButton label={t('canvas.search.title')} short={t('canvas.rail.search')} disabled={!adapterReady} onClick={onSearch} pressed={searchOpen} icon="search" />
       {/* B-4「canvas 为家」:未放置面板入口 —— canvas 看「已放 + 未放」,inbox 缩为纯捕获整理。 */}
       <RailButton label={t('canvas.unplaced')} short={t('canvas.rail.unplaced')} disabled={!adapterReady} onClick={onUnplaced} pressed={unplacedOpen} icon="inbox" />
-      {/* 转义(DSL)是核心卖点,提一级独立按钮(双向:编辑画布文本/导出 DSL)。
-          导出菜单里保留同名项(作为「导出 DSL」入口),两条路都通 DslDialog。 */}
-      <RailButton label={t('canvas.dslTitle')} short={t('canvas.rail.dsl')} disabled={!adapterReady} onClick={onDsl} icon="dsl" />
-      {/* 导出:一个按钮 + 二级拓展(图片/Markdown/DSL)。Diff(版本对比)不是导出,留独立按钮。 */}
-      <div className="cv-rail__group">
-        <RailButton label={t('canvas.export')} short={t('canvas.rail.export')} disabled={!adapterReady} onClick={() => { exportInitialFocus.current = 'first'; setWfMenuOpen(false); setExportMenuOpen((o) => !o) }} expanded={exportMenuOpen} controls="canvas-export-menu" hasPopup onKeyDown={(event) => menuTriggerKeyDown(event, exportInitialFocus, () => { setWfMenuOpen(false); setExportMenuOpen(true) })} icon="export" buttonRef={exportTriggerRef} />
-      </div>
       <RailButton label={t('canvas.diffTitle')} short={t('canvas.rail.diff')} disabled={!adapterReady} onClick={onDiff} icon="diff" />
       <span className="cv-rail__sep" aria-hidden="true" />
       <div className="cv-rail__group">
@@ -1978,7 +1983,7 @@ function CanvasSideRail({
         items={[
           { id: 'image', label: t('canvas.exportImage'), disabled: !adapterReady, onSelect: onExport },
           { id: 'markdown', label: t('canvas.markdown'), disabled: !adapterReady, onSelect: onMarkdown },
-          { id: 'dsl', label: t('canvas.dslTitle'), disabled: !adapterReady, onSelect: onDsl },
+          { id: 'dsl', label: t('canvas.dslEditText'), disabled: !adapterReady, onSelect: onDsl },
         ]}
       />
       <CanvasCommandMenu

@@ -330,6 +330,9 @@ export function CreateCardForm({ onCreate, ready = true }: CreateCardFormProps) 
       )}
 
       <div className="ccf__actions">
+        {title.trim().length === 0 && body.trim().length > 0 && (
+          <span className="ccf__hint" role="status">{t('capture.titleRequired')}</span>
+        )}
         <Button type="submit" disabled={!canSubmit}>
           {submitting ? t('card.detail.saving') : t('inbox.create.submit')}
         </Button>
@@ -420,5 +423,9 @@ const styles = `
   margin: 0;
   font-family: var(--font-mono); font-size: var(--font-size-xs);
   color: var(--color-red);
+}
+.ccf__hint {
+  font-family: var(--font-mono); font-size: var(--font-size-xs);
+  color: var(--color-gray);
 }
 `

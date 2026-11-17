@@ -362,7 +362,7 @@ describe('AiConfirmDialog edge — Fix 4 applied 相位死代码已删', () => {
     // onApplied 触发(生产立即 unmount;test 里不 unmount → 标题应保持原 mode 标题)
     expect(onApplied).toHaveBeenCalledTimes(1)
     // appliedTitle('已应用 ✓')不应出现 —— phase='applied' 分支已删
-    const titleEl = dom.querySelector('.ac__title')
+    const titleEl = dom.querySelector('.ac__subtitle')
     expect(titleEl?.textContent).not.toMatch(/已应用/)
     // 按钮区仍渲染(无 phase !== 'applied' 守卫)
     expect(byText(dom, /^应用$|^Apply$/)).not.toBeNull()

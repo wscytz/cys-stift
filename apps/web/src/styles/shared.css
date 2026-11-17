@@ -217,6 +217,27 @@
  * rules — only the standard "column of title + lede" empty state lives here. */
 .page-empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-3) 0; }
 
+/* Empty-state CTA — works for both <Link> and <button>. */
+.empty__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  appearance: none;
+  -webkit-appearance: none;
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--color-white);
+  color: var(--color-black);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+  cursor: pointer;
+}
+.empty__cta:hover { background: var(--color-primary-container); }
+.empty__cta:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
+
 /* 折叠 ▸/▾ 按钮(companion / outline / minimap 三处共用;从 inline style 抽全局类以支持 :focus-visible)。 */
 .cv-chrome-toggle {
   font-family: var(--font-mono);

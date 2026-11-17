@@ -9,6 +9,7 @@
  * 静态导出:无 'use server' / API route;数据全走客户端 store。
  */
 import { useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { PageHeader } from '@/features/page-header'
 import type { Card, CardId } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
@@ -90,20 +91,37 @@ export default function GraphPage() {
     : null
 
   const isLoading = !ready || !loaded
+  const hasNoCards = nodes.length === 0
   const isEmpty = filtered.nodes.length === 0
 
   return (
     <main id="main" tabIndex={-1} className="page">
       <div className="page-content page-content--wide">
         <PageHeader title={t('graph.title')} />
-        <GraphFilters filter={filter} onChange={setFilter} tags={allTags} />
+        {!hasNoCards && (
+          <GraphFilters filter={filter} onChange={setFilter} tags={allTags} />
+        )}
 
         {isLoading ? (
           <PageLoading />
+        ) : hasNoCards ? (
+          <div className="graph-empty">
+            <p className="graph-empty__title">{t('graph.emptyNoCardsTitle')}</p>
+            <p className="graph-empty__hint">{t('graph.emptyNoCardsHint')}</p>
+            <Link href="/canvas" className="graph-empty__cta">
+              {t('graph.emptyCta')}
+            </Link>
+          </div>
         ) : isEmpty ? (
           <div className="graph-empty">
-            <p className="graph-empty__title">{t('graph.emptyTitle')}</p>
-            <p className="graph-empty__hint">{t('graph.emptyHint')}</p>
+            <p className="graph-empty__title">{t('graph.emptyFilteredTitle')}</p>
+            <button
+              type="button"
+              className="graph-empty__cta"
+              onClick={() => setFilter({ hideArchived: true, tag: null, type: null })}
+            >
+              {t('graph.clearFilters')}
+            </button>
           </div>
         ) : (
           <div className="graph-canvas-wrap">
@@ -243,4 +261,24 @@ const styles = `
   font-size: var(--font-size-sm);
   color: var(--color-gray);
 }
+.graph-empty__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: var(--space-1);
+  padding: 0 var(--space-2);
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--color-white);
+  color: var(--color-black);
+  border: var(--border-hairline);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+  cursor: pointer;
+}
+.graph-empty__cta:hover { background: var(--color-primary-container); }
+.graph-empty__cta:focus-visible { outline: 2px solid var(--color-red); outline-offset: 2px; }
 `

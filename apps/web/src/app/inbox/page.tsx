@@ -11,7 +11,7 @@ import { CardDetailModal } from '@/features/card/card-detail'
 import { useGlobalEdges } from '@/features/graph/use-global-edges'
 import { liveEdgesOnly } from '@/features/graph/aggregate-edges'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
-import { useCanvases } from '@/lib/canvas-store'
+import { DEFAULT_CANVAS_NAME, useCanvases } from '@/lib/canvas-store'
 import { captureSinkRegistry } from '@/features/capture/capture-sink'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
@@ -491,7 +491,7 @@ export default function InboxPage() {
           >
             {canvasesSnap.canvases.map((canvas) => (
               <option key={canvas.id} value={canvas.id}>
-                {canvas.name}
+                {canvas.name === DEFAULT_CANVAS_NAME ? t('canvas.defaultName') : canvas.name}
               </option>
             ))}
           </select>

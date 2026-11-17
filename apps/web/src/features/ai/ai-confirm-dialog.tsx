@@ -17,7 +17,7 @@
  */
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Modal } from '@cys-stift/ui'
-import type { CanvasId, CardService } from '@cys-stift/domain'
+import type { CanvasId, CardId, CardService } from '@cys-stift/domain'
 import { InMemoryCanvasHost, type CanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
 import { parseDslStrictWithDiagnostics } from '@wscytz/dsl'
 import { applyLayout } from '@/features/canvas/apply-layout'
@@ -352,10 +352,17 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
     )
   }
 
+  // 差异列表用卡片标题(有的话)代替裸 #id,用户不用回画布对号。
+  const labelEl = (el: CanvasElement) => {
+    if (el.kind !== 'card') return summarizeEl(el)
+    const cardTitle = props.service.get(el.id as CardId)?.title
+    return cardTitle ? `${cardTitle} · ${summarizeEl(el)}` : summarizeEl(el)
+  }
+
   return (
     <Modal open onClose={props.onRejected} title={title} closeLabel={t('common.close')}>
       <div className="ac">
-        <p className="ac__title">{title}</p>
+        <p className="ac__subtitle">{t('ai.confirm.subtitle')}</p>
 
         {props.mode === 'outline' && (
           editing ? (
@@ -376,13 +383,13 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
           <div className="ac__diff">
             {totalChanges === 0 && <p className="ac__nochange">{t('agent.noChange')}</p>}
             {diff.added.length > 0 && (
-              <DiffGroup color="blue" label={t('agent.added', { n: String(diff.added.length) })} items={diff.added.map((e) => summarizeEl(e))} />
+              <DiffGroup color="blue" label={t('agent.added', { n: String(diff.added.length) })} items={diff.added.map(labelEl)} moreLabel={t('agent.moreItems', { n: String(diff.added.length - 8) })} />
             )}
             {diff.removed.length > 0 && (
-              <DiffGroup color="red" label={t('agent.removed', { n: String(diff.removed.length) })} items={diff.removed.map((e) => summarizeEl(e))} />
+              <DiffGroup color="red" label={t('agent.removed', { n: String(diff.removed.length) })} items={diff.removed.map(labelEl)} moreLabel={t('agent.moreItems', { n: String(diff.removed.length - 8) })} />
             )}
             {diff.changed.length > 0 && (
-              <DiffGroup color="yellow" label={t('agent.changed', { n: String(diff.changed.length) })} items={diff.changed.map((c) => `${summarizeEl(c.after)} (${c.fields.join(', ')})`)} />
+              <DiffGroup color="yellow" label={t('agent.changed', { n: String(diff.changed.length) })} items={diff.changed.map((c) => `${labelEl(c.after)} (${c.fields.join(', ')})`)} moreLabel={t('agent.moreItems', { n: String(diff.changed.length - 8) })} />
             )}
           </div>
         )}

@@ -79,6 +79,7 @@ vi.mock('@/lib/db-client', () => ({
 }))
 
 vi.mock('@/lib/canvas-store', () => ({
+  DEFAULT_CANVAS_NAME: 'default canvas',
   useCanvases: () => ({
     ready: true,
     snapshot: {

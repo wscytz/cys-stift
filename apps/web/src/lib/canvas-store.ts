@@ -33,10 +33,13 @@ const DEFAULT_VIEW = {
   gridSize: 8 as const,
 }
 
+/** 种子画布的持久化名(英文旧名);UI 展示时映射为 canvas.defaultName。 */
+export const DEFAULT_CANVAS_NAME = 'default canvas'
+
 const SEED_CANVAS: Canvas = {
   id: DEFAULT_CANVAS_ID,
   workspaceId: WORKSPACE_ID,
-  name: 'default canvas',
+  name: DEFAULT_CANVAS_NAME,
   view: DEFAULT_VIEW,
   // sentinel epoch (0) so seed always sorts first by createdAt
   createdAt: new Date(0),

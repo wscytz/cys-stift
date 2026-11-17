@@ -118,6 +118,9 @@ export default function TimelinePage() {
                 {t('timeline.empty.title')}
               </h2>
               <p className="empty__lede">{t('timeline.empty.lede')}</p>
+              <Link href="/inbox" className="empty__cta">
+                {t('timeline.empty.cta')}
+              </Link>
             </div>
           </UICard>
         ) : (
