@@ -4,7 +4,7 @@
  * TagManagement — /tags 管理表（D5）。
  *
  * 受控：cards（非删除）+ onApplyChanges（落库）。内部用 tag-ops 纯函数算变更。
- * 操作：改名（点标签名行内编辑）/ 改色（点色块 popover，10 色取一）/ 删（单行去标）/
+ * 操作：改名（点标签名行内编辑）/ 改色（点色块 popover，6 色取一）/ 删（单行去标）/
  * 合并（勾 ≥2 个 → 顶 bar 选 target → 一次性多源合）。
  */
 import { useEffect, useRef, useState } from 'react'

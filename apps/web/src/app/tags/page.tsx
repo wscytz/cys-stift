@@ -14,7 +14,7 @@ import type { TagChange } from '@/features/tags/tag-ops'
 /**
  * 标签页 /tags — P3-T2 标签墙于 D5（2026-07-04）升级为管理页。
  *
- * 管理表（TagManagement）：改名 / 改色（10 色 popover）/ 删（去标）/ 合并（勾 ≥2 →
+ * 管理表（TagManagement）：改名 / 改色（6 色 popover）/ 删（去标）/ 合并（勾 ≥2 →
  * 选 target → 多源一次性合）。变更经 service.update 落库（{tags} 偏更新），snap 反应式刷新。
  */
 export default function TagsPage() {
