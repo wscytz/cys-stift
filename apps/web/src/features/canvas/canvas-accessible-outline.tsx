@@ -7,6 +7,7 @@ import {
   SelfBuiltAdapter,
 } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
+import type { MessageKey } from '@/lib/i18n/messages'
 import { buildOutline } from './outline'
 
 export interface AccessibleCanvasObject {
@@ -116,9 +117,15 @@ export function CanvasAccessibleOutline({
     return parts.join('. ') || t('canvas.a11y.noRelations')
   }
 
+  const kindLabel = (object: AccessibleCanvasObject) => {
+    const kindKey = `canvas.a11y.kind.${object.kind}` as MessageKey
+    const label = t(kindKey)
+    return label === kindKey ? object.kind : label
+  }
+
   const describe = (object: AccessibleCanvasObject) =>
     t('canvas.a11y.object', {
-      kind: t(`canvas.a11y.kind.${object.kind}` as never),
+      kind: kindLabel(object),
       label: object.label,
       x: object.x,
       y: object.y,
@@ -253,7 +260,7 @@ export function CanvasAccessibleOutline({
           >
             <span>{object.label}</span>
             <span className="canvas-a11y-outline__meta">
-              {object.kind} · {object.x}, {object.y}
+              {kindLabel(object)} · {object.x}, {object.y}
             </span>
           </button>
         ))}

@@ -43,13 +43,16 @@ export function CanvasCommandMenu({
       setPosition(null)
       return
     }
+    const MARGIN = 8
     const measure = () => {
       const trigger = triggerRef.current
       if (!trigger) return
       const rect = trigger.getBoundingClientRect()
+      const menuW = menuRef.current?.offsetWidth ?? 168
+      const menuH = menuRef.current?.offsetHeight ?? 0
       setPosition({
-        left: Math.max(8, rect.left - 176),
-        top: rect.top,
+        left: Math.max(MARGIN, Math.min(rect.left - 176, window.innerWidth - menuW - MARGIN)),
+        top: Math.max(MARGIN, Math.min(rect.top, window.innerHeight - menuH - MARGIN)),
       })
     }
     measure()

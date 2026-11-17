@@ -198,6 +198,7 @@ function EmptyState() {
         <p className="eyebrow">{t('trash.crumb')}</p>
         <h2 className="display-title display-title--lg">{t('trash.empty')}</h2>
         <p className="empty__lede">{t('trash.empty.lede')}</p>
+        <Link href="/inbox" className="empty__cta">{t('trash.emptyCta')}</Link>
       </div>
     </UICard>
   )

@@ -25,9 +25,10 @@ import { makeOnCardRemove } from './agent-confirm-card'
 import { applyClusters, type CardCluster } from './cluster'
 import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
 import { summarizeMovement } from '@/features/canvas/layout-movement'
-import { Thumb, DiffGroup, summarizeEl, confirmStyles } from './canvas-thumb'
+import { Thumb, DiffGroup, confirmStyles } from './canvas-thumb'
 import { MarkdownBody } from '@/app/inbox/markdown'
 import { useI18n } from '@/lib/i18n'
+import type { MessageKey } from '@/lib/i18n/messages'
 import { pushToast } from '@/lib/toast-store'
 import { addSample, genSampleId } from './sample-store'
 import { settingsStore } from '@/lib/settings-store'
@@ -99,7 +100,7 @@ function proposalIdentity(props: AiConfirmDialogProps): string | null {
 }
 
 export function AiConfirmDialog(props: AiConfirmDialogProps) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const [phase, setPhase] = useState<Phase>('confirming')
   const [editing, setEditing] = useState(false)
   const dslInitial = props.mode === 'dsl' ? props.dsl : props.mode === 'intent' ? props.intent : ''
@@ -338,7 +339,7 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
     return (
       <Modal open onClose={props.onRejected} onEscape={props.onRejected} title={t('agent.parseError')} closeLabel={t('common.close')}>
         <ul className="ac__errors">
-          {proposalErrors.slice(0, 5).map((e, index) => (<li key={`${e.line}-${index}`}>{e.line > 0 ? `L${e.line}: ` : ''}{e.text || e.message}</li>))}
+          {proposalErrors.slice(0, 5).map((e, index) => (<li key={`${e.line}-${index}`}>{e.line > 0 ? `L${e.line}: ` : ''}{e.message}{e.text && e.text !== e.message ? ` — ${e.text}` : ''}</li>))}
         </ul>
         <p className="ac__subtitle">{t('agent.parseErrorRetryHint')}</p>
         <div className="ac__actions">
@@ -353,11 +354,25 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
     )
   }
 
-  // 差异列表用卡片标题(有的话)代替裸 #id,用户不用回画布对号。
-  const labelEl = (el: CanvasElement) => {
-    if (el.kind !== 'card') return summarizeEl(el)
-    const cardTitle = props.service.get(el.id as CardId)?.title
-    return cardTitle ? `${cardTitle} · ${summarizeEl(el)}` : summarizeEl(el)
+  // 差异列表:card 用真实标题、箭头用两端卡标题、其余用类型人话名;字段名也映射成人话。
+  const fieldLabel = (field: string): string => {
+    const key = `canvas.diffField.${field}` as MessageKey
+    const label = t(key)
+    return label === key ? field : label
+  }
+  const labelEl = (el: CanvasElement): string => {
+    if (el.kind === 'card') {
+      const title = props.service.get(el.id as CardId)?.title
+      return t('canvas.diffElementCard', { title: title || t('card.untitled') })
+    }
+    if (el.kind === 'arrow' && el.from && el.to) {
+      const from = props.service.get(el.from as CardId)?.title || t('card.untitled')
+      const to = props.service.get(el.to as CardId)?.title || t('card.untitled')
+      return t('agent.arrowBetween', { from, to })
+    }
+    const key = `canvas.kind.${el.kind}` as MessageKey
+    const label = t(key)
+    return label === key ? el.kind : label
   }
 
   return (
@@ -390,7 +405,7 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
               <DiffGroup color="red" label={t('agent.removed', { n: String(diff.removed.length) })} items={diff.removed.map(labelEl)} moreLabel={t('agent.moreItems', { n: String(diff.removed.length - 8) })} />
             )}
             {diff.changed.length > 0 && (
-              <DiffGroup color="yellow" label={t('agent.changed', { n: String(diff.changed.length) })} items={diff.changed.map((c) => `${labelEl(c.after)} (${c.fields.join(', ')})`)} moreLabel={t('agent.moreItems', { n: String(diff.changed.length - 8) })} />
+              <DiffGroup color="yellow" label={t('agent.changed', { n: String(diff.changed.length) })} items={diff.changed.map((c) => `${labelEl(c.after)} (${c.fields.map(fieldLabel).join(locale === 'en' ? ', ' : '、')})`)} moreLabel={t('agent.moreItems', { n: String(diff.changed.length - 8) })} />
             )}
           </div>
         )}

@@ -158,6 +158,8 @@ function makeMockService() {
   const created: { id: string; input: unknown }[] = []
   return {
     service: {
+      // 确认门会用 get() 解析卡片标题做 diff 标签;真实 CardService 必有此方法。
+      get: () => undefined,
       createWithId: (id: string, input: unknown) => {
         created.push({ id, input })
       },

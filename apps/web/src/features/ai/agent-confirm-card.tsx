@@ -32,7 +32,8 @@ import { useI18n } from '@/lib/i18n'
 import { canvasStore, DEFAULT_CANVAS_NAME } from '@/lib/canvas-store'
 import { pushToast } from '@/lib/toast-store'
 import { addSample, genSampleId } from './sample-store'
-import { Thumb, DiffGroup, summarizeEl, confirmStyles, AgentContentDiff, type ContentChange } from './canvas-thumb'
+import { Thumb, DiffGroup, confirmStyles, AgentContentDiff, type ContentChange } from './canvas-thumb'
+import type { MessageKey } from '@/lib/i18n/messages'
 import { settingsStore } from '@/lib/settings-store'
 import { archiveStore, type ArchivePayload, type ArchiveStateSnapshot } from '@/lib/archive-store'
 import { buildArchivePayload } from '@/lib/build-archive-payload'
@@ -656,13 +657,34 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
         <p className="ac__title">{t('agent.parseError')}</p>
         <ul className="ac__errors">
           {preview.errors.slice(0, 5).map((e) => (
-            <li key={e.line}>L{e.line}: {e.text}</li>
+            <li key={e.line}>{e.line > 0 ? `L${e.line}: ` : ''}{e.message}{e.text && e.text !== e.message ? ` — ${e.text}` : ''}</li>
           ))}
         </ul>
         <Button variant="ghost" onClick={() => { recordReject(); onRegenerateDsl ? onRegenerateDsl() : onRejected() }}>{onRegenerateDsl ? t('agent.fixDsl') : t('agent.retry')}</Button>
         <style>{confirmStyles}</style>
       </div>
     )
+  }
+
+  // 确认门标签:card 用真实标题、箭头用两端卡标题、其余用类型人话名;字段名也映射成人话。
+  const fieldLabel = (field: string): string => {
+    const key = `canvas.diffField.${field}` as MessageKey
+    const label = t(key)
+    return label === key ? field : label
+  }
+  const labelEl = (el: CanvasElement): string => {
+    if (el.kind === 'card') {
+      const title = service.get(el.id as CardId)?.title
+      return t('canvas.diffElementCard', { title: title || t('card.untitled') })
+    }
+    if (el.kind === 'arrow' && el.from && el.to) {
+      const from = service.get(el.from as CardId)?.title || t('card.untitled')
+      const to = service.get(el.to as CardId)?.title || t('card.untitled')
+      return t('agent.arrowBetween', { from, to })
+    }
+    const key = `canvas.kind.${el.kind}` as MessageKey
+    const label = t(key)
+    return label === key ? el.kind : label
   }
 
   const totalChanges = diff ? diff.added.length + diff.removed.length + diff.changed.length : 0
@@ -691,22 +713,22 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
         <div className="ac__diff">
           {diff.added.length > 0 && (
             <DiffGroup color="blue" label={t('agent.added', { n: String(diff.added.length) })}
-              items={diff.added.map((e) => summarizeEl(e))} />
+              items={diff.added.map((e) => labelEl(e))} />
           )}
           {removedCards.length > 0 && (
             <>
               <DiffGroup color="red" label={t('agent.movedOut', { n: String(removedCards.length) })}
-                items={removedCards.map((e) => summarizeEl(e))} />
+                items={removedCards.map((e) => labelEl(e))} />
               <p className="ac__subtitle">{t('agent.movedOutHint')}</p>
             </>
           )}
           {removedOthers.length > 0 && (
             <DiffGroup color="red" label={t('agent.removed', { n: String(removedOthers.length) })}
-              items={removedOthers.map((e) => summarizeEl(e))} />
+              items={removedOthers.map((e) => labelEl(e))} />
           )}
           {diff.changed.length > 0 && (
             <DiffGroup color="yellow" label={t('agent.changed', { n: String(diff.changed.length) })}
-              items={diff.changed.map((c) => `${summarizeEl(c.after)} (${c.fields.join(', ')})`)} />
+              items={diff.changed.map((c) => `${labelEl(c.after)} (${c.fields.map(fieldLabel).join(', ')})`)} />
           )}
         </div>
       )}
@@ -719,7 +741,7 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
             newCard: t('agent.contentNewCard'),
             titleField: t('agent.contentFieldTitle'),
             bodyField: t('agent.contentFieldBody'),
-            emptyMark: '(空)',
+            emptyMark: t('agent.emptyMark'),
           }}
         />
       )}

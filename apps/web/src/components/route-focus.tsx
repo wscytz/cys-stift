@@ -29,6 +29,17 @@ export function RouteFocus() {
     if (document.querySelector('[role="dialog"][aria-modal="true"]')) return
     const active = document.activeElement
     if (active && active.closest('[role="dialog"][aria-modal="true"]')) return
+    // Deep-link hash (e.g. /settings/#settings-data from /showcase): scroll to
+    // the target instead of resetting to top and dropping the hash. If the hash
+    // is missing or the target doesn't exist, fall through to the #main path.
+    const hash = window.location.hash.slice(1)
+    if (hash) {
+      const target = document.getElementById(hash)
+      if (target) {
+        target.scrollIntoView()
+        return
+      }
+    }
     const main = document.getElementById('main')
     if (main) {
       main.focus()

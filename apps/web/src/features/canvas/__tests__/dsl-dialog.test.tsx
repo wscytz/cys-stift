@@ -339,7 +339,7 @@ describe('DslDialog — T5 archive trigger (dsl-apply)', () => {
     })
 
     const changes = [...domHost.querySelectorAll('.dsl-preview__changes li')].map((node) => node.textContent)
-    expect(changes).toEqual([expect.stringMatching(/arrow #edge.*text/)])
+    expect(changes).toEqual([expect.stringMatching(/canvas.kind.arrow.*canvas.diffField.text/)])
     unmount()
   })
 
@@ -405,7 +405,7 @@ describe('DslDialog — T5 archive trigger (dsl-apply)', () => {
       '[card #target] right-of #anchor @gap(24)',
     )
     const changes = [...domHost.querySelectorAll('.dsl-preview__changes li')].map((node) => node.textContent)
-    expect(changes).toEqual([expect.stringMatching(/card #target.*x.*y/)])
+    expect(changes).toEqual([expect.stringMatching(/canvas.diffElementCard.*canvas.diffField.x.*canvas.diffField.y/)])
     unmount()
   })
 

@@ -80,6 +80,9 @@ export default function HomePage() {
       .slice(0, 4)
   }, [ready, service, snap])
   const isFirstRun = ready && !snap.cards.some((card) => !card.deletedAt)
+  // 卡片都在归档里(没有软删卡、也没有活跃卡):不能冒充「首次使用」或「没有最近编辑」。
+  const hasArchivedOnly =
+    ready && recentCards.length === 0 && snap.cards.some((card) => !card.deletedAt && card.archived)
   return (
     <main id="main" tabIndex={-1} className={`home${fast ? ' home--fast' : ''}`}>
       <CaptureHint />
@@ -147,10 +150,17 @@ export default function HomePage() {
           <div className="home__recent">
             <span>{t('home.recent')}</span>
             {recentCards.length === 0 ? (
-              isFirstRun ? (
+              !ready ? (
+                <p>{t('common.loading')}</p>
+              ) : isFirstRun ? (
                 <div className="home__start-here">
                   <p>{t('home.startHereHint')}</p>
                   <Link href="/inbox">{t('home.openInbox')}</Link>
+                </div>
+              ) : hasArchivedOnly ? (
+                <div className="home__start-here">
+                  <p>{t('home.allArchived')}</p>
+                  <Link href="/archive">{t('nav.archive')}</Link>
                 </div>
               ) : (
                 <p>{t('home.noRecent')}</p>

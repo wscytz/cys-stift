@@ -97,9 +97,9 @@ export function DiffDialog({
 .diff-empty { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-sm); color: var(--color-gray); }
 .diff-list { display: flex; flex-direction: column; gap: var(--space-2); }
 .diff-group { padding: var(--space-2); border: var(--border-hairline); border-radius: var(--radius-sm); }
-.diff-group--added { border-left: var(--space-1) solid var(--color-blue); }
-.diff-group--removed { border-left: var(--space-1) solid var(--color-red); }
-.diff-group--changed { border-left: var(--space-1) solid var(--color-yellow); }
+.diff-group--added .diff-group__title { color: var(--color-blue); }
+.diff-group--removed .diff-group__title { color: var(--color-red); }
+.diff-group--changed .diff-group__title { color: var(--color-yellow, #b8860b); }
 .diff-group__title { margin: 0 0 var(--space-1); font-family: var(--font-display); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
 .diff-group__items { margin: 0; padding: 0; list-style: none; }
 .diff-group__item { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black-soft); padding: var(--space-1) 0; }

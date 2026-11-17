@@ -48,7 +48,7 @@ export function ShowcaseContent() {
               {t('showcase.ctaCapture')} <Plus size={17} aria-hidden="true" />
             </button>
             <a href="https://github.com/wscytz/cys-stift/blob/main/docs/user/README.md" target="_blank" rel="noopener noreferrer" className="showcase__secondary">
-              {t('showcase.readGuide')} <ArrowUpRight size={17} aria-hidden="true" /><span className="sr-only">{t('showcase.opensNewTab')}</span>
+              {locale === 'en' ? t('showcase.readGuideChinese') : t('showcase.readGuide')} <ArrowUpRight size={17} aria-hidden="true" /><span className="sr-only">{t('showcase.opensNewTab')}</span>
             </a>
           </div>
         </section>
@@ -106,8 +106,8 @@ export function ShowcaseContent() {
           </div>
           <figure className="showcase__dsl">
             <figcaption>{t('showcase.dslFigcaption')}</figcaption>
-            <pre aria-label={t('showcase.dslFigcaption')}><code>{`[card #idea create] @pos(320, 160) @title("研究线索")
-[card #next create] @pos(560, 260) @title("下一步行动")
+            <pre aria-label={t('showcase.dslFigcaption')} lang={locale === 'zh' ? 'zh-CN' : 'en'}><code>{`[card #idea create] @pos(320, 160) @title("${t('showcase.dslCard1')}")
+[card #next create] @pos(560, 260) @title("${t('showcase.dslCard2')}")
 [arrow #idea-next] from #idea to #next @label("next")`}</code></pre>
           </figure>
         </section>
@@ -170,12 +170,15 @@ export function ShowcaseContent() {
         .showcase__proof-link:hover { color: var(--color-red); }
         .showcase__dsl { margin: 0; min-width: 0; }
         .showcase__dsl figcaption { margin-bottom: var(--space-2); color: var(--color-gray); font-family: var(--font-mono); font-size: var(--font-size-xs); letter-spacing: 0.08em; }
-        .showcase__proof pre { margin: 0; max-width: 100%; padding: var(--space-4); overflow-x: auto; background: var(--color-black); color: var(--color-white); border-left: 8px solid var(--color-red); font-family: var(--font-mono); font-size: var(--font-size-sm); line-height: 1.7; }
+        .showcase__proof pre { margin: 0; max-width: 100%; padding: var(--space-4); overflow-x: auto; background: var(--color-black); color: var(--color-white); font-family: var(--font-mono); font-size: var(--font-size-sm); line-height: 1.7; }
         .showcase__footer { display: flex; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) 0 var(--space-6); border-top: var(--border-hairline); color: var(--color-gray); font-family: var(--font-mono); font-size: var(--font-size-xs); }
         @media (max-width: 1199px) { .showcase__header { display: none; } .showcase { min-height: calc(100dvh - 64px); } }
         @media (min-width: 1200px) { .showcase { margin-left: var(--app-sidebar-w, var(--editorial-rail-width, 64px)); } }
         @media (max-width: 800px) { .showcase__header, .showcase__intro, .showcase__stage, .showcase__loop, .showcase__proof, .showcase__footer { width: min(100% - 32px, 640px); } .showcase__nav { gap: var(--space-2); } .showcase__nav a:nth-child(2) { display: none; } .showcase__stage-head, .showcase__section-head { display: block; } .showcase__stage-status { width: fit-content; margin-top: var(--space-2); } .showcase__steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } .showcase__proof { grid-template-columns: 1fr; gap: var(--space-4); } }
-        @media (max-width: 520px) { .showcase__nav a:nth-child(3) { display: none; } .showcase h1 { font-size: clamp(2.75rem, 12vw, 3.25rem); } main[lang='en'] h1 { font-size: clamp(2.1rem, 9vw, 2.9rem); } .showcase__lead { font-size: var(--font-size-base); } .showcase__board { min-height: 340px; } .showcase__node { width: 132px; min-height: 88px; padding: var(--space-2); } .showcase__node strong { font-size: var(--font-size-base); } .showcase__node--red { left: 4%; top: 40%; } .showcase__node--yellow { left: 44%; top: 12%; } .showcase__node--blue { left: min(62%, calc(100% - 140px)); top: 60%; } .showcase__connector--one { width: 120px; } .showcase__connector--two { width: 120px; } .showcase__board-tools { left: var(--space-2); right: var(--space-2); gap: 4px; justify-content: flex-start; overflow-x: auto; } .showcase__steps { grid-template-columns: 1fr; } .showcase__steps li { min-height: 96px; } .showcase__footer { flex-direction: column; } }
+        @media (max-width: 520px) { .showcase__nav a:nth-child(3) { display: none; } .showcase h1 { font-size: clamp(2.75rem, 12vw, 3.25rem); } main[lang='en'] h1 { font-size: clamp(2.1rem, 9vw, 2.9rem); } .showcase__lead { font-size: var(--font-size-base); } .showcase__board { min-height: 340px; } .showcase__node { width: 132px; min-height: 88px; padding: var(--space-2); } .showcase__node strong { font-size: var(--font-size-base); } .showcase__node--red { left: 4%; top: 40%; } .showcase__node--yellow { left: 44%; top: 12%; } .showcase__node--blue { left: min(62%, calc(100% - 140px)); top: 60%; } .showcase__connector--one { width: 120px; } .showcase__connector--two { width: 120px; } .showcase__board-tools { left: var(--space-2); right: var(--space-2); gap: 4px; justify-content: flex-start; overflow-x: auto; } .showcase__board-label { max-width: calc(44% - var(--space-3) - var(--space-1)); } .showcase__steps { grid-template-columns: 1fr; } .showcase__steps li { min-height: 96px; } .showcase__footer { flex-direction: column; } }
+        @media (min-width: 521px) and (max-width: 680px) { .showcase__node--red { left: 4%; top: 42%; } .showcase__node--yellow { left: 38%; top: 8%; } .showcase__node--blue { left: min(62%, calc(100% - 206px)); top: 55%; } .showcase__board-label { max-width: calc(38% - var(--space-3) - var(--space-1)); } }
+        @media (max-width: 365px) { .showcase__node--yellow { top: 6%; } .showcase__node--red { top: 46%; } }
+        @media (max-width: 318px) { .showcase__node { width: 108px; } .showcase__node--blue { left: calc(100% - 116px); top: 52%; } }
       `}</style>
     </div>
   )

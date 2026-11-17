@@ -305,6 +305,11 @@ export function AppMenu() {
       </div>
       <div
         className={`app-menu__entries${isNarrow && open ? ' app-menu__entries--open' : ''}`}
+        // 窄屏抽屉关闭时仅靠 transform/opacity/pointer-events 隐藏,DOM 仍可 Tab
+        // 聚焦、仍在读屏树。inert + aria-hidden 把关闭态真正移出交互/无障碍树;
+        // 打开抽屉或宽屏时两者都移除(undefined 不渲染属性)。
+        inert={isNarrow && !open ? true : undefined}
+        aria-hidden={isNarrow && !open ? true : undefined}
       >
         {groups.map((group) => (
           <div key={group.label} className="app-menu__group" role="group" aria-label={t(group.label)}>
@@ -324,7 +329,13 @@ export function AppMenu() {
           </div>
         ))}
       </div>
-      <div className="app-menu__foot">
+      <div
+        className="app-menu__foot"
+        // 同 entries:窄屏抽屉关闭时 Capture 随抽屉滑出屏外,但 DOM 仍可聚焦,
+        // 需 inert + aria-hidden(打开/宽屏时移除)。
+        inert={isNarrow && !open ? true : undefined}
+        aria-hidden={isNarrow && !open ? true : undefined}
+      >
         <button
           type="button"
           className="app-menu__capture"

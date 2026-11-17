@@ -28,7 +28,7 @@ import { diffCanvasSnapshots } from './canvas-diff'
 import { archiveStore } from '@/lib/archive-store'
 import { buildArchivePayload } from '@/lib/build-archive-payload'
 import { VERSION } from '@/lib/version'
-import type { MessageKey } from '@/lib/i18n/messages'
+import { messages, type MessageKey } from '@/lib/i18n/messages'
 
 /** R14:诊断消息人话化 —— 修正误导性报错(如「missing @pos」但行里其实有 @pos,
  *  那是 @pos 分隔符/参数格式错了)。可读诊断优先,原 message 兜底。 */
@@ -126,7 +126,24 @@ export function DslDialog({
   /** Text supplied by the paste bridge; it is reviewed before being applied. */
   initialText?: string
 }) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
+
+  // 预览标签:card 用真实标题,其余用元素类型的人话名;不再显示裸 id / 机器字段名。
+  const elementLabel = (el: CanvasElement): string => {
+    if (el.kind === 'card') {
+      const title = service.get(el.id as CardId)?.title
+      return t('canvas.diffElementCard', { title: title || t('card.untitled') })
+    }
+    const key = `canvas.kind.${el.kind}` as MessageKey
+    // 按消息表判断 key 是否存在,而不是比较 t() 返回值:测试 mock 的 t 直接回 key
+    // (返回 key 也可能是"已翻译"),比较法会把已存在的 key 误判为未知而回退原串。
+    return key in messages ? t(key) : el.kind
+  }
+  const fieldLabel = (field: string): string => {
+    const key = `canvas.diffField.${field}` as MessageKey
+    return key in messages ? t(key) : field
+  }
+
   const [text, setText] = useState('')
   const [appliedHashes, setAppliedHashes] = useState<Set<string>>(new Set())
   const [base, setBase] = useState<{ elements: CanvasElement[]; revision: string } | null>(null)
@@ -409,8 +426,8 @@ export function DslDialog({
             <p id="dsl-guide-title" className="dsl-guide__title">{t('canvas.dslGuideTitle')}</p>
             <p className="dsl-guide__selection">
               {t('canvas.dslGuideSelection', {
-                target: service.get(selectedCards[1]!.id as CardId)?.title || `#${selectedCards[1]!.id}`,
-                anchor: service.get(selectedCards[0]!.id as CardId)?.title || `#${selectedCards[0]!.id}`,
+                target: service.get(selectedCards[1]!.id as CardId)?.title || t('card.untitled'),
+                anchor: service.get(selectedCards[0]!.id as CardId)?.title || t('card.untitled'),
               })}
             </p>
           </div>
@@ -468,13 +485,13 @@ export function DslDialog({
           })}</p>
           <ul className="dsl-preview__changes">
             {preview.diff.added.slice(0, 8).map((element) => (
-              <li key={`added-${element.id}`} className="dsl-preview__added">+ {element.kind} #{element.id}</li>
+              <li key={`added-${element.id}`} className="dsl-preview__added">+ {elementLabel(element)}</li>
             ))}
             {preview.diff.removed.slice(0, 8).map((element) => (
-              <li key={`removed-${element.id}`} className="dsl-preview__removed">- {element.kind} #{element.id}</li>
+              <li key={`removed-${element.id}`} className="dsl-preview__removed">- {elementLabel(element)}</li>
             ))}
             {preview.diff.changed.slice(0, 8).map((change) => (
-              <li key={`changed-${change.id}`} className="dsl-preview__changed">~ {change.after.kind} #{change.id} · {change.fields.join(', ')}</li>
+              <li key={`changed-${change.id}`} className="dsl-preview__changed">~ {elementLabel(change.after)} · {change.fields.map(fieldLabel).join(locale === 'en' ? ', ' : '、')}</li>
             ))}
           </ul>
           {previewHidden > 0 && (
@@ -599,7 +616,7 @@ const styles = `
   white-space: pre-wrap; word-break: break-all; overflow-wrap: anywhere;
 }
 .dsl-text:focus { border-color: var(--color-red); }
-.dsl-preview { margin: 0 0 var(--space-2); padding: var(--space-1) var(--space-2); border-left: var(--space-quarter) solid var(--color-blue); font-family: var(--font-mono); font-size: var(--font-size-xs); }
+.dsl-preview { margin: 0 0 var(--space-2); padding: var(--space-1) var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-xs); }
 .dsl-preview p { margin: 0; }
 .dsl-preview ul { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin: var(--space-1) 0 0; padding: 0; list-style: none; color: var(--color-gray); }
 .dsl-preview__changes { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-1) var(--space-2) !important; }
@@ -616,13 +633,14 @@ const styles = `
   margin-top: var(--space-2);
   padding: var(--space-2) var(--space-3);
   background: var(--color-red-soft);
-  border-left: var(--space-1) solid var(--color-red);
+  border: var(--border-hairline);
+  border-color: var(--color-red);
   border-radius: var(--radius-sm);
 }
 /* 提示(全角标点/拼写手误):元素已保留,琥珀弱化,别和错误一个视觉权重 */
 .dsl-errors--soft {
   background: transparent;
-  border-left-color: var(--color-yellow, #b8860b);
+  border-color: var(--color-yellow, #b8860b);
   opacity: 0.85;
 }
 .dsl-errors__title--soft { color: var(--color-yellow, #b8860b); }

@@ -94,6 +94,11 @@ export default function InboxPage() {
     ),
   )
   const visible = view === 'inbox' ? inbox : archived
+  // 空态措辞分流:收件箱空但卡还在别处(画布/归档)时,不能说「一张卡都没有」。
+  const onCanvasCount = ready
+    ? service.listAll().filter((c) => !c.deletedAt && !c.archived && c.canvasPosition).length
+    : 0
+  const archivedCount = archived.length
 
   // 切 view 时丢弃跨 view 的选中(避免选中当前不可见的卡)。
   useEffect(() => {
@@ -398,7 +403,7 @@ export default function InboxPage() {
         {!ready ? (
           <PageLoading />
         ) : visible.length === 0 ? (
-          <EmptyState view={view} />
+          <EmptyState view={view} onCanvasCount={onCanvasCount} archivedCount={archivedCount} />
         ) : (
           <ul className="grid">
             {visible.map((card) => (
@@ -698,6 +703,13 @@ const styles = `
   }
   .batch-bar__spacer { display: none; }
 }
+.empty__ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: center;
+  margin-top: var(--space-2);
+}
 `
 
 function sameCanvasPosition(a: NonNullable<Card['canvasPosition']>, b: NonNullable<Card['canvasPosition']>): boolean {
@@ -802,25 +814,50 @@ const CardTile = memo(function CardTile({
   )
 })
 
-function EmptyState({ view }: { view: View }) {
+function EmptyState({
+  view,
+  onCanvasCount,
+  archivedCount,
+}: {
+  view: View
+  onCanvasCount: number
+  archivedCount: number
+}) {
   const { t } = useI18n()
   // 移动端无系统全局热键;桌面按平台/用户自定义键显示,避免 Windows 上出现 ⌘。
   const isMobile = useIsMobile()
   const isMac = useIsMac()
   const combo = formatCaptureCombo(isMac, settingsStore.get().captureShortcut)
+  // 收件箱空但卡在画布/归档里:说「已清空」并给跳转,不说「一张卡都没有」。
+  const movedHint = view === 'inbox' && onCanvasCount + archivedCount > 0
   return (
     <UICard>
       <div className="page-empty">
         <BauhausMotif variant="overlap" size={160} />
         <p className="eyebrow">{t('inbox.crumb')}</p>
         <h2 className="display-title display-title--lg">
-          {view === 'inbox' ? t('inbox.empty.title') : t('inbox.empty.titleArchived')}
+          {view === 'inbox'
+            ? movedHint ? t('inbox.empty.titleMoved') : t('inbox.empty.title')
+            : t('inbox.empty.titleArchived')}
         </h2>
         <p className="empty__lede">
-          {view === 'inbox' ? t('inbox.empty.lede') : t('inbox.empty.ledeArchived')}
+          {view === 'inbox'
+            ? movedHint ? t('inbox.empty.ledeMoved') : t('inbox.empty.lede')
+            : t('inbox.empty.ledeArchived')}
         </p>
-        {view === 'inbox' && !isMobile && (
-          <p className="empty__lede">{t('inbox.empty.hintCombo', { combo })}</p>
+        {movedHint ? (
+          <div className="empty__ctas">
+            {onCanvasCount > 0 && (
+              <Link href="/canvas" className="empty__cta">{t('inbox.empty.openCanvas')}</Link>
+            )}
+            {archivedCount > 0 && (
+              <Link href="/archive" className="empty__cta">{t('inbox.empty.openArchive')}</Link>
+            )}
+          </div>
+        ) : (
+          view === 'inbox' && !isMobile && (
+            <p className="empty__lede">{t('inbox.empty.hintCombo', { combo })}</p>
+          )
         )}
       </div>
     </UICard>

@@ -1591,7 +1591,7 @@ ${formatted}`
       </div>
       </div>
 
-      <Modal open={auditScope !== null} onClose={() => { recordReviewMetric({ type: 'scope-cancelled' }); setAuditScope(null) }} title={t('canvas.audit.scopeTitle')} closeLabel={t('common.close')}>
+      <Modal open={auditScope !== null} onClose={() => { recordReviewMetric({ type: 'scope-cancelled' }); setAuditScope(null) }} onEscape={() => { recordReviewMetric({ type: 'scope-cancelled' }); setAuditScope(null) }} title={t('canvas.audit.scopeTitle')} closeLabel={t('common.close')}>
         {auditScope && <>
           <p className="confirm__body">{t('canvas.audit.scopeBody')}</p>
           <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 'var(--space-1) var(--space-2)', margin: 'var(--space-2) 0' }}>
@@ -1608,7 +1608,7 @@ ${formatted}`
         </>}
       </Modal>
 
-      <Modal open={creatingName !== null} onClose={() => setCreatingName(null)} title={t('canvas.newModalTitle')} closeLabel={t('common.close')}>
+      <Modal open={creatingName !== null} onClose={() => setCreatingName(null)} onEscape={() => setCreatingName(null)} title={t('canvas.newModalTitle')} closeLabel={t('common.close')}>
         <p className="confirm__body">{t('canvas.newModalBody')}</p>
         <input
           autoFocus className="cinput" value={creatingName ?? ''}
@@ -1682,7 +1682,7 @@ ${formatted}`
         canvasEl={canvasElRef.current}
       />
 
-      <Modal open={showAiSetup} onClose={() => setShowAiSetup(false)} title={t('canvas.aiSetupTitle')} closeLabel={t('common.close')}>
+      <Modal open={showAiSetup} onClose={() => setShowAiSetup(false)} onEscape={() => setShowAiSetup(false)} title={t('canvas.aiSetupTitle')} closeLabel={t('common.close')}>
         <AiSetupCard
           onGoToSettings={() => {
             setShowAiSetup(false)
@@ -2248,6 +2248,7 @@ const styles = `
 .cv-rail__menu {
   position: fixed; z-index: 26;
   min-width: 168px; padding: var(--space-1);
+  max-height: calc(100dvh - 16px); overflow-y: auto;
   background: var(--color-surface-white); border: var(--border-hairline); border-radius: var(--radius-sm);
   display: flex; flex-direction: column; gap: 2px;
 }

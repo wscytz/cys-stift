@@ -137,6 +137,7 @@ function MarkdownBlock({ source }: { source: string }) {
 
 /** markdown <img> 门禁组件:远程图点击才加载(见上方 P2-3 注释)。 */
 function MarkdownImg({ src, alt, ...rest }: React.ComponentProps<'img'>) {
+  const { t } = useI18n()
   const [loadRemote, setLoadRemote] = useState(false)
   const isSafeData = typeof src === 'string' && isSafeImageDataUrl(src)
   if (isSafeData) return <img src={src} alt={alt} {...rest} />
@@ -151,7 +152,7 @@ function MarkdownImg({ src, alt, ...rest }: React.ComponentProps<'img'>) {
       title={typeof src === 'string' ? src : undefined}
     >
       {(alt || '') + ' '}
-      [远程图片 · 点击加载]
+      {t('md.remoteImageGate')}
     </button>
   )
 }
@@ -288,10 +289,11 @@ const styles = `
 }
 .md pre code { background: transparent; padding: 0; border-radius: 0; color: inherit; }
 .md blockquote {
+  /* 引用块去装饰:不再用 4px 红边 + 粉底的「AI 味」左条,改用中性浅底整块。 */
   margin: 0 0 var(--space-2);
   padding: var(--space-1) var(--space-3);
-  border-left: 4px solid var(--color-red);
-  background: var(--color-red-soft);
+  background: var(--color-surface-container-low);
+  border-radius: var(--radius-sm);
   color: var(--color-black);
 }
 .md hr { border: 0; border-top: var(--border-hairline); margin: var(--space-3) 0; }
