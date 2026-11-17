@@ -227,14 +227,14 @@
 - **主题**:恒为 Swiss Editorial light(暖纸底),设置页无主题选项;历史导入中的 dark/system 值会兼容读取,但不会切换主题
 - **AI provider**:OpenAI / Anthropic / Ollama(本地)三 provider + 多 profile;DeepSeek 等 OpenAI 兼容端点在设置里走 OpenAI 路径(自定义 baseUrl)
 - **实验室区**:当前含「可审计 AI 共编」(默认关闭,开启需确认门);Vision、自动整理/建卡/打标签和主动检索尚未接入,不会在后台修改或外发数据
-- **Data → Export JSON**:导出全部数据为开放格式 JSON(包含 cards / media / drafts / settings / canvases / freeform 几何)
+- **Data → Export JSON**:导出全部数据为开放格式 JSON(包含 cards / media / drafts / settings / canvases / 自建模板(如有)/ freeform 几何;如已启用 AI 对话与样本,也一并导出;默认含归档与软删卡,可在设置关闭)
 - **Data → Import JSON**:先预检并二次确认,可选择 Replace(清理备份中不存在的本地数据)或 Merge(按 ID 合并);写入前自动保存本机完整恢复点，完成后当前页面直接刷新各 store,不强制整页重载；成功恢复后恢复点才清理
 
 ---
 
 ## 数据与隐私
 
-- **本地优先**:所有数据在客户端(Web 与桌面均使用 WebView 存储:卡片、媒体与对话在 localStorage;画布 freeform 几何、AI proposal 与开发存档优先 OPFS,不可用时回退 localStorage)
+- **本地优先**:所有数据在客户端(Web 与桌面均使用 WebView 存储:卡片、媒体与对话在 localStorage;画布 freeform 几何、AI proposal 的 payload/review 与开发存档优先 OPFS,不可用时回退 localStorage)
 - **无 server**:静态导出应用,没有 API,没有云端
 - **可迁移**:随时 Export JSON;格式版本化,未来 schema 变更有迁移路径
 - **桌面端**(Tauri):与网页版共用 WebView 存储,当前版本不写 Tauri 原生应用数据目录;换机或清理 WebView 数据前请先 Export JSON 备份
