@@ -108,6 +108,9 @@ export { arrowKeyDelta, selectAllIds, parseKeyboardAction } from './self-built-k
 export { unionBounds, expandBounds, normalizeBox, intersectsBounds, viewportBounds } from './bounds'
 export type { Bounds } from './bounds'
 
+// ── 场景修订号(stale-guard 用;card h 派生值归一,防假阳性) ─────────────────
+export { sceneRevision } from './scene-revision'
+
 // ── 对齐 / 分布 / 等大(选中多元素 → patch Map) ───────────────────────────────
 export { applyAlign } from './align-distribute'
 export type { AlignOp, AlignPatch } from './align-distribute'

@@ -38,6 +38,10 @@ export function intentRevision(elements: readonly CanvasElement[]): string {
     .map(toIntentElement)
     .filter((element): element is IntentCanvasElement => !!element)
     .sort((a, b) => a.id.localeCompare(b.id))
+    // card h 是引擎派生值(render 每次 syncCardHeights 静默自愈,不发事件);
+    // 字体晚到等会让 h 在无人编辑时漂移 → 归一,否则 AI 确认门在预览与 Apply
+    // 之间被假阳性拒绝("Element changed after preview",2026-11-17 真机复现)。
+    .map((element) => (element.kind === 'card' ? { ...element, h: 0 } : element))
   return `scene-${hashIntentPlan(normalized)}`
 }
 

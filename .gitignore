@@ -117,3 +117,4 @@ scripts/_e2e-screenshots/
 
 # 内核调试台生成物(模板+生成器是源,pnpm --filter @cys-stift/dsl debug:page 重建)
 packages/cys-dsl/debug/index.html
+scripts/_e2e-downloads/

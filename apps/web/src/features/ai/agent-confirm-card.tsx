@@ -67,12 +67,18 @@ type ApplyOutcome = Pick<PersistResult, 'applied' | 'failed' | 'cardsUpdated' | 
 /** Full element revision for the legacy DSL confirmation path.  The intent
  * path has its own revision helper; this one deliberately includes `meta`
  * (freedraw points and future element fields) so a manual edit cannot be
- * hidden by the narrower visual diff contract. */
+ * hidden by the narrower visual diff contract.
+ *
+ * card `h` is excluded: it is engine-derived (syncCardHeights re-derives and
+ * silently self-heals every render, no events), so a late font load would
+ * otherwise trip the stale-proposal guard with nobody editing anything
+ * (2026-11-17 真机复现). Real edits still change body/w/mode — captured. */
 function canvasRevision(elements: readonly CanvasElement[]): string {
   return JSON.stringify(
     elements
       .slice()
-      .sort((a, b) => a.id.localeCompare(b.id)),
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((element) => (element.kind === 'card' ? { ...element, h: 0 } : element)),
   )
 }
 

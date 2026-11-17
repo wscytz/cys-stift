@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Modal, Button } from '@cys-stift/ui'
 import type { CardId, CardService } from '@cys-stift/domain'
-import { InMemoryCanvasHost, type CanvasElement, type CanvasHost } from '@cys-stift/canvas-engine'
+import { InMemoryCanvasHost, sceneRevision, type CanvasElement, type CanvasHost } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
 import { downloadFile } from '@/lib/download'
 import { pushToast } from '@/lib/toast-store'
@@ -96,7 +96,10 @@ function cloneElements(elements: readonly CanvasElement[]): CanvasElement[] {
 }
 
 function revisionOf(elements: readonly CanvasElement[]): string {
-  return JSON.stringify(cloneElements(elements).sort((a, b) => a.id.localeCompare(b.id)))
+  // sceneRevision:card h 是引擎派生值(每次 render 静默自愈),把它当"外部
+  // 变更"会让对话框开着的几秒内 Apply 被假阳性拒绝(2026-11-17 真机复现:
+  // 字体晚到 → h 96→58 → "画布已在编辑期间变化")。其余字段照常参与。
+  return sceneRevision(elements)
 }
 
 export function DslDialog({
