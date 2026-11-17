@@ -2,7 +2,7 @@
 import type { CanvasElement, CanvasView } from './canvas-host'
 import { sortByLayer } from './canvas-host'
 import { colorOf, groupColorOf, domTokenResolver, wrapText, CARD_TITLE_AREA, CARD_BOTTOM_PAD, CARD_LINE_H, type TokenResolver } from './self-built-render'
-import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments, arrowHeadAngle, autoElbowPath, cardObstacles } from './self-built-arrow'
+import { arrowEndpoints, dashPattern, arrowheadPoints, arrowRoute, elbowSegments, arrowHeadAngle, autoElbowPath, cardObstacles, arrowPathPoints } from './self-built-arrow'
 import { unionBounds, expandBounds, normalizeBox, type Bounds } from './bounds'
 import { freedrawPointsOf } from './self-built-freedraw'
 import { buildSmoothPath } from './smooth-path'
@@ -50,6 +50,71 @@ interface CardInfo {
   pinned: boolean
 }
 
+/** 点列 → 紧密 AABB(空列 → null)。 */
+function ptsToBounds(pts: { x: number; y: number }[]): Bounds | null {
+  if (pts.length === 0) return null
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const p of pts) {
+    if (p.x < minX) minX = p.x
+    if (p.y < minY) minY = p.y
+    if (p.x > maxX) maxX = p.x
+    if (p.y > maxY) maxY = p.y
+  }
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+}
+
+/**
+ * 箭头的真实渲染几何 bounds(页坐标):路径点列 + 箭头头三点 + label halo 外扩。
+ * 关系箭头自身 bbox 恒为 (0,0,0,0)(几何来自端点引用),此前导出 bounds 只按元素字段
+ * 并集 → 箭头伸出卡片范围即被裁(2026-11-16 用户报"导出画面不全")。路径与 SVG 绘制段
+ * 完全同源(elbow 手设走 elbowSegments / 自动绕障走 autoElbowPath;curve 端点+控制点;
+ * portal 端点已含在 arrowEndpoints)。端点缺失(悬空引用非 portal)→ null(维持原 bbox)。
+ */
+function arrowGeometryBounds(el: CanvasElement, elements: CanvasElement[]): Bounds | null {
+  const { from, to } = arrowEndpoints(el, elements)
+  if (!from || !to) return null
+  const route = arrowRoute(el)
+  let pts: { x: number; y: number }[]
+  if (route === 'elbow') {
+    const hasManual = !!(el.elbow && el.elbow.length > 0)
+    pts = hasManual
+      ? (elbowSegments(el, from, to) ?? [from, to])
+      : autoElbowPath(
+          el,
+          from,
+          to,
+          cardObstacles(elements, new Set([el.from, el.to].filter((v): v is string => !!v))),
+        )
+  } else {
+    pts = arrowPathPoints(el, elements)
+  }
+  if (pts.length === 0) return null
+  const all = [...pts]
+  // 箭头头(角度 = 终点切线,与绘制段同一算法)。
+  const ctrlPage = route === 'curve' && el.curve ? { x: el.curve.cx, y: el.curve.cy } : null
+  const angle = arrowHeadAngle(route, from, to, { ctrl: ctrlPage, segs: route === 'elbow' ? pts : null })
+  all.push(...arrowheadPoints(el.arrowhead ?? 'arrow', to, angle))
+  // label halo 底条(路径中点,宽度 estimateTextWidth+12;与绘制段同一中点公式)。
+  if (el.text) {
+    let mx: number
+    let my: number
+    if (ctrlPage) {
+      mx = 0.25 * from.x + 0.5 * ctrlPage.x + 0.25 * to.x
+      my = 0.25 * from.y + 0.5 * ctrlPage.y + 0.25 * to.y
+    } else {
+      const mid = pts[Math.floor(pts.length / 2)]!
+      mx = mid.x
+      my = mid.y
+    }
+    const labelW = estimateTextWidth(el.text, 12)
+    all.push({ x: mx - 6, y: my - 15 }, { x: mx + labelW + 6, y: my + 3 })
+  }
+  return ptsToBounds(all)
+}
+
 /** CanvasElement[] → SVG 字符串(对齐 self-built-render 视觉;颜色 tokenResolver 解析具体值)。 */
 export function elementsToSvg(
   elements: CanvasElement[],
@@ -62,7 +127,11 @@ export function elementsToSvg(
   //    KIND_LAYER 出,五视图视觉对齐)。bbox 用全部元素算,与顺序无关。
   // bbox 归一化:自由箭头反向画时 w/h<0,unionBounds 用 x+w 算 maxX 会算反 → 尺寸为负
   // → 钳成 1×1px。归一化(负则翻转 x/y 到左上)与 hitTest/选中框/self-built-render 同源。
-  const boxes: Bounds[] = elements.map((e) => normalizeBox(e))
+  // 箭头特判:自身字段 bbox 是 (0,0,0,0) 退化点(关系箭头)或不含 curve/elbow/portal 派生
+  // 几何(自由箭头)→ 换真实渲染几何 bounds(2026-11-16 导出截断修复)。
+  const boxes: Bounds[] = elements.map((e) =>
+    e.kind === 'arrow' ? (arrowGeometryBounds(e, elements) ?? normalizeBox(e)) : normalizeBox(e),
+  )
   const raw = unionBounds(boxes) ?? { x: 0, y: 0, w: 1, h: 1 }
   const expanded = expandBounds(raw, opts.border)
   const width = Math.max(1, Math.round(expanded.w))

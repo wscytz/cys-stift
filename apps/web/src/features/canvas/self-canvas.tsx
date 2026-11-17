@@ -437,8 +437,19 @@ export function SelfCanvas({
     if (curEdit.textId) {
       const existing = adapter.getElement(curEdit.textId)
       if (existing) {
-        if (v) adapter.upsert({ ...existing, text: v })
-        else adapter.remove(curEdit.textId)
+        if (v) {
+          // 重测量 w/h:此前只 upsert text,内容改长后 w/h 停留在创建时旧值——真实渲染宽
+          // 超出 el.w,导出 bounds 按旧宽算,右/下边缘被裁(2026-11-16 导出截断根因之一)。
+          // 与新建路径同源 measureText;ctx 不可用(jest 等)退化为只更 text。
+          const ctx = canvas?.getContext('2d')
+          if (ctx) {
+            const font = `${readToken('--font-size-sm', '14px')} ${readToken('--font-body', 'Inter, sans-serif')}`
+            const { w, h } = measureText(v, ctx, font, 18)
+            adapter.upsert({ ...existing, text: v, w, h })
+          } else {
+            adapter.upsert({ ...existing, text: v })
+          }
+        } else adapter.remove(curEdit.textId)
       }
       setEdit(null)
       setTextValue('')

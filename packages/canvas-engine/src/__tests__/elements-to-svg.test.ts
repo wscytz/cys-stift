@@ -441,3 +441,57 @@ describe('elementsToSvg — 卡正文行数按卡高派生(P1)+ 属性转义/hal
     expect(r.svg).toContain('fill="#fafafa"')
   })
 })
+
+describe('elementsToSvg — 箭头真实几何参与 bounds(2026-11-16 导出截断修复)', () => {
+  const view = { panX: 0, panY: 0, zoom: 1, gridMode: 'free' as const }
+
+  it('关系箭头不再以 (0,0,0,0) 污染并集:两卡远离原点时 SVG 不被撑大', () => {
+    // 修复前:关系箭头 bbox 恒 (0,0,0,0) → union 含原点 → 内容在 (500,400) 区域时
+    // 导出图左/上方大片空白(尺寸虚大)。修复后箭头按真实路径(卡间连线)参与。
+    const els: CanvasElement[] = [
+      { id: 'a', kind: 'card', x: 500, y: 400, w: 240, h: 120, rotation: 0 },
+      { id: 'b', kind: 'card', x: 900, y: 400, w: 240, h: 120, rotation: 0 },
+      { id: 'e', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b' },
+    ]
+    const r = elementsToSvg(els, view, () => null, { background: true, border: 16 }, domTokenResolver)
+    // 正确并集 = 500..1140 × 400..520 + border×2(修复前 x 从 0 起:宽 1156+)
+    expect(r.width).toBe(640 + 32)
+    expect(r.height).toBe(120 + 32)
+  })
+
+  it('curve 控制点拖出卡片范围 → SVG 覆盖曲线鼓出区域(不被裁)', () => {
+    const els: CanvasElement[] = [
+      { id: 'a', kind: 'card', x: 100, y: 100, w: 240, h: 120, rotation: 0 },
+      { id: 'b', kind: 'card', x: 500, y: 100, w: 240, h: 120, rotation: 0 },
+      { id: 'e', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b',
+        route: 'curve', curve: { cx: 420, cy: 400 } },
+    ]
+    const r = elementsToSvg(els, view, () => null, { background: true, border: 16 }, domTokenResolver)
+    // 曲线最低点(t=0.5):y = 0.25*160 + 0.5*400 + 0.25*160 = 280(二次贝塞尔不过控制点,
+    // 在端点-控制点凸包内)。SVG 高度须覆盖曲线鼓出(修复前按卡片字段算 ~152,下鼓被裁)。
+    expect(r.height).toBeGreaterThan(200)
+    expect(r.height).toBeLessThan(230)
+  })
+
+  it('portal(跨画布 wikilink)+120px → SVG 宽度含 portal 延伸', () => {
+    const els: CanvasElement[] = [
+      { id: 'a', kind: 'card', x: 0, y: 0, w: 240, h: 120, rotation: 0 },
+      { id: 'p', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'ghost',
+        meta: { crossCanvas: true } },
+    ]
+    const r = elementsToSvg(els, view, () => null, { background: true, border: 16 }, domTokenResolver)
+    // portal 点 x = 0+240/2+120 = 240(from 卡右边框外);card 右缘 240 → 并集右缘含 portal。
+    expect(r.width).toBeGreaterThanOrEqual(240 + 16)
+  })
+
+  it('悬空引用箭头(端点缺失、非 portal)不炸、不产生 NaN 尺寸', () => {
+    const els: CanvasElement[] = [
+      { id: 'a', kind: 'card', x: 0, y: 0, w: 240, h: 120, rotation: 0 },
+      { id: 'e', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'missing' },
+    ]
+    const r = elementsToSvg(els, view, () => null, { background: true, border: 16 }, domTokenResolver)
+    expect(Number.isFinite(r.width)).toBe(true)
+    expect(Number.isFinite(r.height)).toBe(true)
+    expect(r.width).toBeGreaterThan(0)
+  })
+})

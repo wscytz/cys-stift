@@ -72,12 +72,32 @@ export async function exportCanvasImage(
   })
   if (!prepared) return null
 
+  // 浏览器 canvas 尺寸守卫:超限后 drawImage 静默不画 / toBlob 返回 null → 导出空白
+  // (2026-11-16 用户报"导出画面不全"的放大失败面:bounds 虚大 × 高 scale 极易超限)。
+  // 单边上限 16384(Chrome/Safari),面积兜底 16384²;超限自动降 scale(逻辑尺寸不变,
+  // 位图分辨率降档)。降档后仍超限(超大画布 × 1 倍)→ rasterizeSvg 内部拦截返回 null。
+  const MAX_EDGE = 16384
+  const MAX_AREA = MAX_EDGE * MAX_EDGE
+  let effectiveScale = scale
+  if (
+    prepared.width * effectiveScale > MAX_EDGE ||
+    prepared.height * effectiveScale > MAX_EDGE ||
+    prepared.width * prepared.height * effectiveScale * effectiveScale > MAX_AREA
+  ) {
+    const byEdge = Math.min(MAX_EDGE / prepared.width, MAX_EDGE / prepared.height)
+    const byArea = Math.sqrt(MAX_AREA / (prepared.width * prepared.height))
+    effectiveScale = Math.max(1, Math.floor(Math.min(scale, byEdge, byArea)))
+    console.warn(
+      `[export-raster] raster ${Math.round(prepared.width * scale)}×${Math.round(prepared.height * scale)} over browser canvas limit — scale ${scale} → ${effectiveScale}`,
+    )
+  }
+
   // 自研光栅化:SVG string → Image → canvas → blob(替代 tldraw getSvgAsImage)。
   const blob = await rasterizeSvg(
     prepared.svg,
     prepared.width,
     prepared.height,
-    scale,
+    effectiveScale,
     format,
     quality,
     background,
@@ -108,17 +128,27 @@ async function rasterizeSvg(
   const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   try {
+    // 兜底守卫(调用方已 clamp scale;此处拦 1 倍仍超限的极端画布):
+    // 超浏览器 canvas 上限的赋值会让 drawImage 静默不画,宁失败不空白。
+    const MAX_EDGE = 16384
+    const MAX_AREA = MAX_EDGE * MAX_EDGE
+    const pw = Math.round(w * scale)
+    const ph = Math.round(h * scale)
+    if (pw > MAX_EDGE || ph > MAX_EDGE || pw * ph > MAX_AREA) {
+      console.warn(`[export-raster] raster ${pw}×${ph} over browser canvas limit — aborting instead of silently blank`)
+      return null
+    }
     const img = new Image()
-    img.width = w * scale
-    img.height = h * scale
+    img.width = pw
+    img.height = ph
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve()
       img.onerror = () => reject(new Error('svg load failed'))
       img.src = url
     })
     const canvas = document.createElement('canvas')
-    canvas.width = w * scale
-    canvas.height = h * scale
+    canvas.width = pw
+    canvas.height = ph
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
     // jpeg has no alpha — fill white so transparent regions don't go black.
