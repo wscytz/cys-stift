@@ -55,7 +55,7 @@
 
 **可审计 AI 共编（Labs，默认关闭）** —— 选择卡片并确认发送范围后，本地 graph lint 与 AI 的 Logic / Ideas / Layout 建议按来源逐项审查；接受后仍需生成 ghost preview 再应用。三个 lane 的 accepted subset 合并为同一份不可变计划，使用可恢复事务、CommitReceipt 与 guarded Undo。该实验不改变 cys-dsl 版本，尚未取得外部用户验证，不能视为稳定版承诺。
 
-**画板适配** —— 响应式(<1024 汉堡抽屉 + companion 覆盖 + canvas 断点归一)+ 触摸手势(双指 pinch zoom + 双指平移 + 触摸目标 44px)+ Android 运行时(rustls ring provider + 平台检测 SSR-safe hooks)。
+**画板适配** —— 响应式(<1200 顶条汉堡抽屉 + <1024 画布侧栏收成纯图标 + canvas 断点归一)+ 触摸手势(双指 pinch zoom + 双指平移 + 触摸目标 44px)+ Android 运行时(rustls ring provider + 平台检测 SSR-safe hooks)。
 
 **其他** —— 命令面板(⌘K)+ 标签管理 `/tags`(六色 canonical 调色板;改名/改色/删除/合并)+ 时间线 `/timeline`(全局)+ 全文搜索(title 加权 + 摘要)+ 软删恢复 + JSON 导出/导入(含画布几何 + freeform + 本机恢复点)+ 中英双语。
 
