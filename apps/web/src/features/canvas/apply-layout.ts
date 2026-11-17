@@ -884,7 +884,9 @@ function buildSanitizeCtx(host: CanvasHost): SanitizeCtx {
   const existingCardIds = new Set<string>()
   const existingFreeIds = new Set<string>()
   const existingFreeKinds = new Map<string, 'rect' | 'text' | 'frame'>()
+  const existingElementIds = new Set<string>()
   for (const element of host.getElements()) {
+    existingElementIds.add(element.id)
     if (element.kind === 'card') existingCardIds.add(element.id)
     else if (element.kind !== 'arrow') {
       existingFreeIds.add(element.id)
@@ -897,7 +899,7 @@ function buildSanitizeCtx(host: CanvasHost): SanitizeCtx {
       }
     }
   }
-  return { existingCardIds, existingFreeIds, existingFreeKinds }
+  return { existingCardIds, existingFreeIds, existingFreeKinds, existingElementIds }
 }
 
 function buildExistingGeometry(host: CanvasHost): Map<string, ExistingGeom> {

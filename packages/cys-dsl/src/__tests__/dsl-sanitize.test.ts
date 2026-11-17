@@ -377,3 +377,41 @@ describe('delete 行存在性检查含卡 id(2026-11-17 跨 kind 修正)', () =>
     expect(diagnostics[0]!.message).toMatch(/ghost/)
   })
 })
+
+describe('delete 存在性用 existingElementIds 全量 id(2026-11-17 arrow 假诊断修正)', () => {
+  it('rect 前缀删 arrow id(delete 按 id 跨 kind 生效)→ 不产假诊断', () => {
+    const op: DslOp = { type: 'free', shape: 'rect', id: 'a1', x: 0, y: 0, delete: true }
+    const { diagnostics } = sanitizeDslOps([op], { existingElementIds: new Set(['a1']) })
+    expect(diagnostics).toHaveLength(0)
+  })
+
+  it('arrow delete 查全量集合 → 不产假诊断(旧实现查 card+free 端点集合,箭头自身不在)→', () => {
+    const op: DslOp = { type: 'arrow', from: '', to: '', id: 'a1', delete: true }
+    const { diagnostics } = sanitizeDslOps([op], {
+      existingFreeIds: new Set<string>(), // arrow 不在端点集合是常态
+      existingElementIds: new Set(['a1']),
+    })
+    expect(diagnostics).toHaveLength(0)
+  })
+
+  it('arrow delete 目标不在全量集合 → 仍报「将跳过」', () => {
+    const op: DslOp = { type: 'arrow', from: '', to: '', id: 'ghost', delete: true }
+    const { diagnostics } = sanitizeDslOps([op], { existingElementIds: new Set(['a1']) })
+    expect(diagnostics).toHaveLength(1)
+    expect(diagnostics[0]!.message).toMatch(/ghost/)
+  })
+
+  it('同批 create 后 delete 同 id → 不产假诊断(apply shadow 语义)', () => {
+    const ops: DslOp[] = [
+      { type: 'card', cardId: 'n' as CardId, x: 0, y: 0, create: true },
+      { type: 'free', shape: 'rect', id: 'n', x: 0, y: 0, delete: true },
+    ]
+    const { diagnostics } = sanitizeDslOps(ops, {
+      existingCardIds: new Set<string>(),
+      existingFreeIds: new Set<string>(),
+      existingFreeKinds: new Map<string, 'rect' | 'text' | 'frame'>(),
+    })
+    // duplicate id 告警是 sanitize 既有行为(同 id 两行),这里只关心不存在性误报。
+    expect(diagnostics.some((d) => d.message.includes('不存在于画布'))).toBe(false)
+  })
+})

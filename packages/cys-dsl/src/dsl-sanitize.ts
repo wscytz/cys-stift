@@ -43,11 +43,15 @@ export interface SanitizeResult {
 
 /** 上下文:画布上已有的 card/free id(case 1/11/7 判断 id 是否存在用)。可选 —— 无 ctx 时不产 diagnostic。
  *  existingFreeKinds(case 3 跨 kind 告警):host 的 free 元素 id → kind(rect/text/frame),
- *  用来检测 free op 带了 host 已有但 kind 不同的 id(apply 会 mint 新 id 而非更新)。 */
+ *  用来检测 free op 带了 host 已有但 kind 不同的 id(apply 会 mint 新 id 而非更新)。
+ *  existingElementIds:host 全部元素 id(card + 所有 free,含 arrow/freedraw),delete 存在性
+ *  检查专用 —— existingFreeIds 是 arrow 端点可指向的 free 元素(不含 arrow 自身),
+ *  直接拿它查 delete 会把「删箭头/手绘」误报成不存在。 */
 export interface SanitizeCtx {
   existingCardIds?: Set<string>
   existingFreeIds?: Set<string>
   existingFreeKinds?: Map<string, 'rect' | 'text' | 'frame'>
+  existingElementIds?: Set<string>
 }
 
 /** card/rect/frame 的 w/h MAX 上限(防 LLM 生成超大跑出可视区)。
@@ -228,6 +232,7 @@ function sanitizeFree(
   idx: number,
   ctx: SanitizeCtx | undefined,
   diagnostics: SanitizeDiagnostic[],
+  deleteExistenceIds: Set<string> | undefined,
 ): DslFreeOp {
   // v10:删除行只认 id(镜像 sanitizeCard 的 delete 分支;提前返回)。
   if (op.delete) {
@@ -246,12 +251,10 @@ function sanitizeFree(
     // 2026-11-17:delete 按 id 跨 kind 生效(apply 侧 planFree 同步修正,卡也走
     // card-delete),存在性检查含卡 id——否则对卡写错 kind 前缀会产「将跳过」的
     // 假诊断,与实际行为自相矛盾。
-    if (
-      op.id &&
-      ctx?.existingFreeKinds !== undefined &&
-      !ctx.existingFreeKinds.has(op.id) &&
-      !ctx.existingCardIds?.has(op.id)
-    ) {
+    // 存在性用 deleteExistenceIds(全量 id + 同批声明,含 arrow);旧实现查
+    // existingFreeKinds(仅 rect/text/frame),对 arrow 元素写错 kind 前缀删除时
+    // 必产「不存在」假诊断(delete 实际按 id 生效)。未传任何 id 集合时无从判断,不产诊断。
+    if (op.id && deleteExistenceIds !== undefined && !deleteExistenceIds.has(op.id)) {
       diagnostics.push({ opIndex: idx, message: `delete ${op.shape} #${op.id} 不存在于画布(该行将跳过)` })
     }
     return { ...op, w: undefined, h: undefined, color: undefined, group: undefined, ...('text' in op ? { text: undefined } : {}), ...('compute' in op ? { compute: undefined } : {}) } as DslFreeOp
@@ -286,6 +289,7 @@ function sanitizeArrow(
   idx: number,
   existingIds: Set<string> | undefined,
   diagnostics: SanitizeDiagnostic[],
+  deleteExistenceIds: Set<string> | undefined,
 ): DslArrowOp {
   // v10:删除行只认 id(镜像 sanitizeCard;from/to 占位 '' 不报,用户真写了才报)。提前返回。
   if (op.delete) {
@@ -307,7 +311,9 @@ function sanitizeArrow(
         message: `delete 行只认 #id,已忽略其余指令(${extra.join(', ')})`,
       })
     }
-    if (op.id && existingIds !== undefined && !existingIds.has(op.id)) {
+    // 存在性用全量 id(含 arrow 自身):existingIds 是端点集合(card+free,不含 arrow),
+    // 删箭头时查它必产「不存在」假诊断。未传 existingElementIds 时退回 existingIds。
+    if (op.id && deleteExistenceIds !== undefined && !deleteExistenceIds.has(op.id)) {
       diagnostics.push({ opIndex: idx, message: `delete arrow #${op.id} 不存在于画布(该行将跳过)` })
     }
     return { type: 'arrow', from: '', to: '', ...(op.id ? { id: op.id } : {}), delete: true }
@@ -373,6 +379,21 @@ export function sanitizeDslOps(ops: DslOp[], ctx?: SanitizeCtx): SanitizeResult 
       if (op.type === 'free' && op.id) existingIds.add(op.id)
     }
   }
+  // delete 行存在性集合:优先全量 existingElementIds(含 arrow);旧调用方只传
+  // card/free 时退回合并(注意:不含 arrow,删箭头可能误报,属兼容路径)。
+  // 同批「先建后删」也算存在(apply 的 shadow 语义:create 后 delete 两 op 均 ready)。
+  let deleteExistenceIds: Set<string> | undefined
+  if (ctx?.existingElementIds || ctx?.existingCardIds || ctx?.existingFreeIds) {
+    deleteExistenceIds = new Set<string>()
+    ctx.existingElementIds?.forEach((id) => deleteExistenceIds!.add(id))
+    ctx.existingCardIds?.forEach((id) => deleteExistenceIds!.add(id))
+    ctx.existingFreeIds?.forEach((id) => deleteExistenceIds!.add(id))
+    for (const op of src) {
+      if (op.type === 'card' && op.create) deleteExistenceIds.add(String(op.cardId))
+      if (op.type === 'free' && op.id && !op.delete) deleteExistenceIds.add(op.id)
+      if (op.type === 'arrow' && op.id && !op.delete) deleteExistenceIds.add(op.id)
+    }
+  }
 
   let i = 0
   // 重复 id 探测(card/free 同名空间):下游 geom 按 id 覆盖 → 后者静默覆盖前者。
@@ -399,10 +420,10 @@ export function sanitizeDslOps(ops: DslOp[], ctx?: SanitizeCtx): SanitizeResult 
             }
             seenIds.add(op.id)
           }
-          out.push(sanitizeFree(op, idx, ctx, diagnostics))
+          out.push(sanitizeFree(op, idx, ctx, diagnostics, deleteExistenceIds))
           break
         case 'arrow':
-          out.push(sanitizeArrow(op, idx, existingIds, diagnostics))
+          out.push(sanitizeArrow(op, idx, existingIds, diagnostics, deleteExistenceIds))
           break
         default:
           // 未知类型:原样保留(保守,让 apply 自己处理)

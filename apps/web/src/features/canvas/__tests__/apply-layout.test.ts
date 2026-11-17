@@ -1062,6 +1062,19 @@ describe('applyLayout — v10 delete 指令', () => {
     expect(host.getElement('a')).toBeDefined()
   })
 
+  it('删 arrow 不产「不存在于画布」假诊断(existingElementIds 全量存在性)', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'a', 0, 0)
+    seedCard(host, 'b', 300, 0)
+    host.upsert({ id: 'e', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b' })
+    // 旧实现查 card+free 端点集合(arrow 自身不在)→ 产一条假诊断,
+    // 用户/AI 会以为删除被跳过;断言零诊断。apply 仍照常删。
+    const report = applyLayout(host, parseDsl('[arrow #e delete]'))
+    expect(report.sanitizeDiagnostics).toBeUndefined()
+    expect(report.applied).toBe(1)
+    expect(host.getElement('e')).toBeUndefined()
+  })
+
   it('同批 create 后 delete 同 id → 复活后删除(净效果不存在,无冲突)', () => {
     const host = new InMemoryCanvasHost()
     const report = applyLayout(host, parseDsl('[card #n create] @pos(0,0) @title("x")\n[card #n delete]'))
