@@ -9,6 +9,8 @@ import { useEffect } from 'react'
 import { Modal } from '@cys-stift/ui'
 import { useI18n } from '@/lib/i18n'
 import { useIsMac } from '@/lib/use-platform'
+import { settingsStore } from '@/lib/settings-store'
+import { formatCaptureCombo } from '@/lib/capture-shortcut'
 
 export function ShortcutHelpDialog({
   open,
@@ -76,7 +78,7 @@ export function ShortcutHelpDialog({
     },
     {
       title: t('canvas.shortcutsGlobal'),
-      rows: [[isMacVal ? '⌘⇧E' : 'Ctrl+Shift+E', t('capture.shortcutHelp')]],
+      rows: [[formatCaptureCombo(isMacVal, settingsStore.get().captureShortcut), t('capture.shortcutHelp')]],
     },
   ]
 

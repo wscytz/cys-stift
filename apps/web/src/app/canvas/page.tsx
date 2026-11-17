@@ -2319,11 +2319,22 @@ const styles = `
    ─────────────────────────────────────────────────────────────── */
 @media (max-width: 1023px) {
   .cv-rail { padding: var(--space-0.5); }
-  .cv-rail__btn { width: 48px; min-height: 48px; gap: 0; padding: var(--space-0.5) 0; }
-  .cv-rail__btn-label { display: none; }
-  .cv-rail__sep { width: var(--space-4); margin: var(--space-0.5) 0; }
+  /* 平板/窄桌面保留短标签:图标全无文字时核心入口要靠猜。 */
+  .cv-rail__btn { width: 52px; min-height: 48px; gap: 1px; padding: 2px 0; }
+  .cv-rail__sep { width: 44px; margin: var(--space-0.5) 0; }
+}
+/* 低高度笔记本窗口:收紧 rail,让底部按钮不必靠滚动才能看到。
+   宽度仍 48px;40px 高度是密集工具条的折中(与审计建议一致)。 */
+@media (max-height: 820px) {
+  .cv-rail { gap: 2px; padding: var(--space-0.5); }
+  .cv-rail__btn { width: 48px; min-height: 40px; gap: 0; padding: 0; }
+  .cv-rail__sep { width: 40px; margin: 1px 0; }
 }
 @media (max-width: 767px) {
+  /* 手机才收成纯图标(侧栏 48px,靠 title/aria-label 说明)。 */
+  .cv-rail__btn { width: 48px; gap: 0; padding: var(--space-0.5) 0; }
+  .cv-rail__btn-label { display: none; }
+  .cv-rail__sep { width: var(--space-4); }
   /* SnapToggle:文字隐藏、改符号按钮,保留 aria-pressed + title。 */
   .tb-snap--toggle .tb-snap__label { display: none; }
   .tb-snap--toggle { min-width: 48px; padding: 0 var(--space-2); }

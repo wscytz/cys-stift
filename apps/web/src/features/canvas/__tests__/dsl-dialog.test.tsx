@@ -166,6 +166,39 @@ describe('DslDialog — T5 archive trigger (dsl-apply)', () => {
     unmount()
   })
 
+  it('未改文本直接 apply → 不落档,提示画布已是最新', async () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({
+      id: 'r1',
+      kind: 'rect',
+      x: 5,
+      y: 5,
+      w: 10,
+      h: 10,
+      rotation: 0,
+    })
+    const { host: domHost, unmount } = mount(
+      <DslDialog
+        open={true}
+        onClose={() => {}}
+        host={host as unknown as CanvasHost}
+        service={makeService()}
+        canvasName="cv"
+      />,
+    )
+    // 打开时自动填入与画布一致的文本;不编辑直接应用应走 no-op 分支。
+    expect((domHost.querySelector('textarea') as HTMLTextAreaElement).value).toContain('[rect #r1]')
+    await act(async () => {
+      applyBtn(domHost)!.click()
+    })
+    await act(async () => {
+      await flushMicro()
+    })
+    expect(archiveAppendSpy).not.toHaveBeenCalled()
+    expect(pushToastSpy).toHaveBeenCalledWith({ kind: 'info', message: 'canvas.dslPreviewNoChanges' })
+    unmount()
+  })
+
   it('apply 含 skipped → note 形如 "DSL apply N (skipped M)"', async () => {
     const host = new InMemoryCanvasHost()
     // 预放一个同 id rect,让 apply 走 update 分支仍计 applied。

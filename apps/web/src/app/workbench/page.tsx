@@ -110,6 +110,7 @@ export default function WorkbenchPage() {
   }
 
   const returnTarget = origin && origin.startsWith('/') ? origin : '/canvas'
+  const backLabel = returnTarget === '/' ? t('workbench.backToHome') : t('workbench.backToCanvas')
 
   return (
     <main id="main" tabIndex={-1} className="page">
@@ -133,9 +134,9 @@ export default function WorkbenchPage() {
                   }
                   router.push(returnTarget)
                 }}
-                aria-label={t('workbench.backToCanvas')}
+                aria-label={backLabel}
               >
-                {t('workbench.backToCanvas')}
+                {backLabel}
               </button>
               <Tag color="blue">{t('workbench.count', { n: String(cards.length) })}</Tag>
             </div>

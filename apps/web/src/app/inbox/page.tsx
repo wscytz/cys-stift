@@ -15,7 +15,9 @@ import { DEFAULT_CANVAS_NAME, useCanvases } from '@/lib/canvas-store'
 import { captureSinkRegistry } from '@/features/capture/capture-sink'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
-import { useIsMobile } from '@/lib/use-platform'
+import { useIsMac, useIsMobile } from '@/lib/use-platform'
+import { settingsStore } from '@/lib/settings-store'
+import { formatCaptureCombo } from '@/lib/capture-shortcut'
 import { PageLoading } from '@/components/page-loading'
 import { typeKeyOf } from '@/lib/type-label'
 import { markdownPreview } from '@/features/card/markdown-preview'
@@ -786,8 +788,10 @@ const CardTile = memo(function CardTile({
 
 function EmptyState({ view }: { view: View }) {
   const { t } = useI18n()
-  // 移动端无系统全局热键;inbox.empty.hint 文案写死 ⌘⇧E,触屏设备上误导 → 隐藏。
+  // 移动端无系统全局热键;桌面按平台/用户自定义键显示,避免 Windows 上出现 ⌘。
   const isMobile = useIsMobile()
+  const isMac = useIsMac()
+  const combo = formatCaptureCombo(isMac, settingsStore.get().captureShortcut)
   return (
     <UICard>
       <div className="page-empty">
@@ -800,7 +804,7 @@ function EmptyState({ view }: { view: View }) {
           {view === 'inbox' ? t('inbox.empty.lede') : t('inbox.empty.ledeArchived')}
         </p>
         {view === 'inbox' && !isMobile && (
-          <p className="empty__lede">{t('inbox.empty.hint')}</p>
+          <p className="empty__lede">{t('inbox.empty.hintCombo', { combo })}</p>
         )}
       </div>
     </UICard>

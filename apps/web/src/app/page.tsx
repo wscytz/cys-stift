@@ -17,6 +17,8 @@ import { CAPTURE_OPEN_EVENT } from '@/features/capture/capture-host'
 import { useDb } from '@/lib/db-client'
 import { DEFAULT_CANVAS_NAME, useCanvases } from '@/lib/canvas-store'
 import { workbenchStore } from '@/lib/workbench-store'
+import { settingsStore } from '@/lib/settings-store'
+import { formatCaptureCombo } from '@/lib/capture-shortcut'
 import { StatusDot } from '@cys-stift/ui/status-dot'
 
 // SSR 渲染 useEffect(不跑)/ 客户端 useLayoutEffect(paint 前跑)的标准同构钩子。
@@ -76,6 +78,7 @@ export default function HomePage() {
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
       .slice(0, 4)
   }, [ready, service, snap])
+  const isFirstRun = ready && !snap.cards.some((card) => !card.deletedAt)
   return (
     <main id="main" tabIndex={-1} className={`home${fast ? ' home--fast' : ''}`}>
       <CaptureHint />
@@ -116,7 +119,9 @@ export default function HomePage() {
             <span className="home__capture-arrow" aria-hidden="true">+</span>
             <span className="home__capture-label">{t('home.feature.capture.title')}</span>
             <span className="home__capture-note">
-              {desktop ? (isMac ? t('home.hint.mac') : t('home.hint.win')) : t('home.feature.capture.desc')}
+              {desktop
+                ? t('capture.hintCombo', { combo: formatCaptureCombo(isMac, settingsStore.get().captureShortcut) })
+                : t('home.feature.capture.descMobile')}
             </span>
           </button>
           <Link href="/inbox" className="home__inbox-action">
@@ -128,7 +133,7 @@ export default function HomePage() {
           <div className="home__section-head">
             <h2 id="home-continue-title">
               <span className="home__secno" aria-hidden="true">01</span>
-              {t('home.continue')}
+              {isFirstRun ? t('home.startHere') : t('home.continue')}
             </h2>
             <Link href="/workbench">{t('home.openWorkbench')}</Link>
           </div>
@@ -142,7 +147,14 @@ export default function HomePage() {
           <div className="home__recent">
             <span>{t('home.recent')}</span>
             {recentCards.length === 0 ? (
-              <p>{t('home.noRecent')}</p>
+              isFirstRun ? (
+                <div className="home__start-here">
+                  <p>{t('home.startHereHint')}</p>
+                  <Link href="/inbox">{t('home.openInbox')}</Link>
+                </div>
+              ) : (
+                <p>{t('home.noRecent')}</p>
+              )
             ) : (
               <ul>
                 {recentCards.map((card) => (

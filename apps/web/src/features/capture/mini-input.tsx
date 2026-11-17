@@ -258,6 +258,7 @@ if (
             type="text"
             placeholder={t('capture.miniTitle')}
             aria-label={t('capture.miniTitle')}
+            aria-describedby={title.trim().length === 0 && body.trim().length > 0 ? 'mini-title-required' : undefined}
             value={title}
             onChange={(e) => setTitleAndPersist(e.target.value)}
             className="mi-title"
@@ -324,7 +325,7 @@ if (
         </div>
         <div className="mi-actions">
           {title.trim().length === 0 && body.trim().length > 0 && (
-            <span className="mi-hint" role="status">{t('capture.titleRequired')}</span>
+            <span className="mi-hint" id="mini-title-required" role="status">{t('capture.titleRequired')}</span>
           )}
           <strong className="mi-hint mi-hint--primary" data-testid="mini-submit-hint">
             {isMacVal ? '⌘↩' : 'Ctrl+Enter'} {t('card.detail.save')} · esc {t('card.detail.cancel')}

@@ -229,6 +229,7 @@ export function CreateCardForm({ onCreate, ready = true }: CreateCardFormProps) 
       <Input
         label={t('card.detail.fieldTitle')}
         name={`${formId}-title`}
+        aria-describedby={title.trim().length === 0 && body.trim().length > 0 ? `${formId}-title-required` : undefined}
         placeholder={t('inbox.create.placeholder')}
         value={title}
         onChange={(e) => setTitleAndPersist(e.target.value)}
@@ -331,7 +332,7 @@ export function CreateCardForm({ onCreate, ready = true }: CreateCardFormProps) 
 
       <div className="ccf__actions">
         {title.trim().length === 0 && body.trim().length > 0 && (
-          <span className="ccf__hint" role="status">{t('capture.titleRequired')}</span>
+          <span className="ccf__hint" id={`${formId}-title-required`} role="status">{t('capture.titleRequired')}</span>
         )}
         <Button type="submit" disabled={!canSubmit}>
           {submitting ? t('card.detail.saving') : t('inbox.create.submit')}

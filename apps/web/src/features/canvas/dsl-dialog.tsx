@@ -234,6 +234,16 @@ export function DslDialog({
     setText((current) => replaceOrAppendCardRelation(current, target.id, anchor.id, direction))
   }
 
+  // 与「载入最新画布」同源的文本。只在文本仍等于当前画布时判无变化:
+  // 纯内容编辑(@title/@content)几何 diff 为零但文本不同,不能被误拦。
+  const serializeCurrent = () => {
+    if (!host) return ''
+    return serializeCanvasReadable(host.getElements(), (id) => {
+      const c = service.get(id as CardId)
+      return c ? { title: c.title, content: c.body, type: c.type, tags: c.tags, links: c.links, codeSnippets: c.codeSnippets, quotes: c.quotes } : undefined
+    })
+  }
+
   const apply = () => {
     if (!host) return
     const hostRevisionChanged = !base || revisionOf(host.getElements()) !== base.revision
@@ -251,6 +261,12 @@ export function DslDialog({
       } else {
         pushToast({ kind: 'info', message: t('canvas.dslEmpty') })
       }
+      return
+    }
+
+    // 没改过文本就点「应用」:画布不会变,别报「已应用 N 条」制造假反馈。
+    if (text.trim() === serializeCurrent().trim()) {
+      pushToast({ kind: 'info', message: t('canvas.dslPreviewNoChanges') })
       return
     }
 

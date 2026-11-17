@@ -141,7 +141,7 @@ export default function ShowcasePage() {
         .showcase__node span { font-family: var(--font-mono); font-size: var(--font-size-xs); text-transform: uppercase; }
         .showcase__node strong { font-family: var(--font-display); font-size: var(--font-size-lg); font-weight: 500; }
         .showcase__node--red { left: 12%; top: 31%; background: var(--color-red); color: var(--color-white); }
-        .showcase__node--yellow { left: 42%; top: 15%; background: var(--color-yellow); color: var(--color-black); }
+        .showcase__node--yellow { left: 42%; top: 15%; background: var(--color-yellow-soft); color: var(--color-black); }
         .showcase__node--blue { left: min(68%, calc(100% - 206px)); top: 50%; background: var(--color-blue); color: var(--color-white); }
         .showcase__connector { position: absolute; height: 2px; background: var(--color-black); transform-origin: left center; }
         .showcase__connector--one { width: 250px; left: 29%; top: 42%; transform: rotate(-20deg); }
