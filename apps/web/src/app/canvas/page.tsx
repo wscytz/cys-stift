@@ -1173,7 +1173,9 @@ ${formatted}`
     if (!template) return
     const ops = parseDsl(template.dsl)
     if (ops.length === 0) return
-    const report = applyLayout(adapterLocal, ops, undefined, onCardCreate, onCardUpdate)
+    // 模板通常只有 create/update;仍传 onCardRemove 防未来模板含 delete 时绕过 DB 守卫
+    // (2026-11-17 对抗审查 F9:page 的 applyLayout 是唯一没接删除回调的实际写路径)。
+    const report = applyLayout(adapterLocal, ops, undefined, onCardCreate, onCardUpdate, onCardRemove)
     if (report.applied > 0) {
       pushToast({ kind: 'success', message: t('canvas.template.applied', { name: tplName === 'blank' ? '' : tplName }) })
     } else {
