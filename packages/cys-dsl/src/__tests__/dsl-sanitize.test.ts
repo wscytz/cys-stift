@@ -354,15 +354,24 @@ describe('sanitizeDslOps — 永不抛错契约(非数组入参)', () => {
 
 describe('delete 行存在性检查含卡 id(2026-11-17 跨 kind 修正)', () => {
   it('free delete op 命中卡 id → 不产「将跳过」假诊断(apply 已按 id 走 card-delete)', () => {
-    const op: DslOp = { type: 'free', shape: 'rect', id: 'a', delete: true }
-    const ctx = { existingCardIds: new Set(['a']), existingFreeIds: new Set(), existingFreeKinds: new Map() }
+    // 与 parser 同构:delete 行也带 x/y(见 dsl-parser.ts:645)。
+    const op: DslOp = { type: 'free', shape: 'rect', id: 'a', x: 0, y: 0, delete: true }
+    const ctx = {
+      existingCardIds: new Set(['a']),
+      existingFreeIds: new Set<string>(),
+      existingFreeKinds: new Map<string, 'rect' | 'text' | 'frame'>(),
+    }
     const { diagnostics } = sanitizeDslOps([op], ctx)
     expect(diagnostics).toHaveLength(0)
   })
 
   it('free delete op id 完全不存在 → 保留「将跳过」诊断', () => {
-    const op: DslOp = { type: 'free', shape: 'rect', id: 'ghost', delete: true }
-    const ctx = { existingCardIds: new Set(), existingFreeIds: new Set(), existingFreeKinds: new Map() }
+    const op: DslOp = { type: 'free', shape: 'rect', id: 'ghost', x: 0, y: 0, delete: true }
+    const ctx = {
+      existingCardIds: new Set<string>(),
+      existingFreeIds: new Set<string>(),
+      existingFreeKinds: new Map<string, 'rect' | 'text' | 'frame'>(),
+    }
     const { diagnostics } = sanitizeDslOps([op], ctx)
     expect(diagnostics).toHaveLength(1)
     expect(diagnostics[0]!.message).toMatch(/ghost/)
