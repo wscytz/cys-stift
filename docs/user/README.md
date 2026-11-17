@@ -234,7 +234,7 @@
 
 ## 数据与隐私
 
-- **本地优先**:所有数据在客户端(Web 与桌面均使用 WebView 存储:卡片与媒体在 localStorage,画布 freeform 几何优先 OPFS、不可用时回退 localStorage)
+- **本地优先**:所有数据在客户端(Web 与桌面均使用 WebView 存储:卡片、媒体与对话在 localStorage;画布 freeform 几何、AI proposal 与开发存档优先 OPFS,不可用时回退 localStorage)
 - **无 server**:静态导出应用,没有 API,没有云端
 - **可迁移**:随时 Export JSON;格式版本化,未来 schema 变更有迁移路径
 - **桌面端**(Tauri):与网页版共用 WebView 存储,当前版本不写 Tauri 原生应用数据目录;换机或清理 WebView 数据前请先 Export JSON 备份
