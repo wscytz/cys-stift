@@ -51,7 +51,7 @@
 
 **关系网络** —— 块引用 + 详情建/删关系 + 跨画布 backlinks + 智能关系推荐(本地四信号 + 可选 AI 语义)+ **wikilink `[[标题]]` 自动建 references 箭头**(跨画布 + 模糊匹配 Levenshtein≤2 + 重命名追踪)+ **AI 对话 agent** `/ask`(对话 → cys-dsl 块 → 确认门 before/after 缩略图)。
 
-**AI** —— 多 provider(OpenAI / Anthropic / Ollama 本地;DeepSeek 等兼容端点走 OpenAI provider)+ AI 排版(诚实位移反馈:重排 N 张 / AI 认为已合理 / 未改动)+ AI 伴侣面板(发现 tab 本地预筛 + 对话 tab)+ **DSL 重试闭环**(AI 出坏 DSL 自动重试喂回错误,maxAttempts=3)+ 失败样本采集(可导出调优)。
+**AI** —— 多 provider(OpenAI / Anthropic / Ollama 本地;DeepSeek 等兼容端点走 OpenAI provider)+ AI 排版(诚实位移反馈:重排 N 张 / AI 认为已合理 / 未改动)+ AI 伴侣面板(发现 tab 本地预筛 + 对话 tab)+ **结构化输出重试闭环**(坏 DSL / Intent IR 自动重试喂回错误,maxAttempts=3)+ 失败样本采集(可导出调优)。
 
 **可审计 AI 共编（Labs，默认关闭）** —— 选择卡片并确认发送范围后，本地 graph lint 与 AI 的 Logic / Ideas / Layout 建议按来源逐项审查；接受后仍需生成 ghost preview 再应用。三个 lane 的 accepted subset 合并为同一份不可变计划，使用可恢复事务、CommitReceipt 与 guarded Undo。该实验不改变 cys-dsl 版本，尚未取得外部用户验证，不能视为稳定版承诺。
 
