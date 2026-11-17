@@ -173,7 +173,7 @@ export default function WorkbenchPage() {
         )}
       </div>
 
-      <Modal open={pendingCardId !== null} onClose={() => setPendingCardId(null)} title={t('workbench.unsavedTitle')} closeLabel={t('common.close')}>
+      <Modal open={pendingCardId !== null} onClose={() => setPendingCardId(null)} onEscape={() => setPendingCardId(null)} title={t('workbench.unsavedTitle')} closeLabel={t('common.close')}>
         <p>{t('workbench.unsavedBody')}</p>
         <div className="wb-page__confirm-actions">
           <Button variant="ghost" onClick={() => setPendingCardId(null)}>{t('common.cancel')}</Button>

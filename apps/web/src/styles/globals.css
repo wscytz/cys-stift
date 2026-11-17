@@ -76,6 +76,9 @@ html[data-vt-nav] body > main { animation: none; }
 body > main {
   animation: page-enter var(--duration-page) var(--ease-editorial);
 }
+/* 路由切换后 RouteFocus 会把焦点移到 #main(供读屏播报)。整页容器不需要
+   Chrome 默认的蓝色 focus 边框;键盘用户的可视落点由目标页自身元素承担。 */
+main:focus { outline: none; }
 @keyframes page-enter {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }

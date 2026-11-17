@@ -355,6 +355,10 @@ export function AISettingsPanel() {
             </div>
           )}
 
+          {editingId !== null && !isActive && (!tested || dirty) && (
+            <p className="aip__hint">{t('settings.aiSetActiveHint')}</p>
+          )}
+
           <div className="aip__actions">
             <button type="button" className="aip__btn" onClick={onTest} disabled={!canTest || testing || dirty || !editingId}>{testing ? t('settings.aiTesting') : t('settings.aiTest')}</button>
             <button type="button" className="aip__btn" onClick={onDelete} disabled={editingId === null}>{t('settings.aiDeleteProfile')}</button>

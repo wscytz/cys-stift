@@ -132,9 +132,11 @@ export function DslDialog({
   const [base, setBase] = useState<{ elements: CanvasElement[]; revision: string } | null>(null)
   const [revisionTick, setRevisionTick] = useState(0)
   const [stale, setStale] = useState(false)
-  // R14:未应用编辑的关闭确认。dirty = 文本自上次 apply 后改过(含新增未应用行)。
+  // R14:未应用编辑的关闭确认。dirty = 当前文本与打开/载入时基线不同
+  // (基线比较天然覆盖快速示例、关系生成等非 textarea 编辑入口)。
   const [confirmClose, setConfirmClose] = useState(false)
-  const dirtyRef = useRef(false)
+  const baselineTextRef = useRef('')
+  const isDirty = text.trim() !== baselineTextRef.current.trim()
 
   // 实时预览:用户输入时即重新 parse,给出"待应用 N 条 / M 行无效"计数,
   // 不必等点 Apply。只在有可说之事时渲染(ok 或 warn),其余不渲染。
@@ -187,7 +189,7 @@ export function DslDialog({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  }, [open, onClose, isDirty])
 
   // 打开时填充当前画布文本(v6:serializeCanvasReadable + CardService resolve,card 含 @title/@content)。
   // 同时清空诊断列表:刚序列化的文本恒为合法,无 parse 错误。
@@ -196,7 +198,9 @@ export function DslDialog({
     if (!open || !host) return
     const els = cloneElements(host.getElements())
     setBase({ elements: els, revision: revisionOf(els) })
-    setText(initialText ?? serializeCanvasReadable(els, (id) => { const c = service.get(id as CardId); return c ? { title: c.title, content: c.body, type: c.type, tags: c.tags, links: c.links, codeSnippets: c.codeSnippets, quotes: c.quotes } : undefined }))
+    const next = initialText ?? serializeCanvasReadable(els, (id) => { const c = service.get(id as CardId); return c ? { title: c.title, content: c.body, type: c.type, tags: c.tags, links: c.links, codeSnippets: c.codeSnippets, quotes: c.quotes } : undefined })
+    setText(next)
+    baselineTextRef.current = next
     setAppliedHashes(new Set())
     setStale(false)
   }, [open, host, service, initialText])
@@ -223,7 +227,9 @@ export function DslDialog({
     if (!host) return
     const elements = cloneElements(host.getElements())
     setBase({ elements, revision: revisionOf(elements) })
-    setText(serializeCanvasReadable(elements, (id) => { const c = service.get(id as CardId); return c ? { title: c.title, content: c.body, type: c.type, tags: c.tags, links: c.links, codeSnippets: c.codeSnippets, quotes: c.quotes } : undefined }))
+    const next = serializeCanvasReadable(elements, (id) => { const c = service.get(id as CardId); return c ? { title: c.title, content: c.body, type: c.type, tags: c.tags, links: c.links, codeSnippets: c.codeSnippets, quotes: c.quotes } : undefined })
+    setText(next)
+    baselineTextRef.current = next
     setAppliedHashes(new Set())
     setStale(false)
   }
@@ -304,9 +310,10 @@ export function DslDialog({
     } else if (applied > 0) {
       // 全部成功:重序列化同步文本(画布即文本),视为已应用,不再 dirty。
       // 清空 hash —— 文本已与画布一致,旧 op hash 留着无意义(下次 apply 是全新 parse 集合)。
-      setText(serializeCanvasReadable(host.getElements(), (id) => { const c = service.get(id as CardId); return c ? { title: c.title, content: c.body, type: c.type, tags: c.tags, links: c.links, codeSnippets: c.codeSnippets, quotes: c.quotes } : undefined }))
+      const nextText = serializeCanvasReadable(host.getElements(), (id) => { const c = service.get(id as CardId); return c ? { title: c.title, content: c.body, type: c.type, tags: c.tags, links: c.links, codeSnippets: c.codeSnippets, quotes: c.quotes } : undefined })
+      setText(nextText)
+      baselineTextRef.current = nextText
       setAppliedHashes(new Set())
-      dirtyRef.current = false
       pushToast({ kind: 'success', message: t('canvas.dslApplied', { n: String(applied) }) })
     } else {
       pushToast({ kind: 'error', message: t('agent.applyFailed') })
@@ -371,9 +378,19 @@ export function DslDialog({
 
   // R14:有未应用编辑时关闭先确认(此前手写 10 分钟点 backdrop/Esc 全丢)。
   const requestClose = () => {
-    if (dirtyRef.current) setConfirmClose(true)
+    if (isDirty) setConfirmClose(true)
     else onClose()
   }
+
+  // 预览每类只列前 8 项,超出部分在列表下方给出计数提示。
+  const previewShown = preview.diff
+    ? Math.min(preview.diff.added.length, 8) +
+      Math.min(preview.diff.removed.length, 8) +
+      Math.min(preview.diff.changed.length, 8)
+    : 0
+  const previewHidden = preview.diff
+    ? preview.diff.added.length + preview.diff.removed.length + preview.diff.changed.length - previewShown
+    : 0
 
   return (
     <Modal open={open} onClose={requestClose} title={t('canvas.dslTitle')} closeLabel={t('common.close')}>
@@ -432,7 +449,6 @@ export function DslDialog({
         value={text}
         onChange={(e) => {
           setText(e.target.value)
-          dirtyRef.current = true // R14:标记有未应用编辑
         }}
         spellCheck={false}
         aria-label={t('canvas.dslTitle')}
@@ -461,10 +477,15 @@ export function DslDialog({
               <li key={`changed-${change.id}`} className="dsl-preview__changed">~ {change.after.kind} #{change.id} · {change.fields.join(', ')}</li>
             ))}
           </ul>
+          {previewHidden > 0 && (
+            <p className="dsl-preview__more">{t('canvas.dslPreviewMore', { n: String(previewHidden) })}</p>
+          )}
         </div>
       )}
       {text.trim() !== '' && preview.opCount > 0 && preview.diff && preview.diff.added.length + preview.diff.removed.length + preview.diff.changed.length === 0 && (
-        <p className="dsl-preview dsl-preview--ok">{t('canvas.dslPreviewNoChanges')}</p>
+        <p className="dsl-preview dsl-preview--ok">
+          {t(isDirty ? 'canvas.dslPreviewContentOnly' : 'canvas.dslPreviewNoChanges')}
+        </p>
       )}
       {text.trim() !== '' && preview.errCount > 0 && (
         <p className="dsl-preview dsl-preview--warn">
@@ -533,7 +554,7 @@ export function DslDialog({
           <p className="dsl-confirm">{t('canvas.dslDiscardBody')}</p>
           <div className="dsl-confirm__actions">
             <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
-            <Button variant="danger" onClick={() => { setConfirmClose(false); dirtyRef.current = false; onClose() }}>
+            <Button variant="danger" onClick={() => { setConfirmClose(false); onClose() }}>
               {t('canvas.dslDiscardAction')}
             </Button>
           </div>
@@ -586,6 +607,8 @@ const styles = `
 .dsl-preview__added { color: var(--color-blue); }
 .dsl-preview__removed { color: var(--color-red); }
 .dsl-preview__changed { color: var(--color-black-soft); }
+/* 隐藏项计数:与列表同层,弱化呈现。选择器带上 .dsl-preview 以压过上方 .dsl-preview p 的 margin:0。 */
+.dsl-preview .dsl-preview__more { margin: var(--space-1) 0 0; color: var(--color-gray); }
 .dsl-preview--ok { color: var(--color-gray); }
 .dsl-preview--warn { color: var(--color-red); }
 .dsl-preview--stale { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }

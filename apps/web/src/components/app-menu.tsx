@@ -268,7 +268,7 @@ export function AppMenu() {
   return (
     <nav
       className={`app-menu${pinned ? ' app-menu--pinned' : ' app-menu--rail'}${suppressHover ? ' app-menu--no-hover' : ''}`}
-      aria-label="Primary"
+      aria-label={t('app.primaryNav')}
       onMouseLeave={() => setSuppressHover(false)}
     >
       <div className="app-menu__head">
@@ -283,7 +283,7 @@ export function AppMenu() {
             {open ? '✕' : '☰'}
           </button>
         )}
-        <Link href="/" className="app-menu__brand">
+        <Link href="/" className="app-menu__brand" aria-label={t('brand.name')}>
           {/* 品牌记号(收起轨里单独可见):墨斜杠 + 红点 */}
           <svg className="app-menu__mark" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <line x1="6" y1="18" x2="18" y2="6" stroke="var(--color-on-surface)" strokeWidth="2" />
@@ -291,12 +291,13 @@ export function AppMenu() {
           </svg>
           <span className="app-menu__brand-name">{t('brand.name')}</span>
         </Link>
-        <span className="app-menu__version" aria-label="app version">v{VERSION}</span>
+        <span className="app-menu__version" aria-label={t('app.version')}>v{VERSION}</span>
         <button
           type="button"
           className="app-menu__pin"
           aria-pressed={pinned}
-          title={pinned ? '⇤ 收起侧栏' : '⇥ 钉住展开'}
+          title={pinned ? t('app.pinCollapse') : t('app.pinExpand')}
+          aria-label={pinned ? t('app.pinCollapse') : t('app.pinExpand')}
           onClick={togglePinned}
         >
           {pinned ? '«' : '»'}
@@ -313,6 +314,7 @@ export function AppMenu() {
                 key={e.key}
                 href={e.href}
                 className={`app-menu__link ${activeKey === e.key ? 'app-menu__link--active' : ''}`}
+                aria-label={t(e.key)}
                 onClick={() => setOpen(false)}
               >
                 <span className="app-menu__icon"><NavIcon id={iconFor(e.href)} /></span>

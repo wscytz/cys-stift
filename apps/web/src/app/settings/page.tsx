@@ -284,7 +284,9 @@ export default function SettingsPage() {
                       ? t('settings.importCheckpointClearFailed')
                       : t('settings.importCheckpointRestored')
                     : resultAction === 'clear'
-                      ? t('settings.clearWorkspaceOk')
+                      ? importResult.checkpointSkipped
+                        ? t('settings.clearWorkspaceOkNoCheckpoint')
+                        : t('settings.clearWorkspaceOk')
                     : importResult.checkpointSkipped
                       ? t('settings.importOkNoCheckpoint', {
                           cards: importResult.cards,

@@ -19,7 +19,6 @@ import { DEFAULT_CANVAS_NAME, useCanvases } from '@/lib/canvas-store'
 import { workbenchStore } from '@/lib/workbench-store'
 import { settingsStore } from '@/lib/settings-store'
 import { formatCaptureCombo } from '@/lib/capture-shortcut'
-import { StatusDot } from '@cys-stift/ui/status-dot'
 
 // SSR 渲染 useEffect(不跑)/ 客户端 useLayoutEffect(paint 前跑)的标准同构钩子。
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
@@ -70,7 +69,9 @@ export default function HomePage() {
     return () => clearTimeout(t)
   }, [])
   const activeCanvas = canvasSnapshot.canvases.find((canvas) => canvas.id === canvasSnapshot.activeCanvasId)
-  const activeCount = ready ? service.listOnCanvas(canvasSnapshot.activeCanvasId).length : 0
+  const activeCount = ready
+    ? service.listOnCanvas(canvasSnapshot.activeCanvasId).filter((c) => !c.archived && !c.deletedAt).length
+    : 0
   const recentCards = useMemo(() => {
     if (!ready) return []
     return service.listAll()
@@ -90,7 +91,6 @@ export default function HomePage() {
             {t('brand.name')} <span className="home__crumb-sep" aria-hidden="true">/</span> {t('home.topbar.index')}
           </span>
           <span className="home__sync">
-            <StatusDot pulse />
             {t('home.topbar.sync')}
           </span>
         </div>

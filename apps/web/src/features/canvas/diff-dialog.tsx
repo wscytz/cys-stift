@@ -7,20 +7,41 @@
  */
 import { useEffect, useMemo } from 'react'
 import { Modal } from '@cys-stift/ui'
-import type { CanvasHost } from '@cys-stift/canvas-engine'
+import type { CardId, CardService } from '@cys-stift/domain'
+import type { CanvasElement, CanvasHost } from '@cys-stift/canvas-engine'
 import { useI18n } from '@/lib/i18n'
+import type { MessageKey } from '@/lib/i18n/messages'
 import { diffCanvasSnapshots } from './canvas-diff'
 
 export function DiffDialog({
   open,
   onClose,
   host,
+  service,
 }: {
   open: boolean
   onClose: () => void
   host: CanvasHost | null
+  /** 可选:card 元素用它解析真实标题(缺省回退到元素类型标签)。 */
+  service?: CardService
 }) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
+
+  // 元素标签:card 用真实卡标题,其余用元素类型的人话名(不再显示裸 id)。
+  const elementLabel = (element: CanvasElement): string => {
+    if (element.kind === 'card') {
+      const title = service?.get(element.id as CardId)?.title
+      return t('canvas.diffElementCard', { title: title || t('card.untitled') })
+    }
+    return t(`canvas.kind.${element.kind}` as MessageKey)
+  }
+
+  // 字段名映射;未知字段回退原字段名。
+  const fieldLabel = (field: string): string => {
+    const key = `canvas.diffField.${field}` as MessageKey
+    const label = t(key)
+    return label === key ? field : label
+  }
 
   useEffect(() => {
     if (!open) return
@@ -54,13 +75,20 @@ export function DiffDialog({
       ) : (
         <div className="diff-list">
           {diff.added.length > 0 && (
-            <DiffGroup kind="added" title={t('canvas.diffAdded')} items={diff.added.map((e) => e.id)} />
+            <DiffGroup kind="added" title={t('canvas.diffAdded')} items={diff.added.map((e) => elementLabel(e))} />
           )}
           {diff.removed.length > 0 && (
-            <DiffGroup kind="removed" title={t('canvas.diffRemoved')} items={diff.removed.map((e) => e.id)} />
+            <DiffGroup kind="removed" title={t('canvas.diffRemoved')} items={diff.removed.map((e) => elementLabel(e))} />
           )}
           {diff.changed.length > 0 && (
-            <DiffGroup kind="changed" title={t('canvas.diffChanged')} items={diff.changed.map((c) => `${c.id} (${c.fields.join(', ')})`)} />
+            <DiffGroup
+              kind="changed"
+              title={t('canvas.diffChanged')}
+              items={diff.changed.map(
+                (c) =>
+                  `${elementLabel(c.after)} (${c.fields.map((field) => fieldLabel(field)).join(locale === 'en' ? ', ' : '、')})`,
+              )}
+            />
           )}
         </div>
       )}

@@ -50,6 +50,18 @@ export function AIPopover({
   const [truncated, setTruncated] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
+  // 标题展示可读动作名,而不是内部枚举值(summarize / improveWriting / …)。
+  const actionLabel =
+    action === 'summarize'
+      ? t('ai.menu.summarize')
+      : action === 'improveWriting'
+        ? t('ai.menu.rewrite')
+        : action === 'translate'
+          ? targetLang === 'en'
+            ? t('ai.menu.translateEn')
+            : t('ai.menu.translateZh')
+          : t('ai.menu.editInstruction')
+
   useEffect(() => {
     const ai = getCurrentAI()
     if (!ai) {
@@ -87,7 +99,7 @@ export function AIPopover({
   return (
     <div className="ai-popover" id="ai-popover" role="dialog" aria-label={t('ai.suggestion')}>
       <div className="ai-popover__hd">
-        <span className="ai-popover__title"><span className="ai-popover__mark" aria-hidden="true">»</span> {action}</span>
+        <span className="ai-popover__title"><span className="ai-popover__mark" aria-hidden="true">»</span> {actionLabel}</span>
         {running && (
           <span className="ai-popover__dot" aria-label={t('ai.streaming')}>
             ●

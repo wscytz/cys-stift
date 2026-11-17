@@ -29,8 +29,10 @@ vi.mock('@/lib/toast-store', () => ({
 // ── mock @cys-stift/ui: Modal 透传 children(让 textarea/button 可 query);
 //    Button 走原生 button(可 click)。──
 vi.mock('@cys-stift/ui', () => ({
-  Modal: ({ children, open }: { children?: React.ReactNode; open: boolean }) =>
-    open ? React.createElement('div', null, children) : null,
+  Modal: ({ children, open, title }: { children?: React.ReactNode; open: boolean; title?: string }) =>
+    open
+      ? React.createElement('div', null, title ? React.createElement('p', null, title) : null, children)
+      : null,
   Button: ({
     children,
     onClick,
@@ -415,6 +417,53 @@ describe('DslDialog — T5 archive trigger (dsl-apply)', () => {
     changeTextarea(domHost, '[unknown #x] @pos(0,0)')
     expect(domHost.querySelector('.dsl-errors__line')?.textContent).toBe('canvas.dslErrorLine')
     expect(archiveAppendSpy).not.toHaveBeenCalled()
+    unmount()
+  })
+
+  it('treats quick-example edits as dirty and confirms before closing', () => {
+    const host = new InMemoryCanvasHost()
+    const onClose = vi.fn()
+    const { host: domHost, unmount } = mount(
+      <DslDialog open={true} onClose={onClose} host={host as unknown as CanvasHost} service={makeService()} canvasName="cv" />,
+    )
+
+    // 快速示例按钮不是 textarea 编辑入口;基线比较也应把文本变化视为 dirty。
+    const example = [...domHost.querySelectorAll('button')].find(
+      (button) => button.textContent === 'canvas.dslExample.starter',
+    ) as HTMLButtonElement
+    expect(example).toBeTruthy()
+    act(() => example.click())
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    })
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(domHost.textContent).toContain('canvas.dslDiscardTitle')
+    unmount()
+  })
+
+  it('reports content-only title edits as content changes, not "no changes"', () => {
+    const host = new InMemoryCanvasHost()
+    host.applyWithoutEcho(() => {
+      host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 80, rotation: 0 })
+    })
+    const { host: domHost, unmount } = mount(
+      <DslDialog
+        open={true}
+        onClose={() => {}}
+        host={host as unknown as CanvasHost}
+        service={makeService({ a: 'Old' })}
+        canvasName="cv"
+      />,
+    )
+
+    const textarea = domHost.querySelector('textarea') as HTMLTextAreaElement
+    expect(textarea.value).toContain('@title("Old")')
+    changeTextarea(domHost, textarea.value.replace('@title("Old")', '@title("New")'))
+
+    expect(domHost.textContent).toContain('canvas.dslPreviewContentOnly')
+    expect(domHost.textContent).not.toContain('canvas.dslPreviewNoChanges')
     unmount()
   })
 

@@ -537,6 +537,15 @@ export default function InboxPage() {
             // currently active in canvasStore (multi-canvas). Falls
             // back to DEFAULT_CANVAS_ID if the store hasn't hydrated
             // yet (first render / SSR).
+            // 归档卡也能「移到画布」:先解归档,失败(配额)则中止并提示,
+            // 避免把已归档卡塞回活跃画布却仍带 archived 标记。
+            if (effectiveDetail.archived) {
+              service.unarchive(effectiveDetail.id)
+              if (service.get(effectiveDetail.id)?.archived) {
+                pushToast({ kind: 'info', message: t('storage.quotaExceeded') })
+                return
+              }
+            }
             const targetCanvasId = canvasesSnap.activeCanvasId ?? DEFAULT_CANVAS_ID
             const existing = service.listOnCanvas(targetCanvasId)
             const nextZ = nextCanvasZ(existing)
@@ -552,6 +561,13 @@ export default function InboxPage() {
               pushToast({ kind: 'info', message: t('storage.quotaExceeded') })
               return
             }
+            const targetCanvas = canvasesSnap.canvases.find((canvas) => canvas.id === targetCanvasId)
+            const targetCanvasName = targetCanvas
+              ? targetCanvas.name === DEFAULT_CANVAS_NAME
+                ? t('canvas.defaultName')
+                : targetCanvas.name
+              : t('nav.canvas')
+            pushToast({ kind: 'success', message: t('card.sendToCanvasOk', { canvas: targetCanvasName }) })
             const updated = service.get(effectiveDetail.id)
             if (updated) setDetail(updated)
           }}
@@ -630,7 +646,7 @@ const styles = `
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: var(--space-3) var(--space-4);
 }
 

@@ -336,13 +336,14 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
       : null
   if (proposalErrors) {
     return (
-      <Modal open onClose={props.onRejected} title={t('agent.parseError')} closeLabel={t('common.close')}>
+      <Modal open onClose={props.onRejected} onEscape={props.onRejected} title={t('agent.parseError')} closeLabel={t('common.close')}>
         <ul className="ac__errors">
           {proposalErrors.slice(0, 5).map((e, index) => (<li key={`${e.line}-${index}`}>{e.line > 0 ? `L${e.line}: ` : ''}{e.text || e.message}</li>))}
         </ul>
+        <p className="ac__subtitle">{t('agent.parseErrorRetryHint')}</p>
         <div className="ac__actions">
           <Button variant="ghost" onClick={() => setEditing((v) => !v)}>{t('agent.edit')}</Button>
-          <Button variant="ghost" onClick={() => { recordReject(); props.onRejected() }}>{t('agent.retry')}</Button>
+          <Button variant="ghost" onClick={() => { recordReject(); props.onRejected() }}>{t('common.close')}</Button>
         </div>
         {editing && (
           <textarea className="ac__edit" value={editedDsl} onChange={(e) => setEditedDsl(e.target.value)} rows={Math.min(8, editedDsl.split('\n').length)} />
@@ -360,7 +361,7 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
   }
 
   return (
-    <Modal open onClose={props.onRejected} title={title} closeLabel={t('common.close')}>
+    <Modal open onClose={props.onRejected} onEscape={props.onRejected} title={title} closeLabel={t('common.close')}>
       <div className="ac">
         <p className="ac__subtitle">{t('ai.confirm.subtitle')}</p>
 

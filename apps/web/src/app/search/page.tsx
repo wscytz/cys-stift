@@ -7,7 +7,7 @@ import { PageHeader } from '@/features/page-header'
 import type { Card, CardId, SearchResult } from '@cys-stift/domain'
 import { searchCards } from '@cys-stift/domain'
 import { useDb } from '@/lib/db-client'
-import { useCanvases } from '@/lib/canvas-store'
+import { DEFAULT_CANVAS_NAME, useCanvases } from '@/lib/canvas-store'
 import { useI18n } from '@/lib/i18n'
 import { pushToast } from '@/lib/toast-store'
 import { DEFAULT_CANVAS_ID } from '@/features/canvas/default-canvas'
@@ -212,6 +212,14 @@ export default function SearchPage() {
             setDetail(null)
           }}
           onSendToCanvas={() => {
+            // 归档卡也能「移到画布」:先解归档,失败(配额)则中止并提示。
+            if (effectiveDetail.card.archived) {
+              service.unarchive(effectiveDetail.card.id)
+              if (service.get(effectiveDetail.card.id)?.archived) {
+                pushToast({ kind: 'error', message: t('storage.quotaExceeded') })
+                return
+              }
+            }
             const targetCanvasId = canvasesSnap.activeCanvasId ?? DEFAULT_CANVAS_ID
             const existing = service.listOnCanvas(targetCanvasId)
             const nextZ = existing.length === 0
@@ -229,6 +237,13 @@ export default function SearchPage() {
               pushToast({ kind: 'error', message: t('storage.quotaExceeded') })
               return
             }
+            const targetCanvas = canvasesSnap.canvases.find((canvas) => canvas.id === targetCanvasId)
+            const targetCanvasName = targetCanvas
+              ? targetCanvas.name === DEFAULT_CANVAS_NAME
+                ? t('canvas.defaultName')
+                : targetCanvas.name
+              : t('nav.canvas')
+            pushToast({ kind: 'success', message: t('card.sendToCanvasOk', { canvas: targetCanvasName }) })
             setDetail(null)
           }}
           onConfirmDelete={() => {
@@ -309,7 +324,7 @@ const styles = `
 .grid {
   list-style: none; margin: 0; padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: var(--space-3) var(--space-4);
 }
 `

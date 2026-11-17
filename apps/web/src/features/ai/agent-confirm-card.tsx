@@ -29,6 +29,7 @@ import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
 import { buildCanvasHostForCanvas, applyOpsAndPersist, type PersistResult } from '@/features/canvas/canvas-host-builder'
 import { v8ToDomainFields, sameTagValues, sameLinkUrls } from '@/features/canvas/v8-fields'
 import { useI18n } from '@/lib/i18n'
+import { canvasStore, DEFAULT_CANVAS_NAME } from '@/lib/canvas-store'
 import { pushToast } from '@/lib/toast-store'
 import { addSample, genSampleId } from './sample-store'
 import { Thumb, DiffGroup, summarizeEl, confirmStyles, AgentContentDiff, type ContentChange } from './canvas-thumb'
@@ -323,6 +324,11 @@ function structuredSummaryNewCard(op: DslOp & { type: 'card' }): ContentChange['
 
 export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApplied, onRejected, onRegenerateDsl, sampleContext }: Props) {
   const { t } = useI18n()
+  // 标题里显示画布名;种子画布的英文旧名映射成本地化文案,未知 id 也回退到默认名。
+  const targetCanvasName = (() => {
+    const name = canvasStore.get().canvases.find((c) => c.id === targetCanvasId)?.name
+    return !name || name === DEFAULT_CANVAS_NAME ? t('canvas.defaultName') : name
+  })()
   const [phase, setPhase] = useState<Phase>('confirming')
   const [editing, setEditing] = useState(false)
   const [editedDsl, setEditedDsl] = useState(dsl)
@@ -663,13 +669,17 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
   const hasGeometryChange = totalChanges > 0
   const hasContentChange = contentChanges.length > 0
   const hasAnyChange = hasGeometryChange || hasContentChange
+  // removed 里 kind=card 实际是 removeFromCanvas(移出画布,卡仍在收件箱),
+  // 与真正删除区分文案;非 card 元素保持「删除」。
+  const removedCards = diff ? diff.removed.filter((e) => e.kind === 'card') : []
+  const removedOthers = diff ? diff.removed.filter((e) => e.kind !== 'card') : []
 
   return (
     <div className="ac">
       <p className="ac__title">
         {phase === 'applied'
           ? t('agent.appliedTitle')
-          : t('agent.proposeTitle', { canvas: canvasName(targetCanvasId) })}
+          : t('agent.proposeTitle', { canvas: targetCanvasName })}
       </p>
 
       {diff && !hasAnyChange && (
@@ -683,9 +693,16 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
             <DiffGroup color="blue" label={t('agent.added', { n: String(diff.added.length) })}
               items={diff.added.map((e) => summarizeEl(e))} />
           )}
-          {diff.removed.length > 0 && (
-            <DiffGroup color="red" label={t('agent.removed', { n: String(diff.removed.length) })}
-              items={diff.removed.map((e) => summarizeEl(e))} />
+          {removedCards.length > 0 && (
+            <>
+              <DiffGroup color="red" label={t('agent.movedOut', { n: String(removedCards.length) })}
+                items={removedCards.map((e) => summarizeEl(e))} />
+              <p className="ac__subtitle">{t('agent.movedOutHint')}</p>
+            </>
+          )}
+          {removedOthers.length > 0 && (
+            <DiffGroup color="red" label={t('agent.removed', { n: String(removedOthers.length) })}
+              items={removedOthers.map((e) => summarizeEl(e))} />
           )}
           {diff.changed.length > 0 && (
             <DiffGroup color="yellow" label={t('agent.changed', { n: String(diff.changed.length) })}
@@ -737,10 +754,6 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
       <style>{confirmStyles}</style>
     </div>
   )
-}
-
-function canvasName(id: CanvasId): string {
-  return String(id)
 }
 
 /** Strip nested operation metadata before embedding a state as one side of a

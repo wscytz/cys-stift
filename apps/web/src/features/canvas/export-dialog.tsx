@@ -200,6 +200,7 @@ export function ExportDialog({
             },
           ]}
         />
+        {selectionDisabled && <p className="exp-hint">{t('canvas.exportSelectionHint')}</p>}
       </Field>
 
       {/* Scale (raster only) */}
@@ -314,7 +315,9 @@ function Segmented<T extends string>({
 const styles = `
 .exp-lede { margin: 0 0 var(--space-3); font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-black-soft); line-height: 1.5; }
 .exp-field { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-2); }
-.exp-field__control { display: flex; align-items: center; }
+.exp-field__control { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+/* 「仅选中」禁用时的解释文案:跟在 Segmented 下方换行,占满控件宽。 */
+.exp-hint { flex-basis: 100%; margin: var(--space-1) 0 0; font-family: var(--font-body); font-size: var(--font-size-xs); color: var(--color-gray); }
 .exp-number {
   width: 88px; height: 32px; padding: 0 var(--space-2);
   background: var(--color-white); color: var(--color-black);

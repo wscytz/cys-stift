@@ -1673,7 +1673,7 @@ ${formatted}`
 
       <ShortcutHelpDialog open={shortcutOpen} onClose={() => setShortcutOpen(false)} />
 
-      <DiffDialog open={diffOpen} onClose={() => setDiffOpen(false)} host={adapter} />
+      <DiffDialog open={diffOpen} onClose={() => setDiffOpen(false)} host={adapter} service={service} />
 
       <CanvasOverviewModal
         open={overviewOpen}
@@ -1996,7 +1996,7 @@ function CanvasSideRail({
         items={[
           { id: 'layout', label: t('canvas.aiLayout'), disabled: aiBusy !== null, onSelect: onAILayout },
           { id: 'cluster', label: t('ai.workflow.cluster'), disabled: aiBusy !== null, onSelect: onAICluster },
-          { id: 'relate', label: t('ai.workflow.relate'), disabled: aiBusy !== null || !showAutoRelate, onSelect: onAutoRelate },
+          { id: 'relate', label: !showAutoRelate ? t('ai.workflow.relateNeedsTwo') : t('ai.workflow.relate'), disabled: aiBusy !== null || !showAutoRelate, onSelect: onAutoRelate },
           { id: 'outline', label: t('ai.workflow.outline'), disabled: aiBusy !== null, onSelect: onAIOutline },
           ...(proposalCoauthorEnabled ? [{ id: 'structure-audit', label: t('canvas.audit.launch'), disabled: aiBusy !== null || !adapterReady, onSelect: onStructureAudit }] : []),
           { id: 'companion', label: t('canvas.companion'), onSelect: onCompanion },

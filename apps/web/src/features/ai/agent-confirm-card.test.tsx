@@ -914,9 +914,9 @@ describe('AgentConfirmCard — Fix 4 appliedTitle 仍用(不破 /ask + companion
     )
     await act(async () => { await flushMicro() })
 
-    // apply 前:标题是 proposeTitle(含 canvas 名)
+    // apply 前:标题是 proposeTitle(含解析后的画布名;测试环境无 'cv' 画布 → 回退默认名)
     const titleBefore = dom.querySelector('.ac__title')
-    expect(titleBefore?.textContent).toMatch(/cv/) // proposeTitle {canvas: 'cv'}
+    expect(titleBefore?.textContent).toMatch(/我的画布/) // proposeTitle {canvas: canvas.defaultName}
 
     const applyBtn = byText(dom, /^应用$|^Apply$/)!
     expect(applyBtn.disabled).toBe(false)
