@@ -108,7 +108,7 @@
 [arrow #<id>] from #<a> to #<b> @label("<标签>") @color(<c>) @dash(solid|dashed|dotted) @arrowhead(arrow|triangle|none)
 ```
 
-**freedraw 不在 DSL**:手绘由程序的 R2 存储 + canvas-engine 渲染负责;`serializeCanvas` 不输出 freedraw,`[freedraw #id]` 输入会报 `unrecognized directive`。AI 的单向画布快照仍可看到本地计算的 shape 描述符,但不是 DSL 往返的一部分。
+**freedraw 不在 DSL**:手绘由程序的本地存储 + canvas-engine 渲染负责;`serializeCanvas` 不输出 freedraw,`[freedraw #id]` 输入会报 `unrecognized directive`。AI 的单向画布快照仍可看到本地计算的 shape 描述符,但不是 DSL 往返的一部分。
 
 **内容转义**:`@title/@content/@text/@label/@code/@quote` 使用引号字符串;`\"` 表示引号、`\\` 表示反斜杠、`\n` 表示换行、反引号前加 `\` 表示字面反引号(v8:防代码里的三反引号提前闭合 AI 的 markdown 围栏)。`@title` 最长 200 字符,`@content`/`@code` 代码体/`@quote` 引文最长 8000 字符。
 
@@ -174,7 +174,7 @@
 
 - **卡片默认更新既有 id**:普通 `[card #id]` 可改几何/颜色和 `@title/@content`;纯内容/属性编辑可省 `@pos` 并保持原几何。`@title("")`/`@content("")` 显式清空,省略 token 则保持不变。显式 `[card #id create]` 可创建带内容的新卡;先持久化成功再写入 host,ID 冲突/配额失败会报告且不留 ghost card。
 - **关系箭头端点必须存在**:`from`/`to` 指向不存在的卡 → 那条 op 跳过(不崩,诊断会报)。
-- **freedraw 已出 DSL**:手绘由程序(R2 + canvas-engine)存储/渲染;DSL 不输出位置或点序列,也不创建/修改手绘。AI 单向 snapshot 可附本地计算的 shape 标签/标量特征,但永不带笔迹点。
+- **freedraw 已出 DSL**:手绘由程序(本地存储 + canvas-engine)存储/渲染;DSL 不输出位置或点序列,也不创建/修改手绘。AI 单向 snapshot 可附本地计算的 shape 标签/标量特征,但永不带笔迹点。
 - **颜色固定 6+1**:越界色回退默认,不静默变黑。
 - **vision 当前未接入**:默认只保留 `kind`(image/pdf)元数据,二进制永不外发。Settings 的 Labs 区会明确显示没有可开启的 Vision consumer;详见 [`privacy.md`](privacy.md)。
 
@@ -197,7 +197,7 @@
 | v9 `right-of/below @组名`(组级相对锚) | 输入型布局语法:以该组已解成员的包围盒为锚(`right-of` 贴右缘/`below` 贴下缘);`@gap(n)` 控组间距;组名支持中文或 `@"带 空格"` 形式;序列化仍回绝对坐标,不回写关系式 |
 | v10 `[kind #id delete]`(显式删除) | card/arrow/rect/text/frame 五种 kind;行内只认 id,其它字段被剥除并产 warning;目标不存在时产诊断并跳过;省略该行 ≠ 删除 |
 | 正文内 `[[wikilink]]`、media 二进制 | 不属于 DSL;仍由程序/CardService/导出数据管理(卡片间的**显式**引用可走 `@href`;结构化 code/quote/links 走 v8 对应指令) |
-| freedraw | **不属于 DSL**;位置/点序列均不进文本,由程序 R2 + 渲染管理 |
+| freedraw | **不属于 DSL**;位置/点序列均不进文本,由程序本地存储 + 渲染管理 |
 
 ---
 
