@@ -12,6 +12,7 @@ export class InMemoryCanvasHost implements CanvasHost {
   private elements = new Map<string, CanvasElement>()
   private view: CanvasView = { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }
   private listeners = new Set<(c: UserChange) => void>()
+  private elementListeners = new Set<() => void>()
   private selectionListeners = new Set<(ids: string[]) => void>()
   private viewListeners = new Set<(v: CanvasView) => void>()
   private historyListeners = new Set<(change: CanvasHistoryChange) => void>()
@@ -69,6 +70,7 @@ export class InMemoryCanvasHost implements CanvasHost {
     }
     this.elements.set(el.id, el)
     if (this.echoing) this.emit({ updated: [el], removed: [] })
+    this.emitElements()
   }
 
   remove(id: string): void {
@@ -92,7 +94,17 @@ export class InMemoryCanvasHost implements CanvasHost {
         removed.push(eid)
       }
     }
+    // 与 SelfBuiltAdapter 同契约:被删元素与级联箭头退出选中集,避免死 id
+    // 经 getSelectedIds 泄漏(2026-11-17 对抗审查 F6:两个实现行为分叉)。
+    const gone = new Set(removed)
+    const filtered = [...this.selectedIds].filter((sid) => !gone.has(sid))
+    if (filtered.length !== this.selectedIds.size) {
+      this.selectedIds = new Set(filtered)
+      const snapshot = [...this.selectedIds]
+      for (const l of this.selectionListeners) l(snapshot)
+    }
     if (this.echoing) this.emit({ updated: [], removed })
+    this.emitElements()
   }
 
   /** 测试用最小 undo:恢复栈顶快照,清 redo,广播 onHistoryChange。 */
@@ -207,6 +219,16 @@ export class InMemoryCanvasHost implements CanvasHost {
     }
   }
 
+  /** 元素模型任何变化(含 applyWithoutEcho 静默写入/undo restore),与
+   *  SelfBuiltAdapter 同契约(2026-11-17 对抗审查:freeform 绑定依赖它感知
+   *  coauthor syncHost 的静默改动)。 */
+  onElementsChange(cb: () => void): () => void {
+    this.elementListeners.add(cb)
+    return () => {
+      this.elementListeners.delete(cb)
+    }
+  }
+
   getView(): CanvasView {
     return { ...this.view }
   }
@@ -231,5 +253,9 @@ export class InMemoryCanvasHost implements CanvasHost {
 
   private emit(c: UserChange): void {
     for (const l of this.listeners) l(c)
+  }
+
+  private emitElements(): void {
+    for (const l of this.elementListeners) l()
   }
 }

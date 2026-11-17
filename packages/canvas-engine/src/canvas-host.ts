@@ -166,6 +166,11 @@ export interface CanvasHost {
   applyWithoutEcho(fn: () => void): void
   /** 订阅「用户源」变更(拖拽/绘制/删除)→ 回写 DB + 快照持久化。返回取消订阅。 */
   onUserChange(cb: (c: UserChange) => void): () => void
+  /** 订阅元素模型的任何变化(含 applyWithoutEcho 静默写入、undo restore)。
+   *  可选——需要感知 AI/协作静默改动的持久化绑定使用(SelfBuiltAdapter 提供;
+   *  最小 host 可省略)。2026-11-17 对抗审查:freeform 绑定只听回声会漏掉
+   *  coauthor syncHost 的静默新建/删除,导致删除不落盘、合并复活。 */
+  onElementsChange?(cb: () => void): () => void
   /** 订阅选区变更(setSelectedIds 实际改变时触发)。返回取消订阅。
    *  替代选区轮询(RelationPanel / auto-relate 按钮)。 */
   onSelectionChange(cb: (ids: string[]) => void): () => void

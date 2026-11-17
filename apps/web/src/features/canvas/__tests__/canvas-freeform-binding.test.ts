@@ -21,6 +21,9 @@ function freedrawEl(id: string): CanvasElement {
 function cardEl(id: string): CanvasElement {
   return { id, kind: 'card', x: 0, y: 0, w: 240, h: 120, rotation: 0 }
 }
+function arrowEl(id: string, from = 't1'): CanvasElement {
+  return { id, kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from, to: from }
+}
 
 /** Manually-resolvable fake store for race tests. */
 function makeFakeStore(loadResult: CanvasFreeformSnapshot | null = null) {
@@ -365,32 +368,80 @@ describe('写前合并磁盘快照(2026-11-17 备案缺陷 4)', () => {
   })
 })
 
+describe('静默写入感知(onElementsChange,2026-11-17 对抗审查)', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('coauthor syncHost 静默新建的箭头删除后落盘,不被磁盘残留复活', async () => {
+    const host = new InMemoryCanvasHost()
+    const store = makeFakeStore({ v: 1, app: 'cys-stift', elements: [textEl('t1')] })
+    const unbind = attachCanvasFreeformPersistence(host, CANVAS, { debounceMs: DEBOUNCE, store })
+    await flush() // hydrate t1
+    // coauthor commit:applyWithoutEcho 静默新建箭头(不触发 onUserChange)
+    host.applyWithoutEcho(() => host.batch(() => host.upsert(arrowEl('a1'))))
+    await vi.advanceTimersByTimeAsync(DEBOUNCE + 10)
+    expect(store.saveCalls.at(-1)?.map((element) => element.id)).toEqual(['t1', 'a1'])
+    // 另一路径把含 a1 的快照落盘(模拟磁盘最新态)
+    store.loadResult = { v: 1, app: 'cys-stift', elements: [textEl('t1'), arrowEl('a1')] }
+    // coauthor 静默删除 a1:旧实现里 knownFreeformIds 不知道它,删除不落盘且合并复活
+    host.applyWithoutEcho(() => host.remove('a1'))
+    await vi.advanceTimersByTimeAsync(DEBOUNCE + 10)
+    store.saveCalls.length = 0
+    host.upsert(textEl('t2'))
+    await vi.advanceTimersByTimeAsync(DEBOUNCE + 10)
+    expect(store.saveCalls.map((elements) => elements.map((element) => element.id))).toEqual([
+      ['t1', 't2'],
+    ])
+    unbind()
+  })
+})
+
 describe('pagehide / visibilitychange flush(2026-11-17 备案缺陷 2)', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
 
   function makePlainStore() {
     const saveCalls: CanvasElement[][] = []
+    const emergencyCalls: CanvasElement[][] = []
     return {
       saveCalls,
+      emergencyCalls,
       load: async () => null,
       remove: async () => true,
       save: async (_id: CanvasId, elements: CanvasElement[]) => {
         saveCalls.push(elements.map((element) => ({ ...element })))
         return true
       },
+      saveEmergencySync(_id: CanvasId, elements: CanvasElement[]) {
+        emergencyCalls.push(elements.map((element) => ({ ...element })))
+        return true
+      },
     }
   }
 
-  it('防抖窗口内 pagehide 立即保存(不等 500ms)', async () => {
+  it('防抖窗口内 pagehide 立即保存(不等 500ms)— pagehide 派发在 window', async () => {
     const host = new InMemoryCanvasHost()
     const store = makePlainStore()
     const unbind = attachCanvasFreeformPersistence(host, CANVAS, { debounceMs: DEBOUNCE, store })
     await flush()
     host.upsert(textEl('t1'))
-    document.dispatchEvent(new Event('pagehide'))
+    window.dispatchEvent(new Event('pagehide'))
     await vi.advanceTimersByTimeAsync(0)
     expect(store.saveCalls.map((elements) => elements.map((element) => element.id))).toEqual([['t1']])
+    unbind()
+  })
+
+  it('关页兜底同步写应急快照(OPFS 异步链在页面销毁前跑不完)', async () => {
+    const host = new InMemoryCanvasHost()
+    const store = makePlainStore()
+    const unbind = attachCanvasFreeformPersistence(host, CANVAS, { debounceMs: DEBOUNCE, store })
+    await flush()
+    host.upsert(textEl('last-stroke'))
+    // 同步断言:不推进任何 timer / microtask,应急写入必须在事件回调里完成。
+    window.dispatchEvent(new Event('pagehide'))
+    expect(store.emergencyCalls.map((elements) => elements.map((element) => element.id))).toEqual([
+      ['last-stroke'],
+    ])
     unbind()
   })
 

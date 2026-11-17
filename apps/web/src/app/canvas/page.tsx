@@ -822,6 +822,13 @@ ${formatted}`
     const current = service.get(cardId as CardId)
     if (!current) throw new Error(`card ${cardId} no longer exists`)
     service.removeFromCanvas(cardId as CardId)
+    // removeFromCanvas 对配额失败返回 false(不抛);false 也可能是「本来就不在
+    // 画布」的幂等 no-op。以 DB 真实状态判定:canvasPosition 仍在 = 没删成,
+    // 必须抛错让 commitApplyPlan 计 failed 并跳过 host.remove——否则下次 sync
+    // 会把卡复活,而级联箭头已经被删掉(2026-11-17 对抗审查 F1)。
+    if (service.get(cardId as CardId)?.canvasPosition) {
+      throw new Error(`failed to remove card ${cardId} from canvas (storage write failed)`)
+    }
   }, [service])
 
   // BUG-B + BUG-A:把"疑似 DSL 文本 → 审核"抽成组件级回调,paste 监听和右键菜单(T6)共用。

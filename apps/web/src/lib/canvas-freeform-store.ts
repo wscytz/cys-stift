@@ -87,10 +87,14 @@ const OPFS_DIR = 'cys-stift'
 const OPFS_PREFIX = 'canvas-freeform.'
 const OPFS_SUFFIX = '.v1'
 
-/** 持久化的载荷:版本 + 生产者标记 + 非卡片元素。 */
+/** 持久化的载荷:版本 + 生产者标记 + 非卡片元素。
+ *  updatedAt 用于 OPFS / localStorage 双后端仲裁(2026-11-17 对抗审查):
+ *  关标签页兜底会同步写 localStorage,若 load 永远优先 OPFS,应急数据永远读不到。
+ *  旧快照无此字段(undefined)按 0 处理,OPFS 优先。 */
 export interface CanvasFreeformSnapshot {
   v: 1
   app: 'cys-stift'
+  updatedAt?: number
   elements: CanvasElement[]
 }
 
@@ -99,14 +103,17 @@ function freeformOnly(elements: CanvasElement[]): CanvasElement[] {
   return elements.filter((el) => el.kind !== 'card')
 }
 
-function makeSnapshot(elements: CanvasElement[]): CanvasFreeformSnapshot {
-  return { v: 1, app: 'cys-stift', elements: freeformOnly(elements) }
+function makeSnapshot(
+  elements: CanvasElement[],
+  updatedAt: number = Date.now(),
+): CanvasFreeformSnapshot {
+  return { v: 1, app: 'cys-stift', updatedAt, elements: freeformOnly(elements) }
 }
 
 /** 解析 + 校验载荷;坏数据返回 null。card 在此再过滤一次(双保险)。 */
 function parseSnapshot(raw: string): CanvasFreeformSnapshot | null {
   try {
-    const parsed = JSON.parse(raw) as { elements?: unknown }
+    const parsed = JSON.parse(raw) as { elements?: unknown; updatedAt?: unknown }
     if (!Array.isArray(parsed.elements)) return null
     // 逐元素校验(恶意/损坏数据):非对象 / 缺 kind / 缺 id / 几何字段类型错 /
     // 无源 image 的元素直接丢弃,不让它们进 host 后被几何/渲染函数假设字段类型
@@ -133,7 +140,14 @@ function parseSnapshot(raw: string): CanvasFreeformSnapshot | null {
         return true
       },
     )
-    return makeSnapshot(clean)
+    return {
+      v: 1,
+      app: 'cys-stift',
+      ...(typeof parsed.updatedAt === 'number' && Number.isFinite(parsed.updatedAt)
+        ? { updatedAt: parsed.updatedAt }
+        : {}),
+      elements: freeformOnly(clean),
+    }
   } catch {
     return null
   }
@@ -265,16 +279,32 @@ async function opfsRemove(canvasId: CanvasId): Promise<boolean> {
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
+/** 双后端仲裁:取 updatedAt 较新者;相等/缺失(旧快照)时 OPFS 优先(主后端)。
+ *  2026-11-17 对抗审查:OPFS 写失败回退 localStorage 后,load 曾永远读旧 OPFS,
+ *  应急数据不可见;关标签页的同步快照也需要这条仲裁才能生效。 */
+function pickNewest(
+  fromOpfs: CanvasFreeformSnapshot | null,
+  fromLs: CanvasFreeformSnapshot | null,
+): CanvasFreeformSnapshot | null {
+  if (!fromOpfs) return fromLs
+  if (!fromLs) return fromOpfs
+  const opfsAt = fromOpfs.updatedAt ?? 0
+  const lsAt = fromLs.updatedAt ?? 0
+  return lsAt > opfsAt ? fromLs : fromOpfs
+}
+
 export const canvasFreeformStore = {
   /**
-   * 读取一个画布的 freeform 快照。OPFS 优先 → localStorage 回退。
-   * 没有数据返回 null。SSR 返回 null。
+   * 读取一个画布的 freeform 快照。同时读 OPFS / localStorage,按 updatedAt
+   * 取较新者(旧快照无 updatedAt → OPFS 优先)。没有数据返回 null。SSR 返回 null。
    */
   async load(canvasId: CanvasId): Promise<CanvasFreeformSnapshot | null> {
     if (typeof window === 'undefined') return null
-    const fromOpfs = await opfsLoad(canvasId)
-    if (fromOpfs) return fromOpfs
-    return lsLoad(canvasId)
+    const [fromOpfs, fromLs] = await Promise.all([
+      opfsLoad(canvasId),
+      Promise.resolve(lsLoad(canvasId)),
+    ])
+    return pickNewest(fromOpfs, fromLs)
   },
 
   /**
@@ -293,6 +323,21 @@ export const canvasFreeformStore = {
     const lsOk = lsSave(canvasId, snapshot)
     if (lsOk) notifyChange()
     return lsOk
+  },
+
+  /**
+   * 关标签页兜底(2026-11-17 对抗审查):OPFS 写是异步的,页面销毁时
+   * `await store.save` 的链条连第一步都跑不完(Chrome 实测文件从未创建)。
+   * 生命周期回调里只能做同步写——localStorage 是唯一能在销毁前完成的落点。
+   * 写入带 updatedAt 的快照,load 时与 OPFS 仲裁;正常保存随后会以更新
+   * 时间戳写回 OPFS。返回是否写入成功(配额失败会触发 onQuotaExceeded 订阅)。
+   */
+  saveEmergencySync(canvasId: CanvasId, elements: CanvasElement[]): boolean {
+    if (typeof window === 'undefined') return true
+    const snapshot = makeSnapshot(elements)
+    const ok = lsSave(canvasId, snapshot)
+    if (ok) notifyChange()
+    return ok
   },
 
   /**

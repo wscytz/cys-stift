@@ -92,12 +92,31 @@ import {
   AgentConfirmCard,
   makeOnCardCreate,
   makeOnCardUpdate,
+  makeOnCardRemove,
   computeContentDiff,
 } from '@/features/ai/agent-confirm-card'
 import { parseDsl } from '@wscytz/dsl'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true
+
+describe('makeOnCardRemove(2026-11-17 对抗审查 F1)', () => {
+  it('removeFromCanvas 返回 false 且 DB 仍有 canvasPosition → 抛错(不静默放行)', () => {
+    const service = {
+      get: vi.fn(() => ({ id: 'c1', canvasPosition: { canvasId: 'x', x: 0, y: 0 } })),
+      removeFromCanvas: vi.fn(() => false),
+    } as unknown as CardService
+    expect(() => makeOnCardRemove(service)('c1')).toThrow(/storage write failed/)
+  })
+
+  it('幂等场景(canvasPosition 已空)不抛', () => {
+    const service = {
+      get: vi.fn(() => ({ id: 'c2' })),
+      removeFromCanvas: vi.fn(() => false),
+    } as unknown as CardService
+    expect(() => makeOnCardRemove(service)('c2')).not.toThrow()
+  })
+})
 
 // ── 最小 mock CanvasHost(实现契约里 live 路径用到的 4 个方法)──
 function makeMockHost(initial: { elements: CanvasElement[] }) {

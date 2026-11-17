@@ -110,8 +110,19 @@ async function freeformMatches(store: FreeformStore, canvasId: string, elements:
   return same(current, elements)
 }
 
+/** card h 是引擎渲染期派生值(syncCardHeights 静默自愈)。比对前归一——否则
+ *  「预览生成后停留几秒」会让 Apply 报 ELEMENT_EXPECTED_MISMATCH、Undo 报
+ *  UNDO_CONFLICT(与 sceneRevision / intent expected 门同规则,2026-11-17 对抗审查 F2)。 */
+function normalizeCardHForCompare(el: CanvasElement | null): CanvasElement | null {
+  if (!el || el.kind !== 'card') return el
+  return { ...el, h: 0 }
+}
+
 function hostMatches(host: CanvasHost, changes: ElementBatchChange[], direction: 'expected' | 'next'): boolean {
-  return changes.every((change) => same(host.getElement(change.id) ?? null, direction === 'expected' ? change.expected : change.next))
+  return changes.every((change) => same(
+    normalizeCardHForCompare(host.getElement(change.id) ?? null),
+    normalizeCardHForCompare(direction === 'expected' ? change.expected : change.next),
+  ))
 }
 
 interface UndoExecutionDependencies {
@@ -225,7 +236,7 @@ export async function commitProposalPlan(plan: ProposalCommitPlanV1, dependencie
   const freeformChanges = plan.elementChanges.filter((change) => (change.expected?.kind ?? change.next?.kind) !== 'card')
 
   for (const change of plan.cardChanges) if (!same(service.get(change.id), change.expected)) return { ok: false, committed: false, code: 'CARD_EXPECTED_MISMATCH' }
-  for (const change of plan.elementChanges) if (!same(host.getElement(change.id) ?? null, change.expected)) return { ok: false, committed: false, code: 'ELEMENT_EXPECTED_MISMATCH', itemIds: [change.itemId] }
+  for (const change of plan.elementChanges) if (!same(normalizeCardHForCompare(host.getElement(change.id) ?? null), normalizeCardHForCompare(change.expected))) return { ok: false, committed: false, code: 'ELEMENT_EXPECTED_MISMATCH', itemIds: [change.itemId] }
 
   const beforeFreeform = (await freeformStore.load(plan.canvasId as CanvasId))?.elements ?? host.getElements().filter((element) => element.kind !== 'card')
   for (const change of freeformChanges) {
@@ -289,7 +300,7 @@ export async function commitProposalPlan(plan: ProposalCommitPlanV1, dependencie
   const undo = async (): Promise<ProposalUndoResult> => {
     if (undone) return { ok: false, code: 'ALREADY_UNDONE' }
     for (const change of plan.cardChanges) if (!same(service.get(change.id), change.next)) return { ok: false, code: 'UNDO_CONFLICT' }
-    for (const change of plan.elementChanges) if (!same(host.getElement(change.id) ?? null, change.next)) return { ok: false, code: 'UNDO_CONFLICT' }
+    for (const change of plan.elementChanges) if (!same(normalizeCardHForCompare(host.getElement(change.id) ?? null), normalizeCardHForCompare(change.next))) return { ok: false, code: 'UNDO_CONFLICT' }
     if (!journalStore.markUndoPrepared || !journalStore.markUndone) return { ok: false, code: 'UNDO_PERSIST_FAILED' }
     const result = await executeUndo({ ...journal, state: 'COMMITTED' }, receipt.receiptId, {
       service, host, freeformStore,

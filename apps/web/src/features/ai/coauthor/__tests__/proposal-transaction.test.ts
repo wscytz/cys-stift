@@ -92,6 +92,31 @@ describe('proposal transaction', () => {
     expect(await commitProposalPlan(await plan(arrow), fixture.dependencies)).toMatchObject({ ok: false, committed: false, code: 'ELEMENT_EXPECTED_MISMATCH' })
   })
 
+  it('card h 引擎派生漂移不拒绝计划(2026-11-17 对抗审查 F2)', async () => {
+    const expected = card('a', 0)
+    const next = { ...card('a', 50), h: expected.h }
+    const cardPlan = await createProposalCommitPlan({
+      planId: 'plan:h-drift', proposalId: 'proposal:1', canvasId: 'canvas:1', itemIds: ['item:1'], cardChanges: [],
+      elementChanges: [{ itemId: 'item:1', id: 'a', expected, next }],
+    })
+    const fixture = dependencies()
+    // 预览与提交之间引擎 syncCardHeights 静默自愈 h(80 → 58)
+    fixture.host.applyWithoutEcho(() => fixture.host.upsert({ ...card('a', 0), h: 58 }))
+    expect(await commitProposalPlan(cardPlan, fixture.dependencies)).toMatchObject({ ok: true, committed: true })
+  })
+
+  it('card h 之外的几何改动仍会被拒(归一不掩盖真实编辑)', async () => {
+    const expected = card('a', 0)
+    const next = { ...card('a', 50), h: expected.h }
+    const cardPlan = await createProposalCommitPlan({
+      planId: 'plan:x-drift', proposalId: 'proposal:1', canvasId: 'canvas:1', itemIds: ['item:1'], cardChanges: [],
+      elementChanges: [{ itemId: 'item:1', id: 'a', expected, next }],
+    })
+    const fixture = dependencies()
+    fixture.host.applyWithoutEcho(() => fixture.host.upsert({ ...card('a', 99), h: 58 }))
+    expect(await commitProposalPlan(cardPlan, fixture.dependencies)).toMatchObject({ ok: false, committed: false, code: 'ELEMENT_EXPECTED_MISMATCH' })
+  })
+
   it('restores the complete before state when freeform persistence fails', async () => {
     const arrow: CanvasElement = { id: 'arrow:1', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b' }
     const fixture = dependencies(false)

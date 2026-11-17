@@ -202,14 +202,16 @@ export function bindCardWriteback(
     timer = null
     flush()
   }
-  document.addEventListener('pagehide', flushNow)
+  // pagehide 派发在 Window(不是 document)——2026-11-17 对抗审查实测 document
+  // 上的监听从未触发。卡片链写 localStorage 是同步的,拿到事件即可在销毁前落盘。
+  window.addEventListener('pagehide', flushNow)
   const onVisibilityChange = () => {
     if (document.visibilityState === 'hidden') flushNow()
   }
   document.addEventListener('visibilitychange', onVisibilityChange)
 
   return () => {
-    document.removeEventListener('pagehide', flushNow)
+    window.removeEventListener('pagehide', flushNow)
     document.removeEventListener('visibilitychange', onVisibilityChange)
     flushNow()
     unsubHistory()

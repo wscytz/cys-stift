@@ -149,6 +149,11 @@ export async function applyOpsAndPersist(
     const current = service.get(cardId as CardId)
     if (!current) throw new Error(`card not found: ${cardId}`)
     service.removeFromCanvas(cardId as CardId)
+    // 同 page.tsx / agent-confirm-card:false 的配额失败不能静默通过,否则
+    // commitApplyPlan 会在 DB 未删卡时执行 host.remove(2026-11-17 对抗审查 F1)。
+    if (service.get(cardId as CardId)?.canvasPosition) {
+      throw new Error(`failed to remove card ${cardId} from canvas (storage write failed)`)
+    }
   })
   const cardsCreated = result.cardsCreated
   const cardsFailed = result.opResults.filter(

@@ -198,6 +198,22 @@ describe('bindCardWriteback: user-source remove → removeFromCanvas (not softDe
     unbind()
   })
 
+  it('关页时 window pagehide 同步 flush 待写回的卡(2026-11-17 对抗审查)', () => {
+    const canvasId = 'canvas-1' as unknown as CanvasId
+    const cards = new Map([['card-p', makeCardOnCanvas('card-p', 'canvas-1')]])
+    const { service, removeFromCanvasCalls } = makeFakeService(cards)
+    const host = new InMemoryCanvasHost()
+    host.applyWithoutEcho(() => host.upsert(cardToElement(cards.get('card-p')!)))
+    const unbind = bindCardWriteback(host, service, canvasId)
+
+    host.remove('card-p')
+    // 派发在 window(pagehide 的规范目标;document 上是死代码)。
+    window.dispatchEvent(new Event('pagehide'))
+    expect(removeFromCanvasCalls).toEqual(['card-p'])
+
+    unbind()
+  })
+
   it('a programmatic (no-echo) remove does NOT trigger writeback', () => {
     const canvasId = 'canvas-1' as unknown as CanvasId
     const cards = new Map([['card-b', makeCardOnCanvas('card-b', 'canvas-1')]])

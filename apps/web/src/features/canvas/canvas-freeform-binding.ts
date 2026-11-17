@@ -32,7 +32,10 @@ export function freeformElementsOf(elements: CanvasElement[]): CanvasElement[] {
   return elements.filter(isFreeformElement)
 }
 
-type Store = Pick<typeof canvasFreeformStore, 'load' | 'save' | 'remove'>
+type Store = Pick<typeof canvasFreeformStore, 'load' | 'save' | 'remove'> & {
+  /** 关标签页兜底(同步 localStorage)。测试 double 可不实现。 */
+  saveEmergencySync?: typeof canvasFreeformStore.saveEmergencySync
+}
 
 /**
  * 挂上 freeform 持久化。返回 unbind(组件 cleanup 调用)。
@@ -58,8 +61,14 @@ export function attachCanvasFreeformPersistence(
   // pre-undo save cannot finish first and then be overwritten by the older
   // write when the two writable handles resolve out of order.
   let saveChain: Promise<void> = Promise.resolve()
+  // 排队/进行中的保存数——关页兜底据此判断是否还有未落盘状态(即使 timer 已触发,
+  // OPFS 异步写仍可能没完成)。
+  let pendingSaveCount = 0
   // 已知的 freeform 元素 id —— 用来判定 removed 的 id 是 freeform 还是 card。
   const knownFreeformIds = new Set<string>()
+  // 元素引用快照:onElementsChange 是高频事件(拖拽/绘制期间每次 upsert),
+  // 用引用比较检测「是否有 freeform 实际变化」,避免每次都对点序列做 JSON 签名。
+  const trackedFreeformRefs = new Map<string, CanvasElement>()
   // 2026-11-17 备案缺陷 4 合并安全阀:本标签已删除(echo 删除)或已撤销(undo
   // 静默撤走)的 freeform id。写前合并磁盘快照时,这些 id 的磁盘残留不可并回,
   // 否则刚删/刚撤销的笔画会被旧快照复活。id 唯一生成,无需过期机制。
@@ -72,6 +81,7 @@ export function attachCanvasFreeformPersistence(
   const enqueueSave = (elements: CanvasElement[]) => {
     const nextSignature = signature(elements)
     const sequence = ++saveSequence
+    pendingSaveCount++
     lastQueuedSignature = nextSignature
     saveChain = saveChain
       .catch(() => undefined)
@@ -104,6 +114,9 @@ export function attachCanvasFreeformPersistence(
           console.warn('[canvas-freeform-binding] save failed', error)
           if (sequence === saveSequence) lastQueuedSignature = lastPersistedSignature
         }
+      })
+      .finally(() => {
+        pendingSaveCount--
       })
   }
 
@@ -182,6 +195,42 @@ export function attachCanvasFreeformPersistence(
     scheduleSave()
   }) ?? (() => {})
 
+  // 2026-11-17 对抗审查:applyWithoutEcho 的静默写入(coauthor syncHost、DB 驱动的
+  // host.remove 级联、undo restore)不触发 onUserChange。只听回声会让 AI 新建的
+  // 箭头永远不在 knownFreeformIds 里——用户删除它时不落盘、写前合并又把它复活
+  // (临时 spec 实测 resurrected=true)。订阅元素模型全量变更:用元素引用检测
+  // freeform 实际变化(避免拖拽期间对点序列做 JSON 签名),同步 known/墓碑后调度保存。
+  const reconcileSilentElements = () => {
+    if (disposed || !hydrated) return
+    const elements = host.getElements()
+    const free = freeformElementsOf(elements)
+    let changed = false
+    const seen = new Set<string>()
+    for (const el of free) {
+      seen.add(el.id)
+      if (trackedFreeformRefs.get(el.id) !== el) {
+        trackedFreeformRefs.set(el.id, el)
+        changed = true
+      }
+    }
+    for (const id of [...trackedFreeformRefs.keys()]) {
+      if (!seen.has(id)) {
+        trackedFreeformRefs.delete(id)
+        changed = true
+      }
+    }
+    const previousKnown = new Set(knownFreeformIds)
+    refreshKnownFreeformIds(elements)
+    for (const id of previousKnown) {
+      if (!knownFreeformIds.has(id)) tombstonedIds.add(id)
+    }
+    for (const id of knownFreeformIds) {
+      if (!previousKnown.has(id)) tombstonedIds.delete(id)
+    }
+    if (changed) scheduleSave()
+  }
+  const unsubElements = host.onElementsChange?.(reconcileSilentElements) ?? (() => {})
+
   // 异步 hydrate:load → restore 非 card(applyWithoutEcho)→ 标记 hydrated。
   void store.load(canvasId).then((snapshot) => {
     if (disposed) {
@@ -207,6 +256,12 @@ export function attachCanvasFreeformPersistence(
     }
     lastPersistedSignature = signature(host.getElements())
     lastQueuedSignature = lastPersistedSignature
+    // 引用快照初始化:hydrate 的静默 upsert 在 hydrated=false 时被 reconcile 跳过,
+    // 这里补一次,后续静默变更才能按引用检测出来。
+    trackedFreeformRefs.clear()
+    for (const el of freeformElementsOf(host.getElements())) {
+      trackedFreeformRefs.set(el.id, el)
+    }
     hydrated = true
     // hydrate 期间用户已改过 → 保存合并态(持久化 + 新建)。
     if (dirtyDuringHydrate) {
@@ -215,33 +270,47 @@ export function attachCanvasFreeformPersistence(
     }
   })
 
-  // 2026-11-17 备案缺陷 2:防抖 500ms 窗口内关标签/切后台不跑 React cleanup,
-  // 最后一整笔会丢(笔迹只存在于 host,未落 OPFS)。pagehide /
-  // visibilitychange(hidden)时立即 flush;OPFS 写不保证完成,但
-  // visibilitychange 通常早于页面关闭触发,是窗口内最好的兜底时机。
-  const flushNow = () => {
+  // 2026-11-17 备案缺陷 2 / 对抗审查加强:防抖 500ms 窗口内关标签/切后台不跑
+  // React cleanup,最后一整笔会丢(笔迹只存在于 host,未落 OPFS)。
+  // @param emergency 生命周期回调(关页/切后台)传 true:额外同步写 localStorage。
+  //   OPFS 写是异步的,页面销毁时 doSave 的链条连第一步都跑不完(Chrome 实测
+  //   OPFS 文件从未创建,而同一 handler 里的同步 localStorage 写入存活)。
+  //   同步 localStorage 是唯一能在销毁前完成的落点;快照带 updatedAt,
+  //   由 store.load 与 OPFS 仲裁,重开时应急快照胜出。
+  const flushNow = (emergency = false) => {
+    // 已 hydrate 才 flush(未 hydrate 时 flush 会用不完整的 host 状态覆盖持久化)。
+    if (!hydrated) return
+    if (emergency) {
+      const elements = freeformElementsOf(host.getElements())
+      const hasUnpersisted =
+        timer !== null ||
+        pendingSaveCount > 0 ||
+        signature(elements) !== lastPersistedSignature
+      if (hasUnpersisted) store.saveEmergencySync?.(canvasId, elements)
+    }
     if (!timer) return
     clearTimeout(timer)
     timer = null
-    // 已 hydrate 才 flush(未 hydrate 时 flush 会用不完整的 host 状态覆盖持久化)。
-    if (hydrated) {
-      flushing = true
-      doSave()
-      flushing = false
-    }
+    flushing = true
+    doSave()
+    flushing = false
   }
-  document.addEventListener('pagehide', flushNow)
+  // pagehide 派发在 Window(不是 document)——2026-11-17 对抗审查实测
+  // document 上的监听从未触发,原实现是死代码。
+  const onPageHide = () => flushNow(true)
   const onVisibilityChange = () => {
-    if (document.visibilityState === 'hidden') flushNow()
+    if (document.visibilityState === 'hidden') flushNow(true)
   }
+  window.addEventListener('pagehide', onPageHide)
   document.addEventListener('visibilitychange', onVisibilityChange)
 
   return () => {
     disposed = true
-    document.removeEventListener('pagehide', flushNow)
+    window.removeEventListener('pagehide', onPageHide)
     document.removeEventListener('visibilitychange', onVisibilityChange)
     unsub()
     unsubHistory()
+    unsubElements()
     flushNow()
     // 未 hydrate 但用户画过:捕获当前 freeform 元素,交给 load .then 合并保存
     // (此时 host 仍存活——unbind 在 self-canvas effect cleanup 的 adapter.detach

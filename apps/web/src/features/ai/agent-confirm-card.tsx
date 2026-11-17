@@ -185,6 +185,12 @@ export function makeOnCardRemove(service: CardService): (cardId: string) => void
     const current = service.get(cardId as CardId)
     if (!current) throw new Error(`card not found: ${cardId}`)
     service.removeFromCanvas(cardId as CardId)
+    // 配额失败时 removeFromCanvas 返回 false 而不抛错(domain 设计);false 也可能是
+    // 「卡本来就不在画布」的幂等 no-op。以 DB 真实状态判定:canvasPosition 仍在
+    // = 没删成,抛错让 applyLayout 计 failed 并跳过 host.remove(2026-11-17 对抗审查 F1)。
+    if (service.get(cardId as CardId)?.canvasPosition) {
+      throw new Error(`failed to remove card ${cardId} from canvas (storage write failed)`)
+    }
   }
 }
 
