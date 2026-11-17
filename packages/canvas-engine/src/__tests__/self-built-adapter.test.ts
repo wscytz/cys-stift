@@ -1107,3 +1107,32 @@ describe('SelfBuiltAdapter eraser 宽容差', () => {
     expect(host.getElement('ar')).toBeUndefined()
   })
 })
+
+describe('SelfBuiltAdapter remove → selection cleanup(2026-11-17 备案缺陷 3)', () => {
+  it('remove 从选中集剔除被删卡片与级联箭头,并通知订阅者', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    host.upsert({ id: 'c2', kind: 'card', x: 50, y: 0, w: 10, h: 10, rotation: 0 })
+    host.upsert({ id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'c1', to: 'c2' } as CanvasElement)
+    const snapshots: string[][] = []
+    host.onSelectionChange((ids) => snapshots.push(ids))
+    host.setSelectedIds(['c1', 'c2', 'ar'])
+    expect(host.getSelectedIds()).toEqual(['c1', 'c2', 'ar'])
+    host.remove('c1')
+    // c1 + 级联箭头 ar 同步退出;活元素 c2 保留,死 id 不再泄漏给订阅者
+    expect(host.getSelectedIds()).toEqual(['c2'])
+    expect(snapshots[snapshots.length - 1]).toEqual(['c2'])
+  })
+
+  it('删除未选中元素不扰动选区(无冗余通知)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    host.upsert({ id: 'c2', kind: 'card', x: 50, y: 0, w: 10, h: 10, rotation: 0 })
+    host.setSelectedIds(['c2'])
+    let calls = 0
+    host.onSelectionChange(() => calls++)
+    host.remove('c1')
+    expect(host.getSelectedIds()).toEqual(['c2'])
+    expect(calls).toBe(0)
+  })
+})

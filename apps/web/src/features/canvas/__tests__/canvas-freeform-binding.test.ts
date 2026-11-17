@@ -301,3 +301,113 @@ describe('attachCanvasFreeformPersistence — race safety', () => {
     expect(host.getElement('late')).toBeUndefined()
   })
 })
+
+describe('写前合并磁盘快照(2026-11-17 备案缺陷 4)', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  function storeWithRemote(remote: CanvasFreeformSnapshot | null) {
+    const saveCalls: CanvasElement[][] = []
+    return {
+      saveCalls,
+      load: async () => remote,
+      remove: async () => true,
+      save: async (_id: CanvasId, elements: CanvasElement[]) => {
+        saveCalls.push(elements.map((element) => ({ ...element })))
+        return true
+      },
+    }
+  }
+
+  it('save 前合并磁盘上本标签没有的元素(远端笔迹不被陈旧标签覆盖)', async () => {
+    const host = new InMemoryCanvasHost()
+    const store = storeWithRemote({ v: 1, app: 'cys-stift', elements: [freedrawEl('remote-1')] })
+    const unbind = attachCanvasFreeformPersistence(host, CANVAS, { debounceMs: DEBOUNCE, store })
+    await flush()
+    host.upsert(textEl('t1'))
+    await vi.advanceTimersByTimeAsync(DEBOUNCE + 10)
+    expect(store.saveCalls.map((elements) => elements.map((element) => element.id))).toEqual([
+      ['remote-1', 't1'],
+    ])
+    unbind()
+  })
+
+  it('同 id 冲突以本标签 host 状态为准', async () => {
+    const host = new InMemoryCanvasHost()
+    const store = storeWithRemote({
+      v: 1,
+      app: 'cys-stift',
+      elements: [{ ...textEl('t1'), text: '远端旧稿' }],
+    })
+    const unbind = attachCanvasFreeformPersistence(host, CANVAS, { debounceMs: DEBOUNCE, store })
+    await flush()
+    host.upsert(textEl('t1'))
+    await vi.advanceTimersByTimeAsync(DEBOUNCE + 10)
+    expect(store.saveCalls[0]).toHaveLength(1)
+    expect(store.saveCalls[0]![0]!.text).toBe('t1')
+    unbind()
+  })
+
+  it('已删除的元素不被磁盘残留复活(墓碑安全阀)', async () => {
+    const host = new InMemoryCanvasHost()
+    const store = makeFakeStore({ v: 1, app: 'cys-stift', elements: [textEl('t1')] })
+    const unbind = attachCanvasFreeformPersistence(host, CANVAS, { debounceMs: DEBOUNCE, store })
+    await flush() // let hydrate complete
+    host.remove('t1')
+    await vi.advanceTimersByTimeAsync(DEBOUNCE + 10)
+    store.saveCalls.length = 0
+    // 另一笔无关编辑触发保存:磁盘上 t1 的残留(t1 在 fake store 的 loadResult
+    // 里恒在)不得并入——本标签已删除,合并进去了就是复活。
+    host.upsert(textEl('t2'))
+    await vi.advanceTimersByTimeAsync(DEBOUNCE + 10)
+    expect(store.saveCalls.map((elements) => elements.map((element) => element.id))).toEqual([['t2']])
+    unbind()
+  })
+})
+
+describe('pagehide / visibilitychange flush(2026-11-17 备案缺陷 2)', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  function makePlainStore() {
+    const saveCalls: CanvasElement[][] = []
+    return {
+      saveCalls,
+      load: async () => null,
+      remove: async () => true,
+      save: async (_id: CanvasId, elements: CanvasElement[]) => {
+        saveCalls.push(elements.map((element) => ({ ...element })))
+        return true
+      },
+    }
+  }
+
+  it('防抖窗口内 pagehide 立即保存(不等 500ms)', async () => {
+    const host = new InMemoryCanvasHost()
+    const store = makePlainStore()
+    const unbind = attachCanvasFreeformPersistence(host, CANVAS, { debounceMs: DEBOUNCE, store })
+    await flush()
+    host.upsert(textEl('t1'))
+    document.dispatchEvent(new Event('pagehide'))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(store.saveCalls.map((elements) => elements.map((element) => element.id))).toEqual([['t1']])
+    unbind()
+  })
+
+  it('visibilitychange(hidden)同样触发', async () => {
+    const host = new InMemoryCanvasHost()
+    const store = makePlainStore()
+    const unbind = attachCanvasFreeformPersistence(host, CANVAS, { debounceMs: DEBOUNCE, store })
+    await flush()
+    host.upsert(freedrawEl('stroke-1'))
+    const original = document.visibilityState
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+    document.dispatchEvent(new Event('visibilitychange'))
+    await vi.advanceTimersByTimeAsync(0)
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => original })
+    expect(store.saveCalls.map((elements) => elements.map((element) => element.id))).toEqual([
+      ['stroke-1'],
+    ])
+    unbind()
+  })
+})

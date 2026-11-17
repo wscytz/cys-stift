@@ -60,6 +60,10 @@ export function attachCanvasFreeformPersistence(
   let saveChain: Promise<void> = Promise.resolve()
   // 已知的 freeform 元素 id —— 用来判定 removed 的 id 是 freeform 还是 card。
   const knownFreeformIds = new Set<string>()
+  // 2026-11-17 备案缺陷 4 合并安全阀:本标签已删除(echo 删除)或已撤销(undo
+  // 静默撤走)的 freeform id。写前合并磁盘快照时,这些 id 的磁盘残留不可并回,
+  // 否则刚删/刚撤销的笔画会被旧快照复活。id 唯一生成,无需过期机制。
+  const tombstonedIds = new Set<string>()
   // hydrate 前用户已绘制但 unbind 时 load 未回:捕获当前 host 的 freeform 元素,
   // 让迟到的 load .then 合并「持久化 ∪ 新建」做一次 save。否则这些笔画会永久丢失
   // (load .then 在 disposed 后短路 return,cleanup 又因 !hydrated 不 flush)。
@@ -73,7 +77,23 @@ export function attachCanvasFreeformPersistence(
       .catch(() => undefined)
       .then(async () => {
         try {
-          const ok = await store.save(canvasId, elements)
+          // 2026-11-17 备案缺陷 4:写前合并磁盘最新快照。双标签同画布时,本标签
+          // hydrate 早于另一标签落盘,直接全量覆盖会抹掉对方新笔迹(静默数据丢失;
+          // wikilink 自动同步还会在陈旧标签上放大此问题)。同 id 以本标签 host 状态
+          // 为准;AI/DSL apply 的权威投影保存仍走 store.save(投影即真相,不合并)。
+          // 残余边界:另一标签删除且本标签 host 仍留有该元素时,并集会复活它——
+          // 删除竞态远窄于原先的必然覆盖,跨标签实时同步需另立方案。
+          const remote = await store.load(canvasId)
+          const merged = (() => {
+            const byId = new Map<string, CanvasElement>()
+            for (const el of remote?.elements ?? []) {
+              if (tombstonedIds.has(el.id)) continue // 本标签已删/已撤销:磁盘残留不复活
+              byId.set(el.id, el)
+            }
+            for (const el of elements) byId.set(el.id, el)
+            return Array.from(byId.values())
+          })()
+          const ok = await store.save(canvasId, merged)
           if (ok !== false) {
             lastPersistedSignature = nextSignature
           } else if (sequence === saveSequence) {
@@ -112,6 +132,7 @@ export function attachCanvasFreeformPersistence(
     for (const el of updated) {
       if (isFreeformElement(el)) {
         knownFreeformIds.add(el.id)
+        tombstonedIds.delete(el.id) // 重画/重做同 id 时解除墓碑
         relevant = true
       } else {
         knownFreeformIds.delete(el.id) // card:确保不在集合里
@@ -120,6 +141,7 @@ export function attachCanvasFreeformPersistence(
     for (const id of removed) {
       if (knownFreeformIds.has(id)) {
         knownFreeformIds.delete(id)
+        tombstonedIds.add(id) // 已删:磁盘残留不得在后续合并中复活
         relevant = true
       }
     }
@@ -144,7 +166,16 @@ export function attachCanvasFreeformPersistence(
     // applyWithoutEcho restore bypasses onUserChange, so refresh the removal
     // index as well as scheduling persistence. Otherwise undoing a deletion
     // followed by deleting the restored element again is silently lost.
+    // 2026-11-17:同步维护墓碑——undo 撤走的 id 入墓碑(磁盘残留不得复活),
+    // undo/redo 恢复的 id 解除墓碑。
+    const previousKnown = new Set(knownFreeformIds)
     refreshKnownFreeformIds(elements)
+    for (const id of previousKnown) {
+      if (!knownFreeformIds.has(id)) tombstonedIds.add(id)
+    }
+    for (const id of knownFreeformIds) {
+      if (!previousKnown.has(id)) tombstonedIds.delete(id)
+    }
     if (!hydrated) { dirtyDuringHydrate = true; return }
     if (timer) { clearTimeout(timer); timer = null }
     if (signature(elements) === lastQueuedSignature) return
@@ -184,20 +215,34 @@ export function attachCanvasFreeformPersistence(
     }
   })
 
+  // 2026-11-17 备案缺陷 2:防抖 500ms 窗口内关标签/切后台不跑 React cleanup,
+  // 最后一整笔会丢(笔迹只存在于 host,未落 OPFS)。pagehide /
+  // visibilitychange(hidden)时立即 flush;OPFS 写不保证完成,但
+  // visibilitychange 通常早于页面关闭触发,是窗口内最好的兜底时机。
+  const flushNow = () => {
+    if (!timer) return
+    clearTimeout(timer)
+    timer = null
+    // 已 hydrate 才 flush(未 hydrate 时 flush 会用不完整的 host 状态覆盖持久化)。
+    if (hydrated) {
+      flushing = true
+      doSave()
+      flushing = false
+    }
+  }
+  document.addEventListener('pagehide', flushNow)
+  const onVisibilityChange = () => {
+    if (document.visibilityState === 'hidden') flushNow()
+  }
+  document.addEventListener('visibilitychange', onVisibilityChange)
+
   return () => {
     disposed = true
+    document.removeEventListener('pagehide', flushNow)
+    document.removeEventListener('visibilitychange', onVisibilityChange)
     unsub()
     unsubHistory()
-    if (timer) {
-      clearTimeout(timer)
-      timer = null
-      // 已 hydrate 才 flush(未 hydrate 时 flush 会用不完整的 host 状态覆盖持久化)。
-      if (hydrated) {
-        flushing = true
-        doSave()
-        flushing = false
-      }
-    }
+    flushNow()
     // 未 hydrate 但用户画过:捕获当前 freeform 元素,交给 load .then 合并保存
     // (此时 host 仍存活——unbind 在 self-canvas effect cleanup 的 adapter.detach
     // 之前跑,host.getElements() 安全)。

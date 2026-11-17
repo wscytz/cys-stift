@@ -192,8 +192,26 @@ export function bindCardWriteback(
   // Review fix (v0.37.0): flush synchronously before unsubscribing so a card
   // dragged then immediately followed by a canvas switch / route change / tab
   // close doesn't lose its last position.
+  // 2026-11-17 备案缺陷 2:但浏览器关标签页/切后台不执行 React cleanup——
+  // 防抖窗口(300ms)内的最后落位仍会丢。补 pagehide /
+  // visibilitychange(hidden)时立即 flush;切后台通常早于真正关闭触发,
+  // 是窗口内最好的兜底时机。
+  const flushNow = () => {
+    if (!timer) return
+    clearTimeout(timer)
+    timer = null
+    flush()
+  }
+  document.addEventListener('pagehide', flushNow)
+  const onVisibilityChange = () => {
+    if (document.visibilityState === 'hidden') flushNow()
+  }
+  document.addEventListener('visibilitychange', onVisibilityChange)
+
   return () => {
-    if (timer) { clearTimeout(timer); flush() }
+    document.removeEventListener('pagehide', flushNow)
+    document.removeEventListener('visibilitychange', onVisibilityChange)
+    flushNow()
     unsubHistory()
     unsub()
   }

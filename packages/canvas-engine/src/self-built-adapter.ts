@@ -364,6 +364,13 @@ export class SelfBuiltAdapter implements CanvasHost {
         this.elements.delete(aid)
       }
     }
+    // 2026-11-17 备案缺陷 3:被删元素与级联箭头同步退出选中集——否则死 id 经
+    // getSelectedIds() 泄漏给订阅者(关系/手绘面板、a11y 轮廓),全死选区还会让
+    // 键盘删除/方向键静默无效。走 setSelectedIds 保持通知一致。
+    if (cascade.length > 0 || this.selectedIds.has(id)) {
+      const gone = new Set<string>([id, ...cascade])
+      this.setSelectedIds([...this.selectedIds].filter((sid) => !gone.has(sid)))
+    }
     if (this.echoing) this.emitUser({ updated: [], removed: [id, ...cascade] })
     this.emitElements()
     this.scheduleRender()
