@@ -394,7 +394,13 @@ export default function HomePage() {
           letter-spacing: 0.08em;
           color: var(--color-secondary);
         }
-        @media (max-width: 640px) { .home__continue { grid-template-columns: 1fr; } .home__section-head { grid-column: 1; } }
+        @media (max-width: 640px) {
+          .home__continue { grid-template-columns: 1fr; }
+          .home__section-head { grid-column: 1; }
+          /* 窄屏:底部链接整项换行,避免中文被挤成一字一行。 */
+          .home__secondary { flex-wrap: wrap; row-gap: var(--space-1); }
+          .home__foot { flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+        }
         .home__foot {
           margin-top: auto;
           padding-top: var(--space-8);
