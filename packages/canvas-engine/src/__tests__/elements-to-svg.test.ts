@@ -495,3 +495,18 @@ describe('elementsToSvg — 箭头真实几何参与 bounds(2026-11-16 导出截
     expect(r.width).toBeGreaterThan(0)
   })
 })
+
+describe('悬空关系箭头不参与 bounds(2026-11-17 边界审查)', () => {
+  it('解析不出端点的箭头不再把 (0,0,0,0) 并进 bounds(原点污染复发守卫)', () => {
+    const view = { panX: 0, panY: 0, zoom: 1, gridMode: 'free' as const }
+    const els: CanvasElement[] = [
+      { id: 'a', kind: 'card', x: 800, y: 600, w: 240, h: 120, rotation: 0 },
+      { id: 'e', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'missing' },
+    ]
+    const r = elementsToSvg(els, view, () => null, { background: false, border: 0 }, domTokenResolver)
+    // bounds 只含卡:修复前 normalizeBox(e)=(0,0,0,0) 并入 → 尺寸被撑到 1040×720;
+    // 修复后悬空箭头跳过,恰为卡片自身 240×120。
+    expect(r.width).toBe(240)
+    expect(r.height).toBe(120)
+  })
+})

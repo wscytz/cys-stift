@@ -1059,3 +1059,22 @@ describe('applyLayout — v10 delete 指令', () => {
     expect(host.getElement('n')).toBeUndefined()
   })
 })
+
+describe('applyLayout — v10 跨 kind delete(2026-11-17 边界审查)', () => {
+  it('[rect #某卡id delete] 按 id 走 card-delete(DB-first 守卫不被绕过)', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'a', 0, 0)
+    seedCard(host, 'b', 300, 0)
+    host.upsert({ id: 'e', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'a', to: 'b' })
+    const removed: string[] = []
+    // kind 前缀写错(rect 但目标是卡)——修复前走 freeform-delete 绕过 DB 守卫:
+    // canvasPosition 不清 → syncCardsToEditor 静默复活卡、箭头永久丢。
+    const report = applyLayout(host, parseDsl('[rect #a delete]'), undefined, undefined, undefined, (id) => { removed.push(id) })
+    expect(report.applied).toBe(1)
+    expect(report.cardsDeleted).toBe(1)
+    expect(host.getElement('a')).toBeUndefined()
+    expect(host.getElement('e')).toBeUndefined() // 引擎级联
+    expect(host.getElement('b')).toBeDefined()
+    expect(removed).toEqual(['a']) // onCardRemove(DB)被走到
+  })
+})

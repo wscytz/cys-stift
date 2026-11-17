@@ -129,9 +129,18 @@ export function elementsToSvg(
   // → 钳成 1×1px。归一化(负则翻转 x/y 到左上)与 hitTest/选中框/self-built-render 同源。
   // 箭头特判:自身字段 bbox 是 (0,0,0,0) 退化点(关系箭头)或不含 curve/elbow/portal 派生
   // 几何(自由箭头)→ 换真实渲染几何 bounds(2026-11-16 导出截断修复)。
-  const boxes: Bounds[] = elements.map((e) =>
-    e.kind === 'arrow' ? (arrowGeometryBounds(e, elements) ?? normalizeBox(e)) : normalizeBox(e),
-  )
+  // 2026-11-17 边界审查:悬空关系箭头(from/to 引用的卡不在本集合)解析不出端点 →
+  // arrowGeometryBounds 返回 null。此时回退 normalizeBox 会把 (0,0,0,0) 并进 bounds——
+  // 原点污染重现(大片空白)。悬空箭头无可见几何(端点缺失渲染为空),直接跳过。
+  const boxes: Bounds[] = []
+  for (const e of elements) {
+    if (e.kind === 'arrow') {
+      const b = arrowGeometryBounds(e, elements)
+      if (b) boxes.push(b)
+      continue
+    }
+    boxes.push(normalizeBox(e))
+  }
   const raw = unionBounds(boxes) ?? { x: 0, y: 0, w: 1, h: 1 }
   const expanded = expandBounds(raw, opts.border)
   const width = Math.max(1, Math.round(expanded.w))

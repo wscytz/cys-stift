@@ -23,9 +23,11 @@ export function toIntentElement(element: CanvasElement): IntentCanvasElement | n
     // 此前裁掉 → AI 触碰过的元素丢失 meta(group/href/compute/freedraw 点序列)与弯折形态,
     // 后续组级锚解析失败、箭头变直线、笔迹拖拽/缩放永久失效。
     ...(element.route ? { route: element.route } : {}),
-    ...(element.curve ? { curve: { ...element.curve } } : {}),
+    ...(element.curve ? { curve: structuredClone(element.curve) } : {}),
     ...(element.elbow ? { elbow: element.elbow.map((p) => ({ ...p })) } : {}),
-    ...(element.meta ? { meta: { ...element.meta } } : {}),
+    // structuredClone 真·深拷:meta.points 是嵌套可变数组,浅拷会与 host 元素共享
+    // 内层引用(引擎 snapshot 契约同款"时序炸弹"防御,见 in-memory-host snapshot)。
+    ...(element.meta ? { meta: structuredClone(element.meta) } : {}),
   }
 }
 

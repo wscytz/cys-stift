@@ -243,7 +243,15 @@ function sanitizeFree(
         message: `delete 行只认 #id,已忽略其余指令(${extra.join(', ')})`,
       })
     }
-    if (op.id && ctx?.existingFreeKinds !== undefined && !ctx.existingFreeKinds.has(op.id)) {
+    // 2026-11-17:delete 按 id 跨 kind 生效(apply 侧 planFree 同步修正,卡也走
+    // card-delete),存在性检查含卡 id——否则对卡写错 kind 前缀会产「将跳过」的
+    // 假诊断,与实际行为自相矛盾。
+    if (
+      op.id &&
+      ctx?.existingFreeKinds !== undefined &&
+      !ctx.existingFreeKinds.has(op.id) &&
+      !ctx.existingCardIds?.has(op.id)
+    ) {
       diagnostics.push({ opIndex: idx, message: `delete ${op.shape} #${op.id} 不存在于画布(该行将跳过)` })
     }
     return { ...op, w: undefined, h: undefined, color: undefined, group: undefined, ...('text' in op ? { text: undefined } : {}), ...('compute' in op ? { compute: undefined } : {}) } as DslFreeOp

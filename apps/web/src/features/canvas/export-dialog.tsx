@@ -134,7 +134,9 @@ export function ExportDialog({
           format,
         })
         if (!blob) {
-          pushToast({ kind: 'error', message: t('canvas.exportEmpty') })
+          // 图片分支的 null 有两种成因:画布为空,或光栅化超尺寸守卫拦截
+          // (2026-11-17 边界审查:超大画布曾被误报为"画布是空的")。
+          pushToast({ kind: 'error', message: t('canvas.exportImageFailed') })
           return
         }
         await downloadImage(blob, baseName, format)

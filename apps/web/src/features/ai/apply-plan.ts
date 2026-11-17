@@ -67,6 +67,13 @@ function stableValue(value: unknown): string {
   return `{${Object.keys(value as object).sort().map((key) => `${JSON.stringify(key)}:${stableValue((value as Record<string, unknown>)[key])}`).join(',')}}`
 }
 
+// 卡 h 是引擎派生值(syncCardHeights 渲染期静默自愈,见 sceneRevision 同款归一)。
+// expected 门比较前归一,防止「确认门开着几秒内 Apply 被拒」假阳性。
+function normalizeCardHForCompare(el: IntentCanvasElement | null): IntentCanvasElement | null {
+  if (!el || el.kind !== 'card') return el
+  return { ...el, h: 0 }
+}
+
 export function hashIntentPlan(value: unknown): string {
   const text = stableValue(value)
   let hash = 0x811c9dc5
@@ -133,7 +140,12 @@ export async function commitIntentPlan(plan: IntentApplyPlan, port: IntentCommit
       const current = projected.has(action.elementId)
         ? projected.get(action.elementId) ?? null
         : port.getElement(action.elementId) ?? null
-      if (stableValue(current) !== stableValue(action.expected)) {
+      // 2026-11-17 边界审查:卡 h 由引擎渲染期静默自愈(syncCardHeights 按 body+宽度
+      // 重算,无事件),expected 门若把 h 计入会复现「确认门开着几秒内 Apply 被拒」的
+      // 假阳性——与 sceneRevision 同规则,card h 归一后再比。
+      const live = normalizeCardHForCompare(current)
+      const expected = normalizeCardHForCompare(action.expected)
+      if (stableValue(live) !== stableValue(expected)) {
         const diagnostics: IntentDiagnostic[] = [{ stage: 'commit', severity: 'error', code: 'EXPECTED_VALUE_MISMATCH', message: `Element ${action.elementId} changed after preview`, opId: op.opId }]
         return reportFromResults(plan, [
           ...blockedResults,

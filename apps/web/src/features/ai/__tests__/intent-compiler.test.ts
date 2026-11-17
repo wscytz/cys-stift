@@ -142,6 +142,20 @@ describe('Intent plan commit', () => {
     expect(port.apply).toHaveBeenCalledTimes(1)
   })
 
+  it('card h drift(引擎渲染期静默自愈)不触发 EXPECTED_VALUE_MISMATCH(2026-11-17 边界审查)', async () => {
+    const compiled = compileIntent(intent([{ op: 'update', target: 'card:one', patch: { color: 'red' } }], 'edit'), snapshot)
+    expect(compiled.ok).toBe(true)
+    if (!compiled.ok) return
+    // 模拟确认门开着期间 syncCardHeights 把 h 自愈(120 → 58):expected 门
+    // 对 card h 归一后应照常通过,不产生「Element changed after preview」假阳性。
+    const drifted: IntentSnapshot = {
+      ...snapshot,
+      elements: snapshot.elements.map((el) => (el.id === 'card:one' ? { ...el, h: 58 } : el)),
+    }
+    const report = await commitIntentPlan(compiled.plan, portFor(drifted))
+    expect(report).toMatchObject({ applied: 1, blocked: 0, failed: 0 })
+  })
+
   it('validates sequential expected values when two ops update one element', async () => {
     const compiled = compileIntent(intent([
       { op: 'update', target: 'card:one', patch: { color: 'red' } },

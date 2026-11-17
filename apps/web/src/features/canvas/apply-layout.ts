@@ -610,6 +610,11 @@ function planFree(
   if (op.delete) {
     const target = op.id ? shadow.get(op.id) : undefined
     if (!target) return skippedItem(opIndex, op, hash, `delete ${op.shape} #${op.id ?? ''} does not exist`)
+    // 2026-11-17 边界审查:delete 的 kind 前缀由模型自选(prompt 只约定带 #id),
+    // 写错前缀(如 [rect #某卡id delete])不得把卡送进 freeform-delete——那会绕过
+    // DB-first 守卫(canvasPosition 不清 → syncCardsToEditor 静默复活卡,挂接箭头
+    // 永久丢)。目标实为卡 → 与 planCard 同语义 card-delete;free 元素 → freeform-delete。
+    if (target.kind === 'card') return deleteItem(opIndex, op, hash, target.id, 'card-delete')
     return deleteItem(opIndex, op, hash, target.id, 'freeform-delete')
   }
   const x = finiteRound(op.x, 0)
