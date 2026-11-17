@@ -47,7 +47,7 @@
 
 **Markdown 渲染** —— GFM(表格/任务列表/删除线)+ 代码高亮(Swiss Editorial 色板)+ **数学公式**(katex `$inline$`/`$$display$$`)+ 脚注 + 块引用 `((标题))` 嵌入(环检测)。
 
-**全局图谱** —— `/graph` 跨画布语义三维签名力导向图(d3-force)+ 缩放条 + 触摸板手势(pinch 缩放/双指平移)。
+**全局图谱** —— `/graph` 跨画布语义签名力导向图(d3-force)+ 缩放条 + 触摸板手势(pinch 缩放/双指平移)。
 
 **关系网络** —— 块引用 + 详情建/删关系 + 跨画布 backlinks + 智能关系推荐(本地四信号 + 可选 AI 语义)+ **wikilink `[[标题]]` 自动建 references 箭头**(跨画布 + 模糊匹配 Levenshtein≤2 + 重命名追踪)+ **AI 对话 agent** `/ask`(对话 → cys-dsl 块 → 确认门 before/after 缩略图)。
 

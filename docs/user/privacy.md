@@ -20,7 +20,7 @@
 | **prompt** | 只在启用 AI 的那次请求中,由客户端组装后发给你选的 provider | 发送请求时。包括当前问题、最近对话上下文(最多 20 条)、allowlist 允许字段和目标画布快照(几何 + 默认含卡片正文,可在设置关闭正文);不是后台同步 |
 | **conversation** | `cys-stift.conversation.<canvasId>.v2` 的本地 localStorage; `/ask` 与 Canvas companion 共用,每画布隔离,最多保留 100 条 | 不会自动外发;只有后续 AI 请求会把最近上下文带给你选的 provider,或你主动导出 JSON |
 | **sample** | `cys-stift.ai-samples.v1` 的本地 localStorage;默认关闭,只有你在设置中明确开启后才累积,最近 500 条 | 不会自动外发;你在设置中导出样本或把完整 JSON 备份交给第三方时才离开本机 |
-| **proposal** | Proposal payload/review/receipt 存在本地 OPFS（不可用时 localStorage）；持久化来源锚点只保存 identity、revision、path/position 与 excerpt hash，不重复保存 `title/body` 原文；审计报告也不包含来源正文、API key 或完整 prompt | 只有生成时 allowlisted Working Set 会发给你选的 provider；本地 proposal 仅在你主动导出报告时离开设备 |
+| **proposal** | Proposal payload/review 存本地 OPFS（不可用时 localStorage）；proposal index、generation markers、transaction journal 与 commit receipt 存 localStorage；持久化来源锚点只保存 identity、revision、path/position 与 excerpt hash，不重复保存 `title/body` 原文；审计报告也不包含来源正文、API key 或完整 prompt | 只有生成时 allowlisted Working Set 会发给你选的 provider；本地 proposal 仅在你主动导出报告时离开设备 |
 | **export / archive** | Export 是你主动下载的开放 JSON; archive 是本地 OPFS(不可用时 localStorage) 的开发存档 | Export 文件由你决定是否分享; archive 本身不发给 AI。两者在最终边界清空 `apiKey`; archive 还剥离媒体 `dataUrl`,只留媒体元数据 |
 
 样本只保存 `question/context/aiOutput`、结果和 DSL 版号等脱敏字段,不保存原始 `Card[]`、settings、`deviceId` 或 API key。完整 JSON 备份可以包含卡片、媒体、草稿、设置、画布几何、对话和样本,所以分享前请把它当作包含你内容的文件处理。**画布 DSL v9(稳定版 v1.5.0;main 已到 v10)**支持卡片 `@title`/`@content`(内容能力自 v5 引入;v6 将 freedraw 移出 DSL;v7 加 `@group` 语义分组 / `@href` 卡片显式引用 / `@compute` 安全公式——其中 `@compute` 只引用元素几何 `#id.x|y|w|h`、**不碰卡片内容**,`@href` 是卡 id,均不新增内容外发;v8 加 `@type`/`@tags`/`@links`/`@code`/`@quote` 结构化字段——其中 `@code`/`@quote` 携带代码/引文内容,与 `@content` 同属内容外发面,应在「全量 DSL 视为含内容」范围内;v9 加组级相对锚 `right-of/below @组名`,只影响几何求解;v10 加显式删除 `[kind #id delete]`,两者均不新增内容外发面):DSL 模态编辑器的人读全量视图会携带内容;"复制所选为 DSL"与自建模板不注入内容,仍是纯几何(outbound 默认隐私安全)。AI 不直接读取模态编辑器 DSL 文本,而由程序通过独立的 `snapshotCanvas` / RAG 视图按任务构造上下文(snapshot 发送卡片 title,正文默认包含、可在设置关闭;RAG 仅发送 allowlist 字段;freedraw 仅 shape 描述符)。分享**你在模态编辑器里复制的全量 DSL 文本**时仍应当作包含卡片内容处理。DSL 永远不含 `apiKey`、媒体二进制或手绘点序列;freedraw 由程序在本地管理,不经 DSL 外发。
@@ -37,9 +37,9 @@
 
 > **AI 对话 agent /ask(2026-06-30)**:在 `/ask` 页对话时,把你的问题 + **RAG 检索到的 top-8 相关卡**(走 allowlist,同下表)+ **目标画布的元素快照**(id+位置+颜色+关系签名+卡片标题/正文,正文默认含、可在设置关闭)发给 AI。AI 回答时引用 `[card #id]`(UI 渲染可点开);要改画布时输出 `cys-dsl` 块,**经你确认才应用**(确认门显示 before/after 缩略图 + 变更摘要)。画布侧的“AI 排版”则使用受限 Intent IR v1,只允许 layout/place/align/distribute/pin,同样先预览 immutable plan 再提交。同样守住上述边界:`deviceId` / `media.dataUrl` / `apiKey` / 软删除卡永不发。
 >
-> **画布快照 content-on-demand 开关(2026-07-22)**:`/ask`、companion、AI 排版/聚类的画布快照默认**还会带卡片正文**(`  content: …` 行),让 AI 在画布类任务里也能理解卡片内容(以前只发标题,AI 常反映"看不到正文")。正文本就在 AI allowlist(RAG 一直发 body),这是同源数据的另一通道,不是新隐私面。想省 token / 更保守,在 **设置 → AI 上下文** 关掉「允许 AI 读取卡片正文」,快照就只发标题。对外「复制为提示词」仍纯几何。
+> **画布快照 content-on-demand 开关(2026-07-22)**:`/ask`、companion、AI 排版/聚类的画布快照默认**还会带卡片正文**(`  content: …` 行),让 AI 在画布类任务里也能理解卡片内容(以前只发标题,AI 常反映"看不到正文")。正文本就在 AI allowlist(RAG 一直发 body),这是同源数据的另一通道,不是新隐私面。想省 token / 更保守,在 **设置 → AI 上下文** 关掉「允许 AI 读取卡片正文」,快照就只发标题。对外「复制为提示词」不含卡片正文,但含卡片标题、自由文本与关系标签等 allowlist 元数据;仍不含媒体二进制、`deviceId` 与软删除卡。
 
-> **思考模式适配(2026-06-30)**:DeepSeek 等 OpenAI 兼容端点默认开「思考模式」,思考会吃掉大量 token 导致排版/分组/关系推荐这类**结构化输出**被截断(实测 1024~4096 token 全花在思考,DSL/JSON 输出 0 字 → 「未生效」)。结构化任务现在对 DeepSeek 端点发 `thinking: {type: disabled}` 关闭思考 —— 不截断、省约 75% token、快 2-3 倍、输出更完整。**只对 DeepSeek 端点发此字段**(靠 baseUrl 识别),真 OpenAI/Claude 端点不发(不破坏兼容)。总结/改写/翻译等需理解推理的任务**不关思考**(保留模型推理能力)。这不涉及隐私——思考内容留在模型侧,不发额外数据。
+> **思考模式适配(2026-06-30)**:DeepSeek 等 OpenAI 兼容端点默认开「思考模式」,思考会吃掉大量 token 导致排版/分组/关系推荐这类**结构化输出**被截断(实测 1024~4096 token 全花在思考,DSL/JSON 输出 0 字 → 「未生效」)。结构化任务现在对 DeepSeek 系端点发 `thinking: {type: disabled}` 关闭思考 —— 不截断、省约 75% token、快 2-3 倍、输出更完整;对 Qwen/DashScope 端点发 `enable_thinking: false`。**DeepSeek 按 baseUrl 或模型名识别**;真 OpenAI/Claude 端点两者都不发(不破坏兼容)。总结/改写/翻译等需理解推理的任务**不关思考**(保留模型推理能力)。这不涉及隐私——思考内容留在模型侧,不发额外数据。
 
 > **vision 模型**:当前版本没有可用的 vision 运行时能力,因此设置中不显示 Vision 实验开关。图片二进制不会进入 AI prompt。只有实现完整 consumer、隐私确认和测试后,未来版本才会公开相应开关。
 
