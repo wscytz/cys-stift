@@ -43,7 +43,7 @@
 
 **canvas(自研 Canvas 2D)** —— 6 种元素(card/arrow/freedraw/text/rect/frame)+ 多画布 + 视图持久化 + 关系箭头(straight/curve/elbow + 手绘识别)+ 工具栏(选择/手绘/文本/连接/橡皮)+ AI 排版 + 导出(图片 SVG/PNG/JPEG + Markdown + DSL)+ Outline / Minimap / 全局缩略图 + 双链 `[[]]` 自动建箭头 + **DSL 模态编辑器(转义,两卡选择可直接生成关系式 + 实时 diff/诊断/stale 恢复)** + 对齐分布 9 操作 + 画布模板 + 整理范式(思维导图/流程图/网格/紧凑 × 四方向)+ 焦点模式 + frame + 手绘规范化(保角 RDP + 贝塞尔平滑 + $1 形状识别)+ **关系式坐标 DSL**(right-of/below + 碰撞避让)+ **卡片密度模式**(紧凑/自适应/仅标题/副标题)+ 双击空白建卡 + **DSL sanitize 兜底**(AI 非法值不崩)。
 
-**工作台** —— per-card 深度编辑(`/workbench` 库页 + canvas 右栏编辑器);画布 hover 只读速览,双击或侧栏入口进入工作台。当前版本已移除旧的 focusEdit 专注编辑态,避免把独立工作台和画布焦点模式混为一谈。
+**工作台** —— per-card 深度编辑(`/workbench` 库页 + 独立编辑页);画布 hover 只读速览,双击卡片或画布顶栏入口跳转工作台(当前版本无画布内右栏编辑器;旧 focusEdit 专注编辑态已移除,避免把独立工作台和画布焦点模式混为一谈)。
 
 **Markdown 渲染** —— GFM(表格/任务列表/删除线)+ 代码高亮(Swiss Editorial 色板)+ **数学公式**(katex `$inline$`/`$$display$$`)+ 脚注 + 块引用 `((标题))` 嵌入(环检测)。
 
