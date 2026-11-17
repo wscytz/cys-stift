@@ -100,7 +100,7 @@ pnpm tauri dev
 
 ## 4. 跨平台常见坑
 
-- **路径**：Tauri fs 插件的 scope 配置需分别按 mac/win 的 OS 数据目录写（spec §11）
+- **路径**：当前数据在 WebView 存储，不经 Tauri fs；fs 插件只用于导出 helper（dialog 选路径后写入），capabilities 为 `fs:default` + `fs:allow-write-file`，无需按 OS 数据目录配 scope。若未来改为原生落盘，再按 spec §11 补 mac/win scope。
 - **大小写**：仓库目录全小写，Windows 不敏感但 mac/Linux 敏感，**统一小写**最稳
 - **行尾**：仓库强制 LF，不要让 IDE 改 CRLF
 - **Tauri 编译**：各自平台编译各自产物，CI 用 GitHub Actions 双平台构建（Phase 8 引入）
