@@ -171,7 +171,7 @@ provider 的服务端会按它的[隐私政策](https://openai.com/policies/row-
 **为什么不加密**:
 - 加密需要密码,密码不能本地存(否则失去意义),要用户每次输入 → 体验差
 - 你已经在自己的设备上,设备本身的锁屏是第一道防线
-- M4 可能升级到 OS keychain(macOS Keychain / Windows Credential Manager)
+- 后续版本可能升级到 OS keychain(macOS Keychain / Windows Credential Manager)
 
 ### 其它本地数据
 
