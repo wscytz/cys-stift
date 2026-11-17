@@ -17,14 +17,13 @@ import { WorkbenchSections } from './workbench-sections'
 /**
  * WorkbenchBrowser — `/workbench` 库主体(搜索 + 分类模式切换器 + 分区列表)。
  *
- * 库 = 浏览/整理面,不编辑(点卡跳 /canvas 由 dock 接管)。分类模式数据驱动
+ * 库 = 浏览/整理面,点卡就地打开右栏编辑器。分类模式数据驱动
  * (WORKBENCH_MODES),切换器渲染由数组派生,加模式只改 modes.ts。
  *
  * 搜索跨模式:对 title/body 做大小写不敏感包含匹配,过滤后的 cards 再进分区。
  * 标签模式:多选 chip(任一匹配),复用 D5 aggregateTags 拉标签列表。
  *
- * 行点击(子任务 5):有 canvasPosition → workbenchStore.open + push /canvas(dock 接管编辑);
- * 无 canvasPosition → toast「未上画布」+ push /inbox(收件箱区卡本就未上画布,去 inbox 更顺)。
+ * 行点击(子任务 5):就地打开右栏编辑器(所有卡,含未上画布的 inbox 卡);不再跳 /canvas。
  */
 export function WorkbenchBrowser({ cards, onOpenCard: onOpenCardProp }: { cards: Card[]; onOpenCard?: (card: Card) => void }) {
   const { t } = useI18n()
