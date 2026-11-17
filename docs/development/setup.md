@@ -18,7 +18,7 @@
 - 路径用 `path.join()` / `path.posix`，不写死 `/` 或 `\`
 - 换行符 `.gitattributes` 强制 LF（仓库已配）
 - 目录 / 文件全小写连字符
-- 数据目录用 OS 规范路径（mac: `~/Library/Application Support`；win: `%APPDATA%`），不写死 `~/`
+- 数据目录用 OS 规范路径（mac: `~/Library/Application Support`；win: `%APPDATA%`），不写死 `~/`（当前版本数据仍在 WebView localStorage/OPFS，不写原生数据目录；未来若落盘再按此规则）
 
 ### 文档与版本门禁
 

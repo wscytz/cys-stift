@@ -88,7 +88,7 @@
 ### 灵感卡行为
 
 - 渲染查 CardService(单一数据源)→ inbox 改 title/body,画布**实时更新**,不需 reload
-- 拖卡 → 位置自动写回 DB
+- 拖卡 → 位置自动写回本地存储
 - body preview 显示卡片正文前几行(折叠式)
 - pinned 卡右上角带黄星
 
