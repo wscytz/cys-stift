@@ -76,10 +76,13 @@ def collect_files() -> list[str]:
 
 
 def gather_lines() -> tuple[list[str], dict]:
-    stats = {'files': 0, 'total_lines': 0, 'truncated': 0}
+    stats = {'files': 0, 'source_lines': 0, 'total_lines': 0, 'truncated': 0}
     out: list[str] = []
     for path in collect_files():
         text = Path(path).read_text(encoding='utf-8', errors='replace')
+        # 源程序量只数真实源码行,不含下面插入的「文件:」分隔头(否则每文件 +1,
+        # 331 文件虚增 331 行,与申请表的行数口径对不上)。
+        stats['source_lines'] += len(text.splitlines())
         sep = '// ═══' if path.endswith('.rs') else '/* ═══'
         end = '═══ */' if not path.endswith('.rs') else '═══'
         out.append(f'{sep} 文件: {path} {end}')
@@ -167,8 +170,8 @@ def main():
     out, n_pages = build_docx(picked)
     print(f'✓ {out}')
     print(f'  模式: {mode}')
-    print(f'  源文件 {stats["files"]} 个 / 全部源码 {stats["total_lines"]} 行')
-    print(f'  收录 {len(picked)} 行(含 1 行中略标记)→ {n_pages} 页 × {LINES_PER_PAGE} 行')
+    print(f'  源文件 {stats["files"]} 个 / 源程序量 {stats["source_lines"]} 行(不含文件分隔头)')
+    print(f'  拼接 {stats["total_lines"]} 行;收录 {len(picked)} 行(含文件头与 1 行中略标记)→ {n_pages} 页 × {LINES_PER_PAGE} 行')
     print(f'  截断行(超 {MAXCOL} 显示列): {stats["truncated"]} 行')
 
 
