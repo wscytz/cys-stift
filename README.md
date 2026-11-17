@@ -21,7 +21,7 @@
 
 ## 下载
 
-最新版本为 [**v1.4.0**](https://github.com/wscytz/cys-stift/releases/tag/v1.4.0)(稳定版)。桌面安装包和 `SHA256SUMS.txt` 均从该 Release 页面下载。也可以直接用[网页版](https://wscytz.com/cys-stift/app/)体验(跟随 main 分支,可能领先 Release tag;数据留在浏览器本地):
+最新版本为 [**v1.5.0**](https://github.com/wscytz/cys-stift/releases/tag/v1.5.0)(稳定版)。桌面安装包和 `SHA256SUMS.txt` 均从该 Release 页面下载。也可以直接用[网页版](https://wscytz.com/cys-stift/app/)体验(跟随 main 分支,可能领先 Release tag;数据留在浏览器本地):
 
 | 平台 | 文件 | 说明 |
 |---|---|---|
@@ -31,7 +31,7 @@
 
 > iPad/iOS 不做。Windows 安装包未经 Authenticode 签名，macOS 安装包为 ad-hoc 签名且未公证，系统可能显示“未知开发者/发布者”警告；安装前请先核对 Release 中的 SHA256。
 
-`v1.4.0` 是当前稳定版:在 v1.3.0 功能核心(预览线三轮打磨 + 三轮对抗测试 + 规则化审查全修)之上,完成 **Swiss Editorial UI 重绘**(设计系统 v0.2:暖纸/手术红/墨/石油蓝,全 0 圆角、1px 线层级、零阴影)与动效体系(同文档 View Transitions 路由过渡、入场编排、触感反馈),改动面纯 UI 层——数据格式与用户设置完全兼容。签名/公证、实机无障碍(VoiceOver)、真实系统 200% 缩放、外部用户研究与真实 provider 配额/拒绝演练仍列为后续加固项;桌面安装器图标暂为旧一代。变更细节见 [Release notes](https://github.com/wscytz/cys-stift/releases) 与 [`docs/changelog.md`](docs/changelog.md);设计规范见 [`docs/design/swiss-editorial.md`](docs/design/swiss-editorial.md)。
+`v1.5.0` 是当前稳定版:在 v1.4.x 基础上,箭头自动避障升级为**全局正交走线求解器**(走廊增强稀疏可见图 + 方向状态 A*,1000 随机场景零穿越),DSL 增加**手误提示**(全角标点/拼错指令与关系词/中文方位词)与敌意输入硬化,并提供单文件**内核调试台**;应用壳数据格式与用户设置兼容。签名/公证、实机无障碍(VoiceOver)、真实系统 200% 缩放、外部用户研究与真实 provider 配额/拒绝演练仍列为后续加固项;桌面安装器图标暂为旧一代。变更细节见 [Release notes](https://github.com/wscytz/cys-stift/releases) 与 [`docs/changelog.md`](docs/changelog.md);设计规范见 [`docs/design/swiss-editorial.md`](docs/design/swiss-editorial.md)。
 
 ---
 
@@ -41,7 +41,7 @@
 
 **inbox** —— 多媒介编辑(链接/代码/引用/媒体)+ 草稿自动保存 + 发送到画布。
 
-**canvas(自研 Canvas 2D)** —— 6 种元素(card/arrow/freedraw/text/rect/frame)+ 多画布 + 视图持久化 + 关系箭头(straight/curve/elbow + 手绘识别)+ 工具栏(选择/手绘/文本/连接/橡皮)+ AI 排版 + 导出(图片 SVG/PNG + Markdown + DSL)+ Outline / Minimap / 全局缩略图 + 双链 `[[]]` 自动建箭头 + **DSL 模态编辑器(转义,两卡选择可直接生成关系式 + 实时 diff/诊断/stale 恢复)** + 对齐分布 9 操作 + 画布模板 + 整理范式(思维导图/流程图/网格/紧凑 × 四方向)+ 焦点模式 + frame + 手绘规范化(保角 RDP + 贝塞尔平滑 + $1 形状识别)+ **关系式坐标 DSL**(right-of/below + 碰撞避让)+ **卡片密度模式**(紧凑/自适应/仅标题/副标题)+ 双击空白建卡 + **DSL sanitize 兜底**(AI 非法值不崩)。
+**canvas(自研 Canvas 2D)** —— 6 种元素(card/arrow/freedraw/text/rect/frame)+ 多画布 + 视图持久化 + 关系箭头(straight/curve/elbow + 手绘识别)+ 工具栏(选择/手绘/文本/连接/橡皮)+ AI 排版 + 导出(图片 SVG/PNG/JPEG + Markdown + DSL)+ Outline / Minimap / 全局缩略图 + 双链 `[[]]` 自动建箭头 + **DSL 模态编辑器(转义,两卡选择可直接生成关系式 + 实时 diff/诊断/stale 恢复)** + 对齐分布 9 操作 + 画布模板 + 整理范式(思维导图/流程图/网格/紧凑 × 四方向)+ 焦点模式 + frame + 手绘规范化(保角 RDP + 贝塞尔平滑 + $1 形状识别)+ **关系式坐标 DSL**(right-of/below + 碰撞避让)+ **卡片密度模式**(紧凑/自适应/仅标题/副标题)+ 双击空白建卡 + **DSL sanitize 兜底**(AI 非法值不崩)。
 
 **工作台** —— per-card 深度编辑(`/workbench` 库页 + canvas 右栏编辑器);画布 hover 只读速览,双击或侧栏入口进入工作台。当前版本已移除旧的 focusEdit 专注编辑态,避免把独立工作台和画布焦点模式混为一谈。
 
@@ -51,13 +51,13 @@
 
 **关系网络** —— 块引用 + 详情建/删关系 + 跨画布 backlinks + 智能关系推荐(本地四信号 + 可选 AI 语义)+ **wikilink `[[标题]]` 自动建 references 箭头**(跨画布 + 模糊匹配 Levenshtein≤2 + 重命名追踪)+ **AI 对话 agent** `/ask`(对话 → cys-dsl 块 → 确认门 before/after 缩略图)。
 
-**AI** —— 多 provider(OpenAI / Anthropic / DeepSeek / Ollama 本地,零成本)+ AI 排版(诚实位移反馈:重排 N 张 / AI 认为已合理 / 未改动)+ AI 伴侣面板(发现 tab 本地预筛 + 对话 tab)+ **DSL 重试闭环**(AI 出坏 DSL 自动重试喂回错误,maxAttempts=3)+ 失败样本采集(可导出调优)。
+**AI** —— 多 provider(OpenAI / Anthropic / Ollama 本地;DeepSeek 等兼容端点走 OpenAI provider)+ AI 排版(诚实位移反馈:重排 N 张 / AI 认为已合理 / 未改动)+ AI 伴侣面板(发现 tab 本地预筛 + 对话 tab)+ **DSL 重试闭环**(AI 出坏 DSL 自动重试喂回错误,maxAttempts=3)+ 失败样本采集(可导出调优)。
 
 **可审计 AI 共编（Labs，默认关闭）** —— 选择卡片并确认发送范围后，本地 graph lint 与 AI 的 Logic / Ideas / Layout 建议按来源逐项审查；接受后仍需生成 ghost preview 再应用。三个 lane 的 accepted subset 合并为同一份不可变计划，使用可恢复事务、CommitReceipt 与 guarded Undo。该实验不改变 cys-dsl 版本，尚未取得外部用户验证，不能视为稳定版承诺。
 
 **画板适配** —— 响应式(<1024 汉堡抽屉 + companion 覆盖 + canvas 断点归一)+ 触摸手势(双指 pinch zoom + 双指平移 + 触摸目标 44px)+ Android 运行时(rustls ring provider + 平台检测 SSR-safe hooks)。
 
-**其他** —— 命令面板(⌘K)+ 标签墙 `/tags`(六色 canonical 调色板)+ 时间线 `/timeline`(全局)+ 全文搜索(title 加权 + 摘要)+ 软删恢复 + JSON 导出/导入(含画布几何 + freeform + 本机恢复点)+ 中英双语。
+**其他** —— 命令面板(⌘K)+ 标签管理 `/tags`(六色 canonical 调色板;改名/改色/删除/合并)+ 时间线 `/timeline`(全局)+ 全文搜索(title 加权 + 摘要)+ 软删恢复 + JSON 导出/导入(含画布几何 + freeform + 本机恢复点)+ 中英双语。
 
 完整能力见最新 [Release notes](https://github.com/wscytz/cys-stift/releases) 与 [`docs/changelog.md`](docs/changelog.md)。
 
@@ -67,7 +67,7 @@
 
 ## 状态
 
-**v1.4.0** — 最新稳定版,已在 GitHub Release 发布。核心闭环、恢复事务、cys-dsl v8 与跨平台构建流水线就绪(1.3.0 定档),本版叠加 Swiss Editorial UI 重绘与动效体系(纯 UI 层,数据/设置兼容),并经两轮规则化审查全修。签名/公证、实机无障碍(VoiceOver)与真实 provider 证据继续作为后续稳定版加固工作;桌面安装器图标换代在列。
+**v1.5.0** — 最新稳定版,已在 GitHub Release 发布。核心闭环、恢复事务、cys-dsl v9 与跨平台构建流水线就绪;本版把箭头避障升级为全局走线求解器,DSL 增加手误提示与敌意输入硬化,并提供内核调试台。签名/公证、实机无障碍(VoiceOver)与真实 provider 证据继续作为后续稳定版加固工作;桌面安装器图标换代在列。
 
 DSL 的实现与内部稳定性验证已经具备，但“普通用户是否愿意学习并重复使用”仍是待外部研究验证的产品假设；README 和展示页不会把内部测试写成用户价值结论。
 
