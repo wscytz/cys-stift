@@ -5,7 +5,7 @@ import { SaveStatusBadge } from '../save-status-badge'
 
 vi.mock('@/lib/i18n', () => ({
   useI18n: () => ({
-    t: (k: string) => (k === 'canvas.saved' ? '仅本机存储' : k),
+    t: (k: string) => (k === 'canvas.saved' ? '默认本机存储' : k),
     locale: 'zh',
     setLocale: () => {},
   }),
@@ -21,11 +21,11 @@ describe('SaveStatusBadge (Task 4)', () => {
     document.body.removeChild(container)
   })
 
-  it('挂载后显示「仅本机存储」(useEffect 置 show)', () => {
+  it('挂载后显示「默认本机存储」(useEffect 置 show)', () => {
     act(() => {
       createRoot(container).render(<SaveStatusBadge />)
     })
-    expect(container.textContent).toContain('仅本机存储')
+    expect(container.textContent).toContain('默认本机存储')
   })
 
   it('不含勾选标记(不冒充最近一次保存成功) + role=status', () => {

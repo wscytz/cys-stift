@@ -13,6 +13,7 @@
 - **公开脚本**：软著源程序生成器不再硬编码本地用户名/私有仓路径，改用 `CYS_STIFT_DOCS_DIR`（默认 `~/projects/cys-stift-docs`）。
 - **浏览器三编辑验收**：`pnpm demo:approval` 连续覆盖插入、移动、纯内容修改和缺失锚点阻断，核对未编辑卡不变。
 - **公共验收测试**：新增 `acceptance-invariants.test.ts`，把三编辑、缺失锚点、create 冲突和 DSL 往返共 7 项状态不变量收进 web 默认测试。
+- **网页表述**：统一中文标点；把“数据仅存本机”改为“默认保存在本机”，避免与可选 AI 发送内容混淆；设置页把 provider/profile 统一为“服务商/配置”。
 - **验证**：全包 lint exit 0；全量 3234 passed / 3 skipped；web build exit 0；线上 12 路由与 PWA 资产 200。
 
 ## 2026-11-17 · 未发布 · fix: 维护回归、验证门与主介绍对齐

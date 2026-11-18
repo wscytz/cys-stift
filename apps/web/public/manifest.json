@@ -1,7 +1,7 @@
 {
   "name": "cy's Stift",
   "short_name": "Stift",
-  "description": "本地优先的灵感画布。你的灵感,在画布上生长。",
+  "description": "本地优先的灵感画布。你的灵感，在画布上生长。",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

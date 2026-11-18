@@ -130,7 +130,7 @@ export function CaptureShortcutSettings({
         </select>
       </div>
       <p className="mono">
-        {t('settings.current')}:{' '}
+        {t('settings.current')}：
         <code className="set__current-code">
           {(candidate.modKey === 'meta' ? '⌘' : 'Ctrl') +
             (candidate.shift ? '+⇧' : '') +

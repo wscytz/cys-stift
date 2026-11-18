@@ -1,6 +1,6 @@
 'use client'
 /**
- * save-status-badge — 画布静态「仅本机存储」角标(2-A)。
+ * save-status-badge — 画布静态「默认本机存储」角标(2-A)。
  *
  * 只说明数据存在哪里,不冒充「最近一次保存成功」(写入失败不会翻转状态)。
  * SSG 期 localStorage 不可达 → 首帧不显示(useEffect 置 show),避免 hydration mismatch。
