@@ -783,8 +783,8 @@ export const messages = {
   'settings.cardDisplaySubtitle': { zh: '标题 + 副标题', en: 'Title + subtitle' },
   'settings.aiContext': { zh: 'AI 上下文', en: 'AI context' },
   'settings.aiContextLede': {
-    zh: '控制 AI 在 AI 对话、排版、聚类时能看到多少卡片内容。开启 = AI 可读卡片正文（理解更准、更耗 token）；关闭 = 只发标题（省 token、更保守）。',
-    en: 'Control how much card content AI sees in AI chat, layout, and clustering. On = AI may read card body (better understanding, more tokens); Off = titles only (saves tokens, more conservative).',
+    zh: '控制 AI 在对话、排版、聚类时能看到多少卡片内容。开启后，AI 可读卡片正文（理解更准，但更耗 token）；关闭后，只发送标题（省 token，更保守）。',
+    en: 'Control how much card content AI sees in chat, layout, and clustering. On: AI may read card body (better understanding, more tokens). Off: titles only (saves tokens, more conservative).',
   },
   'settings.aiIncludeCardContent': { zh: '允许 AI 读取卡片正文', en: 'Allow AI to read card content' },
   'settings.language': { zh: '语言', en: 'Language' },
