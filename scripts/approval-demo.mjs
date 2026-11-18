@@ -1,6 +1,7 @@
-// Approval demo: seed a fixed 6-card canvas, paste a DSL proposal, verify
-// preview labels, apply, and assert untouched cards. Uses the existing static
-// export in apps/web/out; run `pnpm --filter web build` first. No network.
+// Approval demo: seed a fixed 6-card canvas, then exercise three edit shapes
+// (insert, move, content-only) plus a blocked missing-anchor path through the
+// same DSL confirm chain. Uses the existing static export in apps/web/out; run
+// `pnpm --filter web build` first. No network.
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
@@ -133,24 +134,95 @@ try {
   assert(!textarea.includes('[arrow #e2]'), textarea)
   assert(untouched.every((item) => item.x === 0 && item.y === 0 && item.title && item.body), JSON.stringify(untouched))
 
-  await page.evaluate(() => {
-    const button = [...document.querySelectorAll('.cv-rail button')].find((item) => (item.getAttribute('aria-label') ?? '').includes('画布转义') || (item.textContent ?? '').includes('转义'))
-    if (button) button.click()
+  const openDsl = async () => {
+    await page.evaluate(() => {
+      const button = [...document.querySelectorAll('.cv-rail button')].find((item) => (item.getAttribute('aria-label') ?? '').includes('画布转义') || (item.textContent ?? '').includes('转义'))
+      if (button) button.click()
+    })
+    await page.waitForSelector('textarea.dsl-text', { timeout: 10000 })
+  }
+  const setDsl = async (text) => {
+    await page.evaluate((value) => {
+      const area = document.querySelector('textarea.dsl-text')
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+      setter.call(area, value)
+      area.dispatchEvent(new Event('input', { bubbles: true }))
+    }, text)
+  }
+  const clickApply = async () => {
+    await page.evaluate(() => {
+      const button = [...document.querySelectorAll('.dsl-actions button')].find((item) => item.textContent.trim() === '应用')
+      if (button) button.click()
+    })
+  }
+  const readCards = () => page.evaluate((key) => JSON.parse(localStorage.getItem(key)).cards, keys.cards)
+  // h 是渲染层派生值(随内容重算),不作为内容编辑的位置不变量;x/y/w 才是。
+  const cardState = (list) => Object.fromEntries(list.map((card) => [card.id, {
+    x: card.canvasPosition.x, y: card.canvasPosition.y, w: card.canvasPosition.w,
+    title: card.title, body: card.body,
+  }]))
+  const sameExcept = (before, after, ids) => ids.every((id) => {
+    const left = before[id]
+    const right = after[id]
+    return left && right && JSON.stringify(left) === JSON.stringify(right)
   })
-  await page.waitForSelector('textarea.dsl-text', { timeout: 10000 })
-  await page.evaluate((text) => {
-    const textarea = document.querySelector('textarea.dsl-text')
-    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
-    setter.call(textarea, text)
-    textarea.dispatchEvent(new Event('input', { bubbles: true }))
-  }, '[card #e] right-of #ghost @gap(40)')
+
+  // 第二类编辑：移动。整段文本只留一条关系式 op，证明省略不等于删除。
+  await openDsl()
+  await setDsl('[card #e] right-of #f @gap(40)')
+  await page.waitForFunction(() => (document.querySelector('.dsl-preview')?.textContent ?? '').includes('横向位置'), { timeout: 10000 })
+  const movePreview = await page.evaluate(() => document.querySelector('.dsl-preview')?.textContent ?? '')
+  const beforeMove = cardState(await readCards())
+  await clickApply()
+  await page.waitForFunction(() => (document.querySelector('textarea.dsl-text')?.value ?? '').includes('@pos(1300.0,240.0)'), { timeout: 10000 })
+  await new Promise((resolve) => setTimeout(resolve, 600))
+  const afterMoveCards = await readCards()
+  const afterMove = cardState(afterMoveCards)
+  const eAfterMove = afterMoveCards.find((card) => card.id === 'e')
+  assert(eAfterMove, 'card e missing after move')
+  assert.equal(eAfterMove.canvasPosition.x, 1300, 'e should be right of f')
+  assert.equal(eAfterMove.canvasPosition.y, 240, 'e should stay on row 2')
+  assert.equal(eAfterMove.title, 'Card E')
+  assert.equal(eAfterMove.body, 'Body E')
+  assert(sameExcept(beforeMove, afterMove, ['a', 'b', 'c', 'd', 'f', 'g']), 'move changed an unrelated card')
+  assert(movePreview.includes('Card E'), movePreview)
+  assert(movePreview.includes('横向位置'), movePreview)
+  await page.screenshot({ path: '/tmp/cys-demo-move.png' })
+
+  // 第三类编辑：纯内容。位置/元素不变，只改卡片字段。
+  await setDsl('[card #a] @title("Alpha Updated") @content("body updated")')
+  await page.waitForFunction(() => (document.querySelector('.dsl-preview')?.textContent ?? '').includes('Card A'), { timeout: 10000 })
+  const updatePreview = await page.evaluate(() => document.querySelector('.dsl-preview')?.textContent ?? '')
+  const beforeUpdate = cardState(await readCards())
+  await clickApply()
+  await page.waitForFunction(() => {
+    const text = document.querySelector('textarea.dsl-text')?.value ?? ''
+    return text.includes('Alpha Updated') && text.includes('[card #b]')
+  }, { timeout: 10000 })
+  await new Promise((resolve) => setTimeout(resolve, 600))
+  const afterUpdateCards = await readCards()
+  const afterUpdate = cardState(afterUpdateCards)
+  const aAfterUpdate = afterUpdateCards.find((card) => card.id === 'a')
+  assert(aAfterUpdate, 'card a missing after content update')
+  assert.equal(aAfterUpdate.title, 'Alpha Updated')
+  assert.equal(aAfterUpdate.body, 'body updated')
+  assert.deepEqual(
+    { x: afterUpdate.a.x, y: afterUpdate.a.y, w: afterUpdate.a.w },
+    { x: beforeUpdate.a.x, y: beforeUpdate.a.y, w: beforeUpdate.a.w },
+    'content update moved or resized card a',
+  )
+  assert(sameExcept(beforeUpdate, afterUpdate, ['b', 'c', 'd', 'e', 'f', 'g']), 'content update changed an unrelated card')
+  assert(updatePreview.includes('Card A'), updatePreview)
+  assert(updatePreview.includes('标题'), updatePreview)
+  assert(updatePreview.includes('正文'), updatePreview)
+  await page.screenshot({ path: '/tmp/cys-demo-update.png' })
+
+  // 错误路径：缺失锚点整单取消，画布状态不变。
+  await setDsl('[card #e] right-of #ghost @gap(40)')
   await page.waitForFunction(() => [...document.querySelectorAll('.dsl-preview')].some((node) => (node.textContent ?? '').includes('无法应用')), { timeout: 10000 })
   const errorPreview = await page.evaluate(() => [...document.querySelectorAll('.dsl-preview')].map((node) => node.textContent).find((text) => text.includes('无法应用')) ?? '')
   const errorBefore = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)).cards.find((card) => card.id === 'e'), keys.cards)
-  await page.evaluate(() => {
-    const button = [...document.querySelectorAll('.dsl-actions button')].find((item) => item.textContent.trim() === '应用')
-    if (button) button.click()
-  })
+  await clickApply()
   await page.waitForFunction(() => [...document.querySelectorAll('[role="status"], [role="alert"]')].some((node) => (node.textContent ?? '').includes('已整单取消')), { timeout: 10000 })
   const errorToast = await page.evaluate(() => [...document.querySelectorAll('[role="status"], [role="alert"]')].map((node) => node.textContent).find((text) => text.includes('已整单取消')) ?? '')
   await new Promise((resolve) => setTimeout(resolve, 500))
@@ -159,10 +231,17 @@ try {
   assert(errorPreview.includes('ghost'), errorPreview)
   assert.deepEqual(errorAfter.canvasPosition, errorBefore.canvasPosition)
   assert.equal(errorAfter.title, errorBefore.title)
+  assert.equal(errorAfter.body, errorBefore.body)
 
   assert.deepEqual(errors, [])
   assert.deepEqual(external, [])
-  console.log(JSON.stringify({ ok: true, beforeSummary, afterSummary, beforeTitles, afterTitles, preview, toast, untouched, g: { x: g.canvasPosition.x, y: g.canvasPosition.y, title: g.title }, errorPreview, errorToast, errors, external }, null, 2))
+  console.log(JSON.stringify({
+    ok: true, beforeSummary, afterSummary, beforeTitles, afterTitles, preview, toast, untouched,
+    g: { x: g.canvasPosition.x, y: g.canvasPosition.y, title: g.title },
+    move: { preview: movePreview, e: { x: eAfterMove.canvasPosition.x, y: eAfterMove.canvasPosition.y, title: eAfterMove.title } },
+    update: { preview: updatePreview, a: { title: aAfterUpdate.title, body: aAfterUpdate.body, x: aAfterUpdate.canvasPosition.x, y: aAfterUpdate.canvasPosition.y } },
+    errorPreview, errorToast, errors, external,
+  }, null, 2))
 } finally {
   await browser?.close()
   server.closeAllConnections()
