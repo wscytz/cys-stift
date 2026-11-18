@@ -87,7 +87,6 @@ const routes = [
 const browser = await puppeteer.launch({
   executablePath: CHROME,
   headless: true,
-  args: ['--no-sandbox', '--disable-setuid-sandbox'],
 })
 
 let totalErrors = 0

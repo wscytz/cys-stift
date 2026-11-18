@@ -21,10 +21,11 @@
     "d3-force": "^3.0.0",
     "dagre": "^0.8.5",
     "eventsource-parser": "1.1.2",
-    "katex": "^0.17.0",
+    "katex": "0.18.2",
     "lucide-react": "^1.22.0",
     "markitdownllm": "^0.1.5",
-    "next": "15.5.22",
+    "next": "15.5.28",
+    "pdfjs-dist": "6.2.108",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-markdown": "9",
@@ -41,9 +42,9 @@
     "@types/node": "22.9.0",
     "@types/react": "19.0.0",
     "@types/react-dom": "19.0.0",
-    "@vitest/ui": "2.1.5",
+    "@vitest/ui": "4.1.12",
     "jsdom": "^29.1.1",
     "typescript": "5.6.3",
-    "vitest": "2.1.5"
+    "vitest": "4.1.12"
   }
 }

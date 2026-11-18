@@ -36,19 +36,8 @@ jobs:
             apps/desktop/src-tauri/Cargo.lock \
             apps/desktop/src-tauri/tauri.conf.json
 
-      # v0.37.0: a real typecheck gate. The package `test` scripts are just
-      # `vitest run` (no tsc), and vitest does not typecheck — so type errors
-      # in packages/domain, db, ui were silently passing. This step runs the
-      # `lint` script (tsc --noEmit) of the three typed packages. web is
-      # typechecked by `next build` below; its `next lint` is interactive and
-      # not used here.
-      - name: typecheck (domain / db / ui / cys-dsl / canvas-engine — tsc --noEmit)
-        run: |
-          pnpm --filter domain lint
-          pnpm --filter @cys-stift/db lint
-          pnpm --filter @cys-stift/ui lint
-          pnpm --filter @cys-stift/dsl lint
-          pnpm --filter @cys-stift/canvas-engine lint
+      - name: workspace typecheck (including web test fixtures)
+        run: pnpm -r lint
 
       - name: domain test
         run: pnpm --filter domain test
@@ -57,7 +46,10 @@ jobs:
         run: pnpm --filter db test
 
       - name: cys-dsl test
-        run: pnpm --filter @cys-stift/dsl test
+        run: pnpm --filter @wscytz/dsl --fail-if-no-match test
+
+      - name: cys-dsl offline package smoke
+        run: pnpm --filter @wscytz/dsl --fail-if-no-match verify:pack
 
       - name: canvas-engine test
         run: pnpm --filter @cys-stift/canvas-engine test

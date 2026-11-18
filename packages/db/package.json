@@ -18,11 +18,11 @@
   "dependencies": {
     "@cys-stift/domain": "workspace:*",
     "better-sqlite3": "11.5.0",
-    "drizzle-orm": "0.36.4"
+    "drizzle-orm": "0.45.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "7.6.11",
     "typescript": "5.6.3",
-    "vitest": "2.1.5"
+    "vitest": "4.1.12"
   }
 }

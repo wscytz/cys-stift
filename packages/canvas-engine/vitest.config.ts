@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 /**
  * 引擎测试在 jsdom 环境跑 —— 部分纯函数(self-built-render / colorOf)依赖 DOM
@@ -9,5 +9,6 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    exclude: [...configDefaults.exclude, '**/dist/**'],
   },
 })

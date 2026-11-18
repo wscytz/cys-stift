@@ -36,6 +36,8 @@ const solved = solveRelational(clean.ops)   // 关系式 → 绝对坐标
 - `render` — 默认输出 JSON Canvas 1.0(Obsidian `.canvas` 直接可开);`--svg` 输出预览级 SVG。SVG 侧:默认路由**自动避障**(正交可见图 + 方向状态 A* 求解器规划,free 模式叠视线拉直;生成路径不穿卡;显式 `@route/@curve/@elbow` 不干预;源/目标被围死退启发式兜底);`@route(elbow)` 未给折点 = 正交自动路由(求解器,严格水平/垂直);折线转角圆角化。求解器参数可调(`RoutingConfig`:安全边距/折代价 λ/量化步长等,见 `src/routing.ts`)。
 - `roundtrip` — DSL→元素→DSL 双往返签名比对(转义保真)。
 
+贡献者可运行 `pnpm --filter @wscytz/dsl --fail-if-no-match verify:pack`。该检查使用已安装的工作区构建工具，在临时目录干净构建并打包，再离线安装到独立消费者目录，验证包名导入、实际 CLI、退出码和导出内容。它不发布包，也不把本地语法版本视为 npm 已发布版本。
+
 ## 依赖
 
 **零运行时依赖**(2026-10-24 剥离定案):src/ 只 import 包内模块与 Node 内建(cli.ts 的 `node:fs`/`node:url`,不进 barrel)。原 `@cys-stift/canvas-engine`/`@cys-stift/domain` 类型依赖已改为包内 `types.ts` 边界副本 + 结构兼容测试(`types-compat.test.ts`);二者仅作为 devDep 供测试比对。框架无关,可独立于本 monorepo 复用。
