@@ -2318,6 +2318,11 @@ const styles = `
    - ≤1023px(bp-md,平板横/窄桌面):rail 收成纯图标,命中区仍为 44×44。
    - ≤767px(bp-sm,平板竖):顶栏 SnapToggle 与 ZoomGroup 的 Fit 文字收掉,顶栏靠 toolbar overflow-x:auto 兜底不再横向滚。
    ─────────────────────────────────────────────────────────────── */
+/* 1024–1500px 窄桌面:顶栏控件多,收紧间距让「工作台」入口留在视口内;
+   更窄仍走 Toolbar 自带的 overflow-x:auto。 */
+@media (min-width: 1024px) and (max-width: 1500px) {
+  .page > header > div:last-child { gap: var(--space-2); padding-inline: var(--space-2); }
+}
 @media (max-width: 1023px) {
   .cv-rail { padding: var(--space-half); }
   /* 平板/窄桌面保留短标签:图标全无文字时核心入口要靠猜。 */
