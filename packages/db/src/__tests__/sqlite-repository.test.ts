@@ -6,20 +6,26 @@
  * builds real Inbox UI on top.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
-import { CardService, type CaptureSource, toCanvasId } from '@cys-stift/domain'
-import { createMemoryDb } from '../drizzle-client'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { CardService, type CaptureSource, toCanvasId, toCardId } from '@cys-stift/domain'
+import { createMemoryDb, type DbHandle } from '../drizzle-client'
 import { SqliteCardRepository } from '../repositories'
 
 const source: CaptureSource = { kind: 'manual', deviceId: 'test-device-1' }
 
 describe('SQLite repository', () => {
   let service: CardService
+  let handle: DbHandle
 
   beforeEach(() => {
-    const handle = createMemoryDb()
+    handle = createMemoryDb()
     const repo = new SqliteCardRepository(handle)
     service = new CardService(repo)
+  })
+
+  afterEach(() => {
+    handle.raw.close()
+    vi.useRealTimers()
   })
 
   it('inserts and retrieves a card', () => {
@@ -130,6 +136,133 @@ describe('SQLite repository', () => {
     ])).toBe(true)
     expect(service.get(first.id)?.title).toBe('first updated')
     expect(service.get(second.id)).toBeNull()
+  })
+
+  it.each([false, true])('restore retains archived=%s and the original placement after SQLite round-trips', (archived) => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-23T10:00:00.000Z'))
+    const canvasPosition = {
+      canvasId: toCanvasId('restore-canvas'),
+      x: -24,
+      y: 48,
+      w: 320,
+      h: 160,
+      z: 4,
+      rotation: 15,
+    }
+    const created = service.create({
+      title: 'restore me',
+      body: 'keep this content',
+      source,
+      archived,
+      pinned: true,
+      tags: [{ value: 'keep', color: 'var(--color-blue)' }],
+      canvasPosition,
+    })
+    const before = service.get(created.id)!
+    vi.setSystemTime(new Date('2026-06-24T10:00:00.000Z'))
+    service.softDelete(created.id)
+    const deleted = service.get(created.id)!
+    expect(deleted.deletedAt).toBeInstanceOf(Date)
+    expect(deleted).toMatchObject({ archived, canvasPosition })
+    expect(service.listAll()).toEqual([])
+    expect(service.listOnCanvas(canvasPosition.canvasId)).toEqual([])
+
+    const reloaded = new CardService(new SqliteCardRepository(handle))
+    vi.setSystemTime(new Date('2026-06-25T10:00:00.000Z'))
+    expect(reloaded.restore(created.id)).toBe(true)
+    const restored = new SqliteCardRepository(handle).getById(created.id)!
+    expect(restored).toEqual({
+      ...before,
+      deletedAt: undefined,
+      updatedAt: new Date('2026-06-25T10:00:00.000Z'),
+    })
+    expect(handle.raw.prepare('SELECT archived, deleted_at FROM cards WHERE id = ?').get(created.id))
+      .toEqual({ archived: archived ? 1 : 0, deleted_at: null })
+    expect(reloaded.listAll()).toEqual([restored])
+    expect(reloaded.listOnCanvas(canvasPosition.canvasId)).toEqual([restored])
+    expect(reloaded.listInbox()).toEqual([])
+  })
+
+  it('rolls back earlier inserts, updates and deletes on a mid-batch SQLite failure and propagates the error', () => {
+    const first = service.create({ title: 'first', source })
+    const second = service.create({ title: 'second', source })
+    const rejected = service.create({ title: 'reject this update', source })
+    const firstStored = service.get(first.id)!
+    const secondStored = service.get(second.id)!
+    const rejectedStored = service.get(rejected.id)!
+    const insertedAt = new Date('2026-06-23T10:00:00.000Z')
+    const inserted = {
+      ...service.materializeWithId(toCardId('rollback-inserted'), {
+        title: 'new', source, capturedAt: insertedAt, createdAt: insertedAt,
+      }),
+      updatedAt: insertedAt,
+    }
+    const changes = [
+      { id: inserted.id, expected: null, next: inserted },
+      { id: first.id, expected: firstStored, next: { ...firstStored, archived: true } },
+      { id: second.id, expected: secondStored, next: null },
+      { id: rejected.id, expected: rejectedStored, next: { ...rejectedStored, title: 'batch-failure' } },
+    ]
+    const rowsBefore = handle.raw.prepare('SELECT * FROM cards ORDER BY id').all()
+    handle.raw.exec(`
+      CREATE TRIGGER reject_batch_update
+      BEFORE UPDATE OF title ON cards
+      WHEN NEW.title = 'batch-failure'
+      BEGIN
+        SELECT RAISE(ABORT, 'maintenance batch failure');
+      END;
+    `)
+
+    expect(() => service.applyBatch(changes)).toThrow('maintenance batch failure')
+    expect(handle.raw.inTransaction).toBe(false)
+    expect(handle.raw.prepare('SELECT * FROM cards ORDER BY id').all()).toEqual(rowsBefore)
+    const reloaded = new CardService(new SqliteCardRepository(handle))
+    expect(reloaded.get(inserted.id)).toBeNull()
+    expect(reloaded.get(first.id)).toEqual(firstStored)
+    expect(reloaded.get(second.id)).toEqual(secondStored)
+    expect(reloaded.get(rejected.id)).toEqual(rejectedStored)
+
+    handle.raw.exec('DROP TRIGGER reject_batch_update')
+    expect(reloaded.applyBatch(changes)).toBe(true)
+    expect(reloaded.get(inserted.id)).toEqual(inserted)
+    expect(reloaded.get(first.id)?.archived).toBe(true)
+    expect(reloaded.get(second.id)).toBeNull()
+    expect(reloaded.get(rejected.id)?.title).toBe('batch-failure')
+  })
+
+  it('inserts with a null expectation and rejects an occupied id without committing earlier changes', () => {
+    const existing = service.create({ title: 'existing', source })
+    const existingStored = service.get(existing.id)!
+    const insertedAt = new Date('2026-06-23T10:00:00.000Z')
+    const inserted = {
+      ...service.materializeWithId(toCardId('batch-created'), {
+        title: 'inserted', source, capturedAt: insertedAt, createdAt: insertedAt,
+      }),
+      updatedAt: insertedAt,
+    }
+    const missingId = toCardId('batch-missing')
+
+    expect(service.applyBatch([
+      { id: existing.id, expected: existingStored, next: { ...existingStored, title: 'updated' } },
+      { id: inserted.id, expected: null, next: inserted },
+      { id: missingId, expected: null, next: null },
+    ])).toBe(true)
+    const reloaded = new CardService(new SqliteCardRepository(handle))
+    const insertedStored = reloaded.get(inserted.id)!
+    expect(insertedStored).toEqual(inserted)
+    expect(reloaded.get(existing.id)?.title).toBe('updated')
+    expect(reloaded.get(missingId)).toBeNull()
+    const updatedExisting = reloaded.get(existing.id)!
+    const rowsBefore = handle.raw.prepare('SELECT * FROM cards ORDER BY id').all()
+
+    expect(reloaded.applyBatch([
+      { id: existing.id, expected: updatedExisting, next: null },
+      { id: inserted.id, expected: null, next: { ...insertedStored, title: 'overwritten' } },
+    ])).toBe(false)
+    expect(handle.raw.prepare('SELECT * FROM cards ORDER BY id').all()).toEqual(rowsBefore)
+    expect(reloaded.get(existing.id)).toEqual(updatedExisting)
+    expect(reloaded.get(inserted.id)).toEqual(insertedStored)
   })
 
   it('listInbox excludes archived and on-canvas cards', () => {
