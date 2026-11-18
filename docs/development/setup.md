@@ -10,7 +10,7 @@
 | 工具 | 版本 | 检查 |
 |---|---|---|
 | Git | 2.40+ | `git --version` |
-| Node | 22 LTS | `node --version`（用 nvm / nvm-windows 锁定） |
+| Node | 22 LTS（至少 22.13.0） | `node --version`（用 nvm / nvm-windows 锁定） |
 | pnpm | 9+ | `pnpm --version`（推荐 `corepack enable && corepack prepare pnpm@9 --activate`） |
 
 跨平台铁律（见 spec §11）：

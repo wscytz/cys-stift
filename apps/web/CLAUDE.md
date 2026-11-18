@@ -7,9 +7,9 @@
 - **静态导出**（`next.config.ts` 的 `output: 'export'`）：**没有 SSR / 没有 API routes / 没有 Server Actions**。
 - **动态路由会炸**：`output: 'export'` 下 `[id]` 段构建期无法枚举 → 构建失败。画布/卡片选择走**客户端状态**（Zustand 或 React state），不放进 URL 路径。（spec §6.12）
 - **用 server 的东西 = 错误**：任何 `'use server'`、`cookies()`、`headers()`、`fetch` 到自己的 API route 都不可用。
-- **客户端数据**走 `src/lib/db-client.ts`（in-memory + localStorage，Phase 2.5 换 wa-sqlite）。`useDb()` hook 已处理 SSR/客户端 hydration。
+- **客户端数据**走 `src/lib/db-client.ts`（in-memory + localStorage）；画布自由元素快照另走 OPFS。wa-sqlite 未采用，不把历史 Phase 2.5 写成迁移承诺。`useDb()` hook 处理静态预渲染与客户端 hydration。
 - **组件从 `@cys-stift/ui` 引用**，不在这里重造。颜色/字体走 token，不写死。
-- **dev 烟测页**放 `/dev/*`（如 `/dev/db`），production 路由放根级（`/`、`/design`、未来的 `/inbox`）。
+- **dev 烟测页**放 `/dev/*`；当前静态构建也会导出这些路由，不得把它们当作鉴权边界。用户路由放根级（`/`、`/inbox`、`/canvas` 等）。
 
 ## 结构
 
@@ -26,7 +26,7 @@ src/
 │   ├── timeline/               全局时间线(P10)
 │   ├── settings/               设置(快捷键/主题/AI/导入导出)
 │   ├── design/                 /design 视觉契约页
-│   └── dev/                    dev 烟测页(production 不含)
+│   └── dev/                    dev 烟测页（当前构建也会静态导出）
 ├── features/                   按特性切(feature-sliced,ADR 0002)
 │   ├── ai/                     AI provider + isAIReady 门控 + AiSetupCard/AiActionMenu + DSL serialize/parse/apply + locale-aware prompts + canvas-snapshot
 │   ├── canvas/                 画布交互:host adapter / 关系 / outline / minimap / dsl-dialog / 导出(图片+MD+DSL)/ wiki-links / backlinks / canvas-overview
@@ -74,7 +74,7 @@ src/
 - ❌ 自动 codegen 从 Card schema 生成 AI context
 
 **实验室 / Labs**:
-> 当前没有已注册 consumer，Settings 只显示空状态；历史 labs 设置仅兼容读取，不代表功能已实现。
+> 可审计 AI 共编由 `features/ai/labs-registry.ts` 注册，默认关闭；能力和隐私边界以当前 registry 与 consumer 代码为准，不把历史设置键当作已实现能力。
 - 不新增没有真实 consumer 的伪开关。
 - 未来若重新引入 vision，必须同时具备显式用户授权、provider 能力校验、代码级不可绕过守卫、独立隐私说明和反向测试。
 - 即使未来启用 vision，仍禁止发送 deviceId / apiKey / 软删卡；默认 AI 路径继续只发媒体 metadata。
@@ -83,6 +83,6 @@ src/
 - [ ] `docs/user/privacy.md` 字段表更新
 - [ ] `docs/development/privacy-design.md` ai-context.ts API 更新
 - [ ] changelog 加隐私条目
-- [ ] `MEMORY.md` 加索引(若有新 phase)
+- [ ] 架构/实施决策写私有 ADR/decision；当前状态写私有 STATE，不把开发进度复制进 memory
 
 > 用户面向隐私说明:`docs/user/privacy.md`(必读,任何改 AI 的 commit 前都要 review 这份)

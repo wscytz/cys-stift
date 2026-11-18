@@ -21,7 +21,7 @@
 
 ## 下载
 
-最新版本为 [**v1.5.0**](https://github.com/wscytz/cys-stift/releases/tag/v1.5.0)(稳定版)。桌面安装包和 `SHA256SUMS.txt` 均从该 Release 页面下载。也可以直接用[网页版](https://wscytz.com/cys-stift/app/)体验(跟随 main 分支,可能领先 Release tag;数据留在浏览器本地):
+最新版本为 [**v1.5.0**](https://github.com/wscytz/cys-stift/releases/tag/v1.5.0)(稳定版)。桌面安装包和 `SHA256SUMS.txt` 均从该 Release 页面下载。也可以直接用[网页版](https://wscytz.com/cys-stift/app/)体验(网页仅在显式部署后更新，不会自动跟随本地 main；数据留在浏览器本地):
 
 | 平台 | 文件 | 说明 |
 |---|---|---|
@@ -37,7 +37,7 @@
 
 ## 特性
 
-**捕获** —— 全局快捷键 + Mini Input + 文件拖拽,3 秒落库。
+**捕获** —— 桌面端全局快捷键、应用内 Mini Input 与文件拖拽；浏览器端快捷键仅在页面内生效。
 
 **inbox** —— 多媒介编辑(链接/代码/引用/媒体)+ 草稿自动保存 + 发送到画布。
 
@@ -58,6 +58,8 @@
 **画板适配** —— 响应式(<1200 顶条汉堡抽屉 + <1024 画布侧栏收成纯图标 + canvas 断点归一)+ 触摸手势(双指 pinch zoom + 双指平移 + 触摸目标 44px)+ Android 运行时(rustls ring provider + 平台检测 SSR-safe hooks)。
 
 **其他** —— 命令面板(⌘K)+ 标签管理 `/tags`(六色 canonical 调色板;改名/改色/删除/合并)+ 时间线 `/timeline`(全局)+ 全文搜索(title 加权 + 摘要)+ 软删恢复 + JSON 导出/导入(含画布几何 + freeform + 本机恢复点)+ 中英双语。
+
+**可独立消费的文本内核** —— `packages/cys-dsl` 以 [`@wscytz/dsl`](https://www.npmjs.com/package/@wscytz/dsl) 发布，提供 `validate` / `render` / `roundtrip` CLI、SVG 与 JSON Canvas 输出；`canvas-engine` 仍为未单独发布的 workspace 包。npm 版、Release、网页和本地 main 可能不同，按所用版本的手册判断语法能力。DSL 是结构化状态交换，不替代含媒体与手绘的完整备份。
 
 完整能力见最新 [Release notes](https://github.com/wscytz/cys-stift/releases) 与 [`docs/changelog.md`](docs/changelog.md)。
 
@@ -135,4 +137,4 @@ pnpm tauri dev
 
 ## 许可
 
-GPL-3.0-or-later。见 [`LICENSE`](LICENSE)。
+Apache-2.0。见 [`LICENSE`](LICENSE)。

@@ -23,7 +23,7 @@
 | 包管理 | pnpm 9+ workspace monorepo |
 | 前端 | Next.js 15 App Router + React 19 + TS strict + Tailwind v4，**静态导出，无 server** |
 | 桌面 | Tauri v2 + Rust |
-| 数据 | better-sqlite3 + Drizzle（Node 路径）；浏览器侧 in-memory + localStorage（Phase 2.5 换 wa-sqlite + OPFS） |
+| 数据 | better-sqlite3 + Drizzle（Node 路径）；浏览器侧 in-memory + localStorage，画布快照走 OPFS；WASM SQLite 是未立项的历史方向，不是既定迁移任务 |
 | 设计 | Swiss Editorial（warm paper + 手术红；legacy 6 色名冻结为别名）+ 8px 网格 + 编辑栅格 280/64/48px + Space Grotesk / Inter / JetBrains Mono |
 | 测试 | vitest（domain + db + canvas-engine + web）+ puppeteer-core（e2e / render-sweep） |
 
