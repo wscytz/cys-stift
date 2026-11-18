@@ -36,7 +36,7 @@ const REPLACEMENTS = [
   { re: /[A-Za-z]:\\(?:[^\\"'\s)]+\\)*cys-stift/g, to: '.' },
 ]
 
-const LEAK = /(\/Users\/|file:\/\/\/Users\/|[A-Za-z]:\\Users\\|\/home\/[^/"'\s)]+\/.*cys-stift)/
+const LEAK = /(\/Users\/|file:\/\/\/Users\/|[A-Za-z]:\\Users\\|[A-Za-z]:\\(?:[^\\"'\s)]+\\)*cys-stift|\/home\/[^/"'\s)]+\/.*cys-stift|file:\/\/\/[A-Za-z]:\/(?:[^/"'\s)]+\/)*cys-stift)/
 
 let removed = 0
 let rewritten = 0
