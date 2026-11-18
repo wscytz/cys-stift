@@ -28,11 +28,15 @@ const REPLACEMENTS = [
   // file:// URL form first, so the longer match wins.
   { re: /file:\/\/\/Users\/[^/"'\s)]+\/projects\/cys-stift/g, to: 'file:///app' },
   { re: /file:\/\/\/[A-Za-z]:\/Users\/[^/"'\s)]+\/projects\/cys-stift/g, to: 'file:///app' },
+  { re: /file:\/\/\/home\/[^/"'\s)]+\/(?:[^/"'\s)]+\/)*cys-stift/g, to: 'file:///app' },
+  { re: /file:\/\/\/[A-Za-z]:\/(?:[^/"'\s)]+\/)*cys-stift/g, to: 'file:///app' },
   { re: /\/Users\/[^/"'\s)]+\/projects\/cys-stift/g, to: '.' },
+  { re: /\/home\/[^/"'\s)]+\/(?:[^/"'\s)]+\/)*cys-stift/g, to: '.' },
   { re: /[A-Za-z]:\\Users\\[^\\"'\s)]+\\projects\\cys-stift/g, to: '.' },
+  { re: /[A-Za-z]:\\(?:[^\\"'\s)]+\\)*cys-stift/g, to: '.' },
 ]
 
-const LEAK = /(\/Users\/|file:\/\/\/Users\/|[A-Za-z]:\\Users\\)/
+const LEAK = /(\/Users\/|file:\/\/\/Users\/|[A-Za-z]:\\Users\\|\/home\/[^/"'\s)]+\/.*cys-stift)/
 
 let removed = 0
 let rewritten = 0
