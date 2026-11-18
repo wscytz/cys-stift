@@ -713,22 +713,22 @@ export function AgentConfirmCard({ dsl, targetCanvasId, service, liveHost, onApp
         <div className="ac__diff">
           {diff.added.length > 0 && (
             <DiffGroup color="blue" label={t('agent.added', { n: String(diff.added.length) })}
-              items={diff.added.map((e) => labelEl(e))} />
+              items={diff.added.map((element) => labelEl(element))} moreLabel={t('agent.moreItems', { n: String(diff.added.length - 8) })} />
           )}
           {removedCards.length > 0 && (
             <>
               <DiffGroup color="red" label={t('agent.movedOut', { n: String(removedCards.length) })}
-                items={removedCards.map((e) => labelEl(e))} />
+                items={removedCards.map((element) => labelEl(element))} moreLabel={t('agent.moreItems', { n: String(removedCards.length - 8) })} />
               <p className="ac__subtitle">{t('agent.movedOutHint')}</p>
             </>
           )}
           {removedOthers.length > 0 && (
             <DiffGroup color="red" label={t('agent.removed', { n: String(removedOthers.length) })}
-              items={removedOthers.map((e) => labelEl(e))} />
+              items={removedOthers.map((element) => labelEl(element))} moreLabel={t('agent.moreItems', { n: String(removedOthers.length - 8) })} />
           )}
           {diff.changed.length > 0 && (
             <DiffGroup color="yellow" label={t('agent.changed', { n: String(diff.changed.length) })}
-              items={diff.changed.map((c) => `${labelEl(c.after)} (${c.fields.map(fieldLabel).join(', ')})`)} />
+              items={diff.changed.map((change) => `${labelEl(change.after)} (${change.fields.map(fieldLabel).join(', ')})`)} moreLabel={t('agent.moreItems', { n: String(diff.changed.length - 8) })} />
           )}
         </div>
       )}

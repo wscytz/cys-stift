@@ -186,6 +186,35 @@ describe('AiConfirmDialog edge — dsl reject 记样本', () => {
   })
 })
 
+describe('AiConfirmDialog edge — 无法应用的 DSL 整单阻断', () => {
+  it('missing anchor → 显示原因且 Apply 禁用', async () => {
+    const { host: mockHost, calls } = makeMockHost([
+      { id: 'e', kind: 'card', x: 0, y: 0, w: 100, h: 50, rotation: 0, color: 'white' },
+    ])
+    const service = { createWithId: vi.fn() } as never
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog
+        mode="dsl"
+        dsl="[card #e] right-of #ghost @gap(40)"
+        targetCanvasId={'cv' as never}
+        service={service}
+        liveHost={mockHost}
+        onApplied={() => {}}
+        onRejected={() => {}}
+      />,
+    )
+    await act(async () => { await flushMicro() })
+    expect(dom.textContent).toContain('无法应用')
+    expect(dom.textContent).toContain('ghost')
+    const apply = byText(dom, /^应用$|^Apply$/)
+    expect(apply?.disabled).toBe(true)
+    const before = JSON.stringify(calls.upserts)
+    act(() => apply?.click())
+    expect(JSON.stringify(calls.upserts)).toBe(before)
+    unmount()
+  })
+})
+
 describe('AiConfirmDialog edge — cluster mode 无编辑按钮', () => {
   it('cluster mode 不渲染 Edit 按钮(props.mode !== cluster 守卫)', async () => {
     const initial: CanvasElement[] = [

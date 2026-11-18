@@ -247,7 +247,7 @@ const styles = `
   background: var(--color-white); border: 1.5px solid var(--color-black);
 }
 .wb__deck .wb__minicard:nth-child(1) { top: 16px; left: 10px; z-index: 1; }
-.wb__deck .wb__minicard:nth-child(2) { top: var(--space-1); left: var(--space-0.5); z-index: 2; }
+.wb__deck .wb__minicard:nth-child(2) { top: var(--space-1); left: var(--space-half); z-index: 2; }
 .wb__deck .wb__minicard:nth-child(3) { top: 0; left: 0; z-index: 3; }
 /* 单卡折叠态:只有一张卡时不应用堆叠偏移,居正。 */
 .wb__deck > .wb__minicard:only-child { top: 0; left: 0; }

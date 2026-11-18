@@ -114,6 +114,17 @@ describe('MarkdownBody — katex + 脚注', () => {
     expect(html).toMatch(/katex-display/)
   })
 
+  it.each([
+    String.raw`$\href{javascript:alert(1)}{unsafe}$`,
+    String.raw`$\includegraphics{https://example.invalid/private-data}$`,
+    String.raw`$\htmlClass{external-control}{unsafe}$`,
+  ])('untrusted math cannot introduce active content: %s', (source) => {
+    const html = renderHtml(source)
+    const parsed = new DOMParser().parseFromString(html, 'text/html')
+    expect(parsed.querySelector('.katex')).not.toBeNull()
+    expect(parsed.querySelector('a, img, script, iframe, .external-control')).toBeNull()
+  })
+
   // ── 脚注(remark-footnotes)──
   it('渲染脚注 [^1] + 定义', () => {
     const md = '参见[^1]。\n\n[^1]: 这是脚注内容'

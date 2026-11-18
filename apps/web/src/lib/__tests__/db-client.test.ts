@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { toCardId, generateId } from '@cys-stift/domain'
-import type { Card, CardId } from '@cys-stift/domain'
+import { toCardId, toCanvasId, generateId } from '@cys-stift/domain'
+import type { Card, CardId, CardService, CanvasPosition } from '@cys-stift/domain'
 
 // ── Hook testing note ───────────────────────────────────────────────────────
 // useDb (the React hook) is NOT tested here.
@@ -463,5 +463,235 @@ describe('db-client — update/delete throw StorageQuotaError on quota failure',
     expect(() => cardRepo.delete(toCardId('q-2'))).toThrow(StorageQuotaError)
     // 回滚:卡仍在(未删)
     expect(cardRepo.getById(toCardId('q-2'))).not.toBeNull()
+  })
+})
+
+describe('db-client — CardService lifecycle persistence', () => {
+  const placement: CanvasPosition = {
+    canvasId: toCanvasId('lifecycle-canvas'),
+    x: -24,
+    y: 48,
+    w: 320,
+    h: 160,
+    z: 3,
+    rotation: 15,
+  }
+  const lifecycleCases: Array<{
+    name: string
+    initial: Partial<Card>
+    run: (service: CardService, id: CardId) => unknown
+    failure: unknown
+    success: unknown
+    next: Partial<Card> | null
+  }> = [
+    {
+      name: 'update',
+      initial: {},
+      run: (service, id) => service.update(id, { title: 'edited' }),
+      failure: null,
+      success: expect.objectContaining({ title: 'edited' }),
+      next: { title: 'edited' },
+    },
+    {
+      name: 'archive',
+      initial: {},
+      run: (service, id) => service.archive(id),
+      failure: undefined,
+      success: undefined,
+      next: { archived: true },
+    },
+    {
+      name: 'unarchive',
+      initial: { archived: true },
+      run: (service, id) => service.unarchive(id),
+      failure: undefined,
+      success: undefined,
+      next: { archived: false },
+    },
+    {
+      name: 'moveToCanvas',
+      initial: {},
+      run: (service, id) => service.moveToCanvas(id, placement),
+      failure: false,
+      success: true,
+      next: { canvasPosition: placement },
+    },
+    {
+      name: 'removeFromCanvas',
+      initial: { canvasPosition: placement },
+      run: (service, id) => service.removeFromCanvas(id),
+      failure: false,
+      success: true,
+      next: { canvasPosition: undefined },
+    },
+    {
+      name: 'softDelete',
+      initial: { archived: true, canvasPosition: placement },
+      run: (service, id) => service.softDelete(id),
+      failure: undefined,
+      success: undefined,
+      next: { deletedAt: expect.any(Date), archived: true, canvasPosition: placement },
+    },
+    {
+      name: 'restore',
+      initial: {
+        archived: true,
+        canvasPosition: placement,
+        deletedAt: new Date('2026-06-24T10:00:00.000Z'),
+      },
+      run: (service, id) => service.restore(id),
+      failure: false,
+      success: true,
+      next: { deletedAt: undefined, archived: true, canvasPosition: placement },
+    },
+    {
+      name: 'hardDelete',
+      initial: { deletedAt: new Date('2026-06-24T10:00:00.000Z') },
+      run: (service, id) => service.hardDelete(id),
+      failure: false,
+      success: true,
+      next: null,
+    },
+  ]
+
+  it.each(lifecycleCases)('$name retains memory and disk on quota failure and persists a retry', async ({ initial, run, failure, success, next }) => {
+    const { CardService } = await import('@cys-stift/domain')
+    const { onQuotaExceeded } = await import('../db-client')
+    const service = new CardService(dbTest.cardRepo)
+    const original = makeCard({ id: toCardId('lifecycle-card'), pinned: true, ...initial })
+    const untouched = makeCard({ id: toCardId('untouched-card'), title: 'untouched' })
+    dbTest.cardRepo.insert(original)
+    dbTest.cardRepo.insert(untouched)
+    const before = window.localStorage.getItem(STORAGE_KEY)
+    const quotaListener = vi.fn()
+    const unsubscribe = onQuotaExceeded(quotaListener)
+    const storageWrite = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota exceeded', 'QuotaExceededError')
+    })
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      expect(run(service, original.id)).toEqual(failure)
+      expect(quotaListener).toHaveBeenCalledTimes(1)
+      expect(service.get(original.id)).toEqual(original)
+      expect(service.get(untouched.id)).toEqual(untouched)
+      expect(window.localStorage.getItem(STORAGE_KEY)).toBe(before)
+      rehydrateCards()
+      expect(service.get(original.id)).toEqual(original)
+
+      storageWrite.mockRestore()
+      expect(run(service, original.id)).toEqual(success)
+      const committed = service.get(original.id)
+      if (next === null) expect(committed).toBeNull()
+      else {
+        expect(committed).toMatchObject(next)
+        expect(committed?.updatedAt.getTime()).toBeGreaterThan(original.updatedAt.getTime())
+      }
+      expect(quotaListener).toHaveBeenCalledTimes(1)
+      expect(window.localStorage.getItem(STORAGE_KEY)).not.toBe(before)
+
+      vi.resetModules()
+      const reloaded = await import('../db-client')
+      reloaded.rehydrateCards()
+      expect(reloaded.__test__.cardRepo.getById(original.id)).toEqual(committed)
+      expect(reloaded.__test__.cardRepo.getById(untouched.id)).toEqual(untouched)
+    } finally {
+      unsubscribe()
+    }
+  })
+})
+
+describe('db-client — applyBatch persistence atomicity', () => {
+  it('rejects a late stale expectation without writing and accepts the corrected insertion/update/delete batch', async () => {
+    const { CardService } = await import('@cys-stift/domain')
+    const { onQuotaExceeded } = await import('../db-client')
+    const service = new CardService(dbTest.cardRepo)
+    const first = makeCard({ id: toCardId('batch-first') })
+    const second = makeCard({ id: toCardId('batch-second') })
+    const inserted = makeCard({ id: toCardId('batch-inserted'), title: 'inserted' })
+    const updated = { ...first, title: 'updated' }
+    dbTest.cardRepo.insert(first)
+    dbTest.cardRepo.insert(second)
+    const before = window.localStorage.getItem(STORAGE_KEY)
+    const quotaListener = vi.fn()
+    const unsubscribe = onQuotaExceeded(quotaListener)
+    const storageWrite = vi.spyOn(Storage.prototype, 'setItem')
+
+    try {
+      expect(service.applyBatch([
+        { id: inserted.id, expected: null, next: inserted },
+        { id: first.id, expected: first, next: updated },
+        { id: second.id, expected: { ...second, body: 'stale' }, next: null },
+      ])).toBe(false)
+      expect(storageWrite).not.toHaveBeenCalled()
+      expect(quotaListener).not.toHaveBeenCalled()
+      expect(service.listAll()).toEqual([first, second])
+      expect(window.localStorage.getItem(STORAGE_KEY)).toBe(before)
+
+      expect(service.applyBatch([
+        { id: inserted.id, expected: null, next: inserted },
+        { id: first.id, expected: first, next: updated },
+        { id: second.id, expected: second, next: null },
+      ])).toBe(true)
+      expect(storageWrite).toHaveBeenCalledTimes(1)
+      vi.resetModules()
+      const reloaded = await import('../db-client')
+      reloaded.rehydrateCards()
+      expect(reloaded.__test__.cardRepo.getById(first.id)).toEqual(updated)
+      expect(reloaded.__test__.cardRepo.getById(second.id)).toBeNull()
+      expect(reloaded.__test__.cardRepo.getById(inserted.id)).toEqual(inserted)
+    } finally {
+      unsubscribe()
+    }
+  })
+
+  it('rolls back a mixed batch on quota failure, reports failure through CardService, and persists the retry once', async () => {
+    const { CardService, StorageQuotaError } = await import('@cys-stift/domain')
+    const { onQuotaExceeded } = await import('../db-client')
+    const service = new CardService(dbTest.cardRepo)
+    const first = makeCard({ id: toCardId('quota-batch-first') })
+    const second = makeCard({ id: toCardId('quota-batch-second') })
+    const inserted = makeCard({ id: toCardId('quota-batch-inserted') })
+    const updated = { ...first, archived: true }
+    dbTest.cardRepo.insert(first)
+    dbTest.cardRepo.insert(second)
+    const before = window.localStorage.getItem(STORAGE_KEY)
+    const changes = [
+      { id: inserted.id, expected: null, next: inserted },
+      { id: first.id, expected: first, next: updated },
+      { id: second.id, expected: second, next: null },
+    ]
+    const quotaListener = vi.fn()
+    const unsubscribe = onQuotaExceeded(quotaListener)
+    const storageWrite = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota exceeded', 'QuotaExceededError')
+    })
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      expect(() => dbTest.cardRepo.applyBatch(changes)).toThrow(StorageQuotaError)
+      expect(service.listAll()).toEqual([first, second])
+      expect(service.applyBatch(changes)).toBe(false)
+      expect(storageWrite).toHaveBeenCalledTimes(2)
+      expect(quotaListener).toHaveBeenCalledTimes(2)
+      expect(service.listAll()).toEqual([first, second])
+      expect(window.localStorage.getItem(STORAGE_KEY)).toBe(before)
+      rehydrateCards()
+      expect(service.listAll()).toEqual([first, second])
+
+      storageWrite.mockRestore()
+      const retryWrite = vi.spyOn(Storage.prototype, 'setItem')
+      expect(service.applyBatch(changes)).toBe(true)
+      expect(retryWrite).toHaveBeenCalledTimes(1)
+      expect(quotaListener).toHaveBeenCalledTimes(2)
+      vi.resetModules()
+      const reloaded = await import('../db-client')
+      reloaded.rehydrateCards()
+      expect(reloaded.__test__.cardRepo.getById(first.id)).toEqual(updated)
+      expect(reloaded.__test__.cardRepo.getById(second.id)).toBeNull()
+      expect(reloaded.__test__.cardRepo.getById(inserted.id)).toEqual(inserted)
+    } finally {
+      unsubscribe()
+    }
   })
 })

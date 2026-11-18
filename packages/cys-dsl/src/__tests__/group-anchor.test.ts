@@ -174,6 +174,58 @@ describe('v9 组级相对锚 · solve', () => {
     expect(n.y).toBe(600)
   })
 
+  it('mutual group dependencies stay broken without seeds while independent layout still resolves', () => {
+    const parsed = parseDsl([
+      '[card #alpha create] right-of @beta @size(100,80) @group("alpha")',
+      '[card #beta create] below @alpha @size(100,80) @group("beta")',
+      '[card #dependent create] right-of #beta @size(100,80)',
+      '[card #origin create] @pos(1000,1000) @size(100,80) @group("healthy")',
+      '[card #resolved create] right-of @healthy @gap(30) @size(100,80)',
+    ].join('\n'))
+    const before = structuredClone(parsed)
+    const sanitized = sanitizeDslOps(parsed)
+    expect(sanitized.diagnostics).toEqual([])
+    const solved = solveRelational(sanitized.ops)
+    expect(solved.diagnostics.map((diagnostic) => diagnostic.opIndex)).toEqual([0, 1, 2])
+    expect(solved.diagnostics[0]!.message).toContain('组锚 @beta 无已解成员')
+    expect(solved.diagnostics[1]!.message).toContain('组锚 @alpha 无已解成员')
+    expect(solved.diagnostics[1]!.message).toContain('书写顺序')
+    expect(solved.diagnostics[2]!.message).toContain('anchor #beta 上游 anchor 缺失')
+    expect(solved.ops[4]).toMatchObject({ cardId: 'resolved', x: 1130, y: 1000 })
+    expect(solved.ops.every((operation) => operation.type === 'card' && operation.rel === undefined)).toBe(true)
+    expect(solved.ops.every((operation) => operation.type === 'card' && [operation.x, operation.y, operation.w, operation.h].every(Number.isFinite))).toBe(true)
+    expect(parsed).toEqual(before)
+  })
+
+  it('mutual href references are semantic links, not cyclic layout dependencies', () => {
+    const sanitized = sanitizeDslOps(parseDsl([
+      '[card #alpha create] @pos(0,0) @size(100,80) @group("alpha") @href(#beta)',
+      '[card #beta create] right-of @alpha @gap(20) @size(100,80) @group("beta") @href(#alpha)',
+    ].join('\n')))
+    expect(sanitized.diagnostics).toEqual([])
+    const solved = solveRelational(sanitized.ops)
+    expect(solved.diagnostics).toEqual([])
+    expect(solved.ops[0]).toMatchObject({ cardId: 'alpha', x: 0, y: 0, href: ['beta'] })
+    expect(solved.ops[1]).toMatchObject({ cardId: 'beta', x: 120, y: 0, href: ['alpha'] })
+  })
+
+  it('seeded groups resolve sequential updates rather than rejecting them as a graph cycle', () => {
+    const existing = new Map<string, ExistingGeom>([
+      ['alpha', { x: 0, y: 0, w: 100, h: 80, group: 'alpha' }],
+      ['beta', { x: 300, y: 0, w: 100, h: 80, group: 'beta' }],
+    ])
+    const before = structuredClone(existing)
+    const parsed = parseDsl([
+      '[card #alpha] right-of @beta @gap(20)',
+      '[card #beta] below @alpha @gap(20)',
+    ].join('\n'))
+    const solved = solveRelational(sanitizeDslOps(parsed).ops, existing)
+    expect(solved.diagnostics).toEqual([])
+    expect(solved.ops[0]).toMatchObject({ cardId: 'alpha', x: 420, y: 0, w: 100, h: 80 })
+    expect(solved.ops[1]).toMatchObject({ cardId: 'beta', x: 420, y: 100, w: 100, h: 80 })
+    expect(existing).toEqual(before)
+  })
+
   it('更新既有组员不带 @group 时沿用组名(与 web apply 语义一致)', () => {
     const existing = new Map<string, ExistingGeom>([
       ['a', { x: 0, y: 0, w: 100, h: 80, group: 'old' }],

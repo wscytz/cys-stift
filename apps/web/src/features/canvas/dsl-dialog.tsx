@@ -23,7 +23,7 @@ import { serializeCanvasReadable, serializeCanvas } from '@wscytz/dsl'
 import { parseDslWithDiagnostics } from '@wscytz/dsl'
 import { buildCanvasPrompt } from '../ai/canvas-prompt'
 import { DSL_GRAMMAR_REFERENCE } from '@wscytz/dsl'
-import { applyLayout, type CardCreateHandler, type CardUpdateHandler } from './apply-layout'
+import { buildApplyPlan, commitApplyPlan, type CardCreateHandler, type CardUpdateHandler } from './apply-layout'
 import { diffCanvasSnapshots } from './canvas-diff'
 import { archiveStore } from '@/lib/archive-store'
 import { buildArchivePayload } from '@/lib/build-archive-payload'
@@ -129,10 +129,15 @@ export function DslDialog({
   const { t, locale } = useI18n()
 
   // 预览标签:card 用真实标题,其余用元素类型的人话名;不再显示裸 id / 机器字段名。
-  const elementLabel = (el: CanvasElement): string => {
+  const elementLabel = (el: CanvasElement, titleById?: Map<string, string>): string => {
     if (el.kind === 'card') {
-      const title = service.get(el.id as CardId)?.title
+      const title = titleById?.get(el.id) ?? service.get(el.id as CardId)?.title
       return t('canvas.diffElementCard', { title: title || t('card.untitled') })
+    }
+    if (el.kind === 'arrow' && el.from && el.to) {
+      const from = titleById?.get(el.from) ?? service.get(el.from as CardId)?.title ?? el.from
+      const to = titleById?.get(el.to) ?? service.get(el.to as CardId)?.title ?? el.to
+      return `${t('canvas.kind.arrow')} ${from}→${to}`
     }
     const key = `canvas.kind.${el.kind}` as MessageKey
     // 按消息表判断 key 是否存在,而不是比较 t() 返回值:测试 mock 的 t 直接回 key
@@ -167,6 +172,9 @@ export function DslDialog({
         opCount: ops.length,
         errCount: parseErrors.length,
         diff: null as ReturnType<typeof diffCanvasSnapshots> | null,
+        titleById: new Map<string, string>(),
+        contentChanges: [] as { cardId: string; title: string; fields: string[] }[],
+        applyIssues: [] as { opIndex: number; reason: string }[],
       }
     }
     const before = cloneElements(base.elements)
@@ -176,8 +184,37 @@ export function DslDialog({
     })
     // A preview has no persistence side effects. The successful callback only
     // makes card-create operations visible in the projected host.
-    applyLayout(afterHost, ops, undefined, () => ({ ok: true }))
+    const plan = buildApplyPlan(afterHost, ops)
+    const applyIssues = plan.diagnostics.map((diagnostic) => ({ opIndex: diagnostic.opIndex, reason: diagnostic.message }))
+    if (applyIssues.length === 0) {
+      const previewResult = commitApplyPlan(afterHost, plan, undefined, () => ({ ok: true }))
+      for (const result of previewResult.opResults) {
+        if (result.status !== 'applied' && result.reason !== undefined) {
+          applyIssues.push({ opIndex: result.opIndex, reason: result.reason })
+        }
+      }
+    }
     const after = cloneElements(afterHost.getElements())
+    const titleById = new Map<string, string>()
+    for (const op of ops) {
+      if (op.type === 'card' && op.title !== undefined) titleById.set(String(op.cardId), op.title)
+    }
+    const contentChanges: { cardId: string; title: string; fields: string[] }[] = []
+    for (const op of ops) {
+      if (op.type !== 'card' || op.delete || op.create) continue
+      const current = service.get(op.cardId)
+      const fields: string[] = []
+      if (op.title !== undefined && op.title !== current?.title) fields.push('title')
+      if (op.content !== undefined && op.content !== current?.body) fields.push('content')
+      if (op.cardType !== undefined && op.cardType !== current?.type) fields.push('type')
+      if (op.tags !== undefined && JSON.stringify(op.tags) !== JSON.stringify((current?.tags ?? []).map((tag) => tag.value))) fields.push('tags')
+      if (op.links !== undefined && JSON.stringify(op.links) !== JSON.stringify((current?.links ?? []).map((link) => link.url))) fields.push('links')
+      if (op.code !== undefined && JSON.stringify(op.code) !== JSON.stringify(current?.codeSnippets ?? [])) fields.push('code')
+      if (op.quotes !== undefined && JSON.stringify(op.quotes) !== JSON.stringify(current?.quotes ?? [])) fields.push('quotes')
+      if (fields.length > 0) {
+        contentChanges.push({ cardId: String(op.cardId), title: current?.title ?? op.title ?? t('card.untitled'), fields })
+      }
+    }
     return {
       ops,
       errors: parseErrors,
@@ -185,8 +222,11 @@ export function DslDialog({
       opCount: ops.length,
       errCount: parseErrors.length,
       diff: diffCanvasSnapshots(before, after),
+      titleById,
+      contentChanges,
+      applyIssues,
     }
-  }, [text, base])
+  }, [text, base, service, t])
 
   // Escape 关闭模态(与 CardDetailModal 一致;Modal 组件只处理 backdrop 点击,
   // Escape 由调用方负责)。textarea 里 Escape 仍关模态——DSL 编辑器的「完成」手势。
@@ -293,7 +333,12 @@ export function DslDialog({
       return
     }
 
-    const { applied, skipped, failed, newlyApplied } = applyLayout(host, ops, appliedHashes, onCardCreate, onCardUpdate, onCardRemove)
+    const plan = buildApplyPlan(host, ops, appliedHashes)
+    if (plan.diagnostics.length > 0) {
+      pushToast({ kind: 'error', message: t('canvas.dslApplyBlocked', { n: String(plan.diagnostics.length) }) })
+      return
+    }
+    const { applied, skipped, failed, newlyApplied } = commitApplyPlan(host, plan, appliedHashes, onCardCreate, onCardUpdate, onCardRemove)
     // 合并【本次新应用】的 op hash 到现有集合 —— 部分失败时保留已应用行的 hash,
     // 重复 Apply 会跳过它们(planFree 命中已应用 hash 走 update 不造副本),防造无 #id
     // freeform 副本。全部成功时下方 else-if 分支会重序列化文本(画布即文本)并清空 hash。
@@ -400,14 +445,16 @@ export function DslDialog({
   }
 
   // 预览每类只列前 8 项,超出部分在列表下方给出计数提示。
+  const previewTotal = preview.diff
+    ? preview.diff.added.length + preview.diff.removed.length + preview.diff.changed.length + preview.contentChanges.length
+    : 0
   const previewShown = preview.diff
     ? Math.min(preview.diff.added.length, 8) +
       Math.min(preview.diff.removed.length, 8) +
-      Math.min(preview.diff.changed.length, 8)
+      Math.min(preview.diff.changed.length, 8) +
+      Math.min(preview.contentChanges.length, 8)
     : 0
-  const previewHidden = preview.diff
-    ? preview.diff.added.length + preview.diff.removed.length + preview.diff.changed.length - previewShown
-    : 0
+  const previewHidden = previewTotal - previewShown
 
   return (
     <Modal open={open} onClose={requestClose} title={t('canvas.dslTitle')} closeLabel={t('common.close')}>
@@ -476,22 +523,25 @@ export function DslDialog({
           <Button variant="ghost" onClick={reloadFromCanvas}>{t('canvas.dslReload')}</Button>
         </div>
       )}
-      {text.trim() !== '' && preview.opCount > 0 && preview.diff && preview.diff.added.length + preview.diff.removed.length + preview.diff.changed.length > 0 && (
+      {text.trim() !== '' && preview.opCount > 0 && preview.diff && previewTotal > 0 && (
         <div className="dsl-preview dsl-preview--ok" aria-live="polite">
           <p>{t('canvas.dslPreviewChanges', {
             added: String(preview.diff.added.length),
             removed: String(preview.diff.removed.length),
-            changed: String(preview.diff.changed.length),
+            changed: String(preview.diff.changed.length + preview.contentChanges.length),
           })}</p>
           <ul className="dsl-preview__changes">
             {preview.diff.added.slice(0, 8).map((element) => (
-              <li key={`added-${element.id}`} className="dsl-preview__added">+ {elementLabel(element)}</li>
+              <li key={`added-${element.id}`} className="dsl-preview__added">+ {elementLabel(element, preview.titleById)}</li>
             ))}
             {preview.diff.removed.slice(0, 8).map((element) => (
-              <li key={`removed-${element.id}`} className="dsl-preview__removed">- {elementLabel(element)}</li>
+              <li key={`removed-${element.id}`} className="dsl-preview__removed">- {elementLabel(element, preview.titleById)}</li>
             ))}
             {preview.diff.changed.slice(0, 8).map((change) => (
-              <li key={`changed-${change.id}`} className="dsl-preview__changed">~ {elementLabel(change.after)} · {change.fields.map(fieldLabel).join(locale === 'en' ? ', ' : '、')}</li>
+              <li key={`changed-${change.id}`} className="dsl-preview__changed">~ {elementLabel(change.after, preview.titleById)} · {change.fields.map(fieldLabel).join(locale === 'en' ? ', ' : '、')}</li>
+            ))}
+            {preview.contentChanges.slice(0, 8).map((change) => (
+              <li key={`content-${change.cardId}`} className="dsl-preview__changed">~ {t('canvas.diffElementCard', { title: change.title })} · {change.fields.map(fieldLabel).join(locale === 'en' ? ', ' : '、')}</li>
             ))}
           </ul>
           {previewHidden > 0 && (
@@ -499,7 +549,7 @@ export function DslDialog({
           )}
         </div>
       )}
-      {text.trim() !== '' && preview.opCount > 0 && preview.diff && preview.diff.added.length + preview.diff.removed.length + preview.diff.changed.length === 0 && (
+      {text.trim() !== '' && preview.opCount > 0 && preview.diff && previewTotal === 0 && preview.applyIssues.length === 0 && (
         <p className="dsl-preview dsl-preview--ok">
           {t(isDirty ? 'canvas.dslPreviewContentOnly' : 'canvas.dslPreviewNoChanges')}
         </p>
@@ -511,6 +561,21 @@ export function DslDialog({
             bad: String(preview.errCount),
           })}
         </p>
+      )}
+      {text.trim() !== '' && preview.applyIssues.length > 0 && (
+        <div className="dsl-preview dsl-preview--warn">
+          <p>{t('canvas.dslPreviewBlocked', { n: String(preview.applyIssues.length) })}</p>
+          <ul className="dsl-preview__changes">
+            {preview.applyIssues.slice(0, 8).map((issueValue) => (
+              <li key={`blocked-${issueValue.opIndex}`} className="dsl-preview__removed">
+                #{issueValue.opIndex + 1}: {issueValue.reason}
+              </li>
+            ))}
+          </ul>
+          {preview.applyIssues.length > 8 && (
+            <p className="dsl-preview__more">{t('canvas.dslPreviewMore', { n: String(preview.applyIssues.length - 8) })}</p>
+          )}
+        </div>
       )}
       {preview.errors.length > 0 && (
         <div className="dsl-errors">
@@ -588,7 +653,7 @@ const styles = `
 .dsl-bridge__label { font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
 .dsl-bridge__hint { margin-left: auto; color: var(--color-gray); font-family: var(--font-body); }
 .dsl-guide { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: 0 0 var(--space-2); padding: var(--space-2); border: var(--border-hairline); background: var(--color-white); }
-.dsl-guide__title { margin: 0 0 var(--space-0.5); font-family: var(--font-display); font-size: var(--font-size-sm); }
+.dsl-guide__title { margin: 0 0 var(--space-half); font-family: var(--font-display); font-size: var(--font-size-sm); }
 .dsl-guide__selection { margin: 0; color: var(--color-gray); font-family: var(--font-body); font-size: var(--font-size-xs); }
 .dsl-guide__actions { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .dsl-examples { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin: 0 0 var(--space-3); }
@@ -640,10 +705,10 @@ const styles = `
 /* 提示(全角标点/拼写手误):元素已保留,琥珀弱化,别和错误一个视觉权重 */
 .dsl-errors--soft {
   background: transparent;
-  border-color: var(--color-yellow, #b8860b);
+  border-color: var(--color-yellow);
   opacity: 0.85;
 }
-.dsl-errors__title--soft { color: var(--color-yellow, #b8860b); }
+.dsl-errors__title--soft { color: var(--color-yellow); }
 .dsl-errors__title {
   margin: 0 0 var(--space-1);
   font-family: var(--font-body);

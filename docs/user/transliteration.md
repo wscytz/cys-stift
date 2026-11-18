@@ -149,7 +149,7 @@
 [arrow #a1] from #c1 to #c2 @label("相辅") @color(blue)
 ```
 
-**③ 文字 → 画布**:解析 → 只读预演 → 变更预览 → 你确认后应用。AI/Agent 的应用会显示 before/after 缩略图与变更摘要,用户确认后才写入;一次确认对应一次可撤销 mutation。手动 DSL 模态也必须点「应用」才写入。
+**③ 文字 → 画布**:解析 → 只读预演 → 变更预览 → 你确认后应用；无法应用的操作会整单取消。AI/Agent 的应用会显示 before/after 缩略图与变更摘要,用户确认后才写入;一次确认对应一次可撤销 mutation。手动 DSL 模态也必须点「应用」才写入。
 
 > 这套闭环是**可复跑、有测试证明**的,不是宣传话。见
 > `apps/web/src/features/ai/__tests__/transliteration-walkthrough.test.ts`(上面这个场景的端到端断言)。
@@ -211,7 +211,7 @@
 
 > 这是一张 cys-dsl v10 画布描述。每行一个元素;使用 grammar 给出的 `[kind #id]` 与 `@directive(...)` 形式。
 > 卡片默认更新既有 id;可按任务改几何/颜色/`@title`/`@content`;纯内容编辑可省 `@pos`,确实新建时才使用 `[card #new-id create] @pos(...)`,且 ID 必须不存在。语义分组用 `@group("名")`,组级布局用 `right-of/below @组名 @gap(n)`(求解器算坐标),卡片间显式引用用 `@href(#a;#b)`,文本公式用 `@compute("#id.w + …")`(只读几何)。卡片结构化字段用 v8 指令:类型 `@type(note|image|link|code|quote)`、标签 `@tags(a;b)`、外链 `@links(<url>;…)`(URL 编码)、代码 `@code(lang,"代码")`(可重复)、引文 `@quote("文"[,"出处"])`(可重复);代码/引文是引号串,反引号要转义。删除元素必须写显式行 `[kind #id delete]`(省略行不等于删除)。freedraw 与媒体二进制不属于 DSL。
-> 输出一段 DSL 重排或编辑这张画布。应用前会预演、校验并显示确认门;坏行会被诊断并跳过,不会静默成功。
+> 输出一段 DSL 重排或编辑这张画布。应用前会预演、校验并显示确认门;无法解析的行会被诊断并跳过；缺失引用等无法应用的操作会整单取消,不会静默成功。
 
 DSL 模态编辑器里还内嵌了一份语法速查(可折叠 details),双语。
 

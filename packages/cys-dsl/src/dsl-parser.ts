@@ -835,8 +835,8 @@ export function parseDslStrictWithDiagnostics(dslText: string): {
       continue
     }
     const headerClosed = result.kind === 'arrow'
-      ? /^\[arrow(?:\s+#[a-zA-Z0-9_:-]+)?\]/.test(line)
-      : new RegExp(`^\\[${result.kind}\\s+#[a-zA-Z0-9_:-]+(?:\\s+create)?\\]`).test(line)
+      ? /^\[arrow(?:\s+#[a-zA-Z0-9_:-]+)?(?:\s+delete)?\]/.test(line)
+      : new RegExp(`^\\[${result.kind}\\s+#[a-zA-Z0-9_:-]+(?:\\s+(?:create|delete))?\\]`).test(line)
     const allowedClosingChunk = line.startsWith('[arrow]') ? 0 : 1
     const unknownChunks = result.ds.filter((entry) => entry === null).length
     // 2026-10-29:skipChunk 语义化后,junk 原文以 string 落 ds(null 只剩 `]` 工件)——

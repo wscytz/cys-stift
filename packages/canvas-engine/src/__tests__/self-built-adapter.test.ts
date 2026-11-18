@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { SelfBuiltAdapter } from '../self-built-adapter'
-import type { CanvasElement } from '../canvas-host'
+import type { CanvasElement, CanvasView } from '../canvas-host'
 
 describe('SelfBuiltAdapter drag → onUserChange', () => {
   it('upsert during drag emits UserChange (canvas-binding writes back via this)', () => {
@@ -52,6 +52,81 @@ describe('SelfBuiltAdapter pan/zoom', () => {
     host.setView({ panX: 0, panY: 0, zoom: 7.9, gridMode: 'free' })
     h.onWheel(0, 0, 0, -100, true) // 大幅放大
     expect(host.getView().zoom).toBeLessThanOrEqual(8)
+  })
+})
+
+describe('SelfBuiltAdapter finite view boundaries', () => {
+  it('normalizes imported views before pointer coordinates create freedraw geometry', () => {
+    const cases: { view: CanvasView; zoom: number; position: { x: number; y: number } }[] = [
+      {
+        view: { panX: NaN, panY: Infinity, zoom: 0, gridMode: 'free' },
+        zoom: 0.1,
+        position: { x: 200, y: 300 },
+      },
+      {
+        view: { panX: -Infinity, panY: NaN, zoom: -Infinity, gridMode: 'free' },
+        zoom: 1,
+        position: { x: 20, y: 30 },
+      },
+      {
+        view: { panX: -1_000_000_000, panY: 1_000_000_000, zoom: 9999, gridMode: 'free' },
+        zoom: 8,
+        position: { x: 125_000_003, y: -124_999_996 },
+      },
+    ]
+    for (const { view, zoom, position } of cases) {
+      const canvas = document.createElement('canvas')
+      const host = new SelfBuiltAdapter(canvas)
+      try {
+        host.setView(view)
+        expect(host.getView().zoom).toBe(zoom)
+        host.setTool('freedraw')
+        canvas.dispatchEvent(new PointerEvent('pointerdown', {
+          pointerId: 1, pointerType: 'mouse', clientX: 20, clientY: 30, bubbles: true,
+        }))
+        canvas.dispatchEvent(new PointerEvent('pointermove', {
+          pointerId: 1, pointerType: 'mouse', clientX: 28, clientY: 38, bubbles: true,
+        }))
+        canvas.dispatchEvent(new PointerEvent('pointerup', {
+          pointerId: 1, pointerType: 'mouse', clientX: 28, clientY: 38, bubbles: true,
+        }))
+        expect(host.getElements()).toHaveLength(1)
+        const created = host.getElements()[0]!
+        expect(created).toMatchObject({ kind: 'freedraw', ...position })
+        expect([created.x, created.y, created.w, created.h].every(Number.isFinite)).toBe(true)
+      } finally {
+        host.detach()
+      }
+    }
+  })
+
+  it('wheel saturation keeps large finite page anchors fixed at both zoom bounds', () => {
+    const canvas = document.createElement('canvas')
+    const host = new SelfBuiltAdapter(canvas)
+    const cursor = { x: 320, y: 240 }
+    try {
+      for (const { deltaY, zoom, limit } of [
+        { deltaY: -100_000, zoom: 4, limit: 8 },
+        { deltaY: 100_000, zoom: 0.2, limit: 0.1 },
+      ]) {
+        host.setView({ panX: -1_000_000_000, panY: 1_000_000_000, zoom, gridMode: 'free' })
+        const before = host.getView()
+        const pageX = (cursor.x - before.panX) / before.zoom
+        const pageY = (cursor.y - before.panY) / before.zoom
+        for (let step = 0; step < 3; step++) {
+          canvas.dispatchEvent(new WheelEvent('wheel', {
+            clientX: cursor.x, clientY: cursor.y, deltaY, ctrlKey: true, bubbles: true, cancelable: true,
+          }))
+          const current = host.getView()
+          expect(current.zoom).toBe(limit)
+          expect([current.panX, current.panY, current.zoom].every(Number.isFinite)).toBe(true)
+          expect((cursor.x - current.panX) / current.zoom).toBeCloseTo(pageX, 5)
+          expect((cursor.y - current.panY) / current.zoom).toBeCloseTo(pageY, 5)
+        }
+      }
+    } finally {
+      host.detach()
+    }
   })
 })
 
@@ -541,27 +616,176 @@ describe('SelfBuiltAdapter undo/redo', () => {
     expect(host.getElements().map((e) => e.id).sort()).toEqual(['c1', 'c2'])
   })
 
-  it('new user-change 清空 redo 栈', () => {
+  it('no-op batches preserve redo until a real branch edit replaces the future', () => {
     const host = new SelfBuiltAdapter(document.createElement('canvas'))
-    const h = host as unknown as { undo: () => void; redo: () => void; canRedo: () => boolean }
-    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
-    host.upsert({ id: 'c2', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
-    h.undo() // 回到 c1
-    expect(h.canRedo()).toBe(true)
-    host.upsert({ id: 'c3', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 }) // 新变更清 redo
-    expect(h.canRedo()).toBe(false)
+    const original: CanvasElement = { id: 'card', kind: 'card', x: 0, y: 0, w: 100, h: 80, rotation: 0 }
+    try {
+      host.upsert(original)
+      host.upsert({ ...original, x: 20 })
+      host.upsert({ ...original, x: 40 })
+      host.undo()
+      host.undo()
+      host.batch(() => {
+        host.getElements()
+        host.batch(() => host.remove('missing'))
+      })
+      expect(host.canRedo()).toBe(true)
+      host.redo()
+      expect(host.getElement('card')).toEqual({ ...original, x: 20 })
+      host.undo()
+      host.batch(() => {
+        host.upsert({ ...original, x: -20 })
+        host.upsert({ ...original, x: -40 })
+      })
+      expect(host.canRedo()).toBe(false)
+      host.redo()
+      expect(host.getElement('card')).toEqual({ ...original, x: -40 })
+      host.undo()
+      expect(host.getElement('card')).toEqual(original)
+      host.redo()
+      expect(host.getElement('card')).toEqual({ ...original, x: -40 })
+    } finally {
+      host.detach()
+    }
   })
 
-  it('undo 栈上限 50(第 51 步丢弃最旧)', () => {
+  it('retains the newest 50 edits and replays their exact states after capacity eviction', () => {
     const host = new SelfBuiltAdapter(document.createElement('canvas'))
-    const h = host as unknown as { canUndo: () => boolean; undo: () => void }
-    for (let i = 0; i < 55; i++) {
-      host.upsert({ id: 'c' + i, kind: 'card', x: i, y: 0, w: 10, h: 10, rotation: 0 })
+    const original: CanvasElement = { id: 'card', kind: 'card', x: 0, y: 0, w: 100, h: 80, rotation: 0 }
+    try {
+      host.applyWithoutEcho(() => host.upsert(original))
+      for (let position = 1; position <= 55; position++) {
+        host.upsert({ ...original, x: position })
+      }
+      for (let position = 54; position >= 5; position--) {
+        expect(host.canUndo()).toBe(true)
+        host.undo()
+        expect(host.getElements()).toEqual([{ ...original, x: position }])
+      }
+      expect(host.canUndo()).toBe(false)
+      host.undo()
+      expect(host.getElement('card')?.x).toBe(5)
+      for (let position = 6; position <= 55; position++) {
+        expect(host.canRedo()).toBe(true)
+        host.redo()
+        expect(host.getElements()).toEqual([{ ...original, x: position }])
+      }
+      expect(host.canRedo()).toBe(false)
+      host.redo()
+      expect(host.getElement('card')?.x).toBe(55)
+      host.upsert({ ...original, x: 56 })
+      for (let step = 0; step < 50; step++) host.undo()
+      expect(host.canUndo()).toBe(false)
+      expect(host.getElement('card')?.x).toBe(6)
+    } finally {
+      host.detach()
     }
-    // undo 50 次应还能再 undo(false);第 51 次到空
-    let count = 0
-    while (h.canUndo()) { h.undo(); count++ }
-    expect(count).toBe(50)
+  })
+
+  it('a throwing nested batch keeps applied edits in one undo step and resets grouping', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const original: CanvasElement = { id: 'card', kind: 'card', x: 0, y: 0, w: 100, h: 80, rotation: 0 }
+    const failure = new Error('layout callback failed')
+    const history: string[] = []
+    host.onHistoryChange((change) => history.push(change))
+    try {
+      host.applyWithoutEcho(() => host.upsert(original))
+      expect(() => host.batch(() => {
+        host.upsert({ ...original, x: 20 })
+        host.batch(() => {
+          host.remove('card')
+          host.upsert({ ...original, id: 'replacement', x: 40 })
+          throw failure
+        })
+      })).toThrow(failure)
+      expect(history).toEqual(['push'])
+      expect(host.getElements()).toEqual([{ ...original, id: 'replacement', x: 40 }])
+      host.upsert({ ...original, id: 'later', x: 60 })
+      host.undo()
+      expect(host.getElements()).toEqual([{ ...original, id: 'replacement', x: 40 }])
+      host.undo()
+      expect(host.getElements()).toEqual([original])
+      expect(host.canUndo()).toBe(false)
+      host.redo()
+      expect(host.getElements()).toEqual([{ ...original, id: 'replacement', x: 40 }])
+      host.redo()
+      expect(host.getElements().map((element) => element.id)).toEqual(['replacement', 'later'])
+    } finally {
+      host.detach()
+    }
+  })
+
+  it('a batch failing before mutation preserves redo and does not swallow the next edit', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const original: CanvasElement = { id: 'card', kind: 'card', x: 0, y: 0, w: 100, h: 80, rotation: 0 }
+    const failure = new Error('layout validation failed')
+    try {
+      host.upsert(original)
+      host.undo()
+      expect(() => host.batch(() => { throw failure })).toThrow(failure)
+      expect(host.canUndo()).toBe(false)
+      expect(host.canRedo()).toBe(true)
+      host.upsert({ ...original, id: 'branch' })
+      expect(host.canRedo()).toBe(false)
+      host.undo()
+      expect(host.getElements()).toEqual([])
+      expect(host.canUndo()).toBe(false)
+      host.redo()
+      expect(host.getElements()).toEqual([{ ...original, id: 'branch' }])
+    } finally {
+      host.detach()
+    }
+  })
+
+  it('snapshots a mixed batch at its first echoed mutation, not at silent hydration', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const hydrated: CanvasElement = { id: 'card', kind: 'card', x: 100, y: 200, w: 100, h: 80, rotation: 0 }
+    try {
+      host.batch(() => {
+        host.applyWithoutEcho(() => host.upsert(hydrated))
+        host.upsert({ ...hydrated, x: 120 })
+        host.upsert({ ...hydrated, x: 140 })
+      })
+      host.undo()
+      expect(host.getElements()).toEqual([hydrated])
+      expect(host.canUndo()).toBe(false)
+      host.redo()
+      expect(host.getElements()).toEqual([{ ...hydrated, x: 140 }])
+    } finally {
+      host.detach()
+    }
+  })
+
+  it('editing exported history cannot rewrite a later undo or redo snapshot', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const stroke: CanvasElement = {
+      id: 'stroke', kind: 'freedraw', x: 0, y: 0, w: 10, h: 10, rotation: 0,
+      meta: { points: [[0, 0], [10, 10]], label: 'original' },
+    }
+    try {
+      host.upsert(stroke)
+      host.upsert({ id: 'card', kind: 'card', x: 100, y: 0, w: 100, h: 80, rotation: 0 })
+      const exported = host.getHistory()
+      const exportedStroke = exported[1]![0]!
+      exportedStroke.x = 999
+      exportedStroke.meta!.label = 'changed'
+      const exportedPoints = exportedStroke.meta!.points as number[][]
+      exportedPoints[0]![0] = 999
+      exportedPoints.push([500, 500])
+      exported[1]!.pop()
+      exported.pop()
+      host.undo()
+      expect(host.getElements()).toEqual([{
+        ...stroke, meta: { points: [[0, 0], [10, 10]], label: 'original' },
+      }])
+      const secondExport = host.getHistory()
+      secondExport.length = 0
+      host.redo()
+      expect(host.getElement('stroke')!.meta).toEqual({ points: [[0, 0], [10, 10]], label: 'original' })
+      expect(host.getElement('card')).toBeDefined()
+    } finally {
+      host.detach()
+    }
   })
 
   it('R1.1:snapshot 深拷贝 points(undo 回滚能恢复原点序列,不被原地改动污染)', () => {

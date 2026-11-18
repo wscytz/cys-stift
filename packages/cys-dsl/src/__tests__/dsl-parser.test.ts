@@ -366,6 +366,34 @@ describe('parseDslWithDiagnostics', () => {
     expect(errors.map((e) => e.line)).toEqual([2, 4])
   })
 
+  it('mixed CRLF input keeps warning and error locations tied to original source lines', () => {
+    const warningLine = '[card #warn] @pos(10,20) left-of @size(100,80)'
+    const errorLine = '[card #broken]'
+    const source = [
+      '# imported layout',
+      '',
+      `  ${warningLine}  `,
+      `  ${errorLine}  `,
+      '',
+      '[text #safe] @pos(20,30) @text("left-of #anchor is literal")',
+    ].join('\r\n')
+    const parsed = parseDslWithDiagnostics(source)
+    expect(parsed.errors).toEqual([{ line: 4, text: errorLine, message: 'missing @pos' }])
+    expect(parsed.warnings).toHaveLength(1)
+    expect(parsed.warnings[0]).toMatchObject({ line: 3, text: warningLine })
+    expect(parsed.warnings[0]!.message).toContain('unknown relation "left-of"')
+    expect(parsed.warnings[0]!.message).toContain('right-of / below')
+    expect(parsed.warnings[0]!.message).toContain('swap operands')
+    expect(parsed.ops).toHaveLength(2)
+    expect(parsed.ops[1]).toMatchObject({ type: 'free', id: 'safe', text: 'left-of #anchor is literal' })
+    const strict = parseDslStrictWithDiagnostics(source)
+    expect(strict.errors).toEqual([
+      { line: 3, text: warningLine, message: 'unknown residual text' },
+      { line: 4, text: errorLine, message: 'missing @pos' },
+    ])
+    expect(strict.ops).toEqual([parsed.ops[1]])
+  })
+
   it('does not report comments, blank lines, or free-form prose', () => {
     const { errors } = parseDslWithDiagnostics(
       '# a comment line\n\nsome free-form prose\n[card #a1] @pos(1,2)',

@@ -443,7 +443,7 @@ describe('DslDialog — T5 archive trigger (dsl-apply)', () => {
     unmount()
   })
 
-  it('reports content-only title edits as content changes, not "no changes"', () => {
+  it('reports content-only title edits with the changed field, not a generic summary', () => {
     const host = new InMemoryCanvasHost()
     host.applyWithoutEcho(() => {
       host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 80, rotation: 0 })
@@ -462,7 +462,9 @@ describe('DslDialog — T5 archive trigger (dsl-apply)', () => {
     expect(textarea.value).toContain('@title("Old")')
     changeTextarea(domHost, textarea.value.replace('@title("Old")', '@title("New")'))
 
-    expect(domHost.textContent).toContain('canvas.dslPreviewContentOnly')
+    expect(domHost.textContent).toContain('canvas.diffElementCard')
+    expect(domHost.textContent).toContain('canvas.diffField.title')
+    expect(domHost.textContent).not.toContain('canvas.dslPreviewContentOnly')
     expect(domHost.textContent).not.toContain('canvas.dslPreviewNoChanges')
     unmount()
   })

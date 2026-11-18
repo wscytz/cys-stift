@@ -219,8 +219,8 @@ const styles = `
   z-index: 30;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-0.5);
-  padding: var(--space-0.5) var(--space-1);
+  gap: var(--space-half);
+  padding: var(--space-half) var(--space-1);
   background: var(--color-surface-white);
   border: var(--border-hairline);
   border-radius: var(--radius-sm);
@@ -236,7 +236,7 @@ const styles = `
 .cv-freedraw__guess {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-0.5);
+  gap: var(--space-half);
   padding: 0 var(--space-2);
   font-size: var(--font-size-xs);
   letter-spacing: 0.08em;

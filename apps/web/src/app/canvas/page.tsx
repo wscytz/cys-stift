@@ -2141,7 +2141,7 @@ const styles = `
 .tb-tool--active { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
 .tb-tool--active .tb-tool__label { color: var(--color-on-primary); }
 /* 橡皮子模式图标更小,命中区仍守 44×44。 */
-.tb-tool--sub { height: 48px; min-width: 48px; padding: 2px var(--space-0.5); }
+.tb-tool--sub { height: 48px; min-width: 48px; padding: 2px var(--space-half); }
 .tb-tool--sub .tb-tool__icon { font-size: var(--font-size-sm); }
 .tb-tool--sub .tb-tool__label { font-size: var(--font-size-xs); }
 .tb-tool:hover:not(:disabled):not(.tb-tool--active) { background: var(--color-surface-container); border-color: var(--color-secondary); }
@@ -2319,21 +2319,21 @@ const styles = `
    - ≤767px(bp-sm,平板竖):顶栏 SnapToggle 与 ZoomGroup 的 Fit 文字收掉,顶栏靠 toolbar overflow-x:auto 兜底不再横向滚。
    ─────────────────────────────────────────────────────────────── */
 @media (max-width: 1023px) {
-  .cv-rail { padding: var(--space-0.5); }
+  .cv-rail { padding: var(--space-half); }
   /* 平板/窄桌面保留短标签:图标全无文字时核心入口要靠猜。 */
   .cv-rail__btn { width: 52px; min-height: 48px; gap: 1px; padding: 2px 0; }
-  .cv-rail__sep { width: 44px; margin: var(--space-0.5) 0; }
+  .cv-rail__sep { width: 44px; margin: var(--space-half) 0; }
 }
 /* 低高度笔记本窗口:收紧 rail,让底部按钮不必靠滚动才能看到。
    宽度仍 48px;40px 高度是密集工具条的折中(与审计建议一致)。 */
 @media (max-height: 820px) {
-  .cv-rail { gap: 2px; padding: var(--space-0.5); }
+  .cv-rail { gap: 2px; padding: var(--space-half); }
   .cv-rail__btn { width: 48px; min-height: 40px; gap: 0; padding: 0; }
   .cv-rail__sep { width: 40px; margin: 1px 0; }
 }
 @media (max-width: 767px) {
   /* 手机才收成纯图标(侧栏 48px,靠 title/aria-label 说明)。 */
-  .cv-rail__btn { width: 48px; gap: 0; padding: var(--space-0.5) 0; }
+  .cv-rail__btn { width: 48px; gap: 0; padding: var(--space-half) 0; }
   .cv-rail__btn-label { display: none; }
   .cv-rail__sep { width: var(--space-4); }
   /* SnapToggle:文字隐藏、改符号按钮,保留 aria-pressed + title。 */

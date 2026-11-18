@@ -98,7 +98,7 @@ export default function DesignPage() {
             <h2 className="section__h2">Warm paper foundation.</h2>
             <p className="section__lede">
               Full palette per DESIGN.md. Red is surgical — priority interactions,
-              active focus, errors. White (#ffffff) is reserved for documents,
+              active focus, errors. White is reserved for documents,
               canvas and floating layers.
             </p>
             {PALETTE_GROUPS.map(([group, keys]) => (
@@ -206,7 +206,7 @@ export default function DesignPage() {
               </div>
               <div className="borders__cell">
                 <div className="borders__sample borders__sample--muted" />
-                <code>muted · 1px #dbdad7</code>
+                <code>muted · 1px {palette.borderMuted}</code>
               </div>
               <div className="borders__cell">
                 <div className="borders__sample borders__sample--thick" />

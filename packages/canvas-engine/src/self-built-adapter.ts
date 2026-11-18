@@ -667,23 +667,23 @@ export class SelfBuiltAdapter implements CanvasHost {
     this.emitHistory('push')
   }
 
-  private snapshot(): CanvasElement[] {
+  private snapshot(elements: CanvasElement[] = this.getElements()): CanvasElement[] {
     // meta 深拷贝 points:freedraw 的 points 是 [number,number][] 嵌套数组,
     // 浅拷贝({ ...e.meta })会让快照与 live 元素共享同一内层数组 ——
     // 之后 live 元素的原地改动会污染快照,undo 回滚恢复的是被改过的点序列。
-    return this.getElements().map((e) => {
-      if (!e.meta) return { ...e, meta: undefined }
-      const m = e.meta as { points?: unknown }
-      if (Array.isArray(m.points)) {
+    return elements.map((element) => {
+      if (!element.meta) return { ...element, meta: undefined }
+      const metadata = element.meta as { points?: unknown }
+      if (Array.isArray(metadata.points)) {
         return {
-          ...e,
+          ...element,
           meta: {
-            ...e.meta,
-            points: (m.points as [number, number][]).map((p) => [...p] as [number, number]),
+            ...element.meta,
+            points: (metadata.points as [number, number][]).map((point) => [...point] as [number, number]),
           },
         }
       }
-      return { ...e, meta: { ...e.meta } }
+      return { ...element, meta: { ...element.meta } }
     })
   }
 
@@ -698,7 +698,7 @@ export class SelfBuiltAdapter implements CanvasHost {
   /** 返回 undo 历史(只读副本,oldest→newest;不含当前状态)。供画布版本 diff。
    *  深拷贝每个快照(含 freedraw points)防外部篡改引擎内部状态。 */
   getHistory(): CanvasElement[][] {
-    return this.undoStack.map((snap) => snap.map((el) => ({ ...el })))
+    return this.undoStack.map((snapshot) => this.snapshot(snapshot))
   }
 
   undo(): void {

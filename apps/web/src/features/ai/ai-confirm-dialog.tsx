@@ -20,7 +20,7 @@ import { Button, Modal } from '@cys-stift/ui'
 import type { CanvasId, CardId, CardService } from '@cys-stift/domain'
 import { InMemoryCanvasHost, type CanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
 import { parseDslStrictWithDiagnostics } from '@wscytz/dsl'
-import { applyLayout } from '@/features/canvas/apply-layout'
+import { buildApplyPlan, commitApplyPlan } from '@/features/canvas/apply-layout'
 import { makeOnCardRemove } from './agent-confirm-card'
 import { applyClusters, type CardCluster } from './cluster'
 import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
@@ -147,15 +147,19 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
 
   const [beforeState, setBeforeState] = useState<CanvasElement[] | null>(null)
   const [afterState, setAfterState] = useState<CanvasElement[] | null>(null)
+  const [dslIssues, setDslIssues] = useState<{ opIndex: number; message: string }[]>([])
 
   useEffect(() => {
     if (props.mode === 'dsl') {
-      if (preview?.kind !== 'ok') { setBeforeState(null); setAfterState(null); return }
+      if (preview?.kind !== 'ok') { setDslIssues([]); setBeforeState(null); setAfterState(null); return }
       let cancelled = false
       const before = props.liveHost.getElements()
       const afterHost = new InMemoryCanvasHost()
       afterHost.applyWithoutEcho(() => { for (const el of before) afterHost.upsert(el) })
-      applyLayout(afterHost, preview.ops)
+      const plan = buildApplyPlan(afterHost, preview.ops)
+      const issues = plan.diagnostics.map((diagnostic) => ({ opIndex: diagnostic.opIndex, message: diagnostic.message }))
+      setDslIssues(issues)
+      if (issues.length === 0) commitApplyPlan(afterHost, plan, undefined, () => ({ ok: true }))
       if (cancelled) return
       setBeforeState(before)
       setAfterState(afterHost.getElements())
@@ -254,7 +258,13 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
         }
         const before = snapPositions()
         // v10:latent dsl 分支同样接删除(makeOnCardRemove 复用 agent-confirm-card 实现)。
-        const { applied } = applyLayout(props.liveHost, preview.ops, undefined, undefined, undefined, makeOnCardRemove(props.service))
+        const plan = buildApplyPlan(props.liveHost, preview.ops)
+        if (plan.diagnostics.length > 0) {
+          setPhase('confirming')
+          pushToast({ kind: 'error', message: t('canvas.dslApplyBlocked', { n: String(plan.diagnostics.length) }) })
+          return
+        }
+        const { applied } = commitApplyPlan(props.liveHost, plan, undefined, undefined, undefined, makeOnCardRemove(props.service))
         if (applied > 0) {
           void buildArchivePayload()
             .then((p) => archiveStore.append('ai-layout', `AI 重排 ${applied} 张`, p, VERSION))
@@ -398,6 +408,16 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
         {diff && (
           <div className="ac__diff">
             {totalChanges === 0 && <p className="ac__nochange">{t('agent.noChange')}</p>}
+            {props.mode === 'dsl' && dslIssues.length > 0 && (
+              <div className="ac__nochange" role="alert">
+                <p>{t('canvas.dslPreviewBlocked', { n: String(dslIssues.length) })}</p>
+                <ul className="ac__errors">
+                  {dslIssues.slice(0, 4).map((issue) => (
+                    <li key={issue.opIndex}>#{issue.opIndex + 1}: {issue.message}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {diff.added.length > 0 && (
               <DiffGroup color="blue" label={t('agent.added', { n: String(diff.added.length) })} items={diff.added.map(labelEl)} moreLabel={t('agent.moreItems', { n: String(diff.added.length - 8) })} />
             )}

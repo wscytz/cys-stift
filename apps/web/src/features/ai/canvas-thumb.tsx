@@ -218,7 +218,7 @@ export const confirmStyles = `
 .ac__group { padding: var(--space-1) var(--space-2); }
 .ac__group--blue .ac__group-label { color: var(--color-blue); }
 .ac__group--red .ac__group-label { color: var(--color-red); }
-.ac__group--yellow .ac__group-label { color: var(--color-yellow, #b8860b); }
+.ac__group--yellow .ac__group-label { color: var(--color-yellow); }
 .ac__group-label { margin: 0 0 2px; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-black-soft); }
 .ac__group-items { margin: 0; padding: 0 0 0 var(--space-2); list-style: none; }
 .ac__group-items li { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CanvasElement } from '@cys-stift/canvas-engine'
-import { parseDsl, parseDslStrictWithDiagnostics, type DslCardOp } from '../dsl-parser.js'
+import { parseDsl, parseDslStrictWithDiagnostics, parseDslWithDiagnostics, type DslCardOp } from '../dsl-parser.js'
+import { roundtripText } from '../cli.js'
 import { serializeCanvas, type CardDslContent } from '../canvas-dsl.js'
 import { sanitizeDslOps } from '../dsl-sanitize.js'
 import {
@@ -219,6 +220,54 @@ describe('cys-dsl v8 round-trip (serialize → parse, with resolve)', () => {
     ])
     // serialize is deterministic → re-serializing the parsed op's source card is identical
     expect(serializeCanvas([el], resolve)).toBe(text)
+  })
+
+  it('nested JSON and DSL-looking code survive parse-derived serialization and CLI double roundtrip', () => {
+    const nestedJson = JSON.stringify({
+      path: 'C:\\notes\\draft\\',
+      literalNewline: '\\n',
+      markdown: '```ts\nconst title = "quoted"\n```',
+      directive: '[card #injected create] @pos(9,9)',
+    }, null, 2)
+    const content: CardDslContent = {
+      title: 'Nested "JSON" and `code`',
+      content: nestedJson,
+      type: 'code',
+      codeSnippets: [
+        { language: 'json', code: nestedJson, caption: 'literal \\n versus newline\n' },
+        { language: 'ts', code: 'const payload = `@title("not a directive")`\n// trailing \\', caption: 'second block' },
+      ],
+      quotes: [
+        { text: 'She said "use C:\\notes\\"', attribution: 'Reader `one`' },
+        { text: nestedJson, sourceUrl: 'https://example.com/read?q=%22nested%22' },
+      ],
+    }
+    const source = serializeCanvas([el], () => content)
+    const parsed = parseDslWithDiagnostics(source)
+    expect(parsed.errors).toEqual([])
+    expect(parsed.warnings).toEqual([])
+    expect(parsed.ops).toHaveLength(1)
+    const parsedCard = first(parsed.ops)
+    expect(parsedCard).toMatchObject({
+      title: content.title, content: nestedJson, cardType: 'code', code: content.codeSnippets, quotes: content.quotes,
+    })
+    const serialized = serializeCanvas([{
+      id: parsedCard.cardId, kind: 'card', x: parsedCard.x, y: parsedCard.y,
+      w: parsedCard.w!, h: parsedCard.h!, rotation: 0, color: parsedCard.color,
+    }], () => ({
+      title: parsedCard.title,
+      content: parsedCard.content,
+      type: parsedCard.cardType,
+      codeSnippets: parsedCard.code,
+      quotes: parsedCard.quotes,
+    }))
+    expect(serialized).toBe(source)
+    expect(parseDsl(serialized)).toEqual(parsed.ops)
+    expect(parseDslStrictWithDiagnostics(serialized)).toEqual({ ops: parsed.ops, errors: [] })
+    const roundtrip = roundtripText(source)
+    expect(roundtrip.code).toBe(0)
+    expect(roundtrip.stdout).toContain('STABLE')
+    expect(roundtrip.stderr).toBe('')
   })
 
   it('media is NOT serialized (an image card round-trips type only, no binary)', () => {
