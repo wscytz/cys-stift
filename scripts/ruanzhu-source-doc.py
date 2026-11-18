@@ -7,12 +7,15 @@ A4 docx:页眉=软件全称+版本号(左)+ 第 N 页(PAGE 域,右,连续),
 正文 8.5pt Consolas、显式分页符保证每页恰 50 行。
 
 用法:
-  python3 scripts/ruanzhu-source-doc.py            # 生成到私有仓 docs/dachuang-ruanzhu/
+  python3 scripts/ruanzhu-source-doc.py            # 生成到 $CYS_STIFT_DOCS_DIR/docs/dachuang-ruanzhu/
   python3 scripts/ruanzhu-source-doc.py --all      # 总量 ≤ 60 页时才全文(默认同)
+
+CYS_STIFT_DOCS_DIR 默认 ~/projects/cys-stift-docs;可用环境变量指向并排 clone。
 
 数字纪律:生成后脚本自报统计(总行数/收录行数/页数/截断行数),写材料时以
 脚本输出为准,不手抄旧数。软件全称待用户拍板——改名只动 NAME 常量重跑。
 """
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -31,7 +34,7 @@ LINES_PER_PAGE = 50
 FRONT_PAGES = 30
 BACK_PAGES = 30
 MAXCOL = 100  # 显示宽度(半角=1,全角=2)上限,超出截断(源码列表惯例)
-OUT_DIR = Path('/Users/jinxunuo/projects/cys-stift-docs/docs/dachuang-ruanzhu')
+OUT_DIR = Path(os.environ.get('CYS_STIFT_DOCS_DIR', str(Path.home() / 'projects' / 'cys-stift-docs'))) / 'docs' / 'dachuang-ruanzhu'
 
 # 模块拼接顺序(架构自底向上:domain → dsl → engine → db → ui → web → tauri)
 MODULE_ORDER = [
