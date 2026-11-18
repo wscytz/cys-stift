@@ -20,7 +20,7 @@ import { Button, Modal } from '@cys-stift/ui'
 import type { CanvasId, CardId, CardService } from '@cys-stift/domain'
 import { InMemoryCanvasHost, type CanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
 import { parseDslStrictWithDiagnostics } from '@wscytz/dsl'
-import { buildApplyPlan, commitApplyPlan } from '@/features/canvas/apply-layout'
+import { applyPlanIfClean } from '@/features/canvas/apply-layout'
 import { makeOnCardRemove } from './agent-confirm-card'
 import { applyClusters, type CardCluster } from './cluster'
 import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
@@ -156,10 +156,9 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
       const before = props.liveHost.getElements()
       const afterHost = new InMemoryCanvasHost()
       afterHost.applyWithoutEcho(() => { for (const el of before) afterHost.upsert(el) })
-      const plan = buildApplyPlan(afterHost, preview.ops)
-      const issues = plan.diagnostics.map((diagnostic) => ({ opIndex: diagnostic.opIndex, message: diagnostic.message }))
+      const outcome = applyPlanIfClean(afterHost, preview.ops, undefined, () => ({ ok: true }))
+      const issues = outcome.ok ? [] : outcome.diagnostics.map((diagnostic) => ({ opIndex: diagnostic.opIndex, message: diagnostic.message }))
       setDslIssues(issues)
-      if (issues.length === 0) commitApplyPlan(afterHost, plan, undefined, () => ({ ok: true }))
       if (cancelled) return
       setBeforeState(before)
       setAfterState(afterHost.getElements())
@@ -258,13 +257,13 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
         }
         const before = snapPositions()
         // v10:latent dsl 分支同样接删除(makeOnCardRemove 复用 agent-confirm-card 实现)。
-        const plan = buildApplyPlan(props.liveHost, preview.ops)
-        if (plan.diagnostics.length > 0) {
+        const outcome = applyPlanIfClean(props.liveHost, preview.ops, undefined, undefined, undefined, makeOnCardRemove(props.service))
+        if (!outcome.ok) {
           setPhase('confirming')
-          pushToast({ kind: 'error', message: t('canvas.dslApplyBlocked', { n: String(plan.diagnostics.length) }) })
+          pushToast({ kind: 'error', message: t('canvas.dslApplyBlocked', { n: String(outcome.diagnostics.length) }) })
           return
         }
-        const { applied } = commitApplyPlan(props.liveHost, plan, undefined, undefined, undefined, makeOnCardRemove(props.service))
+        const { applied } = outcome.report
         if (applied > 0) {
           void buildArchivePayload()
             .then((p) => archiveStore.append('ai-layout', `AI 重排 ${applied} 张`, p, VERSION))

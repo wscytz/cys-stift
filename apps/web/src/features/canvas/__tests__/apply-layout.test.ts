@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyLayout } from '../apply-layout'
+import { applyLayout, applyPlanIfClean } from '../apply-layout'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import type { DslOp } from '@wscytz/dsl'
@@ -782,6 +782,17 @@ describe('applyLayout — case 4: free id round-trip + arrow 连新建', () => {
 
 // ── B工程:relational card 经 applyLayout 全链路(sanitize → solve → apply)─────────
 describe('applyLayout — relational card (right-of / below)', () => {
+  it('applyPlanIfClean reports a missing anchor and leaves the host untouched', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'e', 10, 20)
+    const outcome = applyPlanIfClean(host, parseDsl('[card #e] right-of #ghost @gap(40)'))
+    expect(outcome.ok).toBe(false)
+    if (!outcome.ok) {
+      expect(outcome.diagnostics.some((diagnostic) => /ghost/.test(diagnostic.message))).toBe(true)
+    }
+    expect(host.getElement('e')).toMatchObject({ x: 10, y: 20 })
+  })
+
   it('right-of 链:c0 绝对 create,c1 right-of c0 → c1 落在求解坐标', () => {
     const host = new InMemoryCanvasHost()
     const created: string[] = []

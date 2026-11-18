@@ -365,6 +365,35 @@ export function applyLayout(
   return commitApplyPlan(host, plan, appliedHashes, onCardCreate, onCardUpdate, onCardRemove)
 }
 
+export type ApplyPlanOutcome =
+  | { ok: true; plan: ApplyPlan; report: ApplyResult }
+  | { ok: false; plan: ApplyPlan; diagnostics: SanitizeDiagnostic[] }
+
+/**
+ * Build and commit only when the plan has no blocking diagnostics. UI paths
+ * that preview or apply user-authored DSL must use this entry point: a missing
+ * anchor or other solver diagnostic otherwise leaves placeholder coordinates
+ * that commitApplyPlan would write to the host.
+ */
+export function applyPlanIfClean(
+  host: CanvasHost,
+  ops: DslOp[],
+  appliedHashes?: Set<string>,
+  onCardCreate?: CardCreateHandler,
+  onCardUpdate?: CardUpdateHandler,
+  onCardRemove?: (cardId: string) => void,
+): ApplyPlanOutcome {
+  const plan = buildApplyPlan(host, ops, appliedHashes)
+  if (plan.diagnostics.length > 0) {
+    return { ok: false, plan, diagnostics: plan.diagnostics }
+  }
+  return {
+    ok: true,
+    plan,
+    report: commitApplyPlan(host, plan, appliedHashes, onCardCreate, onCardUpdate, onCardRemove),
+  }
+}
+
 function emptyReport(total: number): ApplyResult {
   return {
     total,

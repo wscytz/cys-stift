@@ -23,7 +23,7 @@ import { serializeCanvasReadable, serializeCanvas } from '@wscytz/dsl'
 import { parseDslWithDiagnostics } from '@wscytz/dsl'
 import { buildCanvasPrompt } from '../ai/canvas-prompt'
 import { DSL_GRAMMAR_REFERENCE } from '@wscytz/dsl'
-import { buildApplyPlan, commitApplyPlan, type CardCreateHandler, type CardUpdateHandler } from './apply-layout'
+import { applyPlanIfClean, type CardCreateHandler, type CardUpdateHandler } from './apply-layout'
 import { diffCanvasSnapshots } from './canvas-diff'
 import { archiveStore } from '@/lib/archive-store'
 import { buildArchivePayload } from '@/lib/build-archive-payload'
@@ -184,16 +184,12 @@ export function DslDialog({
     })
     // A preview has no persistence side effects. The successful callback only
     // makes card-create operations visible in the projected host.
-    const plan = buildApplyPlan(afterHost, ops)
-    const applyIssues = plan.diagnostics.map((diagnostic) => ({ opIndex: diagnostic.opIndex, reason: diagnostic.message }))
-    if (applyIssues.length === 0) {
-      const previewResult = commitApplyPlan(afterHost, plan, undefined, () => ({ ok: true }))
-      for (const result of previewResult.opResults) {
-        if (result.status !== 'applied' && result.reason !== undefined) {
-          applyIssues.push({ opIndex: result.opIndex, reason: result.reason })
-        }
-      }
-    }
+    const outcome = applyPlanIfClean(afterHost, ops)
+    const applyIssues = outcome.ok
+      ? outcome.report.opResults
+          .filter((result) => result.status !== 'applied' && result.reason !== undefined)
+          .map((result) => ({ opIndex: result.opIndex, reason: result.reason! }))
+      : outcome.diagnostics.map((diagnostic) => ({ opIndex: diagnostic.opIndex, reason: diagnostic.message }))
     const after = cloneElements(afterHost.getElements())
     const titleById = new Map<string, string>()
     for (const op of ops) {
@@ -333,12 +329,12 @@ export function DslDialog({
       return
     }
 
-    const plan = buildApplyPlan(host, ops, appliedHashes)
-    if (plan.diagnostics.length > 0) {
-      pushToast({ kind: 'error', message: t('canvas.dslApplyBlocked', { n: String(plan.diagnostics.length) }) })
+    const outcome = applyPlanIfClean(host, ops, appliedHashes, onCardCreate, onCardUpdate, onCardRemove)
+    if (!outcome.ok) {
+      pushToast({ kind: 'error', message: t('canvas.dslApplyBlocked', { n: String(outcome.diagnostics.length) }) })
       return
     }
-    const { applied, skipped, failed, newlyApplied } = commitApplyPlan(host, plan, appliedHashes, onCardCreate, onCardUpdate, onCardRemove)
+    const { applied, skipped, failed, newlyApplied } = outcome.report
     // 合并【本次新应用】的 op hash 到现有集合 —— 部分失败时保留已应用行的 hash,
     // 重复 Apply 会跳过它们(planFree 命中已应用 hash 走 update 不造副本),防造无 #id
     // freeform 副本。全部成功时下方 else-if 分支会重序列化文本(画布即文本)并清空 hash。
