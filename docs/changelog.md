@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-11-19 · 未发布 · fix: 空 undo、legacy 渲染与预览站部署
+
+> 预览站已更新到当前 main；正式站仍为 v1.5.0。改动尚未提交。
+
+- **关系导出性能**：碰撞查询从每条关系线性扫全表改为一次构建空间索引（2000 卡 / 1950 条关系：387.6ms → 3.38ms，输出逐字节一致）；`serializeElement` 无索引时保留线性回退。
+- **空 undo**：shift 取消最后一个选中不再建立空拖拽组；snap 回原位、resize 无有效几何变化不再推 undo 快照。
+- **legacy 形状**：ellipse/line/note/image 只读渲染（note 复用 text、image 画占位框），不再“看不见却能命中/撑大导出 bounds”。
+- **部署**：备份目录移到 web 根外（修复旧产物可公开访问），支持任意 `APP_REMOTE_DIR`（预览站 `app-preview`）并生成带时间戳的备份与正确回滚命令。
+- **验证**：全包 lint 0；全量 3350 通过 / 3 跳过；web build、`verify:pack`、`demo:approval`、`e2e:dsl-seed` 10/10；预览站 `?dsl=` 线上实测预填、不自动应用、URL 一次性；备份路径 404。
+
 ## 2026-11-19 · 未发布 · fix: 全量审查修复（安全、关系链、验收门）
 
 > 依据独立全量审查报告修复 P1/P2；不改变已发布 v1.5.0 桌面产物或 npm 包 0.1.1。改动尚未提交；在线预览站仍为旧产物。
@@ -16,7 +26,7 @@
 - **引擎**：pinch 同时缩放+平移不再双算中点位移；snap 多选整组同一吸附位移；非整数 DPR 不每帧重建位图；容器 resize 触发重绘；小元素角点容差封顶。
 - **验收/发布**：挂起面板加稳定 `data-testid`，`demo:approval` 修复并支持 `CHROME_PATH`；CI 所有 filter 加 `--fail-if-no-match`，新增提交版 `e2e:dsl-seed` 并接入 CI；`deploy:web --no-build` 也运行隐私清洗；清洗器删除 `.map`、扩展路径前缀、递归处理 app chunks。
 - **UI/i18n/文档**：挂起/软跳过/错误面板补 `role`；删除跨 kind 建议对非 DSL kind 改用 `[rect #id delete]`；AI 确认框区分失败/跳过且全失败不关框；`@compute` 文案修正；privacy 文档补 `?dsl=` URL 日志例外。
-- **验证**：全包 lint 0；全量 3345 passed / 3 skipped；web build、`verify:pack`、`demo:approval` exit 0；`e2e:dsl-seed` 10/10；浏览器验收 34/34。残余 P3：关系导出碰撞检查 O(N²)、空 undo/legacy kind。
+- **验证**：全包 lint 0；全量 3345 passed / 3 skipped；web build、`verify:pack`、`demo:approval` exit 0；`e2e:dsl-seed` 10/10；浏览器验收 34/34。当时记录的 P3（关系导出 O(N²)、空 undo/legacy kind）已由下一条收口。
 
 ## 2026-11-19 · 未发布 · fix: DSL 语义对齐、转义入口与顶栏窄档
 

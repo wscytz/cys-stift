@@ -21,6 +21,7 @@ function mockCtx() {
     bezierCurveTo: (cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number) =>
       calls.push(`bezierCurveTo(${cp1x},${cp1y},${cp2x},${cp2y},${x},${y})`),
     arc: (x: number, y: number, r: number, start: number, end: number) => calls.push(`arc(${x},${y},${r},${start},${end})`),
+    ellipse: (x: number, y: number, rx: number, ry: number) => calls.push(`ellipse(${x},${y},${rx},${ry})`),
     setLineDash: (arr: number[]) => calls.push(`setLineDash(${arr.join(',')})`),
     strokeRect: (x: number, y: number, w: number, h: number) => calls.push(`strokeRect(${x},${y},${w},${h})`),
     roundRect: (x: number, y: number, w: number, h: number, r?: number) => calls.push(`roundRect(${x},${y},${w},${h})`),
@@ -70,6 +71,21 @@ describe('renderElements', () => {
     // title @ (el.x+10, el.y+10+16) = (110, 76)
     expect(ctx._calls.some((c) => c.startsWith('fillText(Title@110,76)'))).toBe(true)
     expect(ctx._calls.some((c) => c.startsWith('rect(0,0,50,30)'))).toBe(true)
+  })
+
+  it('renders legacy kinds visibly instead of leaving them invisible-but-hittable', () => {
+    const ctx = mockCtx()
+    const els: CanvasElement[] = [
+      { id: 'e1', kind: 'ellipse', x: 0, y: 0, w: 100, h: 60, rotation: 0 },
+      { id: 'l1', kind: 'line', x: 10, y: 10, w: 80, h: 40, rotation: 0 },
+      { id: 'n1', kind: 'note', x: 0, y: 80, w: 100, h: 40, rotation: 0, text: 'legacy note' },
+      { id: 'i1', kind: 'image', x: 0, y: 140, w: 100, h: 60, rotation: 0 },
+    ]
+    renderElements(ctx, els, { panX: 0, panY: 0, zoom: 1, gridMode: 'free' }, 800, 600, () => null, '#ffffff')
+    expect(ctx._calls.some((call) => call.startsWith('ellipse(50,30,50,30)'))).toBe(true)
+    expect(ctx._calls.some((call) => call.startsWith('moveTo(10,10)'))).toBe(true)
+    expect(ctx._calls.some((call) => call.startsWith('fillText(legacy note@0,80)'))).toBe(true)
+    expect(ctx._calls.some((call) => call.startsWith('rect(0,140,100,60)'))).toBe(true)
   })
 
   it('skips unknown kinds without throwing', () => {

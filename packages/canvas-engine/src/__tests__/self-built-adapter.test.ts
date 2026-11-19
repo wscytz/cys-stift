@@ -588,6 +588,45 @@ describe('SelfBuiltAdapter undo coalescing (drag/resize/batch → 1 step)', () =
     expect(undoSteps(host)).toBe(2)
   })
 
+  it('shift-click 取消最后选中后拖动不产生空 undo 步', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['c1'])
+    canvas.dispatchEvent(new PointerEvent('pointerdown', {
+      pointerId: 1, pointerType: 'mouse', bubbles: true, clientX: 50, clientY: 50, shiftKey: true,
+    }))
+    dispatch(canvas, 'pointermove', 80, 80)
+    dispatch(canvas, 'pointerup', 80, 80)
+    expect(host.getElement('c1')).toMatchObject({ x: 0, y: 0 })
+    expect((host as unknown as { undoStack: unknown[] }).undoStack.length).toBe(1)
+  })
+
+  it('snap 模式拖动回原位不产生空 undo 步', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'c1', kind: 'rect', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.setView({ panX: 0, panY: 0, zoom: 1, gridMode: 'snap' })
+    dispatch(canvas, 'pointerdown', 50, 50)
+    dispatch(canvas, 'pointermove', 53.2, 50) // 过 3px 阈值，但 snap 回 0
+    dispatch(canvas, 'pointerup', 53.2, 50)
+    expect(host.getElement('c1')).toMatchObject({ x: 0, y: 0 })
+    expect((host as unknown as { undoStack: unknown[] }).undoStack.length).toBe(1)
+  })
+
+  it('snap 模式 resize 回原位不产生空 undo 步', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    host.upsert({ id: 'c1', kind: 'rect', x: 100, y: 100, w: 100, h: 100, rotation: 0 })
+    host.setView({ panX: 0, panY: 0, zoom: 1, gridMode: 'snap' })
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['c1'])
+    dispatch(canvas, 'pointerdown', 200, 200)
+    dispatch(canvas, 'pointermove', 199, 199) // snap 回 200 → 几何不变
+    dispatch(canvas, 'pointerup', 199, 199)
+    expect(host.getElement('c1')).toMatchObject({ x: 100, y: 100, w: 100, h: 100 })
+    expect((host as unknown as { undoStack: unknown[] }).undoStack.length).toBe(1)
+  })
+
   it('batch:批内多次 upsert/remove 合并为 1 undo 步', () => {
     const host = new SelfBuiltAdapter(document.createElement('canvas'))
     host.batch(() => {

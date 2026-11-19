@@ -983,6 +983,10 @@ export class SelfBuiltAdapter implements CanvasHost {
           // 普通点:该元素已选中 → 保留组(准备组移动);否则单选替换
           if (!this.selectedIds.has(id)) this.setSelectedIds([id])
         }
+        if (this.selectedIds.size === 0) {
+          // shift-click 取消最后一个选中：不要建立空拖拽组（否则 move 会推一条空 undo）。
+          return
+        }
         // 组移动:拖动所有选中元素(记录每个的 offset)
         const offsets = new Map<string, { x: number; y: number }>()
         for (const sid of this.selectedIds) {
@@ -1077,16 +1081,21 @@ export class SelfBuiltAdapter implements CanvasHost {
         const p = screenToPage(this.view, sx, sy)
         const el = this.getElement(this.resizing.id)
         if (el) {
-          // lazy pushUndo:首次实际 resize 才推(点 handle 不拖不推)。
-          if (!this.coalescing) {
-            this.pushUndo()
-            this.coalescing = true
-          }
           // snap 模式:拖动角点 p 过 snapCoord(对角由 start 固定,snap 移动角即让尺寸落网格)。
           const sp = this.view.gridMode === 'snap'
             ? { x: this.snapCoord(p.x), y: this.snapCoord(p.y) }
             : p
           const g = resizeGeometry(this.resizing.handle, this.resizing.start, sp)
+          // 有效几何没变（snap 回原位 / 只移动被忽略的 y）→ 不推 undo、不写回。
+          const changed = el.kind === 'card'
+            ? g.x !== el.x || g.w !== el.w
+            : g.x !== el.x || g.y !== el.y || g.w !== el.w || g.h !== el.h
+          if (!changed) return
+          // lazy pushUndo:首次实际 resize 才推(点 handle 不拖不推)。
+          if (!this.coalescing) {
+            this.pushUndo()
+            this.coalescing = true
+          }
           if (el.kind === 'freedraw') {
             // freedraw 真身=点序列:把点序列从旧 bbox 线性映射到新 box(不只改 bbox)。
             const scaled = scaleFreedrawToBox(el, g)
@@ -1110,11 +1119,6 @@ export class SelfBuiltAdapter implements CanvasHost {
         const dxScreen = sx - this.dragGroup.startSx
         const dyScreen = sy - this.dragGroup.startSy
         if (Math.hypot(dxScreen, dyScreen) < 3) return
-        // lazy pushUndo:首次实际移动才推快照(纯点击不拖不推),后续 upsert 被 coalescing 合并。
-        if (!this.coalescing) {
-          this.pushUndo()
-          this.coalescing = true
-        }
         // snap 模式:整组按同一个位移吸附，不能逐元素各 snap 各的——
         // 否则不同元素落进不同 8px 区间，组内相对间距被改变并写回。
         const ids = [...this.dragGroup.ids]
@@ -1130,12 +1134,21 @@ export class SelfBuiltAdapter implements CanvasHost {
             snapDy = this.snapCoord(rawY) - rawY
           }
         }
-        for (const sid of ids) {
+        const moves = ids.flatMap((sid) => {
           const el = this.getElement(sid)
-          const off = this.dragGroup.offsets.get(sid)
-          if (!el || !off) continue
-          const nx = p.x - off.x + snapDx
-          const ny = p.y - off.y + snapDy
+          const off = this.dragGroup!.offsets.get(sid)
+          if (!el || !off) return []
+          return [{ el, nx: p.x - off.x + snapDx, ny: p.y - off.y + snapDy }]
+        })
+        // 空组 / 全部 snap 回原位：没有实际变化就不推 undo（空 undo 步）。
+        if (moves.length === 0) return
+        if (moves.every(({ el, nx, ny }) => el.x === nx && el.y === ny)) return
+        // lazy pushUndo:首次实际移动才推快照(纯点击不拖不推),后续 upsert 被 coalescing 合并。
+        if (!this.coalescing) {
+          this.pushUndo()
+          this.coalescing = true
+        }
+        for (const { el, nx, ny } of moves) {
           if (el.kind === 'freedraw') {
             // freedraw 真身=点序列:按位移平移点序列(不只改 bbox)。
             const moved = translateFreedraw(el, nx - el.x, ny - el.y)

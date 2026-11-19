@@ -330,6 +330,47 @@ function drawElement(
       }
       break
     }
+    case 'ellipse': {
+      // legacy（旧画布）：只读渲染，保证可见/可选中，不再“看不见却能命中”。
+      const rx = Math.abs(el.w) / 2
+      const ry = Math.abs(el.h) / 2
+      if (rx <= 0 || ry <= 0) break
+      ctx.beginPath()
+      ctx.ellipse(el.x + el.w / 2, el.y + el.h / 2, rx, ry, 0, 0, Math.PI * 2)
+      ctx.strokeStyle = colorOf(el.color, tokenResolver)
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+      break
+    }
+    case 'line': {
+      ctx.beginPath()
+      ctx.moveTo(el.x, el.y)
+      ctx.lineTo(el.x + el.w, el.y + el.h)
+      ctx.strokeStyle = colorOf(el.color, tokenResolver)
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+      break
+    }
+    case 'image': {
+      // legacy image：媒体已并入卡片 MediaRef，旧元素只画占位框（虚线 + 对角线）。
+      ctx.beginPath()
+      ctx.rect(el.x, el.y, el.w, el.h)
+      ctx.fillStyle = tokenResolver('--color-white', '#fbf9f6')
+      ctx.fill()
+      ctx.strokeStyle = tokenResolver('--color-border-muted', '#dbdad7')
+      ctx.lineWidth = 1
+      ctx.setLineDash([6, 4])
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(el.x, el.y)
+      ctx.lineTo(el.x + el.w, el.y + el.h)
+      ctx.moveTo(el.x + el.w, el.y)
+      ctx.lineTo(el.x, el.y + el.h)
+      ctx.stroke()
+      ctx.setLineDash([])
+      break
+    }
+    case 'note':
     case 'text': {
       const lines = (el.text ?? '').split('\n')
       if (lines.length === 0 || (lines.length === 1 && lines[0] === '')) break

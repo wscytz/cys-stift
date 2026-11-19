@@ -21,7 +21,7 @@
 
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { basename, resolve } from 'node:path'
 
 const ROOT = process.cwd()
 const PKG = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'))
@@ -29,6 +29,10 @@ const VERSION = PKG.version
 
 const SERVER = process.env.SERVER_HOST || 'root@47.100.54.149'
 const APP_DIR = process.env.APP_REMOTE_DIR || '/var/www/wscytz/cys-stift/app'
+/** 非 /app 目录（如 app-preview）也要能备份/回滚：按目录名生成同级 .bak。 */
+const APP_NAME = basename(APP_DIR)
+/** 备份放在 web 根外，避免旧产物被公开访问（曾出现 app-preview.bak-* 可 200）。 */
+const BACKUP_DIR = process.env.BACKUP_DIR || '/var/backups/cys-stift'
 const BASE_PATH = process.env.BASE_PATH || '/cys-stift/app'
 const URL = process.env.DEPLOY_URL || `https://wscytz.com/cys-stift/app`
 
@@ -124,8 +128,10 @@ run('node scripts/sanitize-web-out.mjs', '静态产物隐私清洗')
 
 // 2) 备份服务器旧版。
 const prev = serverVersion()
+const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+const backupPath = `${BACKUP_DIR}/${APP_NAME}.bak-${prev}-${stamp}`
 ssh(
-  `cd ${APP_DIR.replace(/\/app$/, '')} && rm -rf app.bak-${prev} && cp -a app app.bak-${prev} && echo "备份 app → app.bak-${prev}"`,
+  `mkdir -p ${BACKUP_DIR} && cp -a ${APP_DIR} ${backupPath} && echo "备份 ${APP_DIR} → ${backupPath}"`,
   `备份服务器旧版 v${prev}`,
 )
 
@@ -150,4 +156,4 @@ if (finalCode !== '200') {
   process.exit(1)
 }
 
-console.log(`\n✅ 部署完成 v${VERSION}\n   线上: ${URL}/\n   备份: app.bak-${prev}\n   回滚: mv app app.bak-${VERSION} && mv app.bak-${prev} app`)
+console.log(`\n✅ 部署完成 v${VERSION}\n   线上: ${URL}/\n   备份: ${backupPath}\n   回滚: ssh ${SERVER} "rm -rf ${APP_DIR} && cp -a ${backupPath} ${APP_DIR}"`)
