@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { parseDsl } from '../dsl-parser.js'
 import { sanitizeDslOps } from '../dsl-sanitize.js'
 import { solveRelational } from '../dsl-relational-solver.js'
-import { toSvg, routeAround } from '../to-svg.js'
+import { toSvg, routeAround, renderDslSvg } from '../to-svg.js'
 
 /** CLI render --svg 的底层:ops → 独立 SVG(预览级)。 */
 function solve(text: string) {
@@ -258,5 +258,68 @@ describe('自动避障(routeAround + 默认路由)', () => {
     )
     expect((svg.match(/Q /g) ?? []).length).toBe(0)
     expect(svg).toContain('标')
+  })
+})
+
+describe('toSvg options / renderDslSvg — 外部消费方协作(v11)', () => {
+  const dsl = [
+    '[card #a create] @pos(0,0) @size(200,100) @title("A")',
+    '[card #b create] @pos(400,0) @size(200,100) @title("B")',
+    '[arrow #e1] from #a to #b @label("引用")',
+  ].join('\n')
+
+  it('缺省输出保持旧观感:箭头组在节点组之前', () => {
+    const { svg } = toSvg(solve(dsl))
+    const g1 = svg.indexOf('<g>')
+    const g2 = svg.indexOf('<g>', g1 + 1)
+    expect(svg.slice(g1, g2)).toContain('<path')
+    expect(svg.slice(g1, g2)).not.toContain('<rect')
+    expect(svg.slice(g2)).toContain('<rect')
+  })
+
+  it('arrowsOnTop: true → 节点组在前、箭头组在后(与产品 KIND_LAYER 同序)', () => {
+    const { svg } = toSvg(solve(dsl), { arrowsOnTop: true })
+    const g1 = svg.indexOf('<g>')
+    const g2 = svg.indexOf('<g>', g1 + 1)
+    expect(svg.slice(g1, g2)).toContain('<rect')
+    expect(svg.slice(g2)).toContain('<path')
+  })
+
+  it('strokeWidth / halo / labelFontSize 可调', () => {
+    const { svg } = toSvg(solve(dsl), { strokeWidth: 2.6, halo: true, labelFontSize: 12.5 })
+    expect(svg).toContain('stroke-width="2.6"')
+    expect(svg).toContain('opacity="0.92"')
+    expect(svg).toContain(`font-size="12.5"`)
+  })
+
+  it('缺省(不传 options)输出与旧版一致:无 halo、stroke-width="2"、font-size="11"', () => {
+    const { svg } = toSvg(solve(dsl))
+    expect(svg).not.toContain('opacity="0.92"')
+    expect(svg).toContain('stroke-width="2"')
+    expect(svg).toContain('font-size="11"')
+  })
+
+  it('renderDslSvg 一步到位:合法 DSL 零诊断、卡和箭头都渲染', () => {
+    const { svg, skipped, diagnostics } = renderDslSvg(dsl)
+    expect(diagnostics).toEqual([])
+    expect(skipped).toEqual([])
+    expect(svg).toContain('<rect')
+    expect(svg).toContain('引用')
+  })
+
+  it('renderDslSvg:缺失锚点进 diagnostics,不产悬空线', () => {
+    const { svg, diagnostics } = renderDslSvg('[card #e create] right-of #ghost @gap(20)')
+    expect(diagnostics.some((d) => d.stage === 'solver' && d.message.includes('ghost'))).toBe(true)
+    expect(svg).not.toContain('<path')
+  })
+
+  it('renderDslSvg:existingGeometry 供增量补丁的锚点与避障', () => {
+    const { svg, diagnostics } = renderDslSvg('[card #g create] right-of #a @gap(20) @size(200,100)', {
+      existingGeometry: { a: { x: 0, y: 0, w: 200, h: 100 } },
+    })
+    expect(diagnostics).toEqual([])
+    expect(svg).toContain('<rect')
+    // a 右缘 200 + gap 20 = 220(SVG 里第一个 rect 是带 PAD 偏移的背景,卡片是 220)
+    expect(svg).toContain('<rect x="220"')
   })
 })

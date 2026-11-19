@@ -16,6 +16,9 @@
  * - 路由 straight/curve/elbow 都画;arrowhead arrow=开口 V / triangle=实心三角 / none=无线帽。
  */
 import type { DslOp } from './dsl-parser.js'
+import { parseDslWithDiagnostics } from './dsl-parser.js'
+import { sanitizeDslOps } from './dsl-sanitize.js'
+import { solveRelational, type ExistingGeom } from './dsl-relational-solver.js'
 import { planRoute } from './routing.js'
 
 /** legacy 6 色名 → 设计 token 实值(浅色主题)。grey 是 gray 的冻结别名。 */
@@ -142,9 +145,8 @@ function borderPoint(r: Rect, tx: number, ty: number): Pt {
 }
 
 /** 箭头头部:tip 在线终点,方向由上一段决定。arrow=开口 V;triangle=实心三角。 */
-function arrowHead(tip: Pt, from: Pt, kind: 'arrow' | 'triangle', color: string): string {
+function arrowHead(tip: Pt, from: Pt, kind: 'arrow' | 'triangle', color: string, len = 12): string {
   const ang = Math.atan2(tip.y - from.y, tip.x - from.x)
-  const len = 12
   const spread = 0.42
   const w1 = { x: tip.x - len * Math.cos(ang - spread), y: tip.y - len * Math.sin(ang - spread) }
   const w2 = { x: tip.x - len * Math.cos(ang + spread), y: tip.y - len * Math.sin(ang + spread) }
@@ -345,8 +347,42 @@ function dashAttr(dash?: string): string {
   return ''
 }
 
-export function toSvg(ops: DslOp[]): { svg: string; skipped: SvgSkip[] } {
+/** 渲染观感选项(全部可缺省;缺省输出与 v10 逐字节一致,不破坏既有调用方)。
+ *  动机:外部消费方(宣传视频/draw skill)过去只能手画箭头——层级、线宽、halo、
+ *  标签字号都调不了。现在把产品 KIND_LAYER(箭头在卡之上)与物料观感开放成选项。 */
+export interface ToSvgOptions {
+  /** 箭头层画在节点之上(与产品 KIND_LAYER 同序:arrow=3 > card=2)。
+   *  缺省 false = 旧观感(箭头在卡之下,预览更干净)。 */
+  arrowsOnTop?: boolean
+  /** 关系线主宽。缺省 2。 */
+  strokeWidth?: number
+  /** 主线下先铺一条纸色 halo(线更突出,又不破纸面品牌感)。缺省 false。 */
+  halo?: boolean
+  /** 箭头头部长度(px)。缺省 12。 */
+  arrowHeadLength?: number
+  /** 箭头标签字号。缺省 11;标签自带纸色描边底,宽度随字号缩放。 */
+  labelFontSize?: number
+}
+
+export interface RenderDslSvgOptions extends ToSvgOptions {
+  /** 增量补丁渲染时的已有画布几何:id → 矩形。进入避障表与关系锚点解析。 */
+  existingGeometry?: Record<string, { x: number; y: number; w: number; h: number }>
+}
+
+export type RenderDslDiagnostic = {
+  stage: 'parse' | 'warning' | 'sanitize' | 'solver'
+  message: string
+  line?: number
+}
+
+export function toSvg(ops: DslOp[], options: ToSvgOptions = {}): { svg: string; skipped: SvgSkip[] } {
   const skipped: SvgSkip[] = []
+  const strokeWidth = options.strokeWidth ?? 2
+  const headLen = options.arrowHeadLength ?? 12
+  const labelFontSize = options.labelFontSize ?? 11
+  const labelHaloWidth = Math.max(3, Math.round(labelFontSize / 4))
+  const arrowsOnTop = options.arrowsOnTop === true
+  const halo = options.halo === true
   const bodies: string[] = []
   let minX = Infinity
   let minY = Infinity
@@ -552,13 +588,18 @@ export function toSvg(ops: DslOp[]): { svg: string; skipped: SvgSkip[] } {
       labelAnchor = polyMid(pts)
       for (const p of pts) grow({ x: p.x, y: p.y, w: 0, h: 0 })
     }
-    arrowBodies.push(`<path d="${d}" fill="none" stroke="${color}" stroke-width="2"${dashAttr(op.dash)}/>`)
+    if (halo) {
+      arrowBodies.push(
+        `<path d="${d}" fill="none" stroke="${SURFACE}" stroke-width="${strokeWidth + 5}" stroke-linecap="round" opacity="0.92"/>`,
+      )
+    }
+    arrowBodies.push(`<path d="${d}" fill="none" stroke="${color}" stroke-width="${strokeWidth}"${dashAttr(op.dash)}/>`)
     if (op.arrowhead !== 'none') {
-      arrowBodies.push(arrowHead(p2!, headFrom, op.arrowhead ?? 'arrow', color))
+      arrowBodies.push(arrowHead(p2!, headFrom, op.arrowhead ?? 'arrow', color, headLen))
     }
     if (op.label !== undefined) {
       arrowBodies.push(
-        `<text x="${labelAnchor.x}" y="${labelAnchor.y - 6}" font-family="${FONT}" font-size="11" fill="${INK}" text-anchor="middle" stroke="${SURFACE}" stroke-width="3" paint-order="stroke">${esc(op.label)}</text>`,
+        `<text x="${labelAnchor.x}" y="${labelAnchor.y - 6}" font-family="${FONT}" font-size="${labelFontSize}" fill="${INK}" text-anchor="middle" stroke="${SURFACE}" stroke-width="${labelHaloWidth}" paint-order="stroke">${esc(op.label)}</text>`,
       )
     }
   }
@@ -573,11 +614,46 @@ export function toSvg(ops: DslOp[]): { svg: string; skipped: SvgSkip[] } {
   const vy = Math.floor(minY - PAD)
   const vw = Math.ceil(maxX - minX) + PAD * 2
   const vh = Math.ceil(maxY - minY) + PAD * 2
+  const arrowGroup = `  <g>\n${arrowBodies.map((b) => `    ${b}`).join('\n')}\n  </g>`
+  const nodeGroup = `  <g>\n${nodeBodies.map((b) => `    ${b}`).join('\n')}\n  </g>`
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vx} ${vy} ${vw} ${vh}" width="${vw}" height="${vh}">\n` +
     `  <rect x="${vx}" y="${vy}" width="${vw}" height="${vh}" fill="${SURFACE}"/>\n` +
-    `  <g>\n${arrowBodies.map((b) => `    ${b}`).join('\n')}\n  </g>\n` +
-    `  <g>\n${nodeBodies.map((b) => `    ${b}`).join('\n')}\n  </g>\n` +
+    (arrowsOnTop ? `${nodeGroup}\n${arrowGroup}\n` : `${arrowGroup}\n${nodeGroup}\n`) +
     `</svg>\n`
   return { svg, skipped }
+}
+
+/**
+ * 一把梭 API:DSL 文本 → SVG。外部消费方(宣传视频/draw skill/CLI)不再自己串
+ * parse→sanitize→solve→render,也不再手画箭头——避障路由、圆角折线、贴边端点、
+ * 标签 halo 都在这条链里。诊断(parse/warning/sanitize/solver)原样透出,
+ * 消费方自行决定是拒绝渲染还是带错预览;`skipped` 逐条说明哪些 op 没画、为什么。
+ */
+export function renderDslSvg(
+  dsl: string,
+  options: RenderDslSvgOptions = {},
+): { svg: string; skipped: SvgSkip[]; diagnostics: RenderDslDiagnostic[] } {
+  const parsed = parseDslWithDiagnostics(dsl)
+  const diagnostics: RenderDslDiagnostic[] = []
+  for (const error of parsed.errors ?? []) {
+    diagnostics.push({ stage: 'parse', message: error.message, line: error.line })
+  }
+  for (const warning of parsed.warnings ?? []) {
+    diagnostics.push({ stage: 'warning', message: warning.message, line: warning.line })
+  }
+  const sanitized = sanitizeDslOps(parsed.ops)
+  for (const diagnostic of sanitized.diagnostics) {
+    diagnostics.push({ stage: 'sanitize', message: diagnostic.message })
+  }
+  let existingGeometry: Map<string, ExistingGeom> | undefined
+  if (options.existingGeometry) {
+    existingGeometry = new Map(Object.entries(options.existingGeometry))
+  }
+  const solved = solveRelational(sanitized.ops, existingGeometry)
+  for (const diagnostic of solved.diagnostics) {
+    diagnostics.push({ stage: 'solver', message: diagnostic.message })
+  }
+  const { svg, skipped } = toSvg(solved.ops, options)
+  return { svg, skipped, diagnostics }
 }
