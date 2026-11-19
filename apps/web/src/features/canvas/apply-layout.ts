@@ -503,12 +503,23 @@ function planOp(
   }
 }
 
-/** v7: 给 card 套 group/href meta(幂等合并;空串/空数组清键)。无 group/href → 原 meta(含 undefined)。 */
+/** v7: 给 card 套 group/href meta(幂等合并;空串/空数组清键)。无 group/href → 原 meta(含 undefined)。
+ *  v11: relMeta → meta.layoutAnchor；绝对 @pos 覆盖时清除；纯内容编辑(keepExistingPos)保留。 */
 function applyCardMeta(
   existing: CanvasElement | undefined,
   op: DslCardOp,
 ): Record<string, unknown> | undefined {
-  if (op.group === undefined && op.href === undefined) return existing?.meta
+  const hasRel = op.relMeta !== undefined
+  const shouldClearAnchor =
+    op.keepExistingPos !== true && existing?.meta?.layoutAnchor !== undefined
+  if (
+    op.group === undefined &&
+    op.href === undefined &&
+    !hasRel &&
+    !shouldClearAnchor
+  ) {
+    return existing?.meta
+  }
   const meta: Record<string, unknown> = { ...(existing?.meta ?? {}) }
   if (op.group !== undefined) {
     if (op.group === '') delete meta.group
@@ -517,6 +528,11 @@ function applyCardMeta(
   if (op.href !== undefined) {
     if (op.href.length === 0) delete meta.href
     else meta.href = op.href
+  }
+  if (op.relMeta) {
+    meta.layoutAnchor = { ...op.relMeta }
+  } else if (op.keepExistingPos !== true) {
+    delete meta.layoutAnchor
   }
   return meta
 }

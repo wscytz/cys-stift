@@ -3,7 +3,7 @@ import { applyLayout, applyPlanIfClean } from '../apply-layout'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import type { DslOp } from '@wscytz/dsl'
-import { parseDsl } from '@wscytz/dsl'
+import { parseDsl, serializeCanvas } from '@wscytz/dsl'
 import type { CardId } from '@cys-stift/domain'
 
 /** Pre-seed a card element so a `card` op has something to reposition. */
@@ -1111,5 +1111,68 @@ describe('applyLayout — v10 跨 kind delete(2026-11-17 边界审查)', () => {
     expect(host.getElement('e')).toBeUndefined() // 引擎级联
     expect(host.getElement('b')).toBeDefined()
     expect(removed).toEqual(['a']) // onCardRemove(DB)被走到
+  })
+})
+
+describe('applyLayout — layoutAnchor persistence (v11)', () => {
+  it('relation create writes meta.layoutAnchor', () => {
+    const host = new InMemoryCanvasHost()
+    applyLayout(
+      host,
+      parseDsl(
+        '[card #a create] @pos(100,100) @size(240,120)\n[card #b create] right-of #a @gap(20) @size(240,120)',
+      ),
+    )
+    expect(host.getElement('b')?.meta?.layoutAnchor).toEqual({ id: 'a', dir: 'right-of', gap: 20 })
+  })
+
+  it('absolute @pos update clears the anchor', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({
+      id: 'b',
+      kind: 'card',
+      x: 360,
+      y: 100,
+      w: 240,
+      h: 120,
+      rotation: 0,
+      meta: { layoutAnchor: { id: 'a', dir: 'right-of', gap: 20 } },
+    })
+    applyLayout(host, parseDsl('[card #b] @pos(500,500) @size(240,120)'))
+    expect(host.getElement('b')?.meta?.layoutAnchor).toBeUndefined()
+  })
+
+  it('content-only update preserves the anchor', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({
+      id: 'b',
+      kind: 'card',
+      x: 360,
+      y: 100,
+      w: 240,
+      h: 120,
+      rotation: 0,
+      meta: { layoutAnchor: { id: 'a', dir: 'right-of', gap: 20 } },
+    })
+    applyLayout(host, parseDsl('[card #b] @title("new title")'))
+    expect(host.getElement('b')?.meta?.layoutAnchor).toEqual({ id: 'a', dir: 'right-of', gap: 20 })
+  })
+
+  it('absolute update without a prior anchor does not invent one', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'b')
+    applyLayout(host, parseDsl('[card #b] @pos(10,20)'))
+    expect(host.getElement('b')?.meta?.layoutAnchor).toBeUndefined()
+  })
+
+  it('relation create → serializeCanvas emits right-of (in-memory round-trip)', () => {
+    const host = new InMemoryCanvasHost()
+    applyLayout(
+      host,
+      parseDsl(
+        '[card #a create] @pos(100,100) @size(240,120)\n[card #b create] right-of #a @gap(20) @size(240,120)',
+      ),
+    )
+    expect(serializeCanvas(host.getElements())).toContain('[card #b] right-of #a @gap(20)')
   })
 })

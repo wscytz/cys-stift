@@ -25,6 +25,20 @@ describe('solveRelational — relational → 绝对坐标', () => {
     expect((out[1] as { rel?: unknown }).rel).toBeUndefined()
   })
 
+  it('right-of 解出后保留 relMeta(供 apply 持久化)', () => {
+    const ops = parseDsl(
+      '[card #c0 create] @pos(100,100) @size(240,120)\n[card #c1 create] right-of #c0 @gap(20) @size(240,120)',
+    )
+    const { ops: out } = solveRelational(ops)
+    expect(out[1]).toMatchObject({ relMeta: { id: 'c0', dir: 'right-of', gap: 20 } })
+  })
+
+  it('anchor 缺失时不写 relMeta(避免持久化坏关系)', () => {
+    const ops = parseDsl('[card #c1 create] below #ghost @gap(20)')
+    const { ops: out } = solveRelational(ops)
+    expect((out[0] as { relMeta?: unknown }).relMeta).toBeUndefined()
+  })
+
   it('below 单链:c1.y = c0.y + c0.h + gap,c1.x = c0.x', () => {
     const ops = parseDsl('[card #c0 create] @pos(100,100) @size(240,120)\n[card #c1 create] below #c0 @gap(20)')
     const { ops: out } = solveRelational(ops)

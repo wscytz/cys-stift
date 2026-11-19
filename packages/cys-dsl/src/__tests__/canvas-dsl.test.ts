@@ -434,3 +434,60 @@ describe('serializeCanvas — v7 meta directives (@group / @href / @compute)', (
     if (text?.type === 'free' && text.shape === 'text') expect(text.compute).toBe('#c1.w')
   })
 })
+
+describe('serializeCanvas — layoutAnchor (v11)', () => {
+  const card = (id: string, x: number, y: number, extra: Partial<CanvasElement> = {}): CanvasElement => ({
+    id,
+    kind: 'card',
+    x,
+    y,
+    w: 240,
+    h: 120,
+    rotation: 0,
+    ...extra,
+  })
+
+  it('valid anchor → emits right-of + @gap instead of @pos', () => {
+    const out = serializeCanvas([
+      card('a', 100, 100),
+      card('b', 360, 100, { meta: { layoutAnchor: { id: 'a', dir: 'right-of', gap: 20 } } }),
+    ])
+    expect(out).toContain('[card #b] right-of #a @gap(20) @size(240.0,120.0)')
+    expect(out).not.toContain('[card #b] @pos(')
+  })
+
+  it('missing anchor → falls back to @pos', () => {
+    const out = serializeCanvas([
+      card('b', 360, 100, { meta: { layoutAnchor: { id: 'ghost', dir: 'right-of', gap: 20 } } }),
+    ])
+    expect(out).toContain('[card #b] @pos(360.0,100.0)')
+  })
+
+  it('stale geometry (anchor moved / card dragged) → falls back to @pos', () => {
+    const out = serializeCanvas([
+      card('a', 100, 100),
+      card('b', 360, 140, { meta: { layoutAnchor: { id: 'a', dir: 'right-of', gap: 20 } } }),
+    ])
+    expect(out).toContain('[card #b] @pos(360.0,140.0)')
+  })
+
+  it('below relation emits below', () => {
+    const out = serializeCanvas([
+      card('a', 100, 100),
+      card('b', 100, 240, { meta: { layoutAnchor: { id: 'a', dir: 'below', gap: 20 } } }),
+    ])
+    expect(out).toContain('[card #b] below #a @gap(20)')
+  })
+
+  it('round-trip: emitted relation parses back to rel', () => {
+    const elements = [
+      card('a', 100, 100),
+      card('b', 360, 100, { meta: { layoutAnchor: { id: 'a', dir: 'right-of', gap: 20 } } }),
+    ]
+    const ops = parseDsl(serializeCanvas(elements))
+    const b = ops.find((o) => o.type === 'card' && o.cardId === 'b')
+    if (b?.type === 'card') {
+      expect(b.rel).toMatchObject({ dir: 'right-of', anchor: 'a', gap: 20 })
+    }
+  })
+})

@@ -20,6 +20,42 @@ describe('SelfBuiltAdapter drag → onUserChange', () => {
     host.applyWithoutEcho(() => host.upsert({ id: 'c1', kind: 'card', x: 1, y: 1, w: 1, h: 1, rotation: 0 }))
     expect(fired).toBe(0)
   })
+
+  it('onUserElementChange can normalize user mutations and sees previous', () => {
+    const seen: Array<{ id: string; hadPrevious: boolean }> = []
+    const host = new SelfBuiltAdapter(document.createElement('canvas'), {
+      onUserElementChange: (el, previous) => {
+        seen.push({ id: el.id, hadPrevious: previous !== undefined })
+        const meta = { ...(el.meta ?? {}) }
+        delete meta.layoutAnchor
+        return { ...el, meta }
+      },
+    })
+    host.upsert({
+      id: 'c1',
+      kind: 'card',
+      x: 0,
+      y: 0,
+      w: 10,
+      h: 10,
+      rotation: 0,
+      meta: { layoutAnchor: { id: 'a', dir: 'right-of', gap: 20 } },
+    })
+    expect(host.getElement('c1')?.meta?.layoutAnchor).toBeUndefined()
+    expect(seen).toEqual([{ id: 'c1', hadPrevious: false }])
+    host.upsert({
+      id: 'c1',
+      kind: 'card',
+      x: 5,
+      y: 6,
+      w: 10,
+      h: 10,
+      rotation: 0,
+      meta: { layoutAnchor: { id: 'a', dir: 'right-of', gap: 20 } },
+    })
+    expect(seen[1]).toEqual({ id: 'c1', hadPrevious: true })
+    expect(host.getElement('c1')?.meta?.layoutAnchor).toBeUndefined()
+  })
 })
 
 describe('SelfBuiltAdapter pan/zoom', () => {

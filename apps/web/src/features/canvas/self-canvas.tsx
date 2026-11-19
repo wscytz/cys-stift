@@ -18,6 +18,7 @@ import {
   bindCardWriteback,
 } from './canvas-binding'
 import { attachCanvasFreeformPersistence } from './canvas-freeform-binding'
+import { bindCardLayoutAnchorPersistence, clearLayoutAnchorOnUserGeometryChange } from '@/lib/card-layout-anchor-store'
 import { SelfBuiltAdapter } from '@cys-stift/canvas-engine'
 import { canvasViewStore } from '@/lib/canvas-view-store'
 import { settingsStore } from '@/lib/settings-store'
@@ -160,6 +161,9 @@ export function SelfCanvas({
       // card 橡皮模式命中卡片 → 通知 page softDelete(进回收桶)。adapter 随后自己 remove 几何。
       onEraseCard: (id) => onEraseCard(id),
       cardMode: settingsStore.get().cardDisplayMode ?? 'compact',
+      // v11:用户拖拽/缩放/微移改变几何时，清掉这张卡的持久化相对锚；
+      // 纯内容/样式 upsert、DSL 新建/换锚都保留。规则见 clearLayoutAnchorOnUserGeometryChange。
+      onUserElementChange: clearLayoutAnchorOnUserGeometryChange,
     })
     adapter.setEraserMode(eraserMode)
     adapterInner.current = adapter
@@ -172,6 +176,9 @@ export function SelfCanvas({
     adapter.setView({ panX: view.panX, panY: view.panY, zoom: view.zoom, gridMode: view.gridMode })
 
     loadCardsIntoEditor(adapter, service, canvasId)
+    // v11:card 的 meta.layoutAnchor 不随 DB canvasPosition 持久化，用 sidecar 在
+    // reload 后 merge 回元素；元素变化时 debounce 回写。freeform 持久化不碰 card。
+    const unbindCardAnchors = bindCardLayoutAnchorPersistence(adapter, canvasId)
     // freeform 元素(text/freedraw/arrow/rect)持久化:load 恢复 + 用户改动 debounce 写回。
     // card 几何不在此(走 bindCardWriteback → DB,单一可信源)。须在 loadCardsIntoEditor
     // 之后 attach,以便 restore 时能跳过同 id 的 card。
@@ -210,6 +217,7 @@ export function SelfCanvas({
         })
       }
       unbindView()
+      unbindCardAnchors()
       unbindFreeform()
       unbind()
       adapter.detach()

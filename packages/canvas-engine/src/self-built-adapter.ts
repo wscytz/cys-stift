@@ -97,6 +97,11 @@ export class SelfBuiltAdapter implements CanvasHost {
   /** card 模式命中卡片时的回调(由 web 层注入:service.softDelete 进回收桶)。
    *  引擎不接触 CardService,只通过此回调通知「用户擦了张卡」,由调用方决定 softDelete。 */
   private onEraseCard: ((cardId: string) => void) | null = null
+  /** 用户变更(拖拽/缩放/微移等)的规范化回调；web 层用它清 layoutAnchor 等业务元数据。
+   *  引擎不知道这些键的语义，只把 next 与 previous 交给回调。applyWithoutEcho 不触发。 */
+  private onUserElementChange:
+    | ((el: CanvasElement, previous: CanvasElement | undefined) => CanvasElement)
+    | null = null
   private keyHandler: ((e: KeyboardEvent) => void) | null = null
   /** keyup handler(关方向键 coalescing)。null=未挂。 */
   private keyUpHandler: ((e: KeyboardEvent) => void) | null = null
@@ -124,12 +129,13 @@ export class SelfBuiltAdapter implements CanvasHost {
 
   constructor(
     private canvas: HTMLCanvasElement,
-    opts?: { getCardInfo?: (id: string) => CardInfo | null; tokenResolver?: TokenResolver; onEraseCard?: (cardId: string) => void; cardMode?: CardDisplayMode },
+    opts?: { getCardInfo?: (id: string) => CardInfo | null; tokenResolver?: TokenResolver; onEraseCard?: (cardId: string) => void; cardMode?: CardDisplayMode; onUserElementChange?: (el: CanvasElement, previous: CanvasElement | undefined) => CanvasElement },
   ) {
     this.ctx = canvas.getContext('2d')
     this.getCardInfo = opts?.getCardInfo ?? (() => null)
     this.tokenResolver = opts?.tokenResolver ?? domTokenResolver
     this.onEraseCard = opts?.onEraseCard ?? null
+    this.onUserElementChange = opts?.onUserElementChange ?? null
     this.cardMode = opts?.cardMode ?? 'compact'
     this.attachPointer()
     this.attachKeyboard()
@@ -334,8 +340,12 @@ export class SelfBuiltAdapter implements CanvasHost {
         this.pushUndo()
       }
     }
-    this.elements.set(el.id, el)
-    if (this.echoing) this.emitUser({ updated: [el], removed: [] })
+    const next =
+      this.echoing && this.onUserElementChange
+        ? this.onUserElementChange(el, this.elements.get(el.id))
+        : el
+    this.elements.set(next.id, next)
+    if (this.echoing) this.emitUser({ updated: [next], removed: [] })
     this.emitElements()
     this.scheduleRender()
   }

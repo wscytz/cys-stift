@@ -149,8 +149,14 @@ export function solveRelational(
         gap,
         cardId,
       )
+      const rel = op.rel
       const { rel: _rel, ...rest } = op
-      out.push({ ...rest, x, y, w, h })
+      // v11:关系解出后保留单卡锚元信息，供 apply 写入 element.meta.layoutAnchor。
+      // 组锚暂不持久化（v2 再处理组名/成员变化）。
+      const relMeta = rel.anchorGroup
+        ? undefined
+        : { id: rel.anchor, dir: rel.dir, gap: rel.gap }
+      out.push({ ...rest, x, y, w, h, ...(relMeta ? { relMeta } : {}) })
       geom.set(cardId, { x, y, w, h, group: op.group ?? exist?.group })
       continue
     }

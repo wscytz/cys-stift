@@ -49,9 +49,10 @@ export function serializeCanvas(
    *  不传 → 几何-only(向后兼容,所有现有调用点零改动)。传了 → card 行附相应指令。 */
   resolve?: (id: string) => CardDslContent | undefined,
 ): string {
+  const byId = new Map(elements.map((element) => [element.id, element]))
   return elements
     .filter((e) => (DSL_KINDS as readonly string[]).includes(e.kind))
-    .map((e) => serializeElement(e, e.kind === 'card' ? resolve?.(e.id) : undefined))
+    .map((e) => serializeElement(e, e.kind === 'card' ? resolve?.(e.id) : undefined, byId))
     .filter(Boolean)
     .join('\n')
 }
@@ -75,10 +76,49 @@ export function serializeCanvasReadable(
   return serializeCanvas(elements, resolve)
 }
 
+/** v11:card.meta.layoutAnchor 的最小形状。组锚不在此版本持久化。 */
+type LayoutAnchor = { id: string; dir: 'right-of' | 'below'; gap: number }
+
+/** 读 element.meta.layoutAnchor；形状不合法/空/非有限 gap → undefined。
+ *  id 用 DSL idChars 字符集校验，避免 emit 出 parser 不接受的 id。 */
+function readLayoutAnchor(e: CanvasElement): LayoutAnchor | undefined {
+  const value = e.meta?.layoutAnchor
+  if (typeof value !== 'object' || value === null) return undefined
+  const record = value as Record<string, unknown>
+  if (typeof record.id !== 'string' || !/^[a-zA-Z0-9_:-]+$/.test(record.id)) return undefined
+  if (record.dir !== 'right-of' && record.dir !== 'below') return undefined
+  if (typeof record.gap !== 'number' || !Number.isFinite(record.gap)) return undefined
+  return { id: record.id, dir: record.dir, gap: record.gap }
+}
+
+/** 有 layoutAnchor 且锚点仍在、当前几何与 anchor+gap 一致 → emit right-of/below。
+ *  不一致（锚点被移动/卡片被拖走/元数据过期）→ 回退 @pos，绝不导出坏关系。 */
+function relationForCard(
+  e: CanvasElement,
+  byId?: ReadonlyMap<string, CanvasElement>,
+): string | undefined {
+  if (!byId) return undefined
+  const anchor = readLayoutAnchor(e)
+  if (!anchor) return undefined
+  const target = byId.get(anchor.id)
+  if (!target || target.kind !== 'card' || target.id === e.id) return undefined
+  const expectedX =
+    anchor.dir === 'right-of' ? target.x + target.w + anchor.gap : target.x
+  const expectedY =
+    anchor.dir === 'below' ? target.y + target.h + anchor.gap : target.y
+  if (Math.abs(e.x - expectedX) > 0.5 || Math.abs(e.y - expectedY) > 0.5) {
+    return undefined
+  }
+  const gap = Number(anchor.gap.toFixed(1))
+  return `${anchor.dir} #${anchor.id} @gap(${gap})`
+}
+
 export function serializeElement(
   e: CanvasElement,
   /** v5/v8:card 的内容与结构化字段(可选,由 serializeCanvas 的 resolve 注入)。非 card 元素忽略。 */
   content?: CardDslContent,
+  /** v11:全量元素索引；有它才尝试把 meta.layoutAnchor 还原成 right-of/below。 */
+  byId?: ReadonlyMap<string, CanvasElement>,
 ): string {
   const pos = `@pos(${e.x.toFixed(1)},${e.y.toFixed(1)})`
   const color = e.color ? ` @color(${e.color})` : ''
@@ -93,7 +133,8 @@ export function serializeElement(
       // 截断防护不动。text/frame text 同理走 textAttr helper。
       const titleAttr = quotedAttr('title', content?.title, DSL_MAX_TEXT_LEN)
       const contentAttr = quotedAttr('content', content?.content, DSL_MAX_CONTENT_LEN)
-      return `[card #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}${titleAttr}${contentAttr}${metaGroup(e)}${metaHref(e)}${metaType(content)}${metaTags(content)}${metaLinks(content)}${metaCode(content)}${metaQuote(content)}`
+      const position = relationForCard(e, byId) ?? pos
+      return `[card #${e.id}] ${position} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}${titleAttr}${contentAttr}${metaGroup(e)}${metaHref(e)}${metaType(content)}${metaTags(content)}${metaLinks(content)}${metaCode(content)}${metaQuote(content)}`
     }
     case 'rect':
       return `[rect #${e.id}] ${pos} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}${metaGroup(e)}`

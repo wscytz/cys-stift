@@ -63,6 +63,11 @@ export type DslCardOp = {
     anchorGroup?: boolean
     anchorQuoted?: boolean
   }
+  /** 求解器回填：关系成功解出时保留的持久化锚信息；apply 层写入
+   *  element.meta.layoutAnchor，序列化时优先 emit right-of/below。
+   *  输入路径不设置；serializeCanvas 只读 element.meta，不读这个字段。
+   *  v1 仅单卡锚；组锚（anchorGroup）暂不持久化。 */
+  relMeta?: { id: string; dir: 'right-of' | 'below'; gap: number }
   /** v5(E):无 @pos 的"纯属性/内容编辑"标志。无 @pos(且非 create、非 rel)但携带
    *  title/content/color/size 之一时置真 —— apply 时(planCard)沿用现有卡几何,只更那些字段;
    *  x/y 为占位(0,0),apply 期忽略。serializeCanvas 永不 emit(始终绝对坐标)→ 输入专用。 */
