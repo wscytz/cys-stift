@@ -540,6 +540,23 @@ describe('serializeCanvas — layoutAnchor (v11)', () => {
     expect(out).toContain('[card #b] below #a @gap(20)')
   })
 
+  it('emits @gap(0) when the card exactly touches its anchor (N1 regression)', () => {
+    const cases = [
+      { dir: 'right-of' as const, x: 340, y: 100 },
+      { dir: 'below' as const, x: 100, y: 220 },
+    ]
+    for (const { dir, x, y } of cases) {
+      const out = serializeCanvas([
+        card('a', 100, 100),
+        card('b', x, y, { meta: { layoutAnchor: { id: 'a', dir, gap: 0 } } }),
+      ])
+      expect(out).toContain(`[card #b] ${dir} #a @gap(0)`)
+      const solved = solveRelational(sanitizeDslOps(parseDsl(out)).ops)
+      expect(solved.diagnostics).toEqual([])
+      expect(solved.ops[1]).toMatchObject({ cardId: 'b', x, y })
+    }
+  })
+
   it('round-trip: emitted relation parses back to rel', () => {
     const elements = [
       card('a', 100, 100),

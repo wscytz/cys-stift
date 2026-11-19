@@ -238,6 +238,59 @@ describe('DslDialog draft and retry', () => {
     unmount()
   })
 
+  it('keeps a dependent relation line when its anchor size changes (R-05)', () => {
+    const host = new InMemoryCanvasHost()
+    const a = card('a', 0)
+    const b = { ...card('b', 120), meta: { layoutAnchor: anchor } }
+    const c = { ...card('c', 240), meta: { layoutAnchor: { id: 'b', dir: 'right-of' as const, gap: 20 } } }
+    host.upsert(a)
+    host.upsert(b)
+    host.upsert(c)
+    const { container, unmount } = mountDialog(host, { get: () => undefined })
+    const original = container.querySelector('textarea')!.value
+    // b 是关系卡，只改它自己的 @size；c 行不动，但 c 必须跟随 b 的新宽度。
+    // 缩小宽度（100→80）不会撞到当前 c，避免把避让位移混进断言。
+    changeText(container, original.replace(
+      /(\[card #b\][^\n]*@size\()100(?:\.0)?,/,
+      (_match, before: string) => `${before}80,`,
+    ))
+    apply(container)
+    expect(host.getElement('b')).toMatchObject({ x: 120, w: 80 })
+    expect(host.getElement('c')).toMatchObject({ x: 220 })
+    unmount()
+  })
+
+  it('keeps a dependent relation line when a card switches from @pos to a relation (R-05)', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert(card('a', 0))
+    host.upsert(card('b', 500))
+    host.upsert({ ...card('c', 620), meta: { layoutAnchor: { id: 'b', dir: 'right-of' as const, gap: 20 } } })
+    const { container, unmount } = mountDialog(host, { get: () => undefined })
+    const original = container.querySelector('textarea')!.value
+    changeText(container, original.replace(
+      /(\[card #b\][^\n]*?)@pos\([^)]*\)[^\n]*/,
+      (_match, before: string) => `${before}right-of #a @gap(20)`,
+    ))
+    apply(container)
+    expect(host.getElement('b')).toMatchObject({ x: 120 })
+    expect(host.getElement('c')).toMatchObject({ x: 240 })
+    unmount()
+  })
+
+  it('previews a free-element group change instead of claiming the canvas is up to date (R-07)', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'r1', kind: 'rect', x: 0, y: 0, w: 100, h: 50, rotation: 0 })
+    const { container, unmount } = mountDialog(host, { get: () => undefined })
+    const original = container.querySelector('textarea')!.value
+    changeText(container, original.replace(/(\[rect #r1\][^\n]*)/, '$1 @group("g")'))
+    const text = previewText(container)
+    expect(text).not.toContain('canvas.dslPreviewNoChanges')
+    expect(text).toContain('canvas.diffField.group')
+    apply(container)
+    expect(host.getElement('r1')?.meta?.group).toBe('g')
+    unmount()
+  })
+
   it('keeps a dependent relation line when its anchor moves (A-03)', () => {
     const host = new InMemoryCanvasHost()
     host.upsert(card('a', 0))

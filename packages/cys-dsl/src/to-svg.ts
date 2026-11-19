@@ -27,6 +27,9 @@ import { sanitizeDslOps } from './dsl-sanitize.js'
 import { solveRelational, type ExistingGeom } from './dsl-relational-solver.js'
 import { planRoute } from './routing.js'
 
+/** 外部 JSON ops 的坐标上限：超过后贝塞尔/折线数学可能溢出成 Infinity。 */
+const SVG_COORD_LIMIT = 1e7
+
 /** legacy 6 色名 → 设计 token 实值(浅色主题)。grey 是 gray 的冻结别名。 */
 const COLOR_HEX: Record<string, string> = {
   red: '#b51b17',
@@ -611,11 +614,16 @@ export function toSvg(ops: DslOp[], options: ToSvgOptions = {}): { svg: string; 
       // midpoint so a malformed op can never emit NaN or inject attributes.
       const elbowPoints = Array.isArray(op.elbow)
         ? op.elbow
-            .map((point) => ({
-              x: Number((point as { x?: unknown }).x),
-              y: Number((point as { y?: unknown }).y),
-            }))
-            .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+            .map((point) => {
+              if (!point || typeof point !== 'object') return null
+              const x = Number((point as { x?: unknown }).x)
+              const y = Number((point as { y?: unknown }).y)
+              return Number.isFinite(x) && Number.isFinite(y) &&
+                Math.abs(x) <= SVG_COORD_LIMIT && Math.abs(y) <= SVG_COORD_LIMIT
+                ? { x, y }
+                : null
+            })
+            .filter((point): point is { x: number; y: number } => point !== null)
         : []
       if (op.route === 'elbow' && elbowPoints.length > 0) {
         mid = elbowPoints
@@ -662,7 +670,9 @@ export function toSvg(ops: DslOp[], options: ToSvgOptions = {}): { svg: string; 
     if (route === 'curve') {
       const curveX = Number(op.curve?.cx)
       const curveY = Number(op.curve?.cy)
-      const c = op.curve !== undefined && Number.isFinite(curveX) && Number.isFinite(curveY)
+      const c = op.curve !== undefined &&
+        Number.isFinite(curveX) && Number.isFinite(curveY) &&
+        Math.abs(curveX) <= SVG_COORD_LIMIT && Math.abs(curveY) <= SVG_COORD_LIMIT
         ? { cx: curveX, cy: curveY }
         : { cx: (p1!.x + p2!.x) / 2, cy: (p1!.y + p2!.y) / 2 - 40 }
       d = `M ${p1!.x} ${p1!.y} Q ${c.cx} ${c.cy} ${p2!.x} ${p2!.y}`

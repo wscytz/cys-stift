@@ -544,11 +544,12 @@ describe('AiConfirmDialog DSL persistence', () => {
     ])
     const createWithId = vi.fn(() => { throw new Error('storage full') })
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const onApplied = vi.fn()
     const { host: dom, unmount } = mount(
       <AiConfirmDialog mode="dsl"
         dsl={'[card #b create] @pos(250,0)\n[arrow #edge] from #a to #b'}
         targetCanvasId={'cv' as never} service={{ createWithId, get: vi.fn() } as never}
-        liveHost={host} onApplied={() => {}} onRejected={() => {}} />,
+        liveHost={host} onApplied={onApplied} onRejected={() => {}} />,
     )
     try {
       await act(async () => { await flushMicro() })
@@ -558,6 +559,8 @@ describe('AiConfirmDialog DSL persistence', () => {
       }))
       expect(calls.upserts).toEqual([])
       expect(pushToastSpy.mock.calls.at(-1)?.[0]).toMatchObject({ kind: 'error' })
+      // 全失败不关框：不能触发 onApplied。
+      expect(onApplied).not.toHaveBeenCalled()
     } finally {
       unmount()
       consoleError.mockRestore()

@@ -1088,8 +1088,57 @@ describe('importFromJson — replace / merge transaction', () => {
     expect(restored.activeProfileId).toBeNull()
     expect(restored.labs).toEqual({})
     expect(restored.aiSampleCapture).toBe(false)
+    // 缺省按 true 解释；导入时显式关闭，避免备份静默恢复正文外发（R-02）。
+    expect(restored.aiIncludeCardContent).toBe(false)
     // The profile survives as an inert, user-visible choice.
     expect(restored.profiles).toHaveLength(1)
+  })
+
+  it('replace writes an explicit null activeProfileId even when the backup omits it (R-01)', async () => {
+    const result = await mod.importFromJson(
+      minimalPayload({
+        settings: {
+          // 故意不写 activeProfileId / captureShortcut，命中 salvage 的真实路径。
+          profiles: [{
+            id: 'pwn',
+            name: 'Pwn',
+            provider: 'openai',
+            baseUrl: 'https://attacker.example/v1',
+            apiKey: '',
+            model: 'gpt-4o-mini',
+            enabled: true,
+          }],
+          labs: {},
+          aiSampleCapture: false,
+        },
+      }),
+    )
+    expect(result.ok).toBe(true)
+    const restored = JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!).settings
+    expect(restored.activeProfileId).toBeNull()
+  })
+
+  it('merge keeps local profiles when imported profiles are malformed (R-03)', async () => {
+    const localProfile = {
+      id: 'p1',
+      name: 'Local',
+      provider: 'openai',
+      baseUrl: 'https://local.example/v1',
+      apiKey: 'local-test-key',
+      model: 'm',
+      enabled: true,
+    }
+    seedStores({ settings: { profiles: [localProfile], activeProfileId: 'p1' } })
+    const result = await mod.importFromJson(
+      minimalPayload({
+        settings: { profiles: null, activeProfileId: 'p1' },
+      }),
+      { mode: 'merge' },
+    )
+    expect(result.ok).toBe(true)
+    const restored = JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!).settings
+    expect(restored.activeProfileId).toBe('p1')
+    expect(restored.profiles).toEqual([localProfile])
   })
 
   it('merge unions freeform elements and conversation messages instead of overwriting (D-01)', async () => {
@@ -1477,7 +1526,7 @@ describe('P0 regression — settings key v1→v2', () => {
     // settings round-tripped through the v2 key. AI activation is deliberately
     // not restored by an external backup: the user must pick a profile first.
     const restored = JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!) as { settings: typeof settings }
-    expect(restored.settings).toEqual({ ...settings, activeProfileId: null })
+    expect(restored.settings).toEqual({ ...settings, activeProfileId: null, aiIncludeCardContent: false, labs: {}, aiSampleCapture: false })
   })
 })
 
@@ -1657,7 +1706,7 @@ describe('full round-trip — settings + templates + samples + conversations', (
 
     // All user data restored. External backups do not auto-activate AI.
     expect(JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!)).toEqual({
-      settings: { ...settings, activeProfileId: null },
+      settings: { ...settings, activeProfileId: null, aiIncludeCardContent: false, labs: {}, aiSampleCapture: false },
     })
     expect(JSON.parse(window.localStorage.getItem(TEMPLATES_KEY)!)).toEqual(templates)
     expect(JSON.parse(window.localStorage.getItem(SAMPLES_KEY)!)).toEqual(samples)

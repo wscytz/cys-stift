@@ -459,6 +459,13 @@ describe('快照渲染契约 — delete / 内容编辑 / existingGeometry / 选�
     const elbowed = toSvg(ops).svg
     expect(elbowed).not.toContain('NaN')
     expect(elbowed).not.toContain('onload')
+
+    // null 折点不能抛；超大有限坐标不能经数学运算变成 Infinity 进 d。
+    arrow.elbow = [null, { x: 1e308, y: 1e308 }]
+    expect(() => toSvg(ops)).not.toThrow()
+    arrow.route = 'curve'
+    arrow.curve = { cx: 1e308, cy: 1e308 }
+    expect(() => toSvg(ops)).not.toThrow()
   })
 
   it('sanitize 诊断回填 opIndex + 源行号', () => {

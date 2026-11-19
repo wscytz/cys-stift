@@ -152,12 +152,20 @@ function changedCardPlacements(nextOps: DslOp[], prevOps: DslOp[]): Set<string> 
       continue
     }
     if (groupKey(op) !== groupKey(before)) changed.add(id)
-    if (op.rel === undefined && before.rel === undefined && geometry(op) !== geometry(before)) {
+    const nextIsRel = op.rel !== undefined
+    const prevIsRel = before.rel !== undefined
+    if (nextIsRel !== prevIsRel) {
+      // @pos ↔ right-of/below 切换：依赖它的行必须重新求解。
       changed.add(id)
       continue
     }
-    if (op.rel !== undefined && before.rel !== undefined &&
-        JSON.stringify(op.rel) !== JSON.stringify(before.rel)) {
+    if (!nextIsRel) {
+      if (geometry(op) !== geometry(before)) changed.add(id)
+      continue
+    }
+    // 双方都是关系行：描述符或自身尺寸变化都会影响下游关系（right-of 用锚点 w，
+    // below 用锚点 h）；自身 x/y 是占位值，不能拿来比较。
+    if (JSON.stringify(op.rel) !== JSON.stringify(before.rel) || op.w !== before.w || op.h !== before.h) {
       changed.add(id)
     }
   }
@@ -383,7 +391,27 @@ export function DslDialog({
       for (const result of outcome.report.opResults) {
         if (result.status !== 'applied') continue
         const op = ops[result.opIndex]
-        if (!op || op.type !== 'card' || op.create || op.delete) continue
+        if (!op) continue
+        if (op.type === 'free') {
+          if (!op.id || op.delete) continue
+          const id = op.id
+          const beforeElement = beforeById.get(id)
+          const afterElement = afterHost.getElement(id)
+          if (!beforeElement || !afterElement) continue
+          const fields = (['group', 'compute'] as const).filter(
+            (key) => JSON.stringify(beforeElement.meta?.[key]) !== JSON.stringify(afterElement.meta?.[key]),
+          )
+          if (fields.length > 0) {
+            metaChanges.push({
+              opIndex: result.opIndex,
+              cardId: id,
+              title: ('text' in op && typeof op.text === 'string' && op.text) || id,
+              fields: [...fields],
+            })
+          }
+          continue
+        }
+        if (op.type !== 'card' || op.create || op.delete) continue
         const id = String(op.cardId)
         const beforeElement = beforeById.get(id)
         const afterElement = afterHost.getElement(id)
@@ -574,11 +602,17 @@ export function DslDialog({
       setGeneratedText(serializeCurrent())
       setStale(false)
       pushToast({
-        kind: 'info',
-        message: t('canvas.dslAppliedSkipped', {
-          applied: String(applied),
-          skipped: String(pendingSkips + failed + parseErrors.length),
-        }),
+        kind: failed > 0 ? 'error' : 'info',
+        message: failed > 0
+          ? t('canvas.dslAppliedFailed', {
+              applied: String(applied),
+              failed: String(failed),
+              skipped: String(pendingSkips + parseErrors.length),
+            })
+          : t('canvas.dslAppliedSkipped', {
+              applied: String(applied),
+              skipped: String(pendingSkips + failed + parseErrors.length),
+            }),
       })
     } else if (applied > 0 || skipped > 0) {
       // 全部成功:重序列化同步文本(画布即文本),视为已应用,不再 dirty。

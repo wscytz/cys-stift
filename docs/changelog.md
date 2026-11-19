@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-11-19 · 未发布 · fix: 第二轮复审（导入边界、@gap(0)、依赖链、legacy SVG）
+
+> 针对第二轮独立复审的 P1/P2 与部分 P3；预览站随后更新，正式站仍为 v1.5.0。
+
+- **导入边界（S-01/R-01~R-03）**：`salvageSettings` 只在 `activeProfileId` 字段缺失时自动激活，显式 `null` 保持 `null`；外部备份始终写显式 `null`，profile 逐项校验，merge 永远保留本机 profile；replace 显式 `aiIncludeCardContent=false`。
+- **关系导出（R-04/R-05）**：碰撞守卫排除锚点（组锚为成员集），`@gap(0)` 可正常 emit；`changedCardPlacements` 覆盖关系卡自身 `@size` 与 `@pos`↔关系切换，依赖链会跟随。
+- **legacy 导出（R-06）**：`elementsToSvg` 补齐 line/note/image，画布与 SVG/PNG 可见性一致。
+- **其他收口**：free 元素 meta 预览（R-07）；AI 部分失败文案不再承诺重试（R-08）；straight 双击空 undo（R-09）；sidecar 空 host 不擦除（R-11）；`elbow:[null]`/超大坐标防护（R-12）；发布 workflow `--fail-if-no-match`、preview 版本替换、Windows artifact `error`（R-14/R-15/R-19）；e2e 增加“预览=应用”断言（R-16）；pinch 抬指基线、InMemory restore 通知、fonts.ready（R-22~R-24）。
+- **验证**：全包 lint 0；全量 3360 通过 / 3 跳过；web build、`verify:pack`、`demo:approval` exit 0；`e2e:dsl-seed` 11/11。
+
 ## 2026-11-19 · 未发布 · fix: 空 undo、legacy 渲染与预览站部署
 
 > 预览站已更新到当前 main；正式站仍为 v1.5.0。改动尚未提交。

@@ -105,5 +105,5 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: cy-s-stift-windows
-          if-no-files-found: warn
+          if-no-files-found: error
           path: apps/desktop/src-tauri/target/release/bundle/nsis/*.exe

@@ -50,7 +50,7 @@ jobs:
           workspaces: apps/desktop/src-tauri
       - run: pnpm install --frozen-lockfile
       - name: build Windows NSIS installer
-        run: pnpm --filter desktop exec tauri build --ci --bundles nsis
+        run: pnpm --filter desktop --fail-if-no-match exec tauri build --ci --bundles nsis
       - uses: actions/upload-artifact@v7
         with:
           name: windows-nsis
@@ -74,7 +74,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: build ad-hoc signed Apple Silicon DMG
         run: >-
-          pnpm --filter desktop exec tauri build --ci --bundles dmg
+          pnpm --filter desktop --fail-if-no-match exec tauri build --ci --bundles dmg
           --config '{"bundle":{"active":true,"macOS":{"signingIdentity":"-"}}}'
       - name: validate DMG and embedded app
         shell: bash
@@ -120,9 +120,12 @@ jobs:
             (cd release-assets/windows && sha256sum *.exe)
             (cd release-assets/macos && sha256sum *.dmg)
           } > release-assets/SHA256SUMS.txt
+      - name: render preview release notes
+        run: |
+          sed "s/<VERSION>/${{ github.ref_name }}/g" .github/release-preview.md > release-assets/release-notes.md
       - uses: softprops/action-gh-release@v2
         with:
-          body_path: .github/release-preview.md
+          body_path: release-assets/release-notes.md
           prerelease: true
           generate_release_notes: false
           fail_on_unmatched_files: true

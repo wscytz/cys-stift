@@ -187,6 +187,36 @@ describe('settingsStore — corrupt / invalid localStorage', () => {
     expect(s.locale).toBe('en')
   })
 
+  it('salvage keeps explicit null activeProfileId (does not auto-activate profiles[0])', async () => {
+    const profile = {
+      id: 'p1',
+      name: 'Pwn',
+      provider: 'openai',
+      apiKey: '',
+      baseUrl: 'https://attacker.example/v1',
+      model: 'gpt-4o-mini',
+      enabled: true,
+    }
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        settings: {
+          // 故意缺失 captureShortcut → 触发 salvage（导入不完整备份的真实路径）。
+          theme: 'light',
+          locale: 'en',
+          profiles: [profile],
+          activeProfileId: null,
+          labs: {},
+          aiSampleCapture: false,
+        },
+      }),
+    )
+    store = (await import('../settings-store')).settingsStore
+    const s = store.get()
+    expect(s.profiles).toHaveLength(1)
+    expect(s.activeProfileId).toBeNull()
+  })
+
   it('drops the bad profile but keeps valid fields (R2-D6 P2 fix)', () => {
     window.localStorage.setItem(
       STORAGE_KEY,
@@ -337,7 +367,7 @@ describe('settingsStore — 逐字段挽救(对抗测试 R2-D6 P2 修复)', () =
     expect(s.profiles[0]?.temperature).toBeUndefined()
   })
 
-  it('active 指向被丢弃的坏 profile → 自动锚第一个救出的 profile', () => {
+  it('active 指向被丢弃的坏 profile → 不再自动激活另一个 profile', () => {
     window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -350,7 +380,8 @@ describe('settingsStore — 逐字段挽救(对抗测试 R2-D6 P2 修复)', () =
     )
     const s = store.get()
     expect(s.profiles.map((p) => p.id)).toEqual(['p1'])
-    expect(s.activeProfileId).toBe('p1')
+    // 只有字段缺失才自动锚；坏字符串不auto-activate（防静默改道，S-01）。
+    expect(s.activeProfileId).toBeNull()
   })
 
   it('彻底坏(settings 非对象)→ 回默认且不抛', () => {

@@ -57,7 +57,12 @@ export function serializeCanvas(
   // 元素序来自画布加载序(z 序卡 + freeform 追加),不是依赖序 —— 反序 emit 的
   // 文本在空画布上会解不出锚点(整单被诊断闸门拒绝),破坏异地重建契约。
   const emittedIndex = new Map(serializable.map((element, index) => [element.id, index]))
-  const collisionIndex = new CardCollisionIndex(byId.values())
+  // 没有 layoutAnchor 时 relationForCard 在碰撞检查前就返回；无需为纯绝对画布建索引。
+  const collisionIndex = serializable.some(
+    (element) => element.kind === 'card' && element.meta?.layoutAnchor !== undefined,
+  )
+    ? new CardCollisionIndex(byId.values())
+    : undefined
   return serializable
     .map((e) => serializeElement(e, e.kind === 'card' ? resolve?.(e.id) : undefined, byId, emittedIndex, collisionIndex))
     .filter(Boolean)
@@ -150,17 +155,18 @@ class CardCollisionIndex {
     }
   }
 
-  /** 与 relationForCard 的旧线性检查同语义（含 1e-9 贴边容差），排除自身 id。 */
+  /** 与 relationForCard 的旧线性检查同语义（含 1e-9 贴边容差），排除自身与锚点
+   *  （@gap(0) 时关系卡与锚点恰好相接，不能把锚点当障碍）。 */
   overlaps(
     x: number,
     y: number,
     width: number,
     height: number,
-    excludeId: string,
+    excludeIds: ReadonlySet<string>,
     epsilon: number,
   ): boolean {
     const hit = (box: IndexedCard) =>
-      box.id !== excludeId &&
+      !excludeIds.has(box.id) &&
       x < box.right + epsilon &&
       box.left < x + width + epsilon &&
       y < box.bottom + epsilon &&
@@ -212,13 +218,15 @@ function relationForCard(
       Math.abs(targetX) > DSL_MAX_COORD || Math.abs(targetY) > DSL_MAX_COORD ||
       ![width, height, quantize(target.w), quantize(target.h)].every((size) => size > 0 && size <= DSL_MAX_SIZE)) return undefined
   // 碰撞守卫加 1e-9 保守容差：贴边时宁可回退 @pos，也不 emit 一条重解会触发避让的关系。
+  // 但锚点（组锚则为全体成员）不算障碍：@gap(0) 时候选卡本就与锚点相接。
   const EPS = 1e-9
+  const excluded = new Set<string>([e.id, anchor.id])
   if (collisionIndex) {
-    if (collisionIndex.overlaps(solvedX, solvedY, width, height, e.id, EPS)) return undefined
+    if (collisionIndex.overlaps(solvedX, solvedY, width, height, excluded, EPS)) return undefined
   } else {
     // 直接调用 serializeElement 的外部消费方没有索引：保留原线性检查（结果一致）。
     for (const card of byId.values()) {
-      if (card.kind !== 'card' || card.id === e.id) continue
+      if (card.kind !== 'card' || excluded.has(card.id)) continue
       const left = quantize(card.x)
       const top = quantize(card.y)
       if (solvedX < left + quantize(card.w) + EPS && left < solvedX + width + EPS &&

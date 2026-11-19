@@ -145,6 +145,10 @@ export class SelfBuiltAdapter implements CanvasHost {
       this.resizeObserver = new ResizeObserver(() => this.scheduleRender())
       this.resizeObserver.observe(canvas)
     }
+    // 字体晚到会改变卡片换行/高度；ready 后补一帧，避免等下一次交互才自愈。
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      void document.fonts.ready.then(() => this.scheduleRender()).catch(() => {})
+    }
   }
 
   /** 设置卡片显示模式(web 层 settings 变更时调,触发重渲)。 */
@@ -532,6 +536,8 @@ export class SelfBuiltAdapter implements CanvasHost {
     const { from, to } = arrowEndpoints(el, els)
     if (!from || !to) return false
     const route = arrowRoute(el)
+    // 已是 straight：双击没有可改变的状态，直接 no-op（不再推空 undo）。
+    if (route === 'straight') return false
     this.pushUndo()
     this.coalescing = true
     try {
@@ -771,6 +777,9 @@ export class SelfBuiltAdapter implements CanvasHost {
     this.erasing = null
     this.coalescing = false
     this.batchUndoPending = false
+    // 切工具/恢复时双指手势基线作废；activePointers 保留（物理手指仍按着，
+    // 由 pointerup 清理），下一次两指 move 会重新以当前几何为基线。
+    this.pinch = null
   }
 
   /** 计算当前双指几何(两指距离 + 中点)。不足两指 → null。
@@ -1228,6 +1237,11 @@ export class SelfBuiltAdapter implements CanvasHost {
       if (this.pinch && this.activePointers.size < 2) {
         this.pinch = null
         return
+      }
+      if (this.pinch) {
+        // 三指抬一指后仍有两指：指针对可能变了，重置基线避免缩放跳变。
+        const geo = this.twoFingerGeometry()
+        this.pinch = geo ? { lastDist: geo.dist, lastMid: geo.mid } : null
       }
       if (this.erasing) {
         this.erasing = null

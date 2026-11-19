@@ -421,6 +421,19 @@ const IMPORT_SENSITIVE_SETTING_KEYS = [
   'aiIncludeCardContent',
 ] as const
 
+function isImportableProfile(value: unknown): value is Record<string, unknown> {
+  if (!isObject(value)) return false
+  return (
+    typeof value.id === 'string' && value.id.length > 0 &&
+    typeof value.name === 'string' &&
+    typeof value.provider === 'string' &&
+    typeof value.apiKey === 'string' &&
+    typeof value.baseUrl === 'string' &&
+    typeof value.model === 'string' &&
+    typeof value.enabled === 'boolean'
+  )
+}
+
 function sanitizeImportedSettings(
   imported: Record<string, unknown>,
   current: Record<string, unknown> | undefined,
@@ -428,29 +441,40 @@ function sanitizeImportedSettings(
 ): Record<string, unknown> {
   if (!IMPORT_SENSITIVE_SETTING_KEYS.some((key) => key in imported)) return imported
   const next: Record<string, unknown> = { ...imported }
+  const incomingProfiles = Array.isArray(next.profiles)
+    ? next.profiles.filter(isImportableProfile)
+    : []
   if (mode === 'merge' && current) {
+    // merge 永远以本机 profile 为底，只追加合法的新 profile；畸形 incoming
+    // (null/字符串/坏项)不得把本机配置冲掉。
+    const localProfiles = Array.isArray(current.profiles) ? current.profiles : []
+    const localIds = new Set(
+      localProfiles.flatMap((profile) =>
+        isObject(profile) && typeof profile.id === 'string' ? [profile.id] : [],
+      ),
+    )
+    next.profiles = [
+      ...localProfiles,
+      ...incomingProfiles.filter(
+        (profile) => !localIds.has(String((profile as { id?: unknown }).id)),
+      ),
+    ]
     for (const key of IMPORT_SENSITIVE_SETTING_KEYS) {
       if (key === 'profiles' || !(key in next)) continue
       if (key in current) next[key] = current[key]
       else delete next[key]
     }
-    if (Array.isArray(next.profiles) && Array.isArray(current.profiles)) {
-      const localById = new Map<string, unknown>()
-      for (const profile of current.profiles) {
-        if (isObject(profile) && typeof profile.id === 'string') localById.set(profile.id, profile)
-      }
-      next.profiles = next.profiles.map((profile) =>
-        isObject(profile) && typeof profile.id === 'string' && localById.has(profile.id)
-          ? localById.get(profile.id)
-          : profile,
-      )
-    }
+    if (!('activeProfileId' in current)) next.activeProfileId = null
     return next
   }
-  if ('activeProfileId' in next) next.activeProfileId = null
-  if ('labs' in next) next.labs = {}
-  if ('aiSampleCapture' in next) next.aiSampleCapture = false
-  delete next.aiIncludeCardContent
+  // replace / 无本机基线：profile 只作为未启用的配置保留；active 显式 null，
+  // 防止 salvageSettings 把 profiles[0] 重新激活（S-01 绕过）。
+  next.profiles = incomingProfiles
+  next.activeProfileId = null
+  next.labs = {}
+  next.aiSampleCapture = false
+  // 缺省消费侧按 true 解释；导入时显式关闭，避免备份静默恢复正文外发。
+  next.aiIncludeCardContent = false
   return next
 }
 

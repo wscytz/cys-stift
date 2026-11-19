@@ -1204,7 +1204,8 @@ export const messages = {
   'canvas.aiRunning': { zh: '运行中…', en: 'Running…' },
   'canvas.aiLayoutDone': { zh: 'AI 排版已应用', en: 'AI layout applied' },
   'canvas.aiLayoutAppliedSkipped': { zh: 'AI 排版:应用 {applied} 条 · 跳过 {skipped} 条', en: 'AI layout: applied {applied} · skipped {skipped}' },
-  'canvas.aiLayoutFailed': { zh: 'AI 排版写入失败:应用 {applied} 条 · 失败 {failed} 条 · 跳过 {skipped} 条（失败项可重试）', en: 'AI layout write failed: applied {applied} · failed {failed} · skipped {skipped} (retry the failed ones)' },
+  'canvas.dslAppliedFailed': { zh: '已应用 {applied} 条 · 写入失败 {failed} 条 · 跳过 {skipped} 条；失败项请导出后恢复或重试', en: 'Applied {applied} · failed {failed} · skipped {skipped}; export/recover or retry the failed ones' },
+  'canvas.aiLayoutFailed': { zh: 'AI 排版写入失败:应用 {applied} 条 · 失败 {failed} 条 · 跳过 {skipped} 条（请重新生成或手动修复）', en: 'AI layout write failed: applied {applied} · failed {failed} · skipped {skipped} (regenerate or fix manually)' },
   'canvas.aiLayoutNoneApplied': { zh: 'AI 排版未生效（卡片/端点缺失）', en: 'AI layout had no effect (missing card/endpoint)' },
   'canvas.aiLayoutParseFail': { zh: 'AI 输出了 {n} 行，但格式无法解析（可能是模型用思考模式截断或格式偏差）。再试一次，或换一个非思考模型。', en: 'AI output {n} lines but none parsed (thinking model may truncate / format drift). Retry or use a non-thinking model.' },
   'canvas.aiLayoutEmpty': { zh: 'AI 未返回有效排版', en: 'AI returned no valid layout' },
@@ -1322,6 +1323,7 @@ export const messages = {
   'canvas.diffField.group': { zh: '分组', en: 'group' },
   'canvas.diffField.href': { zh: '关联卡片', en: 'linked cards' },
   'canvas.diffField.layoutAnchor': { zh: '相对锚', en: 'layout anchor' },
+  'canvas.diffField.compute': { zh: '计算式', en: 'formula' },
   'canvas.diffField.elbow': { zh: '折点', en: 'elbow' },
 
   /* 对外展示页 */

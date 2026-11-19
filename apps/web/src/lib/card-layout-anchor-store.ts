@@ -198,6 +198,9 @@ export function bindCardLayoutAnchorPersistence(
       timer = null
     }
     pending = false
+    // 空 host 可能是“卡片还没 hydrate”而非“用户删光了卡”；此时写空表会擦掉
+    // sidecar。加载时缺失 id 的种子会被丢弃，所以跳过空 host 是安全的。
+    if (!host.getElements().some((el) => el.kind === 'card')) return
     stored = collectCardLayoutAnchors(host.getElements())
     saveCardLayoutAnchors(canvasId, stored)
   }

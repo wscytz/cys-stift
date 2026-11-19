@@ -173,6 +173,7 @@ export class InMemoryCanvasHost implements CanvasHost {
       const selSnapshot = [...this.selectedIds]
       for (const l of this.selectionListeners) l(selSnapshot)
     }
+    this.emitElements()
   }
 
   private emitHistory(change: CanvasHistoryChange): void {

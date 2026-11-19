@@ -1058,6 +1058,17 @@ describe('SelfBuiltAdapter doubleClickArrowAt', () => {
     return { host, sel, get }
   }
 
+  it('straight 双击 → false，不推空 undo（R-09）', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    host.upsert({ id: 'ca', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'cb', kind: 'card', x: 300, y: 0, w: 100, h: 100, rotation: 0 })
+    host.upsert({ id: 'ar', kind: 'arrow', x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'ca', to: 'cb', route: 'straight' })
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['ar'])
+    const before = (host as unknown as { undoStack: unknown[] }).undoStack.length
+    expect(host.doubleClickArrowAt({ x: 200, y: 50 })).toBe(false)
+    expect((host as unknown as { undoStack: unknown[] }).undoStack.length).toBe(before)
+  })
+
   it('选中 elbow(1 折点)双击线段 → 加第 2 折点(≤2)', () => {
     const { host, sel, get } = setup()
     sel(['ar'])

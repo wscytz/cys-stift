@@ -294,6 +294,17 @@ function elementToSvg(
     }
     case 'ellipse':
       return `<ellipse cx="${x + el.w / 2}" cy="${y + el.h / 2}" rx="${el.w / 2}" ry="${el.h / 2}" fill="none" stroke="${colorOf(el.color, tokenResolver)}"/>`
+    case 'line': {
+      const stroke = colorOf(el.color, tokenResolver)
+      return `<line x1="${x}" y1="${y}" x2="${x + el.w}" y2="${y + el.h}" stroke="${stroke}" stroke-width="1.5"/>`
+    }
+    case 'image': {
+      // legacy image：媒体已并入卡片 MediaRef，导出用占位框（与 canvas 同源）。
+      const b = normalizeBox(el)
+      const bx = b.x + dx
+      const by = b.y + dy
+      return `<rect x="${bx}" y="${by}" width="${b.w}" height="${b.h}" fill="${c.cardFill}" stroke="${c.cardStroke}" stroke-width="1" stroke-dasharray="6 4"/><line x1="${bx}" y1="${by}" x2="${bx + b.w}" y2="${by + b.h}" stroke="${c.cardStroke}" stroke-width="1"/><line x1="${bx + b.w}" y1="${by}" x2="${bx}" y2="${by + b.h}" stroke="${c.cardStroke}" stroke-width="1"/>`
+    }
     case 'freedraw': {
       const pts = freedrawPointsOf(el) ?? []
       if (pts.length === 0) return ''
@@ -307,6 +318,7 @@ function elementToSvg(
       const d = buildSmoothPath(offset)
       return `<path d="${d}" fill="none" stroke="${colorOf(el.color, tokenResolver)}" stroke-width="2"/>`
     }
+    case 'note':
     case 'text': {
       // 对齐实时渲染 self-built-render.ts:170-177:split('\n') 逐行 fillText,
       // textBaseline='top',行高 18px。SVG <text> 的 \n 不产生换行 → 逐行输出 <text>。

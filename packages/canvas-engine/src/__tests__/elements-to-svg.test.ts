@@ -14,6 +14,18 @@ describe('elementsToSvg', () => {
     expect(r.width).toBeGreaterThan(0)
   })
 
+  it('legacy line/note/image 与 canvas 同源可见（R-06）', () => {
+    const els: CanvasElement[] = [
+      { id: 'l1', kind: 'line', x: 0, y: 0, w: 100, h: 20, rotation: 0 },
+      { id: 'n1', kind: 'note', x: 0, y: 40, w: 100, h: 40, rotation: 0, text: 'legacy note' },
+      { id: 'i1', kind: 'image', x: 0, y: 100, w: 100, h: 80, rotation: 0 },
+    ]
+    const r = elementsToSvg(els, view, () => null, { background: false, border: 0 })
+    expect(r.svg).toContain('<line')
+    expect(r.svg).toContain('legacy note')
+    expect(r.svg).toContain('stroke-dasharray="6 4"')
+  })
+
   it('card → SVG 含 <rect> + <text>(title)', () => {
     const els: CanvasElement[] = [
       { id: 'c1', kind: 'card', x: 0, y: 0, w: 240, h: 120, rotation: 0 },

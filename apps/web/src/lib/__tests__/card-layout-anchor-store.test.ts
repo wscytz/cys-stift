@@ -241,6 +241,14 @@ describe('card-layout-anchor-store', () => {
     expect(host.getElement('a')?.meta?.layoutAnchor).toEqual(storedAnchor)
   })
 
+  it('unbind on an empty host does not clear the sidecar (R-11)', () => {
+    saveCardLayoutAnchors('c1', { a: storedAnchor })
+    const host = new InMemoryCanvasHost()
+    const unbind = bind(host, 'c1', 300)
+    unbind()
+    expect(loadCardLayoutAnchors('c1')).toEqual({ a: storedAnchor })
+  })
+
   it('flushes pending changes on pagehide (window close / Tauri close)', () => {
     const host = new InMemoryCanvasHost()
     bind(host, 'c1', 60_000)

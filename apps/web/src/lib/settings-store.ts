@@ -220,18 +220,23 @@ function salvageSettings(v: unknown): Settings {
     }
     return []
   })
+  const rawActiveProfileId = o.activeProfileId
   const activeProfileId =
-    typeof o.activeProfileId === 'string' && profiles.some((p) => p.id === o.activeProfileId)
-      ? o.activeProfileId
-      : null
+    rawActiveProfileId === undefined
+      // 字段缺失：旧 settings 兼容，救出的 profile 自动激活（原行为）。
+      ? profiles[0]?.id ?? null
+      // 显式 null 必须保持 null——导入/用户清空过 active 时，不能在这里被
+      // profiles[0] 重新激活（否则导入备份可静默改道 AI，S-01 绕过）。
+      : typeof rawActiveProfileId === 'string' && profiles.some((p) => p.id === rawActiveProfileId)
+        ? rawActiveProfileId
+        : null
   return {
     captureShortcut: shortcutOk ? (shortcut as Settings['captureShortcut']) : DEFAULT_SETTINGS.captureShortcut,
     theme,
     locale: o.locale === 'en' ? 'en' : DEFAULT_SETTINGS.locale,
     profiles,
-    // 自动激活:若 active 丢了但救出了 profile,锚第一个(与 upsertProfile 的
-    // 「保存≠激活」修同一陷阱:救出的 key 若不激活,getCurrentAI 仍 null)。
-    activeProfileId: activeProfileId ?? profiles[0]?.id ?? null,
+    // 自动激活只在 activeProfileId 字段缺失时发生（见上方 rawActiveProfileId）。
+    activeProfileId,
     seenCaptureHint: typeof o.seenCaptureHint === 'boolean' ? o.seenCaptureHint : false,
     export: {
       includeDeleted:
