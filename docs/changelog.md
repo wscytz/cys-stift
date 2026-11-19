@@ -13,6 +13,7 @@
 - **关系导出（R-04/R-05）**：碰撞守卫排除锚点（组锚为成员集），`@gap(0)` 可正常 emit；`changedCardPlacements` 覆盖关系卡自身 `@size` 与 `@pos`↔关系切换，依赖链会跟随。
 - **legacy 导出（R-06）**：`elementsToSvg` 补齐 line/note/image，画布与 SVG/PNG 可见性一致。
 - **其他收口**：free 元素 meta 预览（R-07）；AI 部分失败文案不再承诺重试（R-08）；straight 双击空 undo（R-09）；sidecar 空 host 不擦除（R-11）；`elbow:[null]`/超大坐标防护（R-12）；发布 workflow `--fail-if-no-match`、preview 版本替换、Windows artifact `error`（R-14/R-15/R-19）；e2e 增加“预览=应用”断言（R-16）；pinch 抬指基线、InMemory restore 通知、fonts.ready（R-22~R-24）。
+- **部署**：上传从 `scp -r` 改为 `rsync -az --delete`（带 keepalive），不再先清空目标；避免上传中断留下半成品（实测 scp 挂起 37 分钟）。
 - **验证**：全包 lint 0；全量 3360 通过 / 3 跳过；web build、`verify:pack`、`demo:approval` exit 0；`e2e:dsl-seed` 11/11。
 
 ## 2026-11-19 · 未发布 · fix: 空 undo、legacy 渲染与预览站部署

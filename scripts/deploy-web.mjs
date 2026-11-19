@@ -3,7 +3,7 @@
 // 一键部署「网页测试版」到 Aliyun ECS(wscytz.com/cys-stift/app)。
 //
 // 流程:本地静态导出(带 WEB_DEPLOY_BASEPATH 子路径)→ 服务器备份旧版(app.bak-<ver>)
-//       → scp 上传 → HTTPS 全路由 200 验证。
+//       → rsync 上传 → HTTPS 全路由 200 验证。
 //
 // 用法(仓库根目录):
 //   node scripts/deploy-web.mjs            # build + 备份 + 上传 + 验证
@@ -135,14 +135,12 @@ ssh(
   `备份服务器旧版 v${prev}`,
 )
 
-// 3) 清空目标 + 上传。
-ssh(
-  `find ${APP_DIR} -mindepth 1 -delete && echo "清空目标 ${APP_DIR}"`,
-  '清空上传目标(防残留旧 hash 文件)',
-)
+// 3) rsync 上传。不要先 find -delete 清空目标：上传中途断网会留下半成品
+//    （曾实测 scp -r 挂起 37 分钟，线上目录只剩 _next）。rsync --delete 在传输
+//    结束后才移除多余文件，中断时旧文件仍在，站点不会变白屏。
 run(
-  `scp -r apps/web/out/. ${SERVER}:${APP_DIR}/`,
-  `scp 上传 apps/web/out/ → ${APP_DIR}/`,
+  `rsync -az --delete -e "ssh -o ConnectTimeout=10 -o ServerAliveInterval=10 -o ServerAliveCountMax=3" apps/web/out/ ${SERVER}:${APP_DIR}/`,
+  `rsync 上传 apps/web/out/ → ${APP_DIR}/`,
 )
 
 // 4) 验证。
