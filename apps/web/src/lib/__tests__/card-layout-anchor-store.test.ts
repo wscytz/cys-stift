@@ -241,6 +241,19 @@ describe('card-layout-anchor-store', () => {
     expect(host.getElement('a')?.meta?.layoutAnchor).toEqual(storedAnchor)
   })
 
+  it('clears stale sidecar after all cards are deleted (N-04)', () => {
+    vi.useFakeTimers()
+    const host = new InMemoryCanvasHost()
+    bind(host, 'c1', 300)
+    host.upsert(card('a', { meta: { layoutAnchor: storedAnchor } }))
+    vi.advanceTimersByTime(400)
+    expect(loadCardLayoutAnchors('c1')).toEqual({ a: storedAnchor })
+
+    host.remove('a')
+    vi.advanceTimersByTime(400)
+    expect(loadCardLayoutAnchors('c1')).toEqual({})
+  })
+
   it('unbind on an empty host does not clear the sidecar (R-11)', () => {
     saveCardLayoutAnchors('c1', { a: storedAnchor })
     const host = new InMemoryCanvasHost()

@@ -1092,6 +1092,45 @@ describe('importFromJson — replace / merge transaction', () => {
     expect(restored.aiIncludeCardContent).toBe(false)
     // The profile survives as an inert, user-visible choice.
     expect(restored.profiles).toHaveLength(1)
+    expect(restored.profiles[0].enabled).toBe(false)
+  })
+
+  it('merge does not activate a dangling local active id when the backup supplies it (N-00)', async () => {
+    const localProfile = {
+      id: 'local',
+      name: 'Local',
+      provider: 'openai',
+      baseUrl: 'https://local.example/v1',
+      apiKey: '',
+      model: 'm',
+      enabled: true,
+    }
+    seedStores({
+      settings: { profiles: [localProfile], activeProfileId: 'ghost' },
+    })
+    const result = await mod.importFromJson(
+      minimalPayload({
+        settings: {
+          profiles: [{
+            id: 'ghost',
+            name: 'Ghost',
+            provider: 'openai',
+            baseUrl: 'https://attacker.example/v1',
+            apiKey: 'local-test-key',
+            model: 'gpt-4o-mini',
+            enabled: true,
+          }],
+          labs: {},
+          aiSampleCapture: false,
+        },
+      }),
+      { mode: 'merge' },
+    )
+    expect(result.ok).toBe(true)
+    const restored = JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!).settings
+    expect(restored.activeProfileId).toBeNull()
+    expect(restored.profiles.find((profile: { id: string }) => profile.id === 'ghost')?.enabled)
+      .toBe(false)
   })
 
   it('replace writes an explicit null activeProfileId even when the backup omits it (R-01)', async () => {
@@ -1526,7 +1565,7 @@ describe('P0 regression — settings key v1→v2', () => {
     // settings round-tripped through the v2 key. AI activation is deliberately
     // not restored by an external backup: the user must pick a profile first.
     const restored = JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!) as { settings: typeof settings }
-    expect(restored.settings).toEqual({ ...settings, activeProfileId: null, aiIncludeCardContent: false, labs: {}, aiSampleCapture: false })
+    expect(restored.settings).toEqual({ ...settings, profiles: settings.profiles.map((profile) => ({ ...profile, enabled: false })), activeProfileId: null, aiIncludeCardContent: false, labs: {}, aiSampleCapture: false })
   })
 })
 
@@ -1706,7 +1745,7 @@ describe('full round-trip — settings + templates + samples + conversations', (
 
     // All user data restored. External backups do not auto-activate AI.
     expect(JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!)).toEqual({
-      settings: { ...settings, activeProfileId: null, aiIncludeCardContent: false, labs: {}, aiSampleCapture: false },
+      settings: { ...settings, profiles: settings.profiles.map((profile) => ({ ...profile, enabled: false })), activeProfileId: null, aiIncludeCardContent: false, labs: {}, aiSampleCapture: false },
     })
     expect(JSON.parse(window.localStorage.getItem(TEMPLATES_KEY)!)).toEqual(templates)
     expect(JSON.parse(window.localStorage.getItem(SAMPLES_KEY)!)).toEqual(samples)

@@ -557,6 +557,21 @@ describe('serializeCanvas — layoutAnchor (v11)', () => {
     }
   })
 
+  it('emits sibling @gap(0) relations that only touch at a corner (N-01)', () => {
+    const elements = [
+      card('a', 100, 100, { w: 100, h: 80 }),
+      card('b', 200, 100, { w: 100, h: 80, meta: { layoutAnchor: { id: 'a', dir: 'right-of', gap: 0 } } }),
+      card('c', 100, 180, { w: 100, h: 80, meta: { layoutAnchor: { id: 'a', dir: 'below', gap: 0 } } }),
+    ]
+    const out = serializeCanvas(elements)
+    expect(out).toContain('[card #b] right-of #a @gap(0)')
+    expect(out).toContain('[card #c] below #a @gap(0)')
+    const solved = solveRelational(sanitizeDslOps(parseDsl(out)).ops)
+    expect(solved.diagnostics).toEqual([])
+    expect(solved.ops[1]).toMatchObject({ cardId: 'b', x: 200, y: 100 })
+    expect(solved.ops[2]).toMatchObject({ cardId: 'c', x: 100, y: 180 })
+  })
+
   it('round-trip: emitted relation parses back to rel', () => {
     const elements = [
       card('a', 100, 100),

@@ -135,11 +135,11 @@ ssh(
   `备份服务器旧版 v${prev}`,
 )
 
-// 3) rsync 上传。不要先 find -delete 清空目标：上传中途断网会留下半成品
-//    （曾实测 scp -r 挂起 37 分钟，线上目录只剩 _next）。rsync --delete 在传输
-//    结束后才移除多余文件，中断时旧文件仍在，站点不会变白屏。
+// 3) rsync 上传。不要先 find -delete 清空目标：上传中途断网会留下半成品。
+// `--delete-after --delay-updates` 让新文件先写临时名、传输结束后再统一改名/删除，
+// 缩短“HTML 已更新但 chunk 未到”的窗口；rsync 仍不是原子目录切换，注释不夸大。
 run(
-  `rsync -az --delete -e "ssh -o ConnectTimeout=10 -o ServerAliveInterval=10 -o ServerAliveCountMax=3" apps/web/out/ ${SERVER}:${APP_DIR}/`,
+  `rsync -az --delete-after --delay-updates -e "ssh -o ConnectTimeout=10 -o ServerAliveInterval=10 -o ServerAliveCountMax=3" apps/web/out/ ${SERVER}:${APP_DIR}/`,
   `rsync 上传 apps/web/out/ → ${APP_DIR}/`,
 )
 

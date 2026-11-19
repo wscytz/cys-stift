@@ -448,28 +448,34 @@ function sanitizeImportedSettings(
     // merge 永远以本机 profile 为底，只追加合法的新 profile；畸形 incoming
     // (null/字符串/坏项)不得把本机配置冲掉。
     const localProfiles = Array.isArray(current.profiles) ? current.profiles : []
-    const localIds = new Set(
+    const localValidIds = new Set(
       localProfiles.flatMap((profile) =>
-        isObject(profile) && typeof profile.id === 'string' ? [profile.id] : [],
+        isImportableProfile(profile) ? [String(profile.id)] : [],
       ),
     )
     next.profiles = [
       ...localProfiles,
-      ...incomingProfiles.filter(
-        (profile) => !localIds.has(String((profile as { id?: unknown }).id)),
-      ),
+      ...incomingProfiles
+        .filter((profile) => !localValidIds.has(String((profile as { id?: unknown }).id)))
+        // 外部 profile 默认不启用；用户显式“设为当前”后再启用。
+        .map((profile) => ({ ...profile, enabled: false })),
     ]
     for (const key of IMPORT_SENSITIVE_SETTING_KEYS) {
       if (key === 'profiles' || !(key in next)) continue
       if (key in current) next[key] = current[key]
       else delete next[key]
     }
-    if (!('activeProfileId' in current)) next.activeProfileId = null
+    // 只保留“导入前实际有效”的本机 active：raw 悬空 id（如 ghost）不能因为
+    // 备份恰好补了同 id profile 就被激活（S-01 merge 绕过）。
+    next.activeProfileId =
+      typeof current.activeProfileId === 'string' && localValidIds.has(current.activeProfileId)
+        ? current.activeProfileId
+        : null
     return next
   }
   // replace / 无本机基线：profile 只作为未启用的配置保留；active 显式 null，
   // 防止 salvageSettings 把 profiles[0] 重新激活（S-01 绕过）。
-  next.profiles = incomingProfiles
+  next.profiles = incomingProfiles.map((profile) => ({ ...profile, enabled: false }))
   next.activeProfileId = null
   next.labs = {}
   next.aiSampleCapture = false

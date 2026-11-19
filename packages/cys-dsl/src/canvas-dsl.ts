@@ -117,9 +117,11 @@ interface IndexedCard {
   top: number
   right: number
   bottom: number
+  /** 该卡的关系锚 id（无 layoutAnchor → undefined）；同锚兄弟卡贴边不算碰撞。 */
+  anchorId?: string
 }
 
-class CardCollisionIndex {
+export class CardCollisionIndex {
   private readonly cells = new Map<string, IndexedCard[]>()
   private readonly wide: IndexedCard[] = []
 
@@ -135,6 +137,7 @@ class CardCollisionIndex {
         top,
         right: left + quantize(card.w),
         bottom: top + quantize(card.h),
+        anchorId: readLayoutAnchor(card)?.id,
       }
       const minX = Math.floor(box.left / COLLISION_CELL)
       const maxX = Math.floor(box.right / COLLISION_CELL)
@@ -164,13 +167,19 @@ class CardCollisionIndex {
     height: number,
     excludeIds: ReadonlySet<string>,
     epsilon: number,
+    anchorId?: string,
   ): boolean {
-    const hit = (box: IndexedCard) =>
-      !excludeIds.has(box.id) &&
-      x < box.right + epsilon &&
-      box.left < x + width + epsilon &&
-      y < box.bottom + epsilon &&
-      box.top < y + height + epsilon
+    const hit = (box: IndexedCard) => {
+      // 同一锚点的兄弟关系卡允许贴边/角点相接；只有正面积重叠才算碰撞。
+      const eps = anchorId !== undefined && box.anchorId === anchorId ? 0 : epsilon
+      return (
+        !excludeIds.has(box.id) &&
+        x < box.right + eps &&
+        box.left < x + width + eps &&
+        y < box.bottom + eps &&
+        box.top < y + height + eps
+      )
+    }
     for (const box of this.wide) if (hit(box)) return true
     const minX = Math.floor(x / COLLISION_CELL)
     const maxX = Math.floor((x + width) / COLLISION_CELL)
@@ -222,15 +231,16 @@ function relationForCard(
   const EPS = 1e-9
   const excluded = new Set<string>([e.id, anchor.id])
   if (collisionIndex) {
-    if (collisionIndex.overlaps(solvedX, solvedY, width, height, excluded, EPS)) return undefined
+    if (collisionIndex.overlaps(solvedX, solvedY, width, height, excluded, EPS, anchor.id)) return undefined
   } else {
     // 直接调用 serializeElement 的外部消费方没有索引：保留原线性检查（结果一致）。
     for (const card of byId.values()) {
       if (card.kind !== 'card' || excluded.has(card.id)) continue
       const left = quantize(card.x)
       const top = quantize(card.y)
-      if (solvedX < left + quantize(card.w) + EPS && left < solvedX + width + EPS &&
-          solvedY < top + quantize(card.h) + EPS && top < solvedY + height + EPS) return undefined
+      const eps = readLayoutAnchor(card)?.id === anchor.id ? 0 : EPS
+      if (solvedX < left + quantize(card.w) + eps && left < solvedX + width + eps &&
+          solvedY < top + quantize(card.h) + eps && top < solvedY + height + eps) return undefined
     }
   }
   return `${anchor.dir} #${anchor.id} @gap(${gap})`

@@ -247,6 +247,9 @@ export function AISettingsPanel() {
               <span className={`aip__accent aip__accent--${d.accent}`} aria-hidden="true" />
               <span className="aip__profileName">{p.name || d.displayName}</span>
               {active && <span className="aip__activeTag" aria-label={t('settings.aiActive')}>●</span>}
+              {!p.enabled && (
+                <span className="aip__inactiveTag">{t('settings.aiInactive')}</span>
+              )}
             </button>
           )
         })}
@@ -420,6 +423,7 @@ const panelStyles = `
 .aip__profileChip--new { border-style: dashed; color: var(--color-gray); }
 .aip__profileName { font-family: var(--font-display); }
 .aip__activeTag { color: var(--color-blue); }
+.aip__inactiveTag { color: var(--color-gray); font-size: var(--font-size-xs); }
 .aip__providerRow { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin: 0 var(--space-3) var(--space-3); }
 .aip__providerCard { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); padding: var(--space-2) var(--space-3); background: var(--color-white); border: var(--border-hairline); border-color: var(--color-gray); cursor: pointer; text-align: left; font-family: var(--font-body); }
 .aip__providerCard--selected { border-color: var(--color-on-surface); background: var(--color-surface-white); }

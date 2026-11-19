@@ -566,9 +566,36 @@ describe('AiConfirmDialog DSL persistence', () => {
       consoleError.mockRestore()
     }
   })
-})
 
-describe('AiConfirmDialog edge — Fix 4 appliedTitle 残留审计', () => {
+  it('partial persistence failure keeps the dialog open and disables Apply (N-03)', async () => {
+    const { host, calls } = makeMockHost([
+      { id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 50, rotation: 0 },
+    ])
+    const createWithId = vi.fn((id: string) => {
+      if (id === 'c') throw new Error('storage full')
+      return { ok: true }
+    })
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const onApplied = vi.fn()
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog mode="dsl"
+        dsl={'[card #b create] @pos(250,0)\n[card #c create] @pos(500,0)'}
+        targetCanvasId={'cv' as never} service={{ createWithId, get: vi.fn() } as never}
+        liveHost={host} onApplied={onApplied} onRejected={() => {}} />,
+    )
+    try {
+      await act(async () => { await flushMicro() })
+      await act(async () => { byText(dom, /^应用$|^Apply$/)!.click() })
+      expect(calls.upserts.map((el) => el.id)).toEqual(['b'])
+      expect(dom.textContent).toContain('已应用的改动不会回滚')
+      expect(onApplied).not.toHaveBeenCalled()
+      expect(byText(dom, /^应用$|^Apply$/)!.disabled).toBe(true)
+    } finally {
+      unmount()
+      consoleError.mockRestore()
+    }
+  })
+
   /**
    * Fix 4 删了 AiConfirmDialog 的 phase==='applied' 标题三元(appliedTitle 死相位)。
    * agent.appliedTitle i18n key 保留(AgentConfirmCard 共享)。

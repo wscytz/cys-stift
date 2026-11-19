@@ -144,10 +144,13 @@ export function bindCardLayoutAnchorPersistence(
   const known = new Set<string>()
   let applying = false
   let disposed = false
+  /** 是否见过卡片：区分“还没 hydrate 的空画布”与“用户删光了卡”。 */
+  let sawCards = false
 
   const ensureAnchors = () => {
     if (applying) return
     const currentCards = host.getElements().filter((el) => el.kind === 'card')
+    if (currentCards.length > 0) sawCards = true
     const currentIds = new Set(currentCards.map((el) => el.id))
 
     // 卡片从元素集消失（删除/撤销重建/换内容）→ 立即丢弃它的内存种子，不能等
@@ -198,9 +201,9 @@ export function bindCardLayoutAnchorPersistence(
       timer = null
     }
     pending = false
-    // 空 host 可能是“卡片还没 hydrate”而非“用户删光了卡”；此时写空表会擦掉
-    // sidecar。加载时缺失 id 的种子会被丢弃，所以跳过空 host 是安全的。
-    if (!host.getElements().some((el) => el.kind === 'card')) return
+    // 空 host 可能是“卡片还没 hydrate”而非“用户删光了卡”；没见过卡时写空表会
+    // 擦掉 sidecar。见过卡后再变空（删光/全归档）则应清理 stale 锚。
+    if (!sawCards && !host.getElements().some((el) => el.kind === 'card')) return
     stored = collectCardLayoutAnchors(host.getElements())
     saveCardLayoutAnchors(canvasId, stored)
   }

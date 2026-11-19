@@ -319,6 +319,7 @@ export function DslDialog({
         applyIssues: [] as { opIndex: number; line?: number; reason: string }[],
         subsetDiff: null as ReturnType<typeof diffCanvasSnapshots> | null,
         subsetCount: 0,
+        subsetMetaChanges: [] as { opIndex: number; cardId: string; title: string; fields: string[] }[],
         gated: false,
       }
     }
@@ -341,6 +342,8 @@ export function DslDialog({
     const blockedIndices = outcome.ok ? null : new Set(applyIssues.map((issue) => issue.opIndex))
     let subsetDiff: ReturnType<typeof diffCanvasSnapshots> | null = null
     let subsetCount = 0
+    type MetaChange = { opIndex: number; cardId: string; title: string; fields: string[] }
+    let subsetMetaChanges: MetaChange[] = []
     let appliedIndices = new Set(outcome.ok ? outcome.report.opResults.filter((result) => result.status === 'applied').map((result) => result.opIndex) : [])
     if (blockedIndices && applyIssues.length > 0) {
       const subsetOps = ops.filter((_, index) => !blockedIndices.has(index))
@@ -357,6 +360,13 @@ export function DslDialog({
           appliedIndices = new Set(subsetOutcome.report.opResults.flatMap((result) =>
             result.status === 'applied' ? [subsetIndices[result.opIndex]!] : [],
           ))
+          // 子集预览同样要显示 free/card meta 变化（N-02）。
+          subsetMetaChanges = collectMetaChanges(
+            subsetOps,
+            subsetOutcome.report.opResults,
+            before,
+            subsetHost,
+          ).map((change) => ({ ...change, opIndex: subsetIndices[change.opIndex]! }))
         }
       }
     }
@@ -385,12 +395,17 @@ export function DslDialog({
     const contentChanges = allContentChanges.filter((change) => appliedIndices.has(change.opIndex))
     // v11.2:仅属性变化(@group/@href/layoutAnchor)时几何 diff 与内容 diff 都为空，
     // 但 Apply 确实会写 meta。预览必须承认这次写入，不能谎称“画布已是最新”。
-    const metaChanges: { opIndex: number; cardId: string; title: string; fields: string[] }[] = []
-    if (outcome.ok) {
-      const beforeById = new Map(before.map((element) => [element.id, element]))
-      for (const result of outcome.report.opResults) {
+    function collectMetaChanges(
+      opList: DslOp[],
+      results: readonly { opIndex: number; status: string }[],
+      beforeElements: CanvasElement[],
+      afterHost: InMemoryCanvasHost,
+    ): MetaChange[] {
+      const changes: MetaChange[] = []
+      const beforeById = new Map(beforeElements.map((element) => [element.id, element]))
+      for (const result of results) {
         if (result.status !== 'applied') continue
-        const op = ops[result.opIndex]
+        const op = opList[result.opIndex]
         if (!op) continue
         if (op.type === 'free') {
           if (!op.id || op.delete) continue
@@ -402,7 +417,7 @@ export function DslDialog({
             (key) => JSON.stringify(beforeElement.meta?.[key]) !== JSON.stringify(afterElement.meta?.[key]),
           )
           if (fields.length > 0) {
-            metaChanges.push({
+            changes.push({
               opIndex: result.opIndex,
               cardId: id,
               title: ('text' in op && typeof op.text === 'string' && op.text) || id,
@@ -430,7 +445,7 @@ export function DslDialog({
           (key) => JSON.stringify(beforeElement.meta?.[key]) !== JSON.stringify(afterElement.meta?.[key]),
         )
         if (fields.length > 0) {
-          metaChanges.push({
+          changes.push({
             opIndex: result.opIndex,
             cardId: id,
             title: titleById.get(id) ?? service.get(op.cardId)?.title ?? t('card.untitled'),
@@ -438,7 +453,11 @@ export function DslDialog({
           })
         }
       }
+      return changes
     }
+    const metaChanges = outcome.ok
+      ? collectMetaChanges(ops, outcome.report.opResults, before, afterHost)
+      : []
     return {
       ops,
       errors: parseErrors,
@@ -452,6 +471,7 @@ export function DslDialog({
       applyIssues,
       subsetDiff,
       subsetCount,
+      subsetMetaChanges,
       // gated = 诊断闸门整单拒绝(apply 真的不会发生);否则(ok)这些 applyIssues 是
       // 「计划干净但个别行被跳过」(如箭头端点指向同批更晚的卡):应用照常提交其余行,
       // UI 不能渲染成「应用已取消」(2026-11-19 收束:预览承诺必须等于 apply 行为)。
@@ -863,18 +883,20 @@ export function DslDialog({
         </div>
       )}
       {text.trim() !== '' && preview.subsetDiff && preview.subsetCount > 0 &&
-        (preview.subsetDiff.added.length + preview.subsetDiff.removed.length + preview.subsetDiff.changed.length + preview.contentChanges.length) > 0 && (
+        (preview.subsetDiff.added.length + preview.subsetDiff.removed.length + preview.subsetDiff.changed.length +
+          preview.contentChanges.length + preview.subsetMetaChanges.length) > 0 && (
         <div className="dsl-preview dsl-preview--ok" aria-live="polite">
           <p>{t('canvas.dslPreviewSubset', {
             n: String(preview.subsetCount),
             added: String(preview.subsetDiff.added.length),
             removed: String(preview.subsetDiff.removed.length),
-            changed: String(preview.subsetDiff.changed.length + preview.contentChanges.length),
+            changed: String(preview.subsetDiff.changed.length + preview.contentChanges.length + preview.subsetMetaChanges.length),
           })}</p>
-          {renderChangeList(preview.subsetDiff, preview.contentChanges)}        </div>
+          {renderChangeList(preview.subsetDiff, preview.contentChanges, preview.subsetMetaChanges)}
+        </div>
       )}
       {preview.errors.length > 0 && (
-        <div className="dsl-errors" role="alert">
+        <div className="dsl-errors" role="status">
           <p className="dsl-errors__title">{t('canvas.dslErrorsTitle', { n: String(preview.errors.length) })}</p>
           <ul className="dsl-errors__list">
             {preview.errors.map((e, i) => (

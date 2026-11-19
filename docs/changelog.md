@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-11-19 · 未发布 · fix: 第三轮复审（merge 导入、双 gap0、子集 meta、AI 部分失败）
+
+> 针对第三轮独立复审的 P1/P2 与 P3；预览站随后更新，正式站仍为 v1.5.0。
+
+- **导入边界（N-00/N-06）**：merge 只保留“导入前实际有效”的本机 active；raw 悬空 id 不再因备份补同 id profile 而被激活；外部 profile 默认 `enabled:false`，设置页显示“未启用”。
+- **关系导出（N-01）**：同一锚点的兄弟关系卡贴边/角点相接不再误判碰撞；正面积重叠仍回退 `@pos`。
+- **预览（N-02）**：挂起行的子集预览也计算/显示 free/card meta 变化。
+- **AI 确认（N-03）**：部分失败保留确认框并禁用 Apply，提示“已应用改动不回滚，请关闭后重新生成或手动修复”。
+- **sidecar（N-04）**：见过卡片后再删光/全归档会清理 stale 锚；未 hydrate 的空画布仍不擦除。
+- **部署（N-05）**：`rsync --delete-after --delay-updates`，缩短“HTML 已更新但 chunk 未到”的窗口；注释不再宣称原子切换。
+- **类型/无障碍（N-07/N-10）**：导出 `CardCollisionIndex`；解析错误面板改 polite（`role=status`），避免逐键 assertive 播报。
+- **验证**：全包 lint 0；全量 3365 通过 / 3 跳过；web build、`verify:pack`、`demo:approval` exit 0；`e2e:dsl-seed` 11/11。
+
 ## 2026-11-19 · 未发布 · fix: 第二轮复审（导入边界、@gap(0)、依赖链、legacy SVG）
 
 > 针对第二轮独立复审的 P1/P2 与部分 P3；预览站随后更新，正式站仍为 v1.5.0。

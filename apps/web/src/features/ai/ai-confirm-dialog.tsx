@@ -127,6 +127,7 @@ const dslIssueStyles = `
 export function AiConfirmDialog(props: AiConfirmDialogProps) {
   const { t, locale } = useI18n()
   const [phase, setPhase] = useState<Phase>('confirming')
+  const [applyFailure, setApplyFailure] = useState<{ applied: number; failed: number; skipped: number } | null>(null)
   const [editing, setEditing] = useState(false)
   const dslInitial = props.mode === 'dsl' ? props.dsl : props.mode === 'intent' ? props.intent : ''
   const [editedDsl, setEditedDsl] = useState(dslInitial)
@@ -340,11 +341,11 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
             kind: 'error',
             message: t('canvas.aiLayoutFailed', { applied: String(applied), failed: String(failed), skipped: String(skipped) }),
           })
-          // 全部失败：保留确认框让用户重试，不假装已应用后关闭。
-          if (applied === 0) {
-            setPhase('confirming')
-            return
-          }
+          // 部分/全部失败都保留确认框：已应用的行不能安全重放（没有 hash 去重），
+          // 因此禁用 Apply，让用户关闭后重新生成或手动修复失败项。
+          setApplyFailure({ applied, failed, skipped })
+          setPhase('confirming')
+          return
         } else if (notApplied > 0) {
           pushToast({
             kind: 'info',
@@ -481,6 +482,19 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
       <div className="ac">
         <p className="ac__subtitle">{t('ai.confirm.subtitle')}</p>
 
+        {applyFailure && (
+          <div className="ac__notice ac__notice--blocked" role="alert">
+            <p className="ac__notice-title">
+              {t('canvas.aiLayoutFailed', {
+                applied: String(applyFailure.applied),
+                failed: String(applyFailure.failed),
+                skipped: String(applyFailure.skipped),
+              })}
+            </p>
+            <p className="ac__notice-more">{t('ai.confirm.partialFailureHint')}</p>
+          </div>
+        )}
+
         {props.mode === 'outline' && (
           editing ? (
             <textarea
@@ -536,7 +550,7 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
         )}
 
         <div className="ac__actions">
-          <Button variant="primary" onClick={() => void handleApply()} disabled={phase === 'applying' || phase === 'applied' || (props.mode !== 'outline' && (!afterState || ((props.mode === 'dsl' || props.mode === 'cluster') && totalChanges === 0)))}>
+          <Button variant="primary" onClick={() => void handleApply()} disabled={applyFailure !== null || phase === 'applying' || phase === 'applied' || (props.mode !== 'outline' && (!afterState || ((props.mode === 'dsl' || props.mode === 'cluster') && totalChanges === 0)))}>
             {phase === 'applying' ? t('agent.applying') : t('agent.apply')}
           </Button>
           {props.mode !== 'cluster' && (
