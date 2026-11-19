@@ -340,6 +340,10 @@ export function DslDialog({
     // 预览补一次"跳过挂起行的投影"(只影响显示,不改 apply 的整单语义):修复挂起行前
     // 也能看到其余有效指令的改动量。注意这是"修正挂起行之后"的预期,不是本次应用的承诺。
     const blockedIndices = outcome.ok ? null : new Set(applyIssues.map((issue) => issue.opIndex))
+    const titleById = new Map<string, string>()
+    for (const op of ops) {
+      if (op.type === 'card' && op.title !== undefined) titleById.set(String(op.cardId), op.title)
+    }
     let subsetDiff: ReturnType<typeof diffCanvasSnapshots> | null = null
     let subsetCount = 0
     type MetaChange = { opIndex: number; cardId: string; title: string; fields: string[] }
@@ -371,10 +375,6 @@ export function DslDialog({
       }
     }
     const after = cloneElements(afterHost.getElements())
-    const titleById = new Map<string, string>()
-    for (const op of ops) {
-      if (op.type === 'card' && op.title !== undefined) titleById.set(String(op.cardId), op.title)
-    }
     const allContentChanges: { opIndex: number; cardId: string; title: string; fields: string[] }[] = []
     ops.forEach((op, index) => {
       if (op.type !== 'card' || op.delete || op.create) return

@@ -448,11 +448,8 @@ function sanitizeImportedSettings(
     // merge 永远以本机 profile 为底，只追加合法的新 profile；畸形 incoming
     // (null/字符串/坏项)不得把本机配置冲掉。
     const localProfiles = Array.isArray(current.profiles) ? current.profiles : []
-    const localValidIds = new Set(
-      localProfiles.flatMap((profile) =>
-        isImportableProfile(profile) ? [String(profile.id)] : [],
-      ),
-    )
+    const localValidProfiles = localProfiles.filter(isImportableProfile)
+    const localValidIds = new Set(localValidProfiles.map((profile) => String(profile.id)))
     next.profiles = [
       ...localProfiles,
       ...incomingProfiles
@@ -465,12 +462,15 @@ function sanitizeImportedSettings(
       if (key in current) next[key] = current[key]
       else delete next[key]
     }
-    // 只保留“导入前实际有效”的本机 active：raw 悬空 id（如 ghost）不能因为
-    // 备份恰好补了同 id profile 就被激活（S-01 merge 绕过）。
+    // 只保留“导入前实际有效”的本机 active：
+    // - 字段缺失时，salvageSettings 会自动锚 profiles[0]，这里等价保留；
+    // - 显式 null / 悬空 id 保持 null，不能被备份补同 id profile 激活。
     next.activeProfileId =
-      typeof current.activeProfileId === 'string' && localValidIds.has(current.activeProfileId)
-        ? current.activeProfileId
-        : null
+      current.activeProfileId === undefined
+        ? localValidProfiles[0]?.id ?? null
+        : typeof current.activeProfileId === 'string' && localValidIds.has(current.activeProfileId)
+          ? current.activeProfileId
+          : null
     return next
   }
   // replace / 无本机基线：profile 只作为未启用的配置保留；active 显式 null，

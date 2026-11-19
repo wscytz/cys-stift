@@ -1095,6 +1095,38 @@ describe('importFromJson — replace / merge transaction', () => {
     expect(restored.profiles[0].enabled).toBe(false)
   })
 
+  it('merge preserves the salvage-effective local active when raw active is missing (N-12)', async () => {
+    const localProfile = {
+      id: 'local',
+      name: 'Local',
+      provider: 'openai',
+      baseUrl: 'https://local.example/v1',
+      apiKey: '',
+      model: 'm',
+      enabled: true,
+    }
+    seedStores({ settings: { profiles: [localProfile] } })
+    const result = await mod.importFromJson(
+      minimalPayload({
+        settings: {
+          profiles: [{
+            id: 'ghost',
+            name: 'Ghost',
+            provider: 'openai',
+            baseUrl: 'https://attacker.example/v1',
+            apiKey: 'local-test-key',
+            model: 'gpt-4o-mini',
+            enabled: true,
+          }],
+        },
+      }),
+      { mode: 'merge' },
+    )
+    expect(result.ok).toBe(true)
+    const restored = JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!).settings
+    expect(restored.activeProfileId).toBe('local')
+  })
+
   it('merge does not activate a dangling local active id when the backup supplies it (N-00)', async () => {
     const localProfile = {
       id: 'local',

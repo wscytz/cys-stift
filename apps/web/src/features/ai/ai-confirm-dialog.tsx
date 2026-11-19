@@ -341,8 +341,13 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
             kind: 'error',
             message: t('canvas.aiLayoutFailed', { applied: String(applied), failed: String(failed), skipped: String(skipped) }),
           })
-          // 部分/全部失败都保留确认框：已应用的行不能安全重放（没有 hash 去重），
-          // 因此禁用 Apply，让用户关闭后重新生成或手动修复失败项。
+          // 全部失败时没有任何已应用行，允许原地重试；部分失败才禁用 Apply。
+          if (applied === 0) {
+            setPhase('confirming')
+            return
+          }
+          // 部分失败：已应用的行不能安全重放（没有 hash 去重），禁用 Apply，
+          // 让用户关闭后重新生成或手动修复失败项。
           setApplyFailure({ applied, failed, skipped })
           setPhase('confirming')
           return
@@ -556,7 +561,16 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
           {props.mode !== 'cluster' && (
             <Button variant="ghost" onClick={() => setEditing((v) => !v)}>{t('agent.edit')}</Button>
           )}
-          <Button variant="ghost" onClick={() => { recordReject(); props.onRejected() }}>{t('agent.reject')}</Button>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              // 部分失败时已有改动落画布，再记“拒绝”样本会与 applied 矛盾。
+              if (!(applyFailure && applyFailure.applied > 0)) recordReject()
+              props.onRejected()
+            }}
+          >
+            {applyFailure && applyFailure.applied > 0 ? t('common.close') : t('agent.reject')}
+          </Button>
         </div>
       </div>
       <style>{confirmStyles + dslIssueStyles}</style>

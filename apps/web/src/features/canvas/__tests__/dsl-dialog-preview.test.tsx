@@ -291,6 +291,18 @@ describe('DslDialog draft and retry', () => {
     unmount()
   })
 
+  it('shows card meta in the gated subset preview without a TDZ crash (N-11)', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 50, rotation: 0 })
+    const { container, unmount } = mountDialog(host, { get: () => undefined })
+    const original = container.querySelector('textarea')!.value
+    changeText(container, `${original.replace(/(\[card #a\][^\n]*)/, '$1 @group("g")')}\n[card #ghost] right-of #missing`)
+    const text = container.textContent ?? ''
+    expect(text).toContain('canvas.dslPreviewSubset')
+    expect(text).toContain('canvas.diffField.group')
+    unmount()
+  })
+
   it('shows free meta changes in the gated subset preview (N-02)', () => {
     const host = new InMemoryCanvasHost()
     host.upsert({ id: 'r1', kind: 'rect', x: 0, y: 0, w: 100, h: 50, rotation: 0 })

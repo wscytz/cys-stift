@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-11-19 · 未发布 · fix: 第四轮复审（card meta 子集 TDZ、merge effective active）
+
+> 针对第四轮独立复审的 P2/P3；预览站随后更新，正式站仍为 v1.5.0。
+
+- **N-11（P2）**：`titleById` 提前到子集预览之前构建，修复“已有卡 + `@group` + 挂起行”触发的 TDZ 整页渲染崩溃；补 card meta 子集测试。
+- **N-12（P3）**：merge 保留 salvage 后实际有效的本机 active（raw 字段缺失时锚第一个合法本机 profile），不再过阻。
+- **N-13（P3）**：全部失败时允许原地重试（Apply 不禁用）；仅部分失败禁用 Apply。
+- **N-14（P3）**：部分失败后“拒绝”改为“关闭”，且不再记录与 applied 矛盾的 rejected 样本。
+- **验证**：全包 lint 0；全量 3367 通过 / 3 跳过；web build、`verify:pack`、`demo:approval` exit 0；`e2e:dsl-seed` 11/11。
+
 ## 2026-11-19 · 未发布 · fix: 第三轮复审（merge 导入、双 gap0、子集 meta、AI 部分失败）
 
 > 针对第三轮独立复审的 P1/P2 与 P3；预览站随后更新，正式站仍为 v1.5.0。

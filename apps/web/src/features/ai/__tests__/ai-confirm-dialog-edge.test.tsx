@@ -559,8 +559,9 @@ describe('AiConfirmDialog DSL persistence', () => {
       }))
       expect(calls.upserts).toEqual([])
       expect(pushToastSpy.mock.calls.at(-1)?.[0]).toMatchObject({ kind: 'error' })
-      // 全失败不关框：不能触发 onApplied。
+      // 全失败不关框：不能触发 onApplied；允许原地重试（Apply 不禁用）。
       expect(onApplied).not.toHaveBeenCalled()
+      expect(byText(dom, /^应用$|^Apply$/)!.disabled).toBe(false)
     } finally {
       unmount()
       consoleError.mockRestore()
