@@ -35,7 +35,7 @@ jobs:
             apps/desktop/src-tauri/tauri.conf.json
       - run: pnpm -r lint
       - run: pnpm -r test
-      - run: pnpm --filter web build
+      - run: pnpm --filter web --fail-if-no-match build
 
   windows:
     needs: verify

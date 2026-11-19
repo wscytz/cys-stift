@@ -40,10 +40,23 @@ try {
   run('npm', ['install', '--offline', '--ignore-scripts', '--no-audit', '--no-fund', '--no-package-lock', archive], consumer)
   const installed = JSON.parse(readFileSync(join(consumer, 'node_modules/@wscytz/dsl/package.json'), 'utf8'))
   assert.equal(installed.version, manifest.version)
+  assert.equal(installed.main, './dist/index.js')
+  assert.equal(installed.types, './dist/index.d.ts')
   assert.equal(installed.bin['cys-dsl'], './dist/cli.js')
   for (const field of ['dependencies', 'optionalDependencies', 'peerDependencies']) {
     assert.deepEqual(installed[field] ?? {}, {})
   }
+  // Tarball must contain exactly the publishable surface; a stray `src` or
+  // missing `dist` types entry breaks consumers even when runtime import works.
+  const tarList = run('tar', ['-tzf', archive], temp).stdout
+    .split('\n')
+    .filter(Boolean)
+  for (const entry of tarList) {
+    assert.match(entry, /^package\/(package\.json|README\.md|LICENSE|dist\/.*)$/)
+  }
+  assert(tarList.includes('package/dist/index.js'))
+  assert(tarList.includes('package/dist/index.d.ts'))
+  assert(tarList.includes('package/dist/cli.js'))
   const api = run(process.execPath, ['--input-type=module', '-e', `
     import assert from 'node:assert/strict'
     import { DSL_VERSION, parseDsl } from '@wscytz/dsl'

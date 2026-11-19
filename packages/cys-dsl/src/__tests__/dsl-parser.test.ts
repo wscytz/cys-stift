@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseDsl, parseDslStrictWithDiagnostics, parseDslWithDiagnostics, type DslOp } from '../dsl-parser.js'
+import { sanitizeDslOps } from '../dsl-sanitize.js'
+import { solveRelational } from '../dsl-relational-solver.js'
 import { DSL_MAX_TEXT_LEN } from '../dsl-grammar.js'
 
 describe('parseDsl', () => {
@@ -758,5 +760,38 @@ describe('v10 delete 指令', () => {
     const { ops, errors } = parseDslStrictWithDiagnostics('[arrow delete]')
     expect(ops).toHaveLength(0)
     expect(errors.length).toBeGreaterThan(0)
+  })
+})
+
+describe('op.line 源行号回填(v11:诊断/预览显示「第 N 行」)', () => {
+  it('parseDslWithDiagnostics:注释/空行/坏行不影响行号,op 带真实源行号', () => {
+    const { ops } = parseDslWithDiagnostics(
+      '# 头注释\n\n[card #a create] @pos(0,0)\n垃圾行\n[card #b create] right-of #a',
+    )
+    expect(ops).toHaveLength(2)
+    expect(ops[0]!.line).toBe(3)
+    expect(ops[1]!.line).toBe(5)
+  })
+
+  it('parseDslStrictWithDiagnostics 同样回填', () => {
+    const { ops } = parseDslStrictWithDiagnostics('[card #a create] @pos(0,0)\n\n[rect #r] @pos(1,1) @size(2,2)')
+    expect(ops.map((o) => o.line)).toEqual([1, 3])
+  })
+
+  it('sanitize/solve 的 {...op} 展开透传 line(apply 链末端仍可读)', () => {
+    const { ops } = parseDslWithDiagnostics('[card #a create] @pos(0,0)\n[card #b create] right-of #a')
+    const sanitized = sanitizeDslOps(ops).ops
+    const solved = solveRelational(sanitized).ops
+    expect(solved[0]!.line).toBe(1)
+    expect(solved[1]!.line).toBe(2)
+  })
+})
+
+describe('sanitize 改写保留 line(v11;审核 P3:delete 重写曾丢行号)', () => {
+  it('card/arrow delete 改写分支带走 line(带 ctx 走真路径)', () => {
+    const { ops } = parseDslWithDiagnostics('[card #a delete]\n[arrow #e delete]')
+    const sanitized = sanitizeDslOps(ops, {}).ops
+    expect(sanitized.map((op) => op.line)).toEqual([1, 2])
+    expect(sanitized.every((op) => (op as { delete?: boolean }).delete)).toBe(true)
   })
 })

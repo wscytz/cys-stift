@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyLayout, applyPlanIfClean } from '../apply-layout'
+import { applyLayout, applyPlanIfClean, buildApplyPlan } from '../apply-layout'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
 import type { CanvasHost } from '@cys-stift/canvas-engine'
 import type { DslOp } from '@wscytz/dsl'
@@ -1174,5 +1174,133 @@ describe('applyLayout — layoutAnchor persistence (v11)', () => {
       ),
     )
     expect(serializeCanvas(host.getElements())).toContain('[card #b] right-of #a @gap(20)')
+  })
+})
+
+describe('op hash 与源行号无关(v11 line 回填不破坏已应用去重)', () => {
+  it('同一指令挪一行 → hash 相同,appliedHashes 命中被跳过(防造副本闸不失效)', () => {
+    const host1 = new InMemoryCanvasHost()
+    seedCard(host1, 'a1')
+    const opsLine3: DslOp[] = [{ type: 'card', cardId: 'a1' as CardId, x: 300, y: 400, line: 3 }]
+    const hash1 = buildApplyPlan(host1, opsLine3).items[0]!.hash
+
+    const host2 = new InMemoryCanvasHost()
+    seedCard(host2, 'a1')
+    const opsLine99: DslOp[] = [{ type: 'card', cardId: 'a1' as CardId, x: 300, y: 400, line: 99 }]
+    const plan2 = buildApplyPlan(host2, opsLine99, new Set([hash1]))
+    expect(plan2.items[0]!.disposition).toBe('skipped')
+    expect(plan2.items[0]!.reason).toContain('already applied')
+  })
+})
+
+describe('relationship planning across deletes and retries', () => {
+  it('does not commit a chain of relative cards after its anchor fails to persist', () => {
+    const host = new InMemoryCanvasHost()
+    const ops = parseDsl('[card #a create] @pos(0,0)\n[card #b create] right-of #a\n[card #c create] below #b')
+    const attempted: string[] = []
+    const outcome = applyPlanIfClean(host, ops, undefined, ({ cardId }) => {
+      attempted.push(cardId)
+      return { ok: false, reason: 'storage full' }
+    })
+    expect(outcome.ok).toBe(true)
+    if (!outcome.ok) return
+    expect(attempted).toEqual(['a'])
+    expect(outcome.report.opResults.map((result) => result.status)).toEqual(['failed', 'skipped', 'skipped'])
+    expect(host.getElements()).toEqual([])
+  })
+
+  it('skips group placements after a member fails and recomputes them on retry', () => {
+    const host = new InMemoryCanvasHost()
+    const hashes = new Set<string>()
+    const ops = parseDsl([
+      '[card #a create] @pos(0,0) @size(100,80) @group("team")',
+      '[card #b create] @pos(150,0) @size(100,80) @group("team")',
+      '[card #c create] right-of @team @gap(20) @size(100,80)',
+      '[card #d create] below #c @size(100,80)',
+    ].join('\n'))
+    const attempted: string[] = []
+    const first = applyPlanIfClean(host, ops, hashes, ({ cardId }) => {
+      attempted.push(cardId)
+      return cardId === 'b' ? { ok: false, reason: 'storage full' } : { ok: true }
+    })
+    expect(first.ok).toBe(true)
+    if (!first.ok) return
+    expect(attempted).toEqual(['a', 'b'])
+    expect(first.report.opResults.map(({ status }) => status)).toEqual(['applied', 'failed', 'skipped', 'skipped'])
+    expect(host.getElements().map(({ id }) => id)).toEqual(['a'])
+
+    const retry = applyPlanIfClean(host, ops, hashes, () => ({ ok: true }))
+    expect(retry.ok).toBe(true)
+    if (!retry.ok) return
+    expect(retry.report.opResults.map(({ status }) => status)).toEqual(['skipped', 'applied', 'applied', 'applied'])
+    expect(host.getElement('c')).toMatchObject({ x: 270, y: 0 })
+    expect(host.getElement('c')?.meta?.layoutAnchor).toBeUndefined()
+    expect(host.getElement('d')?.x).toBe(270)
+  })
+
+  it('rejects an anchor deleted earlier in the batch without applying either row', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'anchor')
+    seedCard(host, 'dependent', 400, 200)
+    const outcome = applyPlanIfClean(host, parseDsl('[card #anchor delete]\n[card #dependent] right-of #anchor'))
+    expect(outcome).toMatchObject({ ok: false, diagnostics: [expect.objectContaining({ opIndex: 1 })] })
+    expect(host.getElement('anchor')).toBeDefined()
+    expect(host.getElement('dependent')).toMatchObject({ x: 400, y: 200 })
+  })
+
+  it('re-solves an applied relation line when its anchor moved (retry follows the anchor)', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'a', 0, 0)
+    seedCard(host, 'b', 260, 0)
+    const hashes = new Set<string>()
+    const ops = parseDsl('[card #b] right-of #a @gap(20)')
+
+    const first = applyPlanIfClean(host, ops, hashes)
+    expect(first.ok).toBe(true)
+    expect(host.getElement('b')).toMatchObject({ x: 260, y: 0 })
+
+    host.upsert({ ...host.getElement('a')!, x: 1000 })
+    const retry = applyPlanIfClean(host, ops, hashes)
+    expect(retry.ok).toBe(true)
+    expect(host.getElement('b')).toMatchObject({ x: 1260, y: 0 })
+  })
+
+  it('uses the committed anchor position on retry rather than re-solving a skipped placement', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'anchor')
+    const hashes = new Set<string>()
+    const ops = parseDsl('[card #placed create] right-of #anchor @size(100,80)')
+    const first = applyPlanIfClean(host, ops, hashes)
+    expect(first.ok).toBe(true)
+    const placed = host.getElement('placed')!
+    seedCard(host, 'obstacle', placed.x, placed.y)
+    const retry = buildApplyPlan(host, [...ops, ...parseDsl('[card #next create] below #placed @size(100,80)')], hashes)
+    expect(retry.diagnostics).toEqual([])
+    expect(retry.items[0]).toMatchObject({ disposition: 'skipped' })
+    expect(retry.items[1]?.element?.x).toBe(placed.x)
+  })
+})
+
+describe('部分失败后重试:hash 命中行的诊断豁免(v11.1)', () => {
+  it('已应用 create 的「id 已存在」诊断不再整单拦死,applyPlanIfClean 放行', () => {
+    const ops: DslOp[] = [{ type: 'card', cardId: 'a' as CardId, x: 100, y: 0, create: true }]
+
+    // 第一遍:空画布上 create #a 成功,留下 hash(对话框 appliedHashes 的真实来源)
+    const plan1 = buildApplyPlan(new InMemoryCanvasHost(), ops)
+    const hash1 = plan1.items[0]!.hash
+
+    // 重试:#a 已在画布(第一遍成功留下的),同一行(+line 挪位)再次提交
+    const makeHost = () => {
+      const host = new InMemoryCanvasHost()
+      host.upsert({ id: 'a', kind: 'card', x: 100, y: 0, w: 240, h: 120, rotation: 0 })
+      return host
+    }
+    const plan2 = buildApplyPlan(makeHost(), [{ ...ops[0]!, line: 7 }], new Set([hash1]))
+    expect(plan2.items[0]!.disposition).toBe('skipped')
+    // 豁免前这里是 ['create card #a id 已存在(冲突,建卡将失败)'] → 整单拒绝
+    expect(plan2.diagnostics).toHaveLength(0)
+
+    const outcome = applyPlanIfClean(makeHost(), [{ ...ops[0]!, line: 7 }], new Set([hash1]))
+    expect(outcome.ok).toBe(true)
   })
 })

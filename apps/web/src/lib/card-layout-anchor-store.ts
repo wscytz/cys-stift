@@ -79,16 +79,35 @@ export function collectCardLayoutAnchors(
 }
 
 /**
+ * 程序化重排作用域：DSL/关系求解写回新几何时，store 无法仅凭
+ * “anchor 未变 + 几何变了”区分用户拖拽与程序化重排（两者形状相同）。
+ * applyLayout 在这一段显式声明“这是程序化写入”，清锚回调直接放行。
+ * 同步作用域：异常也会恢复深度，避免一次失败让后续拖拽永远不清锚。
+ */
+let programmaticLayoutDepth = 0
+
+export function withLayoutAnchorPreserved<T>(fn: () => T): T {
+  programmaticLayoutDepth++
+  try {
+    return fn()
+  } finally {
+    programmaticLayoutDepth--
+  }
+}
+
+/**
  * 用户几何变更的规范化：只有“anchor 没变、几何变了”才清除。
  * - previous 不存在（新卡/DSL create）→ 保留（DSL 刚写入的 anchor 不能被误清）。
  * - anchor 变化（DSL 重新求解/换锚）→ 保留。
  * - 几何没变（纯内容/样式 upsert）→ 保留。
+ * - DSL 程序化重排（withLayoutAnchorPreserved）→ 保留。
  * - 否则是用户拖拽/缩放/对齐 → 清掉这张卡的 layoutAnchor。
  */
 export function clearLayoutAnchorOnUserGeometryChange(
   el: CanvasElement,
   previous: CanvasElement | undefined,
 ): CanvasElement {
+  if (programmaticLayoutDepth > 0) return el
   if (el.kind !== 'card' || !el.meta || el.meta.layoutAnchor === undefined) return el
   if (!previous) return el
   if (JSON.stringify(previous.meta?.layoutAnchor) !== JSON.stringify(el.meta.layoutAnchor)) return el
@@ -108,6 +127,12 @@ export function clearLayoutAnchorOnUserGeometryChange(
 /**
  * 绑定：先把已存 anchors merge 回 card elements（applyWithoutEcho，不触发回写/undo），
  * 再订阅元素变化，debounce 把当前 anchors 写回 localStorage。返回解绑函数（会同步 flush）。
+ *
+ * 落盘时机：
+ * - 元素变化后 debounce 写回；
+ * - 页面隐藏/卸载（pagehide / visibilitychange=hidden）时同步 flush 待写内容 ——
+ *   Tauri 窗口关闭、浏览器关标签、切后台不保证 React cleanup 会跑，只靠 unbind 会丢最后一笔；
+ * - 解绑时无条件 flush（画布切换 / 组件卸载）。
  */
 export function bindCardLayoutAnchorPersistence(
   host: CanvasHost,
@@ -118,46 +143,99 @@ export function bindCardLayoutAnchorPersistence(
   // 已知卡片 id：只对“新出现的卡”补 stored anchor；用户拖拽清掉的锚不会被重新补回。
   const known = new Set<string>()
   let applying = false
+  let disposed = false
 
   const ensureAnchors = () => {
     if (applying) return
     const currentCards = host.getElements().filter((el) => el.kind === 'card')
     const currentIds = new Set(currentCards.map((el) => el.id))
-    for (const id of [...known]) if (!currentIds.has(id)) known.delete(id)
-    const newCards = currentCards.filter((el) => !known.has(el.id))
-    if (newCards.length === 0) return
+
+    // 卡片从元素集消失（删除/撤销重建/换内容）→ 立即丢弃它的内存种子，不能等
+    // debounce 落盘才更新：同一 id 在窗口期内被复用（删除后立刻重建、DSL 重放同一
+    // 批 #id、undo 后重新 apply）时，新卡不应继承旧卡的锚（旧关系还魂）。
+    for (const id of [...known]) {
+      if (currentIds.has(id)) continue
+      known.delete(id)
+      delete stored[id]
+    }
+
+    const toSeed: CanvasElement[] = []
+    for (const el of currentCards) {
+      if (known.has(el.id)) continue
+      known.add(el.id)
+      const anchor = stored[el.id]
+      // 元素已自带锚（DSL 新建/换锚、undo 恢复）→ 以元素为准，不覆盖。
+      if (!anchor || el.meta?.layoutAnchor !== undefined) continue
+      toSeed.push(el)
+    }
+    if (toSeed.length === 0) return
+
     applying = true
-    host.applyWithoutEcho(() => {
-      for (const el of newCards) {
-        known.add(el.id)
-        const anchor = stored[el.id]
-        if (!anchor || el.meta?.layoutAnchor !== undefined) continue
-        host.upsert({ ...el, meta: { ...(el.meta ?? {}), layoutAnchor: anchor } })
-      }
-    })
-    applying = false
+    try {
+      host.applyWithoutEcho(() => {
+        for (const el of toSeed) {
+          const anchor = stored[el.id]
+          if (!anchor) continue
+          host.upsert({ ...el, meta: { ...(el.meta ?? {}), layoutAnchor: anchor } })
+        }
+      })
+    } finally {
+      applying = false
+    }
   }
 
   // 首次绑定：已有卡片立即补；卡片还没 hydrate 时 known 为空，后续 onElementsChange 再补。
   ensureAnchors()
 
   let timer: ReturnType<typeof setTimeout> | null = null
+  let pending = false
+
   const flush = () => {
-    timer = null
+    // 必须 clearTimeout：pagehide/visibility 的提前 flush 若只把 timer 置 null，
+    // 已排队的旧 timeout 会在 unbind 之后再次触发，把解绑后的 host 状态写回。
+    if (timer !== null) {
+      clearTimeout(timer)
+      timer = null
+    }
+    pending = false
     stored = collectCardLayoutAnchors(host.getElements())
     saveCardLayoutAnchors(canvasId, stored)
   }
   const schedule = () => {
+    if (disposed) return
     ensureAnchors()
-    if (timer) clearTimeout(timer)
+    pending = true
+    if (timer !== null) clearTimeout(timer)
     timer = setTimeout(flush, debounceMs)
   }
   const unsub = host.onElementsChange
     ? host.onElementsChange(schedule)
     : host.onUserChange(schedule)
+  // 绑定期间元素可能已被静默改过（种子被元素自带锚替代/存储里有过期条目）：
+  // 排一次 flush 让 sidecar 与当前元素集自愈。只在已有卡片时排 —— 空画布可能是
+  // 卡片还没 hydrate，此时 flush 会把尚未 merge 的 sidecar 当空表擦掉（reload 丢锚）。
+  if (host.getElements().some((el) => el.kind === 'card')) schedule()
+
+  // 页面隐藏/卸载兜底：只 flush 有 pending 变更的（避免每次切后台都写一遍）。
+  const flushIfPending = () => {
+    if (pending) flush()
+  }
+  const onPageHide = () => flushIfPending()
+  const onVisibilityChange = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      flushIfPending()
+    }
+  }
+  const listenWindow = typeof window !== 'undefined'
+  const listenDocument = typeof document !== 'undefined'
+  if (listenWindow) window.addEventListener('pagehide', onPageHide)
+  if (listenDocument) document.addEventListener('visibilitychange', onVisibilityChange)
 
   return () => {
-    if (timer) clearTimeout(timer)
+    if (disposed) return
+    disposed = true
+    if (listenWindow) window.removeEventListener('pagehide', onPageHide)
+    if (listenDocument) document.removeEventListener('visibilitychange', onVisibilityChange)
     unsub()
     flush()
   }

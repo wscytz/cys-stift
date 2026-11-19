@@ -10,6 +10,7 @@ import { Button, Modal, Toolbar } from '@cys-stift/ui'
 import { useDb } from '@/lib/db-client'
 import { useI18n } from '@/lib/i18n'
 import { downloadFile } from '@/lib/download'
+import { readDslSeed, removeSearchParam } from '@/lib/dsl-seed'
 import { SelfCanvas, type SelfCanvasHandle } from '@/features/canvas/self-canvas'
 import { CanvasIcon, CanvasBusyIcon, type CanvasIconName } from '@/features/canvas/canvas-icons'
 import { workbenchStore } from '@/lib/workbench-store'
@@ -86,6 +87,20 @@ import { planInboxCanvasPlacements } from '@/features/canvas/canvas-placement'
 import { CanvasUnplacedPanel } from '@/features/canvas/unplaced-panel'
 import { DEFAULT_CANVAS_NAME, canvasStore, useCanvases, getSnapshot as getCanvasesSnapshot } from '@/lib/canvas-store'
 import { canvasViewStore } from '@/lib/canvas-view-store'
+
+/**
+ * 站内 query 手术:只替换 query 部分,保留 pathname/hash,且 replaceState
+ * 不新增历史、原样带回 Next 写入的 history.state(传 `{}` 会抹掉 router
+ * 的内部状态,影响返回/前进恢复)。
+ */
+function replaceSearchParam(nextSearch: string): void {
+  if (typeof window === 'undefined') return
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${window.location.pathname}${nextSearch}${window.location.hash}`,
+  )
+}
 
 /**
  * /canvas — 自研 Canvas 2D 主画布页(tldraw 2026-06-23 已完全移除,见 ADR `docs/adr/2026-06-23-remove-tldraw.md`)。
@@ -172,6 +187,21 @@ export default function CanvasPage() {
   const [focusMode, setFocusMode] = useState(false)
   const [dslOpen, setDslOpen] = useState(false)
   const [dslSeedText, setDslSeedText] = useState<string | null>(null)
+  // `?dsl=` 一次性种子生命周期:挂载时读入 ref 并立刻从 URL 摘除,之后**不再**
+  // 读 URL。pending = 尚未交给对话框;settled = 已开启或已作废,防止后续
+  // adapter 重建(切画布)再次触发 —— 手开/粘贴过的对话框绝不会被迟到种子覆盖。
+  const pendingDslSeedRef = useRef<string | null>(null)
+  const dslSeedSettledRef = useRef(false)
+  // 种子归属画布:普通链接钉在挂载时的激活画布;组合 `?card=` 链接跟随卡片
+  // 所在画布。切到别处后种子作废,绝不迟到注入。
+  const dslSeedTargetCanvasRef = useRef<CanvasId | null>(null)
+  // 对话框开启态的 ref 镜像:水化回调里读 state 会拿到过期闭包(false)。
+  const dslOpenRef = useRef(false)
+  /** 手动入口优先:任何手开/粘贴先作废尚未消费的 URL 种子。 */
+  const discardPendingDslSeed = useCallback(() => {
+    pendingDslSeedRef.current = null
+    dslSeedSettledRef.current = true
+  }, [])
   const [shortcutOpen, setShortcutOpen] = useState(false)
   const [diffOpen, setDiffOpen] = useState(false)
   const [overviewOpen, setOverviewOpen] = useState(false)
@@ -852,10 +882,12 @@ ${formatted}`
     if (!handle.current.adapter) return
     // Pasted DSL follows the same frozen-baseline diff and stale-revision
     // guard as manually edited DSL. Nothing mutates until the user confirms.
+    // 手动粘贴优先:作废尚未消费的 ?dsl 种子,避免水化回调随后覆盖这段文本。
+    discardPendingDslSeed()
     setDslSeedText(text)
     setDslOpen(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t])
+  }, [t, discardPendingDslSeed])
 
   // 转义双向桥入口:画布页粘贴纯文本 DSL → 直接应用(不必打开 DSL 模态)。
   // 与全局 FileDropHandler 并存:它只处理文件项,纯文本 early-return;本监听
@@ -1113,15 +1145,15 @@ ${formatted}`
   }, [adapter])
 
   // B1 — 挂载时读 ?card=ID(C command palette 最近编辑跳转来的)。记入 pendingRef,
-  // 清掉 query string(避免刷新重复触发)。消费见下方 adapter 就绪 effect。
+  // 只从 URL 摘掉 card(保留 ?dsl= 等组合字段),刷新不再触发。
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     const cardId = params.get('card')
     if (cardId) {
       pendingJumpCardRef.current = cardId
-      // 清 query string(replaceState 不留历史,刷新不再触发)
-      window.history.replaceState({}, '', window.location.pathname)
+      // 清 card 参数(replaceState 不留历史,刷新不再触发)
+      replaceSearchParam(removeSearchParam(window.location.search, 'card'))
     }
   }, [])
 
@@ -1165,6 +1197,47 @@ ${formatted}`
     pendingJumpCardRef.current = null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adapter])
+
+  // 外部 AI/分享入口:?dsl=<urlencoded DSL> → 打开转义对话框预填审核。复用粘贴桥
+  // 的 dslSeedText → DslDialog initialText 链路:**不自动应用**,确认门不变。
+  // 一次性语义:挂载时立即读入 ref,并只从 URL 摘掉 dsl(保留 ?card= 其他字段/
+  // hash/Next history.state);此后 adapter 重建、切画布都不再读 URL,手开对话框
+  // 后关掉再切画布也不会"迟到"注入。对话框在下方 D5 水化完成后才开,保住冻结
+  // base 快照不被打脏的既有行为。
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const search = window.location.search
+    if (!search) return
+    const seed = readDslSeed(search)
+    if (seed?.ok) {
+      pendingDslSeedRef.current = seed.text
+      // 组合 ?card= 链接会先跳到卡片所在画布:种子跟随那次跳转,和卡片落在
+      // 同一张画布;普通 ?dsl 链接则钉在挂载时的激活画布。用户之后手动切走
+      // 不会把种子带过去(水化回调里发现目标不符即作废)。
+      let targetCanvasId: CanvasId = canvasStore.get().activeCanvasId
+      const jumpCardId = pendingJumpCardRef.current
+      if (jumpCardId) {
+        const jumpCard = service.get(jumpCardId as CardId)
+        const cardCanvasId = jumpCard && !jumpCard.deletedAt ? jumpCard.canvasPosition?.canvasId : undefined
+        if (cardCanvasId && getCanvasesSnapshot().canvases.some((c) => c.id === cardCanvasId)) {
+          targetCanvasId = cardCanvasId
+        }
+      }
+      dslSeedTargetCanvasRef.current = targetCanvasId
+    } else if (seed && !seed.ok) {
+      // 超限拒绝而不是截断后打开:半截 DSL 可能改写用户没写过的内容。
+      pushToast({
+        kind: 'error',
+        message: t('canvas.transliterationLinkTooLong', { length: seed.length, max: seed.max }),
+      })
+    }
+    const nextSearch = removeSearchParam(search, 'dsl')
+    if (nextSearch !== search) replaceSearchParam(nextSearch)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    dslOpenRef.current = dslOpen
+  }, [dslOpen])
 
   // 模板应用:新建画布后 pendingTemplateRef 携带模板名,新 adapter 一就绪就
   // applyLayout。依赖 adapter —— canvasStore.create → setActive → SelfCanvas
@@ -1211,21 +1284,47 @@ ${formatted}`
   useEffect(() => {
     if (!adapter) return
     const adapterLocal = adapter
+    // adapter 建好这一刻的 activeCanvasId 就是它所属画布(SelfCanvas key=canvasId)。
+    const adapterCanvasId = activeCanvasId
     const timer = setTimeout(() => {
       const cardIds = adapterLocal
         .getElements()
         .filter((e) => e.kind === 'card')
         .map((e) => e.id)
-      if (cardIds.length === 0) return
-      syncAllWikiLinks({
-        host: adapterLocal,
-        getCardTitle: (id) => service.get(id as CardId)?.title,
-        getCardBody: (id) => service.get(id as CardId)?.body,
-        canvasCardIds: cardIds,
-        // T5 跨画布双链:候选池 = 所有画布上未删未归档的卡;currentCanvasId 让同画布优先 + crossCanvas 标签。
-        allCards: allWikiCandidates,
-        currentCanvasId: activeCanvasId as string,
-      })
+      if (cardIds.length > 0) {
+        syncAllWikiLinks({
+          host: adapterLocal,
+          getCardTitle: (id) => service.get(id as CardId)?.title,
+          getCardBody: (id) => service.get(id as CardId)?.body,
+          canvasCardIds: cardIds,
+          // T5 跨画布双链:候选池 = 所有画布上未删未归档的卡;currentCanvasId 让同画布优先 + crossCanvas 标签。
+          allCards: allWikiCandidates,
+          currentCanvasId: activeCanvasId as string,
+        })
+      }
+      // `?dsl=` 种子搭这次水化完成的车(不再叠加 300ms 魔法延时):对话框的冻结
+      // base 快照必须落在卡片 load + 双链同步之后,否则水化写入会触发 stale 守卫。
+      const seed = pendingDslSeedRef.current
+      if (!seed || dslSeedSettledRef.current) return
+      const targetCanvasId = dslSeedTargetCanvasRef.current
+      const currentCanvasId = canvasStore.get().activeCanvasId
+      if (targetCanvasId === null) return
+      if (adapterCanvasId !== targetCanvasId) {
+        // 该 adapter 不是种子目标(初始 store 水化前的默认画布):用户已明确切走
+        // → 作废,绝不迟到注入;否则等目标画布的 adapter 水化完再开。
+        if (currentCanvasId !== targetCanvasId) discardPendingDslSeed()
+        return
+      }
+      if (dslOpenRef.current) {
+        // 窗口期内用户已手开对话框/粘贴 DSL:手动内容优先,种子作废 —— 否则
+        // initialText 变化会覆盖正在编辑的文本(绕过 dirty 确认)。
+        discardPendingDslSeed()
+        return
+      }
+      dslSeedSettledRef.current = true
+      pendingDslSeedRef.current = null
+      setDslSeedText(seed)
+      setDslOpen(true)
     }, 200)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1456,7 +1555,7 @@ ${formatted}`
           onSearch={() => { setSearchOpen((o) => !o); setOutlineOpen(false); setCompanionOpen(false) }}
           onUnplaced={() => { setUnplacedOpen((o) => !o); setOutlineOpen(false); setCompanionOpen(false); setSearchOpen(false) }}
           onOverview={() => setOverviewOpen(true)}
-          onDsl={() => { setDslSeedText(null); setDslOpen(true) }}
+          onDsl={() => { discardPendingDslSeed(); setDslSeedText(null); setDslOpen(true) }}
           onExport={() => setExportOpen(true)}
           onMarkdown={handleMarkdown}
           onDiff={() => setDiffOpen(true)}
@@ -1765,7 +1864,7 @@ function CanvasSwitcher({
 function SnapToggle({ mode, onToggle, disabled }: { mode: 'snap' | 'free'; onToggle: () => void; disabled: boolean }) {
   const { t } = useI18n()
   return (
-    <button type="button" className={`tb-snap tb-snap--${mode} tb-snap--toggle`} onClick={onToggle} disabled={disabled} aria-pressed={mode === 'snap'} title={t('canvas.toggleSnap')}>
+    <button type="button" className={`tb-snap tb-snap--${mode} tb-snap--toggle`} onClick={onToggle} disabled={disabled} aria-pressed={mode === 'snap'} aria-label={t('canvas.toggleSnap')} title={t('canvas.toggleSnap')}>
       <span className="tb-snap__label">{mode === 'snap' ? t('canvas.snap') : t('canvas.free')}</span>
       <span className="tb-snap__glyph" aria-hidden="true">{mode === 'snap' ? '▦' : '⌗'}</span>
     </button>
@@ -1816,6 +1915,8 @@ function ZoomGroup({ adapterReady, onZoom }: { adapterReady: boolean; onZoom: (o
       <button type="button" className="tb-icon-btn" onClick={() => onZoom('out')} disabled={!adapterReady} aria-label={t('canvas.zoomOut')} title={`${t('canvas.zoomOut')} (-)`}>−</button>
       <button type="button" className="tb-icon-btn" onClick={() => onZoom('in')} disabled={!adapterReady} aria-label={t('canvas.zoomIn')} title={`${t('canvas.zoomIn')} (+)`}>+</button>
       <button type="button" className="tb-icon-btn tb-icon-btn--fit" onClick={() => onZoom('fit')} disabled={!adapterReady} aria-label={t('canvas.zoomFit')} title={`${t('canvas.zoomFit')} (0)`}>
+        {/* 窄屏/手机收文字后按钮不能是空壳:glyph 平时隐藏,标签收起时顶上(2026-11-19 截图实锤空按钮)。 */}
+        <span className="tb-icon-btn__glyph" aria-hidden="true">⤢</span>
         <span className="tb-icon-btn__label">{t('canvas.zoomFit')}</span>
       </button>
     </span>
@@ -2162,6 +2263,7 @@ const styles = `
 .tb-zoom { display: inline-flex; align-items: center; gap: 0; }
 .tb-icon-btn { display: inline-flex; align-items: center; justify-content: center; height: 48px; min-width: 48px; padding: 0 var(--space-2); font-family: var(--font-display); font-size: var(--font-size-xs); letter-spacing: 0.08em; text-transform: uppercase; background: transparent; color: var(--color-black); border: var(--border-hairline); border-radius: var(--radius-sm); cursor: pointer; font-weight: 600; }
 .tb-icon-btn--fit { padding: 0 var(--space-3); }
+.tb-icon-btn__glyph { display: none; }
 .tb-icon-btn:hover { background: var(--color-on-surface); color: var(--color-surface); }
 .tb-icon-btn:active:not(:disabled) { background: var(--color-surface-container-high); color: var(--color-on-surface); transform: scale(0.98); }
 .tb-icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -2316,12 +2418,39 @@ const styles = `
 /* ── 响应式断点(约定值见 tokens.css:bp-sm 768 / bp-md 1024)─────
    画布页窄 Tauri 窗口 / 平板适配:顶栏溢出 + rail 占画布宽度。
    - ≤1023px(bp-md,平板横/窄桌面):rail 收成纯图标,命中区仍为 44×44。
-   - ≤767px(bp-sm,平板竖):顶栏 SnapToggle 与 ZoomGroup 的 Fit 文字收掉,顶栏靠 toolbar overflow-x:auto 兜底不再横向滚。
+   - 1024–1460:顶栏紧凑档(收文字/限宽/分隔条收半档),见下。
+   - 768–1023:顶栏不收,走 Toolbar overflow-x 横向滚(实测溢出 415–598px,
+     收不完 —— 显式声明不在本轮范围,验收不按 fit 断言)。
+   - ≤767px(bp-sm,平板竖):SnapToggle 与 Fit 文字收掉,其余同上靠横向滚兜底。
    ─────────────────────────────────────────────────────────────── */
-/* 1024–1500px 窄桌面:顶栏控件多,收紧间距让「工作台」入口留在视口内;
-   更窄仍走 Toolbar 自带的 overflow-x:auto。 */
-@media (min-width: 1024px) and (max-width: 1500px) {
-  .page > header > div:last-child { gap: var(--space-2); padding-inline: var(--space-2); }
+/* 1024–1460px 紧凑档:收文字 + 限宽 + 分隔条收半档。
+   归因更正(2026-11-19 二审核实):旧规则 ".page > header > div:last-child" 并非死代码
+   —— header 本身是 .toolbar grid 根,div:last-child 命中的就是 .content,且页面规则
+   (0,2,2)高于 module 类(0,1,0),gap16/pad16 一直在生效。删除它是必要的:保留
+   会以更高优先级压掉下面 1024–1180 的 gap8(实测注入旧规则 gap 8→16)。真正消灭
+   默认态溢出的是三件事:删旧规则、1024–1180 gap8、本档收文字/限宽。
+   en 界面(标签更宽)按二审核实补:分隔条收半档(4 条省 64px)、档上界 1360→1460、
+   切换器右 padding 收半档并放宽到 136(默认中英文名不再裁切)。 */
+@media (min-width: 1024px) and (max-width: 1460px) {
+  .tb-divider { margin-inline: var(--space-1); }
+  /* 主工具收文字;橡皮子模式(✳/□/T)收文字零宽度收益却丢触屏辨识,排除 */
+  .tb-tool:not(.tb-tool--sub) .tb-tool__label { display: none; }
+  .tb-snap--toggle .tb-snap__label { display: none; }
+  .tb-snap--toggle { min-width: 48px; padding: 0 var(--space-2); }
+  .tb-snap--toggle .tb-snap__glyph { display: inline; }
+  .tb-icon-btn--fit .tb-icon-btn__label { display: none; }
+  .tb-icon-btn--fit .tb-icon-btn__glyph { display: inline; }
+  .tb-icon-btn--fit { padding: 0 var(--space-2); }
+  /* 切换器:min-width(200px)优先级高于 max-width,须一并清掉;右 padding 半档
+     (默认 48px 是箭头留位,112px 盒里文字区只剩 46px,默认名被裁——二审实锤) */
+  .cselect { min-width: 0; max-width: 136px; padding-right: var(--space-3); }
+  /* 重命名输入与 select 互斥渲染,但 min-width:200 在 1024 溢出 30px(zh)/约 56(en) */
+  .crename { min-width: 0; max-width: 136px; }
+}
+/* 紧凑档之外统一给切换器上限:maxLength=60 的画布名在 1361+ 曾随名无限长
+   (27 字名 1361 溢出 271px,二审实锤);短名本就是 min-width:200,不受影响。 */
+@media (min-width: 1461px) {
+  .cselect { max-width: 200px; }
 }
 @media (max-width: 1023px) {
   .cv-rail { padding: var(--space-half); }
@@ -2345,8 +2474,9 @@ const styles = `
   .tb-snap--toggle .tb-snap__label { display: none; }
   .tb-snap--toggle { min-width: 48px; padding: 0 var(--space-2); }
   .tb-snap--toggle .tb-snap__glyph { display: inline; }
-  /* ZoomGroup Fit:文字隐藏,留按钮(仍 + / − 同列)。 */
+  /* ZoomGroup Fit:文字隐藏,glyph 顶上(空按钮读不出功能),仍 + / − 同列。 */
   .tb-icon-btn--fit .tb-icon-btn__label { display: none; }
+  .tb-icon-btn--fit .tb-icon-btn__glyph { display: inline; }
   .tb-icon-btn--fit { padding: 0 var(--space-2); }
 }
 /* prefers-reduced-motion:禁用所有按钮按压缩放 + transition,尊重前庭敏感用户系统偏好

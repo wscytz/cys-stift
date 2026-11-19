@@ -238,6 +238,10 @@ export const DSL_GRAMMAR_REFERENCE = `cys-dsl grammar v${DSL_VERSION} (one eleme
   #   (meta.wikilink===true); distinguishes auto-built wikilink arrows from
   #   manual references arrows so the marker survives DSL round-trip.
 Rules: card updates are the default; explicit create persists a new card before its host element (title/content optional).
+  Relative anchors use the canvas plus earlier placements, excluding earlier deletions. A missing
+  anchor is a solver diagnostic and blocks confirmed application. Arrow endpoints and delete targets
+  must be present when the line is applied; write creates before their uses. Web @compute can also
+  resolve later declarations: it evaluates against the final planned geometry.
   To DELETE an element, emit an explicit delete line — [card #id delete]; omitting a line does NOT delete it.
   @title/@content (v5) update an existing card's title/body; "" clears it, omit to leave unchanged.
   @type/@tags/@links/@code/@quote (v8) update an existing card's structured fields the same way (omit to leave unchanged).

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { serializeCanvas, serializeCanvasReadable } from '../canvas-dsl.js'
+import { serializeCanvas, serializeCanvasReadable, serializeElement } from '../canvas-dsl.js'
 import { parseDsl } from '../dsl-parser.js'
+import { sanitizeDslOps } from '../dsl-sanitize.js'
+import { solveRelational } from '../dsl-relational-solver.js'
 import type { CanvasElement } from '@cys-stift/canvas-engine'
 
 describe('serializeCanvas — active kinds', () => {
@@ -463,6 +465,65 @@ describe('serializeCanvas — layoutAnchor (v11)', () => {
     expect(out).toContain('[card #b] @pos(360.0,100.0)')
   })
 
+  it('falls back to @pos if re-solving would avoid an overlapping card', () => {
+    const elements = [
+      card('a', 0, 0, { w: 100 }),
+      card('obstacle', 180, 0, { w: 100 }),
+      card('b', 120, 0, { w: 100, meta: { layoutAnchor: { id: 'a', dir: 'right-of', gap: 20 } } }),
+    ]
+    const out = serializeCanvas(elements)
+    expect(out).toContain('[card #b] @pos(120.0,0.0)')
+    const solved = solveRelational(sanitizeDslOps(parseDsl(out)).ops)
+    expect(solved.diagnostics).toEqual([])
+    expect(solved.ops[2]).toMatchObject({ cardId: 'b', x: 120, y: 0 })
+  })
+
+  it('spatial index output matches the linear fallback (P-06 optimization)', () => {
+    const elements: CanvasElement[] = []
+    for (let i = 0; i < 120; i++) {
+      const above = i - 12
+      elements.push({
+        id: `g${i}`,
+        kind: 'card',
+        x: (i % 12) * 280,
+        y: Math.floor(i / 12) * 160,
+        w: 240,
+        h: 120,
+        rotation: 0,
+        ...(above >= 0
+          ? { meta: { layoutAnchor: { id: `g${above}`, dir: 'below' as const, gap: 40 } } }
+          : {}),
+      })
+    }
+    // 一张挡在某个候选位置上的卡：索引与线性检查都必须回退 @pos。
+    elements.push({ id: 'blocker', kind: 'card', x: 2 * 280, y: 2 * 160, w: 240, h: 120, rotation: 0 })
+    const byId = new Map(elements.map((element) => [element.id, element]))
+    const emittedIndex = new Map(elements.map((element, index) => [element.id, index]))
+    const linear = elements
+      .map((element) => serializeElement(element, undefined, byId, emittedIndex))
+      .filter(Boolean)
+      .join('\n')
+    expect(serializeCanvas(elements)).toBe(linear)
+  })
+
+  it('falls back to @pos when float association would make the re-solver collide at a touching edge (A-06)', () => {
+    const elements = [
+      card('obstacle', 922.9, 0, { w: 100 }),
+      card('a', 256, 0, { w: 370.9 }),
+      card('b', 720.6, 0, {
+        w: 202.3,
+        meta: { layoutAnchor: { id: 'a', dir: 'right-of', gap: 93.7 } },
+      }),
+    ]
+    const out = serializeCanvas(elements)
+    // 贴边时 guard 必须与 solver 一样判“会碰撞”，回退 @pos；否则重解会把 b 推到 1116.6。
+    expect(out).toContain('[card #b] @pos(720.6,0.0)')
+    expect(out).not.toContain('[card #b] right-of #a')
+    const solved = solveRelational(sanitizeDslOps(parseDsl(out)).ops)
+    expect(solved.diagnostics).toEqual([])
+    expect(solved.ops[2]).toMatchObject({ cardId: 'b', x: 720.6, y: 0 })
+  })
+
   it('stale geometry (anchor moved / card dragged) → falls back to @pos', () => {
     const out = serializeCanvas([
       card('a', 100, 100),
@@ -489,5 +550,19 @@ describe('serializeCanvas — layoutAnchor (v11)', () => {
     if (b?.type === 'card') {
       expect(b.rel).toMatchObject({ dir: 'right-of', anchor: 'a', gap: 20 })
     }
+  })
+
+  it('anchor 在元素序更晚(画布按 z 序加载)→ 回退 @pos,导出文本可在空画布重建', () => {
+    // 语义依据:rel 只解「画布已有 / 同批更早」的锚(DSL_GRAMMAR_REFERENCE 明示)。
+    // 元素序 ≠ 依赖序(z 序加载)时仍 emit 关系式,会让导出的文本在空画布上解不出锚点,
+    // 整单被诊断闸门拒绝 —— 破坏「画布文字化后可异地重建」的 round-trip 契约。
+    const out = serializeCanvas([
+      card('b', 360, 100, { meta: { layoutAnchor: { id: 'a', dir: 'right-of', gap: 20 } } }),
+      card('a', 100, 100),
+    ])
+    expect(out).toContain('[card #b] @pos(360.0,100.0)')
+    const clean = sanitizeDslOps(parseDsl(out)).ops
+    const solved = solveRelational(clean)
+    expect(solved.diagnostics).toEqual([])
   })
 })

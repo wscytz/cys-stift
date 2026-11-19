@@ -21,6 +21,7 @@
     "e2e:ai": "node scripts/e2e-ai.mjs",
     "e2e:data": "node scripts/e2e-data.mjs",
     "e2e:canvas": "node scripts/e2e-r18-canvas.mjs",
+    "e2e:dsl-seed": "node scripts/e2e-dsl-seed.mjs",
     "docs:links": "node scripts/check-doc-links.mjs",
     "sweep": "node scripts/render-sweep.mjs",
     "demo:approval": "node scripts/approval-demo.mjs",

@@ -92,6 +92,9 @@ if (NO_BUILD) {
     `本地静态导出(子路径 ${BASE_PATH}, v${VERSION})`,
   )
 }
+// 隐私清洗对两条路径统一执行：`--no-build` 曾直接上传未清洗的 out/，
+// 构建机路径/扫描器状态会随公开产物外带。清洗器幂等，重复跑无副作用。
+run('node scripts/sanitize-web-out.mjs', '静态产物隐私清洗')
 // basePath 前缀校验对两条路径统一执行(ocr 审 S4 P2-2):--no-build 上传根路径
 // build 的陈旧产物时,HTML 200 但 /_next 资产 404 → 白屏,而最终 curl 只查首页
 // 查不出来。读 out/index.html 不依赖「刚构建」,提出 if 外。

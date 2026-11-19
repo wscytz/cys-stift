@@ -13,6 +13,11 @@ describe('handleAtPoint', () => {
   it('中心 → null', () => {
     expect(handleAtPoint(el, { x: 150, y: 150 }, 1)).toBeNull()
   })
+  it('小元素中心仍可拖动(容差封顶到短边 1/4)', () => {
+    const tiny = { x: 0, y: 0, w: 10, h: 10 }
+    expect(handleAtPoint(tiny, { x: 5, y: 5 }, 1)).toBeNull()
+    expect(handleAtPoint(tiny, { x: 1, y: 1 }, 1)).toBe('nw')
+  })
   it('超出容差 → null(容差 6px,zoom=1)', () => {
     // 距角 7 > 容差 6 → 不命中 → null(计划 Step 1.1 原写 toBe('nw') 有误,已按 self-review 修正为 toBeNull)
     expect(handleAtPoint(el, { x: 107, y: 100 }, 1)).toBeNull()

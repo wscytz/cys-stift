@@ -21,7 +21,7 @@ import type { CanvasId, CardId, CardService } from '@cys-stift/domain'
 import { InMemoryCanvasHost, type CanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
 import { parseDslStrictWithDiagnostics } from '@wscytz/dsl'
 import { applyPlanIfClean } from '@/features/canvas/apply-layout'
-import { makeOnCardRemove } from './agent-confirm-card'
+import { makeOnCardCreate, makeOnCardRemove, makeOnCardUpdate } from './agent-confirm-card'
 import { applyClusters, type CardCluster } from './cluster'
 import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
 import { summarizeMovement } from '@/features/canvas/layout-movement'
@@ -29,6 +29,7 @@ import { Thumb, DiffGroup, confirmStyles } from './canvas-thumb'
 import { MarkdownBody } from '@/app/inbox/markdown'
 import { useI18n } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n/messages'
+import { humanizeApplyIssue } from '@/lib/dsl-issue-reasons'
 import { pushToast } from '@/lib/toast-store'
 import { addSample, genSampleId } from './sample-store'
 import { settingsStore } from '@/lib/settings-store'
@@ -41,6 +42,14 @@ import { commitIntentPlan } from './apply-plan'
 import { intentRevision, intentSnapshotFromHost, makeIntentCommitPort, previewIntentPlan } from './intent-host-adapter'
 
 type Phase = 'confirming' | 'applying' | 'applied' | 'error'
+
+/** DSL 预览问题行。opIndex 是 plan 内的序号(无源行号时回落 #序号 显示);
+ *  line 是 parser 回填的 1-based 源行号(空行/注释行不会让它与 opIndex 混同)。 */
+interface DslPreviewIssue {
+  opIndex: number
+  line?: number
+  message: string
+}
 
 export interface AiConfirmSampleContext {
   source: 'layout' | 'cluster' | 'outline'
@@ -99,6 +108,22 @@ function proposalIdentity(props: AiConfirmDialogProps): string | null {
   return null
 }
 
+/**
+ * 预览问题面板样式。红框(role=alert)= 闸门整单拒绝;黄框(role=status)= 计划
+ * 干净但个别行会被跳过。与 DslDialog 的 .dsl-errors/.dsl-errors--soft 同一视觉
+ * 语义,这里沿用 .ac 命名空间(confirmStyles 由 canvas-thumb 共享,不改它)。
+ */
+const dslIssueStyles = `
+.ac__notice { margin: 0 0 var(--space-2); padding: var(--space-1) var(--space-2); border: var(--border-hairline); border-radius: var(--radius-sm); }
+.ac__notice--blocked { border-color: var(--color-red); }
+.ac__notice--skipped { border-color: var(--color-yellow); }
+.ac__notice-title { margin: 0 0 var(--space-1); font-family: var(--font-display); font-size: var(--font-size-xs); font-weight: 600; color: var(--color-red); }
+.ac__notice-title--skipped { color: var(--color-yellow); }
+.ac__notice .ac__errors { margin-bottom: 0; }
+.ac__notice--skipped .ac__errors { color: var(--color-black-soft); }
+.ac__notice-more { margin: var(--space-1) 0 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--color-gray); }
+`
+
 export function AiConfirmDialog(props: AiConfirmDialogProps) {
   const { t, locale } = useI18n()
   const [phase, setPhase] = useState<Phase>('confirming')
@@ -147,18 +172,40 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
 
   const [beforeState, setBeforeState] = useState<CanvasElement[] | null>(null)
   const [afterState, setAfterState] = useState<CanvasElement[] | null>(null)
-  const [dslIssues, setDslIssues] = useState<{ opIndex: number; message: string }[]>([])
+  const [dslIssues, setDslIssues] = useState<DslPreviewIssue[]>([])
+  // 闸门放行、但个别行仍会被跳过(如箭头写在 create 之前)时的软提示。
+  // 与 dslIssues(闸门整单拒绝,apply 不会发生)必须分开:旧 UI 把两者都渲染成
+  // 「应用已取消」,干净计划的跳过行于是谎称整单失败(2026-11-19 收束)。
+  const [dslSkippedIssues, setDslSkippedIssues] = useState<DslPreviewIssue[]>([])
 
   useEffect(() => {
     if (props.mode === 'dsl') {
-      if (preview?.kind !== 'ok') { setDslIssues([]); setBeforeState(null); setAfterState(null); return }
+      if (preview?.kind !== 'ok') { setDslIssues([]); setDslSkippedIssues([]); setBeforeState(null); setAfterState(null); return }
       let cancelled = false
       const before = props.liveHost.getElements()
       const afterHost = new InMemoryCanvasHost()
       afterHost.applyWithoutEcho(() => { for (const el of before) afterHost.upsert(el) })
       const outcome = applyPlanIfClean(afterHost, preview.ops, undefined, () => ({ ok: true }))
-      const issues = outcome.ok ? [] : outcome.diagnostics.map((diagnostic) => ({ opIndex: diagnostic.opIndex, message: diagnostic.message }))
+      // v11:诊断的 opIndex 不是源行号(空行/注释行会让两者错位)——从 parser 回填的
+      // op.line 取真实行号;没有 line(程序构造的 op)时回落 #序号。
+      const issues = outcome.ok ? [] : outcome.diagnostics.map((diagnostic) => ({
+        opIndex: diagnostic.opIndex,
+        line: preview.ops[diagnostic.opIndex]?.line,
+        message: diagnostic.message,
+      }))
+      // 计划干净时 report.opResults 里 status !== 'applied' 的行 = 本次会被跳过的行
+      // (skipped/failed)。它们不是闸门阻断:其余行照常提交,UI 只能软提示。
+      const skippedIssues = outcome.ok
+        ? outcome.report.opResults
+            .filter((result) => result.status !== 'applied' && result.reason !== undefined)
+            .map((result) => ({
+              opIndex: result.opIndex,
+              line: preview.ops[result.opIndex]?.line,
+              message: result.reason!,
+            }))
+        : []
       setDslIssues(issues)
+      setDslSkippedIssues(skippedIssues)
       if (cancelled) return
       setBeforeState(before)
       setAfterState(afterHost.getElements())
@@ -256,14 +303,21 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
           return m
         }
         const before = snapPositions()
-        // v10:latent dsl 分支同样接删除(makeOnCardRemove 复用 agent-confirm-card 实现)。
-        const outcome = applyPlanIfClean(props.liveHost, preview.ops, undefined, undefined, undefined, makeOnCardRemove(props.service))
+        const outcome = applyPlanIfClean(
+          props.liveHost,
+          preview.ops,
+          undefined,
+          makeOnCardCreate(props.targetCanvasId, props.service).onCardCreate,
+          makeOnCardUpdate(props.service),
+          makeOnCardRemove(props.service),
+        )
         if (!outcome.ok) {
           setPhase('confirming')
           pushToast({ kind: 'error', message: t('canvas.dslApplyBlocked', { n: String(outcome.diagnostics.length) }) })
           return
         }
-        const { applied } = outcome.report
+        const { applied, skipped, failed } = outcome.report
+        const notApplied = skipped + failed
         if (applied > 0) {
           void buildArchivePayload()
             .then((p) => archiveStore.append('ai-layout', `AI 重排 ${applied} 张`, p, VERSION))
@@ -278,7 +332,25 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
         }
         const after = snapPositions()
         const summary = summarizeMovement(before, after)
-        if (applied === 0) pushToast({ kind: 'info', message: t('canvas.aiLayoutNoneApplied') })
+        // 结果提示必须与预览里的「将被跳过」一致:部分行被跳过时先说清应用/跳过条数,
+        // 不能只报位移(新建/删除不进位移交集,会把「新增了卡但跳过一行」说成未改动)。
+        // 闸门整单拒绝走上面的 dslApplyBlocked(error),与这里的部分成功语义不同。
+        if (failed > 0) {
+          pushToast({
+            kind: 'error',
+            message: t('canvas.aiLayoutFailed', { applied: String(applied), failed: String(failed), skipped: String(skipped) }),
+          })
+          // 全部失败：保留确认框让用户重试，不假装已应用后关闭。
+          if (applied === 0) {
+            setPhase('confirming')
+            return
+          }
+        } else if (notApplied > 0) {
+          pushToast({
+            kind: 'info',
+            message: t('canvas.aiLayoutAppliedSkipped', { applied: String(applied), skipped: String(notApplied) }),
+          })
+        } else if (applied === 0) pushToast({ kind: 'info', message: t('canvas.aiLayoutNoneApplied') })
         else if (summary.moved > 0) pushToast({ kind: 'success', message: t('canvas.aiLayoutMoved', { moved: String(summary.moved), avgPx: String(summary.avgPx) }) })
         else pushToast({ kind: 'info', message: t('canvas.aiLayoutUnchanged') })
       } else if (props.mode === 'cluster') {
@@ -358,7 +430,7 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
         {editing && (
           <textarea className="ac__edit" value={editedDsl} onChange={(e) => setEditedDsl(e.target.value)} rows={Math.min(8, editedDsl.split('\n').length)} />
         )}
-        <style>{confirmStyles}</style>
+        <style>{confirmStyles + dslIssueStyles}</style>
       </Modal>
     )
   }
@@ -384,6 +456,26 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
     return label === key ? el.kind : label
   }
 
+  // 同一 op 可产多条诊断(如重复 id + create 冲突);列表逐条显示,标题按 op 去重计数。
+  const dslIssueCount = (issues: DslPreviewIssue[]): number =>
+    new Set(issues.map((issue) => issue.opIndex)).size
+  // 源行号优先(parser 回填);程序构造的 op 没有 line 时回落 #序号。原因走
+  // humanizeApplyIssue,与 DslDialog 共用同一套人话映射。
+  const renderDslIssues = (issues: DslPreviewIssue[], keyPrefix: string) => (
+    <>
+      <ul className="ac__errors">
+        {issues.slice(0, 4).map((issue, issueIdx) => (
+          <li key={`${keyPrefix}-${issue.opIndex}-${issueIdx}`}>
+            {issue.line !== undefined ? t('canvas.dslErrorLine', { line: issue.line }) : `#${issue.opIndex + 1}:`} {humanizeApplyIssue(issue.message, t)}
+          </li>
+        ))}
+      </ul>
+      {issues.length > 4 && (
+        <p className="ac__notice-more">{t('canvas.dslPreviewMore', { n: String(issues.length - 4) })}</p>
+      )}
+    </>
+  )
+
   return (
     <Modal open onClose={props.onRejected} onEscape={props.onRejected} title={title} closeLabel={t('common.close')}>
       <div className="ac">
@@ -408,13 +500,15 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
           <div className="ac__diff">
             {totalChanges === 0 && <p className="ac__nochange">{t('agent.noChange')}</p>}
             {props.mode === 'dsl' && dslIssues.length > 0 && (
-              <div className="ac__nochange" role="alert">
-                <p>{t('canvas.dslPreviewBlocked', { n: String(dslIssues.length) })}</p>
-                <ul className="ac__errors">
-                  {dslIssues.slice(0, 4).map((issue) => (
-                    <li key={issue.opIndex}>#{issue.opIndex + 1}: {issue.message}</li>
-                  ))}
-                </ul>
+              <div className="ac__notice ac__notice--blocked" role="alert">
+                <p className="ac__notice-title">{t('canvas.dslPreviewBlocked', { n: String(dslIssueCount(dslIssues)) })}</p>
+                {renderDslIssues(dslIssues, 'blocked')}
+              </div>
+            )}
+            {props.mode === 'dsl' && dslSkippedIssues.length > 0 && (
+              <div className="ac__notice ac__notice--skipped" role="status">
+                <p className="ac__notice-title ac__notice-title--skipped">{t('canvas.dslPreviewSkipped', { n: String(dslIssueCount(dslSkippedIssues)) })}</p>
+                {renderDslIssues(dslSkippedIssues, 'skipped')}
               </div>
             )}
             {diff.added.length > 0 && (
@@ -451,7 +545,7 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
           <Button variant="ghost" onClick={() => { recordReject(); props.onRejected() }}>{t('agent.reject')}</Button>
         </div>
       </div>
-      <style>{confirmStyles}</style>
+      <style>{confirmStyles + dslIssueStyles}</style>
     </Modal>
   )
 }

@@ -52,9 +52,9 @@ export const cards = sqliteTable(
 
     sourceJson: text('source_json').notNull(),
 
-    capturedAt: integer('captured_at', { mode: 'timestamp' }).notNull(),
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+    capturedAt: integer('captured_at', { mode: 'timestamp_ms' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 
     canvasId: text('canvas_id'),
     canvasX: real('canvas_x'),
@@ -67,7 +67,7 @@ export const cards = sqliteTable(
     color: text('color'),
     pinned: integer('pinned', { mode: 'boolean' }).notNull().default(false),
     archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
-    deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+    deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
   },
   (t) => ({
     byWorkspaceInbox: index('idx_cards_workspace_inbox').on(t.workspaceId, t.archived),

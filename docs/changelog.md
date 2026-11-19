@@ -5,6 +5,33 @@
 
 ---
 
+## 2026-11-19 · 未发布 · fix: 全量审查修复（安全、关系链、验收门）
+
+> 依据独立全量审查报告修复 P1/P2；不改变已发布 v1.5.0 桌面产物或 npm 包 0.1.1。改动尚未提交；在线预览站仍为旧产物。
+
+- **备份导入边界**：外部备份不再写入 `activeProfileId`、Labs、样本采集或 `aiIncludeCardContent`；merge 保留本机 AI 端点与同 id profile。清空工作区/恢复检查点走内部可信设置路径。
+- **`.cystift` 隐私**：分享件只嵌入可见卡片（排除归档/回收站及其箭头），并剥离 `source.deviceId`；导出文案改为“可见卡片与布局”。
+- **关系链**：关系行每次应用重新求解；草稿在锚点/组包围盒变化时保留依赖行；DSL 程序化重排不再清掉刚写入的 `layoutAnchor`；部分应用后刷新草稿基线；序列化避碰守卫与 solver 同结合顺序并加贴边容差；仅 `@group/@href/layoutAnchor` 变化时预览显式报告属性变化。
+- **数据契约**：SQLite `listAll`/`listOnCanvas` 与 Web/domain 对齐（底层查询不过滤软删）；时间戳改 `timestamp_ms`；merge 模式 freeform 按元素 id、对话按消息签名求并集。
+- **引擎**：pinch 同时缩放+平移不再双算中点位移；snap 多选整组同一吸附位移；非整数 DPR 不每帧重建位图；容器 resize 触发重绘；小元素角点容差封顶。
+- **验收/发布**：挂起面板加稳定 `data-testid`，`demo:approval` 修复并支持 `CHROME_PATH`；CI 所有 filter 加 `--fail-if-no-match`，新增提交版 `e2e:dsl-seed` 并接入 CI；`deploy:web --no-build` 也运行隐私清洗；清洗器删除 `.map`、扩展路径前缀、递归处理 app chunks。
+- **UI/i18n/文档**：挂起/软跳过/错误面板补 `role`；删除跨 kind 建议对非 DSL kind 改用 `[rect #id delete]`；AI 确认框区分失败/跳过且全失败不关框；`@compute` 文案修正；privacy 文档补 `?dsl=` URL 日志例外。
+- **验证**：全包 lint 0；全量 3345 passed / 3 skipped；web build、`verify:pack`、`demo:approval` exit 0；`e2e:dsl-seed` 10/10；浏览器验收 34/34。残余 P3：关系导出碰撞检查 O(N²)、空 undo/legacy kind。
+
+## 2026-11-19 · 未发布 · fix: DSL 语义对齐、转义入口与顶栏窄档
+
+> 本地 main 的三审修复与发布验收；不改变已发布 v1.5.0 桌面产物或 npm 包 0.1.1。改动尚未提交；在线预览站仍为上一轮产物。
+
+- **关系求解**：显式 `delete` 行先把目标移出几何表，后续锚到已删 id 会判缺失；组级相对锚在解出时记录成员依赖，成员持久化失败时依赖卡跳过并计入 skipped（不再落到错误坐标）。
+- **重试一致性**：应用成功后保留会话内 `appliedHashes`，重试的预览与提交使用同一批 hash；已应用行显示“会话内已应用”跳过，不会造副本。
+- **转义对话框**：打开时记录生成文本，自动生成且未改动的行不参与重放；仅文字改动的行走 `keepExistingPos` 补丁（不重排几何、不丢相对锚）；预览与提交共用同一份 `preview.ops`。
+- **AI 确认**：应用时接卡片 create/update/remove 持久化，创建失败阻断宿主 upsert 与依赖卡，跳过数经 toast 明示。
+- **`?dsl=` 链接入口**：超限拒绝（不截断）；一次性消费（只摘 `dsl`，保留其它参数）；目标画布钉在挂载时；手动打开或粘贴后种子作废。
+- **锚点 sidecar**：`pagehide`/`visibilitychange` flush，卡片消失立即丢弃过期种子，仅在有卡片时 reconcile。
+- **SVG 契约**：`renderDslSvg` 明确为快照渲染（`existingGeometry` 只喂求解，不绘制已有元素/不解析箭头端点）；关系式导出加碰撞与边界守卫，不满足时回退 `@pos`。
+- **顶栏**：间距收紧内聚进 Toolbar 组件（1024–1600 gap 24→16，1024–1180 再→8），zh/en 在 1024–1680 全部零溢出；触屏横屏走既定横向滚兜底。
+- **验证**：全包 lint exit 0；全量 3330 passed / 3 skipped；`pnpm --filter web build` exit 0；本地静态产物浏览器验收 34/34。
+
 ## 2026-11-18 · 未发布 · fix: 静态导出路径清洗与验收补强
 
 > 本地 main 的安全与验收维护；已重新部署清洗后的网页版，不改已发布 v1.5.0 桌面产物或 npm 包 0.1.1。

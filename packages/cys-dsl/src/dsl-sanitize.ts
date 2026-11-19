@@ -80,13 +80,15 @@ function clampCoord(n: number): number {
   return Math.min(DSL_MAX_COORD, Math.max(-DSL_MAX_COORD, n))
 }
 
-/** card op:case 6(size)+ case 1/11(id 不存在)+ case 2b(create id 冲突预检)diagnostic。 */
+/** card op:case 6(size)+ case 1/11(id 不存在)+ case 2b(create id 冲突预检)diagnostic。
+ *  cardExistenceIds = 画布已有卡 ∪ 同批任意位置声明的新卡；实际应用仍受顺序约束。 */
 function sanitizeCard(
-  op: DslCardOp,
+  op: DslCardOp & { line?: number },
   idx: number,
   ctx: SanitizeCtx | undefined,
+  cardExistenceIds: Set<string> | undefined,
   diagnostics: SanitizeDiagnostic[],
-): DslCardOp {
+): DslCardOp & { line?: number } {
   // v10:删除行只认 id——剥除其余字段(防"删除+改属性"矛盾语义,产 warning);提前返回,
   // 不走 create/几何/内容清洗。目标不存在仅提示(apply planOp 会 skip,与 case 1+11 同哲学)。
   if (op.delete) {
@@ -110,14 +112,16 @@ function sanitizeCard(
         message: `delete 行只认 #id,已忽略其余指令(${extra.join(', ')})`,
       })
     }
-    if (ctx?.existingCardIds !== undefined && !ctx.existingCardIds.has(String(op.cardId))) {
+    if (cardExistenceIds !== undefined && !cardExistenceIds.has(String(op.cardId))) {
       diagnostics.push({ opIndex: idx, message: `delete card #${op.cardId} 不存在于画布(该行将跳过)` })
     }
-    return { type: 'card', cardId: op.cardId, x: 0, y: 0, delete: true }
+    // 行内其余字段按 v10 语义剥除;但 line(源行号,v11 parser 回填)不是"指令字段",
+    // 必须随行带走 —— 丢 line 会让诊断/预览无法标行号。
+    return { type: 'card', cardId: op.cardId, x: 0, y: 0, delete: true, line: op.line }
   }
-  // case 1+11:无 create flag + id 不在 existingCardIds → diagnostic
+  // case 1+11:无 create flag + id 不在(画布 ∪ 同批更早 create)→ diagnostic
   // (apply 会 skip,sanitize 额外提示让用户/AI 知道"引用了不存在的卡,想新建加 create")
-  if (ctx?.existingCardIds !== undefined && !op.create && !ctx.existingCardIds.has(String(op.cardId))) {
+  if (cardExistenceIds !== undefined && !op.create && !cardExistenceIds.has(String(op.cardId))) {
     diagnostics.push({
       opIndex: idx,
       message: `card #${op.cardId} 不存在于画布(若想新建需加 create 标记)`,
@@ -285,12 +289,12 @@ function sanitizeFree(
 /** arrow op:case 7(端点不存在 diagnostic)。free arrow 不检查(无端点)。
  *  case 4(端点重写)待后续。 */
 function sanitizeArrow(
-  op: DslArrowOp,
+  op: DslArrowOp & { line?: number },
   idx: number,
   existingIds: Set<string> | undefined,
   diagnostics: SanitizeDiagnostic[],
   deleteExistenceIds: Set<string> | undefined,
-): DslArrowOp {
+): DslArrowOp & { line?: number } {
   // v10:删除行只认 id(镜像 sanitizeCard;from/to 占位 '' 不报,用户真写了才报)。提前返回。
   if (op.delete) {
     const extra: string[] = []
@@ -316,7 +320,7 @@ function sanitizeArrow(
     if (op.id && deleteExistenceIds !== undefined && !deleteExistenceIds.has(op.id)) {
       diagnostics.push({ opIndex: idx, message: `delete arrow #${op.id} 不存在于画布(该行将跳过)` })
     }
-    return { type: 'arrow', from: '', to: '', ...(op.id ? { id: op.id } : {}), delete: true }
+    return { type: 'arrow', from: '', to: '', ...(op.id ? { id: op.id } : {}), delete: true, line: op.line }
   }
   const isFreeArrow = op.freeArrow || (!op.from && !op.to)
   if (!isFreeArrow && existingIds !== undefined) {
@@ -364,34 +368,45 @@ export function sanitizeDslOps(ops: DslOp[], ctx?: SanitizeCtx): SanitizeResult 
   // 永不抛错契约:非数组入参(null/undefined/非数组,仅可能由 as any 误传)→ 当空,不抛。
   const src = Array.isArray(ops) ? ops : []
 
-  // 预合并 existingIds(arrow 端点检查用 —— 端点可能是 card 或 free 元素)
-  let existingIds: Set<string> | undefined
-  if (ctx?.existingCardIds || ctx?.existingFreeIds) {
-    existingIds = new Set<string>()
-    ctx.existingCardIds?.forEach((id) => existingIds!.add(id))
-    ctx.existingFreeIds?.forEach((id) => existingIds!.add(id))
-  }
-  // Same-batch declarations are valid arrow endpoints. Persistence may still
-  // fail later; commitApplyPlan handles that dependency failure explicitly.
-  if (existingIds) {
-    for (const op of src) {
-      if (op.type === 'card' && op.create) existingIds.add(String(op.cardId))
-      if (op.type === 'free' && op.id) existingIds.add(op.id)
-    }
-  }
+  // 存在性集合 = 画布已有 ∪ 同批声明(任意位置;apply 的 shadow 语义对「先建后删」
+  // 就是存在的)。此前 card 的存在性只查画布态 existingCardIds,与 free/arrow 的
+  // 「批内声明也算」口径不一致 → 先建后改 / 先建后删的合法批次被误报「不存在」,
+  // 整单被诊断闸门挡死(2026-11-19 收束)。
+  // 反向:声明写在引用**之后**的行,apply 逐 op 推进 shadow 时会 skip —— sanitize
+  // 不产诊断(保守,不误挡);UI 以「将被跳过」呈现,apply 报告 skipped 计数。
+  const endpointIds: Set<string> | undefined =
+    ctx?.existingCardIds !== undefined || ctx?.existingFreeIds !== undefined
+      ? new Set<string>([
+          ...(ctx.existingCardIds ?? []),
+          ...(ctx.existingFreeIds ?? []),
+        ])
+      : undefined
+  const cardIds: Set<string> | undefined =
+    ctx?.existingCardIds !== undefined ? new Set(ctx.existingCardIds) : undefined
   // delete 行存在性集合:优先全量 existingElementIds(含 arrow);旧调用方只传
   // card/free 时退回合并(注意:不含 arrow,删箭头可能误报,属兼容路径)。
-  // 同批「先建后删」也算存在(apply 的 shadow 语义:create 后 delete 两 op 均 ready)。
-  let deleteExistenceIds: Set<string> | undefined
-  if (ctx?.existingElementIds || ctx?.existingCardIds || ctx?.existingFreeIds) {
-    deleteExistenceIds = new Set<string>()
-    ctx.existingElementIds?.forEach((id) => deleteExistenceIds!.add(id))
-    ctx.existingCardIds?.forEach((id) => deleteExistenceIds!.add(id))
-    ctx.existingFreeIds?.forEach((id) => deleteExistenceIds!.add(id))
-    for (const op of src) {
-      if (op.type === 'card' && op.create) deleteExistenceIds.add(String(op.cardId))
-      if (op.type === 'free' && op.id && !op.delete) deleteExistenceIds.add(op.id)
-      if (op.type === 'arrow' && op.id && !op.delete) deleteExistenceIds.add(op.id)
+  const deleteExistenceIds: Set<string> | undefined =
+    ctx?.existingElementIds !== undefined || ctx?.existingCardIds !== undefined || ctx?.existingFreeIds !== undefined
+      ? new Set<string>([
+          ...(ctx.existingElementIds ?? []),
+          ...(ctx.existingCardIds ?? []),
+          ...(ctx.existingFreeIds ?? []),
+        ])
+      : undefined
+  for (const op of src) {
+    // 永不抛错契约:对抗输入可能塞 null/undefined(测试明确钉住)——跳过即可,
+    // 这些条目交由主循环的 try/catch 原样保留。
+    if (!op) continue
+    if (op.type === 'card' && op.create) {
+      const id = String(op.cardId)
+      cardIds?.add(id)
+      endpointIds?.add(id)
+      deleteExistenceIds?.add(id)
+    } else if (op.type === 'free' && op.id) {
+      endpointIds?.add(op.id)
+      if (!op.delete) deleteExistenceIds?.add(op.id)
+    } else if (op.type === 'arrow' && op.id && !op.delete) {
+      deleteExistenceIds?.add(op.id)
     }
   }
 
@@ -411,7 +426,7 @@ export function sanitizeDslOps(ops: DslOp[], ctx?: SanitizeCtx): SanitizeResult 
             }
             seenIds.add(id)
           }
-          out.push(sanitizeCard(op, idx, ctx, diagnostics))
+          out.push(sanitizeCard(op, idx, ctx, cardIds, diagnostics))
           break
         case 'free':
           if (op.id != null) {
@@ -423,7 +438,7 @@ export function sanitizeDslOps(ops: DslOp[], ctx?: SanitizeCtx): SanitizeResult 
           out.push(sanitizeFree(op, idx, ctx, diagnostics, deleteExistenceIds))
           break
         case 'arrow':
-          out.push(sanitizeArrow(op, idx, existingIds, diagnostics, deleteExistenceIds))
+          out.push(sanitizeArrow(op, idx, endpointIds, diagnostics, deleteExistenceIds))
           break
         default:
           // 未知类型:原样保留(保守,让 apply 自己处理)

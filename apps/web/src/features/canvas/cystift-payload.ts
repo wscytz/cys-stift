@@ -48,6 +48,15 @@ export interface CystiftPayload {
   elements: CanvasElement[]
 }
 
+/** 分享件是“看得见的画布”：归档/回收站卡不属于当前画布视图，不能随图片外带。
+ *  `source.deviceId` 是跨分享件可关联的设备标识，序列化时剥离（kind 等来源语义保留）。 */
+function stripDeviceId(source: Card['source']): Card['source'] {
+  if (!source || typeof source !== 'object' || !('deviceId' in source)) return source
+  const copy: Record<string, unknown> = { ...source }
+  delete copy.deviceId
+  return copy as unknown as Card['source']
+}
+
 /** Build the payload from a live host + service. */
 export function buildCystiftPayload(
   host: CanvasHost,
@@ -55,12 +64,26 @@ export function buildCystiftPayload(
   canvasId: CanvasId,
   canvasName: string,
 ): CystiftPayload {
+  const allCards = service.listOnCanvas(canvasId)
+  const cards = allCards
+    .filter((card) => !card.archived && !card.deletedAt)
+    .map((card) => ({ ...card, source: stripDeviceId(card.source) }))
+  const removedCardIds = new Set(
+    allCards.filter((card) => card.archived || card.deletedAt).map((card) => String(card.id)),
+  )
+  const elements = host.getElements().filter((element) => {
+    if (element.kind === 'card') return !removedCardIds.has(element.id)
+    if (element.kind === 'arrow') {
+      return !removedCardIds.has(element.from ?? '') && !removedCardIds.has(element.to ?? '')
+    }
+    return true
+  })
   return {
     v: 1,
     app: 'cys-stift',
     canvas: { id: canvasId, name: canvasName },
-    cards: service.listOnCanvas(canvasId),
-    elements: host.getElements(),
+    cards,
+    elements,
   }
 }
 

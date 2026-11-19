@@ -414,4 +414,22 @@ describe('delete 存在性用 existingElementIds 全量 id(2026-11-17 arrow 假�
     // duplicate id 告警是 sanitize 既有行为(同 id 两行),这里只关心不存在性误报。
     expect(diagnostics.some((d) => d.message.includes('不存在于画布'))).toBe(false)
   })
+
+  it('同批 create 后 delete 同 id(card)→ 不产假诊断(此前查 existingCardIds 漏了批内声明)', () => {
+    const ops: DslOp[] = [
+      { type: 'card', cardId: 'n' as CardId, x: 0, y: 0, create: true },
+      { type: 'card', cardId: 'n' as CardId, x: 0, y: 0, delete: true },
+    ]
+    const { diagnostics } = sanitizeDslOps(ops, { existingCardIds: new Set<string>() })
+    expect(diagnostics.some((d) => d.message.includes('delete card #n 不存在于画布'))).toBe(false)
+  })
+
+  it('同批 create 后内容更新(card,非 create)→ 不产「不存在」假诊断', () => {
+    const ops: DslOp[] = [
+      { type: 'card', cardId: 'n' as CardId, x: 0, y: 0, create: true },
+      { type: 'card', cardId: 'n' as CardId, x: 0, y: 0, title: 'x' },
+    ]
+    const { diagnostics } = sanitizeDslOps(ops, { existingCardIds: new Set<string>() })
+    expect(diagnostics.some((d) => d.message.includes('不存在于画布'))).toBe(false)
+  })
 })

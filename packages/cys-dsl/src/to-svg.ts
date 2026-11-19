@@ -6,10 +6,16 @@
  * 不 import canvas-engine(web 版 elements-to-svg 依赖宿主 token 注入,搬不动)。
  *
  * 保真边界(如实声明,不冒充完整渲染):
+ * - **快照渲染器**:只画本条 ops/DSL 中带独立几何的元素。它不是增量补丁解释器 ——
+ *   不绘制 existingGeometry 里的已有元素,也不把 delete / 纯内容编辑应用到已有画布。
  * - 卡片 = 描边矩形 + 标题 + 最多 3 行内容(超出省略号);不渲染 media/tag chips/组色带。
  * - @compute 不在此求值(CLI pipeline 只 parse→sanitize→solve):text 只有 compute 无 text 时
  *   渲染公式原文前缀 '='。
- * - 关系箭头端点按 id 解析到卡/自由元素几何,贴边交点连线;端点缺失 → 跳过并留原因。
+ * - 关系箭头端点**只在本批可画元素**(card/free,且非 delete/keepExistingPos)的几何里解析,
+ *   贴边交点连线;端点缺失 → 跳过并留原因(带源行号)。existingGeometry 不参与端点解析。
+ * - delete 指令是 no-op:不绘制、不登记几何(删除由 apply 层执行,快照不模拟画布变更)。
+ * - 纯内容/属性编辑(keepExistingPos,op.x/y 是占位 0,0)没有独立几何 → skipped 留原因,
+ *   绝不猜原点画到 (0,0)。
  * - 默认路由自动避障:直连段穿过卡/矩形时自动绕行走廊(L/Z 形候选,端点重贴边,全清才采纳);
  *   显式 route/curve/elbow 不干预。route=elbow 未给折点 = 正交自动路由(中线 Z / 避障绕行)。
  *   frame 是容器、text 无边界,都不算障碍。折线转角圆角化(渲染层美化,不改几何)。
@@ -41,10 +47,21 @@ const CARD_DEFAULT_H = 120
 const TEXT_DEFAULT_W = 200
 const TEXT_DEFAULT_H = 60
 
+/** 可视化数值选项的门:必须是有限正数,否则回落缺省值。
+ *  防 NaN/Infinity/0/负数经 JS 调用方(或 as any)进入 SVG 属性。 */
+function positiveOption(value: number | undefined, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback
+}
+
+/** 没画的 op 及原因(诚实留痕:不静默丢)。 */
 export interface SvgSkip {
+  /** 该 op 在传给 toSvg 的 ops 数组中的下标(跨阶段时以 line 为准,别拿它当源行号)。 */
   opIndex: number
+  /** op 的可读标识(如 `card #a` / `arrow #e`)。 */
   op: string
   reason: string
+  /** 源 DSL 行号(1-based;parse/sanitize/solve 透传,手工构造 ops 时可能缺失)。 */
+  line?: number
 }
 
 interface Rect {
@@ -57,6 +74,34 @@ interface Rect {
 interface Pt {
   x: number
   y: number
+}
+
+/** 统一记账 skipped:自动带源行号(有则带),避免各分支漏 line 或错用 opIndex。 */
+function recordSkip(skipped: SvgSkip[], opIndex: number, op: DslOp, label: string, reason: string): void {
+  skipped.push({
+    opIndex,
+    op: label,
+    reason,
+    ...(op.line !== undefined ? { line: op.line } : {}),
+  })
+}
+
+/** sanitize/solver 诊断 → 公共诊断:保留 opIndex,并用该阶段 ops 回填源行号。
+ *  两个阶段的 opIndex 都指向各自阶段输出的 ops 数组;跨阶段定位请认 line。 */
+function pushStageDiagnostic(
+  diagnostics: RenderDslDiagnostic[],
+  stage: 'sanitize' | 'solver',
+  message: string,
+  ops: DslOp[],
+  opIndex: number,
+): void {
+  const line = ops[opIndex]?.line
+  diagnostics.push({
+    stage,
+    message,
+    opIndex,
+    ...(line !== undefined ? { line } : {}),
+  })
 }
 
 function esc(s: string): string {
@@ -349,41 +394,59 @@ function dashAttr(dash?: string): string {
 
 /** 渲染观感选项(全部可缺省;缺省输出与 v10 逐字节一致,不破坏既有调用方)。
  *  动机:外部消费方(宣传视频/draw skill)过去只能手画箭头——层级、线宽、halo、
- *  标签字号都调不了。现在把产品 KIND_LAYER(箭头在卡之上)与物料观感开放成选项。 */
+ *  标签字号都调不了。现在把产品 KIND_LAYER(箭头在卡之上)与物料观感开放成选项。
+ *  数值选项契约:**有限正数**;NaN/Infinity/≤0 一律回落缺省值(不把毒值写进 SVG)。 */
 export interface ToSvgOptions {
   /** 箭头层画在节点之上(与产品 KIND_LAYER 同序:arrow=3 > card=2)。
    *  缺省 false = 旧观感(箭头在卡之下,预览更干净)。 */
   arrowsOnTop?: boolean
-  /** 关系线主宽。缺省 2。 */
+  /** 关系线主宽(有限正数)。缺省 2。 */
   strokeWidth?: number
   /** 主线下先铺一条纸色 halo(线更突出,又不破纸面品牌感)。缺省 false。 */
   halo?: boolean
-  /** 箭头头部长度(px)。缺省 12。 */
+  /** 箭头头部长度(px,有限正数)。缺省 12。 */
   arrowHeadLength?: number
-  /** 箭头标签字号。缺省 11;标签自带纸色描边底,宽度随字号缩放。 */
+  /** 箭头标签字号(有限正数)。缺省 11;标签自带纸色描边底,宽度随字号缩放。 */
   labelFontSize?: number
 }
 
 export interface RenderDslSvgOptions extends ToSvgOptions {
-  /** 增量补丁渲染时的已有画布几何:id → 矩形。进入避障表与关系锚点解析。 */
-  existingGeometry?: Record<string, { x: number; y: number; w: number; h: number }>
+  /** **仅相对布局求解上下文**:id → 矩形(可带 group)。传给 solveRelational 作锚点/碰撞避让;
+   *  不绘制其中元素,也不参与箭头端点解析(只存在于这里的 id 不能作为 from/to)。
+   *  delete / 纯内容编辑也不会被应用到这些几何上——renderDslSvg 是快照渲染器,不是补丁解释器。 */
+  existingGeometry?: Record<string, ExistingGeom>
 }
 
+/** 渲染管线诊断。
+ *  - parse/warning:带源行号(line)。
+ *  - sanitize/solver:带 opIndex(该阶段 ops 数组下标,已由 renderDslSvg 回填源行号 line)。 */
 export type RenderDslDiagnostic = {
   stage: 'parse' | 'warning' | 'sanitize' | 'solver'
   message: string
+  /** 源 DSL 行号(1-based)。 */
   line?: number
+  /** sanitize/solver 诊断对应的 op 下标(该阶段 ops 数组;跨阶段定位优先用 line)。 */
+  opIndex?: number
 }
 
+/**
+ * 本批 ops → 独立 SVG(**快照**,不做跨批/跨画布解析)。
+ *
+ * 箭头端点只在**本批可画元素**登记的几何中解析:card 与带 id 的 free;
+ * `delete` 与纯内容编辑(keepExistingPos)不登记几何,因此也不能被箭头引用。
+ * 端点缺失 → `skipped` 留原因(有源行号时一并带上),绝不产悬空线。
+ *
+ * `opIndex` 是传入 ops 数组下标;若调用方自行跨阶段拼接(parse→sanitize→solve),
+ * 定位源行请用 `line`,不要假设 opIndex 等于行号。
+ */
 export function toSvg(ops: DslOp[], options: ToSvgOptions = {}): { svg: string; skipped: SvgSkip[] } {
   const skipped: SvgSkip[] = []
-  const strokeWidth = options.strokeWidth ?? 2
-  const headLen = options.arrowHeadLength ?? 12
-  const labelFontSize = options.labelFontSize ?? 11
+  const strokeWidth = positiveOption(options.strokeWidth, 2)
+  const headLen = positiveOption(options.arrowHeadLength, 12)
+  const labelFontSize = positiveOption(options.labelFontSize, 11)
   const labelHaloWidth = Math.max(3, Math.round(labelFontSize / 4))
   const arrowsOnTop = options.arrowsOnTop === true
   const halo = options.halo === true
-  const bodies: string[] = []
   let minX = Infinity
   let minY = Infinity
   let maxX = -Infinity
@@ -405,10 +468,18 @@ export function toSvg(ops: DslOp[], options: ToSvgOptions = {}): { svg: string; 
     Number.isFinite(r.x) && Number.isFinite(r.y) && Number.isFinite(r.w) && Number.isFinite(r.h)
   for (let i = 0; i < ops.length; i++) {
     const op = ops[i]!
+    // delete 是画布变更指令,不是可画元素:快照不执行删除,也不登记它的占位几何
+    // (否则会凭空多出一张 (0,0) 卡,并让箭头端点/避障误解析到被删元素)。
+    if (op.delete) continue
     if (op.type === 'card') {
+      // 纯内容/属性编辑:x/y 是 parser 占位 (0,0),没有独立几何 —— 不能猜原点。
+      if (op.keepExistingPos === true) {
+        recordSkip(skipped, i, op, `card ${op.cardId}`, '纯内容/属性编辑无 @pos(占位 0,0),快照渲染不猜原点')
+        continue
+      }
       const r = { x: op.x, y: op.y, w: op.w ?? CARD_DEFAULT_W, h: op.h ?? CARD_DEFAULT_H }
       if (!finiteRect(r)) {
-        skipped.push({ opIndex: i, op: `card ${op.cardId}`, reason: '坐标含 NaN/Infinity,不渲染' })
+        recordSkip(skipped, i, op, `card ${op.cardId}`, '坐标含 NaN/Infinity,不渲染')
         continue
       }
       geom.set(String(op.cardId), r)
@@ -422,7 +493,7 @@ export function toSvg(ops: DslOp[], options: ToSvgOptions = {}): { svg: string; 
         h: op.h ?? (isText ? TEXT_DEFAULT_H : CARD_DEFAULT_H),
       }
       if (!finiteRect(r)) {
-        skipped.push({ opIndex: i, op: `free ${op.id}`, reason: '坐标含 NaN/Infinity,不渲染' })
+        recordSkip(skipped, i, op, `free ${op.id}`, '坐标含 NaN/Infinity,不渲染')
         continue
       }
       geom.set(op.id, r)
@@ -436,7 +507,9 @@ export function toSvg(ops: DslOp[], options: ToSvgOptions = {}): { svg: string; 
 
   for (let i = 0; i < ops.length; i++) {
     const op = ops[i]!
+    if (op.delete) continue // delete 永远不画(快照不执行画布变更)
     if (op.type === 'card') {
+      if (op.keepExistingPos === true) continue // 首遍已记 skipped:无独立几何,不猜原点
       const r = geom.get(String(op.cardId))
       if (!r) continue // 首遍判非有限已记 skipped
       grow(r)
@@ -471,7 +544,7 @@ export function toSvg(ops: DslOp[], options: ToSvgOptions = {}): { svg: string; 
           h: op.h ?? (op.shape === 'text' ? TEXT_DEFAULT_H : CARD_DEFAULT_H),
         }
         if (!finiteRect(r)) {
-          skipped.push({ opIndex: i, op: `free ${i}`, reason: '坐标含 NaN/Infinity,不渲染' })
+          recordSkip(skipped, i, op, `free ${i}`, '坐标含 NaN/Infinity,不渲染')
           continue
         }
       }
@@ -513,26 +586,39 @@ export function toSvg(ops: DslOp[], options: ToSvgOptions = {}): { svg: string; 
       p1 = { x: op.x ?? 0, y: op.y ?? 0 }
       p2 = { x: (op.x ?? 0) + (op.w ?? 0), y: (op.y ?? 0) + (op.h ?? 0) }
       if (![p1.x, p1.y, p2.x, p2.y].every(Number.isFinite)) {
-        skipped.push({ opIndex: i, op: `arrow ${op.id ?? ''}`.trim(), reason: '坐标含 NaN/Infinity,不渲染' })
+        recordSkip(skipped, i, op, `arrow ${op.id ?? ''}`.trim(), '坐标含 NaN/Infinity,不渲染')
         continue
       }
     } else {
       const src = geom.get(op.from)
       const dst = geom.get(op.to)
       if (!src || !dst) {
-        skipped.push({
-          opIndex: i,
-          op: `arrow ${op.id ?? `${op.from}→${op.to}`}`,
-          reason: `端点 ${!src ? `#${op.from}` : `#${op.to}`} 不存在,不渲染`,
-        })
+        recordSkip(
+          skipped,
+          i,
+          op,
+          `arrow ${op.id ?? `${op.from}→${op.to}`}`,
+          `端点 ${!src ? `#${op.from}` : `#${op.to}`} 不存在于本批可画元素(快照只解析本批声明的 card/free;existingGeometry 不参与端点解析),不渲染`,
+        )
         continue
       }
       srcRect = src
       dstRect = dst
       p1 = borderPoint(src, dst.x + dst.w / 2, dst.y + dst.h / 2)
       p2 = borderPoint(dst, src.x + src.w / 2, src.y + src.h / 2)
-      if (op.route === 'elbow' && op.elbow !== undefined) {
-        mid = op.elbow
+      // External JSON ops can carry non-finite / non-numeric curve points; they
+      // are interpolated into the `d` attribute. Normalize and fall back to the
+      // midpoint so a malformed op can never emit NaN or inject attributes.
+      const elbowPoints = Array.isArray(op.elbow)
+        ? op.elbow
+            .map((point) => ({
+              x: Number((point as { x?: unknown }).x),
+              y: Number((point as { y?: unknown }).y),
+            }))
+            .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+        : []
+      if (op.route === 'elbow' && elbowPoints.length > 0) {
+        mid = elbowPoints
       } else if (op.route === 'elbow') {
         // route=elbow 未给折点:正交自动路由——求解器(A* 正交可见图)优先,
         // 无解退启发式绕行,再退主方向中线 Z(已对齐则直连);端点随路径重贴边
@@ -574,7 +660,11 @@ export function toSvg(ops: DslOp[], options: ToSvgOptions = {}): { svg: string; 
     let headFrom: Pt
     let labelAnchor: Pt
     if (route === 'curve') {
-      const c = op.curve ?? { cx: (p1!.x + p2!.x) / 2, cy: (p1!.y + p2!.y) / 2 - 40 }
+      const curveX = Number(op.curve?.cx)
+      const curveY = Number(op.curve?.cy)
+      const c = op.curve !== undefined && Number.isFinite(curveX) && Number.isFinite(curveY)
+        ? { cx: curveX, cy: curveY }
+        : { cx: (p1!.x + p2!.x) / 2, cy: (p1!.y + p2!.y) / 2 - 40 }
       d = `M ${p1!.x} ${p1!.y} Q ${c.cx} ${c.cy} ${p2!.x} ${p2!.y}`
       headFrom = { x: c.cx, y: c.cy }
       labelAnchor = { x: (p1!.x + p2!.x) / 2, y: (p1!.y + p2!.y) / 2 }
@@ -625,10 +715,23 @@ export function toSvg(ops: DslOp[], options: ToSvgOptions = {}): { svg: string; 
 }
 
 /**
- * 一把梭 API:DSL 文本 → SVG。外部消费方(宣传视频/draw skill/CLI)不再自己串
+ * 一把梭 API:DSL 文本 → **快照** SVG。外部消费方(宣传视频/draw skill/CLI)不再自己串
  * parse→sanitize→solve→render,也不再手画箭头——避障路由、圆角折线、贴边端点、
- * 标签 halo 都在这条链里。诊断(parse/warning/sanitize/solver)原样透出,
- * 消费方自行决定是拒绝渲染还是带错预览;`skipped` 逐条说明哪些 op 没画、为什么。
+ * 标签 halo 都在这条链里。
+ *
+ * ## 契约:快照渲染器,不是增量补丁解释器
+ * - 只画本条 DSL 中**显式声明了独立几何**的 card/free,以及端点可解析的 arrow。
+ * - `existingGeometry` **仅**喂 `solveRelational`(相对布局锚点/碰撞避让)。它不会:
+ *   把已有元素画出来;让箭头端点解析到已有元素;把 delete/内容编辑应用到已有画布。
+ *   因此 `[arrow] from #已有卡 to #本批卡` 会进 `skipped`(reason 带 #id,line 指向源行)。
+ * - `delete` 是 no-op:不绘制、不登记几何(删除归 apply 层,快照不模拟画布变更)。
+ * - 纯内容/属性编辑(keepExistingPos)没有独立几何 → 进 `skipped`,绝不猜 (0,0) 原点。
+ * - 要预览「已有画布 + 增量修改」,请宿主先把目标元素序列化成带 @pos/@size 的完整 DSL;
+ *   本函数不做 apply/补丁语义。
+ *
+ * 诊断(parse/warning/sanitize/solver)原样透出;sanitize/solver 诊断附 `opIndex` 并回填
+ * `line`。`skipped[].opIndex` 是 solved ops 下标,`skipped[].line` 是源 DSL 行号——
+ * 跨阶段定位请用 line,不要拿 opIndex 当行号。
  */
 export function renderDslSvg(
   dsl: string,
@@ -644,7 +747,7 @@ export function renderDslSvg(
   }
   const sanitized = sanitizeDslOps(parsed.ops)
   for (const diagnostic of sanitized.diagnostics) {
-    diagnostics.push({ stage: 'sanitize', message: diagnostic.message })
+    pushStageDiagnostic(diagnostics, 'sanitize', diagnostic.message, sanitized.ops, diagnostic.opIndex)
   }
   let existingGeometry: Map<string, ExistingGeom> | undefined
   if (options.existingGeometry) {
@@ -652,8 +755,10 @@ export function renderDslSvg(
   }
   const solved = solveRelational(sanitized.ops, existingGeometry)
   for (const diagnostic of solved.diagnostics) {
-    diagnostics.push({ stage: 'solver', message: diagnostic.message })
+    pushStageDiagnostic(diagnostics, 'solver', diagnostic.message, solved.ops, diagnostic.opIndex)
   }
-  const { svg, skipped } = toSvg(solved.ops, options)
+  // existingGeometry 只服务相对求解,不向下传:toSvg 是快照层,不能借它画已有元素/解析端点。
+  const { existingGeometry: _existingGeometry, ...toSvgOptions } = options
+  const { svg, skipped } = toSvg(solved.ops, toSvgOptions)
   return { svg, skipped, diagnostics }
 }

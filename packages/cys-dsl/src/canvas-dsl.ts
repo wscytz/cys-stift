@@ -21,6 +21,7 @@
  * 产出非零值,DB 路径(canvas-binding)保留字段;若将来引入旋转手柄,须同步在
  * grammar 加 @rotation 指令(加法,bump DSL_VERSION),否则 DSL Apply 会把旋转归零。
  */
+import { DSL_MAX_COORD, DSL_MAX_GAP, DSL_MAX_SIZE } from './dsl-sanitize.js'
 import type { CanvasElement, CardType, TagRef, LinkPreview, CodeBlock, Quote } from './types.js'
 import { DSL_KINDS, DSL_MAX_TEXT_LEN, DSL_MAX_CONTENT_LEN, DSL_MAX_HREF_TARGETS, DSL_MAX_TAG_COUNT, DSL_MAX_LINK_COUNT, DSL_MAX_CODE_BLOCKS, DSL_MAX_QUOTES } from './dsl-grammar.js'
 
@@ -49,10 +50,16 @@ export function serializeCanvas(
    *  不传 → 几何-only(向后兼容,所有现有调用点零改动)。传了 → card 行附相应指令。 */
   resolve?: (id: string) => CardDslContent | undefined,
 ): string {
-  const byId = new Map(elements.map((element) => [element.id, element]))
-  return elements
-    .filter((e) => (DSL_KINDS as readonly string[]).includes(e.kind))
-    .map((e) => serializeElement(e, e.kind === 'card' ? resolve?.(e.id) : undefined, byId))
+  const serializable = elements.filter((e) => (DSL_KINDS as readonly string[]).includes(e.kind))
+  const byId = new Map(serializable.filter((element) => element.kind === 'card').map((element) => [element.id, element]))
+  // v11 收束:关系式只在锚点行**更早**出现时 emit。解析/求解按行序单遍解锚
+  // (DSL_GRAMMAR_REFERENCE:anchor must be placed earlier or already exist);
+  // 元素序来自画布加载序(z 序卡 + freeform 追加),不是依赖序 —— 反序 emit 的
+  // 文本在空画布上会解不出锚点(整单被诊断闸门拒绝),破坏异地重建契约。
+  const emittedIndex = new Map(serializable.map((element, index) => [element.id, index]))
+  const collisionIndex = new CardCollisionIndex(byId.values())
+  return serializable
+    .map((e) => serializeElement(e, e.kind === 'card' ? resolve?.(e.id) : undefined, byId, emittedIndex, collisionIndex))
     .filter(Boolean)
     .join('\n')
 }
@@ -91,25 +98,133 @@ function readLayoutAnchor(e: CanvasElement): LayoutAnchor | undefined {
   return { id: record.id, dir: record.dir, gap: record.gap }
 }
 
-/** 有 layoutAnchor 且锚点仍在、当前几何与 anchor+gap 一致 → emit right-of/below。
- *  不一致（锚点被移动/卡片被拖走/元数据过期）→ 回退 @pos，绝不导出坏关系。 */
+/** 有 layoutAnchor 且锚点仍在、锚点行更早、当前几何与 anchor+gap 一致 → emit right-of/below。
+ *  任一不满足（锚点被移动/卡片被拖走/元数据过期/反序加载）→ 回退 @pos，绝不导出坏关系。 */
+/** 关系导出的碰撞查询：一次构建空间索引，避免每条关系都线性扫全部卡（O(N²)）。
+ *  单元格大小取常见卡片量级；超大卡（跨 >64 格）进 wide 列表线性检查，防止
+ *  一个巨型框把索引撑爆。所有坐标都用与 emit/求解一致的 0.1 量化。 */
+const COLLISION_CELL = 256
+const COLLISION_WIDE_CELLS = 64
+
+interface IndexedCard {
+  id: string
+  left: number
+  top: number
+  right: number
+  bottom: number
+}
+
+class CardCollisionIndex {
+  private readonly cells = new Map<string, IndexedCard[]>()
+  private readonly wide: IndexedCard[] = []
+
+  constructor(cards: Iterable<CanvasElement>) {
+    const quantize = (value: number) => Number(value.toFixed(1))
+    for (const card of cards) {
+      if (card.kind !== 'card') continue
+      const left = quantize(card.x)
+      const top = quantize(card.y)
+      const box: IndexedCard = {
+        id: card.id,
+        left,
+        top,
+        right: left + quantize(card.w),
+        bottom: top + quantize(card.h),
+      }
+      const minX = Math.floor(box.left / COLLISION_CELL)
+      const maxX = Math.floor(box.right / COLLISION_CELL)
+      const minY = Math.floor(box.top / COLLISION_CELL)
+      const maxY = Math.floor(box.bottom / COLLISION_CELL)
+      if ((maxX - minX + 1) * (maxY - minY + 1) > COLLISION_WIDE_CELLS) {
+        this.wide.push(box)
+        continue
+      }
+      for (let cx = minX; cx <= maxX; cx++) {
+        for (let cy = minY; cy <= maxY; cy++) {
+          const key = `${cx}:${cy}`
+          const list = this.cells.get(key)
+          if (list) list.push(box)
+          else this.cells.set(key, [box])
+        }
+      }
+    }
+  }
+
+  /** 与 relationForCard 的旧线性检查同语义（含 1e-9 贴边容差），排除自身 id。 */
+  overlaps(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    excludeId: string,
+    epsilon: number,
+  ): boolean {
+    const hit = (box: IndexedCard) =>
+      box.id !== excludeId &&
+      x < box.right + epsilon &&
+      box.left < x + width + epsilon &&
+      y < box.bottom + epsilon &&
+      box.top < y + height + epsilon
+    for (const box of this.wide) if (hit(box)) return true
+    const minX = Math.floor(x / COLLISION_CELL)
+    const maxX = Math.floor((x + width) / COLLISION_CELL)
+    const minY = Math.floor(y / COLLISION_CELL)
+    const maxY = Math.floor((y + height) / COLLISION_CELL)
+    for (let cx = minX; cx <= maxX; cx++) {
+      for (let cy = minY; cy <= maxY; cy++) {
+        const list = this.cells.get(`${cx}:${cy}`)
+        if (!list) continue
+        for (const box of list) if (hit(box)) return true
+      }
+    }
+    return false
+  }
+}
+
 function relationForCard(
   e: CanvasElement,
   byId?: ReadonlyMap<string, CanvasElement>,
+  emittedIndex?: ReadonlyMap<string, number>,
+  collisionIndex?: CardCollisionIndex,
 ): string | undefined {
-  if (!byId) return undefined
+  if (!byId || !emittedIndex) return undefined
   const anchor = readLayoutAnchor(e)
   if (!anchor) return undefined
   const target = byId.get(anchor.id)
   if (!target || target.kind !== 'card' || target.id === e.id) return undefined
-  const expectedX =
-    anchor.dir === 'right-of' ? target.x + target.w + anchor.gap : target.x
-  const expectedY =
-    anchor.dir === 'below' ? target.y + target.h + anchor.gap : target.y
-  if (Math.abs(e.x - expectedX) > 0.5 || Math.abs(e.y - expectedY) > 0.5) {
-    return undefined
+  const selfIndex = emittedIndex.get(e.id)
+  const anchorIndex = emittedIndex.get(anchor.id)
+  if (selfIndex === undefined || anchorIndex === undefined || anchorIndex >= selfIndex) return undefined
+  const quantize = (value: number) => Number(value.toFixed(1))
+  const gap = quantize(anchor.gap)
+  if (gap < 0 || gap > DSL_MAX_GAP) return undefined
+  const targetX = quantize(target.x)
+  const targetY = quantize(target.y)
+  const width = quantize(e.w)
+  const height = quantize(e.h)
+  // 2026-11-19 三审:与 solver 的 + 运算结合顺序保持一致（左结合）。
+  // 此前 `targetX + (w + gap)` 与 solver `(x + w) + gap` 在浮点贴边时相差 1e-13，
+  // guard 判无碰撞、solver 判有碰撞 → 导出的关系文本重解会把卡推走。
+  const solvedX = anchor.dir === 'right-of' ? targetX + quantize(target.w) + gap : targetX
+  const solvedY = anchor.dir === 'below' ? targetY + quantize(target.h) + gap : targetY
+  if (Math.abs(solvedX - quantize(e.x)) > 1e-9 || Math.abs(solvedY - quantize(e.y)) > 1e-9 ||
+      Math.abs(solvedX) > DSL_MAX_COORD || Math.abs(solvedY) > DSL_MAX_COORD ||
+      Math.abs(targetX) > DSL_MAX_COORD || Math.abs(targetY) > DSL_MAX_COORD ||
+      ![width, height, quantize(target.w), quantize(target.h)].every((size) => size > 0 && size <= DSL_MAX_SIZE)) return undefined
+  // 碰撞守卫加 1e-9 保守容差：贴边时宁可回退 @pos，也不 emit 一条重解会触发避让的关系。
+  const EPS = 1e-9
+  if (collisionIndex) {
+    if (collisionIndex.overlaps(solvedX, solvedY, width, height, e.id, EPS)) return undefined
+  } else {
+    // 直接调用 serializeElement 的外部消费方没有索引：保留原线性检查（结果一致）。
+    for (const card of byId.values()) {
+      if (card.kind !== 'card' || card.id === e.id) continue
+      const left = quantize(card.x)
+      const top = quantize(card.y)
+      if (solvedX < left + quantize(card.w) + EPS && left < solvedX + width + EPS &&
+          solvedY < top + quantize(card.h) + EPS && top < solvedY + height + EPS) return undefined
+    }
   }
-  const gap = Number(anchor.gap.toFixed(1))
   return `${anchor.dir} #${anchor.id} @gap(${gap})`
 }
 
@@ -119,6 +234,10 @@ export function serializeElement(
   content?: CardDslContent,
   /** v11:全量元素索引；有它才尝试把 meta.layoutAnchor 还原成 right-of/below。 */
   byId?: ReadonlyMap<string, CanvasElement>,
+  /** v11:元素在输出中的序号；关系式只在锚点行更早时 emit(缺省 → 不 emit 关系式)。 */
+  emittedIndex?: ReadonlyMap<string, number>,
+  /** v11.2:碰撞查询索引（serializeCanvas 一次构建）；缺省时退回线性检查。 */
+  collisionIndex?: CardCollisionIndex,
 ): string {
   const pos = `@pos(${e.x.toFixed(1)},${e.y.toFixed(1)})`
   const color = e.color ? ` @color(${e.color})` : ''
@@ -133,7 +252,7 @@ export function serializeElement(
       // 截断防护不动。text/frame text 同理走 textAttr helper。
       const titleAttr = quotedAttr('title', content?.title, DSL_MAX_TEXT_LEN)
       const contentAttr = quotedAttr('content', content?.content, DSL_MAX_CONTENT_LEN)
-      const position = relationForCard(e, byId) ?? pos
+      const position = relationForCard(e, byId, emittedIndex, collisionIndex) ?? pos
       return `[card #${e.id}] ${position} @size(${e.w.toFixed(1)},${e.h.toFixed(1)})${color}${titleAttr}${contentAttr}${metaGroup(e)}${metaHref(e)}${metaType(content)}${metaTags(content)}${metaLinks(content)}${metaCode(content)}${metaQuote(content)}`
     }
     case 'rect':

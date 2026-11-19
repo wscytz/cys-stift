@@ -105,6 +105,8 @@ export class SelfBuiltAdapter implements CanvasHost {
   private keyHandler: ((e: KeyboardEvent) => void) | null = null
   /** keyup handler(关方向键 coalescing)。null=未挂。 */
   private keyUpHandler: ((e: KeyboardEvent) => void) | null = null
+  /** 容器/窗口尺寸变化时重绘（CSS 尺寸变了但元素集没变，不会触发 upsert 渲染）。 */
+  private resizeObserver: ResizeObserver | null = null
   private undoStack: CanvasElement[][] = []
   private redoStack: CanvasElement[][] = []
   private static readonly UNDO_LIMIT = 50
@@ -139,6 +141,10 @@ export class SelfBuiltAdapter implements CanvasHost {
     this.cardMode = opts?.cardMode ?? 'compact'
     this.attachPointer()
     this.attachKeyboard()
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(() => this.scheduleRender())
+      this.resizeObserver.observe(canvas)
+    }
   }
 
   /** 设置卡片显示模式(web 层 settings 变更时调,触发重渲)。 */
@@ -186,9 +192,13 @@ export class SelfBuiltAdapter implements CanvasHost {
     const w = this.canvas.clientWidth || 800
     const h = this.canvas.clientHeight || 600
     const dpr = window.devicePixelRatio || 1
-    if (this.canvas.width !== w * dpr || this.canvas.height !== h * dpr) {
-      this.canvas.width = w * dpr
-      this.canvas.height = h * dpr
+    // 非整数 DPR(1.25/1.5)下 w*dpr 是小数，而 canvas.width 取整后会永远不相等，
+    // 导致每帧重建位图。用四舍五入后的物理像素比较。
+    const pixelWidth = Math.round(w * dpr)
+    const pixelHeight = Math.round(h * dpr)
+    if (this.canvas.width !== pixelWidth || this.canvas.height !== pixelHeight) {
+      this.canvas.width = pixelWidth
+      this.canvas.height = pixelHeight
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0) // 抵消 DPR,renderElements 用 CSS px
     const preview =
@@ -792,12 +802,12 @@ export class SelfBuiltAdapter implements CanvasHost {
     if (!geo) return
     const factor = geo.dist / this.pinch.lastDist
     const nextZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, this.view.zoom * factor))
-    const pageX = (geo.mid.x - this.view.panX) / this.view.zoom
-    const pageY = (geo.mid.y - this.view.panY) / this.view.zoom
-    let panX = geo.mid.x - pageX * nextZoom
-    let panY = geo.mid.y - pageY * nextZoom
-    panX += geo.mid.x - this.pinch.lastMid.x
-    panY += geo.mid.y - this.pinch.lastMid.y
+    // 以「上一帧中点下的页面点」为缩放锚点：mid 移动 + 缩放补偿在同一个公式里完成。
+    // 若用本帧 mid 算 pageX 再额外 += (mid - lastMid)，平移会被算两遍（内容相对手指漂移）。
+    const pageX = (this.pinch.lastMid.x - this.view.panX) / this.view.zoom
+    const pageY = (this.pinch.lastMid.y - this.view.panY) / this.view.zoom
+    const panX = geo.mid.x - pageX * nextZoom
+    const panY = geo.mid.y - pageY * nextZoom
     this.setView({ ...this.view, zoom: nextZoom, panX, panY })
     this.pinch.lastDist = geo.dist
     this.pinch.lastMid = geo.mid
@@ -1105,12 +1115,27 @@ export class SelfBuiltAdapter implements CanvasHost {
           this.pushUndo()
           this.coalescing = true
         }
-        for (const sid of this.dragGroup.ids) {
+        // snap 模式:整组按同一个位移吸附，不能逐元素各 snap 各的——
+        // 否则不同元素落进不同 8px 区间，组内相对间距被改变并写回。
+        const ids = [...this.dragGroup.ids]
+        let snapDx = 0
+        let snapDy = 0
+        if (this.view.gridMode === 'snap' && ids.length > 0) {
+          const first = this.getElement(ids[0]!)
+          const firstOffset = this.dragGroup.offsets.get(ids[0]!)
+          if (first && firstOffset) {
+            const rawX = p.x - firstOffset.x
+            const rawY = p.y - firstOffset.y
+            snapDx = this.snapCoord(rawX) - rawX
+            snapDy = this.snapCoord(rawY) - rawY
+          }
+        }
+        for (const sid of ids) {
           const el = this.getElement(sid)
           const off = this.dragGroup.offsets.get(sid)
           if (!el || !off) continue
-          const nx = this.snapCoord(p.x - off.x)
-          const ny = this.snapCoord(p.y - off.y)
+          const nx = p.x - off.x + snapDx
+          const ny = p.y - off.y + snapDy
           if (el.kind === 'freedraw') {
             // freedraw 真身=点序列:按位移平移点序列(不只改 bbox)。
             const moved = translateFreedraw(el, nx - el.x, ny - el.y)
@@ -1510,6 +1535,8 @@ export class SelfBuiltAdapter implements CanvasHost {
       cancelAnimationFrame(this.rafId)
       this.rafId = null
     }
+    this.resizeObserver?.disconnect()
+    this.resizeObserver = null
     if (this.pointerHandlers) {
       this.canvas.removeEventListener('pointerdown', this.pointerHandlers.down)
       this.canvas.removeEventListener('pointermove', this.pointerHandlers.move)

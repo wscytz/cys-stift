@@ -25,6 +25,28 @@
   overflow-x: auto;
 }
 
+/* 1024–1600px:间距收紧一档(space-3→space-2),让尾部入口(如画布页的
+   「工作台」)留在视口内,不靠横向滚动才能发现。
+   归因更正(2026-11-19 二审核实):此前由消费方(画布页)写的
+   `.page > header > div:last-child` 一直生效且优先级更高(命中的就是 .content,
+   header 自身是 grid 根、div:last-child 即 content),不是"死代码";删除消费方
+   规则后本档接管,1024–1180 再收到 gap8。上界 1500→1600:en 标签更宽,
+   gap24 时 1501–1561 仍溢出(二审实测 61px @1501)。 */
+@media (min-width: 1024px) and (max-width: 1600px) {
+  .content {
+    gap: var(--space-2);
+    padding: 0 var(--space-2);
+  }
+}
+
+/* 1024–1180px:间距再收一档(space-2→space-1)。实测(2026-11-19)画布顶栏
+   全控件 + gap16 时 ~1134px,1100 视口仍溢出 36px;14 个 gap 各让 8px 即回 112px。 */
+@media (min-width: 1024px) and (max-width: 1180px) {
+  .content {
+    gap: var(--space-1);
+  }
+}
+
 /* flex 子元素(按钮/切换器)不收缩:空间不够时走 overflow-x:auto 横向滚,
    而不是把按钮压扁导致文字("新建"/"重命名")显示不全。
    min-width:0 让 flex 算法允许容器收缩,但子元素自身 flex-shrink:0 保宽度。 */

@@ -180,7 +180,13 @@ export type DslArrowOp = {
   delete?: boolean
 }
 
-export type DslOp = DslCardOp | DslFreeOp | DslArrowOp
+/**
+ * v11:联合成员各加可选 `line`(源行号),而不是逐个改 4 个成员类型 ——
+ * 交叉在联合外层做,parser 一次回填,sanitize/solve 的 `{...op}` 展开天然透传。
+ * 诊断/预览用它在 UI 显示「第 N 行」;apply 的 op hash 计算必须剔除本字段
+ * (hash 语义是"这条指令做什么",不是"它写在哪一行")。
+ */
+export type DslOp = (DslCardOp | DslFreeOp | DslArrowOp) & { line?: number }
 
 /** A diagnostic describing a single malformed DSL line that was dropped. */
 export type DslDiagnostic = {
@@ -728,7 +734,7 @@ export function parseDslWithDiagnostics(dslText: string): {
         errors.push({ line: lineNo, text: line, message: `元素数已达上限 ${DSL_MAX_OPS},本行及后续被截断` })
         break
       }
-      ops.push(built.op)
+      ops.push({ ...built.op, line: lineNo })
       // 自然语言体验(2026-10-29 精确化):skipChunk 的 null 是 `]`(每行常客,设计内静默);
       // string 才是真 junk 原文。junk 存在才分类;@词/关系词检查只看 junk——旧整行 @ 正则
       // 会把合法裸组锚 @g/@methods 误报成 unknown @(v9 文档形态!),junk 视角根除。
@@ -859,7 +865,7 @@ export function parseDslStrictWithDiagnostics(dslText: string): {
         errors.push({ line: lineNo, text: line, message: `元素数已达上限 ${DSL_MAX_OPS},本行及后续被截断` })
         break
       }
-      ops.push(built.op)
+      ops.push({ ...built.op, line: lineNo })
     } else {
       errors.push({ line: lineNo, text: line, message: built.diag })
     }

@@ -4,7 +4,7 @@ cys-dsl — cy's Stift 画布的**双向文字表示(转义)**。整张画布能
 
 ## 是什么
 
-cys-dsl **v9** 文法:**5 种元素**(`card`/`rect`/`frame`/`text`/`arrow`)、6 色名(legacy 枚举冻结)、**关系式放置**(`right-of`/`below #锚` + `@gap`;v9 起 `@组名` 组级相对锚——锚定组包围盒,支持 `@"含空格名"` 与中文裸名)、箭头签名(label/color/dash/arrowhead/route/wikilink)、**卡片内容 `@title`(短)/`@content`(长 markdown,`\n` 转义多行)**,以及语义 directive:**`@group("名")`**(v7,语义分组)、**`@href(#a;#b)`**(v7,显式引用)、**`@compute("公式")`**(v7,安全公式,仅 text)、**`@type/@tags/@links/@code/@quote`**(v8,卡片结构化字段)。v5 内容;v6 freedraw 出 DSL;v9 组级相对锚(锚位三形态与保留字防线见 `DSL_GRAMMAR_REFERENCE`)。
+cys-dsl **v10** 文法(`DSL_VERSION`):**5 种元素**(`card`/`rect`/`frame`/`text`/`arrow`)、6 色名(legacy 枚举冻结)、**关系式放置**(`right-of`/`below #锚` + `@gap`;v9 起 `@组名` 组级相对锚——锚定组包围盒,支持 `@"含空格名"` 与中文裸名;锚点须**本行更早或画布已有**)、箭头签名(label/color/dash/arrowhead/route/wikilink)、**卡片内容 `@title`(短)/`@content`(长 markdown,`\n` 转义多行)**,以及语义 directive:**`@group("名")`**(v7,语义分组)、**`@href(#a;#b)`**(v7,显式引用)、**`@compute("公式")`**(v7,安全公式,仅 text)、**`@type/@tags/@links/@code/@quote`**(v8,卡片结构化字段)、**`[kind #id delete]`**(v10,显式删除行,只认 #id)。v5 内容;v6 freedraw 出 DSL;v9 组级相对锚(锚位三形态与保留字防线见 `DSL_GRAMMAR_REFERENCE`)。2026-11 的解析层增量**不改文法形态**、不 bump 版本:`op.line`(源行号,诊断显示用)与 `meta.layoutAnchor`(单卡相对锚持久化,`serializeCanvas` 仅在几何一致且锚点行更早时还原为 `right-of/below`,否则回退 `@pos`)。
 
 ## public API
 
@@ -14,7 +14,7 @@ cys-dsl **v9** 文法:**5 种元素**(`card`/`rect`/`frame`/`text`/`arrow`)、6 
 - **sanitize**:`sanitizeDslOps`(opt-in 修正层,防 LLM 产非法值不崩)
 - **solve**:`solveRelational` + `ExistingGeom`/`SolveResult`(关系式 → 绝对坐标;组锚、碰撞避让、断链诊断)
 - **adapter**:`toJsonCanvas`(→ JSON Canvas 1.0;integer 坐标、id 去重、跳过留痕)+ `JsonCanvasFile/Node/Edge/SkippedOp` 类型
-- **svg**:`toSvg`(零依赖预览级 SVG,CLI `render --svg` 的底层)
+- **svg**:`toSvg`(已求解 ops → SVG，CLI `render --svg` 的底层)、`renderDslSvg`(DSL 文本 → SVG 快照)；选项与诊断类型为 `ToSvgOptions`、`RenderDslSvgOptions`、`RenderDslDiagnostic`。
 - **types**:`CanvasElement` 等边界类型(与 canvas-engine/domain 结构兼容,`types-compat.test.ts` 钉住)
 
 ## 用法
@@ -27,6 +27,8 @@ const ops   = parseDsl(text)                // 文本 → ops
 const clean = sanitizeDslOps(ops, ctx)      // 修正非法值(永不抛错)
 const solved = solveRelational(clean.ops)   // 关系式 → 绝对坐标
 ```
+
+`renderDslSvg('[rect #box] @pos(0,0) @size(160,80)', { halo: true })` 返回 `{ svg, skipped, diagnostics }`。它渲染图稿，不应用增量补丁：删除行、没有独立几何的内容编辑，以及端点不在图稿中的箭头不会被绘制。`existingGeometry` 只用于关系式求解与卡片放置避碰，不绘制已有元素，也不为箭头补端点。
 
 ## CLI
 
@@ -51,7 +53,9 @@ const solved = solveRelational(clean.ops)   // 关系式 → 绝对坐标
 ## 不变量
 
 - **round-trip**:活跃 kind 的 serialize↔parse 双向稳定。
+- **关系式导出不重排几何**:`serializeCanvas` 仅在锚点行更早、坐标量化后仍一致且不触发避碰时输出 `right-of/below`，否则回退 `@pos`。卡片行默认是更新指令；用于 Web 空画布重建时，须把新卡行明确改为 `create`。
 - **sanitize 永不抛错**:坏输入降级,不整块丢。
+- **存在性口径一致**:sanitize 的「不存在」判定 = 画布已有 ∪ 同批声明(card/free/arrow 同口径);声明写在引用之后的行不产诊断,由 apply 逐 op shadow 跳过并在 UI 以「将被跳过」呈现。
 - **freedraw 不在 DSL**:freedraw 已出 DSL(程序自管 R2 + 渲染);serialize 按 `DSL_KINDS` 过滤,`[freedraw]` 行 parse 报 unrecognized。点序列/位置都不进 DSL(隐私 + 防 DoS + 存储重/意义低)。
 - **Bauhaus 6 色**:不新增色。
 - **截断代理对安全**:`truncateDslText` 不劈开 emoji/增补平面字符(不产孤立代理位)。
@@ -65,7 +69,7 @@ v5 的卡片内容(`@title`/`@content`)在格式层、apply 层、`/ask` 落库�
 - **E(纯内容/属性编辑)**:现有卡的 `@title`/`@content`/`@color`/`@size` 编辑**可省 `@pos`**(`keepExistingPos` 标志,apply 时几何沿用现有卡);`@pos` 仅在**移动**卡或**建卡**时必需。裸行(无任何字段)/ `create` 无 `@pos` 仍报 `missing @pos`。锁于 `dsl-content.test.ts` + `apply-content.test.ts`。
 - DSL 模态编辑器(人读)与 `/ask` agent(AI 写)两条路径对 `@title`/`@content` 行为一致。
 
-**边界(by-design,非局限)**:serialize 不发空 token(空是默认态,无需冗余);`keepExistingPos` 是**输入专用**——serialize 始终发绝对 `@pos`,故 round-trip 序列化格式不变(未 bump `DSL_VERSION`)。
+**边界**:serialize 不发空内容 token(空是默认态);`keepExistingPos` 是输入专用标记。序列化仍显式表示位置：符合条件时用关系式，否则用 `@pos`。
 
 ## 预期能力测试(qwen-max-7-21)
 

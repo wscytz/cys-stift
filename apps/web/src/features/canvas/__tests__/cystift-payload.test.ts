@@ -3,9 +3,10 @@ import {
   embedCystiftInSvg,
   extractCystiftFromSvg,
   restoreCystiftPayload,
+  buildCystiftPayload,
 } from '../cystift-payload'
 import type { CystiftPayload } from '../cystift-payload'
-import type { CanvasElement } from '@cys-stift/canvas-engine'
+import { InMemoryCanvasHost, type CanvasElement } from '@cys-stift/canvas-engine'
 
 // We mock ONLY @/lib/canvas-store so we can drive canvasStore.create's return
 // value (the Bug 2 contract: '' on quota failure). The freeform store is left
@@ -57,6 +58,56 @@ const PAYLOAD: CystiftPayload = {
   ],
   elements: [],
 }
+
+describe('buildCystiftPayload — share boundary', () => {
+  const makeCard = (id: string, overrides: Record<string, unknown> = {}) => ({
+    id,
+    title: id,
+    body: `${id}-body`,
+    type: 'note',
+    media: [],
+    links: [],
+    codeSnippets: [],
+    quotes: [],
+    tags: [],
+    source: { kind: 'manual', deviceId: 'device-secret' },
+    capturedAt: new Date('2026-06-21T00:00:00Z'),
+    createdAt: new Date('2026-06-21T00:00:00Z'),
+    updatedAt: new Date('2026-06-21T00:00:00Z'),
+    pinned: false,
+    archived: false,
+    ...overrides,
+  })
+
+  it('excludes archived/deleted cards, their geometry, dangling arrows, and device ids (S-02)', () => {
+    const host = new InMemoryCanvasHost()
+    const element = (id: string, kind: 'card' | 'arrow'): CanvasElement =>
+      kind === 'card'
+        ? { id, kind, x: 0, y: 0, w: 100, h: 80, rotation: 0 }
+        : { id, kind, x: 0, y: 0, w: 0, h: 0, rotation: 0, from: 'live', to: 'archived' }
+    host.upsert(element('live', 'card'))
+    host.upsert(element('archived', 'card'))
+    host.upsert(element('deleted', 'card'))
+    host.upsert(element('arrow-live-archive', 'arrow'))
+
+    const service = {
+      listOnCanvas: () => [
+        makeCard('live'),
+        makeCard('archived', { archived: true }),
+        makeCard('deleted', { deletedAt: new Date() }),
+      ],
+    }
+    const payload = buildCystiftPayload(
+      host,
+      service as never,
+      'canvas-1' as never,
+      'demo',
+    )
+    expect(payload.cards.map((card) => card.id)).toEqual(['live'])
+    expect('deviceId' in (payload.cards[0]!.source as Record<string, unknown>)).toBe(false)
+    expect(payload.elements.map((item) => item.id)).toEqual(['live'])
+  })
+})
 
 describe('.cystift SVG roundtrip (data-cystift attribute)', () => {
   it('embeds a payload as data-cystift on the root <svg>', () => {

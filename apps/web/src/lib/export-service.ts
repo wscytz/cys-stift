@@ -245,7 +245,7 @@ export async function clearWorkspace(): Promise<ImportResult> {
     canvasView: {},
   }
 
-  return importFromJson(JSON.stringify(emptyWorkspace), { mode: 'replace' })
+  return importFromJson(JSON.stringify(emptyWorkspace), { mode: 'replace', trustedSettings: true })
 }
 
 /**
@@ -313,6 +313,12 @@ export interface ImportOptions {
    * imports pass `false` so restoring cannot replace its own checkpoint.
    */
   checkpoint?: boolean
+  /**
+   * Internal trusted round-trip（清空工作区 / 恢复导入检查点）：这两条路径
+   * 恢复的是本机刚刚导出的状态，不是外部文件；不得把 AI 启用状态/Labs 一并清掉。
+   * UI 导入永远不要设置它。
+   */
+  trustedSettings?: boolean
 }
 
 type JsonObject = Record<string, unknown>
@@ -396,6 +402,104 @@ function storedArray(key: string, property?: string): unknown[] {
   const parsed = readJson(key)
   const value = property && isObject(parsed) ? parsed[property] : parsed
   return Array.isArray(value) ? value : []
+}
+
+/**
+ * 导入边界的安全设置：备份可能来自不可信来源，不能让它静默改道 AI 请求或
+ * 打开用户从未同意的 Labs / 样本采集。
+ * - 只在这些字段真的出现在备份里时介入（普通设置往返保持不变）。
+ * - merge：保留本机的 active profile、Labs、样本/正文开关；同 id profile 用本机版本，
+ *   防止“备份复用了本地 profile id，却把 baseUrl 指向别的端点”。
+ * - replace / 无本机基线：profile 仍导入（作为未启用配置），但 activeProfileId 置空、
+ *   Labs/样本关闭；用户要启用任何一项，必须在设置页自己选择。
+ */
+const IMPORT_SENSITIVE_SETTING_KEYS = [
+  'profiles',
+  'activeProfileId',
+  'labs',
+  'aiSampleCapture',
+  'aiIncludeCardContent',
+] as const
+
+function sanitizeImportedSettings(
+  imported: Record<string, unknown>,
+  current: Record<string, unknown> | undefined,
+  mode: ImportMode,
+): Record<string, unknown> {
+  if (!IMPORT_SENSITIVE_SETTING_KEYS.some((key) => key in imported)) return imported
+  const next: Record<string, unknown> = { ...imported }
+  if (mode === 'merge' && current) {
+    for (const key of IMPORT_SENSITIVE_SETTING_KEYS) {
+      if (key === 'profiles' || !(key in next)) continue
+      if (key in current) next[key] = current[key]
+      else delete next[key]
+    }
+    if (Array.isArray(next.profiles) && Array.isArray(current.profiles)) {
+      const localById = new Map<string, unknown>()
+      for (const profile of current.profiles) {
+        if (isObject(profile) && typeof profile.id === 'string') localById.set(profile.id, profile)
+      }
+      next.profiles = next.profiles.map((profile) =>
+        isObject(profile) && typeof profile.id === 'string' && localById.has(profile.id)
+          ? localById.get(profile.id)
+          : profile,
+      )
+    }
+    return next
+  }
+  if ('activeProfileId' in next) next.activeProfileId = null
+  if ('labs' in next) next.labs = {}
+  if ('aiSampleCapture' in next) next.aiSampleCapture = false
+  delete next.aiIncludeCardContent
+  return next
+}
+
+/**
+ * Merge freeform geometry by element id: incoming wins on the same id, local-only
+ * elements survive. Merge mode's promise (“本机独有数据保留”) must hold for canvas
+ * geometry too — writing `incoming.elements` wholesale silently deletes local-only
+ * strokes/arrows/text.
+ */
+function mergeElementsById(
+  current: readonly CanvasElement[],
+  incoming: readonly CanvasElement[],
+): CanvasElement[] {
+  const merged = [...current]
+  const index = new Map(current.map((element, i) => [element.id, i]))
+  for (const element of incoming) {
+    const existingIndex = index.get(element.id)
+    if (existingIndex === undefined) {
+      index.set(element.id, merged.length)
+      merged.push(element)
+    } else {
+      merged[existingIndex] = element
+    }
+  }
+  return merged
+}
+
+/** Conversations have no message ids; merge by full-message signature and keep
+ *  local order first. This is lossless for “local-only remains” and does not
+ *  pretend to resolve edits of the same message (there is no id to anchor on). */
+function mergeConversations(
+  current: unknown,
+  incoming: readonly PersistedConversationMessage[],
+): PersistedConversationMessage[] {
+  const existing = Array.isArray(current)
+    ? (current as PersistedConversationMessage[]).filter(
+        (message): message is PersistedConversationMessage =>
+          isObject(message) && typeof message.role === 'string' && typeof message.content === 'string',
+      )
+    : []
+  const seen = new Set(existing.map((message) => JSON.stringify(message)))
+  const merged = [...existing]
+  for (const message of incoming) {
+    const signature = JSON.stringify(message)
+    if (seen.has(signature)) continue
+    seen.add(signature)
+    merged.push(message)
+  }
+  return merged
 }
 
 function mergeByStringKey(
@@ -1004,6 +1108,9 @@ export async function importFromJson(
           )
         }
       }
+      settings = options?.trustedSettings
+        ? settings
+        : sanitizeImportedSettings(settings, currentSettings, mode)
       planOptional(STORE_KEYS.settings, true, { settings })
     } else {
       planOptional(STORE_KEYS.settings, false, null)
@@ -1063,7 +1170,18 @@ export async function importFromJson(
         if (!Array.isArray(messages)) continue
         const key = `${CONVERSATION_PREFIX}${canvasId}${CONVERSATION_SUFFIX}`
         incomingConversationKeys.add(key)
-        operations.push({ key, value: JSON.stringify(messages) })
+        let mergedMessages: readonly PersistedConversationMessage[] = messages as PersistedConversationMessage[]
+        if (mode === 'merge') {
+          let currentMessages: unknown = null
+          try {
+            const raw = window.localStorage.getItem(key)
+            currentMessages = raw ? JSON.parse(raw) : null
+          } catch {
+            currentMessages = null
+          }
+          mergedMessages = mergeConversations(currentMessages, mergedMessages)
+        }
+        operations.push({ key, value: JSON.stringify(mergedMessages) })
       }
     }
     if (mode === 'replace') {
@@ -1172,11 +1290,19 @@ export async function importFromJson(
   try {
     for (const canvasId of freeformIds) {
       const incoming = incomingFreeform.get(canvasId)
-      const ok = incoming
-        ? await canvasFreeformStore.save(canvasId as CanvasId, incoming.elements)
+      const elements = incoming
+        ? mode === 'merge'
+          ? mergeElementsById(
+              freeformSnapshot.get(canvasId)?.elements ?? [],
+              incoming.elements,
+            )
+          : incoming.elements
+        : undefined
+      const ok = elements
+        ? await canvasFreeformStore.save(canvasId as CanvasId, elements)
         : await canvasFreeformStore.remove(canvasId as CanvasId)
       if (!ok) throw new Error(`could not persist canvas ${canvasId}`)
-      if (incoming) freeformCanvases++
+      if (elements) freeformCanvases++
     }
   } catch (error) {
     let freeformRestored = true
@@ -1237,6 +1363,7 @@ export async function restoreImportCheckpoint(): Promise<ImportResult> {
   const result = await importFromJson(JSON.stringify(checkpoint.payload), {
     mode: 'replace',
     checkpoint: false,
+    trustedSettings: true,
   })
   if (!result.ok) return result
 

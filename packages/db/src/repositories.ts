@@ -58,15 +58,13 @@ export class SqliteCardRepository implements CardRepository {
   }
 
   listOnCanvas(canvasId: CanvasId) {
+    // 与 Web/domain 的契约一致：listOnCanvas 是底层查询，不承担“可见列表”的
+    // 软删过滤；消费侧自己按 deletedAt/archived 过滤。SQLite 独有过滤会让
+    // 回收站恒空、删画布时软删卡不被迁回 inbox。
     const rows = this.handle.db
       .select()
       .from(schema.cards)
-      .where(
-        and(
-          eq(schema.cards.canvasId, canvasId),
-          isNull(schema.cards.deletedAt),
-        ),
-      )
+      .where(eq(schema.cards.canvasId, canvasId))
       .orderBy(asc(schema.cards.canvasZ))
       .all()
     return rows.map(cardFromRow)
@@ -74,9 +72,7 @@ export class SqliteCardRepository implements CardRepository {
 
   listAll() {
     const rows = this.handle.db.select().from(schema.cards).all()
-    return rows
-      .filter((r) => r.deletedAt == null)
-      .map(cardFromRow)
+    return rows.map(cardFromRow)
   }
 
   applyBatch(changes: CardBatchChange[]): boolean {

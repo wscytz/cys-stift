@@ -34,9 +34,15 @@ const REPLACEMENTS = [
   { re: /\/home\/[^/"'\s)]+\/(?:[^/"'\s)]+\/)*cys-stift/g, to: '.' },
   { re: /[A-Za-z]:\\Users\\[^\\"'\s)]+\\projects\\cys-stift/g, to: '.' },
   { re: /[A-Za-z]:\\(?:[^\\"'\s)]+\\)*cys-stift/g, to: '.' },
+  // 其他构建机常见前缀（macOS 临时目录 / Homebrew / CI root / /tmp）；只在路径
+  // 明确指向本项目时替换，避免误改合法文本。
+  { re: /\/private\/var\/[^"'\s)]*\/cys-stift/g, to: '.' },
+  { re: /\/opt\/homebrew\/[^"'\s)]*\/cys-stift/g, to: '.' },
+  { re: /\/root\/[^/"'\s)]*\/cys-stift/g, to: '.' },
+  { re: /\/tmp\/[^/"'\s)]*\/cys-stift/g, to: '.' },
 ]
 
-const LEAK = /(\/Users\/|file:\/\/\/Users\/|[A-Za-z]:\\Users\\|[A-Za-z]:\\(?:[^\\"'\s)]+\\)*cys-stift|\/home\/[^/"'\s)]+\/.*cys-stift|file:\/\/\/[A-Za-z]:\/(?:[^/"'\s)]+\/)*cys-stift)/
+const LEAK = /(\/Users\/|file:\/\/\/Users\/|[A-Za-z]:\\Users\\|[A-Za-z]:\\(?:[^\\"'\s)]+\\)*cys-stift|\/home\/[^/"'\s)]+\/.*cys-stift|file:\/\/\/[A-Za-z]:\/(?:[^/"'\s)]+\/)*cys-stift|\/private\/var\/[^"'\s)]*\/cys-stift|\/opt\/homebrew\/[^"'\s)]*\/cys-stift|\/root\/[^/"'\s)]*\/cys-stift|\/tmp\/[^/"'\s)]*\/cys-stift)/
 
 let removed = 0
 let rewritten = 0
@@ -58,6 +64,13 @@ async function walk(dir) {
     }
     if (!entry.isFile()) continue
     const ext = path.extname(entry.name).toLowerCase()
+    // Source maps are build-machine artifacts: never publish them. They also
+    // carry absolute paths that text rewriting cannot safely scrub.
+    if (ext === '.map') {
+      await rm(full, { force: true })
+      removed++
+      continue
+    }
     if (!TEXT_EXT.has(ext)) continue
     scanned++
     const source = await readFile(full, 'utf8')
@@ -120,7 +133,7 @@ async function renameRewrittenChunks() {
   const chunksDir = path.join(OUT, '_next/static/chunks')
   const renamed = []
   for (const full of rewrittenFiles) {
-    if (path.dirname(full) !== chunksDir) continue
+    if (!full.startsWith(chunksDir + path.sep)) continue
     const base = path.basename(full)
     const match = base.match(/^(.*)\.([0-9a-f]{16})\.js$/)
     if (!match) continue
@@ -129,7 +142,7 @@ async function renameRewrittenChunks() {
     const newHash = createHash('sha256').update(content).digest('hex').slice(0, 16)
     if (newHash === oldHash) continue
     const newBase = `${prefix}.${newHash}.js`
-    await rename(full, path.join(chunksDir, newBase))
+    await rename(full, path.join(path.dirname(full), newBase))
     // The webpack runtime maps chunk id -> bare hash, not the full filename.
     await replaceInTextFiles(oldHash, newHash)
     renamed.push(`${base} -> ${newBase}`)

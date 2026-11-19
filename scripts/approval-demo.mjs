@@ -5,10 +5,21 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import path from 'node:path'
 import puppeteer from 'puppeteer-core'
 
+const chromePath = process.env.CHROME_PATH || [
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+].find((candidate) => existsSync(candidate))
+if (!chromePath) {
+  console.error('Chrome/Chromium not found. Set CHROME_PATH to the browser binary.')
+  process.exit(1)
+}
 const root = path.resolve('apps/web/out')
 const source = (file) => readFileSync(path.join('apps/web/src/lib', file), 'utf8')
 const keyOf = (file) => source(file).match(/const STORAGE_KEY = '([^']+)'/)[1]
@@ -64,9 +75,14 @@ let browser
 const errors = []
 const external = []
 try {
-  browser = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true, defaultViewport: { width: 1440, height: 900, deviceScaleFactor: 1 } })
+  browser = await puppeteer.launch({ executablePath: chromePath, headless: true, defaultViewport: { width: 1440, height: 900, deviceScaleFactor: 1 } })
   const context = await browser.createBrowserContext()
   const page = await context.newPage()
+  // The demo asserts Chinese labels; CI runners default to en-US, so pin the
+  // navigator language before app scripts run (i18n detects locale from it).
+  await page.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, 'language', { get: () => 'zh-CN' })
+  })
   page.on('pageerror', (error) => errors.push(error.message))
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()) })
   await page.setRequestInterception(true)
@@ -219,8 +235,8 @@ try {
 
   // 错误路径：缺失锚点整单取消，画布状态不变。
   await setDsl('[card #e] right-of #ghost @gap(40)')
-  await page.waitForFunction(() => [...document.querySelectorAll('.dsl-preview')].some((node) => (node.textContent ?? '').includes('无法应用')), { timeout: 10000 })
-  const errorPreview = await page.evaluate(() => [...document.querySelectorAll('.dsl-preview')].map((node) => node.textContent).find((text) => text.includes('无法应用')) ?? '')
+  await page.waitForFunction(() => document.querySelector('[data-testid="dsl-apply-blocked"]'), { timeout: 10000 })
+  const errorPreview = await page.evaluate(() => document.querySelector('[data-testid="dsl-apply-blocked"]')?.textContent ?? '')
   const errorBefore = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)).cards.find((card) => card.id === 'e'), keys.cards)
   await clickApply()
   await page.waitForFunction(() => [...document.querySelectorAll('[role="status"], [role="alert"]')].some((node) => (node.textContent ?? '').includes('已整单取消')), { timeout: 10000 })

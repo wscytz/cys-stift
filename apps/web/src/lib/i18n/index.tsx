@@ -4,12 +4,18 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { settingsStore, useSettings } from '@/lib/settings-store'
 import type { MessageKey, Locale } from './messages'
 import { messages } from './messages'
+import { interpolateMessage } from './interpolate'
 
 // L4 (v0.23.3): dedupe dev-mode missing-key warnings. Without this, a
 // single typo'd t() call warns on every re-render (a page with the bug
 // re-renders dozens of times in dev). We record each `${locale}:${key}`
 // pair once and stay silent after.
 const _warnedKeys = new Set<string>()
+
+/**
+ * 文案插值:见 ./interpolate.ts(单遍正则 + 回调,双占位符/`$` 模式/嵌套三类坑全避)。
+ */
+export { interpolateMessage } from './interpolate'
 
 interface I18nCtx {
   locale: Locale
@@ -81,11 +87,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
         return String(key)
       }
       if (!params) return msg
-      let result: string = msg
-      for (const [k, v] of Object.entries(params)) {
-        result = result.replace(`{${k}}`, String(v ?? ''))
-      }
-      return result
+      return interpolateMessage(msg, params)
     },
     [locale],
   )

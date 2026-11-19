@@ -65,6 +65,20 @@ describe('self-built pinch', () => {
     expect(host.getView().zoom).toBeLessThan(zoomAfterSpread)
   })
 
+  it('双指同时缩放+平移:内容相对手指不漂移(缩放锚点=上一帧中点)', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'))
+    const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas
+    dispatch(canvas, 'pointerdown', 100, 100, 1)
+    dispatch(canvas, 'pointerdown', 200, 100, 2)
+    dispatch(canvas, 'pointermove', 120, 100, 1)
+    dispatch(canvas, 'pointermove', 260, 100, 2)
+    const view = host.getView()
+    expect(view.zoom).toBeCloseTo(1.4, 6)
+    // lastMid=(150,100), 新 mid=(190,100): pan = 190 - 150*1.4 = -20 / 100 - 100*1.4 = -40
+    expect(view.panX).toBeCloseTo(-20, 6)
+    expect(view.panY).toBeCloseTo(-40, 6)
+  })
+
   it('单指 drag 元素中第二指落下 → 中断 drag(clearInteractionState)', () => {
     const host = new SelfBuiltAdapter(document.createElement('canvas'))
     const canvas = (host as unknown as { canvas: HTMLCanvasElement }).canvas

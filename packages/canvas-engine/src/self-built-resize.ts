@@ -13,8 +13,10 @@ export function handleAtPoint(
   point: { x: number; y: number },
   zoom: number,
 ): Handle | null {
-  const tol = HANDLE_HIT_PX / zoom
   const b = normalizeBox(el) // 负 bbox 归一化,四角才算对
+  // 小元素(10×10)在 6px 容差下中心点会同时命中四角，导致整块无法拖动。
+  // 容差封顶到短边的 1/4，保证中心区仍可拖动。
+  const tol = Math.min(HANDLE_HIT_PX / zoom, 0.25 * Math.min(b.w, b.h))
   const corners: Record<Handle, { x: number; y: number }> = {
     nw: { x: b.x, y: b.y },
     ne: { x: b.x + b.w, y: b.y },

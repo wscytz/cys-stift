@@ -40,10 +40,10 @@ jobs:
         run: pnpm -r lint
 
       - name: domain test
-        run: pnpm --filter domain test
+        run: pnpm --filter domain --fail-if-no-match test
 
       - name: db test
-        run: pnpm --filter db test
+        run: pnpm --filter db --fail-if-no-match test
 
       - name: cys-dsl test
         run: pnpm --filter @wscytz/dsl --fail-if-no-match test
@@ -52,13 +52,23 @@ jobs:
         run: pnpm --filter @wscytz/dsl --fail-if-no-match verify:pack
 
       - name: canvas-engine test
-        run: pnpm --filter @cys-stift/canvas-engine test
+        run: pnpm --filter @cys-stift/canvas-engine --fail-if-no-match test
 
       - name: web test
-        run: pnpm --filter web test
+        run: pnpm --filter web --fail-if-no-match test
 
       - name: web build (includes web typecheck)
-        run: pnpm --filter web build
+        run: pnpm --filter web --fail-if-no-match build
+
+      - name: approval demo (DSL confirm chain)
+        run: pnpm demo:approval
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+
+      - name: DSL seed e2e (?dsl= entry)
+        run: pnpm e2e:dsl-seed
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
   build-tauri-windows:
     runs-on: windows-latest
     steps:

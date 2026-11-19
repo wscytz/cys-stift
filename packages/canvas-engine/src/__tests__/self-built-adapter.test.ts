@@ -1168,6 +1168,19 @@ describe('SelfBuiltAdapter gridMode snap to 8px grid', () => {
     expect(host.getElement('c1')).toMatchObject({ x: 8, y: 8 })
   })
 
+  it('snap mode: multi-select drag keeps relative spacing', () => {
+    const host = new SelfBuiltAdapter(document.createElement('canvas'), { getCardInfo: () => null })
+    host.upsert({ id: 'r1', kind: 'rect', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
+    host.upsert({ id: 'r2', kind: 'rect', x: 4, y: 0, w: 10, h: 10, rotation: 0 })
+    host.setView({ panX: 0, panY: 0, zoom: 1, gridMode: 'snap' })
+    ;(host as unknown as { setSelectedIds: (i: string[]) => void }).setSelectedIds(['r1', 'r2'])
+
+    // +5 → 组锚点 0→5 吸附到 8（位移 +3）；两元素同加 +3，间距仍为 4。
+    simulateDrag(host, 5, 5, 5, 0)
+    expect(host.getElement('r1')).toMatchObject({ x: 8, y: 0 })
+    expect(host.getElement('r2')).toMatchObject({ x: 12, y: 0 })
+  })
+
   it('snap mode: arrow keys move by 8px (not 1px)', () => {
     const host = new SelfBuiltAdapter(document.createElement('canvas'), { getCardInfo: () => null })
     host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 100, rotation: 0 })

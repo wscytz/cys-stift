@@ -1021,6 +1021,132 @@ describe('importFromJson — replace / merge transaction', () => {
     ).not.toBeNull()
   })
 
+  it('merge keeps local AI endpoint/Labs/sample switches and same-id profiles (S-01)', async () => {
+    const localProfile = {
+      id: 'p1',
+      name: 'Local',
+      provider: 'openai',
+      baseUrl: 'https://local.example/v1',
+      apiKey: 'local-test-key',
+      model: 'm',
+      enabled: true,
+    }
+    seedStores({
+      settings: {
+        activeProfileId: 'p1',
+        labs: { proposalCoauthorLab: false },
+        aiSampleCapture: false,
+        aiIncludeCardContent: true,
+        profiles: [localProfile],
+      },
+    })
+
+    const result = await mod.importFromJson(
+      minimalPayload({
+        settings: {
+          activeProfileId: 'p1',
+          labs: { proposalCoauthorLab: true },
+          aiSampleCapture: true,
+          aiIncludeCardContent: false,
+          profiles: [{ ...localProfile, baseUrl: 'https://attacker.example/v1', apiKey: 'evil' }],
+        },
+      }),
+      { mode: 'merge' },
+    )
+
+    expect(result.ok).toBe(true)
+    const restored = JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!).settings
+    expect(restored.activeProfileId).toBe('p1')
+    expect(restored.labs).toEqual({ proposalCoauthorLab: false })
+    expect(restored.aiSampleCapture).toBe(false)
+    expect(restored.aiIncludeCardContent).toBe(true)
+    expect(restored.profiles).toEqual([localProfile])
+  })
+
+  it('replace does not auto-activate imported AI profiles or enable Labs/sample capture (S-01)', async () => {
+    const result = await mod.importFromJson(
+      minimalPayload({
+        settings: {
+          activeProfileId: 'p1',
+          labs: { proposalCoauthorLab: true },
+          aiSampleCapture: true,
+          profiles: [{
+            id: 'p1',
+            name: 'Remote',
+            provider: 'openai',
+            baseUrl: 'https://attacker.example/v1',
+            apiKey: 'evil',
+            model: 'm',
+            enabled: true,
+          }],
+        },
+      }),
+    )
+
+    expect(result.ok).toBe(true)
+    const restored = JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!).settings
+    expect(restored.activeProfileId).toBeNull()
+    expect(restored.labs).toEqual({})
+    expect(restored.aiSampleCapture).toBe(false)
+    // The profile survives as an inert, user-visible choice.
+    expect(restored.profiles).toHaveLength(1)
+  })
+
+  it('merge unions freeform elements and conversation messages instead of overwriting (D-01)', async () => {
+    const localRect = {
+      id: 'local-rect',
+      kind: 'rect',
+      x: 0,
+      y: 0,
+      w: 10,
+      h: 10,
+      rotation: 0,
+      color: 'red',
+    }
+    window.localStorage.setItem(
+      `${FREEFORM_PREFIX}merge-canvas${FREEFORM_SUFFIX}`,
+      JSON.stringify({ v: 1, app: 'cys-stift', elements: [localRect] }),
+    )
+    seedConversation('merge-chat', [{ role: 'user', content: 'local' }])
+
+    const result = await mod.importFromJson(
+      minimalPayload({
+        freeform: {
+          'merge-canvas': {
+            v: 1,
+            app: 'cys-stift',
+            elements: [{
+              id: 'incoming-rect',
+              kind: 'rect',
+              x: 20,
+              y: 0,
+              w: 10,
+              h: 10,
+              rotation: 0,
+              color: 'blue',
+            }],
+          },
+        },
+        conversations: {
+          'merge-chat': [{ role: 'assistant', content: 'incoming' }],
+        },
+      }),
+      { mode: 'merge' },
+    )
+
+    expect(result.ok).toBe(true)
+    const { canvasFreeformStore } = await import('../canvas-freeform-store')
+    const merged = await canvasFreeformStore.load('merge-canvas' as never)
+    expect(merged?.elements.map((element) => element.id).sort()).toEqual([
+      'incoming-rect',
+      'local-rect',
+    ])
+    const messages = JSON.parse(
+      window.localStorage.getItem(conversationStorageKey('merge-chat'))!,
+    ) as { content: string }[]
+    expect(messages.map((message) => message.content).sort()).toEqual(['incoming', 'local'])
+  })
+
   it('preserves a target-device API key when importing a redacted profile', async () => {
     const targetSecret = 'sk-target-device-only'
     const profile = {
@@ -1331,7 +1457,7 @@ describe('P0 regression — settings key v1→v2', () => {
     expect(window.localStorage.getItem(SETTINGS_KEY_LEGACY_V1)).toBeNull()
   })
 
-  it('round-trips settings through export → wipe → import (v2 key, no loss)', async () => {
+  it('round-trips settings through export → wipe → import (v2 key; AI activation stays off)', async () => {
     const settings = {
       theme: 'dark',
       locale: 'en',
@@ -1348,9 +1474,10 @@ describe('P0 regression — settings key v1→v2', () => {
     const result = await mod.importFromJson(json)
     expect(result.ok).toBe(true)
 
-    // settings round-tripped through the v2 key.
+    // settings round-tripped through the v2 key. AI activation is deliberately
+    // not restored by an external backup: the user must pick a profile first.
     const restored = JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!) as { settings: typeof settings }
-    expect(restored.settings).toEqual(settings)
+    expect(restored.settings).toEqual({ ...settings, activeProfileId: null })
   })
 })
 
@@ -1528,8 +1655,10 @@ describe('full round-trip — settings + templates + samples + conversations', (
     const result = await mod.importFromJson(json)
     expect(result.ok).toBe(true)
 
-    // All user data restored.
-    expect(JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!)).toEqual({ settings })
+    // All user data restored. External backups do not auto-activate AI.
+    expect(JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!)).toEqual({
+      settings: { ...settings, activeProfileId: null },
+    })
     expect(JSON.parse(window.localStorage.getItem(TEMPLATES_KEY)!)).toEqual(templates)
     expect(JSON.parse(window.localStorage.getItem(SAMPLES_KEY)!)).toEqual(samples)
     expect(JSON.parse(window.localStorage.getItem(conversationStorageKey('canvas-x'))!)).toEqual(convMsgs)

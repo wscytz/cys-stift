@@ -313,7 +313,7 @@ describe('toSvg options / renderDslSvg — 外部消费方协作(v11)', () => {
     expect(svg).not.toContain('<path')
   })
 
-  it('renderDslSvg:existingGeometry 供增量补丁的锚点与避障', () => {
+  it('renderDslSvg:existingGeometry 供相对布局求解(锚点/避障),但本身不绘制', () => {
     const { svg, diagnostics } = renderDslSvg('[card #g create] right-of #a @gap(20) @size(200,100)', {
       existingGeometry: { a: { x: 0, y: 0, w: 200, h: 100 } },
     })
@@ -321,5 +321,160 @@ describe('toSvg options / renderDslSvg — 外部消费方协作(v11)', () => {
     expect(svg).toContain('<rect')
     // a 右缘 200 + gap 20 = 220(SVG 里第一个 rect 是带 PAD 偏移的背景,卡片是 220)
     expect(svg).toContain('<rect x="220"')
+    // existing #a 只参与求解,快照不画它:背景 + 新卡恰两张 rect
+    expect((svg.match(/<rect /g) ?? [])).toHaveLength(2)
+  })
+})
+
+describe('快照渲染契约 — delete / 内容编辑 / existingGeometry / 选项守卫', () => {
+  const dsl = [
+    '[card #a create] @pos(0,0) @size(200,100) @title("A")',
+    '[card #b create] @pos(400,0) @size(200,100) @title("B")',
+    '[arrow #e1] from #a to #b @label("引用")',
+  ].join('\n')
+
+  it('delete 永不绘制、不登记占位几何,也不进 skipped', () => {
+    const { svg, skipped } = toSvg(
+      solve(
+        [
+          '[card #gone delete]',
+          '[rect #r delete]',
+          '[text #t delete]',
+          '[frame #f delete]',
+          '[arrow #e delete]',
+          '[card #ok create] @pos(0,0) @size(100,80)',
+        ].join('\n'),
+      ),
+    )
+    expect(skipped).toEqual([])
+    // 仅背景 + ok 卡两张 rect:delete 的 (0,0) 占位卡没有被画出来
+    expect((svg.match(/<rect /g) ?? [])).toHaveLength(2)
+    expect(svg).toContain('width="100"')
+    expect(svg).not.toContain('<path')
+  })
+
+  it('箭头端点指向 delete op → skipped(delete 不登记几何),不产悬空线', () => {
+    const { svg, skipped } = toSvg(solve('[card #gone delete]\n[arrow #e] from #gone to #gone'))
+    expect(skipped).toHaveLength(1)
+    expect(skipped[0]).toMatchObject({ opIndex: 1, line: 2 })
+    expect(skipped[0]!.reason).toContain('#gone')
+    expect(svg).not.toContain('<path')
+  })
+
+  it('纯内容编辑不猜 (0,0) 原点:skipped 带原因/行号,占位卡不画', () => {
+    const { svg, skipped } = toSvg(
+      solve('[card #a] @title("改名")\n[card #b create] @pos(0,0) @size(100,80) @title("B")'),
+    )
+    expect(skipped).toHaveLength(1)
+    expect(skipped[0]).toMatchObject({ opIndex: 0, line: 1 })
+    expect(skipped[0]!.reason).toContain('无 @pos')
+    expect(svg).not.toContain('改名')
+    expect(svg).toContain('>B<')
+  })
+
+  it('existingGeometry 不让内容编辑凭空投影(快照不是补丁)', () => {
+    const { svg, skipped } = renderDslSvg('[card #a] @title("改名")', {
+      existingGeometry: { a: { x: 100, y: 200, w: 240, h: 120 } },
+    })
+    expect(skipped).toHaveLength(1)
+    expect(skipped[0]).toMatchObject({ line: 1 })
+    expect(skipped[0]!.reason).toContain('无 @pos')
+    expect(svg).not.toContain('改名')
+    expect(svg).not.toContain('width="240"')
+  })
+
+  it('existingGeometry 只供相对求解:箭头指向已有 id → skipped,已有元素不画', () => {
+    const text = [
+      '[card #b create] @pos(0,0) @size(100,80)',
+      '[arrow #e1] from #ex to #b',
+      '[arrow #e2] from #b to #ex',
+    ].join('\n')
+    const { svg, skipped, diagnostics } = renderDslSvg(text, {
+      existingGeometry: { ex: { x: 400, y: 0, w: 100, h: 80 } },
+    })
+    expect(diagnostics).toEqual([])
+    expect(skipped).toHaveLength(2)
+    expect(skipped.map((s) => ({ opIndex: s.opIndex, line: s.line }))).toEqual([
+      { opIndex: 1, line: 2 },
+      { opIndex: 2, line: 3 },
+    ])
+    expect(skipped.every((s) => s.reason.includes('#ex'))).toBe(true)
+    expect(svg).not.toContain('<path')
+    // 只有背景 + DSL 里的 b 卡;existing #ex 不画
+    expect((svg.match(/<rect /g) ?? [])).toHaveLength(2)
+  })
+
+  it('existingGeometry 本身不进画面(空 DSL → 只有背景)', () => {
+    const { svg, skipped } = renderDslSvg('', {
+      existingGeometry: { ex: { x: 0, y: 0, w: 300, h: 200 } },
+    })
+    expect(skipped).toEqual([])
+    expect((svg.match(/<rect /g) ?? [])).toHaveLength(1)
+    expect(svg).not.toContain('width="300"')
+  })
+
+  it('可视化数值选项非有限/非正 → 回落缺省(输出逐字节等于缺省)', () => {
+    const ops = solve(dsl)
+    const base = toSvg(ops).svg
+    expect(toSvg(ops, { strokeWidth: Number.NaN, arrowHeadLength: Infinity, labelFontSize: 0 }).svg).toBe(base)
+    expect(toSvg(ops, { strokeWidth: -1, arrowHeadLength: -12, labelFontSize: Number.NaN }).svg).toBe(base)
+    expect(toSvg(ops, { arrowHeadLength: 0 }).svg).toBe(base)
+    expect(/NaN|Infinity/.test(toSvg(ops, { strokeWidth: Infinity, labelFontSize: -5 }).svg)).toBe(false)
+  })
+
+  it('合法正数选项生效(含小数)', () => {
+    const ops = solve(dsl)
+    const base = toSvg(ops).svg
+    const custom = toSvg(ops, { strokeWidth: 3.5, arrowHeadLength: 20, labelFontSize: 12 }).svg
+    expect(custom).not.toBe(base)
+    expect(custom).toContain('stroke-width="3.5"')
+    expect(custom).toContain('font-size="12"')
+    // arrowHeadLength 单独生效(箭头头部坐标变化)
+    expect(toSvg(ops, { arrowHeadLength: 20 }).svg).not.toBe(base)
+  })
+
+  it('skipped/diagnostics 带源行号;opIndex 是 op 数组下标而非行号', () => {
+    const { skipped, diagnostics } = renderDslSvg(
+      ['[card #bad]', '[card #a create] @pos(0,0) @size(100,80)', '[arrow #e] from #a to #ghost'].join('\n'),
+    )
+    expect(diagnostics).toContainEqual(expect.objectContaining({ stage: 'parse', line: 1 }))
+    expect(skipped).toHaveLength(1)
+    expect(skipped[0]).toMatchObject({ opIndex: 1, line: 3 })
+    expect(skipped[0]!.reason).toContain('#ghost')
+  })
+
+  it('外部 JSON ops 的非有限 curve/elbow 不产 NaN 或属性注入 (P-10)', () => {
+    const ops = solve(
+      '[card #a create] @pos(0,0) @size(100,80)\n[card #b create] @pos(300,0) @size(100,80)\n[arrow #e] from #a to #b',
+    )
+    const arrow = ops.find((op) => op.type === 'arrow') as Record<string, unknown>
+    arrow.route = 'curve'
+    arrow.curve = { cx: '0" onload="alert(1)', cy: Number.NaN }
+    const curved = toSvg(ops).svg
+    expect(curved).not.toContain('NaN')
+    expect(curved).not.toContain('onload')
+
+    arrow.route = 'elbow'
+    arrow.elbow = [{ x: Number.NaN, y: 2 }, { x: '1" onload="x', y: 3 }]
+    const elbowed = toSvg(ops).svg
+    expect(elbowed).not.toContain('NaN')
+    expect(elbowed).not.toContain('onload')
+  })
+
+  it('sanitize 诊断回填 opIndex + 源行号', () => {
+    const { diagnostics, skipped } = renderDslSvg(
+      '[card #a create] @pos(0,0)\n[card #b create] right-of #a @gap(-5)',
+    )
+    const diagnostic = diagnostics.find((d) => d.stage === 'sanitize')
+    expect(diagnostic).toMatchObject({ opIndex: 1, line: 2 })
+    expect(diagnostic!.message).toContain('gap')
+    expect(skipped).toEqual([])
+  })
+
+  it('solver 诊断回填 opIndex + 源行号(空行也计行)', () => {
+    const { diagnostics } = renderDslSvg('\n[card #e create] right-of #ghost @gap(20)')
+    const diagnostic = diagnostics.find((d) => d.stage === 'solver')
+    expect(diagnostic).toMatchObject({ opIndex: 0, line: 2 })
+    expect(diagnostic!.message).toContain('ghost')
   })
 })

@@ -459,6 +459,112 @@ describe('AiConfirmDialog edge — Fix 3 cluster >0 变更 → 应用可点(不�
 
 // ── Fix 4 batch-2:AiConfirmDialog 无 appliedTitle 残留 / AgentConfirmCard 仍用 ──
 
+describe('AiConfirmDialog edge — dsl 闸门阻断 vs 干净计划跳过行(2026-11-19)', () => {
+  it('闸门阻断:红面板显示源行号 + 人话原因,不谎称「将被跳过」,Apply 禁用', async () => {
+    const { host: mockHost } = makeMockHost([
+      { id: 'e', kind: 'card', x: 0, y: 0, w: 100, h: 50, rotation: 0, color: 'white' },
+    ])
+    const service = { createWithId: vi.fn() } as never
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog
+        mode="dsl"
+        dsl={'# 注释占一行\n[card #e] right-of #ghost @gap(40)'}
+        targetCanvasId={'cv' as never}
+        service={service}
+        liveHost={mockHost}
+        onApplied={() => {}}
+        onRejected={() => {}}
+      />,
+    )
+    await act(async () => { await flushMicro() })
+    const blocked = dom.querySelector('.ac__notice--blocked')
+    expect(blocked).not.toBeNull()
+    expect(blocked!.textContent).toContain('无法应用')
+    // parser 回填真实源行号(注释行之后是第 2 行,不是 op #1)
+    expect(blocked!.textContent).toContain('第 2 行')
+    // 人话化:不再是 "relational card ... anchor" 行话
+    expect(blocked!.textContent).toContain('锚点卡 #ghost 不存在')
+    expect(blocked!.textContent).not.toContain('relational card')
+    expect(dom.querySelector('.ac__notice--skipped')).toBeNull()
+    expect(byText(dom, /^应用$|^Apply$/)?.disabled).toBe(true)
+    unmount()
+  })
+
+  it('干净计划的跳过行:黄面板软提示 + 源行号/人话原因,其余行照常可应用', async () => {
+    const { host: mockHost, calls } = makeMockHost([
+      { id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 50, rotation: 0, color: 'white' },
+    ])
+    const service = { get: vi.fn(), createWithId: vi.fn() } as never
+    const onApplied = vi.fn()
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog
+        mode="dsl"
+        dsl={'# 注释占一行\n[arrow #e] from #a to #z\n[card #z create] @pos(200,0) @size(100,50)'}
+        targetCanvasId={'cv' as never}
+        service={service}
+        liveHost={mockHost}
+        onApplied={onApplied}
+        onRejected={() => {}}
+      />,
+    )
+    await act(async () => { await flushMicro() })
+    const skipped = dom.querySelector('.ac__notice--skipped')
+    expect(skipped).not.toBeNull()
+    expect(skipped!.textContent).toContain('将被跳过')
+    expect(skipped!.textContent).toContain('第 2 行')
+    expect(skipped!.textContent).toContain('箭头端点 #z 不存在')
+    // 不是闸门整单拒绝:没有「应用已取消」红面板,Apply 仍可用(卡 #z 会创建)
+    expect(dom.querySelector('.ac__notice--blocked')).toBeNull()
+    expect(dom.textContent).not.toContain('应用已取消')
+    const applyBtn = byText(dom, /^应用$|^Apply$/)!
+    expect(applyBtn.disabled).toBe(false)
+
+    pushToastSpy.mockClear()
+    await act(async () => { applyBtn.click() })
+    await act(async () => { await flushMicro() })
+
+    // 只提交干净行:卡创建,箭头跳过
+    expect(calls.upserts.some((el) => el.id === 'z' && el.kind === 'card')).toBe(true)
+    expect(calls.upserts.some((el) => el.id === 'e')).toBe(false)
+    expect(onApplied).toHaveBeenCalledTimes(1)
+    // 结果 toast 说清「应用 1 · 跳过 1」,不能只报位移/未生效
+    const toast = pushToastSpy.mock.calls.at(-1)![0] as { kind: string; message: string }
+    expect(toast.kind).toBe('info')
+    expect(toast.message).toContain('应用 1 条')
+    expect(toast.message).toContain('跳过 1 条')
+    expect(toast.message).not.toContain('未生效')
+    unmount()
+  })
+})
+
+describe('AiConfirmDialog DSL persistence', () => {
+  it('does not add a card or its dependent arrow when card storage fails', async () => {
+    const { host, calls } = makeMockHost([
+      { id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 50, rotation: 0 },
+    ])
+    const createWithId = vi.fn(() => { throw new Error('storage full') })
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog mode="dsl"
+        dsl={'[card #b create] @pos(250,0)\n[arrow #edge] from #a to #b'}
+        targetCanvasId={'cv' as never} service={{ createWithId, get: vi.fn() } as never}
+        liveHost={host} onApplied={() => {}} onRejected={() => {}} />,
+    )
+    try {
+      await act(async () => { await flushMicro() })
+      await act(async () => { byText(dom, /^应用$|^Apply$/)!.click() })
+      expect(createWithId).toHaveBeenCalledWith('b', expect.objectContaining({
+        canvasPosition: expect.objectContaining({ canvasId: 'cv', x: 250 }),
+      }))
+      expect(calls.upserts).toEqual([])
+      expect(pushToastSpy.mock.calls.at(-1)?.[0]).toMatchObject({ kind: 'error' })
+    } finally {
+      unmount()
+      consoleError.mockRestore()
+    }
+  })
+})
+
 describe('AiConfirmDialog edge — Fix 4 appliedTitle 残留审计', () => {
   /**
    * Fix 4 删了 AiConfirmDialog 的 phase==='applied' 标题三元(appliedTitle 死相位)。

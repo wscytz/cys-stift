@@ -6,6 +6,11 @@ import type { DslArrowOp, DslCardOp, DslFreeOp, DslOp } from '@wscytz/dsl'
 import { sanitizeDslOps, evalCompute, evalComputeDetail, formatComputeNumber } from '@wscytz/dsl'
 import type { SanitizeCtx, SanitizeDiagnostic, ComputeResolver } from '@wscytz/dsl'
 import { solveRelational, type ExistingGeom } from '@wscytz/dsl'
+import { withLayoutAnchorPreserved } from '@/lib/card-layout-anchor-store'
+
+/** hash 命中跳过的 reason(v11.1)。产点与诊断豁免点共用一处常量:两处字符串
+ *  一旦漂移,豁免静默失效(「已应用」行又被闸门挡死)。 */
+export const HASH_SKIP_REASON = 'operation already applied in this session'
 
 function uid(prefix: string): string {
   const rand =
@@ -160,28 +165,52 @@ export function buildApplyPlan(
 ): ApplyPlan {
   const { ops: sanitized, diagnostics: sanitizeDiagnostics } =
     sanitizeDslOps(ops, buildSanitizeCtx(host))
-  const { ops: solved, diagnostics: solveDiagnostics } =
-    solveRelational(sanitized, buildExistingGeometry(host))
-  const diagnostics = [...sanitizeDiagnostics, ...solveDiagnostics]
+  const hashes = sanitized.map(({ line: _sourceLine, ...op }) => JSON.stringify(op))
+  // 关系行是声明式约束，不是一次性指令：锚点可能在上一次应用后被移动，
+  // 重试时必须重新求解，绝不能按“本次会话已应用”跳过（v11.2 三审 A-02）。
+  // 其余行仍按稳定 hash 去重（create 一行只造一次卡；文本/属性补丁幂等）。
+  const skippableByHash = (opIndex: number) => {
+    const op = sanitized[opIndex]
+    if (
+      op?.type === 'card' &&
+      op.rel !== undefined &&
+      !op.create &&
+      !op.delete
+    ) {
+      return false
+    }
+    return appliedHashes?.has(hashes[opIndex]!) === true
+  }
+  const pendingIndices = sanitized.flatMap((_, index) => skippableByHash(index) ? [] : [index])
+  const { ops: solved, diagnostics: solveDiagnostics, anchorDependencies } = solveRelational(
+    pendingIndices.map((index) => sanitized[index]!),
+    buildExistingGeometry(host),
+  )
+  const diagnostics = [
+    ...sanitizeDiagnostics.filter(({ opIndex }) => !skippableByHash(opIndex)),
+    ...solveDiagnostics.map((diagnostic) => ({ ...diagnostic, opIndex: pendingIndices[diagnostic.opIndex]! })),
+  ]
   const shadow = new Map(host.getElements().map((element) => [element.id, element]))
   const items: ApplyPlanItem[] = []
+  let solvedIndex = 0
 
-  for (let opIndex = 0; opIndex < solved.length; opIndex++) {
-    const op = solved[opIndex]!
-    const hash = JSON.stringify(op)
-    if (appliedHashes?.has(hash)) {
+  for (let opIndex = 0; opIndex < sanitized.length; opIndex++) {
+    const hash = hashes[opIndex]!
+    if (skippableByHash(opIndex)) {
+      const op = sanitized[opIndex]!
       items.push({
         opIndex,
         op,
         hash,
         disposition: 'skipped',
-        reason: 'operation already applied in this session',
+        reason: HASH_SKIP_REASON,
         dependencies: [],
       })
       continue
     }
-
-    const item = planOp(shadow, op, opIndex, hash)
+    const op = solved[solvedIndex]!
+    const anchors = anchorDependencies.get(solvedIndex++)
+    const item = planOp(shadow, op, opIndex, hash, anchors)
     items.push(item)
     if (item.disposition === 'ready' && item.element) {
       shadow.set(item.element.id, item.element)
@@ -273,6 +302,7 @@ export function commitApplyPlan(
         (id) => failedElementIds.has(id) || !host.getElement(id),
       )
       if (missingDependency) {
+        if (item.element) failedElementIds.add(item.element.id)
         report.skipped++
         report.opResults.push(
           opResult(item, 'skipped', `dependency #${missingDependency} was not committed`),
@@ -342,8 +372,12 @@ export function commitApplyPlan(
     }
   }
 
-  if (plan.items.some((item) => item.disposition === 'ready')) host.batch(commit)
-  else commit()
+  // DSL/关系求解是程序化重排：同一锚描述符解到新位置时，不能把刚写入的
+  // layoutAnchor 当作用户拖拽清掉（清锚回调用几何变化识别拖拽，两者形状相同）。
+  withLayoutAnchorPreserved(() => {
+    if (plan.items.some((item) => item.disposition === 'ready')) host.batch(commit)
+    else commit()
+  })
 
   if (plan.diagnostics.length > 0) {
     report.sanitizeDiagnostics = plan.diagnostics
@@ -492,10 +526,11 @@ function planOp(
   op: DslOp,
   opIndex: number,
   hash: string,
+  anchors?: readonly string[],
 ): ApplyPlanItem {
   switch (op.type) {
     case 'card':
-      return planCard(shadow, op, opIndex, hash)
+      return planCard(shadow, op, opIndex, hash, anchors)
     case 'free':
       return planFree(shadow, op, opIndex, hash)
     case 'arrow':
@@ -596,9 +631,11 @@ function planCard(
   op: DslCardOp,
   opIndex: number,
   hash: string,
+  anchors?: readonly string[],
 ): ApplyPlanItem {
   const id = String(op.cardId)
   const existing = shadow.get(id)
+  const dependencies = anchors?.filter((anchorId) => anchorId !== id) ?? []
   // v10:删除行。目标存在 → card-delete(引擎 host.remove 级联清挂接箭头,DB 侧经 onCardRemove
   // 移出画布,卡本体保留可恢复);不存在/跨 kind → skip(sanitize 已产信息性 diagnostic)。
   if (op.delete) {
@@ -632,7 +669,7 @@ function planCard(
       hash,
       element,
       'card-create',
-      [],
+      dependencies,
       {
         cardId: id,
         x,
@@ -669,6 +706,7 @@ function planCard(
       ...(updateMeta !== undefined ? { meta: updateMeta } : {}),
     },
     'card-update',
+    dependencies,
   )
   // v5:card-update 带 @title/@content → 携带,commit 时写回 CardService。v8:同机制扩到结构化字段。
   if (op.title !== undefined || op.content !== undefined || hasV8Fields(op)) {

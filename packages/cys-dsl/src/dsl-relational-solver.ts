@@ -38,21 +38,21 @@ export interface ExistingGeom {
  *  同批更早的 rel 落点也计入,更晚的不回溯;组内无人 → undefined,由调用方产 diagnostic)。
  *  broken 占位卡(anchor 缺失 / 组锚失败,坐标无意义)不进 bbox——防 (0,0) 占位
  *  把包围盒拖向画布原点、污染后续组锚落点。 */
-function groupBBox(geom: Map<string, ExistingGeom>, group: string, broken: Set<string>): ExistingGeom | undefined {
+function groupBBox(geom: Map<string, ExistingGeom>, group: string, broken: Set<string>): (ExistingGeom & { memberIds: string[] }) | undefined {
   let minX = Infinity
   let minY = Infinity
   let maxX = -Infinity
   let maxY = -Infinity
-  let found = false
+  const memberIds: string[] = []
   for (const [id, g] of geom.entries()) {
     if (g.group !== group || broken.has(id)) continue
-    found = true
+    memberIds.push(id)
     if (g.x < minX) minX = g.x
     if (g.y < minY) minY = g.y
     if (g.x + g.w > maxX) maxX = g.x + g.w
     if (g.y + g.h > maxY) maxY = g.y + g.h
   }
-  return found ? { x: minX, y: minY, w: maxX - minX, h: maxY - minY } : undefined
+  return memberIds.length > 0 ? { x: minX, y: minY, w: maxX - minX, h: maxY - minY, memberIds } : undefined
 }
 
 /** card 默认尺寸(与 apply-layout applyCardOp 一致:op.w ?? 240 / op.h ?? 120)。 */
@@ -62,6 +62,7 @@ const DEFAULT_CARD_H = 120
 export interface SolveResult {
   ops: DslOp[]
   diagnostics: SanitizeDiagnostic[]
+  anchorDependencies: ReadonlyMap<number, readonly string[]>
 }
 
 /**
@@ -77,6 +78,7 @@ export function solveRelational(
 ): SolveResult {
   const diagnostics: SanitizeDiagnostic[] = []
   const out: DslOp[] = []
+  const anchorDependencies = new Map<number, readonly string[]>()
 
   // seed:画布现有 card 几何(复制,不污染入参)
   const geom = new Map<string, ExistingGeom>(existingGeometry)
@@ -87,6 +89,15 @@ export function solveRelational(
   let i = 0
   for (const op of ops) {
     const idx = i++
+    if (op.delete && op.type !== 'arrow') {
+      const id = op.type === 'card' ? String(op.cardId) : op.id
+      if (id !== undefined) {
+        geom.delete(id)
+        brokenAnchors.delete(id)
+      }
+      out.push(op)
+      continue
+    }
     if (op.type !== 'card') {
       // free / arrow:透传(非 pilot 关系式范围)
       out.push(op)
@@ -103,9 +114,8 @@ export function solveRelational(
       // v9:anchor 双形态 —— #id(单卡 geom 条目)/ @组名(组包围盒,lazy 求当前已解成员;
       // broken 占位不进 bbox,见 groupBBox)
       const isGroup = op.rel.anchorGroup === true
-      const anchorRect = isGroup
-        ? groupBBox(geom, op.rel.anchor, brokenAnchors)
-        : geom.get(op.rel.anchor)
+      const groupAnchor = isGroup ? groupBBox(geom, op.rel.anchor, brokenAnchors) : undefined
+      const anchorRect = isGroup ? groupAnchor : geom.get(op.rel.anchor)
       if (!anchorRect) {
         // anchor 不存在(前向引用 / 幽灵 id / 组锚无成员)→ diagnostic,op 保留占位坐标
         diagnostics.push({
@@ -133,6 +143,7 @@ export function solveRelational(
         })
         brokenAnchors.add(cardId)
       }
+      anchorDependencies.set(idx, groupAnchor?.memberIds ?? [op.rel.anchor])
       const gap = op.rel.gap
       // 统一放置公式(组锚即包围盒矩形):right-of → (a.x+a.w+gap, a.y 顶对齐);
       // below → (a.x 左对齐, a.y+a.h+gap)。组右=贴 bbox 右缘、组下=贴 bbox 下缘。
@@ -176,6 +187,7 @@ export function solveRelational(
   return {
     ops: validated.ops,
     diagnostics: [...diagnostics, ...validated.diagnostics],
+    anchorDependencies,
   }
 }
 
@@ -253,7 +265,7 @@ function resolveCollision(
 function validateSolvedCoordinates(
   ops: DslOp[],
   existingGeometry?: Map<string, ExistingGeom>,
-): SolveResult {
+): Pick<SolveResult, 'ops' | 'diagnostics'> {
   const diagnostics: SanitizeDiagnostic[] = []
   const geom = new Map<string, ExistingGeom>(existingGeometry)
   const validated = ops.map((op, opIndex) => {

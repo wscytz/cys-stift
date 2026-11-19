@@ -36,6 +36,21 @@ describe('SQLite repository', () => {
     expect(fetched?.source.kind).toBe('manual')
   })
 
+  it('preserves millisecond timestamps and accepts them in applyBatch expectations', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-23T10:00:00.123Z'))
+    const created = service.create({ title: 'ms precision', source })
+    const fetched = service.get(created.id)!
+    expect(fetched.capturedAt.toISOString()).toBe('2026-06-23T10:00:00.123Z')
+    expect(fetched.createdAt.toISOString()).toBe('2026-06-23T10:00:00.123Z')
+    expect(fetched.updatedAt.toISOString()).toBe('2026-06-23T10:00:00.123Z')
+    // applyBatch 的 expected 用毫秒快照比较；秒级截断会让它永远不相等。
+    expect(service.applyBatch([
+      { id: created.id, expected: fetched, next: { ...fetched, title: 'ms precision 2' } },
+    ])).toBe(true)
+    expect(service.get(created.id)?.title).toBe('ms precision 2')
+  })
+
   it('preserves JSON columns through round-trip (links, code, quote, source)', () => {
     const card = service.create({
       title: 'rich card',
@@ -165,8 +180,10 @@ describe('SQLite repository', () => {
     const deleted = service.get(created.id)!
     expect(deleted.deletedAt).toBeInstanceOf(Date)
     expect(deleted).toMatchObject({ archived, canvasPosition })
-    expect(service.listAll()).toEqual([])
-    expect(service.listOnCanvas(canvasPosition.canvasId)).toEqual([])
+    // 契约与 Web/domain 一致：listAll/listOnCanvas 是底层查询，软删项仍返回；
+    // 回收站/画布视图由消费侧按 deletedAt/archived 过滤。
+    expect(service.listAll()).toEqual([deleted])
+    expect(service.listOnCanvas(canvasPosition.canvasId)).toEqual([deleted])
 
     const reloaded = new CardService(new SqliteCardRepository(handle))
     vi.setSystemTime(new Date('2026-06-25T10:00:00.000Z'))
