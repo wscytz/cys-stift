@@ -4,7 +4,9 @@ export * from './codec'
 export {
   createMemoryDb,
   createFileDb,
+  migrateLegacyCardTimestamps,
   type DbHandle,
+  type FileDbOptions,
 } from './drizzle-client'
 export {
   SqliteCardRepository,

@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { CardService } from '@cys-stift/domain'
-import { createFileDb, migrateLegacyCardTimestamps } from '../drizzle-client'
+import { createFileDb, migrateLegacyCardTimestamps } from '../index'
 import { SqliteCardRepository } from '../repositories'
 
 describe('SQLite schema migration', () => {
