@@ -5,6 +5,14 @@
 
 ---
 
+## 2026-11-20 · 未发布 · fix: 第六轮 P3 收口（SQLite 迁移、清洗器、CI）
+
+> 目标：清掉仍记录的 P3，并把 GitHub Actions 上的假红修掉。正式站仍为 v1.5.0。
+
+- **N-09**：默认打开 v0 文件不猜测单位（`1_700_000_000` 同时是 1970 ms 日期）；新增显式 `createFileDb(file, { legacyCardSeconds: true })` / `migrateLegacyCardTimestamps(handle)`，只乘卡表 4 个时间列并写 v1，遇到已有毫秒值拒绝二次缩放。workspace/canvas 仍按 `mode: 'timestamp'` 的秒级契约解码，不参与转换。
+- **N-08**：清洗器增加通用 `file:///Users|/home` 前缀、`/home`/`/root` 泄漏门和二进制 `latin1` 扫描；二进制只检测不重写，带 fixture 测试（文本重写、二进制泄漏、裸 home 路径硬失败）。
+- **CI**：`e2e:dsl-seed` 等待 preview 而非读完对话框即断言，并兼容 en-US `2 added` 词序；`routing.test.ts` 的密集 Dijkstra 对拍给 30s 超时（CI 5s 默认不够）；CI verify 纳入 `e2e:visual` 与 `test:sanitize`。
+
 ## 2026-11-20 · 未发布 · fix: 第六轮复审（AI confirm meta/content、测试与 a11y 收口）
 
 > 第六轮接手 pass5：N-16/N-17 已在仓库测试中闭合；N-10 的非阻塞残项一并收口。正式站仍为 v1.5.0。

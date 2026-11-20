@@ -22,17 +22,73 @@ export function createMemoryDb(): DbHandle {
   const raw = new Database(':memory:')
   const db = drizzle(raw, { schema })
   applySchema(raw)
+  raw.pragma('user_version = 1')
   return { raw, db }
 }
 
-export function createFileDb(path: string): DbHandle {
+export interface FileDbOptions {
+  /** Explicit provenance for a legacy DB whose card timestamps are seconds.
+   *  Required because a v0 value such as 1_700_000_000 is also a valid 1970
+   *  millisecond date; magnitude alone cannot prove the unit safely. */
+  legacyCardSeconds?: boolean
+}
+
+export function createFileDb(path: string, options: FileDbOptions = {}): DbHandle {
   const raw = new Database(path)
   raw.pragma('journal_mode = WAL')
   const db = drizzle(raw, { schema })
   applySchema(raw)
+  if (options.legacyCardSeconds) migrateLegacyCardTimestamps({ raw, db })
+  else finalizeModernTimestampVersion(raw)
   return { raw, db }
 }
 
+/** Schema/migration version stored in SQLite's built-in `user_version`.
+ *  v1 = card timestamps are milliseconds. Workspace/canvas timestamps stay in
+ *  seconds (`mode: 'timestamp'`) and are never multiplied by this migration. */
+const SCHEMA_VERSION = 1
+const MILLISECONDS_MIN = 100_000_000_000
+
+const CARD_TIMESTAMP_COLUMNS = ['captured_at', 'created_at', 'updated_at', 'deleted_at'] as const
+
+function cardTimestampValues(raw: Database.Database): number[] {
+  const rows = raw.prepare(`SELECT ${CARD_TIMESTAMP_COLUMNS.join(', ')} FROM cards`).all() as Array<Record<string, number | null>>
+  return rows
+    .flatMap((row) => CARD_TIMESTAMP_COLUMNS.map((column) => row[column]))
+    .filter((value): value is number => typeof value === 'number' && value > 0)
+}
+
+/** Fresh/current DBs can be stamped safely; ambiguous v0 values are left at 0
+ *  so they are never silently reinterpreted. */
+function finalizeModernTimestampVersion(raw: Database.Database): void {
+  if ((raw.pragma('user_version', { simple: true }) as number) >= SCHEMA_VERSION) return
+  const values = cardTimestampValues(raw)
+  if (values.length === 0 || values.some((value) => value >= MILLISECONDS_MIN)) {
+    raw.pragma(`user_version = ${SCHEMA_VERSION}`)
+  }
+}
+
+/**
+ * Explicit legacy-seconds migration. The caller must know the file predates
+ * the timestamp contract (there is no runtime consumer yet). Refuse if the
+ * cards table already contains millisecond values, to avoid double scaling.
+ */
+export function migrateLegacyCardTimestamps(handle: DbHandle): void {
+  const { raw } = handle
+  if ((raw.pragma('user_version', { simple: true }) as number) >= SCHEMA_VERSION) return
+  const values = cardTimestampValues(raw)
+  if (values.some((value) => value >= MILLISECONDS_MIN)) {
+    throw new Error('refusing legacy-seconds migration: cards table already contains millisecond timestamps')
+  }
+  raw.transaction(() => {
+    for (const column of CARD_TIMESTAMP_COLUMNS) {
+      raw
+        .prepare(`UPDATE cards SET ${column} = ${column} * 1000 WHERE ${column} IS NOT NULL AND ${column} > 0`)
+        .run()
+    }
+    raw.pragma(`user_version = ${SCHEMA_VERSION}`)
+  })()
+}
 /**
  * Push the Drizzle schema into a fresh database using raw DDL. We avoid
  * Drizzle's migration machinery for Phase 2 because the schema is small
