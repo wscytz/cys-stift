@@ -2,7 +2,7 @@
 
 cy's Stift {{VERSION}} is a stable release of the local-first idea canvas. Capture -> Inbox -> Canvas -> Workbench -> Export: capture, organizing, deep editing, and recovery all stay fully on your machine. The app sends nothing to a server and collects no usage telemetry.
 
-This 1.5.0 stable release carries the 1.3.0 feature core, the **Swiss Editorial redesign** (design system v0.2: warm paper / surgical red / ink / petrol blue, zero radius, 1px line hierarchy, 280/64/48 editorial grid) and the full **motion pass**, followed by successive hardening batches — font wiring, segmented-hydration root fix, DSL round-trip truncation guard, the seven-field AI confirm gate, desktop single-instance, and import/media hardening — and, new in 1.5.0, a **routing solver** for automatic obstacle-avoiding arrows and **DSL authoring hints** that flag common mistakes without blocking. Per-version details live in [`docs/changelog.md`](https://github.com/wscytz/cys-stift/blob/main/docs/changelog.md). Release baseline re-verified at tagging: lint clean, full test suite green, web build exit 0, docs link check passing.
+This 1.6.0 stable release carries the 1.3.0 feature core, the **Swiss Editorial redesign** (design system v0.2: warm paper / surgical red / ink / petrol blue, zero radius, 1px line hierarchy, 280/64/48 editorial grid) and the full **motion pass**, followed by successive hardening batches — font wiring, segmented-hydration root fix, DSL round-trip truncation guard, the seven-field AI confirm gate, desktop single-instance, and import/media hardening — and, new in 1.6.0, **cys-dsl v10 explicit deletion**, the **`?dsl=` share entry**, AI confirmation/import/persistence hardening, explicit SQLite legacy migration, and sanitizer binary gates. Per-version details live in [`docs/changelog.md`](https://github.com/wscytz/cys-stift/blob/main/docs/changelog.md). Release baseline re-verified at tagging: lint clean, full test suite green, web build exit 0, docs link check passing.
 
 ## Downloads
 
@@ -39,7 +39,7 @@ The macOS app is ad-hoc signed for artifact integrity but not notarized with an 
 
 ## Stable scope
 
-"Stable" means the data format (1.1-compatible), core workflow, cys-dsl v9 contract, recovery behavior, automated test baseline, and release build pipeline are frozen for compatible maintenance. It does not claim platform certification or third-party AI reliability.
+"Stable" means the data format (1.1-compatible), core workflow, cys-dsl v10 contract, recovery behavior, automated test baseline, and release build pipeline are frozen for compatible maintenance. It does not claim platform certification or third-party AI reliability.
 
 - macOS Developer ID signing/notarization and Windows Authenticode signing are not present.
 - VoiceOver, real operating-system 200% scaling, installation upgrades on a representative device matrix, and real-provider quota/refusal testing remain post-release hardening work.
