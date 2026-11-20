@@ -21,7 +21,7 @@
 
 ## 下载
 
-最新版本为 [**v1.5.0**](https://github.com/wscytz/cys-stift/releases/tag/v1.5.0)(稳定版)。桌面安装包和 `SHA256SUMS.txt` 均从该 Release 页面下载。也可以直接用[网页版](https://wscytz.com/cys-stift/app/)体验(网页仅在显式部署后更新，不会自动跟随本地 main；数据留在浏览器本地):
+最新版本为 [**v1.5.0**](https://github.com/wscytz/cys-stift/releases/tag/v1.5.0)(稳定版)。桌面安装包和 `SHA256SUMS.txt` 均从该 Release 页面下载。也可以直接用[网页版](https://wscytz.com/cys-stift/app/)体验(网页仅在显式部署后更新，不会自动跟随本地 main；数据留在浏览器本地)。网页版支持 `/canvas/?dsl=` 分享链接：链接只预填审核对话框，不会自动应用；URL 可能进入访问日志和浏览器历史，**不要把私密正文放进链接**，私密内容请在转义编辑器内直接粘贴。
 
 | 平台 | 文件 | 说明 |
 |---|---|---|

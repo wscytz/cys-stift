@@ -24,6 +24,7 @@ import { applyPlanIfClean } from '@/features/canvas/apply-layout'
 import { makeOnCardCreate, makeOnCardRemove, makeOnCardUpdate } from './agent-confirm-card'
 import { applyClusters, type CardCluster } from './cluster'
 import { diffCanvasSnapshots } from '@/features/canvas/canvas-diff'
+import { collectDslContentChanges, collectDslMetaChanges, type DslNonGeomChange } from '@/features/canvas/dsl-change-summary'
 import { summarizeMovement } from '@/features/canvas/layout-movement'
 import { Thumb, DiffGroup, confirmStyles } from './canvas-thumb'
 import { MarkdownBody } from '@/app/inbox/markdown'
@@ -178,10 +179,21 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
   // 与 dslIssues(闸门整单拒绝,apply 不会发生)必须分开:旧 UI 把两者都渲染成
   // 「应用已取消」,干净计划的跳过行于是谎称整单失败(2026-11-19 收束)。
   const [dslSkippedIssues, setDslSkippedIssues] = useState<DslPreviewIssue[]>([])
+  const [dslNonGeomChanges, setDslNonGeomChanges] = useState<{
+    content: DslNonGeomChange[]
+    meta: DslNonGeomChange[]
+  }>({ content: [], meta: [] })
 
   useEffect(() => {
     if (props.mode === 'dsl') {
-      if (preview?.kind !== 'ok') { setDslIssues([]); setDslSkippedIssues([]); setBeforeState(null); setAfterState(null); return }
+      if (preview?.kind !== 'ok') {
+        setDslIssues([])
+        setDslSkippedIssues([])
+        setDslNonGeomChanges({ content: [], meta: [] })
+        setBeforeState(null)
+        setAfterState(null)
+        return
+      }
       let cancelled = false
       const before = props.liveHost.getElements()
       const afterHost = new InMemoryCanvasHost()
@@ -205,14 +217,34 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
               message: result.reason!,
             }))
         : []
+      // Geometry diff cannot see card content or meta; collect them here so a
+      // proposal that only changes @title/@content/@group is not reported as
+      // "no changes" and remains applicable (N-17).
+      const appliedIndices = new Set(
+        outcome.ok
+          ? outcome.report.opResults.filter((result) => result.status === 'applied').map((result) => result.opIndex)
+          : [],
+      )
+      const titleById = new Map<string, string>()
+      for (const op of preview.ops) {
+        if (op.type === 'card' && op.title !== undefined) titleById.set(String(op.cardId), op.title)
+      }
+      const contentChanges = outcome.ok
+        ? collectDslContentChanges(preview.ops, props.service, t('card.untitled'), appliedIndices)
+        : []
+      const metaChanges = outcome.ok
+        ? collectDslMetaChanges(preview.ops, outcome.report.opResults, before, afterHost, titleById, props.service, t('card.untitled'))
+        : []
       setDslIssues(issues)
       setDslSkippedIssues(skippedIssues)
+      setDslNonGeomChanges({ content: contentChanges, meta: metaChanges })
       if (cancelled) return
       setBeforeState(before)
       setAfterState(afterHost.getElements())
       return () => { cancelled = true }
     }
     if (props.mode === 'intent') {
+      setDslNonGeomChanges({ content: [], meta: [] })
       if (intentPreview?.kind !== 'ok') { setBeforeState(null); setAfterState(null); return }
       const before = props.liveHost.getElements()
       setBeforeState(before)
@@ -220,6 +252,7 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
       return
     }
     if (props.mode === 'cluster') {
+      setDslNonGeomChanges({ content: [], meta: [] })
       let cancelled = false
       const before = props.liveHost.getElements()
       const afterHost = new InMemoryCanvasHost()
@@ -237,7 +270,9 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
     return diffCanvasSnapshots(beforeState, afterState)
   }, [beforeState, afterState])
 
-  const totalChanges = diff ? diff.added.length + diff.removed.length + diff.changed.length : 0
+  const geometryChanges = diff ? diff.added.length + diff.removed.length + diff.changed.length : 0
+  const nonGeomChanges = [...dslNonGeomChanges.meta, ...dslNonGeomChanges.content]
+  const totalChanges = geometryChanges + nonGeomChanges.length
 
   const recordReject = () => {
     if (!props.sampleContext) return
@@ -538,6 +573,14 @@ export function AiConfirmDialog(props: AiConfirmDialogProps) {
             )}
             {diff.changed.length > 0 && (
               <DiffGroup color="yellow" label={t('agent.changed', { n: String(diff.changed.length) })} items={diff.changed.map((c) => `${labelEl(c.after)} (${c.fields.map(fieldLabel).join(locale === 'en' ? ', ' : '、')})`)} moreLabel={t('agent.moreItems', { n: String(diff.changed.length - 8) })} />
+            )}
+            {nonGeomChanges.length > 0 && (
+              <DiffGroup
+                color="yellow"
+                label={t('agent.changed', { n: String(nonGeomChanges.length) })}
+                items={nonGeomChanges.map((c) => `${t('canvas.diffElementCard', { title: c.title })} (${c.fields.map(fieldLabel).join(locale === 'en' ? ', ' : '、')})`)}
+                moreLabel={t('agent.moreItems', { n: String(nonGeomChanges.length - 8) })}
+              />
             )}
           </div>
         )}

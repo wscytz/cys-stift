@@ -116,6 +116,20 @@ describe('DslDialog preview labels', () => {
     unmount()
   })
 
+  it('parse errors use role=alert (actionable failure, not a passive status)', () => {
+    const host = new InMemoryCanvasHost()
+    const service = { get: () => undefined }
+    const { container, unmount } = mountDialog(host, service)
+    changeText(container, '[card #a] @pos(')
+    const panel = container.querySelector('.dsl-errors')
+    // Live preview is polite; only an explicit Apply escalates to alert.
+    expect(panel?.getAttribute('role')).toBe('status')
+    const apply = [...container.querySelectorAll('button')].find((button) => button.textContent === 'canvas.dslApply')
+    act(() => apply?.click())
+    expect(container.querySelector('.dsl-errors')?.getAttribute('role')).toBe('alert')
+    unmount()
+  })
+
   it('blocks a proposal whose anchor does not exist', () => {
     const host = new InMemoryCanvasHost()
     host.upsert({ id: 'e', kind: 'card', x: 0, y: 0, w: 100, h: 50, rotation: 0, color: 'white' })
@@ -124,7 +138,7 @@ describe('DslDialog preview labels', () => {
     changeText(container, '[card #e] right-of #ghost @gap(40)')
     // 挂起面板改用与解析错误同一套 .dsl-errors 视觉语法(v11)
     const panel = container.querySelector('[data-testid="dsl-apply-blocked"]')
-    expect(panel?.getAttribute('role')).toBe('alert')
+    expect(panel?.getAttribute('role')).toBe('status')
     const text = panel?.textContent ?? ''
     expect(text).toContain('canvas.dslPreviewBlocked')
     expect(text).toContain('ghost')
@@ -133,6 +147,7 @@ describe('DslDialog preview labels', () => {
       (button) => button.textContent === 'canvas.dslApply',
     ) as HTMLButtonElement | undefined
     act(() => apply?.click())
+    expect(container.querySelector('[data-testid="dsl-apply-blocked"]')?.getAttribute('role')).toBe('alert')
     expect(JSON.stringify(host.getElements())).toBe(before)
     unmount()
   })

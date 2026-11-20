@@ -537,12 +537,79 @@ describe('AiConfirmDialog edge — dsl 闸门阻断 vs 干净计划跳过行(202
   })
 })
 
-describe('AiConfirmDialog DSL persistence', () => {
-  it('does not add a card or its dependent arrow when card storage fails', async () => {
+describe('AiConfirmDialog DSL non-geometry changes', () => {
+  const card = {
+    id: 'a',
+    title: '旧标题',
+    body: '旧正文',
+    type: 'note',
+    tags: [],
+    links: [],
+    codeSnippets: [],
+    quotes: [],
+  }
+
+  it('meta-only proposal is not reported as no change and is applicable (N-17)', async () => {
     const { host, calls } = makeMockHost([
       { id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 50, rotation: 0 },
     ])
-    const createWithId = vi.fn(() => { throw new Error('storage full') })
+    const service = { get: vi.fn(() => card) } as never
+    const onApplied = vi.fn()
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog mode="dsl"
+        dsl={'[card #a] @group("g")'}
+        targetCanvasId={'cv' as never} service={service}
+        liveHost={host} onApplied={onApplied} onRejected={() => {}} />,
+    )
+    await act(async () => { await flushMicro() })
+    expect(dom.querySelector('.ac__nochange')).toBeNull()
+    expect(dom.textContent).toContain('分组')
+    const applyBtn = byText(dom, /^应用$|^Apply$/)!
+    expect(applyBtn.disabled).toBe(false)
+    await act(async () => { applyBtn.click() })
+    await act(async () => { await flushMicro() })
+    expect(calls.upserts.at(-1)?.meta?.group).toBe('g')
+    expect(onApplied).toHaveBeenCalledTimes(1)
+    unmount()
+  })
+
+  it('content-only proposal is not reported as no change and writes CardService (N-17)', async () => {
+    const { host, calls } = makeMockHost([
+      { id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 50, rotation: 0 },
+    ])
+    const update = vi.fn(() => card)
+    const service = { get: vi.fn(() => card), update } as never
+    const onApplied = vi.fn()
+    const { host: dom, unmount } = mount(
+      <AiConfirmDialog mode="dsl"
+        dsl={'[card #a] @title("新标题")'}
+        targetCanvasId={'cv' as never} service={service}
+        liveHost={host} onApplied={onApplied} onRejected={() => {}} />,
+    )
+    await act(async () => { await flushMicro() })
+    expect(dom.querySelector('.ac__nochange')).toBeNull()
+    expect(dom.textContent).toContain('标题')
+    const applyBtn = byText(dom, /^应用$|^Apply$/)!
+    expect(applyBtn.disabled).toBe(false)
+    await act(async () => { applyBtn.click() })
+    await act(async () => { await flushMicro() })
+    expect(update).toHaveBeenCalledWith('a', { title: '新标题' })
+    expect(calls.upserts.length).toBeGreaterThan(0)
+    expect(onApplied).toHaveBeenCalledTimes(1)
+    unmount()
+  })
+})
+
+describe('AiConfirmDialog DSL persistence', () => {
+  it('does not add a card or its dependent arrow when card storage fails, then retries cleanly', async () => {
+    const { host, calls } = makeMockHost([
+      { id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 50, rotation: 0 },
+    ])
+    let fail = true
+    const createWithId = vi.fn(() => {
+      if (fail) throw new Error('storage full')
+      return { ok: true }
+    })
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     const onApplied = vi.fn()
     const { host: dom, unmount } = mount(
@@ -562,13 +629,21 @@ describe('AiConfirmDialog DSL persistence', () => {
       // 全失败不关框：不能触发 onApplied；允许原地重试（Apply 不禁用）。
       expect(onApplied).not.toHaveBeenCalled()
       expect(byText(dom, /^应用$|^Apply$/)!.disabled).toBe(false)
+
+      // 同一提案原地重试：成功后只触发一次 onApplied，且依赖箭头正常落地。
+      fail = false
+      await act(async () => { byText(dom, /^应用$|^Apply$/)!.click() })
+      await act(async () => { await flushMicro() })
+      expect(calls.upserts.some((el) => el.id === 'b' && el.kind === 'card')).toBe(true)
+      expect(calls.upserts.some((el) => el.id === 'edge' && el.kind === 'arrow')).toBe(true)
+      expect(onApplied).toHaveBeenCalledTimes(1)
     } finally {
       unmount()
       consoleError.mockRestore()
     }
   })
 
-  it('partial persistence failure keeps the dialog open and disables Apply (N-03)', async () => {
+  it('partial persistence failure keeps the dialog open, disables Apply, and closes without recording a reject (N-03/N-14)', async () => {
     const { host, calls } = makeMockHost([
       { id: 'a', kind: 'card', x: 0, y: 0, w: 100, h: 50, rotation: 0 },
     ])
@@ -578,11 +653,14 @@ describe('AiConfirmDialog DSL persistence', () => {
     })
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     const onApplied = vi.fn()
+    const onRejected = vi.fn()
+    addSampleSpy.mockClear()
     const { host: dom, unmount } = mount(
       <AiConfirmDialog mode="dsl"
         dsl={'[card #b create] @pos(250,0)\n[card #c create] @pos(500,0)'}
         targetCanvasId={'cv' as never} service={{ createWithId, get: vi.fn() } as never}
-        liveHost={host} onApplied={onApplied} onRejected={() => {}} />,
+        sampleContext={{ source: 'layout', context: 'ctx', targetCanvasId: 'cv' }}
+        liveHost={host} onApplied={onApplied} onRejected={onRejected} />,
     )
     try {
       await act(async () => { await flushMicro() })
@@ -591,6 +669,13 @@ describe('AiConfirmDialog DSL persistence', () => {
       expect(dom.textContent).toContain('已应用的改动不会回滚')
       expect(onApplied).not.toHaveBeenCalled()
       expect(byText(dom, /^应用$|^Apply$/)!.disabled).toBe(true)
+      // 部分失败已有 applied 行：按钮语义是“关闭”，不能记 rejected 样本。
+      expect(byText(dom, /^关闭$|^Close$/)).not.toBeNull()
+      expect(byText(dom, /^拒绝$|^Reject$/)).toBeNull()
+      addSampleSpy.mockClear()
+      await act(async () => { byText(dom, /^关闭$|^Close$/)!.click() })
+      expect(addSampleSpy).not.toHaveBeenCalled()
+      expect(onRejected).toHaveBeenCalledTimes(1)
     } finally {
       unmount()
       consoleError.mockRestore()

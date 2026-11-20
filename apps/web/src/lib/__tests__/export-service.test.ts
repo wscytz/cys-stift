@@ -1125,6 +1125,10 @@ describe('importFromJson — replace / merge transaction', () => {
     expect(result.ok).toBe(true)
     const restored = JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!).settings
     expect(restored.activeProfileId).toBe('local')
+    const { settingsStore } = await import('../settings-store')
+    const effective = settingsStore.get()
+    expect(effective.activeProfileId).toBe('local')
+    expect(effective.profiles.find((profile) => profile.id === 'local')?.enabled).toBe(true)
   })
 
   it('merge ignores local profiles that salvage would drop when picking effective active (N-15)', async () => {

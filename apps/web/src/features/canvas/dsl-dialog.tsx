@@ -26,6 +26,7 @@ import { DSL_GRAMMAR_REFERENCE } from '@wscytz/dsl'
 import { applyPlanIfClean, HASH_SKIP_REASON, type CardCreateHandler, type CardUpdateHandler } from './apply-layout'
 import { humanizeApplyIssue } from '@/lib/dsl-issue-reasons'
 import { diffCanvasSnapshots } from './canvas-diff'
+import { collectDslContentChanges, collectDslMetaChanges, type DslNonGeomChange } from './dsl-change-summary'
 import { archiveStore } from '@/lib/archive-store'
 import { buildArchivePayload } from '@/lib/build-archive-payload'
 import { VERSION } from '@/lib/version'
@@ -290,6 +291,9 @@ export function DslDialog({
   const [generatedText, setGeneratedText] = useState<string | null>(null)
   const [revisionTick, setRevisionTick] = useState(0)
   const [stale, setStale] = useState(false)
+  // 实时诊断使用 role=status(polite);只有用户点过 Apply 后才升级为
+  // role=alert,避免每击键都打断读屏(R-18)。
+  const [applyAttempted, setApplyAttempted] = useState(false)
   // R14:未应用编辑的关闭确认。dirty = 当前文本与打开/载入时基线不同
   // (基线比较天然覆盖快速示例、关系生成等非 textarea 编辑入口)。
   const [confirmClose, setConfirmClose] = useState(false)
@@ -314,12 +318,12 @@ export function DslDialog({
         errCount: parseErrors.length,
         diff: null as ReturnType<typeof diffCanvasSnapshots> | null,
         titleById: new Map<string, string>(),
-        contentChanges: [] as { opIndex: number; cardId: string; title: string; fields: string[] }[],
-        metaChanges: [] as { opIndex: number; cardId: string; title: string; fields: string[] }[],
+        contentChanges: [] as DslNonGeomChange[],
+        metaChanges: [] as DslNonGeomChange[],
         applyIssues: [] as { opIndex: number; line?: number; reason: string }[],
         subsetDiff: null as ReturnType<typeof diffCanvasSnapshots> | null,
         subsetCount: 0,
-        subsetMetaChanges: [] as { opIndex: number; cardId: string; title: string; fields: string[] }[],
+        subsetMetaChanges: [] as DslNonGeomChange[],
         gated: false,
       }
     }
@@ -346,8 +350,7 @@ export function DslDialog({
     }
     let subsetDiff: ReturnType<typeof diffCanvasSnapshots> | null = null
     let subsetCount = 0
-    type MetaChange = { opIndex: number; cardId: string; title: string; fields: string[] }
-    let subsetMetaChanges: MetaChange[] = []
+    let subsetMetaChanges: DslNonGeomChange[] = []
     let appliedIndices = new Set(outcome.ok ? outcome.report.opResults.filter((result) => result.status === 'applied').map((result) => result.opIndex) : [])
     if (blockedIndices && applyIssues.length > 0) {
       const subsetOps = ops.filter((_, index) => !blockedIndices.has(index))
@@ -365,98 +368,25 @@ export function DslDialog({
             result.status === 'applied' ? [subsetIndices[result.opIndex]!] : [],
           ))
           // 子集预览同样要显示 free/card meta 变化（N-02）。
-          subsetMetaChanges = collectMetaChanges(
+          subsetMetaChanges = collectDslMetaChanges(
             subsetOps,
             subsetOutcome.report.opResults,
             before,
             subsetHost,
+            titleById,
+            service,
+            t('card.untitled'),
           ).map((change) => ({ ...change, opIndex: subsetIndices[change.opIndex]! }))
         }
       }
     }
     const after = cloneElements(afterHost.getElements())
-    const allContentChanges: { opIndex: number; cardId: string; title: string; fields: string[] }[] = []
-    ops.forEach((op, index) => {
-      if (op.type !== 'card' || op.delete || op.create) return
-      const current = service.get(op.cardId)
-      const fields: string[] = []
-      if (op.title !== undefined && op.title !== current?.title) fields.push('title')
-      if (op.content !== undefined && op.content !== current?.body) fields.push('content')
-      if (op.cardType !== undefined && op.cardType !== current?.type) fields.push('type')
-      if (op.tags !== undefined && JSON.stringify(op.tags) !== JSON.stringify((current?.tags ?? []).map((tag) => tag.value))) fields.push('tags')
-      if (op.links !== undefined && JSON.stringify(op.links) !== JSON.stringify((current?.links ?? []).map((link) => link.url))) fields.push('links')
-      if (op.code !== undefined && JSON.stringify(op.code) !== JSON.stringify(current?.codeSnippets ?? [])) fields.push('code')
-      if (op.quotes !== undefined && JSON.stringify(op.quotes) !== JSON.stringify(current?.quotes ?? [])) fields.push('quotes')
-      if (fields.length > 0) {
-        allContentChanges.push({ opIndex: index, cardId: String(op.cardId), title: current?.title ?? op.title ?? t('card.untitled'), fields })
-      }
-    })
     // 挂起行的内容修改不进预览(它还没被应允);主面板只在无挂起时渲染,天然一致。
-    const contentChanges = allContentChanges.filter((change) => appliedIndices.has(change.opIndex))
+    const contentChanges = collectDslContentChanges(ops, service, t('card.untitled'), appliedIndices)
     // v11.2:仅属性变化(@group/@href/layoutAnchor)时几何 diff 与内容 diff 都为空，
     // 但 Apply 确实会写 meta。预览必须承认这次写入，不能谎称“画布已是最新”。
-    function collectMetaChanges(
-      opList: DslOp[],
-      results: readonly { opIndex: number; status: string }[],
-      beforeElements: CanvasElement[],
-      afterHost: InMemoryCanvasHost,
-    ): MetaChange[] {
-      const changes: MetaChange[] = []
-      const beforeById = new Map(beforeElements.map((element) => [element.id, element]))
-      for (const result of results) {
-        if (result.status !== 'applied') continue
-        const op = opList[result.opIndex]
-        if (!op) continue
-        if (op.type === 'free') {
-          if (!op.id || op.delete) continue
-          const id = op.id
-          const beforeElement = beforeById.get(id)
-          const afterElement = afterHost.getElement(id)
-          if (!beforeElement || !afterElement) continue
-          const fields = (['group', 'compute'] as const).filter(
-            (key) => JSON.stringify(beforeElement.meta?.[key]) !== JSON.stringify(afterElement.meta?.[key]),
-          )
-          if (fields.length > 0) {
-            changes.push({
-              opIndex: result.opIndex,
-              cardId: id,
-              title: ('text' in op && typeof op.text === 'string' && op.text) || id,
-              fields: [...fields],
-            })
-          }
-          continue
-        }
-        if (op.type !== 'card' || op.create || op.delete) continue
-        const id = String(op.cardId)
-        const beforeElement = beforeById.get(id)
-        const afterElement = afterHost.getElement(id)
-        if (!beforeElement || !afterElement) continue
-        // 位置变化时 layoutAnchor 只是关系求解的副产物，几何行已经说明变化；
-        // 只在“仅属性变化”时单列 layoutAnchor，避免同一行重复两条。
-        const geometryChanged =
-          beforeElement.x !== afterElement.x ||
-          beforeElement.y !== afterElement.y ||
-          beforeElement.w !== afterElement.w ||
-          beforeElement.h !== afterElement.h
-        const metaKeys = geometryChanged
-          ? (['group', 'href'] as const)
-          : (['group', 'href', 'layoutAnchor'] as const)
-        const fields = metaKeys.filter(
-          (key) => JSON.stringify(beforeElement.meta?.[key]) !== JSON.stringify(afterElement.meta?.[key]),
-        )
-        if (fields.length > 0) {
-          changes.push({
-            opIndex: result.opIndex,
-            cardId: id,
-            title: titleById.get(id) ?? service.get(op.cardId)?.title ?? t('card.untitled'),
-            fields: [...fields],
-          })
-        }
-      }
-      return changes
-    }
     const metaChanges = outcome.ok
-      ? collectMetaChanges(ops, outcome.report.opResults, before, afterHost)
+      ? collectDslMetaChanges(ops, outcome.report.opResults, before, afterHost, titleById, service, t('card.untitled'))
       : []
     return {
       ops,
@@ -561,6 +491,7 @@ export function DslDialog({
   }
 
   const apply = () => {
+    setApplyAttempted(true)
     if (!host) return
     const hostRevisionChanged = !base || revisionOf(host.getElements()) !== base.revision
     if (hostRevisionChanged || stale) {
@@ -832,6 +763,7 @@ export function DslDialog({
         value={text}
         onChange={(e) => {
           setText(e.target.value)
+          setApplyAttempted(false)
         }}
         spellCheck={false}
         aria-label={t('canvas.dslTitle')}
@@ -869,7 +801,7 @@ export function DslDialog({
         </p>
       )}
       {text.trim() !== '' && gateBlocked && (
-        <div className="dsl-errors" role="alert" data-testid="dsl-apply-blocked">
+        <div className="dsl-errors" role={applyAttempted ? 'alert' : 'status'} data-testid="dsl-apply-blocked">
           <p className="dsl-errors__title">{t('canvas.dslPreviewBlocked', { n: String(blockedOpCount) })}</p>
           {renderApplyIssues('blocked')}
         </div>
@@ -896,7 +828,7 @@ export function DslDialog({
         </div>
       )}
       {preview.errors.length > 0 && (
-        <div className="dsl-errors" role="status">
+        <div className="dsl-errors" role={applyAttempted ? 'alert' : 'status'}>
           <p className="dsl-errors__title">{t('canvas.dslErrorsTitle', { n: String(preview.errors.length) })}</p>
           <ul className="dsl-errors__list">
             {preview.errors.map((e, i) => (

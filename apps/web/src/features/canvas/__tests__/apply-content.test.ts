@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { applyLayout } from '../apply-layout'
 import { InMemoryCanvasHost } from '@cys-stift/canvas-engine'
 import { parseDsl } from '@wscytz/dsl'
+import type { CardService } from '@cys-stift/domain'
+import { makeOnCardUpdate } from '@/features/ai/agent-confirm-card'
 import type { CardCreateParams, CardUpdateContent } from '../apply-layout'
 
 /**
@@ -99,7 +101,7 @@ describe('applyLayout v5 — DSL apply 写卡片内容(@title/@content)', () => 
     expect(host.getElement('c1')).toMatchObject({ x: 50, y: 60, color: 'red' })
   })
 
-  it('v5(D): @title("") / @content("") → onCardUpdate 收到空串(清空意图)', () => {
+  it('v5(E): @title("") / @content("") → onCardUpdate 收到空串(清空意图)', () => {
     const host = new InMemoryCanvasHost()
     host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 10, h: 10, rotation: 0 })
     let updated: CardUpdateContent | undefined
@@ -108,6 +110,32 @@ describe('applyLayout v5 — DSL apply 写卡片内容(@title/@content)', () => 
       updated = p
     })
     expect(updated).toMatchObject({ cardId: 'c1', title: '', content: '' })
+  })
+
+  it('onCardUpdate 抛错 → 该 op failed,host 不写入(DB/host 不漂移)', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 80, rotation: 0 })
+    const ops = parseDsl('[card #c1] @pos(50,50) @title("New Title")')
+    const result = applyLayout(host, ops, undefined, undefined, () => {
+      throw new Error('storage full')
+    })
+    expect(result.failed).toBe(1)
+    expect(result.applied).toBe(0)
+    expect(host.getElement('c1')).toMatchObject({ x: 0, y: 0 })
+  })
+
+  it('production makeOnCardUpdate treats CardService.update() null as failed', () => {
+    const host = new InMemoryCanvasHost()
+    host.upsert({ id: 'c1', kind: 'card', x: 0, y: 0, w: 100, h: 80, rotation: 0 })
+    const service = {
+      get: () => ({ id: 'c1', title: 'Old', body: '', type: 'note', tags: [], links: [], codeSnippets: [], quotes: [] }),
+      update: () => null,
+    } as unknown as CardService
+    const ops = parseDsl('[card #c1] @pos(50,50) @title("New Title")')
+    const result = applyLayout(host, ops, undefined, undefined, makeOnCardUpdate(service))
+    expect(result.failed).toBe(1)
+    expect(result.applied).toBe(0)
+    expect(host.getElement('c1')).toMatchObject({ x: 0, y: 0 })
   })
 })
 

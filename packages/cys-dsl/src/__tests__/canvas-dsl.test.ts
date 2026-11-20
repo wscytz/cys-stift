@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { serializeCanvas, serializeCanvasReadable, serializeElement } from '../canvas-dsl.js'
+import { describe, expect, it, vi } from 'vitest'
+import { CardCollisionIndex, serializeCanvas, serializeCanvasReadable, serializeElement } from '../canvas-dsl.js'
 import { parseDsl } from '../dsl-parser.js'
 import { sanitizeDslOps } from '../dsl-sanitize.js'
 import { solveRelational } from '../dsl-relational-solver.js'
@@ -476,6 +476,20 @@ describe('serializeCanvas — layoutAnchor (v11)', () => {
     const solved = solveRelational(sanitizeDslOps(parseDsl(out)).ops)
     expect(solved.diagnostics).toEqual([])
     expect(solved.ops[2]).toMatchObject({ cardId: 'b', x: 120, y: 0 })
+  })
+
+  it('uses the spatial collision index for anchored serialization (P-06)', () => {
+    const spy = vi.spyOn(CardCollisionIndex.prototype, 'overlaps')
+    try {
+      const out = serializeCanvas([
+        card('a', 100, 100, { w: 100 }),
+        card('b', 220, 100, { w: 100, meta: { layoutAnchor: { id: 'a', dir: 'right-of', gap: 20 } } }),
+      ])
+      expect(out).toContain('[card #b] right-of #a @gap(20)')
+      expect(spy).toHaveBeenCalled()
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   it('spatial index output matches the linear fallback (P-06 optimization)', () => {

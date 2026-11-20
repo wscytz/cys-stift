@@ -5,6 +5,15 @@
 
 ---
 
+## 2026-11-20 · 未发布 · fix: 第六轮复审（AI confirm meta/content、测试与 a11y 收口）
+
+> 第六轮接手 pass5：N-16/N-17 已在仓库测试中闭合；N-10 的非阻塞残项一并收口。正式站仍为 v1.5.0。
+
+- **N-17**：AI confirm 现在把 `@title/@content` 与 `@group/@href/layoutAnchor` 等非几何变化计入 diff/`totalChanges`，仅 meta/正文的提案不再显示“无变更”，Apply 可用；与 DslDialog 共用 `dsl-change-summary` 收集器，避免两套语义漂移。
+- **N-16**：补仓库回归测试——部分失败按钮为“关闭”且不记 rejected；全失败可原地重试成功且 `onApplied` 只触发一次；N-12 merge 断言 `settingsStore.get()` 的内存 active。
+- **N-10**：解析错误/闸门面板在实时输入时用 `role=status`（polite），只有点过 Apply 后才升级 `role=alert`，避免每击键打断读屏；`onCardUpdate` 复用 `makeOnCardUpdate`，把 `CardService.update()` 的 `null`（仓储写失败）与异常都转成失败，让 `commitApplyPlan` 计 failed 且不写 host；README 补 `/canvas/?dsl=` 私密内容警告；补 `serializeCanvas` 空间索引 spy 测试（非时间阈值，避免 CI 抖动）。
+- **验证**：全包 lint 0；全量 **3374 通过 / 3 跳过**（domain 104、canvas-engine 621、db 13、cys-dsl 588/2 skip、web 2048/1 skip）；web build、`verify:pack`、`demo:approval` exit 0；`e2e:dsl-seed` 11/11；`docs:links`、`git diff --check` 0。
+
 ## 2026-11-20 · 未发布 · fix: 第五轮复审收口（导入 profile 校验）
 
 > 第五轮独立复审 N-11～N-14 已闭合；本轮补 N-15 窄边界，正式站仍为 v1.5.0。
