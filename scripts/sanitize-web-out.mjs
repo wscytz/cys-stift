@@ -18,7 +18,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const OUT = path.join(ROOT, 'apps/web/out')
+const OUT = process.env.SANITIZE_WEB_OUT
+  ? path.resolve(process.env.SANITIZE_WEB_OUT)
+  : path.join(ROOT, 'apps/web/out')
 const TEXT_EXT = new Set([
   '.js', '.mjs', '.cjs', '.html', '.htm', '.json', '.css', '.txt', '.map',
   '.svg', '.xml', '.webmanifest', '.md',
@@ -34,6 +36,11 @@ const REPLACEMENTS = [
   { re: /\/home\/[^/"'\s)]+\/(?:[^/"'\s)]+\/)*cys-stift/g, to: '.' },
   { re: /[A-Za-z]:\\Users\\[^\\"'\s)]+\\projects\\cys-stift/g, to: '.' },
   { re: /[A-Za-z]:\\(?:[^\\"'\s)]+\\)*cys-stift/g, to: '.' },
+  // Generic user-home URL prefixes: catch non-cys-stift build paths after
+  // the project-specific replacements. The build gate still rejects any
+  // bare /Users|/home path that cannot be safely rewritten.
+  { re: /file:\/\/\/Users\/[^/"'\s)]+/g, to: 'file:///app' },
+  { re: /file:\/\/\/home\/[^/"'\s)]+/g, to: 'file:///app' },
   // 其他构建机常见前缀（macOS 临时目录 / Homebrew / CI root / /tmp）；只在路径
   // 明确指向本项目时替换，避免误改合法文本。
   { re: /\/private\/var\/[^"'\s)]*\/cys-stift/g, to: '.' },
@@ -42,11 +49,12 @@ const REPLACEMENTS = [
   { re: /\/tmp\/[^/"'\s)]*\/cys-stift/g, to: '.' },
 ]
 
-const LEAK = /(\/Users\/|file:\/\/\/Users\/|[A-Za-z]:\\Users\\|[A-Za-z]:\\(?:[^\\"'\s)]+\\)*cys-stift|\/home\/[^/"'\s)]+\/.*cys-stift|file:\/\/\/[A-Za-z]:\/(?:[^/"'\s)]+\/)*cys-stift|\/private\/var\/[^"'\s)]*\/cys-stift|\/opt\/homebrew\/[^"'\s)]*\/cys-stift|\/root\/[^/"'\s)]*\/cys-stift|\/tmp\/[^/"'\s)]*\/cys-stift)/
+const LEAK = /(\/Users\/|file:\/\/\/Users\/|file:\/\/\/home\/|\/home\/[^/"'\s)]+\/|file:\/\/\/root\/|\/root\/[^/"'\s)]+\/|[A-Za-z]:\\Users\\|[A-Za-z]:\\(?:[^\\"'\s)]+\\)*cys-stift|\/home\/[^/"'\s)]+\/.*cys-stift|file:\/\/\/[A-Za-z]:\/(?:[^/"'\s)]+\/)*cys-stift|\/private\/var\/[^"'\s)]*\/cys-stift|\/opt\/homebrew\/[^"'\s)]*\/cys-stift|\/root\/[^/"'\s)]*\/cys-stift|\/tmp\/[^/"'\s)]*\/cys-stift)/
 
 let removed = 0
 let rewritten = 0
 let scanned = 0
+let binaryScanned = 0
 const rewrittenFiles = new Set()
 
 async function walk(dir) {
@@ -95,9 +103,16 @@ async function assertClean(dir) {
     }
     if (!entry.isFile()) continue
     const ext = path.extname(entry.name).toLowerCase()
-    if (!TEXT_EXT.has(ext)) continue
-    const source = await readFile(full, 'utf8')
-    if (LEAK.test(source)) leaks.push(path.relative(OUT, full))
+    const bytes = await readFile(full)
+    if (!TEXT_EXT.has(ext)) {
+      binaryScanned++
+      // Binary assets are not rewritten (changing bytes would break them), but
+      // they must not ship a build-machine path either. latin1 preserves ASCII
+      // byte sequences for the leak regex.
+      if (LEAK.test(bytes.toString('latin1'))) leaks.push(`${path.relative(OUT, full)} (binary)`)
+      continue
+    }
+    if (LEAK.test(bytes.toString('utf8'))) leaks.push(path.relative(OUT, full))
   }
   return leaks
 }
@@ -174,4 +189,4 @@ if (leaks.length > 0) {
   console.error(`✗ web export still contains build-machine home paths: ${leaks.join(', ')}`)
   process.exit(1)
 }
-console.log(`✓ web export sanitized: ${scanned} text files scanned, ${rewritten} rewritten, ${removed} scanner/OS artifacts removed`)
+console.log(`✓ web export sanitized: ${scanned} text files scanned, ${binaryScanned} binary files scanned, ${rewritten} rewritten, ${removed} scanner/OS artifacts removed`)

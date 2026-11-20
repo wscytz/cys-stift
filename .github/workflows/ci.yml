@@ -60,6 +60,9 @@ jobs:
       - name: web build (includes web typecheck)
         run: pnpm --filter web --fail-if-no-match build
 
+      - name: sanitizer fixture test
+        run: pnpm test:sanitize
+
       - name: approval demo (DSL confirm chain)
         run: pnpm demo:approval
         env:

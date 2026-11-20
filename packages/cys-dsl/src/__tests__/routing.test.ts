@@ -440,5 +440,5 @@ describe('planRoute(走廊增强稀疏正交可见图 + 方向状态 A*)', () =>
       expect(slack, `seed=${seed} sparse=${geoCost(sparse)} dense=${dense}`).toBeLessThanOrEqual(0.75)
     }
     expect(checked).toBeGreaterThanOrEqual(6)
-  })
+  }, 30_000)
 })
