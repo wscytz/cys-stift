@@ -75,19 +75,23 @@ function finalizeModernTimestampVersion(raw: Database.Database): void {
  */
 export function migrateLegacyCardTimestamps(handle: DbHandle): void {
   const { raw } = handle
-  if ((raw.pragma('user_version', { simple: true }) as number) >= SCHEMA_VERSION) return
-  const values = cardTimestampValues(raw)
-  if (values.some((value) => value >= MILLISECONDS_MIN)) {
-    throw new Error('refusing legacy-seconds migration: cards table already contains millisecond timestamps')
-  }
-  raw.transaction(() => {
+  // immediate() takes SQLite's write lock before the callback. The version and
+  // unit checks must happen under that lock: two processes can otherwise both
+  // observe v0 and the second multiplies already-converted milliseconds.
+  const migrate = raw.transaction(() => {
+    if ((raw.pragma('user_version', { simple: true }) as number) >= SCHEMA_VERSION) return
+    const values = cardTimestampValues(raw)
+    if (values.some((value) => value >= MILLISECONDS_MIN)) {
+      throw new Error('refusing legacy-seconds migration: cards table already contains millisecond timestamps')
+    }
     for (const column of CARD_TIMESTAMP_COLUMNS) {
       raw
         .prepare(`UPDATE cards SET ${column} = ${column} * 1000 WHERE ${column} IS NOT NULL AND ${column} > 0`)
         .run()
     }
     raw.pragma(`user_version = ${SCHEMA_VERSION}`)
-  })()
+  })
+  migrate.immediate()
 }
 /**
  * Push the Drizzle schema into a fresh database using raw DDL. We avoid

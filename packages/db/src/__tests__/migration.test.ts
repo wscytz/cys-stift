@@ -46,9 +46,14 @@ describe('SQLite schema migration', () => {
 
     // Default open must not guess: 1_700_000_000 is also a valid 1970 ms value.
     const reopened = createFileDb(file)
+    // A second connection opened while the file is still v0 must not scale twice.
+    const secondConnection = createFileDb(file)
     expect(reopened.raw.pragma('user_version', { simple: true })).toBe(0)
     expect(reopened.raw.prepare('SELECT captured_at FROM cards WHERE id = ?').get(card.id)).toEqual({ captured_at: seconds(before.capturedAt) })
     migrateLegacyCardTimestamps(reopened)
+    expect(() => migrateLegacyCardTimestamps(secondConnection)).not.toThrow()
+    expect(secondConnection.raw.prepare('SELECT captured_at FROM cards WHERE id = ?').get(card.id)).toEqual({ captured_at: before.capturedAt.getTime() })
+    secondConnection.raw.close()
     const after = new CardService(new SqliteCardRepository(reopened)).get(card.id)!
     expect(after.capturedAt.toISOString()).toBe(before.capturedAt.toISOString())
     expect(after.createdAt.toISOString()).toBe(before.createdAt.toISOString())
