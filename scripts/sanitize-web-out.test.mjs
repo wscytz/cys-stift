@@ -29,10 +29,12 @@ try {
   const safe = await fixture()
   await writeFile(join(safe, 'index.html'), '<a href="file:///Users/alice/not-the-project/app.js">x</a>')
   await writeFile(join(safe, 'safe.bin'), Buffer.from([0, 1, 2, 3, 255]))
+  await writeFile(join(safe, 'pdf.worker.mjs'), 'const HOME="/home/web_user";')
   const safeRun = runSanitizer(safe)
   assert.equal(safeRun.status, 0, safeRun.stderr || safeRun.stdout)
   assert.match(safeRun.stdout, /binary files scanned/)
   assert.match(safeRun.stdout, /1 rewritten/)
+  assert.equal(await readFile(join(safe, 'pdf.worker.mjs'), 'utf8'), 'const HOME="/home/web_user";')
 
   // Binary leak: the sanitizer must fail instead of publishing the bytes.
   const binaryLeak = await fixture()
@@ -41,14 +43,14 @@ try {
   assert.equal(binaryRun.status, 1, binaryRun.stdout)
   assert.match(binaryRun.stderr, /leak\.bin \(binary\)/)
 
-  // Bare home path in text is rewritten too; binary paths remain detection-only.
+  // Bare home-like paths are detection-only; never rewrite virtual paths.
   const textHome = await fixture()
   await writeFile(join(textHome, 'note.txt'), '/home/alice/secret')
   const textRun = runSanitizer(textHome)
-  assert.equal(textRun.status, 0, textRun.stderr || textRun.stdout)
-  assert.equal(await readFile(join(textHome, 'note.txt'), 'utf8'), '.')
+  assert.equal(textRun.status, 1, textRun.stdout)
+  assert.match(textRun.stderr, /note\.txt/)
 
-  console.log('PASS  sanitizer fixture: text rewrite, binary scan, bare home rewrite')
+  console.log('PASS  sanitizer fixture: URL rewrite, binary scan, virtual HOME preserved, bare home gate')
 } finally {
   await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })))
 }
