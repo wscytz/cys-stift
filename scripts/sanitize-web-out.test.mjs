@@ -3,7 +3,7 @@
 // leak gate are covered without a full Next build.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -41,14 +41,14 @@ try {
   assert.equal(binaryRun.status, 1, binaryRun.stdout)
   assert.match(binaryRun.stderr, /leak\.bin \(binary\)/)
 
-  // Bare home path in text is also a hard failure.
-  const textLeak = await fixture()
-  await writeFile(join(textLeak, 'note.txt'), '/home/alice/secret')
-  const textRun = runSanitizer(textLeak)
-  assert.equal(textRun.status, 1, textRun.stdout)
-  assert.match(textRun.stderr, /note\.txt/)
+  // Bare home path in text is rewritten too; binary paths remain detection-only.
+  const textHome = await fixture()
+  await writeFile(join(textHome, 'note.txt'), '/home/alice/secret')
+  const textRun = runSanitizer(textHome)
+  assert.equal(textRun.status, 0, textRun.stderr || textRun.stdout)
+  assert.equal(await readFile(join(textHome, 'note.txt'), 'utf8'), '.')
 
-  console.log('PASS  sanitizer fixture: text rewrite, binary scan, bare home leak gate')
+  console.log('PASS  sanitizer fixture: text rewrite, binary scan, bare home rewrite')
 } finally {
   await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })))
 }

@@ -36,11 +36,16 @@ const REPLACEMENTS = [
   { re: /\/home\/[^/"'\s)]+\/(?:[^/"'\s)]+\/)*cys-stift/g, to: '.' },
   { re: /[A-Za-z]:\\Users\\[^\\"'\s)]+\\projects\\cys-stift/g, to: '.' },
   { re: /[A-Za-z]:\\(?:[^\\"'\s)]+\\)*cys-stift/g, to: '.' },
-  // Generic user-home URL prefixes: catch non-cys-stift build paths after
-  // the project-specific replacements. The build gate still rejects any
-  // bare /Users|/home path that cannot be safely rewritten.
+  // Generic user-home URL prefixes and bare paths: catch non-cys-stift build
+  // paths after the project-specific replacements. Binary files are still
+  // detection-only; text paths are rewritten so a dependency cannot silently
+  // publish the build user's home path.
   { re: /file:\/\/\/Users\/[^/"'\s)]+/g, to: 'file:///app' },
   { re: /file:\/\/\/home\/[^/"'\s)]+/g, to: 'file:///app' },
+  { re: /\/Users\/[^/"'\s)]+(?:\/[^/"'\s)]+)*/g, to: '.' },
+  { re: /\/home\/[^/"'\s)]+(?:\/[^/"'\s)]+)*/g, to: '.' },
+  { re: /\/root\/[^/"'\s)]+(?:\/[^/"'\s)]+)*/g, to: '.' },
+  { re: /[A-Za-z]:\\Users\\[^\\"'\s)]+(?:\\[^\\"'\s)]+)*/g, to: '.' },
   // 其他构建机常见前缀（macOS 临时目录 / Homebrew / CI root / /tmp）；只在路径
   // 明确指向本项目时替换，避免误改合法文本。
   { re: /\/private\/var\/[^"'\s)]*\/cys-stift/g, to: '.' },
