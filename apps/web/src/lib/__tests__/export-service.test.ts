@@ -1127,6 +1127,48 @@ describe('importFromJson — replace / merge transaction', () => {
     expect(restored.activeProfileId).toBe('local')
   })
 
+  it('merge ignores local profiles that salvage would drop when picking effective active (N-15)', async () => {
+    const badProfile = {
+      id: 'bad',
+      name: 'Bad',
+      provider: 'openai',
+      baseUrl: 'not-a-url',
+      apiKey: '',
+      model: 'm',
+      enabled: true,
+    }
+    const localProfile = {
+      id: 'local',
+      name: 'Local',
+      provider: 'openai',
+      baseUrl: 'https://local.example/v1',
+      apiKey: '',
+      model: 'm',
+      enabled: true,
+    }
+    // raw active 缺失：salvage 会丢弃 bad，锚第一个有效 profile(local)。
+    seedStores({ settings: { profiles: [badProfile, localProfile] } })
+    const result = await mod.importFromJson(
+      minimalPayload({
+        settings: {
+          profiles: [{
+            id: 'ghost',
+            name: 'Ghost',
+            provider: 'openai',
+            baseUrl: 'https://attacker.example/v1',
+            apiKey: 'local-test-key',
+            model: 'gpt-4o-mini',
+            enabled: true,
+          }],
+        },
+      }),
+      { mode: 'merge' },
+    )
+    expect(result.ok).toBe(true)
+    const restored = JSON.parse(window.localStorage.getItem(SETTINGS_KEY)!).settings
+    expect(restored.activeProfileId).toBe('local')
+  })
+
   it('merge does not activate a dangling local active id when the backup supplies it (N-00)', async () => {
     const localProfile = {
       id: 'local',

@@ -5,6 +5,14 @@
 
 ---
 
+## 2026-11-20 · 未发布 · fix: 第五轮复审收口（导入 profile 校验）
+
+> 第五轮独立复审 N-11～N-14 已闭合；本轮补 N-15 窄边界，正式站仍为 v1.5.0。
+
+- **N-15**：`isImportableProfile` 增加 provider/baseUrl/model 安全校验，与 `salvageSettings` 的严格过滤对齐；raw 缺 `activeProfileId` 时不会把 salvage 会丢弃的坏 profile 当作有效 active。
+- **N-16/N-17**：仍为 P3 记录——N-14/重试成功的仓库测试缺口，以及 AI confirm 仅 meta/正文变化时“无变更”的既有问题；本轮不改行为。
+- **验证**：全包 lint 0；全量 3368 通过 / 3 跳过；web build、`verify:pack`、`demo:approval` exit 0；`e2e:dsl-seed` 11/11。
+
 ## 2026-11-19 · 未发布 · fix: 第四轮复审（card meta 子集 TDZ、merge effective active）
 
 > 针对第四轮独立复审的 P2/P3；预览站随后更新，正式站仍为 v1.5.0。

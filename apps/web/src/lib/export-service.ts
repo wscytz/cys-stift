@@ -8,7 +8,13 @@ import type { CanvasTemplate } from './canvas-templates'
 import type { PersistedConversationMessage } from './conversation-store'
 import type { Sample } from '@/features/ai/sample-store'
 import { redactExportSecrets, restoreDeviceProfileSecrets } from './export-redaction'
-import { isSafeMediaDataUrl, MAX_SAFE_MEDIA_BYTES } from './safe-href'
+import {
+  isSafeBaseUrl,
+  isSafeMediaDataUrl,
+  isSafeModelId,
+  isSafeProviderId,
+  MAX_SAFE_MEDIA_BYTES,
+} from './safe-href'
 import { rehydrateCards } from './db-client'
 import { rehydrateDrafts } from './draft-store'
 import { rehydrateSettings } from './settings-store'
@@ -426,10 +432,10 @@ function isImportableProfile(value: unknown): value is Record<string, unknown> {
   return (
     typeof value.id === 'string' && value.id.length > 0 &&
     typeof value.name === 'string' &&
-    typeof value.provider === 'string' &&
+    typeof value.provider === 'string' && isSafeProviderId(value.provider) &&
     typeof value.apiKey === 'string' &&
-    typeof value.baseUrl === 'string' &&
-    typeof value.model === 'string' &&
+    typeof value.baseUrl === 'string' && isSafeBaseUrl(value.baseUrl) &&
+    typeof value.model === 'string' && isSafeModelId(value.model) &&
     typeof value.enabled === 'boolean'
   )
 }
