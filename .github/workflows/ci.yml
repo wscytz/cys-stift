@@ -69,6 +69,11 @@ jobs:
         run: pnpm e2e:dsl-seed
         env:
           CHROME_PATH: /usr/bin/google-chrome
+
+      - name: visual e2e (DSL preview + meta persistence)
+        run: pnpm e2e:visual
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
   build-tauri-windows:
     runs-on: windows-latest
     steps:

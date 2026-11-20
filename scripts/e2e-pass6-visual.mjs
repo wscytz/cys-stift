@@ -187,7 +187,7 @@ try {
 
   await setDsl(page, '[card #a create] @pos(100,100) @size(200,120) @title("Card A")')
   await page.waitForFunction(
-    () => (document.querySelector('[role="dialog"]')?.textContent ?? '').match(/added\s*1|新增\s*1/i),
+    () => /(?:新增\s*1|added\s*1|1\s*added)/i.test(document.querySelector('[role="dialog"]')?.textContent ?? ''),
     { timeout: 8000 },
   )
   await clickButton(page, '[role="dialog"]', /^(apply|应用)$/)

@@ -154,8 +154,17 @@ try {
 
     await page.goto(`${origin}/canvas/?dsl=${encodeURIComponent(DSL)}`, { waitUntil: 'networkidle0' })
     await page.waitForSelector(dialog, { timeout: 15000 })
+    // Chrome on CI defaults to en-US; wait for the preview itself (not just the
+    // dialog shell) and accept both locale word orders: "新增 2" / "2 added".
+    await page.waitForFunction(
+      () => {
+        const text = document.querySelector('[role="dialog"]')?.textContent ?? ''
+        return /(?:新增\s*2|added\s*2|2\s*added)/i.test(text)
+      },
+      { timeout: 10000 },
+    )
     const previewText = (await page.$eval('[role="dialog"]', (el) => el.textContent)) ?? ''
-    check('preview reports 2 additions', /(新增\s*2|added\s*2)/i.test(previewText))
+    check('preview reports 2 additions', /(?:新增\s*2|added\s*2|2\s*added)/i.test(previewText))
     await clickButton(page, '[role="dialog"]', /^(apply|应用)$/)
     await page.waitForFunction(() => document.querySelectorAll('.canvas-a11y-outline [role="option"]').length === 2, { timeout: 10000 })
     check('seed applied on second canvas', (await objects(page)) === 2)
