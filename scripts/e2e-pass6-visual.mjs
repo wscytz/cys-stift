@@ -103,6 +103,30 @@ async function buttonDisabled(page, scopeSel, re) {
   )
 }
 
+async function openDsl(page) {
+  await page.waitForFunction(
+    () => [...document.querySelectorAll('button')].some((button) => /DSL|转义/i.test(`${button.getAttribute('aria-label') ?? ''} ${button.textContent ?? ''}`)),
+    { timeout: 15000 },
+  )
+  await page.evaluate(() => {
+    const button = [...document.querySelectorAll('button')].find((entry) => /DSL|转义/i.test(`${entry.getAttribute('aria-label') ?? ''} ${entry.textContent ?? ''}`))
+    button?.click()
+  })
+  await page.waitForSelector(dialog, { timeout: 8000 })
+}
+
+async function closeDsl(page) {
+  await page.evaluate(() => {
+    const dialog = document.querySelector('[role="dialog"]')
+    if (!dialog) return
+    const button = [...dialog.querySelectorAll('button')].find(
+      (entry) => /close|关闭/i.test(entry.getAttribute('aria-label') ?? '') || (entry.textContent ?? '').trim() === '×',
+    )
+    button?.click()
+  })
+  await page.waitForFunction((selector) => !document.querySelector(selector), { timeout: 8000 }, dialog)
+}
+
 async function dismissToasts(page) {
   await page.evaluate(() => {
     for (const toast of document.querySelectorAll('[role="alert"], [role="status"]')) {
@@ -140,18 +164,10 @@ try {
   })
 
   await page.goto(`${origin}/canvas/`, { waitUntil: 'networkidle0' })
-  await page.waitForFunction(
-    () => [...document.querySelectorAll('button')].some((button) => /DSL|转义/i.test(`${button.getAttribute('aria-label') ?? ''} ${button.textContent ?? ''}`)),
-    { timeout: 15000 },
-  )
   check('canvas renders', (await objects(page)) === 0)
   await page.screenshot({ path: path.join(shots, '01-canvas.png') })
 
-  await page.evaluate(() => {
-    const button = [...document.querySelectorAll('button')].find((entry) => /DSL|转义/i.test(`${entry.getAttribute('aria-label') ?? ''} ${entry.textContent ?? ''}`))
-    button?.click()
-  })
-  await page.waitForSelector(dialog, { timeout: 8000 })
+  await openDsl(page)
   check('DSL dialog opens from visible control', true)
 
   await setDsl(page, '[card #a] @pos(')
@@ -182,11 +198,15 @@ try {
 
   await setDsl(page, '[card #a] @group("g")')
   await page.waitForFunction(
-    () => /group|分组/i.test(document.querySelector('[role="dialog"]')?.textContent ?? ''),
+    () => [...document.querySelectorAll('.dsl-preview__changed')].some(
+      (row) => /Card A/i.test(row.textContent ?? '') && /group|分组/i.test(row.textContent ?? ''),
+    ),
     { timeout: 8000 },
   )
+  const changedRows = await page.$$eval('.dsl-preview__changed', (rows) => rows.map((row) => row.textContent ?? ''))
+  check('meta-only preview has a visible Card A @group row', changedRows.some((row) => /Card A/i.test(row) && /group|分组/i.test(row)), changedRows.join(' | '))
   const metaApplyDisabled = await buttonDisabled(page, '[role="dialog"]', /^(apply|应用)$/)
-  check('meta-only proposal is previewed and applicable', metaApplyDisabled === false)
+  check('meta-only proposal is applicable', metaApplyDisabled === false)
   await page.screenshot({ path: path.join(shots, '05-meta-preview.png') })
   await clickButton(page, '[role="dialog"]', /^(apply|应用)$/)
   await page.waitForFunction(
@@ -195,6 +215,15 @@ try {
   )
   check('meta-only proposal applies without a fake error', (await objects(page)) === 1)
   await page.screenshot({ path: path.join(shots, '06-meta-applied.png') })
+
+  // Round-trip proof: close and reopen the DSL dialog; the fresh serialization
+  // must contain the persisted @group, not merely a transient preview.
+  await closeDsl(page)
+  await openDsl(page)
+  const serialized = await page.$eval('textarea.dsl-text', (textarea) => textarea.value)
+  const cardLine = serialized.split('\n').find((line) => line.includes('[card #a]')) ?? ''
+  check('meta survives close/reopen serialization', /@group\("g"\)/.test(cardLine), cardLine)
+  await page.screenshot({ path: path.join(shots, '07-meta-reopened.png') })
 
   check('no page errors during visual flow', pageErrors.length === 0, pageErrors.join(' | '))
   await context.close()
