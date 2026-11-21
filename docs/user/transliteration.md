@@ -42,7 +42,7 @@
 
 ## 三、DSL 语法速查
 
-每行一个元素。`#id` 是元素标识(往返用),`@pos/@size/@color` 是几何与样式。当前稳定版语法是 **cys-dsl v10**(v5 加卡片内容;v6 将 freedraw 移出 DSL;v7 加语义分组 `@group` / 卡片显式引用 `@href` / 安全公式 `@compute`;v8 加卡片结构化字段 `@type` / `@tags` / `@links` / `@code` / `@quote`;v9 加组级相对锚 `right-of/below @组名` 与 `@gap`;v10 加显式删除 `[kind #id delete]`)。**已发布的稳定版 v1.6.0 随 cys-dsl v10**；v10 的显式删除是当前稳定版能力。下面速查以 v1.6.0 为准；v1.5.0 桌面版不提供删除行。
+每行一个元素。`#id` 是元素标识(往返用),`@pos/@size/@color` 是几何与样式。当前稳定版语法是 **cys-dsl v10**(v5 加卡片内容;v6 将 freedraw 移出 DSL;v7 加语义分组 `@group` / 卡片显式引用 `@href` / 安全公式 `@compute`;v8 加卡片结构化字段 `@type` / `@tags` / `@links` / `@code` / `@quote`;v9 加组级相对锚 `right-of/below @组名` 与 `@gap`;v10 加显式删除 `[kind #id delete]`)。**已发布的稳定版 v1.6.1 随 cys-dsl v10**；v10 的显式删除是当前稳定版能力。下面速查以 v1.6.1 为准；v1.5.0 桌面版不提供删除行。
 
 ```
 # 卡片:默认更新既有卡;可改几何/颜色/title/content
@@ -184,7 +184,7 @@
 - **颜色固定 6+1**:越界色回退默认,不静默变黑。
 - **vision 当前未接入**:默认只保留 `kind`(image/pdf)元数据,二进制永不外发。Settings 的 Labs 区会明确显示没有可开启的 Vision consumer;详见 [`privacy.md`](privacy.md)。
 
-### DSL coverage(v10;稳定版 v1.6.0)
+### DSL coverage(v10;稳定版 v1.6.1)
 
 | 字段 | DSL 状态 |
 |---|---|

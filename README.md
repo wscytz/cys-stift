@@ -21,7 +21,7 @@
 
 ## 下载
 
-最新版本为 [**v1.6.0**](https://github.com/wscytz/cys-stift/releases/tag/v1.6.0)(稳定版)。桌面安装包和 `SHA256SUMS.txt` 均从该 Release 页面下载。也可以直接用[网页版](https://wscytz.com/cys-stift/app/)体验(网页仅在显式部署后更新，不会自动跟随本地 main；数据留在浏览器本地)。网页版支持 `/canvas/?dsl=` 分享链接：链接只预填审核对话框，不会自动应用；URL 可能进入访问日志和浏览器历史，**不要把私密正文放进链接**，私密内容请在转义编辑器内直接粘贴。
+最新版本为 [**v1.6.1**](https://github.com/wscytz/cys-stift/releases/tag/v1.6.1)(稳定版)。桌面安装包和 `SHA256SUMS.txt` 均从该 Release 页面下载。也可以直接用[网页版](https://wscytz.com/cys-stift/app/)体验(网页仅在显式部署后更新，不会自动跟随本地 main；数据留在浏览器本地)。网页版支持 `/canvas/?dsl=` 分享链接：链接只预填审核对话框，不会自动应用；URL 可能进入访问日志和浏览器历史，**不要把私密正文放进链接**，私密内容请在转义编辑器内直接粘贴。
 
 | 平台 | 文件 | 说明 |
 |---|---|---|
@@ -31,7 +31,7 @@
 
 > iPad/iOS 不做。Windows 安装包未经 Authenticode 签名，macOS 安装包为 ad-hoc 签名且未公证，系统可能显示“未知开发者/发布者”警告；安装前请先核对 Release 中的 SHA256。
 
-`v1.6.0` 是当前稳定版:在 v1.5.0 基础上,加入 cys-dsl v10 显式删除、`?dsl=` 分享入口、AI 确认与导入/持久化加固、显式 SQLite 旧秒级迁移 API 与清洗器二进制门禁;保留全局正交走线求解器、DSL 手误提示与内核调试台。应用壳数据格式与用户设置兼容。签名/公证、实机无障碍(VoiceOver)、真实系统 200% 缩放、外部用户研究与真实 provider 配额/拒绝演练仍列为后续加固项;桌面安装器图标暂为旧一代。变更细节见 [Release notes](https://github.com/wscytz/cys-stift/releases) 与 [`docs/changelog.md`](docs/changelog.md);设计规范见 [`docs/design/swiss-editorial.md`](docs/design/swiss-editorial.md)。
+`v1.6.1` 是当前稳定版:在 v1.6.0 基础上修复关系锚点不可解时写占位坐标的问题,语言与数据格式不变;仍包含 cys-dsl v10 显式删除、`?dsl=` 分享入口、AI 确认与导入/持久化加固、显式 SQLite 旧秒级迁移 API 与清洗器二进制门禁;保留全局正交走线求解器、DSL 手误提示与内核调试台。应用壳数据格式与用户设置兼容。签名/公证、实机无障碍(VoiceOver)、真实系统 200% 缩放、外部用户研究与真实 provider 配额/拒绝演练仍列为后续加固项;桌面安装器图标暂为旧一代。变更细节见 [Release notes](https://github.com/wscytz/cys-stift/releases) 与 [`docs/changelog.md`](docs/changelog.md);设计规范见 [`docs/design/swiss-editorial.md`](docs/design/swiss-editorial.md)。
 
 ---
 
@@ -69,7 +69,7 @@
 
 ## 状态
 
-**v1.6.0** — 最新稳定版,已在 GitHub Release 发布。核心闭环、恢复事务、cys-dsl v10 与跨平台构建流水线就绪;本版加入显式删除、`?dsl=` 分享入口、AI 确认与导入/持久化加固、SQLite 旧秒级迁移 API 与清洗器二进制门禁。签名/公证、实机无障碍(VoiceOver)与真实 provider 证据继续作为后续稳定版加固工作;桌面安装器图标换代在列。
+**v1.6.1** — 最新稳定版,已在 GitHub Release 发布。核心闭环、恢复事务、cys-dsl v10 与跨平台构建流水线就绪;本版为 1.6.0 的补丁,修复关系锚点不可解时写占位坐标的问题,其余稳定面不变。签名/公证、实机无障碍(VoiceOver)与真实 provider 证据继续作为后续稳定版加固工作;桌面安装器图标换代在列。
 
 DSL 的实现与内部稳定性验证已经具备，但“普通用户是否愿意学习并重复使用”仍是待外部研究验证的产品假设；README 和展示页不会把内部测试写成用户价值结论。
 
