@@ -10,7 +10,7 @@ import { solveRelational } from '../dsl-relational-solver.js'
  * - 单遍顺序求解:rel op anchor 到同批更早 op 或 existingGeometry(已处理元素的绝对几何已知)
  * - right-of #X:x = X.x + X.w + gap;y = X.y
  * - below    #X:y = X.y + X.h + gap;x = X.x
- * - anchor 不存在 → diagnostic(op 保留占位坐标,apply 自己处理)
+ * - anchor 不存在 → diagnostic + 该行丢弃(不可应用,不写占位坐标)
  * - 默认 card 尺寸 240×120(op.w/h undefined + 非 existing 时);existing card 用其真实 w/h
  * - 纯函数,永不抛错;非 card op + 绝对 card op 引用稳定(原样返回)
  */
@@ -33,10 +33,12 @@ describe('solveRelational — relational → 绝对坐标', () => {
     expect(out[1]).toMatchObject({ relMeta: { id: 'c0', dir: 'right-of', gap: 20 } })
   })
 
-  it('anchor 缺失时不写 relMeta(避免持久化坏关系)', () => {
+  it('anchor 缺失时该行丢弃(不写 relMeta,也不留占位)', () => {
     const ops = parseDsl('[card #c1 create] below #ghost @gap(20)')
-    const { ops: out } = solveRelational(ops)
-    expect((out[0] as { relMeta?: unknown }).relMeta).toBeUndefined()
+    const { ops: out, diagnostics } = solveRelational(ops)
+    expect(out).toHaveLength(0)
+    expect(diagnostics).toHaveLength(1)
+    expect((out[0] as { relMeta?: unknown } | undefined)?.relMeta).toBeUndefined()
   })
 
   it('below 单链:c1.y = c0.y + c0.h + gap,c1.x = c0.x', () => {
@@ -71,15 +73,13 @@ describe('solveRelational — relational → 绝对坐标', () => {
     expect(out[1]).toMatchObject({ y: 140 })
   })
 
-  it('anchor 不存在 → diagnostic + op 保留(占位坐标)', () => {
+  it('anchor 不存在 → diagnostic + 该行丢弃(不可应用)', () => {
     const ops = parseDsl('[card #c1 create] right-of #ghost @gap(20) @size(100,100)')
     const { ops: out, diagnostics } = solveRelational(ops)
     expect(diagnostics).toHaveLength(1)
     expect(diagnostics[0]!.message).toMatch(/ghost/)
     expect(diagnostics[0]!.opIndex).toBe(0)
-    // op 保留(占位 0,0),apply 自己处理
-    expect(out[0]).toMatchObject({ cardId: 'c1' })
-    expect((out[0] as { rel?: unknown }).rel).toBeUndefined()
+    expect(out).toHaveLength(0)
   })
 
   it('existingGeometry 提供 anchor(画布已有 card)', () => {
@@ -234,27 +234,29 @@ describe('solveRelational — relational → 绝对坐标', () => {
     expect(c1.x).toBeGreaterThanOrEqual(c0.x + c0.w) // 清空(c0 右沿及之后)
   })
 
-  it('传递性断 anchor:c1 anchor 缺失 → c2(→c1)也得 diagnostic(链式,不静默解析到占位)', () => {
+  it('传递性断 anchor:c1 anchor 缺失 → c1/c2 都不应用,c2 得链式诊断', () => {
     const ops = parseDsl(
       '[card #c1 create] right-of #ghost @gap(20) @size(100,100)\n' +
         '[card #c2 create] right-of #c1 @gap(20) @size(100,100)',
     )
-    const { diagnostics } = solveRelational(ops)
-    // c1 直接断 + c2 链式断:两条 diagnostic(否则 c2 静默解析到占位坐标,用户无信号)
+    const { ops: out, diagnostics } = solveRelational(ops)
+    // c1 直接断 + c2 链式断:两条 diagnostic,且两行都不产出(op 丢弃)
+    expect(out).toHaveLength(0)
     expect(diagnostics).toHaveLength(2)
     expect(diagnostics[0]!.message).toContain('#c1')
     expect(diagnostics[1]!.message).toContain('#c2')
     expect(diagnostics[1]!.message).toContain('链式')
   })
 
-  it('环(c1→c2→c1):单遍天然防环,不进死循环;两员均判 broken(直接 + 链式)', () => {
+  it('环(c1→c2→c1):单遍天然防环,不进死循环;两行均不应用', () => {
     const ops = parseDsl(
       '[card #c1 create] right-of #c2 @gap(20) @size(100,100)\n' +
         '[card #c2 create] right-of #c1 @gap(20) @size(100,100)',
     )
     // c1 前向引用 c2(尚未置)→ 直接 diagnostic + broken;c2 → c1(broken)→ 链式 diagnostic。
     // 单遍 anchor 必更早 → 环天然断,无死循环(测试能返回即证终止)。
-    const { diagnostics } = solveRelational(ops)
+    const { ops: out, diagnostics } = solveRelational(ops)
+    expect(out).toHaveLength(0)
     expect(diagnostics).toHaveLength(2)
     expect(diagnostics.some((d) => d.message.includes('#c1'))).toBe(true)
     expect(diagnostics.some((d) => d.message.includes('#c2'))).toBe(true)

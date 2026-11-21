@@ -63,6 +63,8 @@ export interface SolveResult {
   ops: DslOp[]
   diagnostics: SanitizeDiagnostic[]
   anchorDependencies: ReadonlyMap<number, readonly string[]>
+  /** 输入 ops 的下标:关系不可解而整行丢弃的行(不进入 ops)。 */
+  dropped: ReadonlySet<number>
 }
 
 /**
@@ -79,6 +81,7 @@ export function solveRelational(
   const diagnostics: SanitizeDiagnostic[] = []
   const out: DslOp[] = []
   const anchorDependencies = new Map<number, readonly string[]>()
+  const dropped = new Set<number>()
 
   // seed:画布现有 card 几何(复制,不污染入参)
   const geom = new Map<string, ExistingGeom>(existingGeometry)
@@ -117,31 +120,21 @@ export function solveRelational(
       const groupAnchor = isGroup ? groupBBox(geom, op.rel.anchor, brokenAnchors) : undefined
       const anchorRect = isGroup ? groupAnchor : geom.get(op.rel.anchor)
       if (!anchorRect) {
-        // anchor 不存在(前向引用 / 幽灵 id / 组锚无成员)→ diagnostic,op 保留占位坐标
+        // anchor 不存在(前向引用 / 幽灵 id / 组锚无成员)→ diagnostic,整行不应用。
+        // 不能保留占位坐标:create 行会落在 (0,0),update 行会绕开几何检查写其他字段。
+        const chained = !isGroup && brokenAnchors.has(op.rel.anchor)
         diagnostics.push({
           opIndex: idx,
           message: isGroup
-            ? `relational card #${cardId} 的组锚 @${op.rel.anchor} 无已解成员(组不存在,或组员都在本卡之后——组锚按书写顺序解)`
-            : `relational card #${cardId} 的 anchor #${op.rel.anchor} 不存在(画布/同批更早均无)`,
+            ? `relational card #${cardId} 的组锚 @${op.rel.anchor} 无已解成员(组不存在,或组员都在本卡之后——组锚按书写顺序解;整行不应用)`
+            : chained
+              ? `relational card #${cardId} 的 anchor #${op.rel.anchor} 上游 anchor 缺失(链式,整行不应用)`
+              : `relational card #${cardId} 的 anchor #${op.rel.anchor} 不存在(画布/同批更早均无,整行不应用)`,
         })
-        // 标 broken:下游 anchor 到本卡的 rel 也会得链式 diagnostic(否则静默解析到占位)
+        // 标 broken:下游 anchor 到本卡的 rel 也按链式诊断处理
         brokenAnchors.add(cardId)
-        // 剥离 rel,保留占位 x/y(apply 自己 create/skip)
-        // v9:group 继承 —— 同批更新既有卡不带 @group 时沿用 existing 组名(与 web
-        // applyCardMeta 的"不带即保留"语义一致);空串显式清组不受影响。
-        const { rel: _rel, ...rest } = op
-        out.push({ ...rest, w, h })
-        geom.set(cardId, { x: op.x, y: op.y, w, h, group: op.group ?? exist?.group })
+        dropped.add(idx)
         continue
-      }
-      // 传递性断链:anchor 存在但本身是 broken 占位 → 本卡也判 broken + diagnostic(链式传播)
-      // (仅卡锚;组锚无 broken 概念——组内成员各自携带自己的诊断)
-      if (!isGroup && brokenAnchors.has(op.rel.anchor)) {
-        diagnostics.push({
-          opIndex: idx,
-          message: `relational card #${cardId} 的 anchor #${op.rel.anchor} 上游 anchor 缺失(链式占位,坐标可能不符预期)`,
-        })
-        brokenAnchors.add(cardId)
       }
       anchorDependencies.set(idx, groupAnchor?.memberIds ?? [op.rel.anchor])
       const gap = op.rel.gap
@@ -188,6 +181,7 @@ export function solveRelational(
     ops: validated.ops,
     diagnostics: [...diagnostics, ...validated.diagnostics],
     anchorDependencies,
+    dropped,
   }
 }
 

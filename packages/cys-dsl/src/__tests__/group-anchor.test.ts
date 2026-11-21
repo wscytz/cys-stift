@@ -108,7 +108,7 @@ describe('v9 组级相对锚 · solve', () => {
     expect(n.y).toBe(200)
   })
 
-  it('组无已解成员 → 诊断(提示顺序敏感),rel 剥离留占位', () => {
+  it('组无已解成员 → 诊断(提示顺序敏感),该行不应用', () => {
     const ops = parseDsl(
       [
         '[card #n create] right-of @ghost @gap(20)',
@@ -119,9 +119,9 @@ describe('v9 组级相对锚 · solve', () => {
     expect(diagnostics).toHaveLength(1)
     expect(diagnostics[0]!.message).toContain('@ghost')
     expect(diagnostics[0]!.message).toContain('顺序')
-    const n = card(out.find((o) => o.type === 'card' && o.cardId === 'n'))
-    expect(n.rel).toBeUndefined()
-    expect(n.x).toBe(0) // 占位坐标
+    // #n 丢弃,#g1 正常落地
+    expect(out).toHaveLength(1)
+    expect(out[0]).toMatchObject({ cardId: 'g1' })
   })
 
   it('组名与断链卡 id 同名时,组锚不误入 broken 链', () => {
@@ -191,7 +191,10 @@ describe('v9 组级相对锚 · solve', () => {
     expect(solved.diagnostics[1]!.message).toContain('组锚 @alpha 无已解成员')
     expect(solved.diagnostics[1]!.message).toContain('书写顺序')
     expect(solved.diagnostics[2]!.message).toContain('anchor #beta 上游 anchor 缺失')
-    expect(solved.ops[4]).toMatchObject({ cardId: 'resolved', x: 1130, y: 1000 })
+    // alpha / beta / dependent 三行全部丢弃;origin + resolved 落地
+    expect(solved.ops.map((operation) => operation.type === 'card' ? operation.cardId : '<non-card>')).toEqual(['origin', 'resolved'])
+    const resolved = solved.ops.find((operation) => operation.type === 'card' && operation.cardId === 'resolved')
+    expect(resolved).toMatchObject({ x: 1130, y: 1000 })
     expect(solved.ops.every((operation) => operation.type === 'card' && operation.rel === undefined)).toBe(true)
     expect(solved.ops.every((operation) => operation.type === 'card' && [operation.x, operation.y, operation.w, operation.h].every(Number.isFinite))).toBe(true)
     expect(parsed).toEqual(before)

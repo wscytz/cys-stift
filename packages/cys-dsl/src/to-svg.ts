@@ -89,8 +89,8 @@ function recordSkip(skipped: SvgSkip[], opIndex: number, op: DslOp, label: strin
   })
 }
 
-/** sanitize/solver 诊断 → 公共诊断:保留 opIndex,并用该阶段 ops 回填源行号。
- *  两个阶段的 opIndex 都指向各自阶段输出的 ops 数组;跨阶段定位请认 line。 */
+/** sanitize/solver 诊断 → 公共诊断:保留 opIndex,并用该阶段**输入** ops 回填源行号。
+ *  opIndex 指向该阶段输入数组(阶段可能丢弃 op,不能拿输出数组下标去查)。 */
 function pushStageDiagnostic(
   diagnostics: RenderDslDiagnostic[],
   stage: 'sanitize' | 'solver',
@@ -757,7 +757,7 @@ export function renderDslSvg(
   }
   const sanitized = sanitizeDslOps(parsed.ops)
   for (const diagnostic of sanitized.diagnostics) {
-    pushStageDiagnostic(diagnostics, 'sanitize', diagnostic.message, sanitized.ops, diagnostic.opIndex)
+    pushStageDiagnostic(diagnostics, 'sanitize', diagnostic.message, parsed.ops, diagnostic.opIndex)
   }
   let existingGeometry: Map<string, ExistingGeom> | undefined
   if (options.existingGeometry) {
@@ -765,7 +765,7 @@ export function renderDslSvg(
   }
   const solved = solveRelational(sanitized.ops, existingGeometry)
   for (const diagnostic of solved.diagnostics) {
-    pushStageDiagnostic(diagnostics, 'solver', diagnostic.message, solved.ops, diagnostic.opIndex)
+    pushStageDiagnostic(diagnostics, 'solver', diagnostic.message, sanitized.ops, diagnostic.opIndex)
   }
   // existingGeometry 只服务相对求解,不向下传:toSvg 是快照层,不能借它画已有元素/解析端点。
   const { existingGeometry: _existingGeometry, ...toSvgOptions } = options

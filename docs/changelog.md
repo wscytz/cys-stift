@@ -5,6 +5,15 @@
 
 ---
 
+## 2026-11-21 · 未发布 · fix: 关系锚点不可解时整行不应用
+
+> 幽灵/缺失锚点不再落占位坐标；`solveRelational` 丢弃该行并回报 `dropped`，apply 记为 skipped。
+
+- **solver**：锚点不存在（含空组锚、链式断链）产诊断后丢弃该行，不再写占位 x/y；锚到被丢行的下游 op 同样丢弃，诊断区分“不存在”与“上游缺失”。
+- **apply**：`buildApplyPlan` 按 `dropped` 集合补 skipped 项，保持 `applied + skipped + failed === total`；同批其余合法行照常提交。
+- **诊断行号**：`toSvg` 的 sanitize/solver 诊断改用阶段**输入** ops 回填 line，阶段丢弃 op 后行号不再漂移。
+- **验证**：cys-dsl 588 通过 / 2 跳过；web canvas+ai 1145 通过 / 1 跳过；dsl lint 0。回归覆盖 ghost create 不建卡、update 不改其他字段、链式/环两行全丢、空组锚丢弃。
+
 ## 2026-11-20 · 1.6.0 · release: 局部编辑收口与 DSL v10
 
 > 将 v1.5.0 之后的审查修复、DSL v10 与验收链收束为稳定版；发布产物由 stable-release 流水线生成。

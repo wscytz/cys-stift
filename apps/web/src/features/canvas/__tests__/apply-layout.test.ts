@@ -835,7 +835,7 @@ describe('applyLayout — relational card (right-of / below)', () => {
     expect(host.getElement('c1')).toMatchObject({ x: 100, y: 240 })
   })
 
-  it('relational anchor 缺失 → result.sanitizeDiagnostics 透出', () => {
+  it('relational anchor 缺失 → 诊断透出,且不建卡(不写占位坐标)', () => {
     const host = new InMemoryCanvasHost()
     const res = applyLayout(host, [
       {
@@ -849,6 +849,18 @@ describe('applyLayout — relational card (right-of / below)', () => {
     ])
     expect(res.sanitizeDiagnostics).toBeDefined()
     expect(res.sanitizeDiagnostics!.some((d) => /ghost/.test(d.message))).toBe(true)
+    expect(host.getElements()).toHaveLength(0)
+    expect(res.applied).toBe(0)
+  })
+
+  it('relational anchor 缺失时不应用该行的其他字段', () => {
+    const host = new InMemoryCanvasHost()
+    seedCard(host, 'e', 10, 20)
+    const before = host.getElement('e')
+    const res = applyLayout(host, parseDsl('[card #e] right-of #ghost @color(red)'))
+    expect(res.applied).toBe(0)
+    expect(host.getElement('e')).toMatchObject({ x: 10, y: 20 })
+    expect(host.getElement('e')?.color).toBe(before?.color)
   })
 
   it('relational DSL 文本端到端:parse → applyLayout → 落点正确', () => {

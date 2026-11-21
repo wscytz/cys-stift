@@ -182,10 +182,17 @@ export function buildApplyPlan(
     return appliedHashes?.has(hashes[opIndex]!) === true
   }
   const pendingIndices = sanitized.flatMap((_, index) => skippableByHash(index) ? [] : [index])
-  const { ops: solved, diagnostics: solveDiagnostics, anchorDependencies } = solveRelational(
+  const {
+    ops: solved,
+    diagnostics: solveDiagnostics,
+    anchorDependencies,
+    dropped: solveDropped,
+  } = solveRelational(
     pendingIndices.map((index) => sanitized[index]!),
     buildExistingGeometry(host),
   )
+  const droppedOriginal = new Set<number>()
+  for (const index of solveDropped) droppedOriginal.add(pendingIndices[index]!)
   const diagnostics = [
     ...sanitizeDiagnostics.filter(({ opIndex }) => !skippableByHash(opIndex)),
     ...solveDiagnostics.map((diagnostic) => ({ ...diagnostic, opIndex: pendingIndices[diagnostic.opIndex]! })),
@@ -193,6 +200,7 @@ export function buildApplyPlan(
   const shadow = new Map(host.getElements().map((element) => [element.id, element]))
   const items: ApplyPlanItem[] = []
   let solvedIndex = 0
+  let inputIndex = 0
 
   for (let opIndex = 0; opIndex < sanitized.length; opIndex++) {
     const hash = hashes[opIndex]!
@@ -208,8 +216,18 @@ export function buildApplyPlan(
       })
       continue
     }
+    const anchors = anchorDependencies.get(inputIndex)
+    // 关系不可解(solver 判定整行丢弃)→ 记 skipped,不计入写入;后续行照常提交。
+    if (droppedOriginal.has(opIndex)) {
+      const reason = solveDiagnostics.find((diagnostic) => diagnostic.opIndex === inputIndex)?.message
+        ?? 'relational layout is not applicable'
+      inputIndex++
+      items.push(skippedItem(opIndex, sanitized[opIndex]!, hash, reason))
+      continue
+    }
     const op = solved[solvedIndex]!
-    const anchors = anchorDependencies.get(solvedIndex++)
+    solvedIndex++
+    inputIndex++
     const item = planOp(shadow, op, opIndex, hash, anchors)
     items.push(item)
     if (item.disposition === 'ready' && item.element) {
